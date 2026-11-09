@@ -76,32 +76,37 @@ export function CardiologySection({
       defaultOpen={true}>
       
             {/* Tabs */}
+            {/* EMRCARD-FE-001 (audit 3886, round 21): the four tab buttons only
+                switch the LOCAL view — they never mutate EMR data. Disabling them
+                for signed/completed encounters locked the doctor out of the
+                read-only Echo/Labs/Risk summaries, so navigation stays enabled
+                while every clinical input inside the tabs keeps disabled={disabled}. */}
             <div className="cardiology-tabs">
                 <button
           className={`cardiology-tab ${activeTab === 'ecg' ? 'active' : ''}`}
           onClick={() => setActiveTab('ecg')}
-          disabled={disabled}>
+          aria-pressed={activeTab === 'ecg'}>
 
                     {t('misc.cs_tab_ecg')}
                 </button>
                 <button
           className={`cardiology-tab ${activeTab === 'echo' ? 'active' : ''}`}
           onClick={() => setActiveTab('echo')}
-          disabled={disabled}>
+          aria-pressed={activeTab === 'echo'}>
 
                     {t('misc.cs_tab_echo')}
                 </button>
                 <button
           className={`cardiology-tab ${activeTab === 'labs' ? 'active' : ''}`}
           onClick={() => setActiveTab('labs')}
-          disabled={disabled}>
+          aria-pressed={activeTab === 'labs'}>
 
                     {t('misc.cs_tab_labs')}
                 </button>
                 <button
           className={`cardiology-tab ${activeTab === 'risk' ? 'active' : ''}`}
           onClick={() => setActiveTab('risk')}
-          disabled={disabled}>
+          aria-pressed={activeTab === 'risk'}>
 
                     {t('misc.cs_tab_risk')}
                 </button>
@@ -280,12 +285,26 @@ export function CardiologySection({
       }
 
             {/* Risk Calculator Tab */}
+            {/* EMRSCORE-FE-001 + EMRSCORE-FE-002 (audit 3886, round 21):
+                this panel used to multiply a few linear factors (with the
+                legacy mg/dL cholesterol fed straight into a per-mmol/L
+                formula!) and present the clamped result as a «SCORE2
+                10-year risk» with fixed 5/10/20% treatment bands. That
+                number was never a SCORE2 prediction and could clinically
+                misclassify patients. The panel is now an eligibility check:
+                explicit prior-CVD / diabetes / ESC-risk-region inputs,
+                a hard 40–69 age gate, unit-explicit cholesterol (mg/dL is
+                converted with the exact 38.67 divisor for display only),
+                and an honest verdict — NO fabricated numeric risk, category
+                or drug recommendation is rendered; the eligible case points
+                to the official ESC calculator. Only input facts are
+                persisted (cardio_labs.*), never a computed "official" score. */}
             {activeTab === 'risk' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-risk-calculator">
                         <h4>{t('misc.cs_score2_title')}</h4>
                         <p className="cardiology-info">
-                            {t('misc.cs_score2_desc')}
+                            {t('misc.cs_score2_desc_v2')}
                         </p>
 
                         {/* Risk Input Fields */}
@@ -297,7 +316,7 @@ export function CardiologySection({
               disabled={disabled}
               type="number"
               placeholder="40-69" />
-            
+
                             <div className="cardiology-select-field">
                                 <label>{t('misc.cs_sex')}</label>
                                 <select
@@ -332,87 +351,136 @@ export function CardiologySection({
               type="number"
               placeholder="120-180" />
 
-                            <EMRTextField
-              label={t('misc.cs_score2_chol')}
-              value={labResults?.cholesterol_total || ''}
-              onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('cholesterol_total', e.target.value)}
+                            {/* EMRSCORE-FE-001: cholesterol for the risk panel is
+                                its OWN unit-explicit field — the legacy
+                                cardio_labs.cholesterol_total stays mg/dL for the
+                                labs tab and is never silently reinterpreted as
+                                mmol/L by the risk formula again. */}
+                            <div className="cardiology-chol-field">
+                                <EMRTextField
+              label={t('misc.cs_score2_chol_own')}
+              value={labResults?.score2_chol || ''}
+              onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('score2_chol', e.target.value)}
               disabled={disabled}
               type="number"
-              placeholder={t('misc.cs_score2_chol_ph')} />
-            
+              placeholder={labResults?.score2_chol_unit === 'mgdl' ? '150-250' : '4-8'} />
+                                <div className="cardiology-select-field">
+                                    <label>{t('misc.cs_score2_unit')}</label>
+                                    <select
+                value={labResults?.score2_chol_unit || 'mmol'}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('score2_chol_unit', e.target.value)}
+                disabled={disabled}
+                className="cardiology-select">
+                                        <option value="mmol">{t('misc.cs_unit_mmol')}</option>
+                                        <option value="mgdl">{t('misc.cs_unit_mgdl')}</option>
+                                    </select>
+                                </div>
+                                {(() => {
+                                    const cholRaw = parseFloat(labResults?.score2_chol);
+                                    if (labResults?.score2_chol_unit === 'mgdl' && Number.isFinite(cholRaw) && cholRaw > 0) {
+                                        return <p className="cardiology-chol-equiv" data-testid="score2-chol-equiv">
+                                            {t('misc.cs_score2_chol_equiv', { value: (cholRaw / 38.67).toFixed(1) })}
+                                        </p>;
+                                    }
+                                    return null;
+                                })()}
+                            </div>
+
+                            {/* EMRSCORE-FE-002: eligibility inputs — SCORE2 is
+                                validated for 40–69-year-olds WITHOUT established
+                                CVD and WITHOUT diabetes. */}
+                            <div className="cardiology-select-field">
+                                <label>{t('misc.cs_score2_prior_cvd')}</label>
+                                <select
+                value={labResults?.prior_cvd || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('prior_cvd', e.target.value)}
+                disabled={disabled}
+                className="cardiology-select">
+                                    <option value="">{t('misc.cs_select')}</option>
+                                    <option value="no">{t('common.no')}</option>
+                                    <option value="yes">{t('common.yes')}</option>
+                                </select>
+                            </div>
+                            <div className="cardiology-select-field">
+                                <label>{t('misc.cs_score2_diabetes')}</label>
+                                <select
+                value={labResults?.diabetes || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('diabetes', e.target.value)}
+                disabled={disabled}
+                className="cardiology-select">
+                                    <option value="">{t('misc.cs_select')}</option>
+                                    <option value="no">{t('common.no')}</option>
+                                    <option value="yes">{t('common.yes')}</option>
+                                </select>
+                            </div>
+                            <div className="cardiology-select-field">
+                                <label>{t('misc.cs_score2_region')}</label>
+                                <select
+                value={labResults?.risk_region || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('risk_region', e.target.value)}
+                disabled={disabled}
+                className="cardiology-select">
+                                    <option value="">{t('misc.cs_select')}</option>
+                                    <option value="low">{t('misc.cs_score2_region_low')}</option>
+                                    <option value="moderate">{t('misc.cs_score2_region_moderate')}</option>
+                                    <option value="high">{t('misc.cs_score2_region_high')}</option>
+                                    <option value="very-high">{t('misc.cs_score2_region_very_high')}</option>
+                                </select>
+                            </div>
                         </div>
 
-                        {/* Risk Calculation Result */}
-                        <div className="cardiology-risk-result">
+                        {/* Eligibility verdict — replaces the fabricated number */}
+                        <div className="cardiology-risk-result" data-testid="score2-verdict">
                             {(() => {
               const age = parseFloat(labResults?.patient_age);
               const sex = labResults?.patient_sex;
-              const smoking = labResults?.smoking === 'yes';
+              const smoking = labResults?.smoking;
               const sbp = parseFloat(labResults?.systolic_bp);
-              const cholesterol = parseFloat(labResults?.cholesterol_total);
+              const chol = parseFloat(labResults?.score2_chol);
+              const priorCvd = labResults?.prior_cvd;
+              const diabetes = labResults?.diabetes;
+              const region = labResults?.risk_region;
+              const regionLabel = (code: string) => ({
+                'low': t('misc.cs_score2_region_low'),
+                'moderate': t('misc.cs_score2_region_moderate'),
+                'high': t('misc.cs_score2_region_high'),
+                'very-high': t('misc.cs_score2_region_very_high'),
+              } as Record<string, string>)[code] || code;
 
-              // Check if all fields are filled
-              if (!age || !sex || !labResults?.smoking || !sbp || !cholesterol) {
+              // Missing or non-positive inputs → keep the fill-in placeholder
+              if (!Number.isFinite(age) || age <= 0 || !sex || !smoking
+                || !Number.isFinite(sbp) || sbp <= 0
+                || !Number.isFinite(chol) || chol <= 0
+                || !priorCvd || !diabetes) {
                 return <p className="cardiology-risk-placeholder">{t('misc.cs_fill_all_fields')}</p>;
               }
 
-              // Simplified SCORE2 calculation (ESC 2021 low-risk region approximation)
-              // Base risk depends on age and sex
-              const baseRisk = sex === 'male' ? 3 : 1.5;
-
-              // Age factor (increases exponentially with age)
-              const ageFactor = Math.pow(1.06, age - 50);
-
-              // Smoking factor
-              const smokingFactor = smoking ? 2.0 : 1.0;
-
-              // SBP factor (per 10 mmHg above 120)
-              const sbpFactor = 1 + (sbp - 120) / 10 * 0.15;
-
-              // Cholesterol factor (per 1 mmol/L above 5)
-              const cholesterolFactor = 1 + (cholesterol - 5) * 0.2;
-
-              // Calculate final risk
-              let risk = baseRisk * ageFactor * smokingFactor * sbpFactor * cholesterolFactor;
-              risk = Math.max(1, Math.min(risk, 30)); // Clamp between 1-30%
-
-              // Determine risk category
-              let category, categoryClass, recommendation;
-              if (risk < 5) {
-                category = t('misc.cs_risk_low');
-                categoryClass = 'low';
-                recommendation = t('misc.cs_rec_low');
-              } else if (risk < 10) {
-                category = t('misc.cs_risk_moderate');
-                categoryClass = 'moderate';
-                recommendation = t('misc.cs_rec_moderate');
-              } else if (risk < 20) {
-                category = t('misc.cs_risk_high');
-                categoryClass = 'high';
-                recommendation = t('misc.cs_rec_high');
-              } else {
-                category = t('misc.cs_risk_very_high');
-                categoryClass = 'very-high';
-                recommendation = t('misc.cs_rec_very_high');
+              // EMRSCORE-FE-002: region is required — the model is calibrated
+              // per ESC risk region and an uncalibrated verdict is meaningless.
+              if (!region) {
+                return <p className="cardiology-score2-notice" role="status">{t('misc.cs_score2_region_missing')}</p>;
               }
 
+              // EMRSCORE-FE-002: hard age gate — the SCORE2 cohort is 40–69.
+              if (age < 40 || age > 69) {
+                return <p className="cardiology-score2-notice" role="status">{t('misc.cs_score2_age_out')}</p>;
+              }
+
+              // EMRSCORE-FE-002: established CVD / diabetes are outside the
+              // SCORE2 population (secondary prevention / other scales).
+              if (priorCvd === 'yes' || diabetes === 'yes') {
+                return <p className="cardiology-score2-notice" role="status">{t('misc.cs_score2_high_risk_pop')}</p>;
+              }
+
+              // EMRSCORE-FE-001: eligible inputs, but NO fabricated number —
+              // the numeric SCORE2 must come from the official ESC calculator
+              // with region calibration; we only echo the unit-canonical input.
+              const cholMmol = labResults?.score2_chol_unit === 'mgdl' ? chol / 38.67 : chol;
               return (
-                <div className="cardiology-risk-display">
-                                        <div className={`cardiology-risk-score ${categoryClass}`}>
-                                            <span className="risk-value">{risk.toFixed(1)}%</span>
-                                            <span className="risk-label">{t('misc.cs_10y_risk')}</span>
-                                        </div>
-                                        <div className={`cardiology-risk-category ${categoryClass}`}>
-                                            <span className="category-name">{category} {t('misc.cs_risk_word')}</span>
-                                            <span className="category-recommendation">{recommendation}</span>
-                                        </div>
-                                        <div className="cardiology-risk-legend">
-                                            <div className="legend-item low">{'<5%'} {t('misc.cs_risk_low')}</div>
-                                            <div className="legend-item moderate">5-10% {t('misc.cs_risk_moderate')}</div>
-                                            <div className="legend-item high">10-20% {t('misc.cs_risk_high')}</div>
-                                            <div className="legend-item very-high">{'>20%'} {t('misc.cs_risk_very_high')}</div>
-                                        </div>
-                                    </div>);
+                <div className="cardiology-score2-eligible" role="status">
+                  <p>{t('misc.cs_score2_no_number', { region: regionLabel(region), chol: cholMmol.toFixed(1) })}</p>
+                </div>
+              );
 
             })()}
                         </div>

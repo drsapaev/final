@@ -72,6 +72,20 @@
     color: var(--mac-error);
 }
 
+/* EMRVITAL-FE-001 (audit 3886, round 21): explicit out-of-range feedback */
+.emr-vitals__field--invalid input {
+    border-color: var(--mac-error) !important;
+}
+
+.emr-vitals__invalid-hint {
+    position: absolute;
+    left: 0;
+    bottom: -14px;
+    font-size: 10px;
+    color: var(--mac-error);
+    white-space: nowrap;
+}
+
 /* UNITS */
 .emr-vitals__unit {
     position: absolute;
