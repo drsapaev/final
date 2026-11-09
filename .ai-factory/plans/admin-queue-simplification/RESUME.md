@@ -1,3 +1,17 @@
+## Resume — PR #3946 review fixes verified — 2026-11-09T22:52:10+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3946 remains OPEN and unmerged at code HEAD `63834695523542962f2d99d4c189ea2ef6a12841`, based on current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`.
+
+All three review findings are fixed. Hosted target run #42660993022 passed the default runtime and opt-in artifact-runtime builds. Exact-head Unified CI #42660993069 and PR Required Gate succeeded after retrying only failed jobs; the first backend attempt had one unrelated lab-report failure (`Unknown analyte code 'hgb'`) among 6,091 passes, and the retry passed without a source change. PR Review Quality Gate #42662431018 passed after the PR-body Validation fields were labeled exactly as required. The PR body now records the outcomes and skipped checks.
+
+Local focused evidence: staging guard 295 passed, API runtime Vitest 7 passed, scoped ESLint, Black, Python compilation, YAML parsing, diff checks, and local PR-body template validation passed. Local Docker/Compose is unavailable; frontend local build/type-check has the recorded shared `nitro` dependency gap and unrelated Axios mock typing errors. No staging or production services were started. GitGuardian flagged synthetic-only Compose placeholder values; no real account credentials were found in those values, and Gitleaks/Security workflows passed.
+
+T18/Tier-2 remains PARTIAL; full RQ-18 browser response-body provenance, `served_revision_verified`, remaining T18 scenarios, and the full `STAGING_VALIDATION.md` checklist are not complete. No deferral is claimed.
+
+Next exact action: validate and commit/push the current three journal-only updates to the existing PR; update the PR body to the resulting documentation commit and verify the new required checks. Then obtain the independent approval required by repository policy. The user owns merge. Continue T18 after merge in a fresh worktree from current `origin/main`.
+
+---
+
 ## Resume — PR #3946 artifact inventory CI correction — 2026-11-09T22:02:44+05:00
 
 Continue the existing #3946 code-review fix in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. Remote HEAD is `09318ded6f718d028d1ab8fa1c8f9ff38a0e371e`; new CI run #42660251143 passed default Compose/runtime build but failed artifact-runtime exact inventory because Nginx's stock `50x.html` remained. A local correction removes default docroot contents before copying the manifest-verified artifact and adds a guard test; this correction and checkpoint are not committed yet.

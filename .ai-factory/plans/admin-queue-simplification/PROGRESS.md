@@ -1,5 +1,29 @@
 # Progress — T18 final acceptance
 
+## PR #3946 — review fixes verified on exact HEAD — 2026-11-09T22:52:10+05:00
+
+PR #3946 is OPEN and unmerged at code HEAD `63834695523542962f2d99d4c189ea2ef6a12841`, based on current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`. The three review findings are fixed in the PR code: artifact API/WebSocket requests use the served origin; artifact contexts are constrained and fully inventoried; the default Compose file no longer requires `additional_contexts`.
+
+- Hosted target validation [#42660993022](https://github.com/drsapaev/final/actions/runs/42660993022): SUCCESS for default `runtime` and optional `artifact-runtime` config/build.
+- Exact-head Unified CI [#42660993069](https://github.com/drsapaev/final/actions/runs/42660993069): SUCCESS after one rerun of failed jobs. First backend attempt reported 6,091 passed and one failure in unchanged lab-report test `test_finalized_catalog_based_report_keeps_flag_snapshot_after_catalog_changes` (`Unknown analyte code 'hgb'`); retry passed without source changes. Frontend build/unit/lint/E2E, backend retry, docs, metadata, context-boundary checks, Telegram gate, quality, notifications and PR Required Gate passed.
+- PR Review Quality Gate [#42662431018](https://github.com/drsapaev/final/actions/runs/42662431018): SUCCESS after restoring required exact labels `Targeted tests or smoke run` and `Result` in the PR body. Local `scripts/check_pr_review_template.py` validation passed before updating the description.
+- DAST, Backend integration, Docker build, staging/production readiness, load, and Frontend–Backend Parity were SKIPPED by path/trigger and are not counted as passes.
+- Local focused checks recorded for code HEAD `638346955`: staging guard 295 passed; frontend runtime Vitest 7 passed; scoped ESLint, Black check, Python compilation, YAML parsing and diff checks passed. Local Docker/Compose is unavailable; local frontend type-check/build remains blocked by the shared `nitro` dependency gap and existing Axios mock typing errors.
+- GitGuardian posted a detector alert for explicit synthetic-only Compose placeholders in the build-validation workflow. They are not account credentials; the workflow only validates/configures and builds images and does not start staging. Gitleaks and the Security workflow passed.
+- No staging project, production service, deployment, or merge was performed. T18/Tier-2 remains PARTIAL; no deferral is claimed.
+
+| Work item | Status | Evidence |
+|-----------|--------|----------|
+| Review P1/P2 fixes | IMPLEMENTED / VERIFIED | Exact-origin API routing, scratch-contained artifact validation and isolated optional Compose override; inventory correction verified by hosted target build. |
+| Hosted artifact targets | PASS | Run #42660993022 succeeded for both Compose targets. |
+| Exact-head required CI | PASS AFTER RETRY | Unified #42660993069 and PR Required Gate succeeded; one initial unrelated lab-test failure did not recur on failed-job retry. |
+| PR body quality | PASS | Local template validator and Quality Gate #42662431018 passed. |
+| Tier-2 / T18 | PARTIAL | No staging run in this PR cycle; RQ-18 asset-body provenance and full `STAGING_VALIDATION.md` remain outstanding. |
+
+Next exact action: commit and push this journal-only reconciliation to PR #3946, refresh the PR body to the resulting HEAD and verify the new required checks. Then obtain the independent approval required by repository policy; merge remains user-owned. Continue the remaining T18 acceptance only after merge in a fresh worktree from current `origin/main`.
+
+---
+
 ## PR #3946 review fixes — artifact-target CI correction — 2026-11-09T22:02:44+05:00
 
 PR #3946 is OPEN and unmerged; remote HEAD is `09318ded6f718d028d1ab8fa1c8f9ff38a0e371e`. Review fixes are committed as `169d005f6`; fresh `origin/main` #3959 at `562f5e97a2ff452e6dd0810a0359e0ad41b693d0` was merged without conflict as `212348692`. Hosted run `42660251143` built the ordinary runtime target but failed artifact-runtime inventory verification because the Nginx base image contributes its stock `50x.html`. A scoped Dockerfile/test correction is local and uncommitted. No staging project or production service was started.

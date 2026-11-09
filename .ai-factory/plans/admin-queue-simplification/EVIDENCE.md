@@ -1,3 +1,28 @@
+## PR #3946 exact-head review-fix validation — 2026-11-09T22:52:10+05:00
+
+- Commit under test: code HEAD `63834695523542962f2d99d4c189ea2ef6a12841`; base/current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`. This entry records that code commit; the three journal-only checkpoint edits are being prepared separately.
+- Environment: GitHub Actions hosted runner plus isolated Windows worktree `aqs-t18-memory-safe-staging`; no staging or production service was started.
+- Execution mode: prior `gate_known_root_cause` for `frontend/Dockerfile.staging`; known root confirmed and all nine implementation/runbook paths plus T18 journals were scoped. Gate outcome was `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt was read. No new source edit was made in this checkpoint.
+- Allowed paths: the existing PR #3946 staging workflow, Dockerfile, API runtime/targeted test, staging Compose files, launcher/guard tests, staging runbook, and T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Actual changed paths in this checkpoint: only the three T18 journal files. The earlier code fix in this PR remains limited to its reviewed staging build/configuration scope.
+- Original review findings: P1 fixed API origin for customized frontend ports; P2 limits artifact path and validates exact checksummed inventory; P2 isolates Compose named-context support to the optional target. Initial hosted artifact build exposed Nginx's stock `50x.html`; Dockerfile/test correction clears the stock document root before copying the verified artifact.
+- Validation commands/results:
+  - Focused staging guard tests — PASS, 295 tests.
+  - `npm.cmd run test:run -- src/api/__tests__/runtime.test.ts` — PASS, 7 tests.
+  - Scoped ESLint, Black check, Python compilation, YAML parsing and `git diff --check` — PASS.
+  - `scripts/check_pr_review_template.py` on the revised PR body — PASS.
+  - Hosted target validation [#42660993022](https://github.com/drsapaev/final/actions/runs/42660993022) — SUCCESS; default `runtime` and optional `artifact-runtime` PR target configs/builds passed.
+  - Exact-head Unified CI [#42660993069](https://github.com/drsapaev/final/actions/runs/42660993069) — SUCCESS. Initial backend attempt: 6,091 passed and one failure in unchanged lab-report test `test_finalized_catalog_based_report_keeps_flag_snapshot_after_catalog_changes`, caused by unknown analyte code `hgb`. Only failed jobs were rerun; backend passed on retry with no source changes. Frontend E2E and all other applicable jobs passed. PR Required Gate passed.
+  - PR Review Quality Gate [#42662431018](https://github.com/drsapaev/final/actions/runs/42662431018) — SUCCESS after adding the required exact field labels to the PR body's Validation section.
+  - DAST, backend integration, Docker build, staging/production readiness, load and Frontend–Backend Parity — SKIPPED by configured path/trigger; not treated as passes.
+- Result: P1/P2 source fixes and both hosted target builds PASS; required exact-head CI PASS after retry; PR body quality PASS. The one unrelated lab-report failure was not changed and did not recur on retry.
+- Scope check: no backend/lab/clinical application code, database, auth, production, deployment, staging resources, or main checkout changed. GitGuardian flagged explicit synthetic-only Compose placeholders; no account credential was present and no staging service was started. Gitleaks and the separate Security workflow passed.
+- Remaining limitation: local Docker/Compose was unavailable; local frontend build/type-check remains unverified due to missing `nitro` in the shared dependency junction and existing Axios mock typing errors. Full T18/Tier-2 remains PARTIAL; RQ-18 response-body asset provenance and complete `STAGING_VALIDATION.md` remain outstanding; no deferral is claimed.
+- PR: [#3946](https://github.com/drsapaev/final/pull/3946), OPEN / unmerged; code HEAD `63834695523542962f2d99d4c189ea2ef6a12841`; merge remains user-owned.
+- Merge commit: none.
+
+---
+
 ## PR #3946 — artifact inventory CI correction — 2026-11-09T22:02:44+05:00
 
 - Commit under test: remote PR HEAD `09318ded6f718d028d1ab8fa1c8f9ff38a0e371e`; local correction to `frontend/Dockerfile.staging` and its guard test is uncommitted. Parent synchronized code commit `212348692` includes fix `169d005f6` and current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`.
