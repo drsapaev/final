@@ -1,14 +1,16 @@
-## PR #3946 — review-fix local validation — 2026-11-09T21:57:02+05:00
+## PR #3946 — artifact inventory CI correction — 2026-11-09T22:02:44+05:00
 
-- Commit under test: synchronized code commit `212348692` including code-fix commit `169d005f6` and current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`. The journal checkpoint is a documentation-only follow-up; no runtime or test source changed after the focused checks.
+- Commit under test: remote PR HEAD `09318ded6f718d028d1ab8fa1c8f9ff38a0e371e`; local correction to `frontend/Dockerfile.staging` and its guard test is uncommitted. Parent synchronized code commit `212348692` includes fix `169d005f6` and current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`.
 - Base synchronization: fresh `origin/main` #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0` is merged into the PR branch as `212348692`, without conflict. Incoming changes are confined to Cardiology files and remain outside the PR diff.
 - Environment: Windows isolated worktree `aqs-t18-memory-safe-staging`; Python 3.11 via `scripts/run_python.ps1`; frontend dependencies resolve through the existing shared junction. Windows Docker CLI unavailable.
 - Execution mode: `gate_known_root_cause`; known root `frontend/Dockerfile.staging`. Gate outcome recorded before editing: `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt was read. Scope stayed in PR #3946.
 - Allowed paths: `.github/workflows/staging-frontend-artifact.yml`, `frontend/Dockerfile.staging`, `frontend/src/api/runtime.ts`, `frontend/src/api/__tests__/runtime.test.ts`, `ops/compose.staging.yml`, `ops/compose.staging.artifact.yml`, `scripts/wsl_staging.py`, `scripts/tests/test_wsl_staging_guard.py`, `docs/runbooks/WSL_STAGING_SESSION.md`, and the existing T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` journals.
 - Actual changed paths: the nine implementation/runbook paths above; this evidence checkpoint and companion progress/resume notes are being updated. No other worktree files are changed.
 - Original findings: artifact JS had fixed API port 18082; build context was user-selectable without worktree containment or exact file-list validation; the default Compose service required `additional_contexts` even for the ordinary runtime target.
+- Hosted build evidence: PR run [#42660251143](https://github.com/drsapaev/final/actions/runs/42660251143) completed the base Compose config and ordinary runtime build. Artifact Compose config passed, but artifact-runtime failed the exact copied-file inventory because the Nginx base image's preinstalled `50x.html` remained in its document root. This is a harness/image-layer mismatch, not an unlisted source artifact.
+- Correction: clear existing Nginx document-root entries before copying the verified named context; add a focused guard assertion that cleanup precedes the artifact COPY.
 - Validation commands and results:
-  - `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','scripts/tests/test_wsl_staging_guard.py','-q')` on `212348692` — PASS, 295 tests.
+  - `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','scripts/tests/test_wsl_staging_guard.py','-q')` after the correction — PASS, 295 tests.
   - `npm.cmd run test:run -- src/api/__tests__/runtime.test.ts` on `212348692` — PASS, 7 tests.
   - `npm.cmd exec -- eslint src/api/runtime.ts src/api/__tests__/runtime.test.ts` — PASS.
   - `scripts/run_python.ps1 -RequireModule black -PythonArgs @('-m','black','--check','scripts/wsl_staging.py','scripts/tests/test_wsl_staging_guard.py')` — PASS.
@@ -17,10 +19,10 @@
   - `git diff --check` — PASS.
   - `npm run type-check` — FAIL / not clean: missing `nitro` through the shared dependency junction and existing Axios mock typing errors; no changed runtime file was reported as a failure in the prior run.
   - Docker/Compose config and actual target builds — NOT_RUN because the Windows Docker CLI is unavailable. Full local frontend build — NOT_RUN because `nitro` is absent from the shared dependency junction. Exact-head GitHub CI — PENDING push.
-- Result: local focused checks pass; hosted Compose build and exact-head CI have not yet run.
+- Result: local focused checks pass; the prior hosted artifact target failed as described above; exact-head CI for the correction is pending.
 - Scope check: `git status` contains only the recorded PR implementation/runbook/journal paths; production checkout, application backend, unrelated worktrees, and staging resources were untouched.
 - Remaining limitation: do not claim Docker target validation, staging validation, or completed Tier-2 until hosted target builds and remaining T18 acceptance are independently evidenced.
-- PR: [#3946](https://github.com/drsapaev/final/pull/3946), open; synchronized branch and documentation checkpoint have not yet been pushed; remote PR still points to `934f38d`.
+- PR: [#3946](https://github.com/drsapaev/final/pull/3946), open; remote HEAD `09318ded`; correction and updated evidence are not yet pushed.
 - Merge commit: none; merge remains user-owned.
 
 ## PR #3946 exact-head review readiness and stale checkpoint reconciliation — 2026-11-09T20:22:16+05:00

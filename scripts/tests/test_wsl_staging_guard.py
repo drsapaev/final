@@ -2597,6 +2597,13 @@ def test_prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance():
     )
     assert dockerfile.startswith("# syntax=docker/dockerfile:1.7\n")
     assert "FROM nginx:1.27-alpine AS artifact-runtime" in dockerfile
+    clear_default_docroot = (
+        "RUN find /usr/share/nginx/html -mindepth 1 -maxdepth 1 -exec rm -rf {} \\;"
+    )
+    assert clear_default_docroot in dockerfile
+    assert dockerfile.index(clear_default_docroot) < dockerfile.index(
+        "COPY --from=staging_artifact"
+    )
     assert "COPY --from=staging_artifact . /usr/share/nginx/html/" in dockerfile
     assert 'test "$(cat source.sha)" = "$VERCEL_GIT_COMMIT_SHA"' in dockerfile
     assert "sha256sum -c SHA256SUMS" in dockerfile
