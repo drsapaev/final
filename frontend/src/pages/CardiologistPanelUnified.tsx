@@ -553,6 +553,13 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         setBloodTests([]);
         setPatientFiles([]);
         setVisitHistory([]);
+        // RETRO-3941-01 (post-merge review of PR 3941): an open manual ECG
+        // form belongs to the patient it was opened for — close it on owner
+        // change so no typed A measurements can be submitted under B. The
+        // mount below is additionally keyed by patient+visit identity.
+        setShowForm((prev) => (prev.open && prev.type === 'ecg'
+          ? { open: false, type: 'ecg' }
+          : prev));
       }
 
       // Сохраняем ID текущего пациента
@@ -571,6 +578,11 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       setPatientFiles([]);
       setVisitHistory([]);
       setHistoryFilter('all');
+      // RETRO-3941-01: clearing the selection is an owner change too — an
+      // open ECG form must not survive it.
+      setShowForm((prev) => (prev.open && prev.type === 'ecg'
+        ? { open: false, type: 'ecg' }
+        : prev));
     }
   }, [selectedPatient, loadPatientData, authRefreshTick]);
 
@@ -1972,8 +1984,12 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
           {/* CARDIO-FE-001 (audit 3886 round 20): dedicated manual ECG form.
               The old flow reused <BloodTestsTab showFormOpen /> here, which
               rendered blood-test inputs and POSTed null ECG parameters. */}
+          {/* RETRO-3941-01: keyed by the canonical patient+visit identity so
+              a selection switch can never reuse the previous patient's
+              local form state under the new patient's props. */}
           {showForm.open && showForm.type === 'ecg' && (
             <ManualEcgForm
+              key={`manual-ecg-${((selectedPatient?.patient?.id || selectedPatient?.patient_id) ?? 'none')}-${(selectedPatient?.visit_id ?? 'none')}`}
               patientId={((selectedPatient?.patient?.id || selectedPatient?.patient_id) as string | number | null | undefined) ?? null}
               visitId={(selectedPatient?.visit_id ?? null) as string | number | null}
               onCancel={() => setShowForm({ open: false })}
