@@ -63,6 +63,10 @@ const PriceOverrideApproval = () => {
   const [priceOverrides, setPriceOverrides] = useState<PriceOverrideEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
+  // REGPRICE-BE-004 (audit #3892, group 16): полный фильтрованный total с
+  // бэкенда (X-Total-Count) — раньше клиент молча терял заявки за
+  // пределами первой 100-строчной страницы.
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedOverride, setSelectedOverride] = useState<PriceOverrideEntry | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -82,12 +86,15 @@ const PriceOverrideApproval = () => {
     try {
       // UX Audit Registrar #1: raw fetch() → fetchPriceOverrides() из api/registrar.
       // Auth/CSRF/refresh-token обрабатываются axios-interceptor'ом в api/client.js.
-      const data = await fetchPriceOverrides({ statusFilter, limit: 100 });
+      // REGPRICE-BE-004: клиент сам идёт по offset-страницам до полного total —
+      // самые старые заявки больше не выпадают из очереди молча.
+      const { items, total } = await fetchPriceOverrides({ statusFilter, limit: 100 });
       if (epoch !== loadEpochRef.current) {
         // Устаревший ответ: его фильтр уже не активен — не трогаем список.
         return;
       }
-      setPriceOverrides(data);
+      setPriceOverrides(items);
+      setTotalCount(total);
     } catch (error) {
       if (epoch !== loadEpochRef.current) {
         return;
@@ -213,6 +220,17 @@ const PriceOverrideApproval = () => {
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Обновить
           </button>
+
+          {/* REGPRICE-BE-004: полный total очереди — заявки за пределами
+              отображаемой страницы больше не невидимы для регистратора */}
+          {!loading && totalCount > priceOverrides.length && (
+            <span
+              data-testid="price-override-total"
+              className="text-sm text-gray-600 dark:text-gray-300"
+            >
+              {t('misc.poa_vsego_zaprosov')}: {totalCount}
+            </span>
+          )}
         </div>
       </div>
 
@@ -293,6 +311,14 @@ const PriceOverrideApproval = () => {
                     <DollarSign size={16} className="text-gray-400" />
                     <span className="text-lg font-medium">{formatPrice(override.original_price)}</span>
                   </div>
+                  {/* DERMAPRICE-BE-002 end-to-end (group 16 follow-up): рецензент
+                      видит ФАКТИЧЕСКУЮ цену услуги в визите на момент запроса,
+                      а не только каталожную ссылку */}
+                  {override.visit_price_before != null && (
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {t('misc.poa_tsena_v_vizite')}: {formatPrice(Number(override.visit_price_before))}
+                    </div>
+                  )}
                 </div>
                 
                 <div>

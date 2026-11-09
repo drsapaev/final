@@ -8,6 +8,10 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.repositories.derma_api_repository import DermaApiRepository
+from app.services.price_override_approval import (
+    PriceOverrideApprovalError,
+    ensure_no_pending_override_for_visit_service,
+)
 
 
 @dataclass
@@ -66,6 +70,20 @@ class DermaApiService:
                 409,
                 "Услуга не привязана к выбранному визиту",
             )
+
+        # REGPRICE-BE-003 (audit #3892, group 16): two sequential pending
+        # overrides for the same visit/service can be approved in reverse
+        # order — each approval validated against the SAME captured
+        # before-price, silently overwriting the newer intent. Creation is
+        # refused while one intent is still awaiting review.
+        try:
+            ensure_no_pending_override_for_visit_service(
+                self.repository.db,
+                visit_id=override_data.visit_id,
+                service_id=override_data.service_id,
+            )
+        except PriceOverrideApprovalError as exc:
+            raise DermaApiDomainError(exc.status_code, exc.detail) from exc
 
         doctor = self.repository.get_doctor_by_user_id(user_id)
         if not doctor:

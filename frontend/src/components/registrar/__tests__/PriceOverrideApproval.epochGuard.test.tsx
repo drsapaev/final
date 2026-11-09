@@ -94,7 +94,8 @@ describe('REG-FE-073 — stale filter response cannot overwrite the latest list'
     apiMocks.fetchPriceOverrides.mockImplementation(({ statusFilter }: { statusFilter: string }) => {
       if (statusFilter === 'pending') return pendingA.promise;
       if (statusFilter === 'approved') return approvedB.promise;
-      return Promise.resolve([]);
+      // REGPRICE-BE-004: fetchPriceOverrides теперь возвращает {items, total}.
+      return Promise.resolve({ items: [], total: 0 });
     });
 
     renderApproval(<PriceOverrideApproval />);
@@ -111,13 +112,13 @@ describe('REG-FE-073 — stale filter response cannot overwrite the latest list'
     expect(apiMocks.fetchPriceOverrides.mock.calls[1][0]).toMatchObject({ statusFilter: 'approved', limit: 100 });
 
     // Approved-ответ (B) приходит ПЕРВЫМ — список становится approved.
-    approvedB.resolve([APPROVED_ENTRY]);
+    approvedB.resolve({ items: [APPROVED_ENTRY], total: 1 });
     await waitFor(() => {
       expect(screen.getByText('SVC-APPROVED-LIST')).toBeTruthy();
     });
 
     // «Медленный» pending-ответ (A) приходит ПОСЛЕ — и обязан быть отброшен.
-    pendingA.resolve([PENDING_ENTRY]);
+    pendingA.resolve({ items: [PENDING_ENTRY], total: 1 });
     // Дать шанс перерисоваться, если бы баг жил (эпоха должна блокировать).
     await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -133,7 +134,8 @@ describe('REG-FE-073 — stale filter response cannot overwrite the latest list'
     apiMocks.fetchPriceOverrides.mockImplementation(({ statusFilter }: { statusFilter: string }) => {
       if (statusFilter === 'pending') return pendingA.promise;
       if (statusFilter === 'approved') return approvedB.promise;
-      return Promise.resolve([]);
+      // REGPRICE-BE-004: fetchPriceOverrides теперь возвращает {items, total}.
+      return Promise.resolve({ items: [], total: 0 });
     });
 
     renderApproval(<PriceOverrideApproval />);
@@ -143,7 +145,7 @@ describe('REG-FE-073 — stale filter response cannot overwrite the latest list'
     fireEvent.change(select, { target: { value: 'approved' } });
     await waitFor(() => expect(apiMocks.fetchPriceOverrides).toHaveBeenCalledTimes(2));
 
-    approvedB.resolve([APPROVED_ENTRY]);
+    approvedB.resolve({ items: [APPROVED_ENTRY], total: 1 });
     await waitFor(() => expect(screen.getByText('SVC-APPROVED-LIST')).toBeTruthy());
 
     // Теперь «старый» запрос не просто опоздал — он ПРОВАЛИЛСЯ. Его ошибка

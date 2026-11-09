@@ -65,13 +65,26 @@ class DentalApiRepository:
             .first()
         )
 
-    def list_pending_price_overrides(self, *, limit: int) -> list[DoctorPriceOverride]:
+    def list_pending_price_overrides(
+        self, *, limit: int, offset: int = 0
+    ) -> list[DoctorPriceOverride]:
+        # REGPRICE-BE-004 (audit #3892, group 16): deterministic
+        # (created_at DESC, id DESC) order so offset pagination is stable
+        # across pages even for same-second timestamps.
         return (
             self.db.query(DoctorPriceOverride)
             .filter(DoctorPriceOverride.status == "pending")
-            .order_by(DoctorPriceOverride.created_at.desc())
+            .order_by(DoctorPriceOverride.created_at.desc(), DoctorPriceOverride.id.desc())
+            .offset(offset)
             .limit(limit)
             .all()
+        )
+
+    def count_pending_price_overrides(self) -> int:
+        return (
+            self.db.query(DoctorPriceOverride)
+            .filter(DoctorPriceOverride.status == "pending")
+            .count()
         )
 
     def commit(self) -> None:

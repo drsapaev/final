@@ -9759,6 +9759,8 @@ const uzCyrl = {
     poa_vse: 'Все',
     poa_zagruzka: 'Загрузка...',
     poa_izmeneniy_tsen_ne_naydeno: 'Изменений цен не найдено',
+    poa_vsego_zaprosov: 'Навбатдаги жами сўровлар',
+    poa_tsena_v_vizite: 'Визитдаги хизмат нархи',
     // PatientPanel.jsx (pp_)
     pp_ne_udalos_zagruzit_label_obn: 'Не удалось загрузить {label}. Обновите страницу.',
     pp_zapisi: 'записи',
