@@ -6577,3 +6577,12 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Served frontend provenance: `NOT_RUN`. The test checks the page-error counter before it emits asset records, so no actual JS/CSS response hash was available. Canonical launcher still returned `served_revision_verified=false`.
 - Session result: child FAIL; canonical teardown PASS, removing the exact owned r2 project. No tracked application/test source was edited. Safe phase summary and failing test result are in the task `.scratch`; no patient payload, URL tokens or secret values are journaled.
 - Next: make a task-local copy of the E2E spec solely to record page-error class, current static phase, and script basename/line; move only the asset-hash report before the final page-error guard. Run it in a fresh synthetic project and inspect the sanitized result. Any confirmed product defect requires a new source gate before code changes.
+
+## T18 RQ-18 diagnostic retry — Preflight PASS — 2026-11-09T10:48:00+05:00
+
+- Commit under test: `6f41d13a2e84c06b0d174134b7cfecdaade1180d`; tracked app/test code unchanged from app source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Scope: untracked diagnostic copy of `rq18-permanent-qr-live.spec.ts` only. It captures page-error class, static phase label, and sanitized JS frame locations without error messages or payloads, and emits the existing actual-browser asset hash report before the existing page-error assertion. No tracked test or runtime changes.
+- Corrected local `--list` wrapper: PASS, exactly two diagnostic tests discovered and zero executed. This validates discovery only.
+- Environment: fresh owned synthetic project `clinic-aqs-t18-memory-20261109-r3`, ports 19003/18082/55443; same checked artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Canonical Preflight: PASS; Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3199 MiB; warnings empty. Runtime readiness `NOT_RUN`; no services started yet.
+- Next: canonical Start and one Session. Staging/browser behavior is not yet checked on r3.

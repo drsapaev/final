@@ -1,6 +1,6 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — T18.10 PASS; RQ-18 stopped on Admin page error — 2026-11-09T10:40:00+05:00
+## Current checkpoint — diagnostic copy prepared; fresh Preflight PASS — 2026-11-09T10:48:00+05:00
 
 - Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`.
 - Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, synchronized with latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`. The only incoming main paths were two CI workflow files; application source is unchanged.
@@ -17,9 +17,11 @@
 - Canonical Start: PASS for r2; build reserve 10 GiB, C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3201 MiB, runtime readiness PASS, no warnings.
 - Canonical Session executed both RQ-18 tests: the isolated browser-response provenance regression passed; the live Admin/QR test completed normal password→TOTP enrollment, T18.10 (`specialists`, editor return/history and protected DELETE 409), booking/resource ownership, archival and reactivation phases. It then failed its final uncaught-Admin-page-error guard at `rq18-permanent-qr-live.spec.ts:1162`; an Admin page error was observed, cause not yet identified. Overall live RQ-18 remains PARTIAL/FAIL pending diagnosis; do not interpret all completed phases as a passing test.
 - Actual browser asset hashes were not emitted because the existing spec checks `pageErrors` before calling `reportForOrigin`; therefore browser-served frontend provenance remains `NOT_RUN`. Canonical Session returned FAIL for the child test and teardown PASS, removing r2. The summary stayed sanitized; raw application payloads and credentials were not recorded.
+- Prepared an untracked diagnostic-only copy of the RQ-18 spec. It emits only error class, last static phase, and JS filename/line frames; it moves the existing browser-asset report before the same final error assertion. The original tracked test and application code are unchanged. Corrected wrapper/list validation PASS: exactly two tests discovered, zero executed in that check.
+- Fresh canonical Preflight: PASS for project `clinic-aqs-t18-memory-20261109-r3`, ports backend 19003/frontend 18082/PostgreSQL 55443; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3199 MiB, no warnings. Frontend remains on the artifact's embedded origin port 18082; runtime readiness `NOT_RUN` and no services were started by Preflight.
 - Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read.
 - Allowed tracked paths remain the seven recorded in the pre-edit checkpoint below. Denied: runtime/backend/auth, GitHub workflow, gate/router, production, deployment and foreign staging resources.
-- Next exact action: diagnose the uncaught page error using an untracked copy of the RQ-18 spec that records only error class, active static phase, and sanitized JS frame locations, and emits actual browser asset hashes before the final guard. Do not change tracked app or test code. Then use a fresh synthetic project, retain frontend port 18082 for the artifact, and run canonical Preflight → Start → one Session. If the error points to application behavior, stop and run the required source gate before proposing a fix.
+- Next exact action: run canonical Start on r3 and then one Session with the diagnostic-only spec copy. Confirm actual browser JS/CSS hashes against the 261-file artifact manifest. If the error points to application behavior, stop and run the required source gate before proposing a fix. The prior RQ-18 full test remains failed pending diagnosis; T18.10's own printed marker was PASS on the prior run.
 
 ---
 
