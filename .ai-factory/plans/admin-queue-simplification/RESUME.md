@@ -1,4 +1,4 @@
-# Current resume — diagnostic retry ready; fresh Preflight passed — 2026-11-09T10:48:00+05:00
+# Current resume — asset recorder diagnosis needed — 2026-11-09T10:41:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
 
@@ -10,11 +10,11 @@ The first canonical Session stopped before tests due to a local PowerShell/Node 
 
 The first failed session's root cause was the harness (conflicting color flags plus native stderr promotion), not the app. In the successful Playwright launch, the test itself failed specifically at its final `pageErrors !== 0` check. The actual page error has not been diagnosed.
 
-An untracked diagnostic copy is ready; it records only page-error class, active static phase, and sanitized JS frame locations, and emits actual browser JS/CSS response hashes before the same final page-error guard. The tracked test and runtime are unchanged. Its two tests were discovered with `--list` only. Canonical Preflight passed for fresh project `clinic-aqs-t18-memory-20261109-r3` on ports 19003/18082/55443; free capacity was C: 13 GiB, WSL backing D: 26 GiB, WSL memory 3199 MiB.
+The untracked diagnostic copy ran in fresh r3. T18.10 passed, but the RQ-18 test stopped in its asset recorder: 13 JS body reads returned `browser-response-body-unavailable`; the recorder threw before the final page-error guard or actual asset hashes. The one printed hash was from the synthetic probe and is not artifact evidence. Canonical teardown passed and removed r3. The original r2 page-error failure is still unresolved.
 
-Next: run canonical Start then one Session with the diagnostic copy. If the diagnostic points to application behavior, stop and run the required source gate before proposing a fix. The prior complete RQ-18 test failed at its Admin page-error guard; do not record it as PASS. T18.10 navigation and delete-guard marker passed, while browser-served asset hashes remain unverified.
+Next: adjust the task-local diagnostic copy to summarize asset-body failures rather than aborting and to instrument the exact Admin pageerror listener using only error class, phase, and JS filename/line. Then use a fresh synthetic project and canonical Preflight → Start → one Session. If any pageerror points to app behavior, run the required source gate before proposing a code fix. Keep actual browser asset provenance `NOT_RUN` until real loaded app-asset hashes match the manifest.
 
-Validation already reported: focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; corrected `--list` found exactly two RQ-18 tests. First project Start passed; wrapper stopped before tests and teardown passed. Second project Start passed; T18.10 passed; RQ-18 reached its final phase but failed the Admin page-error check; teardown passed. Diagnostic retry Preflight passed; r3 Start/Session not yet run. Do not claim staging or T18 completion yet.
+Validation already reported: focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; `--list` found exactly two RQ-18 tests. First Session was a wrapper failure and teardown passed. Second project: T18.10 passed; original RQ-18 reached its final phase but failed the page-error guard; teardown passed. Third project: diagnostic RQ-18 reached the end phase but recorder failed on 13 JS bodies before actual asset hashes or page-error guard; teardown passed. No T18 completion claim.
 
 ---
 

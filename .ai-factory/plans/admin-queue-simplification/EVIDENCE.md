@@ -6558,7 +6558,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Harness dependencies: sibling cache `C:\final\frontend\node_modules` reused through a worktree-only ignored junction after confirming matching `frontend/package-lock.json` SHA-256; Playwright 1.62.0 and its Chromium 1234 executable are present. The result was test collection only: exactly two RQ-18 cases were discovered, zero executed during `--list`.
 - Next: use a new project with fresh backend/PostgreSQL ports while retaining frontend port 18082 (the artifact embeds that origin); remove the conflicting color variable and capture Node stdout/stderr using separate redirected files so PowerShell cannot promote a warning to a harness exception. Run canonical Preflight → Start → one Session; only report results actually emitted by that run.
 
-## T18 corrected harness and fresh Preflight — 2026-11-09T10:22:00+05:00
+## T18 corrected harness and fresh Preflight — 2026-11-09T10:17:00+05:00
 
 - Commit under test: `27929062fe61eec14b53bbf8e5d2c7830595f83b`; application frontend/backend source remains the hosted artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
 - Harness correction: removed `NO_COLOR`/`FORCE_COLOR` and redirected Node stdout/stderr to separate task-local files with `Start-Process`. PowerShell parser validation PASS. Playwright test execution remains `NOT_RUN` until Session.
@@ -6567,7 +6567,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Prior exact project `clinic-aqs-t18-memory-20261109` teardown: PASS from canonical Session. The retry uses a fresh project and fresh backend/PostgreSQL ports; only the artifact-required frontend port 18082 is reused after teardown.
 - Next: canonical Start followed by one Session with the corrected wrapper. A Session result must include successful Playwright exit, T18.10 and RQ-18 completion markers, and browser-served JS/CSS hashes matching the verified 261-file manifest before those checks can be reported PASS.
 
-## T18.10 and RQ-18 current-source Session — 2026-11-09T10:40:00+05:00
+## T18.10 and RQ-18 current-source Session — 2026-11-09T10:28:17+05:00
 
 - Commit under test: `1263ac589a50a7653829a1e14efea873aa2e1b61`; runtime application source matches artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`. Hosted artifact run `42563847059`, 261/261 manifest checks were verified before startup.
 - Environment: owned synthetic project `clinic-aqs-t18-memory-20261109-r2`, Ubuntu-24.04, ports 19002/18082/55442. Fresh Preflight PASS; Start PASS with runtime readiness PASS and 3201 MiB WSL available memory. No clinical/production data used.
@@ -6578,7 +6578,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Session result: child FAIL; canonical teardown PASS, removing the exact owned r2 project. No tracked application/test source was edited. Safe phase summary and failing test result are in the task `.scratch`; no patient payload, URL tokens or secret values are journaled.
 - Next: make a task-local copy of the E2E spec solely to record page-error class, current static phase, and script basename/line; move only the asset-hash report before the final page-error guard. Run it in a fresh synthetic project and inspect the sanitized result. Any confirmed product defect requires a new source gate before code changes.
 
-## T18 RQ-18 diagnostic retry — Preflight PASS — 2026-11-09T10:48:00+05:00
+## T18 RQ-18 diagnostic retry — Preflight PASS — 2026-11-09T10:31:00+05:00
 
 - Commit under test: `6f41d13a2e84c06b0d174134b7cfecdaade1180d`; tracked app/test code unchanged from app source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
 - Scope: untracked diagnostic copy of `rq18-permanent-qr-live.spec.ts` only. It captures page-error class, static phase label, and sanitized JS frame locations without error messages or payloads, and emits the existing actual-browser asset hash report before the existing page-error assertion. No tracked test or runtime changes.
@@ -6586,3 +6586,12 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Environment: fresh owned synthetic project `clinic-aqs-t18-memory-20261109-r3`, ports 19003/18082/55443; same checked artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
 - Canonical Preflight: PASS; Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3199 MiB; warnings empty. Runtime readiness `NOT_RUN`; no services started yet.
 - Next: canonical Start and one Session. Staging/browser behavior is not yet checked on r3.
+
+## T18 RQ-18 diagnostic Session — response-body recorder failure — 2026-11-09T10:37:24+05:00
+
+- Commit under test: `d5cbe259accca49a5e02eec8b0eb9cac5ff9ce48`; frontend artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Environment: owned synthetic project `clinic-aqs-t18-memory-20261109-r3`, Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3, ports 19003/18082/55443. Exact-commit Preflight PASS (3181 MiB WSL available memory); Start PASS (3253 MiB, runtime readiness PASS, 10 GiB build reserve).
+- Execution: canonical Session ran the two RQ-18 tests. Result `1 passed, 1 failed`; `RQ18_T18_10=PASS`; lifecycle phases reached `completed`.
+- Failure: the diagnostic copy's browser-response recorder rejected before printing the actual app-asset hashes. It recorded 13 `/assets/*.js` body reads as `browser-response-body-unavailable`; the reported `1` asset belongs only to the synthetic probe in the isolated provenance test and is explicitly excluded from artifact matching. Thus actual app assets matched `0/0`; served artifact provenance remains `NOT_RUN`. The page-error guard was not reached on this diagnostic copy, so the earlier r2 page-error result remains unresolved.
+- Teardown: canonical Session result FAIL for the test command, teardown PASS; r3 project removed. No tracked source/test changes, no secrets or response contents recorded.
+- Next: on a task-local copy only, summarize recorder failures instead of throwing before the final guard and instrument the exact Admin pageerror listener to emit only error class, active static phase, and JS basename/line. Then run a fresh canonical synthetic Preflight → Start → Session. No product conclusion or source edit until the diagnostic distinguishes recorder behavior from application behavior.
