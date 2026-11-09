@@ -65,6 +65,21 @@ class DentalApiRepository:
             .first()
         )
 
+    def has_pending_override(self, *, visit_id: int, service_id: int) -> bool:
+        """REGPRICE-BE-003 (audit 3892, group 16): creation-side probe —
+        another pending override for the same visit/service must block a
+        second intent (reverse-order approval hazard)."""
+        return (
+            self.db.query(DoctorPriceOverride)
+            .filter(
+                DoctorPriceOverride.visit_id == visit_id,
+                DoctorPriceOverride.service_id == service_id,
+                DoctorPriceOverride.status == "pending",
+            )
+            .first()
+            is not None
+        )
+
     def list_pending_price_overrides(
         self, *, limit: int, offset: int = 0
     ) -> list[DoctorPriceOverride]:

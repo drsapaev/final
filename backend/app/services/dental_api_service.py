@@ -15,9 +15,9 @@ from app.models.user import User
 from app.repositories.dental_api_repository import DentalApiRepository
 from app.services.notifications import notification_sender_service
 from app.services.price_override_approval import (
+    PENDING_DUPLICATE_DETAIL,
     PriceOverrideApprovalError,
     PriceOverrideApprovalService,
-    ensure_no_pending_override_for_visit_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,11 @@ class DentalApiService:
         db: Session,
         repository: DentalApiRepository | None = None,
     ):
+        # REGPRICE-BE-002: the canonical approval service needs the SAME
+        # session for the locked transaction. The session is kept on the
+        # SERVICE itself (repository internals are off-limits to the
+        # service layer — repository-boundary test enforces this).
+        self.db = db
         self.repository = repository or DentalApiRepository(db)
 
     @staticmethod
@@ -112,15 +117,14 @@ class DentalApiService:
         # overrides for the same visit/service can be approved in reverse
         # order — each approval validated against the SAME captured
         # before-price, silently overwriting the newer intent. Creation is
-        # refused while one intent is still awaiting review.
-        try:
-            ensure_no_pending_override_for_visit_service(
-                self.repository.db,
-                visit_id=override_data.visit_id,
-                service_id=override_data.service_id,
-            )
-        except PriceOverrideApprovalError as exc:
-            raise DentalApiDomainError(exc.status_code, exc.detail) from exc
+        # refused while one intent is still awaiting review. The probe goes
+        # through the repository (session access is boundary-forbidden in
+        # this service layer).
+        if self.repository.has_pending_override(
+            visit_id=override_data.visit_id,
+            service_id=override_data.service_id,
+        ):
+            raise DentalApiDomainError(409, PENDING_DUPLICATE_DETAIL)
 
         price_override = DoctorPriceOverride(
             visit_id=override_data.visit_id,
@@ -245,10 +249,22 @@ class DentalApiService:
                 400,
                 "Действие должно быть 'approve' или 'reject'",
             )
+        # Cheap pre-validation through the repository (unit tests drive this
+        # path with fake repositories — no session available; the canonical
+        # service below is the locked SSOT for the actual transition and
+        # re-validates under the row lock).
+        existing = self.repository.get_price_override(override_id)
+        if existing is None:
+            raise DentalApiDomainError(404, "Изменение цены не найдено")
+        if action == "reject" and not (approval_data.rejection_reason or "").strip():
+            raise DentalApiDomainError(
+                400,
+                "При отклонении необходимо указать причину",
+            )
 
         try:
             price_override = PriceOverrideApprovalService(
-                self.repository.db
+                self.db
             ).process(
                 override_id=override_id,
                 action=action,

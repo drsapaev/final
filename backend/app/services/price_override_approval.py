@@ -66,6 +66,16 @@ PENDING_STATUS = "pending"
 APPROVED_STATUS = "approved"
 REJECTED_STATUS = "rejected"
 
+# REGPRICE-BE-003 (audit 3892, group 16): shared refusal text for a SECOND
+# pending override on the same visit/service. The creation-side probe itself
+# lives on the repositories (``has_pending_override``) so the dental/derma
+# services stay repository-boundary compliant — they must never touch the
+# raw session (enforced by tests/unit/test_service_repository_boundary.py).
+PENDING_DUPLICATE_DETAIL = (
+    "Для этой услуги уже есть запрос изменения цены, ожидающий "
+    "одобрения — дождитесь его обработки или отклоните дубликат."
+)
+
 
 class PriceOverrideApprovalService:
     """Single SSOT for approve/reject decisions on ``DoctorPriceOverride``."""
@@ -265,30 +275,3 @@ class PriceOverrideApprovalService:
         except Exception:
             self.db.rollback()
             raise
-
-
-def ensure_no_pending_override_for_visit_service(
-    db: Session, *, visit_id: int, service_id: int
-) -> None:
-    """REGPRICE-BE-003 (creation side): refuse a SECOND pending intent.
-
-    Two sequential pending overrides for the same visit/service can apply in
-    reverse order (each approval validated against the SAME stale
-    ``visit_price_before``), silently overwriting the newer intent. Creation
-    must fail closed while one intent is still awaiting review.
-    """
-    duplicate = (
-        db.query(DoctorPriceOverride)
-        .filter(
-            DoctorPriceOverride.visit_id == visit_id,
-            DoctorPriceOverride.service_id == service_id,
-            DoctorPriceOverride.status == PENDING_STATUS,
-        )
-        .first()
-    )
-    if duplicate is not None:
-        raise PriceOverrideApprovalError(
-            409,
-            "Для этой услуги уже есть запрос изменения цены, ожидающий "
-            f"одобрения (запрос #{duplicate.id}). Дождитесь его обработки.",
-        )

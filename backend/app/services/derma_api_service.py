@@ -9,8 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories.derma_api_repository import DermaApiRepository
 from app.services.price_override_approval import (
-    PriceOverrideApprovalError,
-    ensure_no_pending_override_for_visit_service,
+    PENDING_DUPLICATE_DETAIL,
 )
 
 
@@ -75,15 +74,13 @@ class DermaApiService:
         # overrides for the same visit/service can be approved in reverse
         # order — each approval validated against the SAME captured
         # before-price, silently overwriting the newer intent. Creation is
-        # refused while one intent is still awaiting review.
-        try:
-            ensure_no_pending_override_for_visit_service(
-                self.repository.db,
-                visit_id=override_data.visit_id,
-                service_id=override_data.service_id,
-            )
-        except PriceOverrideApprovalError as exc:
-            raise DermaApiDomainError(exc.status_code, exc.detail) from exc
+        # refused while one intent is still awaiting review. The probe goes
+        # through the repository (service layer stays session-free).
+        if self.repository.has_pending_override(
+            visit_id=override_data.visit_id,
+            service_id=override_data.service_id,
+        ):
+            raise DermaApiDomainError(409, PENDING_DUPLICATE_DETAIL)
 
         doctor = self.repository.get_doctor_by_user_id(user_id)
         if not doctor:
