@@ -1,3 +1,17 @@
+## Current resume — #3946 synced to #3955 main; local focused guard passed — 2026-11-09T18:05:31+05:00
+
+Continue the umbrella queue-simplification task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 remains OPEN / Ready for review at its last remotely confirmed HEAD `0647b705`; after local sync, current candidate is merge commit `f2e34bf184720fc3b7ae6d8be8dde4c88493820e`, based on fresh `origin/main` #3955 `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`. Push is pending; do not merge.
+
+Main #3955 changes only root `package.json` and `package-lock.json`; the existing PR diff still contains exactly the seven staging Docker/Compose, guard test, runbook and T18 journal paths. Local focused guard passed 1/282 (282 deselected); Python compilation and diff check passed. Local frontend build failed before compilation because the worktree dependency junction targets `C:\final\frontend\node_modules`, where `nitro` is missing; no install was attempted. Windows Docker CLI is absent, so Compose config was not rerun; canonical r6 Start already validated the unchanged PR Dockerfile/Compose on source `476c261f`.
+
+The sync gate used the known staging Dockerfile root and exact existing PR scope, but returned `narrow_override`, `gate_misroute=true`, `override_used=true`, with handoff required. The prompt was read. Record this as a bounded scope misroute; no code or dependency edit was made. The #3946 code review summary had no findings at `94a7c45`; later changes were journals only, but no formal approval is recorded. Recheck exact-head CI and PR state after push.
+
+T18/Tier-2 remains PARTIAL. Current-main RQ-17 staging passed 1/1 with normal Admin 2FA and Doctor/QueueResource publication; 3 browser-captured assets matched the 261-file artifact manifest and teardown was clean. The exact RQ-18 recorder still lacks 13 browser response bodies; `served_revision_verified=false`; full runbook and other required T18 checks remain incomplete. No deferral is claimed.
+
+Next: validate the three-file journal diff and scope, commit/push the sync on #3946, refresh its PR body and confirm exact-head checks. Leave merge to the user. After merge, create a fresh worktree from current `origin/main`, run the gate for the focused RQ-18 response-body recorder fix, then continue remaining T18 and `STAGING_VALIDATION.md` items.
+
+---
+
 ## Current resume — current-main RQ-17 staging and three-asset match — 2026-11-09T17:35:25+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. T00–T17 are merged. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 remains OPEN / Ready for review at HEAD `ade10c2bf4e6cc0cafc51dbde89df35a26467f13`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; merge remains user-owned.

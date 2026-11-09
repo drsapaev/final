@@ -1,3 +1,18 @@
+## PR #3946 latest-main sync and focused validation — 2026-11-09T18:05:31+05:00
+
+- Commit under test: local sync merge `f2e34bf184720fc3b7ae6d8be8dde4c88493820e`, parents `0647b705af69a33f73af951ce647570347262918` and current `origin/main` #3955 `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
+- Environment: isolated Windows worktree `aqs-t18-memory-safe-staging`; no WSL, Docker, Compose, staging, or production services were started for this sync.
+- Execution mode: `gate_known_root_cause`; known root `frontend/Dockerfile.staging`; exact scope was the seven existing PR paths. Gate returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. The scoped override relies on the user's standing authorization to continue the T18 plan within this existing staging-only PR; it does not authorize dependency edits, new PR, merge, or deploy.
+- Incoming base change: #3955 updates only root `package.json` and `package-lock.json`. No overlap with the seven-file #3946 diff. The latest-main merge completed without conflict.
+- Validation commands/results: `scripts/run_python.ps1 -PythonArgs @('-m','py_compile','scripts/tests/test_wsl_staging_guard.py')` — PASS; `scripts/run_python.ps1 -PythonArgs @('-m','pytest','scripts/tests/test_wsl_staging_guard.py','-k','prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance','-q')` — PASS, 1 passed / 282 deselected; `git diff --check origin/main...HEAD` — PASS.
+- Local build limitation: `npm.cmd run build` — FAIL before compilation because the worktree's `frontend/node_modules` junction points at `C:\final\frontend\node_modules`, where Vite's config import `nitro` is missing. No dependency installation or mutation of that shared tree was attempted. Exact-head hosted frontend build is pending after push.
+- Compose validation: `docker compose -f ops/compose.staging.yml config -q` — NOT_RUN because Windows has no `docker` command. The same PR Dockerfile/Compose artifact target was exercised by canonical r6 Preflight/Start/Session on application source #3953 `476c261f`; this base-only sync did not change those files. No new staging run was performed.
+- Actual changed tracked paths in this checkpoint: `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only; the target PR diff remains exactly its seven staging/runbook/test/T18-journal paths.
+- GitHub state before sync: PR #3946 OPEN / Ready for review at `0647b705`, based on `476c261f`, `mergeStateStatus=BEHIND`, `reviewDecision` blank. Previous applicable checks on that head passed; path-skipped backend/integration/E2E/Docker/readiness/load/DAST are not passes. Exact-head checks after pushing the new sync/journal commit remain pending.
+- T18 limitation: RQ-17 r6 passed 1/1 and three browser-observed assets matched the hosted artifact. Exact tracked RQ-18 remains incomplete after 13 browser response-body reads were unavailable; no app asset hashes were emitted and `served_revision_verified=false`. Full T18 and `STAGING_VALIDATION.md` remain PARTIAL; no deferral is claimed.
+- Scope check: only the existing PR worktree was synced. No product runtime, API, DB, auth, dependency versions, production, deployment, other worktree, or staging project changed.
+- Next: validate the three journal checkpoint, push the current-main sync inside #3946, update PR body and verify exact-head checks; user retains review/merge authority.
+
 ## PR #3946 exact HEAD and focused guard rerun — 2026-11-09T16:56:59+05:00
 
 - Commit under test: PR branch HEAD `0fa5c1426b06b5183b598227cce8fde47c2e9a94`; base/current `origin/main` #3953 `476c261f848b1d04adec36807837c981a979c8fa`.
