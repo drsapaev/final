@@ -85,6 +85,16 @@ const toEMRApiError = (err: unknown): EMRApiError => {
     return { message: String(err) };
 };
 
+/** RETRO-3930-01 follow-up 2 (Codex review on round 22): a shared cache
+ * promise may resolve with a NON-RECORD outcome marker — { stale: true } for
+ * a request dropped by a visit switch, or { accessDenied, ... } for a denied
+ * one. Those outcomes belong to the subscriber that started the request; a
+ * subscriber that JOINS the cached promise must only ever dispatch a real
+ * EMR record, never a marker (which would load an empty clinical document
+ * and clear the current dirty flag and undo history). */
+const isEmrRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value && typeof value === 'object' && (value as Record<string, unknown>).data);
+
 /**
  * useEMR Hook
  *
@@ -194,16 +204,20 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             if (cachedEntry?.promise) {
                 // audit/phase-final, BS-18: dispatch to this instance when promise resolves.
                 cachedEntry.promise.then((result: unknown) => {
-                    if (result && !forceRefresh && stillCurrentVisit()) {
-                        dispatch(emrActions.load(result as Record<string, unknown>));
+                    // Codex follow-up 2: validate the shared result — a
+                    // dropped/denied original request resolves with a
+                    // non-record marker that must never be dispatched as a
+                    // loaded EMR.
+                    if (isEmrRecord(result) && !forceRefresh && stillCurrentVisit()) {
+                        dispatch(emrActions.load(result));
                     }
                 }).catch(() => {});
                 return cachedEntry.promise;
             }
         } else if (cachedEntry?.promise) {
             cachedEntry.promise.then((result: unknown) => {
-                if (result && stillCurrentVisit()) {
-                    dispatch(emrActions.load(result as Record<string, unknown>));
+                if (isEmrRecord(result) && stillCurrentVisit()) {
+                    dispatch(emrActions.load(result));
                 }
             }).catch(() => {});
             return cachedEntry.promise;

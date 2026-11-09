@@ -224,4 +224,49 @@ describe('RETRO-3930-01: late failures of the previous visit cannot lock or erro
         expect(utils.result.current.data.complaints).toBe('unsaved B edit');
         expect(utils.result.current.error).toBeFalsy();
     });
+
+    it('a shared cached promise resolved with a stale marker never loads an empty document (Codex follow-up 2)', async () => {
+        // Visit A mounts with a hanging GET; its load promise is cached.
+        const gateA = deferred<{ status: number; data: unknown }>();
+        apiClientMock.get.mockImplementationOnce(() => gateA.promise);
+        const utils = renderHook((props: { visitId: number }) => useEMR(props.visitId, { specialty: 'therapy' }), {
+            initialProps: { visitId: 95 },
+        });
+
+        // The doctor leaves to visit B (loads fine)…
+        apiClientMock.get.mockResolvedValueOnce({ status: 200, data: serverEmr(96) });
+        act(() => {
+            utils.rerender({ visitId: 96 });
+        });
+        await waitFor(() => {
+            expect(utils.result.current.data.complaints).toBe('visit-96 text');
+        });
+
+        // …and returns to visit A BEFORE the pending GET fails: the new
+        // load joins the module-global cached promise (no second GET for A).
+        act(() => {
+            utils.rerender({ visitId: 95 });
+        });
+        act(() => {
+            utils.result.current.setField('complaints', 'unsaved A edit');
+        });
+        expect(utils.result.current.isDirty).toBe(true);
+        const getCallsForA = apiClientMock.get.mock.calls.filter((c) => String(c[0]).includes('/95')).length;
+
+        // A's original GET finally fails — the ORIGINAL subscriber's load is
+        // dropped as stale, so the shared promise resolves { stale: true }.
+        await act(async () => {
+            gateA.reject({ response: { status: 500, data: { detail: 'boom' } } });
+            await flush();
+        });
+
+        // The joining subscriber must NOT dispatch the marker as a loaded
+        // EMR: no empty document, no cleared dirty flag, no phantom record.
+        expect(apiClientMock.get.mock.calls.filter((c) => String(c[0]).includes('/95')).length)
+            .toBe(getCallsForA);
+        expect(utils.result.current.emr).toBeNull();
+        expect(utils.result.current.isDirty).toBe(true);
+        expect(utils.result.current.data.complaints).toBe('unsaved A edit');
+        expect(utils.result.current.error).toBeFalsy();
+    });
 });
