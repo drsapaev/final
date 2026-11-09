@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 import app.api.v1.endpoints.patient_portal as patient_portal
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, Schedule
-from app.models.department import Department
+from app.models.department import Department, DepartmentService
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.patient_access_audit import PatientAccessAuditLog
@@ -555,6 +555,128 @@ def test_confirmed_public_booking_rejects_an_occupied_time(
     assert response.status_code == 409, response.text
     assert response.json()["detail"]["code"] == "booking_time_unavailable"
     assert db_session.query(Appointment).count() == 1
+    assert db_session.query(PublicBookingRequest).count() == 0
+
+
+@pytest.mark.integration
+def test_confirmed_public_booking_enforces_five_active_future_appointments(
+    client: TestClient,
+    db_session: Session,
+    public_booking_case,
+):
+    case = public_booking_case
+    version = _enable_confirmed_mode(db_session)
+    now = datetime.now(UTC) - timedelta(days=1)
+    db_session.add_all(
+        [
+            Appointment(
+                patient_id=case["patient"].id,
+                doctor_id=case["doctor_id"],
+                department_id=case["department_id"],
+                appointment_date=case["date"] + timedelta(days=offset),
+                appointment_time="09:00",
+                duration_minutes_snapshot=20,
+                status="scheduled",
+                created_at=now,
+            )
+            for offset in range(5)
+        ]
+    )
+    db_session.commit()
+
+    response = client.post(
+        PATIENT_CONFIRMED_APPOINTMENTS,
+        headers={**case["patient_headers"], "Idempotency-Key": uuid4().hex},
+        json={**_create_body(case), "expected_settings_version": version},
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "booking_active_appointment_limit"
+    assert db_session.query(Appointment).count() == 5
+    assert db_session.query(PublicBookingRequest).count() == 0
+
+
+@pytest.mark.integration
+def test_confirmed_public_booking_shares_the_per_patient_creation_rate_limit(
+    client: TestClient,
+    db_session: Session,
+    public_booking_case,
+):
+    case = public_booking_case
+    for hour in ("09:00", "09:20", "09:40", "10:00"):
+        request_response = client.post(
+            PATIENT_REQUESTS,
+            headers={
+                **case["patient_headers"],
+                "Idempotency-Key": uuid4().hex,
+            },
+            json=_create_body(case, hour=hour),
+        )
+        assert request_response.status_code == 201, request_response.text
+
+    now = datetime.now(UTC)
+    db_session.add(
+        Appointment(
+            patient_id=case["patient"].id,
+            doctor_id=case["doctor_id"],
+            department_id=case["department_id"],
+            appointment_date=case["date"],
+            appointment_time="10:20",
+            duration_minutes_snapshot=20,
+            status="cancelled",
+            created_at=now,
+        )
+    )
+    db_session.commit()
+    version = _enable_confirmed_mode(db_session)
+
+    response = client.post(
+        PATIENT_CONFIRMED_APPOINTMENTS,
+        headers={**case["patient_headers"], "Idempotency-Key": uuid4().hex},
+        json={**_create_body(case), "expected_settings_version": version},
+    )
+
+    assert response.status_code == 429, response.text
+    assert response.json()["detail"]["code"] == "booking_request_rate_limited"
+    assert response.headers["retry-after"] == "60"
+    assert db_session.query(Appointment).count() == 1
+    assert db_session.query(PublicBookingRequest).count() == 4
+
+
+@pytest.mark.integration
+def test_confirmed_public_booking_rejects_service_bound_to_another_department(
+    client: TestClient,
+    db_session: Session,
+    public_booking_case,
+):
+    case = public_booking_case
+    version = _enable_confirmed_mode(db_session)
+    other_department = Department(
+        key=f"public-request-other-{uuid4().hex[:12]}",
+        name_ru="Другое отделение",
+        name_uz="Boshqa bo'lim",
+        active=True,
+    )
+    db_session.add(other_department)
+    db_session.flush()
+    db_session.add(
+        DepartmentService(
+            service_id=case["service"].id,
+            department_id=other_department.id,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        PATIENT_CONFIRMED_APPOINTMENTS,
+        headers={**case["patient_headers"], "Idempotency-Key": uuid4().hex},
+        json={**_create_body(case), "expected_settings_version": version},
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "public_booking_unavailable"
+    assert response.json()["detail"]["code"] != "booking_time_unavailable"
+    assert db_session.query(Appointment).count() == 0
     assert db_session.query(PublicBookingRequest).count() == 0
 
 
@@ -1290,6 +1412,10 @@ def test_public_booking_request_openapi_routes_and_idempotency_contract(
         "application/json"
     ]["schema"]["$ref"]
     assert confirmed_schema.endswith("PatientConfirmedPublicBookingOut")
+    assert "429" in confirmed_create["responses"]
+    assert confirmed_create["responses"]["429"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("PublicBookingRequestErrorOut")
     assert resubmit["operationId"] == "patient_resubmit_public_booking_request"
     assert staff_list["operationId"] == "staff_list_public_booking_requests"
     assert confirm["operationId"] == "staff_confirm_public_booking_request"
@@ -1312,6 +1438,7 @@ def test_public_booking_request_openapi_routes_and_idempotency_contract(
     assert {
         "booking_request_duplicate",
         "booking_request_rate_limited",
+        "booking_active_appointment_limit",
         "booking_request_unavailable",
     } <= error_codes
     not_found_schema = create["responses"]["404"]["content"]["application/json"][

@@ -174,6 +174,24 @@ describe('PatientBookingPage', () => {
     expect(screen.getByText(/Врач Один/)).toBeInTheDocument();
   });
 
+  it('explains the five future appointment limit returned by the server', async () => {
+    mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'confirmed_appointment' } as never);
+    mockedCreateAppointment.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 409,
+        data: { detail: { code: 'booking_active_appointment_limit' } },
+      },
+    });
+    renderPage();
+    await chooseSlot();
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить запись' }));
+
+    expect(await screen.findByText(/5 активных записей на будущие даты/i)).toBeInTheDocument();
+    expect(mockedCreateAppointment).toHaveBeenCalledTimes(1);
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+
   it('requires explicit acknowledgement before switching from request to confirmed appointment mode', async () => {
     renderPage();
     await chooseSlot();

@@ -625,6 +625,16 @@
             },
             "description": "Conflict"
           },
+          "429": {
+            "description": "The patient has reached the public booking creation limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            }
+          },
           "503": {
             "content": {
               "application/json": {
@@ -106186,6 +106196,7 @@
               "booking_request_idempotency_conflict",
               "booking_request_duplicate",
               "booking_request_rate_limited",
+              "booking_active_appointment_limit",
               "booking_request_unavailable"
             ],
             "title": "Code"

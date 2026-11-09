@@ -36826,7 +36826,7 @@ export type components = {
              * Code
              * @enum {string}
              */
-            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict" | "booking_request_duplicate" | "booking_request_rate_limited" | "booking_request_unavailable";
+            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict" | "booking_request_duplicate" | "booking_request_rate_limited" | "booking_active_appointment_limit" | "booking_request_unavailable";
         };
         /** PublicBookingRequestErrorOut */
         PublicBookingRequestErrorOut: {
@@ -44683,6 +44683,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The patient has reached the public booking creation limit. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
                 };
             };
             /** @description Service Unavailable */

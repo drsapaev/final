@@ -69,6 +69,7 @@ type Copy = {
   slotExpired: string;
   duplicate: string;
   rateLimited: string;
+  activeAppointmentLimit: string;
   profileRequired: string;
   requestUnknown: string;
   requestFailed: string;
@@ -124,6 +125,7 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     slotExpired: 'Выбранное время уже недоступно. Выберите другое время.',
     duplicate: 'У вас уже есть активная заявка на эти услугу, врача и время. Новая заявка не создана; свяжитесь с регистратором, если нужна помощь.',
     rateLimited: 'Слишком много заявок за короткое время. Подождите и попробуйте позже.',
+    activeAppointmentLimit: 'У вас уже есть 5 активных записей на будущие даты. Свяжитесь с регистратором, если нужна помощь.',
     profileRequired: 'Для онлайн-заявки нужна собственная карточка пациента в клинике. Обратитесь к регистратору, чтобы проверить или активировать её.',
     requestUnknown: 'Не удалось подтвердить результат отправки. Чтобы избежать дубликата, повтор можно выполнить только для той же заявки.',
     requestFailed: 'Не удалось безопасно проверить заявку. Не отправляйте её повторно; свяжитесь с регистратором.',
@@ -177,6 +179,7 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     slotExpired: 'Tanlangan vaqt endi mavjud emas. Boshqa vaqtni tanlang.',
     duplicate: 'Bu xizmat, shifokor va vaqt uchun faol so‘rovingiz bor. Yangi so‘rov yaratilmadi; yordam uchun registratorga murojaat qiling.',
     rateLimited: 'Qisqa vaqt ichida juda ko‘p so‘rov yuborildi. Biroz kutib, keyinroq urinib ko‘ring.',
+    activeAppointmentLimit: 'Sizda kelajak sanalar uchun 5 ta faol qabul yozuvi bor. Yordam uchun registrator bilan bog‘laning.',
     profileRequired: 'Onlayn so‘rov uchun klinikada o‘zingizning bemor kartangiz bo‘lishi kerak. Uni tekshirish yoki faollashtirish uchun registratorga murojaat qiling.',
     requestUnknown: 'Yuborish natijasini tasdiqlab bo‘lmadi. Takroriy so‘rovni oldini olish uchun faqat ayni so‘rovni qayta tekshirish mumkin.',
     requestFailed: 'So‘rovni xavfsiz tekshirib bo‘lmadi. Uni qayta yubormang; registrator bilan bog‘laning.',
@@ -289,6 +292,7 @@ function getErrorMessage(code: string | null, copy: Copy): string {
     case 'booking_mode_changed': return copy.policyChanged;
     case 'booking_request_duplicate': return copy.duplicate;
     case 'booking_request_rate_limited': return copy.rateLimited;
+    case 'booking_active_appointment_limit': return copy.activeAppointmentLimit;
     case 'patient_profile_required': return copy.profileRequired;
     case 'booking_request_idempotency_conflict': return copy.requestFailed;
     default: return copy.optionsError;

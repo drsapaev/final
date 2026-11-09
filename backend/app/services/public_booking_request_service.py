@@ -42,12 +42,17 @@ from app.schemas.public_booking_settings import (
 from app.services.appointment_booking_routing import (
     resolve_doctor_routing_department,
 )
+from app.services.appointment_duration_snapshot import (
+    InvalidServiceSelection,
+    resolve_exact_service_selection,
+)
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import (
     lock_department_for_booking,
     lock_doctor_for_slot_reservation,
 )
 from app.services.public_booking_availability_service import (
+    PUBLIC_BOOKING_TIMEZONE,
     PublicBookingAvailabilityService,
 )
 from app.services.public_booking_calendar_settings import (
@@ -65,6 +70,7 @@ from app.services.registrar_doctor_eligibility import (
 
 REQUEST_CREATION_LIMIT_PER_PATIENT = 5
 REQUEST_CREATION_WINDOW = timedelta(minutes=1)
+ACTIVE_FUTURE_APPOINTMENT_LIMIT_PER_PATIENT = 5
 
 
 class PublicBookingRequestError(Exception):
@@ -136,6 +142,7 @@ class PublicBookingRequestService:
         if replay is not None:
             return self._patient_out(replay)
         self._require_request_settings(settings, expected_settings_version)
+        self._lock_patient_for_booking(patient_id)
         self._require_request_creation_limit(patient_id)
         service_id, doctor_id = self._validate_slot(
             settings=settings,
@@ -222,6 +229,10 @@ class PublicBookingRequestService:
         if settings.mode != PublicBookingMode.CONFIRMED_APPOINTMENT:
             raise PublicBookingRequestError(409, "booking_mode_changed")
 
+        self._lock_patient_for_booking(patient_id)
+        self._require_request_creation_limit(patient_id)
+        self._require_active_future_appointment_limit(patient_id)
+
         self.repository.lock_settings(
             f"{PUBLIC_BOOKING_CALENDAR_KEY_PREFIX}{appointment_date.year:04d}"
         )
@@ -261,6 +272,7 @@ class PublicBookingRequestService:
             doctor_slug=doctor_slug,
             appointment_date=appointment_date,
             appointment_time=appointment_time,
+            department_id=department.id,
         )
         if (locked_service_id, locked_doctor_id) != (service_id, doctor_id):
             raise PublicBookingRequestError(409, "public_booking_unavailable")
@@ -283,7 +295,20 @@ class PublicBookingRequestService:
             self.db.commit()
         except HTTPException as exc:
             self.db.rollback()
-            raise PublicBookingRequestError(409, "booking_time_unavailable") from exc
+            detail = exc.detail
+            if (
+                exc.status_code == 422
+                and isinstance(detail, dict)
+                and detail.get("code")
+                in {
+                    "service_incompatible_with_doctor",
+                    "service_incompatible_with_department",
+                }
+            ):
+                raise PublicBookingRequestError(
+                    409, "public_booking_unavailable"
+                ) from exc
+            raise
         except Exception:
             self.db.rollback()
             raise
@@ -697,16 +722,32 @@ class PublicBookingRequestService:
             }
         )
 
+    def _lock_patient_for_booking(self, patient_id: int) -> None:
+        patient = self.repository.lock_patient_for_booking(patient_id=patient_id)
+        if patient is None or patient.is_deleted:
+            raise PublicBookingRequestError(409, "public_booking_unavailable")
+
     def _require_request_creation_limit(self, patient_id: int) -> None:
         created_since = datetime.now(UTC) - REQUEST_CREATION_WINDOW
         if (
-            self.repository.count_patient_requests_since(
+            self.repository.count_patient_booking_creations_since(
                 patient_id=patient_id,
                 created_since=created_since,
             )
             >= REQUEST_CREATION_LIMIT_PER_PATIENT
         ):
             raise PublicBookingRequestError(429, "booking_request_rate_limited")
+
+    def _require_active_future_appointment_limit(self, patient_id: int) -> None:
+        today = datetime.now(PUBLIC_BOOKING_TIMEZONE).date()
+        if (
+            self.repository.count_active_future_appointments(
+                patient_id=patient_id,
+                from_date=today,
+            )
+            >= ACTIVE_FUTURE_APPOINTMENT_LIMIT_PER_PATIENT
+        ):
+            raise PublicBookingRequestError(409, "booking_active_appointment_limit")
 
     def _require_no_active_duplicate(
         self,
@@ -788,7 +829,22 @@ class PublicBookingRequestService:
         doctor_slug: str,
         appointment_date: date,
         appointment_time: time,
+        department_id: int | None = None,
     ) -> tuple[int, int]:
+        service = self.public_site_repository.get_public_service_by_slug(service_slug)
+        doctor = self.public_site_repository.get_public_doctor_by_slug(doctor_slug)
+        if service is None or doctor is None:
+            raise PublicBookingRequestError(404, "public_content_not_found")
+        try:
+            resolve_exact_service_selection(
+                self.db,
+                [int(service.id)],
+                doctor_id=int(doctor.id),
+                department_id=department_id,
+            )
+        except InvalidServiceSelection as exc:
+            raise PublicBookingRequestError(409, "public_booking_unavailable") from exc
+
         snapshot = self.availability_service.public_availability_for_day(
             service_slug=service_slug,
             doctor_slug=doctor_slug,
@@ -799,10 +855,6 @@ class PublicBookingRequestService:
             raise PublicBookingRequestError(404, "public_content_not_found")
         if appointment_time not in snapshot.slots:
             raise PublicBookingRequestError(409, "booking_time_unavailable")
-        service = self.public_site_repository.get_public_service_by_slug(service_slug)
-        doctor = self.public_site_repository.get_public_doctor_by_slug(doctor_slug)
-        if service is None or doctor is None:
-            raise PublicBookingRequestError(404, "public_content_not_found")
         return int(service.id), int(doctor.id)
 
     def _add_event(

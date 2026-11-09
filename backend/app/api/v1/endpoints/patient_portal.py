@@ -1192,6 +1192,10 @@ def _patient_request_idempotency_scope(request: Request) -> str:
             )
         },
         409: {"model": PublicBookingRequestErrorOut},
+        429: {
+            "model": PublicBookingRequestErrorOut,
+            "description": "The patient has reached the public booking creation limit.",
+        },
         503: {"model": PublicBookingRequestErrorOut},
     },
     operation_id="patient_create_confirmed_public_booking_appointment",

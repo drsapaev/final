@@ -8,7 +8,9 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor
+from app.models.patient import Patient
 from app.models.public_booking_request import (
     PublicBookingRequest,
     PublicBookingRequestEvent,
@@ -31,6 +33,16 @@ class PublicBookingRequestRepository:
         return (
             self.db.query(ClinicSettings)
             .filter(ClinicSettings.key == key)
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
+
+    def lock_patient_for_booking(self, *, patient_id: int) -> Patient | None:
+        """Serialize patient-scoped public booking quotas in PostgreSQL."""
+        return (
+            self.db.query(Patient)
+            .filter(Patient.id == patient_id)
             .populate_existing()
             .with_for_update()
             .first()
@@ -63,14 +75,39 @@ class PublicBookingRequestRepository:
             query = query.filter(PublicBookingRequest.id != excluding_request_id)
         return query.first() is not None
 
-    def count_patient_requests_since(
+    def count_patient_booking_creations_since(
         self, *, patient_id: int, created_since: datetime
     ) -> int:
-        return int(
+        request_count = int(
             self.db.query(func.count(PublicBookingRequest.id))
             .filter(
                 PublicBookingRequest.patient_id == patient_id,
                 PublicBookingRequest.created_at >= created_since,
+            )
+            .scalar()
+            or 0
+        )
+        appointment_count = int(
+            self.db.query(func.count(Appointment.id))
+            .filter(
+                Appointment.patient_id == patient_id,
+                Appointment.created_at >= created_since,
+            )
+            .scalar()
+            or 0
+        )
+        return request_count + appointment_count
+
+    def count_active_future_appointments(
+        self, *, patient_id: int, from_date: date
+    ) -> int:
+        """Match the patient-card activity rule: today onward, not cancelled."""
+        return int(
+            self.db.query(func.count(Appointment.id))
+            .filter(
+                Appointment.patient_id == patient_id,
+                Appointment.appointment_date >= from_date,
+                Appointment.status != "cancelled",
             )
             .scalar()
             or 0

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, Schedule
+from app.models.department import Department, DepartmentService
 from app.models.online_queue import DailyQueue, QueueResource
 from app.models.service import Service
 from app.models.user import User
@@ -323,6 +324,45 @@ def test_public_availability_hides_unknown_pair_with_no_store(
     assert response.status_code == 404
     assert response.json() == {"detail": {"code": "public_content_not_found"}}
     assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.integration
+def test_public_availability_hides_service_bound_to_another_department(
+    client: TestClient, db_session: Session
+) -> None:
+    target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+    service, doctor, doctor_user = _configured_public_booking(
+        db_session, target_date=target_date
+    )
+    doctor_department = Department(
+        key="public-availability-doctor-department",
+        name_ru="Отделение врача",
+        name_uz="Shifokor bo'limi",
+        active=True,
+    )
+    service_department = Department(
+        key="public-availability-service-department",
+        name_ru="Отделение услуги",
+        name_uz="Xizmat bo'limi",
+        active=True,
+    )
+    db_session.add_all([doctor_department, service_department])
+    db_session.flush()
+    doctor.department_id = doctor_department.id
+    db_session.add(
+        DepartmentService(
+            service_id=service.id,
+            department_id=service_department.id,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(_availability_url(service.slug, doctor.slug, target_date))
+
+    assert response.status_code == 200, response.text
+    assert response.json()["slots"] == []
+    assert response.headers["cache-control"] == "no-store"
+    assert db_session.query(Appointment).count() == 0
 
 
 @pytest.mark.integration
