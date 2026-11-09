@@ -1,4 +1,4 @@
-# Current resume — canonical Preflight passed; Start/Session next — 2026-11-09T10:02:00+05:00
+# Current resume — Start passed; first Session harness stopped before tests — 2026-11-09T10:15:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
 
@@ -6,11 +6,11 @@ PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. The feature br
 
 The memory-safe prebuilt frontend target is implemented and its focused test passes. Existing hosted artifact workflow `42563847059` built the exact latest main source; `source.sha` matched and all 261 artifact checksums passed. The artifact is in ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`. The ordinary full frontend build stays the default. Windows lacks Docker CLI; canonical WSL Preflight validated Compose configuration and resources, but Start/Session have not run and no services are up.
 
-Canonical `Preflight` passed on the owned synthetic project with Compose 2.40.3 and the `artifact-runtime` target: host worktree disk 13 GiB free, WSL backing disk 26 GiB free, WSL available memory 3209 MiB, ports accepted, no warnings. The first Preflight attempt failed only because the generated env file split one password line; it started no services, and the corrected Preflight passed. Credential values remain unlogged.
+Canonical `Preflight` and `Start` passed on owned synthetic project `clinic-aqs-t18-memory-20261109`; Start reported healthy runtime and `teardown=PENDING_SESSION`. The first canonical `Session` ended before test execution because the local wrapper set conflicting `NO_COLOR`/`FORCE_COLOR`; PowerShell promoted Node's stderr warning to a terminating error. There are no Playwright phase markers, so RQ-18 and T18.10 remain `NOT_RUN`. Canonical teardown passed and removed this project; do not reuse it. No credential values are in the journal.
 
-Next: run `Start`, then immediately run one `Session` using the same env/project and verified artifact. Start will apply the 10 GiB build reserve; it still builds backend/worker but avoids WSL `npm ci`/Vite by selecting the static Nginx target. If Start fails, rely on canonical cleanup and resolve the cause before any retry. Do not mark served revision verified from image ID alone; use the RQ-17 browser-response checksum capture plus the hosted manifest.
+Next: fix only the ignored local Playwright wrapper to remove the redundant color variable and redirect Node stdout/stderr separately. Use one fresh synthetic Compose project with fresh backend/PostgreSQL ports and frontend port 18082, which the verified artifact requires. Run canonical Preflight → Start → one Session; no test rerun until that setup is ready. Do not mark served revision verified from image ID alone; compare browser-delivered JS/CSS response hashes with the hosted manifest.
 
-Validation already reported: focused test 1 passed/282 deselected; Python compile passed; `git diff --check` passed; hosted artifact source/checksums passed. An initial pytest command from the backend runner used an invalid relative path and was corrected; no test ran on that first attempt. Do not claim staging or T18 completion yet.
+Validation already reported: focused test 1 passed/282 deselected; Python compile passed; `git diff --check` passed; hosted artifact source/checksums passed; `--list` found two RQ-18 tests but executed none. Start passed and the first Session's owned teardown passed; RQ-18/T18.10 behavior remains unverified. An initial pytest command from the backend runner used an invalid relative path and was corrected; no test ran on that first attempt. Do not claim staging or T18 completion yet.
 
 ---
 

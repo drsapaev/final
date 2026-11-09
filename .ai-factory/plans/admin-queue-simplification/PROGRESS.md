@@ -1,6 +1,6 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — hosted artifact verified; canonical Preflight PASS — 2026-11-09T10:02:00+05:00
+## Current checkpoint — Start PASS; first Session stopped in local harness — 2026-11-09T10:15:00+05:00
 
 - Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`.
 - Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, synchronized with latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`. The only incoming main paths were two CI workflow files; application source is unchanged.
@@ -9,9 +9,12 @@
 - Local checks: focused guard test PASS (1 passed, 282 deselected); Python compile PASS; `git diff --check` PASS. An initial pytest invocation used a backend-relative path and found no test; rerun from the repository Python launcher passed. Windows has no Docker CLI, so Compose config is NOT_RUN locally and must be checked through canonical WSL Preflight.
 - Canonical Preflight: PASS. Ubuntu-24.04 / Docker 29.1.3 / Compose 2.40.3; worktree disk free 13 GiB, WSL backing disk free 26 GiB, WSL available memory 3209 MiB; custom ports 19001/18082/55441 accepted; no warnings. Compose config validated with `artifact-runtime` and the existing artifact context. No containers/services were started.
 - First Preflight attempt failed before Compose mutation because a PowerShell env-file expression wrote the synthetic Admin password on a separate line. The env file was regenerated with one `key=value` line per setting; the diagnostic Compose config then succeeded through canonical Preflight. No credentials were printed.
+- Canonical Start: PASS for owned synthetic project `clinic-aqs-t18-memory-20261109`. Runtime readiness PASS; backend/frontend/PostgreSQL ports 19001/18082/55441; WSL available memory 3200 MiB; build reserve 10 GiB; `served_revision_verified=false` as designed. Start returned `teardown=PENDING_SESSION`.
+- First Session: harness failure, not an application result. The Windows wrapper set conflicting `NO_COLOR` and `FORCE_COLOR`; Node wrote a warning to stderr and PowerShell promoted it to a terminating error before any Playwright phase marker was captured. Result: RQ-18/T18.10 tests `NOT_RUN`; canonical Session reports teardown PASS. The project was removed; do not reuse it.
+- Local Playwright dependency reuse was read-only verified: `C:\final\frontend\package-lock.json` has the same SHA-256 as this worktree. A worktree-only ignored junction points `frontend/node_modules` at that cache; installed Playwright 1.62.0 and Chromium 1234 are present. The junction is local execution plumbing, not a tracked change.
 - Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read.
 - Allowed tracked paths remain the seven recorded in the pre-edit checkpoint below. Denied: runtime/backend/auth, GitHub workflow, gate/router, production, deployment and foreign staging resources.
-- Next exact action: run canonical Start, then one Session using the same project/env and verified artifact. Preflight passed; Start still checks the 10 GiB build reserve. If Start rejects storage/resources or fails, rely on its exact-project cleanup, do not retry until the cause is resolved, and keep affected checks `NOT_RUN`.
+- Next exact action: correct the local runner to redirect Node stdout/stderr without PowerShell native-stderr promotion and remove the redundant `NO_COLOR` variable. Create one fresh synthetic project (retain frontend port 18082 required by the artifact, select fresh backend/PostgreSQL ports), then run canonical Preflight → Start → one Session. Stop on any new prerequisite failure; no blind retry.
 
 ---
 
