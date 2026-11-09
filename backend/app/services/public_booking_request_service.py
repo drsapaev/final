@@ -25,7 +25,10 @@ from app.repositories.public_booking_request_repository import (
 )
 from app.repositories.public_site_read_repository import PublicSiteReadRepository
 from app.repositories.services_api_repository import ServicesApiRepository
-from app.schemas.appointment import PatientPortalAppointmentCreate
+from app.schemas.appointment import (
+    PatientConfirmedPublicBookingOut,
+    PatientPortalAppointmentCreate,
+)
 from app.schemas.public_booking_request import (
     PublicBookingRequestEventOut,
     PublicBookingRequestOut,
@@ -194,6 +197,103 @@ class PublicBookingRequestService:
         )
         assert stored is not None
         return self._patient_out(stored)
+
+    def create_confirmed_appointment_for_patient(
+        self,
+        *,
+        patient_id: int,
+        service_slug: str,
+        doctor_slug: str,
+        appointment_date: date,
+        appointment_time: time,
+        expected_settings_version: int,
+    ) -> PatientConfirmedPublicBookingOut:
+        """Create a reserved Appointment only in the current confirmed mode.
+
+        The settings/calendar/service/doctor locks follow the staff-confirm
+        path. Availability is re-evaluated after the doctor slot lock so
+        concurrent appointment writers cannot both take the same interval.
+        """
+        settings = self._locked_request_settings()
+        if settings.version != expected_settings_version:
+            raise PublicBookingRequestError(409, "booking_settings_version_conflict")
+        if not settings.is_enabled or not settings.is_ready:
+            raise PublicBookingRequestError(409, "public_booking_unavailable")
+        if settings.mode != PublicBookingMode.CONFIRMED_APPOINTMENT:
+            raise PublicBookingRequestError(409, "booking_mode_changed")
+
+        self.repository.lock_settings(
+            f"{PUBLIC_BOOKING_CALENDAR_KEY_PREFIX}{appointment_date.year:04d}"
+        )
+        service_id, doctor_id = self._validate_slot(
+            settings=settings,
+            service_slug=service_slug,
+            doctor_slug=doctor_slug,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+        )
+
+        doctor = lock_doctor_for_slot_reservation(self.db, doctor_id)
+        if doctor is None:
+            raise PublicBookingRequestError(409, "public_booking_unavailable")
+        try:
+            ensure_doctor_eligible_for_appointment(self.db, doctor_id)
+            department = resolve_doctor_routing_department(doctor, None)
+            department = lock_department_for_booking(self.db, department)
+        except HTTPException as exc:
+            raise PublicBookingRequestError(409, "public_booking_unavailable") from exc
+        if department is None:
+            raise PublicBookingRequestError(409, "public_booking_unavailable")
+
+        service = ServicesApiRepository(self.db).get_service_for_update(service_id)
+        if (
+            service is None
+            or service.slug != service_slug
+            or not service.active
+            or not service.show_on_website
+        ):
+            raise PublicBookingRequestError(409, "public_booking_unavailable")
+
+        # Re-read the exact pair and intervals after every relevant row lock.
+        locked_service_id, locked_doctor_id = self._validate_slot(
+            settings=settings,
+            service_slug=service_slug,
+            doctor_slug=doctor_slug,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+        )
+        if (locked_service_id, locked_doctor_id) != (service_id, doctor_id):
+            raise PublicBookingRequestError(409, "public_booking_unavailable")
+
+        appointment_in = PatientPortalAppointmentCreate(
+            patient_id=patient_id,
+            doctor_id=doctor_id,
+            department_id=department.id,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time.strftime("%H:%M"),
+            status="scheduled",
+            service_ids=[service_id],
+        )
+        try:
+            appointment = appointment_crud.create(
+                db=self.db,
+                obj_in=appointment_in,
+                commit=False,
+            )
+            self.db.commit()
+        except HTTPException as exc:
+            self.db.rollback()
+            raise PublicBookingRequestError(409, "booking_time_unavailable") from exc
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return PatientConfirmedPublicBookingOut(
+            id=int(appointment.id),
+            appointment_date=appointment.appointment_date,
+            appointment_time=appointment_time,
+            status="scheduled",
+        )
 
     def list_for_patient(
         self, *, patient_id: int, limit: int, offset: int

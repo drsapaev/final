@@ -528,6 +528,126 @@
         ]
       }
     },
+    "/api/v1/patients/public-booking/appointments": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Create an appointment from the confirmed public booking mode",
+        "description": "Reserve an available slot as a normal Appointment for the own card.\n\nThis route is valid only while the clinic's current mode is\n`confirmed_appointment`; it never falls back to a non-reserving request.",
+        "operationId": "patient_create_confirmed_public_booking_appointment",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Required for safe retries of the same appointment submission.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Required for safe retries of the same appointment submission."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientConfirmedPublicBookingOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestPatientProfileErrorOut"
+                    }
+                  ],
+                  "title": "Response 404 Patient Create Confirmed Public Booking Appointment"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patients/booking-requests": {
       "post": {
         "tags": [
@@ -100232,6 +100352,44 @@
           "benefit_id"
         ],
         "title": "PatientBenefitCreate"
+      },
+      "PatientConfirmedPublicBookingOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointment Date"
+          },
+          "appointment_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Appointment Time"
+          },
+          "status": {
+            "type": "string",
+            "const": "scheduled",
+            "title": "Status"
+          },
+          "timezone": {
+            "type": "string",
+            "const": "Asia/Tashkent",
+            "title": "Timezone",
+            "default": "Asia/Tashkent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "appointment_date",
+          "appointment_time",
+          "status"
+        ],
+        "title": "PatientConfirmedPublicBookingOut",
+        "description": "Minimal result for an immediately-created public booking appointment."
       },
       "PatientCreate": {
         "properties": {

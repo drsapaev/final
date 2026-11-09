@@ -43,6 +43,7 @@ from app.services.registrar_notification_service import RegistrarNotificationSer
 from tests.conftest import mint_access_token
 
 PATIENT_REQUESTS = "/api/v1/patients/booking-requests"
+PATIENT_CONFIRMED_APPOINTMENTS = "/api/v1/patients/public-booking/appointments"
 STAFF_REQUESTS = "/api/v1/admin/public-booking-requests"
 
 
@@ -165,6 +166,22 @@ def _create_body(case, *, hour: str = "09:00") -> dict[str, object]:
         "appointment_time": hour,
         "expected_settings_version": 1,
     }
+
+
+def _enable_confirmed_mode(db_session: Session) -> int:
+    settings = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == "public_booking_settings")
+        .one()
+    )
+    version = int(settings.value["version"]) + 1
+    settings.value = {
+        **settings.value,
+        "version": version,
+        "mode": "confirmed_appointment",
+    }
+    db_session.commit()
+    return version
 
 
 def _request_new_time(
@@ -408,6 +425,137 @@ async def test_patient_submission_is_idempotent_and_never_creates_appointment(
     patient_list = client.get(PATIENT_REQUESTS, headers=case["patient_headers"])
     assert patient_list.status_code == 200
     assert [item["id"] for item in patient_list.json()["items"]] == [first.json()["id"]]
+
+
+@pytest.mark.integration
+def test_confirmed_public_booking_creates_regular_appointment_and_replays_safely(
+    client: TestClient,
+    db_session: Session,
+    public_booking_case,
+):
+    case = public_booking_case
+    version = _enable_confirmed_mode(db_session)
+    body = {
+        **_create_body(case),
+        "expected_settings_version": version,
+    }
+    headers = {
+        **case["patient_headers"],
+        "Idempotency-Key": uuid4().hex,
+    }
+
+    created = client.post(PATIENT_CONFIRMED_APPOINTMENTS, headers=headers, json=body)
+    replay = client.post(PATIENT_CONFIRMED_APPOINTMENTS, headers=headers, json=body)
+
+    assert created.status_code == 201, created.text
+    assert replay.status_code == 201, replay.text
+    assert replay.json() == created.json()
+    assert created.headers["cache-control"] == "no-store"
+    assert created.json() == {
+        "id": created.json()["id"],
+        "appointment_date": case["date"].isoformat(),
+        "appointment_time": "09:00:00",
+        "status": "scheduled",
+        "timezone": "Asia/Tashkent",
+    }
+    assert db_session.query(PublicBookingRequest).count() == 0
+    assert db_session.query(Appointment).count() == 1
+    appointment = db_session.query(Appointment).one()
+    assert appointment.id == created.json()["id"]
+    assert appointment.patient_id == case["patient"].id
+    assert appointment.doctor_id == case["doctor_id"]
+    assert appointment.department_id == case["department_id"]
+    assert appointment.appointment_date == case["date"]
+    assert appointment.appointment_time == "09:00"
+    assert appointment.status == "scheduled"
+    assert appointment.duration_minutes_snapshot == 20
+
+    audit = (
+        db_session.query(PatientAccessAuditLog)
+        .filter(
+            PatientAccessAuditLog.resource_type == "appointment",
+            PatientAccessAuditLog.resource_id == str(appointment.id),
+            PatientAccessAuditLog.action == "create",
+        )
+        .one()
+    )
+    assert audit.subject_patient_id == case["patient"].id
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("mode", "version", "expected_version", "expected_code"),
+    [
+        ("registrar_request", 1, 1, "booking_mode_changed"),
+        ("confirmed_appointment", 2, 1, "booking_settings_version_conflict"),
+    ],
+)
+def test_confirmed_public_booking_fails_closed_for_mode_or_policy_change(
+    client: TestClient,
+    db_session: Session,
+    public_booking_case,
+    mode: str,
+    version: int,
+    expected_version: int,
+    expected_code: str,
+):
+    case = public_booking_case
+    settings = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == "public_booking_settings")
+        .one()
+    )
+    settings.value = {**settings.value, "version": version, "mode": mode}
+    db_session.commit()
+    body = {
+        **_create_body(case),
+        "expected_settings_version": expected_version,
+    }
+
+    response = client.post(
+        PATIENT_CONFIRMED_APPOINTMENTS,
+        headers={**case["patient_headers"], "Idempotency-Key": uuid4().hex},
+        json=body,
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == expected_code
+    assert response.headers["cache-control"] == "no-store"
+    assert db_session.query(Appointment).count() == 0
+    assert db_session.query(PublicBookingRequest).count() == 0
+
+
+@pytest.mark.integration
+def test_confirmed_public_booking_rejects_an_occupied_time(
+    client: TestClient,
+    db_session: Session,
+    public_booking_case,
+):
+    case = public_booking_case
+    version = _enable_confirmed_mode(db_session)
+    db_session.add(
+        Appointment(
+            patient_id=case["patient"].id,
+            doctor_id=case["doctor_id"],
+            department_id=case["department_id"],
+            appointment_date=case["date"],
+            appointment_time="09:00",
+            duration_minutes_snapshot=20,
+            status="scheduled",
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        PATIENT_CONFIRMED_APPOINTMENTS,
+        headers={**case["patient_headers"], "Idempotency-Key": uuid4().hex},
+        json={**_create_body(case), "expected_settings_version": version},
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "booking_time_unavailable"
+    assert db_session.query(Appointment).count() == 1
+    assert db_session.query(PublicBookingRequest).count() == 0
 
 
 @pytest.mark.integration
@@ -1124,11 +1272,24 @@ def test_public_booking_request_openapi_routes_and_idempotency_contract(
     assert response.status_code == 200
     schema = response.json()
     create = schema["paths"][PATIENT_REQUESTS]["post"]
+    confirmed_create = schema["paths"][PATIENT_CONFIRMED_APPOINTMENTS]["post"]
     resubmit = schema["paths"][f"{PATIENT_REQUESTS}/{{request_id}}/resubmit"]["post"]
     staff_list = schema["paths"][STAFF_REQUESTS]["get"]
     confirm = schema["paths"][f"{STAFF_REQUESTS}/{{request_id}}/confirm"]["post"]
 
     assert create["operationId"] == "patient_create_public_booking_request"
+    assert confirmed_create["operationId"] == (
+        "patient_create_confirmed_public_booking_appointment"
+    )
+    assert "201" in confirmed_create["responses"]
+    assert "409" in confirmed_create["responses"]
+    assert "Idempotency-Key" in {
+        parameter["name"] for parameter in confirmed_create["parameters"]
+    }
+    confirmed_schema = confirmed_create["responses"]["201"]["content"][
+        "application/json"
+    ]["schema"]["$ref"]
+    assert confirmed_schema.endswith("PatientConfirmedPublicBookingOut")
     assert resubmit["operationId"] == "patient_resubmit_public_booking_request"
     assert staff_list["operationId"] == "staff_list_public_booking_requests"
     assert confirm["operationId"] == "staff_confirm_public_booking_request"
