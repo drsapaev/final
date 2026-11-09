@@ -1,3 +1,13 @@
+## PR #3946 exact-head checks after body correction — 2026-11-09T15:15:52+05:00
+
+- Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), HEAD `6a69d42a352e671a594ee17c2f2768a2de32bacc`, base/current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.
+- The corrected PR body was fetched from GitHub and validated locally with `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-env','PR_BODY','--author','drsapaev')`: 19 unit tests, both documented sample bodies, and exact current PR body — PASS.
+- On exact HEAD `6a69d42`, PR Required Gate, PR Review Quality Gate, Frontend unit/build/lint, CI Scope, security, CodeQL, Gitleaks, secret scan, Git scratch guards, GitGuardian, lifecycle recommendation, metadata, and notification checks — PASS.
+- Backend, integration, frontend E2E, Docker build, staging/production readiness, load tests, and path-dependent checks were skipped by configured conditions; they are not represented as passing. No staging run was performed for this documentation checkpoint.
+- PR remains OPEN / Ready for review / mergeable. The preceding run `42596533267` was the body-field failure; after correction, the exact-head PR Review Quality Gate passed. The earlier checkpoint's attribution to a missing `Result` field was incorrect; `Red-check handling` was the omitted field.
+- Scope: PR description metadata and the three T18 journals; no product/runtime, staging configuration, test code, production, workflow, gate/router, or database changes. T18/Tier-2 remains PARTIAL from the prior RQ-18 Session result; browser-served provenance is unverified. Merge remains user-owned.
+- Next: wait for user-owned merge of #3946 before starting a separate response-body recorder correction cycle.
+
 ## PR #3946 PR-body gate correction — 2026-11-09T14:56:05+05:00
 
 - Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), exact pushed HEAD `ff3b5b0d97ac542a3f9216a3f459d361861c7c79`, base/current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.

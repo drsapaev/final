@@ -1,36 +1,36 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — RQ-18 partial; PR body gate corrected — 2026-11-09T14:56:05+05:00
+## Current checkpoint — corrected body; exact-head checks pass — 2026-11-09T15:15:52+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance
-Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged. PR #3946 remains OPEN / Ready for review / mergeable at pushed HEAD `ff3b5b0d97ac542a3f9216a3f459d361861c7c79`. Its latest PR Review Quality Gate run failed because the body omitted required `Red-check handling`; the corrected body now passes local validation, and a fresh exact-head run is pending. T18/Tier-2 remains PARTIAL.
+Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged. PR #3946 remains OPEN / Ready for review / mergeable at HEAD `6a69d42a352e671a594ee17c2f2768a2de32bacc`. Applicable exact-head CI on this HEAD passed, including PR Required Gate, PR Review Quality Gate, frontend unit/build/lint, security, CodeQL, secret scans, guards, lifecycle, and GitGuardian. The corrected exact PR body also passes local validation. T18/Tier-2 remains PARTIAL.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`
 Branch: `codex/aqs-t18-memory-safe-staging-20261109`
 Base/current main: `88012cd0a4a7f1de510541b6660a2a85f18baa62`
-Last pushed PR SHA: `ff3b5b0d97ac542a3f9216a3f459d361861c7c79`
-Current local commit: `ff3b5b0d97ac542a3f9216a3f459d361861c7c79` (journal correction not yet committed)
-Last updated: 2026-11-09T14:56:05+05:00
+Last pushed PR SHA: `6a69d42a352e671a594ee17c2f2768a2de32bacc`
+Current local commit at this checkpoint: `6a69d42a352e671a594ee17c2f2768a2de32bacc`
+Last updated: 2026-11-09T15:15:52+05:00
 
 | Work item | Status | Evidence |
 |-----------|--------|----------|
 | T00–T17 | MERGED | Present on current main. |
 | PR #3937 | MERGED | Merge commit `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. |
-| PR #3946 staging artifact path | OPEN / Ready for review | PR HEAD `ff3b5b0`; latest PR Review Quality Gate failed only because required `Red-check handling` was absent from body. Body now corrected and exact remote body locally validates; journal checkpoint push and fresh CI pending. |
+| PR #3946 staging artifact path | OPEN / Ready for review | Exact HEAD `6a69d42`; applicable required/review/frontend/security checks passed. Backend, integration, E2E, Docker, readiness, and load checks were skipped by path/trigger. Merge remains user-owned. |
 | T18 / Tier-2 | PARTIAL | Current main artifact and owned r5 Preflight/Start passed. Exact tracked RQ-18 ran: T18.10 and lifecycle reached final phase, but 13 browser response bodies were unavailable; served-asset provenance is still NOT_RUN. Canonical teardown passed. |
 
 ### Current checkpoint
 
 - Freshness: fetched `origin/main` at `88012cd0a4a7f1de510541b6660a2a85f18baa62`. Since PR base #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`, main added 17 EMR files. None overlap the PR's seven staging/runbook/test/journal paths. Sync merge `77bef757253bdee40b041ac4f1b338c8d2a59536` completed without conflicts.
 - Local validation after sync: focused staging guard passed (1 passed, 282 deselected); `git diff --check origin/main...HEAD` passed. The staged PR scope still contains only the seven allowed paths.
-- Current GitHub checks on `ff3b5b0`: PR Required Gate, frontend unit/build/lint, CI Scope, security, CodeQL, Gitleaks, Git scratch guards, GitGuardian, and lifecycle recommendation passed. Backend, integration, frontend E2E, Docker, staging/production readiness, and load checks were skipped by path/trigger. PR Review Quality Gate run `42596533267` failed because the exact body lacked `Red-check handling`; its log confirms 19 unit tests and both sample bodies passed, then exact `PR_BODY` validation failed on that missing field. The `Result` field was present; the prior note attributing the failure to `Result` was incorrect. The field is now restored, and exact remote PR body validation passed locally; push a journal-only checkpoint to trigger fresh exact-head checks. Merge remains user-owned.
+- Exact-head checks on `6a69d42`: PR Required Gate, PR Review Quality Gate, frontend unit/build/lint, CI Scope, security, CodeQL, Gitleaks, secret scans, Git scratch guards, GitGuardian, and lifecycle recommendation passed. Backend, integration, frontend E2E, Docker, staging/production readiness, and load checks were skipped by path/trigger, not passed. The PR body was updated with the correction and passed local validation (19 unit tests, both samples, exact body). Merge remains user-owned.
 - Current-main hosted artifact: run `42592028425`, source SHA `88012cd0a4a7f1de510541b6660a2a85f18baa62`, run success. Local artifact source matched and all 261/261 SHA256SUMS entries verified.
 - Execution mode: continue the existing `gate_known_root_cause` staging-validation scope. The recorded gate result for this unchanged artifact-runtime scope was `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`, with the execution prompt read. Allowed: own ignored artifact/env and validation outputs, canonical staging launcher, T18 journals. Denied: product/runtime code, backend/API/auth, DB/migrations, workflow/gate/router, production/deploy, foreign projects, merge.
 - Canonical Preflight for owned project `clinic-aqs-t18-memory-safe-20261109-r5`: PASS on `Ubuntu-24.04`, Docker 29.1.3, Compose 2.40.3; C: 13 GiB free, WSL backing D: 26 GiB free, Linux `/` and Docker root: 909 GiB free, available WSL memory 3189 MiB, warnings empty. Ports 19005/18082/55446 were accepted. Runtime readiness is still `NOT_RUN`; no services started by Preflight. Launcher reports `worktree_dirty=true` because only the T18 journal files have local edits; artifact source provenance is separately verified. `git diff --check` passed and `git status` showed only the two intended journal files.
 - Canonical Start for the same project: PASS with build enabled, 10 GiB disk reserve satisfied (C: 13 GiB, D: 26 GiB), WSL available memory 3203 MiB, warnings empty, runtime readiness PASS. Backend/frontend/worker image IDs are in EVIDENCE.md.
 - Canonical Session ran the exact tracked RQ-18 file on current-main artifact `88012cd`. Playwright result: 1 passed / 1 failed in 1.1 minutes. Normal Admin password+TOTP and T18.10 passed; the lifecycle reached `completed`, and the final Admin page-error guard did not fail. The lifecycle test failed while verifying browser assets: 13 `browser-response-body-unavailable` results prevented actual app asset hashes from being emitted. The sole asset hash was for the isolated synthetic provenance probe and is excluded. Therefore no actual app JS/CSS match was confirmed; launcher `served_revision_verified=false` remains.
 - The Session also reported a temporary wrapper error after Playwright exited: a PowerShell interpolated variable left an invalid `-eq` expression in the post-run summary. This caused the child exit status to be nonzero; a separate sanitized parser of the saved log confirmed the Playwright outcomes above. Canonical Session teardown was `PASS`; the owned r5 project was removed. No runtime/test source changed.
-- Next exact action: finish and diff-check the three journal updates, commit and push the checkpoint, then verify fresh exact-head CI. Do not repeat the same RQ-18 run with the unchanged recorder. After #3946 merges, open a separately gated narrow test-harness correction for browser response-body capture, then resume remaining T18 and `STAGING_VALIDATION.md` checks.
+- Next exact action: wait for user-owned merge of #3946. After it merges, close/clean this PR worktree and begin a new isolated cycle from fresh `origin/main`; separately gate the browser response-body recorder correction, then resume remaining T18 and all `STAGING_VALIDATION.md` checks. Do not repeat the unchanged RQ-18 run.
 - T18 remains PARTIAL; the new artifact is not yet evidence that the browser served matching bytes or that RQ-18 passed. The remaining T18 and `STAGING_VALIDATION.md` checks stay open.
 - One task-owned ignored scratch folder remains because host policy blocked deletion. Canonical teardown removed both owned r4 and r5 Compose projects; no alternate deletion method was attempted.
 
