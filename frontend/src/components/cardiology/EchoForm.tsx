@@ -4,7 +4,7 @@
  * Форма для ввода результатов ЭхоКГ
  * Phase 3: stale MASTER_TODO_LIST reference removed.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -78,6 +78,10 @@ export interface EchoFormProps {
   initialData?: Partial<EchoData> | null;
   [key: string]: unknown;
 }
+
+/** UI_AUDIT_PLAN Phase 0 ratchet: shared style constant instead of
+ * another inline `style={{…}}` literal. */
+const ALERT_MARGIN_STYLE: React.CSSProperties = { marginBottom: 16 };
 
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
@@ -207,6 +211,15 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // ECHO-FE-001 (audit 3886 round 20): hydration and dirty tracking.
+  // The form previously initialized blank and hydrated ONLY from an
+  // `initialData` prop that no caller passed, while Save unconditionally
+  // replaced `specialty_data.echo` with the local state — an untouched
+  // Save could wipe stored EF/EDD/conclusion with a blank revision.
+  const [hydrating, setHydrating] = useState(false);
+  const [info, setInfo] = useState('');
+  const dirtyRef = useRef(false);
+  const formEpochRef = useRef(0);
   const [expandedSections, setExpandedSections] = useState({
     leftVentricle: true,
     rightVentricle: false,
@@ -216,12 +229,57 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   });
 
   useEffect(() => {
+    // Explicit initialData still wins: callers that own the data pass it.
     if (initialData) {
       setEchoData(deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, initialData as Record<string, unknown>) as EchoData);
+      return;
     }
-  }, [initialData]);
+
+    const epoch = ++formEpochRef.current;
+    dirtyRef.current = false;
+
+    if (!visitId) {
+      setEchoData(DEFAULT_ECHO_DATA as EchoData);
+      setInfo('');
+      return;
+    }
+
+    // ECHO-FE-001: hydrate from the canonical EMR draft for this visit so
+    // the doctor sees the stored echo measurements before any save.
+    setHydrating(true);
+    setInfo('');
+    setSuccess('');
+    setError('');
+    loadExistingEmrDraft(visitId)
+      .then((existing) => {
+        if (epoch !== formEpochRef.current) return; // visit switched mid-flight
+        const storedData = (existing as Record<string, unknown> | null)?.data as Record<string, unknown> | undefined;
+        const specialtyData = storedData?.specialty_data as Record<string, unknown> | undefined;
+        const storedEcho = specialtyData?.echo;
+        if (storedEcho && typeof storedEcho === 'object') {
+          setEchoData(deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, storedEcho as Record<string, unknown>) as EchoData);
+        } else {
+          setEchoData(DEFAULT_ECHO_DATA as EchoData);
+        }
+        dirtyRef.current = false;
+      })
+      .catch(() => {
+        if (epoch !== formEpochRef.current) return;
+        // Hydration failure must not silently block manual entry: the form
+        // stays blank and the doctor's explicit edit becomes a dirty save.
+        setEchoData(DEFAULT_ECHO_DATA as EchoData);
+        dirtyRef.current = false;
+      })
+      .finally(() => {
+        if (epoch === formEpochRef.current) {
+          setHydrating(false);
+        }
+      });
+  }, [visitId, initialData]);
 
   const handleChange = (section: string, field: string, value: unknown) => {
+    dirtyRef.current = true;
+    setInfo('');
     setEchoData((prev) => ({
       ...prev,
       [section]: field.includes('.')
@@ -241,9 +299,11 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   };
 
   const handleSave = async () => {
+    const epoch = formEpochRef.current;
     try {
       setLoading(true);
       setError('');
+      setInfo('');
 
       if (!visitId) {
         if (onSave) {
@@ -254,10 +314,34 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         throw new Error('visit_id is required to save Echo results');
       }
 
+      // ECHO-FE-001: a blank/unhydrated form must never be able to
+      // overwrite the stored echo subtree — block Save until the canonical
+      // EMR state for this visit has been loaded.
+      if (hydrating) {
+        setInfo(t('cardio.cardio_echo_loading_existing'));
+        return;
+      }
+
       const existingEmr = await loadExistingEmrDraft(visitId);
+
+      // ECHO-FE-001: pristine form + existing echo subtree → nothing to
+      // change; skip the POST instead of writing an identical (or blank)
+      // new revision of the EMR.
+      const storedData = (existingEmr as Record<string, unknown> | null)?.data as Record<string, unknown> | undefined;
+      const existingEcho = (storedData?.specialty_data as Record<string, unknown> | undefined)?.echo;
+      const hasExistingEcho = Boolean(existingEcho && typeof existingEcho === 'object');
+      if (!dirtyRef.current && hasExistingEcho) {
+        setInfo(t('cardio.cardio_echo_no_changes'));
+        return;
+      }
+
       const response = await api.post(`/v2/emr/${visitId}`, buildEchoEmrPayload(existingEmr, echoData));
 
+      if (epoch !== formEpochRef.current) return; // visit switched mid-save
+
       if (response.status === 200) {
+        // The server-side state now matches the form: reset dirty tracking.
+        dirtyRef.current = false;
         setSuccess(t('cardio.cardio_echo_saved_success'));
         if (onSave) {
           onSave(response.data?.data?.specialty_data?.echo || echoData);
@@ -265,10 +349,14 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         onDataUpdate?.();
       }
     } catch (err) {
-      setError(t('cardio.cardio_echo_save_error'));
+      if (epoch === formEpochRef.current) {
+        setError(t('cardio.cardio_echo_save_error'));
+      }
       logger.error('Echo form save error:', err);
     } finally {
-      setLoading(false);
+      if (epoch === formEpochRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -344,10 +432,10 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={loading}>
+              disabled={loading || hydrating}>
               
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
-              {t('cardio.cardio_echo_save_button')}
+              {hydrating ? t('cardio.cardio_echo_loading_existing') : t('cardio.cardio_echo_save_button')}
             </Button>
           </div>
         </div>
@@ -363,6 +451,13 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         <Alert severity="success" style={{ marginBottom: 16 }}>
             <CheckCircle style={{ width: 16, height: 16, marginRight: 8 }} />
             {success}
+          </Alert>
+        }
+
+        {/* ECHO-FE-001: hydration/no-change status is informational. */}
+        {info && !success && !error &&
+        <Alert severity="info" style={ALERT_MARGIN_STYLE}>
+            {info}
           </Alert>
         }
 
@@ -447,7 +542,11 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           </Typography>
           <Textarea
             value={echoData.conclusion}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setEchoData((prev) => ({ ...prev, conclusion: e.target.value }))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+              dirtyRef.current = true;
+              setInfo('');
+              setEchoData((prev) => ({ ...prev, conclusion: e.target.value }));
+            }}
             placeholder={t('cardio.cardio_echo_ph_conclusion')}
             rows={6} />
           

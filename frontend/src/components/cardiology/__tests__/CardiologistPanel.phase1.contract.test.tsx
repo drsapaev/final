@@ -62,15 +62,26 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
 
   it('C-4: Добавить ЭКГ button renders a form when showForm.type === ecg', () => {
     const source = readSource('pages/CardiologistPanelUnified.tsx');
+    const manualForm = readSource('components/cardiology/ManualEcgForm.tsx');
 
-    // Must render UI when type === 'ecg'.
+    // Must render UI when type === 'ecg' — CARDIO-FE-001 (audit 3886
+    // round 20) moved the entry UI into the dedicated ManualEcgForm; the
+    // old flow reused <BloodTestsTab showFormOpen /> and POSTed null ECG
+    // measurements read from the blood-test form state.
     expect(source).toContain('showForm.type === \'ecg\'');
-    // i18n-unification: hardcoded Russian replaced with i18n key
-    expect(source).toContain('cardio_panel_add_ecg_title');
+    expect(source).toContain('<ManualEcgForm');
+    expect(manualForm).toContain('cardio_panel_add_ecg_title');
 
-    // Must persist to /cardio/ecg endpoint.
-    expect(source).toContain('/cardio/ecg');
-    expect(source).toContain('source: \'manual\'');
+    // Must persist to /cardio/ecg with the manual source and the real
+    // ECG DTO keys (now owned by ManualEcgForm).
+    expect(manualForm).toContain('/cardio/ecg');
+    expect(manualForm).toContain('source: \'manual\'');
+    expect(manualForm).toContain('heart_rate');
+    expect(manualForm).toContain('pr_interval');
+    expect(manualForm).toContain('qrs_duration');
+    expect(manualForm).toContain('qt_interval');
+    expect(manualForm).toContain('rhythm');
+    expect(manualForm).toContain('axis');
   });
 
   it('C-5: ECGViewer onDrop catch has notify.error', () => {

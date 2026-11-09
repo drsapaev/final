@@ -16,6 +16,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './cardiology.css';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
+// CARDIO-FE-001 (audit 3886 round 20): dedicated manual ECG entry form.
+// The old flow reused <BloodTestsTab showFormOpen /> for the ECG add
+// action, rendering blood-test inputs and POSTing null ECG measurements.
+import ManualEcgForm from '../components/cardiology/ManualEcgForm';
 import HistoryTab from '../components/cardiology/HistoryTab';
 import ServicesTab from '../components/cardiology/ServicesTab';
 import AiTab from '../components/cardiology/AiTab';
@@ -230,6 +234,13 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const [historyFilter, setHistoryFilter] = useState('all');
   const [authRefreshTick, setAuthRefreshTick] = useState(0);
   const filesAccessDeniedRef = useRef(false);
+  // CARDIO-FE-002 (audit 3886 round 20): request-generation guard for the
+  // four cross-patient data stores below (ecgResults, bloodTests,
+  // patientFiles, visitHistory). Every loadPatientData run takes a
+  // generation ticket; a store may only be written while that run is still
+  // the latest one. A late response for patient A can therefore never
+  // overwrite the visible panels of patient B after a selection change.
+  const patientDataEpochRef = useRef(0);
 
   const getSelectedPatientContext = useCallback(() => {
     const patientId = selectedPatient?.patient?.id || selectedPatient?.patient_id || null;
@@ -417,9 +428,14 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const loadPatientData = useCallback(async () => {
     const { patientId, visitId } = getSelectedPatientContext();
     if (!patientId) {
+      // Invalidate any in-flight load for a previous patient context.
+      patientDataEpochRef.current += 1;
       setVisitHistory([]);
       return;
     }
+
+    const epoch = ++patientDataEpochRef.current;
+    const isStale = () => epoch !== patientDataEpochRef.current;
 
     try {
       const token = tokenManager.getAccessToken();
@@ -430,6 +446,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       });
       if (ecgResponse.ok) {
         const ecgData = await ecgResponse.json();
+        if (isStale()) return; // CARDIO-FE-002: late cross-patient response
         setEcgResults(Array.isArray(ecgData) ? ecgData : []);
       }
 
@@ -439,6 +456,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       });
       if (bloodResponse.ok) {
         const bloodData = await bloodResponse.json();
+        if (isStale()) return; // CARDIO-FE-002: late cross-patient response
         setBloodTests(Array.isArray(bloodData) ? bloodData : []);
       }
 
@@ -451,6 +469,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       }
 
       if (filesAccessDeniedRef.current) {
+        if (isStale()) return;
         setPatientFiles([]);
         return;
       }
@@ -460,6 +479,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         const fileResponse = await fetch(endpoint, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
+
+        if (isStale()) return; // CARDIO-FE-002: late cross-patient response
 
         if (!fileResponse.ok) {
           if (fileResponse.status === 403) {
@@ -475,6 +496,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         }
 
         const fileData = await fileResponse.json();
+        if (isStale()) return; // CARDIO-FE-002: late cross-patient response
         const files: unknown[] = Array.isArray(fileData?.files) ? fileData.files : [];
         files.forEach((file) => {
           const fileRecord = file as Record<string, unknown>;
@@ -484,6 +506,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         });
       }
 
+      if (isStale()) return; // CARDIO-FE-002: late cross-patient response
       setPatientFiles(Array.from(mergedFiles.values()));
 
       // Cardioplan slice 4: doctor-owned visit history ("записи") of the same
@@ -492,16 +515,21 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       // ever renders visits the authenticated doctor owns.
       try {
         const historyDoctorId = await resolveCurrentDoctorId();
+        if (isStale()) return; // CARDIO-FE-002: late cross-patient response
         const { data: visitsData } = await apiClient.get('/visits/visits', {
           params: { patient_id: patientId, doctor_id: historyDoctorId, limit: 50 },
         });
+        if (isStale()) return; // CARDIO-FE-002: late cross-patient response
         setVisitHistory(Array.isArray(visitsData) ? visitsData : []);
       } catch (visitErr) {
+        if (isStale()) return;
         logger.warn('[Cardiology] Failed to load doctor-owned visit history', visitErr);
         setVisitHistory([]);
       }
     } catch (error: unknown) {
-      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_data_update_failed')));
+      if (epoch === patientDataEpochRef.current) {
+        notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_data_update_failed')));
+      }
     }
   }, [getSelectedPatientContext, resolveCurrentDoctorId]);
 
@@ -516,6 +544,15 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         // Очищаем EMR и visitData при смене пациента
         setEmr(null);
         setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
+        // CARDIO-FE-002 (audit 3886 round 20): a selection change must also
+        // invalidate any in-flight loads for the PREVIOUS patient and clear
+        // the four cross-patient data stores, so no late A response can land
+        // in B's panels while B's own loads are still in flight.
+        patientDataEpochRef.current += 1;
+        setEcgResults([]);
+        setBloodTests([]);
+        setPatientFiles([]);
+        setVisitHistory([]);
       }
 
       // Сохраняем ID текущего пациента
@@ -526,6 +563,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     } else {
       // Если пациента нет, очищаем всё
       prevSelectedPatientRef.current = null;
+      patientDataEpochRef.current += 1;
       setEmr(null);
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
       setEcgResults([]);
@@ -535,6 +573,12 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       setHistoryFilter('all');
     }
   }, [selectedPatient, loadPatientData, authRefreshTick]);
+
+  // CARDIO-FE-002 (audit 3886 round 20): on unmount the pending loads must
+  // become stale so their late resolutions never touch panel state.
+  useEffect(() => () => {
+    patientDataEpochRef.current += 1;
+  }, []);
 
   // Отслеживаем изменения URL для синхронизации активной вкладки
   useEffect(() => {
@@ -1925,74 +1969,19 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
             </Suspense>
           }
 
-          {/* C-4 fix: 'Добавить ЭКГ' button now opens a simple ECG entry form.
-              Previously setShowForm({type:'ecg'}) was called but no UI rendered. */}
+          {/* CARDIO-FE-001 (audit 3886 round 20): dedicated manual ECG form.
+              The old flow reused <BloodTestsTab showFormOpen /> here, which
+              rendered blood-test inputs and POSTed null ECG parameters. */}
           {showForm.open && showForm.type === 'ecg' && (
-            <Card className="cardio-p-6">
-              <div className="cardio-flex-between" style={{ marginBottom: 16 }}>
-                <h3 style={{ margin: 0 }}>{tI18n('cardio.cardio_panel_add_ecg_title')}</h3>
-                <Button variant="outline" size="small" onClick={() => setShowForm({ open: false })}>
-                  {tI18n('cardio.cardio_panel_close')}
-                </Button>
-              </div>
-              <BloodTestsTab
-                bloodTests={[]}
-                bloodTestForm={{
-                  ...bloodTestForm,
-                  // Hint the doctor that this form is for ECG metadata entry
-                  interpretation: String(bloodTestForm?.interpretation ?? ''),
-                }}
-                setBloodTestForm={setBloodTestForm}
-                showFormOpen
-                onNewTest={() => {}}
-                onCancelForm={() => setShowForm({ open: false })}
-                onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
-                  e?.preventDefault?.();
-                  // C-4 fix: Persist ECG metadata to /cardio/ecg as a manual entry
-                  // (file_id is null — the doctor is typing parameters from
-                  // a printout or another system). Uses fetch + tokenManager
-                  // to match the rest of CardiologistPanelUnified (not apiClient).
-                  const token = tokenManager.getAccessToken();
-                  fetch(`${API_V1_BASE}/cardio/ecg`, {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      patient_id: selectedPatient?.patient?.id || selectedPatient?.patient_id || null,
-                      visit_id: selectedPatient?.visit_id || null,
-                      file_id: null,
-                      ecg_date: new Date().toISOString().slice(0, 10),
-                      heart_rate: bloodTestForm?.heart_rate || null,
-                      pr_interval: bloodTestForm?.pr_interval || null,
-                      qrs_duration: bloodTestForm?.qrs_duration || null,
-                      qt_interval: bloodTestForm?.qt_interval || null,
-                      rhythm: bloodTestForm?.rhythm || null,
-                      axis: bloodTestForm?.axis || null,
-                      interpretation: bloodTestForm?.interpretation || null,
-                      source: 'manual',
-                      parameters: bloodTestForm,
-                    }),
-                  }).then((response) => {
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    notify.success(tI18n('cardio.ecg_added'));
-                    setShowForm({ open: false });
-                    loadPatientData();
-                  }).catch((err) => {
-                    logger.error('[Cardiology] Ошибка сохранения ЭКГ:', err);
-                    notify.error(tI18n('cardio.ecg_save_failed'));
-                  });
-                }}
-                getEmptyBloodTestForm={getEmptyBloodTestForm}
-                getFieldRangeWarning={getFieldRangeWarning}
-                isLdlCritical={isLdlCritical}
-                settings={settings}
-                getColor={getColor}
-                getFontSize={getFontSize}
-                getSpacing={getSpacing}
-              />
-            </Card>
+            <ManualEcgForm
+              patientId={((selectedPatient?.patient?.id || selectedPatient?.patient_id) as string | number | null | undefined) ?? null}
+              visitId={(selectedPatient?.visit_id ?? null) as string | number | null}
+              onCancel={() => setShowForm({ open: false })}
+              onSaved={() => {
+                setShowForm({ open: false });
+                loadPatientData();
+              }}
+            />
           )}
 
           {/* Анализы крови — R-15: extracted to BloodTestsTab component */}
