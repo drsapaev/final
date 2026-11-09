@@ -1,32 +1,40 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — diagnostic r4 Preflight PASS — 2026-11-09T10:49:00+05:00
+## Current checkpoint — synced after PR #3937; memory-safe staging path exercised — 2026-11-09T11:17:10+05:00
 
-- Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`.
-- Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, synchronized with latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`. The only incoming main paths were two CI workflow files; application source is unchanged.
-- The opt-in `artifact-runtime` path is implemented in the staging Dockerfile/Compose. The default `runtime` target is unchanged. The build checks `source.sha` and all `SHA256SUMS` entries and removes provenance files before Nginx serves the directory.
-- Hosted artifact workflow `42563847059` completed successfully on app source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the downloaded artifact matched `source.sha` and all 261 listed files passed SHA-256 verification. Artifact is under this worktree's ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`.
-- Local checks: focused guard test PASS (1 passed, 282 deselected); Python compile PASS; `git diff --check` PASS. An initial pytest invocation used a backend-relative path and found no test; rerun from the repository Python launcher passed. Windows has no Docker CLI, so Compose config is NOT_RUN locally and must be checked through canonical WSL Preflight.
-- Canonical Preflight: PASS. Ubuntu-24.04 / Docker 29.1.3 / Compose 2.40.3; worktree disk free 13 GiB, WSL backing disk free 26 GiB, WSL available memory 3209 MiB; custom ports 19001/18082/55441 accepted; no warnings. Compose config validated with `artifact-runtime` and the existing artifact context. No containers/services were started.
-- First Preflight attempt failed before Compose mutation because a PowerShell env-file expression wrote the synthetic Admin password on a separate line. The env file was regenerated with one `key=value` line per setting; the diagnostic Compose config then succeeded through canonical Preflight. No credentials were printed.
-- Canonical Start: PASS for owned synthetic project `clinic-aqs-t18-memory-20261109`. Runtime readiness PASS; backend/frontend/PostgreSQL ports 19001/18082/55441; WSL available memory 3200 MiB; build reserve 10 GiB; `served_revision_verified=false` as designed. Start returned `teardown=PENDING_SESSION`.
-- First Session: harness failure, not an application result. The Windows wrapper set conflicting `NO_COLOR` and `FORCE_COLOR`; Node wrote a warning to stderr and PowerShell promoted it to a terminating error before any Playwright phase marker was captured. Result: RQ-18/T18.10 tests `NOT_RUN`; canonical Session reports teardown PASS. The project was removed; do not reuse it.
-- Local Playwright dependency reuse was read-only verified: `C:\final\frontend\package-lock.json` has the same SHA-256 as this worktree. A worktree-only ignored junction points `frontend/node_modules` at that cache; installed Playwright 1.62.0 and Chromium 1234 are present. The junction is local execution plumbing, not a tracked change.
-- Corrected the ignored wrapper to keep Node streams in redirected files and remove both color overrides. PowerShell parser validation passed; no tests were executed during that check.
-- Fresh canonical Preflight: PASS for new synthetic project `clinic-aqs-t18-memory-20261109-r2`, ports backend 19002/frontend 18082/PostgreSQL 55442. C: free 13 GiB, WSL backing D: free 26 GiB, WSL available memory 3206 MiB, storage reserve 2 GiB for this non-build Preflight, warnings empty; runtime readiness `NOT_RUN`. Frontend stays on 18082 because the verified artifact embeds that origin.
-- Canonical Start: PASS for r2; build reserve 10 GiB, C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3201 MiB, runtime readiness PASS, no warnings.
-- Canonical Session on r2: normal Admin 2FA and T18.10 passed; the QR lifecycle reached its final phase but the original spec failed its final uncaught-Admin-page-error guard. In the diagnostic copy on r3, the failure occurred earlier: 13 lazy JS assets returned `browser-response-body-unavailable` to Playwright's response-body recorder, and `reportForOrigin` aborted before outputting any hashes. One isolated browser-response test passed, but that is not artifact attestation. The diagnostic copy did not reach the page-error guard, so the earlier observed page error still needs diagnosis. Overall live RQ-18 remains PARTIAL/FAIL.
-- Both Session runs returned canonical teardown PASS and removed their exact projects. Actual browser asset hashes remain `NOT_RUN`; the wrapper output was `0/0` after the recorder threw before emitting records. No application or tracked test change was made; no raw response content, patient payload or credentials were recorded.
-- Prepared an untracked diagnostic-only copy of the RQ-18 spec. It now reports asset-body capture failures without aborting before the final pageerror guard, records only error class, active static phase and JS filename/line, and emits available actual browser-asset hashes. The original tracked test and application code are unchanged. PowerShell parser and corrected Playwright `--list` PASS: exactly two tests discovered, zero executed in this check.
-- Fresh canonical Preflight: PASS for project `clinic-aqs-t18-memory-20261109-r4` on commit `984d06112917cdd50f8f11187ab8b7f72eceecb0`, ports backend 19004/frontend 18082/PostgreSQL 55445. C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3213 MiB, warnings empty; runtime readiness `NOT_RUN`. The artifact requires frontend port 18082.
-- Fresh canonical Preflight for r3: PASS on exact code/document commit `d5cbe259accca49a5e02eec8b0eb9cac5ff9ce48`, ports backend 19003/frontend 18082/PostgreSQL 55443; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3181 MiB, no warnings. Start then passed with 3253 MiB WSL memory and runtime readiness PASS. Frontend remains on the artifact's embedded origin port 18082.
-- Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read.
-- Allowed tracked paths remain the seven recorded in the pre-edit checkpoint below. Denied: runtime/backend/auth, GitHub workflow, gate/router, production, deployment and foreign staging resources.
-- Next exact action: run canonical Start on r4, then one Session with the ready diagnostic copy. Do not change tracked app or test code. If pageerror identifies application behavior, stop and use the required source gate before proposing a fix.
+Plan version: 1.0
+Current task: T18 final synthetic acceptance
+Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged; the staging-only artifact path is implemented and exercised locally, with its PR preparation next. T18/Tier-2 remains PARTIAL.
+Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`
+Branch: `codex/aqs-t18-memory-safe-staging-20261109`
+Base commit: current `origin/main` `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2` (#3943)
+Staging code under test: `9d75b1262708c2bf7e68a5d3076305ec4d2bfae1`
+Branch sync commit: `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`
+Last updated: 2026-11-09T11:17:10+05:00
+
+| Work item | Status | Evidence |
+|-----------|--------|----------|
+| T00–T17 | MERGED | Current main includes the merged plan implementation PRs. |
+| PR #3937 | MERGED | GitHub confirms merge commit `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. |
+| Memory-safe artifact path | VALIDATED LOCALLY; PR pending | Hosted artifact and its manifest verified; canonical Preflight, Start, Session and owned teardown completed. Exact live RQ-18 acceptance is still partial. |
+| T18 / Tier-2 | PARTIAL | T18.10 navigation passed in the diagnostic copy; the original tracked RQ-18 spec has no complete passing run on current source, and other T18/runbook checks remain open. |
+
+### Current checkpoint
+
+- The staging-only branch began from fresh `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`. After the r4 Session, it was synchronized with `origin/main` #3943 (`4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`) in merge commit `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`. Incoming paths are EMR-only and do not overlap the seven-file staging scope. The current PR diff remains seven files: staging Dockerfile, staging Compose file, focused guard test, WSL staging runbook, and the three plan journals. No product runtime or backend changes were made by this task.
+- The opt-in `artifact-runtime` target leaves the ordinary `runtime` build as default. It checks `source.sha` and every `SHA256SUMS` entry in the image build, then removes those metadata files from the served document root.
+- Hosted artifact workflow `42563847059` used application source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the downloaded artifact matched `source.sha`, and all 261 manifest entries passed SHA-256 verification.
+- Focused staging-guard test passed (1 passed, 282 deselected), including a rerun after main #3943 synchronization; Python compilation and `git diff --check` passed. Canonical Preflight validated named build context and ports on WSL Compose 2.40.3. Canonical Start and Session ran on owned synthetic project `clinic-aqs-t18-memory-20261109-r4`; Start and runtime readiness passed. Session teardown passed and removed the owned project.
+- The r4 Session ran an untracked diagnostic copy of the two RQ-18 browser tests, not the exact tracked test file. Playwright reported `2 passed (48.0s)`; the T18.10 marker and final Admin `pageerror` guard passed in this run. The QR lifecycle reached its final phase.
+- The same diagnostic run recorded 13 browser response-body capture errors (`resource-id-missing`). It captured 63 actual app JS/CSS response hashes and all 63 matched the verified artifact manifest; 5 unique asset paths had no hash (8 capture errors overlapped with paths that also had a successful capture). The canonical launcher still reported `served_revision_verified=false`. Therefore complete browser asset provenance is NOT_RUN/PARTIAL, and the exact tracked RQ-18 test is not marked PASS.
+- The earlier r2 run of the exact tracked spec passed T18.10 but failed the final uncaught-Admin-page-error guard. That failure did not reproduce in the r4 diagnostic copy; its cause remains unresolved, with no confirmed product defect. The r3 diagnostic run stopped earlier on body-capture errors.
+- The scratch wrapper incorrectly surfaced the first `RQ18_ASSET_CAPTURE_FAILURE_COUNT` (the separate synthetic probe's zero) instead of the later main-flow value of 13. Use the raw safe main-flow record, not the wrapper aggregate; do not reuse this wrapper until that parser is corrected.
+- Execution gate for this staging-only scope was already recorded as `gate_known_root_cause` → `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the generated prompt was read. Allowed tracked paths remain the seven listed in the pre-edit checkpoint. Denied: product runtime/backend/API/auth, DB/migrations, CI workflow/gate/router, production/deployment, foreign worktrees/projects, and merge by agent.
+- Next exact action: commit the three journal updates, push the synchronized single-purpose branch, and open one PR. Exact-head CI is the next validation gate. The owned r4 Compose project is gone; local ignored scratch deletion was blocked by workspace policy and is recorded in EVIDENCE.md. After the PR is green and the user merges it, continue T18 from fresh `origin/main`; do not repeat r4 solely to obtain the already-recorded infrastructure validation.
 
 ---
 
-## Current checkpoint — memory-safe frontend artifact path — pre-edit — 2026-11-09T09:39:19+05:00
+## Historical checkpoint — memory-safe frontend artifact path — pre-edit — superseded by the r4 Session result above — 2026-11-09T09:39:19+05:00
 
 - Umbrella task: `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`; this worktree starts from that exact fresh `origin/main` commit.
 - Objective: make the existing hosted staging frontend artifact usable by canonical local staging so T18 does not repeat the memory-heavy `npm ci`/Vite build inside WSL. Keep the ordinary build path unchanged.

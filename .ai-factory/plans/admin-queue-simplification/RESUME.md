@@ -1,4 +1,4 @@
-# Current resume — diagnostic r4 Preflight passed — 2026-11-09T10:49:00+05:00
+# Previous resume — diagnostic r4 Preflight checkpoint (superseded) — 2026-11-09T10:49:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
 
@@ -14,13 +14,25 @@ The untracked diagnostic copy ran in fresh r3. T18.10 passed, but the RQ-18 test
 
 The task-local diagnostic copy and wrapper are ready. They keep body-capture failures separate from manifest matches and expose only page-error class, static phase and JS basename/line. PowerShell parsing and `--list` both passed; two tests were discovered and none ran in that check. Tracked application and test sources are unchanged. Canonical Preflight passed for r4 on ports 19004/18082/55445; C: 13 GiB free, WSL backing D: 26 GiB free, WSL memory 3213 MiB.
 
-Next: run canonical Start then one Session on r4. If pageerror identifies app behavior, run the required source gate before proposing a source fix. Keep browser asset provenance `NOT_RUN` until all loaded app-asset hashes match the verified manifest.
+Superseded: canonical Start and the r4 diagnostic Session completed; see the current resume below and the latest EVIDENCE.md record.
 
-Validation already reported: focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; diagnostic `--list` found exactly two RQ-18 tests. First Session was a wrapper failure and teardown passed. Second project: T18.10 passed; original RQ-18 reached its final phase but failed the page-error guard; teardown passed. Third project: diagnostic RQ-18 reached the end phase but recorder failed on 13 JS bodies before actual asset hashes or page-error guard; teardown passed. Updated harness discovery and fresh r4 Preflight passed; Start/Session remain pending. No T18 completion claim.
+Historical snapshot (superseded): focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; diagnostic `--list` found exactly two RQ-18 tests. The later r4 Session result is recorded in the current EVIDENCE.md entry. No T18 completion claim.
 
 ---
 
-# Current resume — PR #3937 merged; memory-safe staging path in progress — 2026-11-09
+# Current resume — r4 diagnostic Session recorded; prepare the staging artifact PR — 2026-11-09T11:17:10+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. After the r4 Session, this branch was synced with current `origin/main` #3943 (`4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`) in merge commit `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`; the incoming change is EMR-only and does not overlap this staging PR. The r4 Session itself used application/artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+
+The memory-safe `artifact-runtime` path preserves the default full frontend build, verifies `source.sha` and all `SHA256SUMS` entries, and was exercised by canonical Preflight → Start → Session using hosted artifact run `42563847059`. The exact r4 diagnostic project was torn down successfully. Its diagnostic Playwright copy reported 2 passed, but 13 browser response-body reads failed; 63 captured asset hashes matched, while 5 unique paths have no hash. `served_revision_verified=false` remains. The focused staging guard test was rerun after main #3943 sync (1 passed, 282 deselected), and `git diff --check` passed. Do not claim the exact tracked RQ-18 spec or full served-asset provenance passed.
+
+The prior exact tracked spec run failed its final Admin page-error guard; the r4 diagnostic copy passed that guard, so the discrepancy remains unresolved. T18/Tier-2 is PARTIAL. Other open work includes current-source T18.1–5 and T18.8–9 browser acceptance, the full `STAGING_VALIDATION.md` checks, and cross-cutting language, keyboard, viewport, latency, and console review.
+
+Next exact action: review the seven-file diff, commit and push this single-purpose branch, then open one PR. The focused staging-guard regression (1 passed, 282 deselected) and `git diff --check` already pass after syncing with main #3943. Wait for exact-head CI; the user owns merge. The r4 Compose project is gone, but workspace policy blocked removal of its one task-owned `.scratch/t18-memory-safe-staging-20261109` folder; no bypass was attempted. After merge, fetch fresh `origin/main` and continue with a separate focused correction/validation for the exact RQ-18 browser recorder and unresolved page-error discrepancy. Do not start another Compose cycle just to repeat r4 infrastructure validation.
+
+---
+
+# Previous resume — PR #3937 merged; memory-safe staging path pre-edit — 2026-11-09
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`, based on merged `origin/main` `3a6d0f72dd72191de32c216dbdb145e0e407ae96` (PR #3937).
 

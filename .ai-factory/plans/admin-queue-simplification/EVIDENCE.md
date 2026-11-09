@@ -6609,4 +6609,30 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Environment: new synthetic project `clinic-aqs-t18-memory-20261109-r4`, ports 19004/18082/55445; frontend port 18082 is fixed by the artifact's embedded origin.
 - Canonical Preflight: PASS; Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3213 MiB, warnings empty. Runtime readiness `NOT_RUN`; no services started.
 - Diagnostic-only wrapper/list checks: PASS, two tests discovered and zero executed. The wrapper reports actual app asset matches and capture failures separately.
-- Next: canonical Start then one Session with the diagnostic copy.
+- Superseded: canonical Start and one diagnostic Session completed on r4; see the following record.
+
+## T18 memory-safe staging path — r4 synthetic diagnostic Session — 2026-11-09T11:03:46+05:00
+
+- Commit under test: staging worktree `9d75b1262708c2bf7e68a5d3076305ec4d2bfae1`; application/frontend artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Environment: Windows host with `Ubuntu-24.04`, Docker 29.1.3 and Compose 2.40.3; owned synthetic project `clinic-aqs-t18-memory-20261109-r4`, ports 19004/18082/55445. Frontend port 18082 is required by the artifact's embedded API/WebSocket origin.
+- Execution mode: previously recorded `gate_known_root_cause` → `narrow_override`, no misroute, override used, handoff required; generated prompt was read. Runtime and application behavior were not edited in this Session.
+- Allowed tracked paths for this PR: `frontend/Dockerfile.staging`, `ops/compose.staging.yml`, `scripts/tests/test_wsl_staging_guard.py`, `docs/runbooks/WSL_STAGING_SESSION.md`, and the three T18 journals. Reference-only: app/backend/auth, CI workflow, WSL lifecycle implementation and production configuration. Denied: production, deployment, app/runtime/backend/API/auth, migrations, gate/router, foreign worktrees/projects and merge by agent.
+- Original failure: r2 ran the exact tracked `rq18-permanent-qr-live.spec.ts`; T18.10 passed, but the QR-flow test failed its final uncaught-Admin-page-error guard. The error itself was not captured. In r3, a diagnostic copy stopped earlier after 13 JS response bodies could not be read by Playwright.
+- Validation command: canonical `wsl_staging.ps1` Preflight → Start → Session for r4, with the task-local diagnostic copy of the two RQ-18 Playwright tests. Preflight and Start passed; runtime readiness passed. The diagnostic Playwright summary was `2 passed (48.0s)`; T18.10 and its final page-error guard passed, and the QR lifecycle reached its final phase.
+- Result: memory-safe artifact path PASS for this synthetic run. The Session did not execute the exact tracked spec: diagnostic code made asset-body capture errors nonfatal so the final guard could be observed. It recorded 13 body-capture errors (`resource-id-missing`); 63 actual app JS/CSS response hashes matched the artifact manifest, 5 unique paths had no hash, and 8 capture errors overlapped paths with a successful capture. Full RQ-18/browser-provenance result remains PARTIAL/NOT_RUN, not PASS.
+- Artifact evidence: hosted build workflow `42563847059`, exact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; `source.sha` matched and 261/261 `SHA256SUMS` entries passed before startup. The canonical launcher still reported `served_revision_verified=false`; partial browser hash matches do not override that field or prove every loaded asset.
+- Harness limitation: the scratch wrapper's summary selected the first failure-count marker (zero from the separate synthetic probe) rather than the later main-flow value (13). The raw sanitized main-flow result was used for this record. Do not reuse that aggregate until the parser selects the main-flow marker explicitly.
+- Cleanup: canonical Session teardown PASS; the exact r4 Compose project and its owned resources were removed. No other project was touched.
+- Scope check: no product runtime, backend, API, auth, database, workflow, production, merge or deployment changes. The isolated result does not complete T18 or the full `STAGING_VALIDATION.md` checklist.
+- Remaining limitation: resolve the exact-test page-error discrepancy and response-body read failures, then rerun the exact tracked spec on a future fresh artifact/source revision. T18.1–5, T18.8–9 and cross-cutting keyboard, viewport, latency, language, console and complete runbook checks remain open as recorded in PROGRESS.md.
+- PR: staging-only artifact-path PR not opened at this record; exact-head CI and PR are pending.
+- Merge commit: not applicable.
+
+## T18 staging artifact PR preparation — synced and locally validated — 2026-11-09T11:17:10+05:00
+
+- Commit under test: staging implementation `9d75b1262708c2bf7e68a5d3076305ec4d2bfae1`; branch sync merge `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`.
+- Base: current `origin/main` #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`. The incoming main commit touched EMR files only; it did not overlap the staging change. Current branch PR diff remains the seven scoped files listed above.
+- Validation command: after main sync, `scripts/run_python.ps1 -RequireModule pytest -m pytest scripts/tests/test_wsl_staging_guard.py -k prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance -q` using the existing `C:\final\backend\.venv\Scripts\python.exe` — PASS (1 passed, 282 deselected). `git diff --check` — PASS. An earlier malformed launcher invocation omitted `-RequireModule pytest` and did not start pytest; it is not counted.
+- Scratch cleanup: the attempted command named only `.scratch/t18-memory-safe-staging-20261109` under this worktree and included guards against paths outside `.scratch` or reparse points. Local workspace policy rejected the command before PowerShell ran, so neither the guard checks nor deletion executed. No alternate deletion route was used; one task-owned scratch folder remains for manual removal. The synthetic Compose project itself was already removed by canonical Session teardown.
+- PR: not yet opened; commit, push, and PR creation are the next action.
+- Result: branch is synchronized and the focused guard passes; the full T18 acceptance remains PARTIAL as in the preceding r4 record.
