@@ -1,6 +1,6 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — Start PASS; first Session stopped in local harness — 2026-11-09T10:15:00+05:00
+## Current checkpoint — retry harness fixed; fresh Preflight PASS — 2026-11-09T10:22:00+05:00
 
 - Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`.
 - Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, synchronized with latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`. The only incoming main paths were two CI workflow files; application source is unchanged.
@@ -12,9 +12,11 @@
 - Canonical Start: PASS for owned synthetic project `clinic-aqs-t18-memory-20261109`. Runtime readiness PASS; backend/frontend/PostgreSQL ports 19001/18082/55441; WSL available memory 3200 MiB; build reserve 10 GiB; `served_revision_verified=false` as designed. Start returned `teardown=PENDING_SESSION`.
 - First Session: harness failure, not an application result. The Windows wrapper set conflicting `NO_COLOR` and `FORCE_COLOR`; Node wrote a warning to stderr and PowerShell promoted it to a terminating error before any Playwright phase marker was captured. Result: RQ-18/T18.10 tests `NOT_RUN`; canonical Session reports teardown PASS. The project was removed; do not reuse it.
 - Local Playwright dependency reuse was read-only verified: `C:\final\frontend\package-lock.json` has the same SHA-256 as this worktree. A worktree-only ignored junction points `frontend/node_modules` at that cache; installed Playwright 1.62.0 and Chromium 1234 are present. The junction is local execution plumbing, not a tracked change.
+- Corrected the ignored wrapper to keep Node streams in redirected files and remove both color overrides. PowerShell parser validation passed; no tests were executed during that check.
+- Fresh canonical Preflight: PASS for new synthetic project `clinic-aqs-t18-memory-20261109-r2`, ports backend 19002/frontend 18082/PostgreSQL 55442. C: free 13 GiB, WSL backing D: free 26 GiB, WSL available memory 3206 MiB, storage reserve 2 GiB for this non-build Preflight, warnings empty; runtime readiness `NOT_RUN`. Frontend stays on 18082 because the verified artifact embeds that origin.
 - Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read.
 - Allowed tracked paths remain the seven recorded in the pre-edit checkpoint below. Denied: runtime/backend/auth, GitHub workflow, gate/router, production, deployment and foreign staging resources.
-- Next exact action: correct the local runner to redirect Node stdout/stderr without PowerShell native-stderr promotion and remove the redundant `NO_COLOR` variable. Create one fresh synthetic project (retain frontend port 18082 required by the artifact, select fresh backend/PostgreSQL ports), then run canonical Preflight → Start → one Session. Stop on any new prerequisite failure; no blind retry.
+- Next exact action: run canonical Start on project `clinic-aqs-t18-memory-20261109-r2`, then one Session using the same env and fixed wrapper. Start applies the 10 GiB build reserve and still builds backend/worker. If Start or the corrected Session fails, use its exact-project teardown result and do not repeat unchanged steps.
 
 ---
 

@@ -1,4 +1,4 @@
-# Current resume — Start passed; first Session harness stopped before tests — 2026-11-09T10:15:00+05:00
+# Current resume — corrected harness; fresh Preflight passed — 2026-11-09T10:22:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
 
@@ -6,11 +6,13 @@ PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. The feature br
 
 The memory-safe prebuilt frontend target is implemented and its focused test passes. Existing hosted artifact workflow `42563847059` built the exact latest main source; `source.sha` matched and all 261 artifact checksums passed. The artifact is in ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`. The ordinary full frontend build stays the default. Windows lacks Docker CLI; canonical WSL Preflight validated Compose configuration and resources, but Start/Session have not run and no services are up.
 
-Canonical `Preflight` and `Start` passed on owned synthetic project `clinic-aqs-t18-memory-20261109`; Start reported healthy runtime and `teardown=PENDING_SESSION`. The first canonical `Session` ended before test execution because the local wrapper set conflicting `NO_COLOR`/`FORCE_COLOR`; PowerShell promoted Node's stderr warning to a terminating error. There are no Playwright phase markers, so RQ-18 and T18.10 remain `NOT_RUN`. Canonical teardown passed and removed this project; do not reuse it. No credential values are in the journal.
+The first canonical `Session` ended before test execution because the local wrapper set conflicting `NO_COLOR`/`FORCE_COLOR`; PowerShell promoted Node's stderr warning to a terminating error. There were no Playwright phase markers, so RQ-18 and T18.10 remain `NOT_RUN`. Canonical teardown passed and removed that project; do not reuse it.
 
-Next: fix only the ignored local Playwright wrapper to remove the redundant color variable and redirect Node stdout/stderr separately. Use one fresh synthetic Compose project with fresh backend/PostgreSQL ports and frontend port 18082, which the verified artifact requires. Run canonical Preflight → Start → one Session; no test rerun until that setup is ready. Do not mark served revision verified from image ID alone; compare browser-delivered JS/CSS response hashes with the hosted manifest.
+The wrapper now redirects Node stdout/stderr separately and has passed PowerShell syntax validation. Canonical Preflight passed for new synthetic project `clinic-aqs-t18-memory-20261109-r2` on backend/frontend/PostgreSQL ports 19002/18082/55442; free capacity was C: 13 GiB, WSL backing D: 26 GiB, WSL memory 3206 MiB. The artifact source and embedded frontend origin remain `215472cadbbdc8cd4046ca2c8eae0e9205594521` and `http://127.0.0.1:18082`.
 
-Validation already reported: focused test 1 passed/282 deselected; Python compile passed; `git diff --check` passed; hosted artifact source/checksums passed; `--list` found two RQ-18 tests but executed none. Start passed and the first Session's owned teardown passed; RQ-18/T18.10 behavior remains unverified. An initial pytest command from the backend runner used an invalid relative path and was corrected; no test ran on that first attempt. Do not claim staging or T18 completion yet.
+Next: run canonical Start, then one Session using the same env/project and corrected wrapper. Start performs the 10 GiB build-reserve check. Do not mark served revision verified from image ID alone; compare browser-delivered JS/CSS response hashes with the hosted manifest.
+
+Validation already reported: focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; `--list` found two RQ-18 tests but executed none. First project Start passed; its Session wrapper failed before tests and teardown passed. Fresh retry Preflight passed; RQ-18/T18.10 behavior remains unverified until the upcoming Session. An initial pytest command from the backend runner used an invalid relative path and was corrected; no test ran on that first attempt. Do not claim staging or T18 completion yet.
 
 ---
 
