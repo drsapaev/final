@@ -180,4 +180,48 @@ describe('RETRO-3930-01: late failures of the previous visit cannot lock or erro
         expect(apiClientMock.post).toHaveBeenCalledTimes(2);
         expect(utils.result.current.accessDenied).toBe(false);
     });
+
+    it('a conflict reload dropped by a visit switch does not clear the new visit\'s unsaved edits (Codex follow-up)', async () => {
+        // Visit A loads, then a conflict «discard» reload is started and hangs.
+        apiClientMock.get.mockResolvedValueOnce({ status: 200, data: serverEmr(90) });
+        const utils = renderHook((props: { visitId: number }) => useEMR(props.visitId, { specialty: 'therapy' }), {
+            initialProps: { visitId: 90 },
+        });
+        await waitFor(() => {
+            expect(utils.result.current.emr).not.toBeNull();
+        });
+
+        const gateReload = deferred<{ status: number; data: unknown }>();
+        apiClientMock.get.mockImplementationOnce(() => gateReload.promise);
+        await act(async () => {
+            void utils.result.current.reloadFromServer();
+        });
+
+        // The doctor switches to visit B while the reload is in flight.
+        apiClientMock.get.mockResolvedValueOnce({ status: 200, data: serverEmr(91) });
+        act(() => {
+            utils.rerender({ visitId: 91 });
+        });
+        await waitFor(() => {
+            expect(utils.result.current.data.complaints).toBe('visit-91 text');
+        });
+
+        // B gets unsaved edits.
+        act(() => {
+            utils.result.current.setField('complaints', 'unsaved B edit');
+        });
+        expect(utils.result.current.isDirty).toBe(true);
+
+        // A's reload GET finally fails — the load is dropped as stale.
+        await act(async () => {
+            gateReload.reject({ response: { status: 500, data: { detail: 'boom' } } });
+            await flush();
+        });
+
+        // The dropped reload must NOT resolve the current visit's conflict
+        // state: B's dirty flag and edits survive untouched.
+        expect(utils.result.current.isDirty).toBe(true);
+        expect(utils.result.current.data.complaints).toBe('unsaved B edit');
+        expect(utils.result.current.error).toBeFalsy();
+    });
 });

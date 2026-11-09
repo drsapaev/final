@@ -281,9 +281,12 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 emrCache.delete(cacheKey);
                 // RETRO-3930-01: same guard for late failures of the previous
                 // visit — no stale error state, no stale toast, no rejection
-                // into callers that already moved on to the new visit.
+                // into callers that already moved on to the new visit. The
+                // outcome is an EXPLICIT stale marker (not a fake success) so
+                // continuations like reloadFromServer can distinguish a
+                // dropped load from a completed one.
                 if (!stillCurrentVisit()) {
-                    return null;
+                    return { stale: true };
                 }
                 if (isMountedRef.current) {
                     dispatch(emrActions.saveError(apiError.message || 'Failed to load EMR'));
@@ -583,6 +586,14 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     const reloadFromServer = useCallback(async () => {
         const result = await loadEMR(true);
         if (result?.accessDenied) {
+            return result;
+        }
+        // RETRO-3930-01 follow-up (Codex review on round 22): a load that was
+        // DROPPED because the visit switched mid-reload must not resolve the
+        // CURRENT visit's conflict — the «discard» continuation belongs to
+        // the visit that started it, and dispatching here would clear the
+        // new visit's dirty flag and undo history for edits it never saw.
+        if (!result || (result as { stale?: boolean }).stale) {
             return result;
         }
         // EMRCONFLICT-FE-001 (audit 3886 round 17): this is the explicit
