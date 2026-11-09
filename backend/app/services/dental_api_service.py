@@ -169,6 +169,15 @@ class DentalApiService:
             logger.warning("Не найдены пользователи с ролью Registrar для отправки уведомлений")
             return
 
+        # DENTPRICE-BE-001 (audit #3892, group 17): the REAL user↔chat
+        # association lives in ``telegram_users`` (user_id ↔ chat_id); the
+        # User model has no telegram_id attribute, so the old ``hasattr``
+        # probe skipped EVERY send while the flag below still claimed
+        # success.
+        chat_ids = self.repository.get_telegram_chat_ids_by_user_ids(
+            [registrar.id for registrar in registrars]
+        )
+
         doctor_name = doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
         patient_info = f"Пациент #{visit.patient_id}" if visit else "Неизвестный пациент"
         details_line = f"Детали: {price_override.details}\n" if price_override.details else ""
@@ -185,17 +194,21 @@ class DentalApiService:
             "Статус: Ожидает одобрения"
         )
 
+        confirmed_deliveries = 0
         for registrar in registrars:
-            try:
-                if hasattr(registrar, "telegram_id") and registrar.telegram_id:
-                    await notification_sender_service.send_telegram_message(
-                        user_id=registrar.telegram_id,
-                        message=message,
-                        parse_mode="HTML",
-                    )
+            chat_id = chat_ids.get(registrar.id)
+            if chat_id is None:
                 logger.info(
-                    "Уведомление о изменении цены отправлено регистратору %s",
+                    "У регистратора %s нет активной привязки Telegram — "
+                    "уведомление не отправлено",
                     registrar.username,
+                )
+                continue
+            try:
+                result = await notification_sender_service.send_telegram_message(
+                    user_id=chat_id,
+                    message=message,
+                    parse_mode="HTML",
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.error(
@@ -203,10 +216,33 @@ class DentalApiService:
                     registrar.username,
                     exc,
                 )
+                continue
+            if isinstance(result, dict) and result.get("success") is True:
+                confirmed_deliveries += 1
+                logger.info(
+                    "Уведомление о изменении цены доставлено регистратору %s",
+                    registrar.username,
+                )
+            else:
+                logger.error(
+                    "Отправка уведомления регистратору %s не подтверждена: %s",
+                    registrar.username,
+                    result,
+                )
 
-        price_override.notification_sent = True
-        price_override.notification_sent_at = datetime.now(UTC)
-        self.repository.commit()
+        # DENTPRICE-BE-001: ``notification_sent`` means at least one
+        # CONFIRMED delivery — «отправлено» ≠ «попытка отправки». The
+        # pending request itself stays committed and reviewable regardless
+        # of the delivery outcome.
+        if confirmed_deliveries > 0:
+            price_override.notification_sent = True
+            price_override.notification_sent_at = datetime.now(UTC)
+            self.repository.commit()
+        else:
+            logger.warning(
+                "Ни одно уведомление об изменении цены не подтверждено — "
+                "notification_sent остается False"
+            )
 
     def get_dental_price_overrides(
         self,

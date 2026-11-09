@@ -235,7 +235,13 @@ def test_registrar_approve_updates_chargeable_price_and_json_mirror(
     assert refreshed_visit_service.price == Decimal("180000"), (
         "registrar approval must update the chargeable VisitService.price"
     )
-    assert refreshed_visit_service.custom_price == Decimal("180000")
+    # DOCVISIT-BE-001 (group 17): VisitService has no custom_price column —
+    # the canonical service must not leave an ephemeral attribute on the
+    # shared-session instance. The persisted price above is the whole truth.
+    assert not hasattr(refreshed_visit_service, "custom_price"), (
+        "custom_price is not a mapped field; an ephemeral attribute here means "
+        "a non-persisted write leaked through the identity map"
+    )
 
     refreshed_visit = db_session.get(Visit, visit.id)
     mirror = (refreshed_visit.doctor_price_override or {}).get(str(service.id))
@@ -282,7 +288,9 @@ def test_dental_approve_updates_json_mirror_and_chargeable_price(
     db_session.expire_all()
     refreshed_visit_service = db_session.get(VisitService, visit_service.id)
     assert refreshed_visit_service.price == Decimal("145000")
-    assert refreshed_visit_service.custom_price == Decimal("145000")
+    # DOCVISIT-BE-001 (group 17): no ephemeral custom_price may survive the
+    # canonical approval — only the persisted price exists.
+    assert not hasattr(refreshed_visit_service, "custom_price")
 
     refreshed_visit = db_session.get(Visit, visit.id)
     mirror = (refreshed_visit.doctor_price_override or {}).get(str(service.id))

@@ -337,7 +337,11 @@ def test_price_override_approval_updates_visit_service_price_exactly_once(
     db_session.expire_all()
     refreshed = db_session.get(VisitService, visit_service.id)
     assert refreshed.price == Decimal("180000")
-    assert refreshed.custom_price == Decimal("180000")
+    # DOCVISIT-BE-001 (group 17): VisitService has no custom_price column.
+    # The old assertion passed vacuously through the shared-session identity
+    # map (an ephemeral attribute set by the approval path); only the
+    # persisted price is real.
+    assert not hasattr(refreshed, "custom_price")
 
 
 @pytest.mark.parametrize(

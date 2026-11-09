@@ -262,8 +262,11 @@ class PriceOverrideApprovalService:
             # written together, in ONE commit — both routes now converge on
             # the identical canonical outcome.
             for row in chargeable_rows:
+                # DOCVISIT-BE-001 (audit #3892, group 17): VisitService has
+                # no custom_price column — writing one would only set an
+                # ephemeral Python attribute that never persists. The
+                # chargeable price IS ``price``.
                 row.price = override.new_price
-                row.custom_price = override.new_price
             self._apply_visit_json(override)
 
             self.db.commit()

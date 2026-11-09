@@ -7294,7 +7294,15 @@ export type paths = {
         get?: never;
         /**
          * Add Service To Visit
-         * @description Добавить услугу к визиту
+         * @description Добавить услугу к визиту.
+         *
+         *     DOCVISIT-BE-002: ``quantity``/``custom_price`` валидируются ДО записи —
+         *     некорректные строки не попадают в биллинг. DOCVISIT-BE-003: мутация
+         *     координируется с платёжным легером (каноничный Visit-lock + отказ при
+         *     processing-инвойсах и оплаченном остатке). DOCVISIT-BE-001: ответ
+         *     строится ТОЛЬКО из персистентного состояния — ``price`` и есть
+         *     фактическая цена (кастомная или каталожная), фантомного ``custom_price``
+         *     поля не существует.
          */
         put: operations["add_service_to_visit_api_v1_doctor_visits__visit_id__add_service_put"];
         post?: never;
@@ -7316,7 +7324,10 @@ export type paths = {
         post?: never;
         /**
          * Remove Service From Visit
-         * @description Удалить услугу из визита
+         * @description Удалить услугу из визита.
+         *
+         *     DOCVISIT-BE-003: удаление строки услуги оплаченного визита меняет базу
+         *     стоимости под неизменным чеком — отказ (409), как и для добавления.
          */
         delete: operations["remove_service_from_visit_api_v1_doctor_visits__visit_id__services__visit_service_id__delete"];
         options?: never;
