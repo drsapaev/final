@@ -90,6 +90,9 @@ class TestDentalApiService:
             def get_visit_service(self, *, visit_id, service_id):
                 return SimpleNamespace(visit_id=visit_id, service_id=service_id, price=Decimal("120"))
 
+            def has_pending_override(self, *, visit_id, service_id):
+                return False  # REGPRICE-BE-003: no other pending intent
+
             def get_doctor_by_user_id(self, user_id):
                 return SimpleNamespace(id=7, specialty=specialty, user=None)
 
@@ -174,6 +177,9 @@ class TestDentalApiService:
 
             def get_visit_service(self, *, visit_id, service_id):
                 return SimpleNamespace(visit_id=visit_id, service_id=service_id, price=Decimal("120"))
+
+            def has_pending_override(self, *, visit_id, service_id):
+                return False  # REGPRICE-BE-003: no other pending intent
 
             def get_doctor_by_user_id(self, user_id):
                 return SimpleNamespace(id=7, specialty="dental", user=None)

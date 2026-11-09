@@ -22,18 +22,18 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.api.v1.endpoints.registrar_wizard._cart import (
-    approve_price_override,
     PriceOverrideApprovalRequest,
+    approve_price_override,
 )
 from app.db import base  # noqa: F401 — регистрация всех моделей
 from app.db.base_class import Base
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.patient import Patient
 from app.models.user import User
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 
 
 @pytest.fixture()
@@ -84,6 +84,21 @@ def _seed(engine) -> tuple[int, int, int]:
             },
         )
         session.add(visit)
+        session.flush()
+
+        # REGPRICE-BE-001 (audit 3892, group 16): the canonical approval
+        # fail-closes when the chargeable VisitService row is missing — the
+        # JSON-persistence contract under test needs the attached row.
+        session.add(
+            VisitService(
+                visit_id=visit.id,
+                service_id=202,
+                code="202",
+                name="XC service B",
+                qty=1,
+                price=Decimal("200000.00"),
+            )
+        )
         session.flush()
 
         override_b = DoctorPriceOverride(
@@ -161,6 +176,17 @@ def test_first_price_override_still_persists_from_empty_json(fresh_engine) -> No
         visit = Visit(patient_id=patient.id, status="open", doctor_price_override=None)
         session.add(visit)
         session.flush()
+        session.add(
+            VisitService(
+                visit_id=visit.id,
+                service_id=303,
+                code="303",
+                name="XC service 303",
+                qty=1,
+                price=Decimal("50000.00"),
+            )
+        )
+        session.flush()
         override = DoctorPriceOverride(
             visit_id=visit.id,
             service_id=303,
@@ -210,6 +236,17 @@ def test_approved_at_is_set_on_override_row(fresh_engine) -> None:
         session.flush()
         visit = Visit(patient_id=patient.id, status="open")
         session.add(visit)
+        session.flush()
+        session.add(
+            VisitService(
+                visit_id=visit.id,
+                service_id=404,
+                code="404",
+                name="XC service 404",
+                qty=1,
+                price=Decimal("10000.00"),
+            )
+        )
         session.flush()
         override = DoctorPriceOverride(
             visit_id=visit.id,

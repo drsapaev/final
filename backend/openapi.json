@@ -20306,7 +20306,7 @@
           "registrar-wizard"
         ],
         "summary": "Получить все изменения цен для одобрения",
-        "description": "Получить список изменений цен для одобрения регистратурой",
+        "description": "Получить список изменений цен для одобрения регистратурой\n\nREGPRICE-BE-004 (audit #3892, group 16): the queue is paginated over a\ndeterministic ``(created_at DESC, id DESC)`` order and the FULL filtered\ntotal is exposed via the ``X-Total-Count`` header — a bare 100-row\nnewest-first window silently hid older pending requests with no way to\nreach them from the registrar UI.",
         "operationId": "get_pending_price_overrides_api_v1_registrar_price_overrides_get",
         "security": [
           {
@@ -20342,6 +20342,17 @@
               "minimum": 1,
               "default": 50,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -20379,7 +20390,7 @@
           "registrar-wizard"
         ],
         "summary": "Одобрить или отклонить изменение цены",
-        "description": "Одобрить или отклонить изменение цены врачом",
+        "description": "Одобрить или отклонить изменение цены врачом\n\nREGPRICE-BE-001/002/003/005 (audit #3892, group 16): the registrar route\nnow delegates to the canonical PriceOverrideApprovalService — the SAME\nimplementation the dental PUT route uses — so both independently exposed\nroutes converge on one outcome: locked decision (409 for the loser of a\nconcurrent race), chargeable ``VisitService.price`` update PLUS the\n``Visit.doctor_price_override`` JSON mirror in one commit, stale-intent\nvalidation and a mandatory non-blank rejection reason.",
         "operationId": "approve_price_override_api_v1_registrar_price_override_approve_post",
         "requestBody": {
           "content": {
@@ -52760,6 +52771,17 @@
               "minimum": 1,
               "default": 50,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -103738,6 +103760,30 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "New Price"
+          },
+          "visit_price_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Price Before"
+          },
+          "visit_price_difference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Price Difference"
           },
           "reason": {
             "type": "string",

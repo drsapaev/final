@@ -15,6 +15,10 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
 )  # noqa: F401
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
+from app.services.price_override_approval import (
+    PriceOverrideApprovalError,
+    PriceOverrideApprovalService,
+)
 from app.services.registrar_doctor_eligibility import service_routes_to_resource_queue
 from app.services.registrar_wizard_queue_assignment_service import (
     DuplicateCartResourceQueueVisitsError,
@@ -1198,6 +1202,12 @@ class PriceOverrideListResponse(BaseModel):
     patient_name: str | None
     original_price: Decimal
     new_price: Decimal
+    # DERMAPRICE-BE-002 end-to-end (audit #3892, group 16 follow-up): the
+    # registrar reviewer also sees the visit's ACTUAL before-price captured
+    # at request time and the delta relative to it — the catalogue
+    # original_price keeps its immutable reference semantics.
+    visit_price_before: Decimal | None = None
+    visit_price_difference: Decimal | None = None
     reason: str
     details: str | None
     status: str
@@ -1218,24 +1228,50 @@ def _price_override_available_actions(override_status: str) -> list[str]:
     response_model=list[PriceOverrideListResponse],
 )
 def get_pending_price_overrides(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
     status_filter: str | None = Query(
         default="pending", pattern="^(pending|approved|rejected|all)$"
     ),
     limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
 ) -> list[PriceOverrideListResponse]:
     """
     Получить список изменений цен для одобрения регистратурой
+
+    REGPRICE-BE-004 (audit #3892, group 16): the queue is paginated over a
+    deterministic ``(created_at DESC, id DESC)`` order and the FULL filtered
+    total is exposed via the ``X-Total-Count`` header — a bare 100-row
+    newest-first window silently hid older pending requests with no way to
+    reach them from the registrar UI.
     """
     try:
-        query = db.query(DoctorPriceOverride).join(Service).join(Doctor)
+        # Explicit join conditions on the OVERRIDE's foreign keys. The
+        # previous implicit ``.join(Service).join(Doctor)`` chain inferred
+        # ``Service.doctor_id == Doctor.id`` for the second hop — catalogue
+        # services (doctor_id NULL) then silently disappeared from the
+        # registrar queue, an even harsher drop than REGPRICE-BE-004
+        # described.
+        query = (
+            db.query(DoctorPriceOverride)
+            .join(Service, DoctorPriceOverride.service_id == Service.id)
+            .join(Doctor, DoctorPriceOverride.doctor_id == Doctor.id)
+        )
 
         if status_filter != "all":
             query = query.filter(DoctorPriceOverride.status == status_filter)
 
+        total = query.count()
+        response.headers["X-Total-Count"] = str(total)
+
         overrides = (
-            query.order_by(DoctorPriceOverride.created_at.desc()).limit(limit).all()
+            query.order_by(
+                DoctorPriceOverride.created_at.desc(), DoctorPriceOverride.id.desc()
+            )
+            .offset(offset)
+            .limit(limit)
+            .all()
         )
 
         result = []
@@ -1260,6 +1296,12 @@ def get_pending_price_overrides(
                     patient_name=patient_name,
                     original_price=override.original_price,
                     new_price=override.new_price,
+                    visit_price_before=override.visit_price_before,
+                    visit_price_difference=(
+                        override.new_price - override.visit_price_before
+                        if override.visit_price_before is not None
+                        else None
+                    ),
                     reason=override.reason,
                     details=override.details,
                     status=override.status,
@@ -1290,82 +1332,36 @@ def approve_price_override(
 ) -> dict[str, Any]:
     """
     Одобрить или отклонить изменение цены врачом
+
+    REGPRICE-BE-001/002/003/005 (audit #3892, group 16): the registrar route
+    now delegates to the canonical PriceOverrideApprovalService — the SAME
+    implementation the dental PUT route uses — so both independently exposed
+    routes converge on one outcome: locked decision (409 for the loser of a
+    concurrent race), chargeable ``VisitService.price`` update PLUS the
+    ``Visit.doctor_price_override`` JSON mirror in one commit, stale-intent
+    validation and a mandatory non-blank rejection reason.
     """
     try:
-        # Получаем изменение цены
-        override = (
-            db.query(DoctorPriceOverride)
-            .filter(DoctorPriceOverride.id == approval_data.override_id)
-            .first()
+        override = PriceOverrideApprovalService(db).process(
+            override_id=approval_data.override_id,
+            action=approval_data.action,
+            rejection_reason=approval_data.rejection_reason,
+            approver_id=current_user.id,
         )
+    except PriceOverrideApprovalError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-        if not override:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Изменение цены не найдено",
-            )
-
-        if override.status != "pending":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Изменение цены уже обработано (статус: {override.status})",
-            )
-
-        # Обновляем статус
-        if approval_data.action == "approve":
-            override.status = "approved"
-            override.approved_by = current_user.id
-            override.approved_at = datetime.now(UTC)
-
-            # Обновляем цену в визите
-            visit = db.query(Visit).filter(Visit.id == override.visit_id).first()
-            if visit:
-                # Обновляем doctor_price_override в JSON поле.
-                # REG-XC-001 (follow-up audit 2026-11-02): колонка — обычный
-                # mapped_column(JSON) БЕЗ MutableDict, поэтому SQLAlchemy не
-                # отслеживает in-place мутации словаря. Первое согласование
-                # (None → {}) маркировало атрибут dirty, но ВТОРОЕ на
-                # непустом словаре проходило без присваивания/flag_modified —
-                # одобрение возвращало 2xx, а JSON визита не сохранялся.
-                # Каноническая правка: собрать НОВЫЙ словарь и присвоить его
-                # атрибуту — dirty-трекинг срабатывает на каждом согласовании.
-                updated_override = dict(visit.doctor_price_override or {})
-                updated_override[str(override.service_id)] = {
-                    "original_price": float(override.original_price),
-                    "new_price": float(override.new_price),
-                    "override_id": override.id,
-                    "approved_at": override.approved_at.isoformat(),
-                }
-                visit.doctor_price_override = updated_override
-
-            message = "Изменение цены одобрено"
-
-        elif approval_data.action == "reject":
-            override.status = "rejected"
-            override.approved_by = current_user.id
-            override.approved_at = datetime.now(UTC)
-            override.rejection_reason = approval_data.rejection_reason
-
-            message = "Изменение цены отклонено"
-
-        db.commit()
-        db.refresh(override)
-
-        return {
-            "success": True,
-            "message": message,
-            "override_id": override.id,
-            "new_status": override.status,
-        }
-
-    except HTTPException:
-        raise
-    except Exception:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
+    message = (
+        "Изменение цены одобрено"
+        if override.status == "approved"
+        else "Изменение цены отклонено"
+    )
+    return {
+        "success": True,
+        "message": message,
+        "override_id": override.id,
+        "new_status": override.status,
+    }
 
 
 # ===================== УПРАВЛЕНИЕ ЛЬГОТАМИ ALL FREE =====================
