@@ -1,3 +1,13 @@
+## Current resume — PR #3946 exact-head CI passed; checkpoint commit next — 2026-11-09T13:23:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Draft / mergeable, HEAD `da54660bbe8289b644f91621bb32f847bf551666`, based on current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`.
+
+PR #3946 applicable exact-head CI passed. The PR-description gate also passed locally (19 tests plus both examples and the exact body). Backend/integration/E2E/Docker/staging/production/load checks are skipped by path conditions and are not claimed as passes. The PR body now attributes the exact tracked RQ-18 page-error failure to the earlier artifact/source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the current #3943 artifact has not been exercised by that exact test.
+
+The staging change is seven paths: staging Dockerfile/Compose, one focused guard test, WSL staging runbook, and the three T18 journals. Default frontend build remains unchanged. The owned synthetic r4 Compose project was torn down. The exact tracked RQ-18 browser test has not passed; r4's untracked diagnostic copy is not equivalent, 13 response-body reads failed, five unique assets have no captured hash, and `served_revision_verified=false`. T18/Tier-2 stays PARTIAL.
+
+Next: commit/push the current three-journal CI checkpoint with normal hooks, verify new exact-head checks, then mark #3946 Ready for review. Leave merge to the user. After the user merges it, refresh main in a new worktree and continue with the exact tracked RQ-18 recorder/page-error discrepancy and remaining T18 acceptance. One task-owned ignored `.scratch/t18-memory-safe-staging-20261109` folder remains because local host policy blocked removal; no alternate deletion route was attempted.
+
 # Previous resume — diagnostic r4 Preflight checkpoint (superseded) — 2026-11-09T10:49:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.

@@ -1,3 +1,12 @@
+## PR #3946 exact-head CI and corrected source attribution — 2026-11-09T13:23:00+05:00
+
+- Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), staging-only artifact path; exact HEAD `da54660bbe8289b644f91621bb32f847bf551666`, base/current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`.
+- GitHub exact-head checks: PR Required Gate, PR Review Quality Gate, lifecycle recommendation, frontend unit/build/lint, CI Scope, security scan, Gitleaks, CodeQL, Git scratch guards, and GitGuardian — PASS. Backend tests, integration, frontend E2E, Docker build, staging readiness, production readiness and k6 — SKIPPED by configured scope/conditions, not PASS.
+- PR-description correction: exact tracked `rq18-permanent-qr-live.spec.ts` failure belongs to artifact/source `215472cadbbdc8cd4046ca2c8eae0e9205594521`, before #3943. Current main #3943 artifact was not exercised by that RQ-18 run. Corrected body passed `scripts/run_pr_review_gate_checks.py --body-env PR_BODY --author drsapaev`: 19 tests, both sample descriptions, and live proposed body PASS.
+- PR remains OPEN / Draft / mergeable; no independent formal review is recorded. No merge or deployment was performed.
+- Tier-2 remains PARTIAL. r4 used an untracked diagnostic copy, not the exact tracked spec; 13 response-body reads failed, five unique JS/CSS paths lack captured hashes, and canonical `served_revision_verified=false` remains. The earlier exact tracked test failed its final Admin page-error guard on source `215472...`; cause unresolved. Do not claim full RQ-18 or current-main browser provenance.
+- Scope: no runtime, backend, API, database, auth, production, deployment, workflow, or gate changes. Only the existing three-journal checkpoint is being updated before a new normal-hook commit; existing staging implementation scope remains unchanged.
+
 ## PR #3937 journal checkpoint push — 2026-11-08T22:48:28+05:00
 
 - Commit `8ef2302065d93d5f4eff512016d8572e4e6e18f2` was pushed to `codex/aqs-t18-completion-20261108`; four changed paths are the plan, PROGRESS, EVIDENCE, and RESUME journals only.
