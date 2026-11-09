@@ -148,6 +148,42 @@
     font-style: italic;
 }
 
+/* EMRSCORE-FE-001/002 (audit 3886, round 21): eligibility verdict styling.
+   The fabricated numeric risk display below is intentionally unused now. */
+.cardiology-chol-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-2, 8px);
+}
+
+.cardiology-chol-equiv {
+    margin: 0;
+    font-size: var(--mac-font-size-xs, 11px);
+    color: var(--mac-text-secondary, inherit);
+}
+
+.cardiology-score2-notice,
+.cardiology-score2-eligible {
+    padding: var(--mac-spacing-3, 12px) var(--mac-spacing-4, 16px);
+    border-radius: var(--mac-radius-md, 8px);
+    background: var(--mac-bg-tertiary, transparent);
+    color: var(--mac-text-primary, inherit);
+    line-height: 1.5;
+}
+
+.cardiology-score2-notice {
+    border-left: 3px solid var(--mac-warning, currentcolor);
+}
+
+.cardiology-score2-eligible {
+    border-left: 3px solid var(--mac-accent-blue, currentcolor);
+}
+
+.cardiology-score2-eligible p,
+.cardiology-score2-notice {
+    margin: 0;
+}
+
 .cardiology-risk-display {
     display: flex;
     flex-direction: column;
