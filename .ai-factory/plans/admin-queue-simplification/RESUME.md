@@ -1,3 +1,72 @@
+# Current resume — #3937 synchronized and pushed; T18 still partial — 2026-11-09T02:11:10+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. T00–T17 are merged. PR #3937 is synchronized with current `origin/main` #3941 (`34da7981fe6985c1cc33be127fd3b32fd89c8f6f`) by merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`; the push to PR HEAD `620c3c13313e543f6b290ccd5fa6b2b17971ee59` succeeded. The PR description was refreshed to that base/head. Review #5819382573's two P2 fixes remain in `25d981667a148005f549b102e32b3ffc8470d850`; both threads are resolved. Agent Workflow Guards, Lifecycle Recommendation, corrected PR Review Quality Gate, Security and Gitleaks passed on head `620c3c1`; Unified CI was still in progress at last check. The final candidate type-check, isolated Chromium browser-byte regression (1/1), frontend build and earlier scoped ESLint result are recorded in EVIDENCE; the full RQ-18 synthetic Admin/2FA run is NOT_RUN. Do not treat the isolated regression as full Tier-2.
+
+Local checks used the existing minimal Chromium config and an ephemeral local HTTP server; they did not start WSL, Docker, or Compose. A full staging rerun remains deferred until a memory-safe, checksum-verified artifact path is available. Prior T18.10 and RQ-18 PASS evidence remains scoped to application SHA `16e04af35e47663481a08923d8625d94a1c9d010`; the corrected full live spec has not been rerun.
+
+T18.1–5 remains NOT_RUN: the latest canonical Session was interrupted during frontend image build after host free RAM fell from 1.76 GiB to 0.13 GiB; owned Compose teardown and post-audit passed. T18.8–9 browser join/replay checks remain open. T18.6/7 and backend portions can be carried forward only where exact owner paths still match. T18/Tier-2 remains PARTIAL.
+
+The task-owned synthetic env file `.scratch/t18-final-acceptance-20261108/staging-final4.env` still exists because local policy blocked its deletion. Remove only that file through the permitted local process before another staging run; do not bypass the policy. The hosted artifact workflow is incompatible as-is (fixed API/WS origin, no embedded source SHA, and Compose still builds inside WSL). A staging-only, checksum-verified artifact path is required before another local build.
+
+Next:
+1. Finish this status correction in the three allowed journals, run `git diff --check`, commit it, and push normally. Do not force-push or merge.
+2. Refresh the PR body to the new documentation-only head, then confirm GitHub PR #3937 exact head/base, both review threads, PR Required Gate, PR Review Quality Gate, and all applicable checks. User owns merge.
+3. After user merge, start the staging-only, memory-safe canonical frontend artifact path from fresh main; do not compile the large frontend inside WSL again. The available verified artifact is for #3938, not current main #3941.
+4. Run the corrected RQ-18 full synthetic flow and outstanding current-source T18.1–5 and T18.8–9 checks in a bounded owned session; preserve earlier T18.6/7/backend evidence only where owners and source SHA still match.
+5. Resume the three full T11-deferred live specs (`admin-navigation.spec.ts`, `queue-system.spec.ts`, `panel-qa-admin-live.spec.ts`) with a compatible safe harness; deferral is not a pass.
+6. Complete affected keyboard/focus/forms/error/empty/retry/language/viewport/latency checks, classify the two unreproduced historical console events and eight unmapped bundle call sites, and disposition every applicable prerequisite and `STAGING_VALIDATION.md` Check 0–10 with source SHA and cleanup proof. Keep T18/Tier-2 PARTIAL until all required items are closed. Production validation, deployment, and v1-flag activation are separate and unauthorized.
+
+---
+# Previous resume — PR #3937 prior-head CI; current-source T18 staging interrupted — 2026-11-08T21:45:42+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. T00–T17 are merged. PR #3937 is OPEN, Ready for review and mergeable at HEAD `a166befeadbac7fea69164bf434c937a98b6dc23`, based on current `origin/main` #3935 `8299d7d6897621bc284051004309b39acbef6adc`. Exact-head Frontend build/unit/lint/E2E, PR Required Gate, PR Review Quality Gate, CodeQL, Gitleaks and security checks passed. Path-aware Backend/integration/Docker/readiness checks were skipped. No independent review has been submitted; user owns merge/deployment.
+
+T18.10 (`specialists` navigation, four legacy Admin routes, typed return context, reload/Back/Forward and guarded DELETE 409) and current-source RQ-18 (publish, permanent QR, anonymous resource-owned booking, deactivation/archive/reactivation) passed in synthetic Admin/2FA Session on app source `16e04af35e47663481a08923d8625d94a1c9d010`. Observed JS/CSS/service-worker assets matched 68/68; the generic launcher still reports `served_revision_verified=false`. Canonical teardown and prior owned-project audits passed.
+
+The 2026-11-08 T18.1–T18.5 current-source Session is `INTERRUPTED / NOT_RUN`: Preflight passed, but Windows free RAM dropped from 1.76 GiB to 0.13 GiB during image build before any verifiable Playwright report existed. The exact synthetic Compose project was torn down and audited empty (5 containers, 3 volumes, 1 network, 3 images removed; zero owned resources/listeners afterwards). A newly created private env `.scratch/t18-final-acceptance-20261108/staging-final4.env` remains because local policy rejected deletion; it requires manual removal. Do not bypass that policy.
+
+Local uncommitted changes now reconcile EVIDENCE/PROGRESS/RESUME/top-level plan with this attempt and the completed CI result. Next: run `git diff --check`, commit/push only the allowed four journal files, update PR #3937's body, and recheck exact-head CI. Then complete current-source T18.1–5 and T18.8–9 with a staging build approach that does not exhaust host RAM; finish affected keyboard/focus/forms/language/viewports/latency/console checks and disposition each applicable `STAGING_VALIDATION.md` Check 0–10. T18/Tier-2 remain PARTIAL until evidence closes those gaps. Production, deployment and v1 flag activation remain separate.
+
+---
+
+# Previous resume — PR #3937 exact-head CI pending; T18 remains partial — 2026-11-08T20:55:32+05:00
+
+# Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. PR #3937 is OPEN, Ready for review and mergeable at HEAD `8bac0d25c969c78b23a99be0ca79d294431c3e97`, based on fresh `origin/main` #3935 `8299d7d6897621bc284051004309b39acbef6adc`. On this exact HEAD, Frontend E2E passed; Frontend unit tests failed in unchanged `LabResultsSection.identity.test.tsx`; PR Required Gate failed as a result. Frontend lint/build and security checks passed; path-aware backend/Docker jobs were skipped. Review submissions: none. User owns merge and deployment.
+
+Latest canonical synthetic Admin/2FA Session passed both T18.10 and RQ-18. T18.10 covered the real `specialists` row, four legacy routes, typed return context, tab switch, reload, Back/Forward, and guarded UI DELETE 409 with row retained. RQ-18 covered permanent QR publication/join/deactivation/archive/reactivation. All 68 browser-observed JS/CSS/service-worker hashes matched the owned frontend container; `/sw.js` contained the full tested source SHA. The launcher's generic `served_revision_verified=false` remains unchanged. Canonical Session teardown passed; exact-label audits found zero resources and no listeners for all four owned task projects.
+
+The current CI failure expects a PDF download control while the lab-results section is still collapsed; GitHub reports only the section header and the separate “Заказать анализы” action. Both the failing test and component match `origin/main`; this is outside the PR's queue E2E scope. A request for approval to adjust this single test only is pending. Do not edit it without that decision. Prior local T18 checks remain recorded in EVIDENCE; two staging harness failures were corrected and both canonical teardowns passed.
+
+Read-only source reconciliation is complete for the selected T18 owner paths. Tested app `16e04af3` has current main `8299d7d6` as its second parent, with no selected queue-owner path differences to main. Compared with prior scenario bases, only `AdminSetupDirections.tsx`, `QueueProfilesManager.tsx`, `useQueueManager.ts`, `QueueJoin.tsx`, and `services/queue.ts` changed. T18.6 settings, T18.7 cabinet, and the backend portions of T18.5/8/9 can retain evidence where their owner paths match; changed profile/Department UI flows (T18.1–5) and browser admission/replay paths (T18.8–9) still need current-source checks. `STAGING_VALIDATION.md` has Check 0 through Check 10 (11 sections), each needing an explicit disposition.
+
+Scratch cleanup: canonical Compose teardown and exact-project audits passed. Removal of only this task's `.scratch/t18-final-acceptance-20261108` was rejected by the local execution policy before PowerShell started; the directory remains with synthetic credential env files and temporary test output. No alternate deletion method was used. `frontend/node_modules` is a junction into sibling worktree `aqs-t18-selected-profile-context-20261108`; preserve its target.
+
+## Next exact actions
+
+1. Continue PR #3937. The previously requested decision on a test-only adjustment to the unrelated EMR lab test is still pending; if approved, run the required gate for that scope, change the test only, validate it and rerun exact-head CI. If not approved, leave the PR unmergeable and record the blocker.
+2. Obtain independent review and leave merge to the user. Do not start a new PR cycle before #3937 is green and merged.
+3. After merge, refresh `origin/main` in a new worktree; run the impacted T18.1–5 profile/Department flows and T18.8–9 admission/replay flows; finish current UI/latency/console checks and per-item `STAGING_VALIDATION.md` Checks 0–10. Keep T18/Tier-2 PARTIAL until requirements are proven; production, deployment and v1 flag remain separate.
+
+T18/Tier-2 is still PARTIAL. No production, deployment, merge, external Sentry/AI/Telegram action, or v1 feature-flag change occurred.
+
+---
+a task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. Base/current `origin/main` is #3927 at `404043bb62a4b8081242c453957ae939ed4b06ff`; local candidate HEAD `e003ab787a93dd72c49e632c63e323ee42842d3b` is three commits ahead. The test and journal work is not pushed; no PR or hosted CI is claimed. User owns merge and deployment.
+
+Current-source RQ-18 passed in canonical synthetic `Preflight → Session`: normal Admin password + TOTP; hidden QueueProfile, doctorless Service and QueueResource; explicit publication; permanent QR provision/reload; anonymous booking to a resource-owned queue; deactivation preserving the queue and closing new booking; profile archive/reactivation and reopening the same address. The browser observed 49 JS/CSS paths plus `/sw.js`; all 50 SHA-256 values matched the owned frontend container and the service worker carried the full tested commit SHA. The helper still reports `served_revision_verified=false`; do not rewrite that field. Teardown PASS removed 5 containers, 3 volumes and 1 network; no project containers/volumes/networks remained.
+
+The test-only asset capture change is in commit `e003ab7`; local scoped ESLint, TypeScript, Playwright collection and commit hooks passed. Preceding run `q18d` reached the scenario end but the temporary runner failed to parse a marker line; the runner was corrected and final `q18e` passed. Evidence is recorded in the current top section of `PROGRESS.md` and `EVIDENCE.md`. No runtime or production code changed.
+
+## Next exact actions
+
+1. Review the focused three-commit diff and the new journal checkpoint; verify history remains intact and run `git diff --check`.
+2. Remove only this task's private `.scratch/t18-final-acceptance-20261108` after confirming the path resolves inside this worktree. It contains synthetic credentials and raw Playwright output. Remove the temporary `frontend/node_modules` junction only if its link target is still the previously verified sibling dependency cache; preserve the target.
+3. Commit the journal update with the E2E test change, push the branch, open a focused PR, and verify exact-head CI and independent review. Leave merge to the user.
+4. After merge, fetch fresh `origin/main` into a new worktree. Complete current-source T18.10 live Admin/2FA `specialists` navigation/return/history/legacy URL/guarded-delete assertions, then close the remaining applicable `STAGING_VALIDATION.md` items and reconcile scenarios T18.1–T18.9. Keep T18/Tier-2 `PARTIAL` until every mandatory item has evidence.
+
+Remaining acceptance gaps: T18.10 current-source live flow; full runbook; final-source reconciliation. Keyboard/focus, form/empty/error, five-language, viewport 375/768/1280/1920, and cold/repeat checks previously passed on `cbd8c642`; current main is not descended from that SHA and later changed the selected-profile setup link and QueueProfilesManager dirty-edit behavior, so revalidate those affected flows and reconcile unaffected results by source. Two earlier console events remain unreproduced and eight bundle call sites unmapped. Do not claim whole-system health, production readiness or completed T18 from the RQ-18 pass alone.
+
+---
+
 # Current resume — #3930 synced locally; journal commit and exact-head checks pending — 2026-11-08T12:08:30+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
