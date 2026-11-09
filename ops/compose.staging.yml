@@ -127,8 +127,6 @@ services:
       context: ../frontend
       dockerfile: Dockerfile.staging
       target: ${STAGING_FRONTEND_BUILD_TARGET:-runtime}
-      additional_contexts:
-        staging_artifact: ${STAGING_FRONTEND_ARTIFACT_CONTEXT:-../frontend/docker}
       args:
         VITE_API_BASE: /api/v1
         VITE_API_URL: ${STAGING_PUBLIC_BASE_URL}

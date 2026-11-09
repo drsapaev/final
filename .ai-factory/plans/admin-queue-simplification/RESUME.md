@@ -1,3 +1,17 @@
+## Resume — PR #3946 review findings — 2026-11-09T21:52:14+05:00
+
+Continue the existing #3946 code-review fix in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. The remote PR remains open at `934f38d0764431b0a6f77ad129ddc0241b13f8df`; local changes are uncommitted. Fresh `origin/main` #3959 is `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`; its Cardiology changes are disjoint, and the clean merge tree was verified. Merge it into this branch before pushing.
+
+The P1 port mismatch is addressed by building the hosted artifact with `VITE_API_BASE_URL=same-origin`; the frontend resolves API and notification WebSocket origins from the served page. P2 arbitrary build context is addressed by launcher checks requiring an exact verified artifact beneath the current worktree `.scratch`, plus Docker image checksum/inventory verification. P2 Compose-version compatibility is addressed by moving named build contexts to `ops/compose.staging.artifact.yml`, loaded only for the opt-in artifact target and requiring an explicit context. The ordinary target uses only the base Compose file.
+
+Local evidence: 295 focused staging-guard tests, 7 API runtime tests, ESLint, Black check, Python compilation, YAML parse, and diff check passed. Local Docker/Compose checks were unavailable. Local frontend type-check failed on missing `nitro` through the shared junction and existing Axios mock type mismatches; full build was not run. No staging project was started. The exact-head GitHub workflow must still run to build both Compose frontend targets.
+
+Gate context: `gate_known_root_cause`, known root `frontend/Dockerfile.staging`; result `narrow_override`, `gate_misroute=true`, `override_used=true`, handoff required; prompt read. The bounded basis is the user's continued authorization for the existing #3946 scope. No merge or production action is authorized.
+
+Next exact action: perform final scope/diff review, commit the recorded changes, merge the disjoint fresh main update in this isolated branch, rerun focused checks, then push to the existing PR and wait for exact-head checks and both target builds. Update the PR description with factual results. Leave merge to the user. T18/Tier-2 remains PARTIAL; the RQ-18 browser asset capture and full staging acceptance are still open.
+
+---
+
 ## Current resume — PR #3946 review readiness — 2026-11-09T20:22:16+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3946 was verified OPEN, Ready, and mergeable at HEAD `41977694f825c14e5360af9e358073fbae882ccc`, based on #3957 `6fee1cf957a312970142fd36486b944aaabe6f45`. This snapshot precedes the journal-only reconciliation in this same PR.

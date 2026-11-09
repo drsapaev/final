@@ -96,12 +96,20 @@ STAGING_FRONTEND_ARTIFACT_CONTEXT=../.scratch/<session>/frontend-artifact
 VERCEL_GIT_COMMIT_SHA=<same application commit>
 ```
 
-The artifact workflow currently embeds the frontend origin
-`http://127.0.0.1:18082` and WebSocket origin `ws://127.0.0.1:18082`; set the
-staging frontend port and public origins to those values only after the
-canonical preflight confirms the port is free. The `artifact-runtime` build
-target checks the embedded source file and all listed checksums, then removes
-the provenance files from the Nginx document root. It copies the prebuilt
+The artifact is built with `VITE_API_BASE_URL=same-origin`. The browser uses
+the exact origin and port where the selected staging frontend is served;
+Nginx forwards API and WebSocket requests to that Compose project's backend.
+Configure public origins for the selected frontend port and let canonical
+Preflight confirm them. The `artifact-runtime` target checks the embedded
+source SHA, every manifest checksum, and the exact copied file inventory
+before removing provenance files from the Nginx document root. The launcher
+also verifies the artifact before WSL starts and accepts it only from a real
+directory below the current worktree's `.scratch/`; symlinks and unlisted
+files are rejected. The default Compose file does not use named build
+contexts. Only the optional artifact target loads
+`compose.staging.artifact.yml` and requires Docker Compose 2.17.0 or newer.
+The artifact path is relative to `ops/`, for example
+`../.scratch/<session>/frontend-artifact`. The target copies the prebuilt
 bundle into a small Nginx image and skips `npm ci` and `npm run build` inside
 WSL. Backend/worker image builds still occur, so use normal build-reserve
 Preflight and do not pass `-NoBuild` to `Start` or `Session`.

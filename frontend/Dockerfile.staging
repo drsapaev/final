@@ -51,6 +51,10 @@ RUN set -eu; \
     test -n "$VERCEL_GIT_COMMIT_SHA"; \
     test "$(cat source.sha)" = "$VERCEL_GIT_COMMIT_SHA"; \
     sha256sum -c SHA256SUMS; \
+    test -z "$(find . -type l -print -quit)"; \
+    manifest_files="$(awk 'NF == 2 { print $2 } NF != 2 { exit 1 }' SHA256SUMS | LC_ALL=C sort)"; \
+    copied_files="$(find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort)"; \
+    test "$manifest_files" = "$copied_files"; \
     rm -f source.sha SHA256SUMS
 
 EXPOSE 80
