@@ -1134,14 +1134,15 @@ def _execute_public_booking_request_mutation(
     request: Request,
     current_user: User,
     action: str,
-    operation: Callable[[int], PublicBookingRequestOut],
-) -> PublicBookingRequestOut:
+    operation: Callable[[int], Any],
+    resource_type: str = "public_booking_request",
+) -> Any:
     """Run request persistence and audit in one worker thread."""
     patient_id = _require_patient_audited(
         db,
         request,
         current_user,
-        resource_type="public_booking_request",
+        resource_type=resource_type,
         action=action,
     )
     scope = _patient_portal_scope(patient_id)
@@ -1152,7 +1153,7 @@ def _execute_public_booking_request_mutation(
             db,
             request=request,
             current_user=current_user,
-            resource_type="public_booking_request",
+            resource_type=resource_type,
             action=action,
             reason=exc.code,
             scope=scope,
@@ -1161,8 +1162,8 @@ def _execute_public_booking_request_mutation(
     log_patient_access(
         db=db,
         scope=scope,
-        resource_type="public_booking_request",
-        resource_id=str(result.id),
+        resource_type=resource_type,
+        resource_id=str(getattr(result, "id", getattr(result, "appointment_id", ""))),
         action=action,
         outcome="success",
         request=request,
@@ -1175,6 +1176,69 @@ def _patient_request_idempotency_scope(request: Request) -> str:
     # identity and collapse only trailing slashes.
     normalized_path = request.url.path.rstrip("/") or "/"
     return f"{request.method.upper()}:{normalized_path}"
+
+
+@router.post(
+    "/public-booking/appointments",
+    response_model=appointment_schemas.PatientConfirmedPublicBookingOut,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: _PORTAL_401,
+        403: _PORTAL_403,
+        404: {
+            "model": (
+                PublicBookingRequestErrorOut
+                | PublicBookingRequestPatientProfileErrorOut
+            )
+        },
+        409: {"model": PublicBookingRequestErrorOut},
+        429: {
+            "model": PublicBookingRequestErrorOut,
+            "description": "The patient has reached the public booking creation limit.",
+        },
+        503: {"model": PublicBookingRequestErrorOut},
+    },
+    operation_id="patient_create_confirmed_public_booking_appointment",
+    summary="Create an appointment from the confirmed public booking mode",
+)
+async def create_patient_confirmed_public_booking_appointment(
+    body: PublicBookingRequestCreate,
+    request: Request,
+    response: Response,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=128,
+        description="Required for safe retries of the same appointment submission.",
+    ),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(_active_portal_user_audited("appointment", "create")),
+) -> appointment_schemas.PatientConfirmedPublicBookingOut:
+    """Reserve an available slot as a normal Appointment for the own card.
+
+    This route is valid only while the clinic's current mode is
+    `confirmed_appointment`; it never falls back to a non-reserving request.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    return await run_in_threadpool(
+        _execute_public_booking_request_mutation,
+        db=db,
+        request=request,
+        current_user=current_user,
+        action="create",
+        resource_type="appointment",
+        operation=lambda patient_id: PublicBookingRequestService(
+            db
+        ).create_confirmed_appointment_for_patient(
+            patient_id=patient_id,
+            service_slug=body.service_slug,
+            doctor_slug=body.doctor_slug,
+            appointment_date=body.appointment_date,
+            appointment_time=body.appointment_time,
+            expected_settings_version=body.expected_settings_version,
+        ),
+    )
 
 
 @router.post(

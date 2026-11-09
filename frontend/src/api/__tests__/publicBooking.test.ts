@@ -7,6 +7,7 @@ vi.mock('../client', () => ({
 import { api } from '../client';
 import {
   clearPendingPublicBookingSelection,
+  createPatientConfirmedPublicBookingAppointment,
   createPatientPublicBookingRequest,
   getPendingPublicBookingLocale,
   getPublicBookingAvailability,
@@ -63,6 +64,32 @@ describe('publicBooking API adapter', () => {
 
     expect(mockedApi.post).toHaveBeenCalledWith('/patients/booking-requests', body, {
       headers: { 'Idempotency-Key': 'key-once' },
+    });
+    expect(body).not.toHaveProperty('patient_id');
+  });
+
+  it('creates a directly confirmed appointment with the same public selection contract and idempotency key', async () => {
+    const result = {
+      id: 42,
+      appointment_date: '2026-10-28',
+      appointment_time: '09:00:00',
+      status: 'scheduled',
+      timezone: 'Asia/Tashkent',
+    } as const;
+    mockedApi.post.mockResolvedValueOnce({ data: result });
+    const body = {
+      service_slug: 'cardiology',
+      doctor_slug: 'doctor-one',
+      appointment_date: '2026-10-28',
+      appointment_time: '09:00',
+      expected_settings_version: 3,
+    };
+
+    await expect(createPatientConfirmedPublicBookingAppointment(body, 'confirmed-key'))
+      .resolves.toEqual(result);
+
+    expect(mockedApi.post).toHaveBeenCalledWith('/patients/public-booking/appointments', body, {
+      headers: { 'Idempotency-Key': 'confirmed-key' },
     });
     expect(body).not.toHaveProperty('patient_id');
   });

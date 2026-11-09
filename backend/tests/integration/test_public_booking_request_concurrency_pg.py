@@ -18,6 +18,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 
 import app.db.base  # noqa: F401 - register all models before create_all
 from app.api import deps
+from app.api.v1.endpoints import patient_portal as patient_portal_module
 from app.crud.clinic import update_weekly_schedule
 from app.db.base_class import Base
 from app.main import app
@@ -28,6 +29,9 @@ from app.models.patient import Patient
 from app.models.public_booking_request import PublicBookingRequest
 from app.models.service import Service
 from app.models.user import User
+from app.repositories.public_booking_request_repository import (
+    PublicBookingRequestRepository,
+)
 from app.repositories.services_api_repository import ServicesApiRepository
 from app.services import (
     public_booking_request_service as booking_request_service_module,
@@ -42,6 +46,8 @@ from tests.conftest import mint_access_token
 pytestmark = pytest.mark.integration
 
 PATIENT_REQUESTS = "/api/v1/patients/booking-requests"
+PATIENT_CONFIRMED_APPOINTMENTS = "/api/v1/patients/public-booking/appointments"
+PATIENT_PORTAL_BOOKING = "/api/v1/patients/booking"
 
 
 @pytest.fixture
@@ -235,6 +241,673 @@ def test_concurrent_different_keys_create_one_active_request(
             .all()
         )
         assert len(active) == 1
+
+
+def test_concurrent_confirmed_public_bookings_create_one_appointment_for_slot(
+    booking_request_pg_engine,
+):
+    """The doctor slot lock allows only one confirmed appointment per interval."""
+    engine = booking_request_pg_engine
+    unique = uuid.uuid4().hex[:12]
+    with Session(engine) as db:
+        doctor_user = User(
+            username=f"confirmed-booking-doctor-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Doctor",
+            is_active=True,
+            full_name="Synthetic Doctor",
+        )
+        patient_user = User(
+            username=f"confirmed-booking-patient-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Patient",
+            is_active=True,
+            full_name="Synthetic Patient",
+        )
+        db.add_all([doctor_user, patient_user])
+        db.flush()
+        patient = Patient(
+            user_id=patient_user.id,
+            first_name="Synthetic",
+            last_name=f"Patient {unique}",
+        )
+        department = Department(
+            key=f"confirmed-booking-{unique}",
+            name_ru="Synthetic department",
+            name_uz="Synthetic department",
+            active=True,
+        )
+        db.add_all([patient, department])
+        db.flush()
+        doctor = Doctor(
+            user_id=doctor_user.id,
+            department_id=department.id,
+            specialty="cardiology",
+            active=True,
+            show_on_website=True,
+            slug=f"confirmed-booking-doctor-{unique}",
+            bio_ru="Synthetic cardiologist.",
+            bio_uz="Synthetic cardiologist.",
+        )
+        service = Service(
+            name="Synthetic consultation",
+            name_uz="Synthetic consultation",
+            description_ru="Synthetic service description.",
+            description_uz="Synthetic service description.",
+            slug=f"confirmed-booking-service-{unique}",
+            duration_minutes=20,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        db.add_all([doctor, service])
+        db.flush()
+
+        target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+        db.add(
+            Schedule(
+                doctor_id=doctor.id,
+                weekday=target_date.weekday(),
+                start_time=time(9),
+                end_time=time(11),
+                breaks=[],
+                active=True,
+            )
+        )
+        db.add_all(
+            [
+                ClinicSettings(
+                    key="public_booking_settings",
+                    category="booking_settings",
+                    value={
+                        "version": 1,
+                        "is_enabled": True,
+                        "mode": "confirmed_appointment",
+                        "booking_horizon_days": 30,
+                        "service_ids": [service.id],
+                        "doctor_ids": [doctor.id],
+                    },
+                    updated_by=doctor_user.id,
+                ),
+                ClinicSettings(
+                    key=f"public_booking_calendar_year_{target_date.year:04d}",
+                    category="booking_calendar",
+                    value={
+                        "year": target_date.year,
+                        "version": 1,
+                        "is_confirmed": True,
+                        "holidays": [],
+                        "confirmed_at": datetime.now(UTC).isoformat(),
+                        "confirmed_by": doctor_user.id,
+                    },
+                    updated_by=doctor_user.id,
+                ),
+            ]
+        )
+        db.commit()
+        patient_id = patient.id
+        doctor_id = doctor.id
+        department_id = department.id
+        patient_token = mint_access_token(patient_user)
+        body = {
+            "service_slug": service.slug,
+            "doctor_slug": doctor.slug,
+            "appointment_date": target_date.isoformat(),
+            "appointment_time": "09:00",
+            "expected_settings_version": 1,
+        }
+
+    previous_override = app.dependency_overrides.get(deps.get_db)
+
+    def override_get_db():
+        with Session(engine) as db:
+            yield db
+
+    app.dependency_overrides[deps.get_db] = override_get_db
+    barrier = threading.Barrier(2)
+    try:
+        with TestClient(app) as client:
+
+            def submit(key: str):
+                barrier.wait(timeout=5)
+                return client.post(
+                    PATIENT_CONFIRMED_APPOINTMENTS,
+                    headers={
+                        "Authorization": f"Bearer {patient_token}",
+                        "Idempotency-Key": key,
+                    },
+                    json=body,
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                responses = list(
+                    executor.map(submit, (uuid.uuid4().hex, uuid.uuid4().hex))
+                )
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(deps.get_db, None)
+        else:
+            app.dependency_overrides[deps.get_db] = previous_override
+
+    assert sorted(response.status_code for response in responses) == [201, 409]
+    rejected = next(response for response in responses if response.status_code == 409)
+    assert rejected.json()["detail"]["code"] == "booking_time_unavailable"
+
+    with Session(engine) as db:
+        appointments = (
+            db.query(Appointment)
+            .filter(
+                Appointment.patient_id == patient_id,
+                Appointment.doctor_id == doctor_id,
+                Appointment.department_id == department_id,
+            )
+            .all()
+        )
+        assert len(appointments) == 1
+        assert appointments[0].appointment_time == "09:00"
+
+
+def test_concurrent_confirmed_bookings_cannot_exceed_patient_active_appointment_cap(
+    booking_request_pg_engine,
+):
+    """Patient-row serialization keeps the five-future-appointment cap atomic."""
+    engine = booking_request_pg_engine
+    unique = uuid.uuid4().hex[:12]
+    with Session(engine) as db:
+        doctor_user = User(
+            username=f"confirmed-cap-doctor-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Doctor",
+            is_active=True,
+            full_name="Synthetic Doctor",
+        )
+        patient_user = User(
+            username=f"confirmed-cap-patient-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Patient",
+            is_active=True,
+            full_name="Synthetic Patient",
+        )
+        db.add_all([doctor_user, patient_user])
+        db.flush()
+        patient = Patient(
+            user_id=patient_user.id,
+            first_name="Synthetic",
+            last_name=f"Patient {unique}",
+        )
+        department = Department(
+            key=f"confirmed-cap-{unique}",
+            name_ru="Synthetic department",
+            name_uz="Synthetic department",
+            active=True,
+        )
+        db.add_all([patient, department])
+        db.flush()
+        doctor = Doctor(
+            user_id=doctor_user.id,
+            department_id=department.id,
+            specialty="cardiology",
+            active=True,
+            show_on_website=True,
+            slug=f"confirmed-cap-doctor-{unique}",
+            bio_ru="Synthetic cardiologist.",
+            bio_uz="Synthetic cardiologist.",
+        )
+        service = Service(
+            name="Synthetic consultation",
+            name_uz="Synthetic consultation",
+            description_ru="Synthetic service description.",
+            description_uz="Synthetic service description.",
+            slug=f"confirmed-cap-service-{unique}",
+            duration_minutes=20,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        db.add_all([doctor, service])
+        db.flush()
+
+        target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+        prior_created_at = datetime.now(UTC) - timedelta(days=1)
+        db.add(
+            Schedule(
+                doctor_id=doctor.id,
+                weekday=target_date.weekday(),
+                start_time=time(9),
+                end_time=time(11),
+                breaks=[],
+                active=True,
+            )
+        )
+        db.add_all(
+            [
+                Appointment(
+                    patient_id=patient.id,
+                    doctor_id=doctor.id,
+                    department_id=department.id,
+                    appointment_date=target_date + timedelta(days=offset),
+                    appointment_time="09:00",
+                    duration_minutes_snapshot=20,
+                    status="scheduled",
+                    created_at=prior_created_at,
+                )
+                for offset in range(1, 5)
+            ]
+        )
+        db.add_all(
+            [
+                ClinicSettings(
+                    key="public_booking_settings",
+                    category="booking_settings",
+                    value={
+                        "version": 1,
+                        "is_enabled": True,
+                        "mode": "confirmed_appointment",
+                        "booking_horizon_days": 30,
+                        "service_ids": [service.id],
+                        "doctor_ids": [doctor.id],
+                    },
+                    updated_by=doctor_user.id,
+                ),
+                ClinicSettings(
+                    key=f"public_booking_calendar_year_{target_date.year:04d}",
+                    category="booking_calendar",
+                    value={
+                        "year": target_date.year,
+                        "version": 1,
+                        "is_confirmed": True,
+                        "holidays": [],
+                        "confirmed_at": datetime.now(UTC).isoformat(),
+                        "confirmed_by": doctor_user.id,
+                    },
+                    updated_by=doctor_user.id,
+                ),
+            ]
+        )
+        db.commit()
+        patient_id = patient.id
+        doctor_id = doctor.id
+        department_id = department.id
+        patient_token = mint_access_token(patient_user)
+        bodies = [
+            {
+                "service_slug": service.slug,
+                "doctor_slug": doctor.slug,
+                "appointment_date": target_date.isoformat(),
+                "appointment_time": slot,
+                "expected_settings_version": 1,
+            }
+            for slot in ("09:00", "09:20")
+        ]
+
+    previous_override = app.dependency_overrides.get(deps.get_db)
+
+    def override_get_db():
+        with Session(engine) as db:
+            yield db
+
+    app.dependency_overrides[deps.get_db] = override_get_db
+    barrier = threading.Barrier(2)
+    try:
+        with TestClient(app) as client:
+
+            def submit(item: tuple[dict[str, str], str]):
+                body, key = item
+                barrier.wait(timeout=5)
+                return client.post(
+                    PATIENT_CONFIRMED_APPOINTMENTS,
+                    headers={
+                        "Authorization": f"Bearer {patient_token}",
+                        "Idempotency-Key": key,
+                    },
+                    json=body,
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                responses = list(
+                    executor.map(
+                        submit,
+                        [(body, uuid.uuid4().hex) for body in bodies],
+                    )
+                )
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(deps.get_db, None)
+        else:
+            app.dependency_overrides[deps.get_db] = previous_override
+
+    assert sorted(response.status_code for response in responses) == [201, 409]
+    rejected = next(response for response in responses if response.status_code == 409)
+    assert rejected.json()["detail"]["code"] == "booking_active_appointment_limit"
+
+    with Session(engine) as db:
+        active_future = (
+            db.query(Appointment)
+            .filter(
+                Appointment.patient_id == patient_id,
+                Appointment.appointment_date
+                >= datetime.now(PUBLIC_BOOKING_TIMEZONE).date(),
+                Appointment.status != "cancelled",
+            )
+            .all()
+        )
+        new_appointments = [
+            appointment
+            for appointment in active_future
+            if appointment.appointment_date == target_date
+        ]
+        assert len(active_future) == 5
+        assert len(new_appointments) == 1
+        assert new_appointments[0].doctor_id == doctor_id
+        assert new_appointments[0].department_id == department_id
+
+
+def test_postgres_rate_count_excludes_request_linked_appointments(
+    booking_request_pg_engine,
+):
+    engine = booking_request_pg_engine
+    now = datetime.now(UTC)
+    with Session(engine) as db:
+        patient = Patient(first_name="Synthetic", last_name="Patient")
+        doctor = Doctor(specialty="cardiology", active=True)
+        service = Service(name="Synthetic consultation", active=True)
+        db.add_all([patient, doctor, service])
+        db.flush()
+        target_date = now.date() + timedelta(days=2)
+        for offset, request_created_at in (
+            (0, now),
+            (20, now - timedelta(minutes=2)),
+        ):
+            appointment = Appointment(
+                patient_id=patient.id,
+                doctor_id=doctor.id,
+                appointment_date=target_date,
+                appointment_time=f"09:{offset:02d}",
+                status="scheduled",
+                created_at=now,
+            )
+            db.add(appointment)
+            db.flush()
+            db.add(
+                PublicBookingRequest(
+                    patient_id=patient.id,
+                    doctor_id=doctor.id,
+                    service_id=service.id,
+                    appointment_id=appointment.id,
+                    appointment_date=target_date,
+                    appointment_time=time(9, offset),
+                    status="confirmed",
+                    settings_version=1,
+                    version=1,
+                    created_at=request_created_at,
+                )
+            )
+        db.add(
+            Appointment(
+                patient_id=patient.id,
+                doctor_id=doctor.id,
+                appointment_date=target_date,
+                appointment_time="09:40",
+                status="cancelled",
+                created_at=now,
+            )
+        )
+        db.commit()
+
+        count = PublicBookingRequestRepository(
+            db
+        ).count_patient_booking_creations_since(
+            patient_id=patient.id,
+            created_since=now - timedelta(minutes=1),
+        )
+        assert count == 2
+
+
+def test_postgres_future_quota_excludes_terminal_and_elapsed_appointments(
+    booking_request_pg_engine,
+):
+    engine = booking_request_pg_engine
+    local_now = datetime(2031, 5, 19, 12, tzinfo=PUBLIC_BOOKING_TIMEZONE)
+    with Session(engine) as db:
+        patient = Patient(first_name="Synthetic", last_name="Patient")
+        db.add(patient)
+        db.flush()
+        for day_offset, status, appointment_time in (
+            (1, "scheduled", "09:00"),
+            (0, "scheduled", "11:59"),
+            (0, "completed", "13:00"),
+            (0, "no_show", "13:00"),
+            (0, "cancelled", "13:00"),
+            (0, "scheduled", "12:01"),
+            (0, "pending", None),
+            (0, "planned", "invalid"),
+        ):
+            db.add(
+                Appointment(
+                    patient_id=patient.id,
+                    appointment_date=local_now.date() + timedelta(days=day_offset),
+                    appointment_time=appointment_time,
+                    status=status,
+                )
+            )
+        db.commit()
+
+        count = PublicBookingRequestRepository(db).count_active_future_appointments(
+            patient_id=patient.id,
+            from_date=local_now.date(),
+            after_time=local_now.time(),
+        )
+        assert count == 4
+
+
+def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
+    booking_request_pg_engine, monkeypatch
+):
+    """The existing portal and public writer can reserve different slots together."""
+    engine = booking_request_pg_engine
+    unique = uuid.uuid4().hex[:12]
+    with Session(engine) as db:
+        doctor_user = User(
+            username=f"mixed-booking-doctor-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Doctor",
+            is_active=True,
+            full_name="Synthetic Doctor",
+        )
+        patient_user = User(
+            username=f"mixed-booking-patient-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Patient",
+            is_active=True,
+            full_name="Synthetic Patient",
+        )
+        db.add_all([doctor_user, patient_user])
+        db.flush()
+        patient = Patient(
+            user_id=patient_user.id,
+            first_name="Synthetic",
+            last_name=f"Patient {unique}",
+        )
+        department = Department(
+            key=f"mixed-booking-{unique}",
+            name_ru="Synthetic department",
+            name_uz="Synthetic department",
+            active=True,
+        )
+        db.add_all([patient, department])
+        db.flush()
+        doctor = Doctor(
+            user_id=doctor_user.id,
+            department_id=department.id,
+            specialty="cardiology",
+            active=True,
+            show_on_website=True,
+            slug=f"mixed-booking-doctor-{unique}",
+            bio_ru="Synthetic cardiologist.",
+            bio_uz="Synthetic cardiologist.",
+        )
+        service = Service(
+            name="Synthetic consultation",
+            name_uz="Synthetic consultation",
+            description_ru="Synthetic service description.",
+            description_uz="Synthetic service description.",
+            slug=f"mixed-booking-service-{unique}",
+            duration_minutes=20,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        db.add_all([doctor, service])
+        db.flush()
+        target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+        db.add(
+            Schedule(
+                doctor_id=doctor.id,
+                weekday=target_date.weekday(),
+                start_time=time(9),
+                end_time=time(11),
+                breaks=[],
+                active=True,
+            )
+        )
+        db.add_all(
+            [
+                ClinicSettings(
+                    key="public_booking_settings",
+                    category="booking_settings",
+                    value={
+                        "version": 1,
+                        "is_enabled": True,
+                        "mode": "confirmed_appointment",
+                        "booking_horizon_days": 30,
+                        "service_ids": [service.id],
+                        "doctor_ids": [doctor.id],
+                    },
+                    updated_by=doctor_user.id,
+                ),
+                ClinicSettings(
+                    key=f"public_booking_calendar_year_{target_date.year:04d}",
+                    category="booking_calendar",
+                    value={
+                        "year": target_date.year,
+                        "version": 1,
+                        "is_confirmed": True,
+                        "holidays": [],
+                        "confirmed_at": datetime.now(UTC).isoformat(),
+                        "confirmed_by": doctor_user.id,
+                    },
+                    updated_by=doctor_user.id,
+                ),
+            ]
+        )
+        db.commit()
+        patient_id = patient.id
+        doctor_id = doctor.id
+        patient_token = mint_access_token(patient_user)
+        portal_body = {
+            "appointmentDate": target_date.isoformat(),
+            "appointmentTime": "09:20",
+            "doctorId": doctor_id,
+            "serviceIds": [service.id],
+        }
+        public_body = {
+            "service_slug": service.slug,
+            "doctor_slug": doctor.slug,
+            "appointment_date": target_date.isoformat(),
+            "appointment_time": "09:00",
+            "expected_settings_version": 1,
+        }
+
+    portal_has_doctor = threading.Event()
+    public_has_patient = threading.Event()
+    public_waits_for_doctor = threading.Event()
+    portal_lock = patient_portal_module.lock_doctor_for_slot_reservation
+    public_lock = booking_request_service_module.lock_doctor_for_slot_reservation
+    patient_lock = PublicBookingRequestRepository.lock_patient_for_booking
+
+    def hold_portal_doctor_lock(db, selected_doctor_id):
+        doctor = portal_lock(db, selected_doctor_id)
+        portal_has_doctor.set()
+        if not public_waits_for_doctor.wait(timeout=10):
+            raise RuntimeError("Public booking did not reach the doctor lock")
+        return doctor
+
+    def lock_public_patient(repository, *, patient_id):
+        if not portal_has_doctor.wait(timeout=10):
+            raise RuntimeError("Portal booking did not acquire the doctor lock")
+        patient = patient_lock(repository, patient_id=patient_id)
+        public_has_patient.set()
+        return patient
+
+    def wait_for_public_doctor_lock(db, selected_doctor_id):
+        if not public_has_patient.is_set():
+            raise RuntimeError("Public booking did not acquire the patient lock")
+        public_waits_for_doctor.set()
+        return public_lock(db, selected_doctor_id)
+
+    monkeypatch.setattr(
+        patient_portal_module,
+        "lock_doctor_for_slot_reservation",
+        hold_portal_doctor_lock,
+    )
+    monkeypatch.setattr(
+        PublicBookingRequestRepository, "lock_patient_for_booking", lock_public_patient
+    )
+    monkeypatch.setattr(
+        booking_request_service_module,
+        "lock_doctor_for_slot_reservation",
+        wait_for_public_doctor_lock,
+    )
+
+    previous_override = app.dependency_overrides.get(deps.get_db)
+
+    def override_get_db():
+        with Session(engine) as db:
+            yield db
+
+    app.dependency_overrides[deps.get_db] = override_get_db
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            headers = {"Authorization": f"Bearer {patient_token}"}
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                portal_future = executor.submit(
+                    client.post,
+                    PATIENT_PORTAL_BOOKING,
+                    headers={**headers, "Idempotency-Key": uuid.uuid4().hex},
+                    json=portal_body,
+                )
+                if not portal_has_doctor.wait(timeout=10):
+                    pytest.fail("Portal doctor lock not acquired")
+                public_future = executor.submit(
+                    client.post,
+                    PATIENT_CONFIRMED_APPOINTMENTS,
+                    headers={**headers, "Idempotency-Key": uuid.uuid4().hex},
+                    json=public_body,
+                )
+                portal_response = portal_future.result(timeout=25)
+                public_response = public_future.result(timeout=25)
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(deps.get_db, None)
+        else:
+            app.dependency_overrides[deps.get_db] = previous_override
+
+    assert public_has_patient.is_set()
+    assert public_waits_for_doctor.is_set()
+    assert portal_response.status_code == 201, portal_response.text
+    assert public_response.status_code == 201, public_response.text
+    with Session(engine) as db:
+        appointments = (
+            db.query(Appointment)
+            .filter(
+                Appointment.patient_id == patient_id, Appointment.doctor_id == doctor_id
+            )
+            .all()
+        )
+        assert sorted(item.appointment_time for item in appointments) == [
+            "09:00",
+            "09:20",
+        ]
 
 
 def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
