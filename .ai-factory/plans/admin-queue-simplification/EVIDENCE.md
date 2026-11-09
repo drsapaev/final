@@ -1,3 +1,15 @@
+## PR #3946 sync to current main and exact-head CI — 2026-11-09T15:50:04+05:00
+
+- Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), HEAD `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`, base/current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`.
+- Freshness: `origin/main` advanced by #3950 (dermatology) and #3953 (EMR) from the previous base #3947. `git merge-tree` showed no conflicts; the branch synced in merge commit `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`. After sync, `git diff --name-only origin/main...HEAD` still contains the seven allowed PR paths.
+- Validation: `git diff --check origin/main...HEAD` — PASS. Local focused `pytest` — NOT_RUN: Windows launcher found no configured Python 3.11+ interpreter; Ubuntu Python 3.12.3 has no pytest module. No dependency installation or environment mutation was performed.
+- Exact-head GitHub checks on `ab23f1e`: PR Required Gate, PR Review Quality Gate, frontend unit tests (9m24s), frontend build, frontend lint/type-check, Python/JavaScript/Actions analysis, security, CodeQL, Gitleaks, secret scanning, Git scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope — PASS.
+- Backend tests, integration tests, frontend E2E, Docker build, staging/production readiness, load tests, DAST and other path/trigger-dependent jobs were SKIPPED; they are not counted as passing. This PR sync did not rerun staging.
+- Review/lifecycle: GitHub Codex review summary has no findings for this HEAD. Review submissions and formal human approvals are absent; lifecycle recommendation still requests human review. PR is OPEN / Ready for review / CLEAN / MERGEABLE; merge remains user-owned.
+- Execution mode: continuation of the existing approved `gate_known_root_cause` T18/staging scope; the existing recorded gate outcome and handoff prompt remain applicable. This checkpoint updates only the three T18 journals. Allowed: `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`; denied: product/runtime, production/deploy, DB/auth, gate/router, foreign worktrees/projects, agent merge.
+- Result: PR branch is current with main and applicable checks pass. T18/Tier-2 remains PARTIAL: the previously executed exact tracked RQ-18 test still has 13 browser response-body capture failures, emits no application asset hashes, and leaves `served_revision_verified=false`; canonical teardown passed. Do not repeat the unchanged run.
+- Next: user review/merge of #3946. After merge, create a fresh isolated worktree, run the required gate for a focused browser response-body recorder correction, and continue T18 plus the complete `STAGING_VALIDATION.md` checklist.
+
 ## PR #3946 exact-head checks after body correction — 2026-11-09T15:15:52+05:00
 
 - Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), HEAD `6a69d42a352e671a594ee17c2f2768a2de32bacc`, base/current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.

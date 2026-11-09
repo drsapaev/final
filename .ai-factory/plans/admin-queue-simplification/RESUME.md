@@ -1,4 +1,18 @@
-## Current resume — PR #3946 exact-head checks pass — 2026-11-09T15:15:52+05:00
+## Current resume — PR #3946 current-main sync and CI pass — 2026-11-09T15:50:04+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. PR #3946 is OPEN / Ready for review at HEAD `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; GitHub reports CLEAN / MERGEABLE.
+
+The branch was synced to current main with no conflicts. The PR diff still contains only the seven staging/runbook/test/T18-journal paths. Exact-head applicable CI passed, including PR Required Gate, PR Review Quality Gate, frontend unit/build/lint, analyzers, security, secret checks, guards, lifecycle, metadata, notifications, GitGuardian and CI Scope. Backend, integration, E2E, Docker, readiness, load and DAST jobs were skipped by scope/trigger. Local focused pytest was NOT_RUN because Windows has no configured Python 3.11+ and Ubuntu lacks pytest; no packages were installed.
+
+Codex's current review summary reports no findings, but there is no formal human review/approval. The lifecycle recommendation requests human review. Leave merge to the user.
+
+T18/Tier-2 remains PARTIAL. Current-main artifact source and all 261 manifest entries matched; canonical Preflight/Start and ordinary Admin/TOTP passed. The exact tracked RQ-18 run had one pass and one failure because 13 browser response bodies were unavailable; no app asset hashes were emitted and `served_revision_verified=false`. Canonical teardown passed. Do not repeat the unchanged test.
+
+Next: user reviews/merges #3946. After merge, create a fresh worktree from current `origin/main`, gate a focused correction to browser response-body capture, then continue the remaining T18 scenarios and all `STAGING_VALIDATION.md` checks. The task-owned Compose project is gone; one ignored scratch directory remains because local workspace policy blocks deletion.
+
+---
+
+## Previous resume — PR #3946 exact-head checks pass — 2026-11-09T15:15:52+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. PR #3946 is OPEN / Ready for review / mergeable at HEAD `6a69d42a352e671a594ee17c2f2768a2de32bacc`, based on current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.
 
