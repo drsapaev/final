@@ -1,3 +1,12 @@
+## PR #3946 Ready-for-review checkpoint — exact-head CI on 535cc — 2026-11-09T13:39:00+05:00
+
+- At verification, PR #3946 was OPEN / Ready for review / mergeable at HEAD `535cc03667cf6f3244c38b66d792a839504e5e90`, based on current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`. This checkpoint changes journals only. No review approval or merge is claimed; merge remains user-owned.
+- Exact-head CI on 535cc passed PR Required Gate, PR Review Quality Gate, lifecycle recommendation, frontend unit/build/lint, CI Scope, security, Gitleaks, CodeQL, Git scratch guards, and GitGuardian. Backend, integration, frontend E2E, Docker build, staging readiness, production readiness and k6 were skipped by configured path/trigger conditions.
+- Local PR body gate passed after correcting source attribution: 19 tests, two samples, and the proposed body. PR body states exact tracked RQ-18 failure was on artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`, not current main #3943.
+- PR #3946 changes remain limited to seven staging/configuration/test/runbook/evidence paths. Default frontend build remains unchanged. The synthetic r4 project was torn down.
+- T18/Tier-2 remains PARTIAL: exact tracked RQ-18 did not pass; the r4 diagnostic copy is not equivalent, 13 response-body reads failed, five unique paths lacked hashes, and `served_revision_verified=false`. No full T18 or production validation is claimed.
+- The task-owned ignored `.scratch/t18-memory-safe-staging-20261109` remains because local policy blocked deletion. No alternate deletion method was used.
+
 ## PR #3946 exact-head CI and corrected source attribution — 2026-11-09T13:23:00+05:00
 
 - Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), staging-only artifact path; exact HEAD `da54660bbe8289b644f91621bb32f847bf551666`, base/current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`.

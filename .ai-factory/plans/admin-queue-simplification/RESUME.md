@@ -8,6 +8,14 @@ The staging change is seven paths: staging Dockerfile/Compose, one focused guard
 
 Next: commit/push the current three-journal CI checkpoint with normal hooks, verify new exact-head checks, then mark #3946 Ready for review. Leave merge to the user. After the user merges it, refresh main in a new worktree and continue with the exact tracked RQ-18 recorder/page-error discrepancy and remaining T18 acceptance. One task-owned ignored `.scratch/t18-memory-safe-staging-20261109` folder remains because local host policy blocked removal; no alternate deletion route was attempted.
 
+## Current resume — PR #3946 Ready; waiting for user merge — 2026-11-09T13:39:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. At the last verification, PR #3946 was OPEN / Ready for review / mergeable at HEAD `535cc03667cf6f3244c38b66d792a839504e5e90`, based on current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`; applicable exact-head checks passed. This checkpoint changes journals only; merge is user-owned.
+
+The change adds an opt-in `artifact-runtime` target for the canonical synthetic staging path. Normal frontend build stays default; artifact source SHA and manifest are verified in-image. One synthetic r4 Session and teardown passed. The exact tracked RQ-18 test still has no complete pass: it failed its final Admin page-error guard on artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`. The diagnostic copy is not equivalent; 13 response-body reads failed, five unique assets lacked a captured hash, and canonical `served_revision_verified=false` remains. Current main #3943's artifact was not tested by that exact run.
+
+T18/Tier-2 remains PARTIAL; no deferral is claimed. After user merges #3946, refresh current main in a new isolated worktree and continue the exact tracked RQ-18 recorder/page-error investigation, then the remaining T18 and `STAGING_VALIDATION.md` checks. Do not merge or deploy from the agent session. One task-owned ignored `.scratch/t18-memory-safe-staging-20261109` folder remains because local policy blocked deletion; the Compose project itself is gone.
+
 # Previous resume — diagnostic r4 Preflight checkpoint (superseded) — 2026-11-09T10:49:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.

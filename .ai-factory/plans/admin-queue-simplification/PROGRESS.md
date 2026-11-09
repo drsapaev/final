@@ -1,33 +1,33 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — PR #3946 exact-head CI passed — 2026-11-09T13:23:00+05:00
+## Current checkpoint — PR #3946 Ready for review — 2026-11-09T13:39:00+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance
-Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged. PR #3946 contains the opt-in, memory-safe staging artifact path and is OPEN / Draft; applicable exact-head CI passed. T18/Tier-2 remains PARTIAL.
+Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged. PR #3946 contains the opt-in, memory-safe staging artifact path and is OPEN / Ready for review / mergeable. Exact-head CI passed. T18/Tier-2 remains PARTIAL.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`
 Branch: `codex/aqs-t18-memory-safe-staging-20261109`
 Base commit: `origin/main` #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`
-PR HEAD: `da54660bbe8289b644f91621bb32f847bf551666`
+Last exact-head CI SHA: `535cc03667cf6f3244c38b66d792a839504e5e90` (subsequent checkpoint commit changes journals only)
 Staging implementation: `9d75b1262708c2bf7e68a5d3076305ec4d2bfae1`
-Last updated: 2026-11-09T13:23:00+05:00
+Last updated: 2026-11-09T13:39:00+05:00
 
 | Work item | Status | Evidence |
 |-----------|--------|----------|
 | T00–T17 | MERGED | Present on current main. |
 | PR #3937 | MERGED | Merge commit `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. |
-| PR #3946 staging artifact path | CI PASS; Draft | Seven-file staging/docs/test/evidence change; hosted artifact and local synthetic Session recorded below. No formal independent review yet. |
+| PR #3946 staging artifact path | CI PASS; Ready for review | Seven-file staging/docs/test/evidence change; hosted artifact and local synthetic Session recorded below. Awaiting user-owned merge. |
 | T18 / Tier-2 | PARTIAL | Exact tracked RQ-18 run failed on artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`; current main #3943's artifact was not tested. r4 diagnostic run is not equivalent to the tracked spec; full provenance and remaining T18 checks are open. |
 
 ### Current checkpoint
 
-- Exact-head CI for PR #3946 HEAD `da54660bbe8289b644f91621bb32f847bf551666`: PR Required Gate, PR Review Quality Gate, lifecycle recommendation, frontend unit/build/lint, CI Scope, security, Gitleaks, CodeQL, Git scratch guards, and GitGuardian passed. Backend, integration, frontend E2E, Docker build, staging readiness, production readiness and load-test jobs were skipped by path/trigger conditions; skipped jobs are not claimed as passed.
+- Exact-head CI for PR #3946 HEAD `535cc03667cf6f3244c38b66d792a839504e5e90`: PR Required Gate, PR Review Quality Gate, lifecycle recommendation, frontend unit/build/lint, CI Scope, security, Gitleaks, CodeQL, Git scratch guards, and GitGuardian passed. Backend, integration, frontend E2E, Docker build, staging readiness, production readiness and load-test jobs were skipped by path/trigger conditions; skipped jobs are not claimed as passed.
 - The PR body was corrected to say the tracked RQ-18 failure used the artifact from `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the current main #3943 SHA `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2` was not exercised by that run. The local PR-description gate passed: 19 tests, both samples, and the proposed body.
-- PR #3946 remains Draft / open / mergeable. User retains merge authority. Before moving it to Ready, commit and push this checkpoint, then verify exact-head checks again.
+- PR #3946 is OPEN / Ready for review / mergeable. User retains merge authority; do not merge from the agent session.
 - r4 synthetic Compose teardown passed. One task-owned ignored `.scratch/t18-memory-safe-staging-20261109` folder remains because the host policy blocked its deletion; no alternate deletion method was attempted.
-- Next exact action: commit and push this three-journal checkpoint using normal hooks, verify all applicable CI on the new HEAD, then mark PR #3946 Ready for review. After user-owned merge, start from fresh main and continue the exact tracked RQ-18 harness/provenance work; do not repeat r4 solely for infrastructure validation.
+- Next exact action: wait for user-owned merge of #3946. After merge, refresh current main in a new worktree and continue with the exact tracked RQ-18 recorder/page-error discrepancy and remaining T18 acceptance; do not repeat r4 solely for infrastructure validation.
 
-## Previous checkpoint — synced after PR #3937; staging PR body validated — 2026-11-09T11:23:56+05:00
+## Previous checkpoint — PR #3946 exact-head CI passed while Draft — 2026-11-09T13:23:00+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance
