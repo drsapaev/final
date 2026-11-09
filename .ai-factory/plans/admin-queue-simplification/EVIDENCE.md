@@ -1,17 +1,17 @@
-## PR #3946 GitGuardian workflow follow-up — 2026-11-09T23:56:46+05:00
+## PR #3946 GitGuardian workflow follow-up — 2026-11-10T00:22:20+05:00
 
-- Commit under test: local main-sync commit `f1312d6b096e64f750097b67b9ac7adeff76fffe`; synced base `origin/main` `929363c66315b2b70229439662e3a92d7b9b1ab8`; remote PR head at start `e2e1f65490a4d5d5d7689ffe8b0a0f09eeda2d44`.
-- Environment: isolated Windows worktree; no Compose services or staging were started.
-- Execution mode: `narrow_override`; mandatory gate result: `gate_misroute=no`, `override_used=yes`, `handoff_required=yes`; execution prompt read. Known root is `.github/workflows/staging-frontend-artifact.yml`.
-- Allowed paths: `.github/workflows/staging-frontend-artifact.yml`, `scripts/tests/test_wsl_staging_guard.py`, and T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied: production/runtime application, staging execution, force-push/history rewrite, merge.
-- Actual changed paths: the workflow, its focused guard test, and the three T18 journals. The ignored gate log is generated-only under worktree `ai/.scratch/`.
-- Original failure: GitGuardian's required check reported static CI-only Compose values in the workflow, introduced at historical PR commit `169d005f68b07af08c94bda21244196868f2695a`. No raw values or scanner payload are recorded.
-- Validation commands/results: focused `scripts/tests/test_wsl_staging_guard.py` — PASS, 296 tests; YAML parse — PASS; `py_compile` — PASS; Black check — PASS; `git diff --check` — PASS; local actionlint — NOT_RUN (not installed); exact-head GitGuardian/CI — NOT_RUN (fix not pushed yet).
-- Result: LOCAL PASS; remote finding remains unverified and blocking until exact-head checks complete.
-- Relevant output: gate result/prompt in ignored worktree-local `.scratch`; test and validation outputs contain no secrets.
-- Scope check: only the five allowed tracked files changed; no runtime application, staging project, production, or deployment changed.
-- Remaining limitation: scanner may continue to report the historical commit after literals are removed from the current tree. Do not bypass or rewrite history without a separate decision.
-- PR: [#3946](https://github.com/drsapaev/final/pull/3946), OPEN; normal push and exact-head checks pending.
+- Commit under test: `2ca1255fbdd8bf39601ae81ab487476fb31d08ee`; base/current main `929363c66315b2b70229439662e3a92d7b9b1ab8`.
+- Environment: isolated Windows worktree and GitHub Actions. No Compose services or staging were started.
+- Execution mode: `narrow_override`; gate result `gate_misroute=no`, `override_used=yes`, `handoff_required=yes`; execution prompt read. Known root: `.github/workflows/staging-frontend-artifact.yml`.
+- Allowed files: the staging artifact workflow, its focused guard test, and T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. No runtime, production, deployment, staging, or history rewrite.
+- Actual changed paths committed and pushed: workflow, `scripts/tests/test_wsl_staging_guard.py`, and the three T18 journals.
+- Original failure: GitGuardian reported fixed CI-only Compose values in historical PR commit `169d005f68b07af08c94bda21244196868f2695a`. The current workflow uses run-scoped values, but the PR-history scan still reports that old occurrence.
+- Validation: 296 focused staging-guard tests — PASS; YAML parse — PASS; `py_compile` — PASS; Black check — PASS; local `git diff --check` — PASS; local actionlint — NOT_RUN (not installed); PR-body template validator — PASS.
+- Hosted: target validation [#42679243165](https://github.com/drsapaev/final/actions/runs/42679243165) — PASS. Unified exact-head checks: 34 success, 12 skipped, 1 failure. Backend, frontend unit/E2E, PR Required Gate, Gitleaks, CodeQL, Security Scan, frontend build/lint, and scope checks — PASS. The final PR description update passed PR Review Quality Gate [#42682574773](https://github.com/drsapaev/final/actions/runs/42682574773). GitGuardian's [incident comment](https://github.com/drsapaev/final/pull/3946#issuecomment-6746135174) remains FAIL on historical commit `169d005f68b07af08c94bda21244196868f2695a`.
+- Result: code and documentation are validated, but required checks are not all green because the historical GitGuardian incident remains unresolved. No checks are pending on the code and body snapshot at this status read.
+- Scope check: the pushed fix changed the workflow, its test, and three T18 journals; the PR body is updated. This latest evidence-only checkpoint also updates those same journals. No staging or production resources changed.
+- Remaining limitation: clearing the old occurrence requires either a GitGuardian false-positive disposition or rewriting branch history. No scanner bypass or force-push was performed.
+- PR: [#3946](https://github.com/drsapaev/final/pull/3946), OPEN, Ready for review, mergeable, HEAD `2ca1255fbdd8bf39601ae81ab487476fb31d08ee`.
 - Merge commit: none; merge remains user-owned.
 
 ## PR #3946 exact-head review-fix validation — 2026-11-09T22:52:10+05:00

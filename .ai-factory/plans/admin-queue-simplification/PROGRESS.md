@@ -1,15 +1,14 @@
 # Progress — T18 final acceptance
 
-## PR #3946 — GitGuardian workflow finding — 2026-11-09T23:56:46+05:00
+## PR #3946 — GitGuardian workflow finding — 2026-11-10T00:22:20+05:00
 
-PR #3946 remains OPEN and unmerged. Worktree branch `codex/aqs-t18-memory-safe-staging-20261109` is locally synced to `origin/main` `929363c66315b2b70229439662e3a92d7b9b1ab8` at `f1312d6b096e64f750097b67b9ac7adeff76fffe`; remote PR head before this follow-up was `e2e1f65490a4d5d5d7689ffe8b0a0f09eeda2d44`.
+PR #3946 remains OPEN and unmerged at pushed HEAD `2ca1255fbdd8bf39601ae81ab487476fb31d08ee`, based on current main `929363c66315b2b70229439662e3a92d7b9b1ab8`. Commit `2ca1255` replaces fixed CI-only Compose values with per-run values and adds a focused guard test. PR description was refreshed and passes the local review-template validator.
 
-- Blocking finding: GitGuardian reported static CI-only Compose identity/secret literals in `.github/workflows/staging-frontend-artifact.yml`, first introduced at historical PR commit `169d005f68b07af08c94bda21244196868f2695a`. No real account credentials were identified; values are intentionally omitted here.
-- Execution mode: `narrow_override`; mandatory launcher gate reported `gate_misroute=no`, `override_used=yes`, and `handoff_required=yes`. The generated execution prompt was read. Known root: `.github/workflows/staging-frontend-artifact.yml`.
-- Allowed paths: `.github/workflows/staging-frontend-artifact.yml`, `scripts/tests/test_wsl_staging_guard.py`, and this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` only. Denied: production, application runtime, staging services, history rewrite/force-push, and merge.
-- Changed locally: per-run Compose identity/secret derivation from GitHub run ID/attempt; one focused workflow regression test; these three T18 journals. No staging or production service was started.
-- Local validation: focused staging guard — PASS, 296 tests; workflow YAML parse — PASS; Python compile — PASS; Black check — PASS; `git diff --check` — PASS. Local actionlint — NOT_RUN because it is not installed. Exact-head GitGuardian/CI — pending push; the earlier remote finding is not considered cleared yet.
-- Next action: inspect the final scoped diff, commit and push normally to #3946, then verify the exact-head GitGuardian and required CI results. Do not bypass the security check. If the old historical commit still blocks after the normal fix, do not rewrite history without a separate decision.
+- Gate: `narrow_override`; `gate_misroute=no`, `override_used=yes`, `handoff_required=yes`; prompt read. Known root: `.github/workflows/staging-frontend-artifact.yml`.
+- Local validation: 296 focused guard tests, Python compile, Black, workflow YAML parse, and `git diff --check` — PASS. Local actionlint — NOT_RUN (not installed).
+- Hosted target workflow [#42679243165](https://github.com/drsapaev/final/actions/runs/42679243165) — PASS for PR target validation. Unified exact-head checks completed: 34 success, 12 skipped, 1 failure. Backend, frontend unit/E2E, PR Required Gate, Gitleaks, CodeQL, Security Scan, frontend build/lint, and target validation passed. After refreshing the PR description, PR Review Quality Gate [#42682574773](https://github.com/drsapaev/final/actions/runs/42682574773) also passed. GitGuardian's [PR incident comment](https://github.com/drsapaev/final/pull/3946#issuecomment-6746135174) still reports the historical occurrence in commit `169d005f68b07af08c94bda21244196868f2695a`.
+- The remaining decision is how to resolve the historical GitGuardian incident. No bypass or history rewrite has been performed. This evidence update is ready for the PR journal; no staging or production service was started.
+- Next: await the user's choice between false-positive disposition and authorized PR-history rewrite; then complete the corresponding GitHub follow-up and recheck the exact head. Merge remains user-owned.
 
 ## PR #3946 — review fixes verified on exact HEAD — 2026-11-09T22:52:10+05:00
 

@@ -1,12 +1,10 @@
-## Resume — PR #3946 GitGuardian follow-up — 2026-11-09T23:56:46+05:00
+## Resume — PR #3946 GitGuardian follow-up — 2026-11-10T00:22:20+05:00
 
-Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. The branch is synced with `origin/main` `929363c66315b2b70229439662e3a92d7b9b1ab8` at local HEAD `f1312d6b096e64f750097b67b9ac7adeff76fffe`; the remote PR head before this follow-up was `e2e1f65490a4d5d5d7689ffe8b0a0f09eeda2d44`.
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3946 is OPEN, Ready for review, mergeable, and pushed at HEAD `2ca1255fbdd8bf39601ae81ab487476fb31d08ee` on base `origin/main` `929363c66315b2b70229439662e3a92d7b9b1ab8`.
 
-The scoped fix is implemented locally: the artifact-validation workflow derives ephemeral Compose values from the GitHub run ID/attempt, with a focused regression assertion. Local validation passed: 296 staging-guard tests, YAML parse, Python compile, Black check and diff check. Local actionlint is unavailable; exact-head GitGuardian and CI still need a normal push. The previous GitGuardian finding at historical PR commit `169d005f68b07af08c94bda21244196868f2695a` is not yet considered resolved.
+The scoped workflow fix uses per-run Compose values and has a regression assertion. Local checks passed: 296 staging-guard tests, YAML parse, Python compile, Black, `git diff --check`, and PR body template validation. Hosted target validation passed. Unified exact-head checks completed: 34 success, 12 skipped, 1 failure. Backend/frontend unit/E2E, PR Required Gate, Gitleaks, CodeQL, Security Scan, frontend build/lint and target validation passed. The final PR description update passed PR Review Quality Gate. GitGuardian still fails on historical PR commit `169d005f68b07af08c94bda21244196868f2695a`.
 
-The mandatory launcher returned `narrow_override`, `gate_misroute=no`, `override_used=yes`, `handoff_required=yes`; its execution prompt was read. Changed files are limited to the workflow, its focused test, and T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Do not merge, start staging, bypass GitGuardian, or rewrite history. If the scanner still blocks after the normal fix, stop before any history rewrite and report that evidence.
-
-T18/Tier-2 remains PARTIAL; `served_revision_verified` and full `STAGING_VALIDATION.md` acceptance remain incomplete. Next: review the exact diff, commit/push normally to #3946, inspect exact-head checks, update the PR body with truthful outcomes, and leave merge to the user.
+The PR description was updated and validated. This latest evidence-only journal update is not yet pushed. The remaining external blocker requires choosing between GitGuardian false-positive disposition and history rewrite. Do not force-push or merge without user authorization. T18/Tier-2 remains PARTIAL; `served_revision_verified` and full `STAGING_VALIDATION.md` acceptance are incomplete.
 
 ## Resume — PR #3946 review fixes verified — 2026-11-09T22:52:10+05:00
 
