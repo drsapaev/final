@@ -10,11 +10,29 @@
  *   первая страница загружается при открытии, следующие — кнопкой
  *   «Показать ещё» без дублей (follow-up P2-2: визит с числом фото
  *   больше размера страницы больше не теряет старые фото);
- * - приватное превью получает авторизованным запросом (GET /files/{id}/preview, blob);
+ * - приватное превью получает авторизованным запросом (GET /files/{id}/preview, blob)
+ *   с ограниченной параллельностью и независимыми отказами (DERMAGALLERY-FE-007);
  * - временные objectURL освобождаются при размонтировании и смене пациента/визита;
  * - категории «осмотр»/«до»/«после» хранятся в существующих тегах файла
  *   (dermatology,photo,examination|before|after);
  * - псевдозагрузки File/blob: в JSON ЭМК нет — галерея не пишет в specialty_data.
+ *
+ * Инварианты контекста (аудит 3892: DERMAGALLERY-FE-001..007, DERMAAI-FE-001/002/004/005):
+ * - смена пациента/визита СИНХРОННО очищает видимое состояние (фото, total,
+ *   страницу, анализ AI, подтверждение удаления) — до разрешения нового GET
+ *   старые карточки и действия недоступны (DERMAGALLERY-FE-001);
+ * - асинхронные действия (upload/delete/AI) захватывают контекст и не
+ *   перезагружают/не применяют результат после смены контекста (FE-002, DERMAAI-FE-001);
+ * - пагинация доступна и в пустой локально категории (FE-004), состояние
+ *   loadMore сбрасывается при смене контекста (FE-003), кнопка «Показать ещё»
+ *   честно отключается во время любой загрузки (FE-007);
+ * - частично успешная загрузка перечитывает список и честно сообщает о
+ *   частичном результате (FE-005);
+ * - удаление — двухшаговое подтверждение без запроса к серверу на первом шаге (FE-006);
+ * - подсказка AI привязана к файлу и контексту: канонический status='error'
+ *   внутри HTTP 200 — ошибка, а не успех (DERMAAI-FE-002); анализ удалённого
+ *   файла не показывается и не «воскрешает» поздний ответ (DERMAAI-FE-004);
+ *   панель всегда называет фото-источник (DERMAAI-FE-005).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Image as ImageIcon, RefreshCw, Sparkles, Trash2, Upload, X } from 'lucide-react';
@@ -73,6 +91,8 @@ interface SkinFileAnalysisState {
 }
 
 const LIST_PAGE_SIZE = 100;
+/** Ограниченная параллельность приватных превью (DERMAGALLERY-FE-007). */
+const PREVIEW_CONCURRENCY = 4;
 
 export function DermaVisitGallery({ patientId, visitId, disabled = false }: DermaVisitGalleryProps) {
   const { t: rawT } = useTranslation();
@@ -89,9 +109,20 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   const [currentPage, setCurrentPage] = useState(1);
   const [activeCategory, setActiveCategory] = useState<DermaPhotoCategory>('examination');
   const [analysis, setAnalysis] = useState<SkinFileAnalysisState | null>(null);
+  // Двухшаговое удаление (DERMAGALLERY-FE-006): первый клик только «взводит»
+  // подтверждение; DELETE уходит со второго, явного.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const objectUrlsRef = useRef<Set<string>>(new Set());
   const loadSeqRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Текущий контекст (пациент:визит) для стражей асинхронных действий
+  // (DERMAGALLERY-FE-002, DERMAAI-FE-001): ref обновляется на каждом рендере
+  // и сравнивается с контекстом, захваченным действием на старте.
+  const contextKeyRef = useRef(`${patientId}:${visitId}`);
+  contextKeyRef.current = `${patientId}:${visitId}`;
+  // Зеркало списка фото для стражей «файл ещё существует» (DERMAAI-FE-004).
+  const photosRef = useRef<VisitPhoto[]>([]);
+  photosRef.current = photos;
 
   const releaseObjectUrls = useCallback(() => {
     for (const url of objectUrlsRef.current) {
@@ -103,18 +134,25 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   // Превью — отдельные авторизованные запросы для переданных файлов
   // (приватные файлы недоступны по прямому URL без заголовков авторизации).
   // Общий seq-guard: отмена при смене пациента/визита и конкурирующих загрузках.
+  // Запросы идут ограниченными пачками (DERMAGALLERY-FE-007): один зависший
+  // или упавший запрос не блокирует остальные превьи своей пачки, а отказ
+  // одного файла оставляет остальные карточки живыми.
   const attachPreviews = useCallback(async (files: StoredFile[], seq: number) => {
-    for (const file of files) {
-      try {
-        const previewResponse = await api.get<Blob>(`/files/${file.id}/preview`, { responseType: 'blob' });
-        if (seq !== loadSeqRef.current) return;
-        const url = URL.createObjectURL(previewResponse.data);
-        objectUrlsRef.current.add(url);
-        setPhotos((prev) => prev.map((photo) => (photo.id === file.id ? { ...photo, previewUrl: url } : photo)));
-      } catch (error) {
-        // Превью недоступно — карточка файла остаётся с заглушкой.
-        logger.warn('[DermaVisitGallery] preview failed', { fileId: file.id, errorType: (error as { name?: string })?.name });
-      }
+    for (let offset = 0; offset < files.length; offset += PREVIEW_CONCURRENCY) {
+      if (seq !== loadSeqRef.current) return;
+      const batch = files.slice(offset, offset + PREVIEW_CONCURRENCY);
+      await Promise.allSettled(batch.map(async (file) => {
+        try {
+          const previewResponse = await api.get<Blob>(`/files/${file.id}/preview`, { responseType: 'blob' });
+          if (seq !== loadSeqRef.current) return;
+          const url = URL.createObjectURL(previewResponse.data);
+          objectUrlsRef.current.add(url);
+          setPhotos((prev) => prev.map((photo) => (photo.id === file.id ? { ...photo, previewUrl: url } : photo)));
+        } catch (error) {
+          // Превью недоступно — карточка файла остаётся с заглушкой.
+          logger.warn('[DermaVisitGallery] preview failed', { fileId: file.id, errorType: (error as { name?: string })?.name });
+        }
+      }));
     }
   }, []);
 
@@ -122,6 +160,10 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
     const seq = ++loadSeqRef.current;
     setLoading(true);
     setLoadFailed(false);
+    // Смена контекста (или повторная загрузка) сбрасывает застрявший флаг
+    // постраничной загрузки (DERMAGALLERY-FE-003): старый finally с устаревшим
+    // seq не очистит его сам.
+    setLoadingMore(false);
     try {
       const listResponse = await api.get<{ files?: StoredFile[]; total?: number } | StoredFile[]>('/files/', {
         params: { patient_id: patientId, visit_id: visitId, size: LIST_PAGE_SIZE, page: 1 },
@@ -143,7 +185,9 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
       })));
       setTotalFiles(total);
       setCurrentPage(1);
-      await attachPreviews(imageFiles, seq);
+      // Превью не блокируют завершение загрузки списка (DERMAGALLERY-FE-007):
+      // карточки и пагинация доступны сразу, превьи подтягиваются параллельно.
+      void attachPreviews(imageFiles, seq);
     } catch (error) {
       if (seq === loadSeqRef.current) {
         setLoadFailed(true);
@@ -187,7 +231,7 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
       });
       setTotalFiles(total);
       setCurrentPage(nextPage);
-      await attachPreviews(newFiles, seq);
+      void attachPreviews(newFiles, seq);
     } catch (error) {
       if (seq === loadSeqRef.current) {
         logger.error('[DermaVisitGallery] load more failed:', error);
@@ -199,7 +243,17 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   }, [currentPage, loading, loadingMore, totalFiles, photos, patientId, visitId, attachPreviews, t]);
 
   // Загрузка при открытии и при смене пациента/визита; очистка при уходе.
+  // DERMAGALLERY-FE-001: смена контекста СИНХРОННО (до разрешения нового GET)
+  // очищает видимое состояние — старые фото, метаданные, анализ AI и
+  // «взведённое» удаление недоступны под новым визитом.
   useEffect(() => {
+    setPhotos([]);
+    setTotalFiles(0);
+    setCurrentPage(1);
+    setLoadingMore(false);
+    setAnalysis(null);
+    setConfirmDeleteId(null);
+    setLoadFailed(false);
     loadGallery();
     return () => {
       loadSeqRef.current += 1;
@@ -207,38 +261,64 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
     };
   }, [loadGallery, releaseObjectUrls]);
 
+  // Загрузка файлов: пофайловые исходники, честный частичный результат
+  // (DERMAGALLERY-FE-005) и страж контекста для отложенной перезагрузки
+  // (DERMAGALLERY-FE-002): поздний ответ A не перечитывает список под B.
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    const actionContext = `${patientId}:${visitId}`;
     setUploading(true);
+    let uploaded = 0;
+    const failedNames: string[] = [];
     try {
       for (const rawFile of Array.from(files)) {
-        let uploadFile: File | Blob = rawFile;
-        if (isHEICFile(rawFile)) {
-          uploadFile = await convertHEICToJPEG(rawFile, 0.9);
+        try {
+          let uploadFile: File | Blob = rawFile;
+          if (isHEICFile(rawFile)) {
+            uploadFile = await convertHEICToJPEG(rawFile, 0.9);
+          }
+          const formData = new FormData();
+          formData.append('file', uploadFile);
+          formData.append('file_type', 'image');
+          formData.append('permission', 'private');
+          formData.append('tags', `dermatology,photo,${activeCategory}`);
+          formData.append('patient_id', String(patientId));
+          formData.append('visit_id', String(visitId));
+          await api.post('/files/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+          uploaded += 1;
+        } catch (error) {
+          logger.error('[DermaVisitGallery] upload failed:', error, { file: rawFile.name });
+          failedNames.push(rawFile.name);
         }
-        const formData = new FormData();
-        formData.append('file', uploadFile);
-        formData.append('file_type', 'image');
-        formData.append('permission', 'private');
-        formData.append('tags', `dermatology,photo,${activeCategory}`);
-        formData.append('patient_id', String(patientId));
-        formData.append('visit_id', String(visitId));
-        await api.post('/files/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       }
-      await loadGallery();
-      notify.success(t('derma.derma_gallery_uploaded'));
-    } catch (error) {
-      logger.error('[DermaVisitGallery] upload failed:', error);
-      notify.error(t('derma.derma_gallery_upload_failed'));
     } finally {
       setUploading(false);
+    }
+    // DERMAGALLERY-FE-002: контекст сменился, пока шли POST'ы — не трогаем
+    // список чужого визита (успешные файлы A уже сохранены на сервере; их
+    // покажет перезагрузка при возврате к A).
+    if (actionContext !== contextKeyRef.current) return;
+    if (uploaded > 0) {
+      await loadGallery();
+      if (failedNames.length === 0) {
+        notify.success(t('derma.derma_gallery_uploaded'));
+      } else {
+        notify.warning(t('derma.derma_gallery_upload_partial', { uploaded, failed: failedNames.length }));
+      }
+    } else {
+      notify.error(t('derma.derma_gallery_upload_failed'));
     }
   }, [activeCategory, patientId, visitId, loadGallery, t]);
 
   // AI-анализ сохранённого фото — ТОЛЬКО по нажатию (пункт 9 плана аудита).
   // Ответ — подсказка: показывается в панели и никогда не записывается в ЭМК
   // (компонент не имеет onChange в specialty_data). Ошибка/503 не ломают галерею.
+  // DERMAAI-FE-001: поздний ответ не применяется после смены контекста;
+  // DERMAAI-FE-002: канонический status='error' внутри HTTP 200 — ошибка;
+  // DERMAAI-FE-004: файл, удалённый пока запрос был в полёте, не получает
+  // «воскрешённую» подсказку.
   const handleAnalyze = useCallback(async (photoId: number) => {
+    const actionContext = `${patientId}:${visitId}`;
     setAnalysis({ fileId: photoId, status: 'loading' });
     try {
       const response = await api.post<{
@@ -251,32 +331,58 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
         visit_id: visitId,
         file_id: photoId,
       });
+      if (actionContext !== contextKeyRef.current) return;
       const payload = response.data ?? {};
+      const aiNotice = typeof payload.ai_notice === 'string' ? payload.ai_notice : '';
+      if (payload.status === 'error') {
+        setAnalysis({ fileId: photoId, status: 'error', aiNotice });
+        return;
+      }
+      if (!photosRef.current.some((photo) => photo.id === photoId)) {
+        // Файл удалён, пока ответ шёл: без подсказки и без панели-«призрака».
+        setAnalysis(null);
+        return;
+      }
       const content = payload.data?.content;
       setAnalysis({
         fileId: photoId,
         status: 'done',
         suggestion: typeof content === 'string' && content.trim() ? content : '',
-        aiNotice: typeof payload.ai_notice === 'string' ? payload.ai_notice : '',
+        aiNotice,
       });
     } catch (error) {
       logger.error('[DermaVisitGallery] AI analysis failed:', error);
-      setAnalysis({ fileId: photoId, status: 'error' });
+      if (actionContext === contextKeyRef.current) {
+        setAnalysis({ fileId: photoId, status: 'error' });
+      }
     }
-  }, [visitId]);
+  }, [patientId, visitId]);
 
+  // Удаление — только со второго, явного подтверждения (DERMAGALLERY-FE-006):
+  // первый клик лишь взводит подтверждение и НЕ посылает DELETE.
   const handleDelete = useCallback(async (photoId: number) => {
+    const actionContext = `${patientId}:${visitId}`;
     try {
       await api.delete(`/files/${photoId}`);
+      // DERMAAI-FE-004: подсказка AI удалённого файла исчезает вместе с ним.
+      setAnalysis((prev) => (prev && prev.fileId === photoId ? null : prev));
+      // DERMAGALLERY-FE-002: контекст сменился, пока DELETE шёл — не
+      // перечитываем список под чужим визитом.
+      if (actionContext !== contextKeyRef.current) return;
       await loadGallery();
       notify.success(t('derma.derma_gallery_deleted'));
     } catch (error) {
       logger.error('[DermaVisitGallery] delete failed:', error);
-      notify.error(t('derma.derma_gallery_delete_failed'));
+      if (actionContext === contextKeyRef.current) {
+        notify.error(t('derma.derma_gallery_delete_failed'));
+      }
     }
-  }, [loadGallery, t]);
+  }, [patientId, visitId, loadGallery, t]);
 
   const visiblePhotos = photos.filter((photo) => photo.category === activeCategory);
+  // DERMAAI-FE-005: панель подсказки всегда называет фото-источник и живёт
+  // только пока файл существует в текущем списке.
+  const analysisPhoto = analysis ? photos.find((photo) => photo.id === analysis.fileId) : undefined;
 
   return (
     <section className="derma-gallery" aria-label={t('derma.derma_gallery_title')}>
@@ -335,57 +441,83 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
         : visiblePhotos.length === 0 ?
         <div className="derma-gallery-state">
           <ImageIcon size={32} aria-hidden="true" />
-          <p>{t('derma.derma_gallery_empty')}</p>
+          <p>{photos.length === 0 ? t('derma.derma_gallery_empty') : t('derma.derma_gallery_empty_category')}</p>
         </div>
         :
-        <>
-          <div className="derma-gallery-grid">
-            {visiblePhotos.map((photo) => (
-              <div key={photo.id} className="derma-gallery-item">
-                {photo.previewUrl ?
-                  <img
-                    src={photo.previewUrl}
-                    alt={t('derma.derma_gallery_photo_alt', { category: t(`derma.derma_gallery_category_${photo.category}`) })}
-                    loading="lazy" /> :
-                  <div className="derma-gallery-item-placeholder" aria-label={t('derma.derma_gallery_photo_alt', { category: t(`derma.derma_gallery_category_${photo.category}`) })}>
-                    <ImageIcon size={24} aria-hidden="true" />
-                  </div>}
-                <div className="derma-gallery-item-actions">
-                  <button
-                    type="button"
-                    className="derma-gallery-analyze"
-                    aria-label={t('derma.derma_gallery_ai_button_aria', { category: t(`derma.derma_gallery_category_${photo.category}`) })}
-                    title={t('derma.derma_gallery_ai_button')}
-                    disabled={disabled || (analysis?.status === 'loading')}
-                    onClick={() => void handleAnalyze(photo.id)}>
-                    <Sparkles size={14} aria-hidden="true" />
-                  </button>
-                  {!disabled &&
+        <div className="derma-gallery-grid">
+          {visiblePhotos.map((photo) => (
+            <div key={photo.id} className="derma-gallery-item">
+              {photo.previewUrl ?
+                <img
+                  src={photo.previewUrl}
+                  alt={t('derma.derma_gallery_photo_alt', { category: t(`derma.derma_gallery_category_${photo.category}`) })}
+                  loading="lazy" /> :
+                <div className="derma-gallery-item-placeholder" aria-label={t('derma.derma_gallery_photo_alt', { category: t(`derma.derma_gallery_category_${photo.category}`) })}>
+                  <ImageIcon size={24} aria-hidden="true" />
+                </div>}
+              <div className="derma-gallery-item-actions">
+                <button
+                  type="button"
+                  className="derma-gallery-analyze"
+                  aria-label={t('derma.derma_gallery_ai_button_aria', { category: t(`derma.derma_gallery_category_${photo.category}`) })}
+                  title={t('derma.derma_gallery_ai_button')}
+                  disabled={disabled || (analysis?.status === 'loading')}
+                  onClick={() => void handleAnalyze(photo.id)}>
+                  <Sparkles size={14} aria-hidden="true" />
+                </button>
+                {!disabled &&
+                  (confirmDeleteId === photo.id ?
+                    <span className="derma-gallery-delete-confirm" role="group" aria-label={t('derma.derma_gallery_delete_confirm')}>
+                      <button
+                        type="button"
+                        className="derma-gallery-delete derma-gallery-delete-confirm-yes"
+                        aria-label={t('derma.derma_gallery_delete_confirm_yes')}
+                        title={t('derma.derma_gallery_delete_confirm')}
+                        onClick={() => {
+                          setConfirmDeleteId(null);
+                          void handleDelete(photo.id);
+                        }}>
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="derma-gallery-delete-cancel"
+                        aria-label={t('derma.derma_gallery_delete_cancel')}
+                        title={t('derma.derma_gallery_delete_cancel')}
+                        onClick={() => setConfirmDeleteId(null)}>
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    </span>
+                    :
                     <button
                       type="button"
                       className="derma-gallery-delete"
                       aria-label={t('derma.derma_gallery_delete_aria', { category: t(`derma.derma_gallery_category_${photo.category}`) })}
-                      onClick={() => void handleDelete(photo.id)}>
+                      title={t('derma.derma_gallery_delete_confirm')}
+                      onClick={() => setConfirmDeleteId(photo.id)}>
                       <Trash2 size={14} aria-hidden="true" />
-                    </button>}
-                </div>
+                    </button>)}
               </div>
-            ))}
-          </div>
-          {/* Пагинация по серверному контракту FileList (follow-up P2-2):
-              загружено меньше total — предложить следующую страницу. */}
-          {photos.length < totalFiles &&
-            <button
-              type="button"
-              className="derma-gallery-load-more"
-              onClick={() => void handleLoadMore()}
-              disabled={disabled || loadingMore}>
-              {loadingMore ? t('derma.derma_gallery_loading') : t('derma.derma_gallery_load_more')}
-            </button>}
-        </>}
+            </div>
+          ))}
+        </div>}
+      {/* Пагинация по серверному контракту FileList (follow-up P2-2):
+          загружено меньше total — предложить следующую страницу.
+          DERMAGALLERY-FE-004: кнопка доступна и когда в выбранной категории
+          сейчас нет карточек (позже страницы лежат фото других категорий);
+          DERMAGALLERY-FE-007: кнопка честно отключена на время любой загрузки. */}
+      {!loadFailed && !loading && photos.length < totalFiles &&
+        <button
+          type="button"
+          className="derma-gallery-load-more"
+          onClick={() => void handleLoadMore()}
+          disabled={disabled || loading || loadingMore}>
+          {loadingMore ? t('derma.derma_gallery_loading') : t('derma.derma_gallery_load_more')}
+        </button>}
 
-      {/* Подсказка AI — только по нажатию, никогда не записывается в ЭМК (пункт 9) */}
-      {analysis &&
+      {/* Подсказка AI — только по нажатию, никогда не записывается в ЭМК (пункт 9).
+          DERMAAI-FE-005: панель явно называет фото-источник подсказки. */}
+      {analysis && analysisPhoto &&
         <div className="derma-gallery-analysis" role="status" aria-live="polite">
           <div className="derma-gallery-analysis-header">
             <span className="derma-gallery-analysis-title">{t('derma.derma_gallery_ai_result_title')}</span>
@@ -397,6 +529,10 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
               <X size={14} aria-hidden="true" />
             </button>
           </div>
+          <p className="derma-gallery-analysis-source">
+            {t('derma.derma_gallery_ai_source')}:{' '}
+            <span className="derma-gallery-analysis-source-name">{analysisPhoto.title}</span>
+          </p>
           {analysis.status === 'loading' &&
             <p className="derma-gallery-analysis-hint">{t('derma.derma_gallery_ai_analyzing')}</p>}
           {analysis.status === 'error' &&
