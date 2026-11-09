@@ -544,7 +544,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         // Очищаем EMR и visitData при смене пациента
         setEmr(null);
         setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
-        // RETRO-3941-01 (post-merge review #3944): an open data-entry form
+        // RETRO-3941-01 (post-merge review 3944): an open data-entry form
         // belongs to the patient it was opened for. A selection switch must
         // close it, so patient A's unsaved form values can never be
         // submitted under patient B's context.
@@ -571,7 +571,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       patientDataEpochRef.current += 1;
       setEmr(null);
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
-      // RETRO-3941-01 (post-merge review #3944): no patient context — no
+      // RETRO-3941-01 (post-merge review 3944): no patient context — no
       // open data-entry form either.
       setShowForm({ open: false });
       setEcgResults([]);
@@ -1798,7 +1798,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     || selectedPatient?.patient?.full_name
     || selectedPatient?.patient?.name
     || '—';
-  // RETRO-3941-01 (post-merge review #3944): canonical owner identity for
+  // RETRO-3941-01 (post-merge review 3944): canonical owner identity for
   // the manual ECG entry form — exactly the patient/visit ids the form's
   // props are built from. Keying the form by this identity forces a remount
   // (blank state) whenever the context switches, so unsaved measurements

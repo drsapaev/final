@@ -18,7 +18,7 @@
  *    (no silent empty ECG records);
  *  - the submit button is disabled while the request is in flight
  *    (no duplicate submissions);
- *  - RETRO-3941-01 (post-merge review #3944): the typed content belongs
+ *  - RETRO-3941-01 (post-merge review 3944): the typed content belongs
  *    to the patient/visit context the form was OPENED for. If the props
  *    later point at a different patient/visit (selection switch without
  *    a remount), the submit is refused — patient A's measurements must
@@ -156,7 +156,7 @@ export function ManualEcgForm({
   });
   const [submitting, setSubmitting] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
-  // RETRO-3941-01 (post-merge review #3944): capture the owner identity at
+  // RETRO-3941-01 (post-merge review 3944): capture the owner identity at
   // mount. The typed values below belong to THIS patient/visit; a later
   // prop change to another context must never carry them over.
   const ownerRef = useRef({

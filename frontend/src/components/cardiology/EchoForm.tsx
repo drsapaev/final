@@ -83,6 +83,12 @@ export interface EchoFormProps {
  * another inline `style={{…}}` literal. */
 const ALERT_MARGIN_STYLE: React.CSSProperties = { marginBottom: 16 };
 
+/** RETRO-3941-02 (post-merge review 3944): shared constants for the
+ * hydration-failure alert icon and retry button (Phase 0 ratchet: no new
+ * inline style literals — the metric may only improve). */
+const ALERT_ICON_STYLE: React.CSSProperties = { width: 16, height: 16, marginRight: 8 };
+const RETRY_BUTTON_STYLE: React.CSSProperties = { marginLeft: 12 };
+
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
   leftVentricle: {
@@ -217,7 +223,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   // replaced `specialty_data.echo` with the local state — an untouched
   // Save could wipe stored EF/EDD/conclusion with a blank revision.
   const [hydrating, setHydrating] = useState(false);
-  // RETRO-3941-02 (post-merge review #3944): hydration must fail CLOSED.
+  // RETRO-3941-02 (post-merge review 3944): hydration must fail CLOSED.
   // A transient GET 500/network error used to leave a blank form with an
   // enabled Save — a later dirty save then overwrote the stored echo
   // subtree (EDD/valves/conclusion) with blanks at the newest row_version.
@@ -228,7 +234,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   const [info, setInfo] = useState('');
   const dirtyRef = useRef(false);
   const formEpochRef = useRef(0);
-  // RETRO-3941-03 (post-merge review #3944): edits made while a save request
+  // RETRO-3941-03 (post-merge review 3944): edits made while a save request
   // is in flight must never be reported as persisted when the ACK returns.
   // Editor inputs are disabled during save; if an edit lands anyway (race,
   // autofill, future refactor), dirty tracking stays true and the form
@@ -504,19 +510,19 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           </Alert>
         }
 
-        {/* RETRO-3941-02 (post-merge review #3944): fail closed — a failed
+        {/* RETRO-3941-02 (post-merge review 3944): fail closed — a failed
             canonical hydration is surfaced with a retry; Save stays blocked
             until the stored echo state is actually known. */}
         {hydrationFailed &&
         <Alert severity="error" style={ALERT_MARGIN_STYLE}>
-            <AlertTriangle style={{ width: 16, height: 16, marginRight: 8 }} />
+            <AlertTriangle style={ALERT_ICON_STYLE} />
             <span data-testid="echo-hydration-failure">
               {t('cardio.cardio_echo_load_failed')}
             </span>
             <Button
               variant="outline"
               size="small"
-              style={{ marginLeft: 12 }}
+              style={RETRY_BUTTON_STYLE}
               onClick={() => setRetryTick((n) => n + 1)}
               disabled={hydrating}>
               {t('cardio.cardio_echo_retry')}
