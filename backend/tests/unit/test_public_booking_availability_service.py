@@ -14,6 +14,72 @@ from app.services.public_booking_availability_service import (
 TARGET_DATE = date(2026, 10, 26)  # Monday
 
 
+class StubQuery:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def filter(self, *_criteria):
+        return self
+
+    def all(self):
+        return self.rows
+
+
+class StubResult:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def all(self):
+        return self.rows
+
+
+class StubAvailabilityPolicySession:
+    """Minimal session for the canonical exact-service compatibility check."""
+
+    def __init__(self):
+        self.service = SimpleNamespace(
+            id=11,
+            name="Test service",
+            doctor_id=None,
+            department_id=None,
+            department_key=None,
+            duration_minutes=20,
+        )
+        self.doctor = SimpleNamespace(
+            id=22,
+            specialty=None,
+            department_id=None,
+        )
+        self._query_count = 0
+        self._execute_count = 0
+
+    def query(self, *_entities):
+        self._query_count += 1
+        return StubQuery([self.service] if self._query_count == 1 else [])
+
+    def execute(self, _statement):
+        self._execute_count += 1
+        if self._execute_count == 1:
+            rows = [
+                SimpleNamespace(
+                    id=self.service.id,
+                    doctor_id=self.service.doctor_id,
+                    department_key=self.service.department_key,
+                )
+            ]
+        else:
+            rows = [
+                SimpleNamespace(
+                    id=self.doctor.id,
+                    specialty=self.doctor.specialty,
+                )
+            ]
+        return StubResult(rows)
+
+    def get(self, _model, _identity):
+        return self.doctor
+
+
 class StubAvailabilityRepository:
     def __init__(
         self,
@@ -26,6 +92,7 @@ class StubAvailabilityRepository:
             list[tuple[int, date | None, str | None, int | None, int | None]] | None
         ) = None,
     ) -> None:
+        self.db = StubAvailabilityPolicySession()
         self.schedules = schedules
         self.appointments = appointments or []
         self.visits = visits or []

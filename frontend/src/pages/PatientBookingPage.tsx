@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   createPublicBookingIdempotencyKey,
+  createPatientConfirmedPublicBookingAppointment,
   createPatientPublicBookingRequest,
   resubmitPatientPublicBookingRequest,
   getPublicBookingAvailability,
@@ -27,6 +28,7 @@ import { getState } from '../stores/auth';
 type Copy = {
   title: string;
   intro: string;
+  confirmedIntro: string;
   service: string;
   doctor: string;
   date: string;
@@ -38,6 +40,7 @@ type Copy = {
   retry: string;
   unavailable: string;
   modeClosed: string;
+  resubmitModeClosed: string;
   choosePair: string;
   noSlots: string;
   slotsError: string;
@@ -50,6 +53,11 @@ type Copy = {
   submitting: string;
   requestSent: string;
   requestResubmitted: string;
+  appointmentSubmit: string;
+  appointmentNotice: string;
+  appointmentCreated: string;
+  appointmentCreatedNotice: string;
+  appointmentUnknown: string;
   requestNotice: string;
   nonReserving: string;
   responseTime: string;
@@ -61,6 +69,7 @@ type Copy = {
   slotExpired: string;
   duplicate: string;
   rateLimited: string;
+  activeAppointmentLimit: string;
   profileRequired: string;
   requestUnknown: string;
   requestFailed: string;
@@ -75,6 +84,7 @@ const COPY: Record<PublicBookingLocale, Copy> = {
   ru: {
     title: 'Онлайн-запись',
     intro: 'Выберите услугу, врача, дату и доступное время. Заявка не занимает время в расписании.',
+    confirmedIntro: 'Выберите услугу, врача, дату и время. После проверки расписания приём будет создан и время занято.',
     service: 'Услуга',
     doctor: 'Врач',
     date: 'Дата',
@@ -86,11 +96,12 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     retry: 'Повторить загрузку',
     unavailable: 'Онлайн-запись сейчас недоступна. Пожалуйста, свяжитесь с клиникой.',
     modeClosed: 'Этот способ записи пока не подключён. Пожалуйста, свяжитесь с клиникой.',
+    resubmitModeClosed: 'Этот вариант нельзя использовать для изменения прежней заявки. Откройте заявку в личном кабинете или свяжитесь с регистратором.',
     choosePair: 'Для этой услуги выберите одного из доступных врачей.',
     noSlots: 'На эту дату свободного времени нет. Выберите другой день.',
     slotsError: 'Не удалось проверить расписание. Повторите попытку.',
     optionsError: 'Не удалось загрузить варианты записи. Повторите попытку.',
-    loginRequired: 'Чтобы отправить заявку, войдите в свою карточку пациента. Если клиника уже завела для вас карточку, её можно активировать.',
+    loginRequired: 'Чтобы продолжить онлайн-запись, войдите в свою карточку пациента. Если клиника уже завела для вас карточку, её можно активировать.',
     activate: 'Активировать карточку',
     login: 'Войти как пациент',
     submit: 'Отправить заявку',
@@ -98,6 +109,11 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     submitting: 'Проверяем и отправляем…',
     requestSent: 'Заявка отправлена регистратору. Это ещё не подтверждённая запись.',
     requestResubmitted: 'Новое время отправлено регистратору в рамках вашей прежней заявки.',
+    appointmentSubmit: 'Подтвердить запись',
+    appointmentNotice: 'После заключительной проверки свободного времени приём будет создан автоматически.',
+    appointmentCreated: 'Запись подтверждена.',
+    appointmentCreatedNotice: 'Вы записаны на выбранное время. Информация о приёме появится в личном кабинете.',
+    appointmentUnknown: 'Не удалось подтвердить результат. Чтобы избежать двойной записи, повторите только ту же операцию.',
     requestNotice: 'Регистратор повторно проверит выбранное время. До подтверждения время может занять другой пациент.',
     nonReserving: 'Отправка заявки не резервирует время.',
     responseTime: 'Точный срок ответа пока не обещан. Для отмены или переноса свяжитесь с регистратором.',
@@ -109,10 +125,11 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     slotExpired: 'Выбранное время уже недоступно. Выберите другое время.',
     duplicate: 'У вас уже есть активная заявка на эти услугу, врача и время. Новая заявка не создана; свяжитесь с регистратором, если нужна помощь.',
     rateLimited: 'Слишком много заявок за короткое время. Подождите и попробуйте позже.',
+    activeAppointmentLimit: 'У вас уже есть 5 активных записей на будущие даты. Свяжитесь с регистратором, если нужна помощь.',
     profileRequired: 'Для онлайн-заявки нужна собственная карточка пациента в клинике. Обратитесь к регистратору, чтобы проверить или активировать её.',
     requestUnknown: 'Не удалось подтвердить результат отправки. Чтобы избежать дубликата, повтор можно выполнить только для той же заявки.',
     requestFailed: 'Не удалось безопасно проверить заявку. Не отправляйте её повторно; свяжитесь с регистратором.',
-    retrySame: 'Повторно проверить ту же заявку',
+    retrySame: 'Повторить ту же отправку',
     resubmitContextExpired: 'Данные для изменения прежней заявки устарели или потеряны. Откройте её в личном кабинете и начните выбор времени заново.',
     contact: 'Связаться с клиникой',
     home: 'На главную',
@@ -121,6 +138,7 @@ const COPY: Record<PublicBookingLocale, Copy> = {
   'uz-Latn': {
     title: 'Onlayn yozilish',
     intro: 'Xizmat, shifokor, sana va bo‘sh vaqtni tanlang. So‘rov jadvaldagi vaqtni band qilmaydi.',
+    confirmedIntro: 'Xizmat, shifokor, sana va vaqtni tanlang. Jadval tekshirilgach, qabul yaratiladi va vaqt band qilinadi.',
     service: 'Xizmat',
     doctor: 'Shifokor',
     date: 'Sana',
@@ -132,11 +150,12 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     retry: 'Qayta yuklash',
     unavailable: 'Onlayn yozilish hozir mavjud emas. Iltimos, klinika bilan bog‘laning.',
     modeClosed: 'Bu yozilish turi hali ulanmagan. Iltimos, klinika bilan bog‘laning.',
+    resubmitModeClosed: 'Bu variant avvalgi so‘rovni o‘zgartirish uchun ishlatilmaydi. So‘rovni bemor kabinetida oching yoki registrator bilan bog‘laning.',
     choosePair: 'Bu xizmat uchun mavjud shifokorlardan birini tanlang.',
     noSlots: 'Bu sanada bo‘sh vaqt yo‘q. Boshqa kunni tanlang.',
     slotsError: 'Jadvalni tekshirib bo‘lmadi. Qayta urinib ko‘ring.',
     optionsError: 'Yozilish variantlarini yuklab bo‘lmadi. Qayta urinib ko‘ring.',
-    loginRequired: 'So‘rov yuborish uchun bemor kartangizga kiring. Klinikada kartangiz oldindan ochilgan bo‘lsa, uni faollashtirishingiz mumkin.',
+    loginRequired: 'Onlayn yozilishni davom ettirish uchun bemor kartangizga kiring. Klinikada kartangiz oldindan ochilgan bo‘lsa, uni faollashtirishingiz mumkin.',
     activate: 'Kartani faollashtirish',
     login: 'Bemor sifatida kirish',
     submit: 'So‘rov yuborish',
@@ -144,6 +163,11 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     submitting: 'Tekshirilmoqda va yuborilmoqda…',
     requestSent: 'So‘rov registratorga yuborildi. Bu hali tasdiqlangan qabul emas.',
     requestResubmitted: 'Yangi vaqt avvalgi so‘rovingiz doirasida registratorga yuborildi.',
+    appointmentSubmit: 'Yozilishni tasdiqlash',
+    appointmentNotice: 'Bo‘sh vaqt yakuniy tekshirilgach, qabul avtomatik yaratiladi.',
+    appointmentCreated: 'Qabul tasdiqlandi.',
+    appointmentCreatedNotice: 'Siz tanlagan vaqtga yozildingiz. Qabul ma’lumotlari bemor kabinetida ko‘rinadi.',
+    appointmentUnknown: 'Natijani tasdiqlab bo‘lmadi. Ikki marta yozilib qolmasligi uchun faqat ayni amalni takrorlang.',
     requestNotice: 'Registrator tanlangan vaqtni qayta tekshiradi. Tasdiqlanguncha vaqtni boshqa bemor egallashi mumkin.',
     nonReserving: 'So‘rov vaqtni band qilmaydi.',
     responseTime: 'Hozircha aniq javob muddati belgilanmagan. Bekor qilish yoki ko‘chirish uchun registratorga murojaat qiling.',
@@ -155,10 +179,11 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     slotExpired: 'Tanlangan vaqt endi mavjud emas. Boshqa vaqtni tanlang.',
     duplicate: 'Bu xizmat, shifokor va vaqt uchun faol so‘rovingiz bor. Yangi so‘rov yaratilmadi; yordam uchun registratorga murojaat qiling.',
     rateLimited: 'Qisqa vaqt ichida juda ko‘p so‘rov yuborildi. Biroz kutib, keyinroq urinib ko‘ring.',
+    activeAppointmentLimit: 'Sizda kelajak sanalar uchun 5 ta faol qabul yozuvi bor. Yordam uchun registrator bilan bog‘laning.',
     profileRequired: 'Onlayn so‘rov uchun klinikada o‘zingizning bemor kartangiz bo‘lishi kerak. Uni tekshirish yoki faollashtirish uchun registratorga murojaat qiling.',
     requestUnknown: 'Yuborish natijasini tasdiqlab bo‘lmadi. Takroriy so‘rovni oldini olish uchun faqat ayni so‘rovni qayta tekshirish mumkin.',
     requestFailed: 'So‘rovni xavfsiz tekshirib bo‘lmadi. Uni qayta yubormang; registrator bilan bog‘laning.',
-    retrySame: 'Ayni so‘rovni qayta tekshirish',
+    retrySame: 'Ayni yuborishni takrorlash',
     resubmitContextExpired: 'Avvalgi so‘rovni o‘zgartirish ma’lumotlari eskirgan yoki yo‘qolgan. Bemor kabinetida so‘rovni ochib, vaqt tanlashni qaytadan boshlang.',
     contact: 'Klinika bilan bog‘lanish',
     home: 'Bosh sahifa',
@@ -207,12 +232,17 @@ interface PatientBookingResubmitContext {
 
 type PatientBookingAttempt =
   | { kind: 'create'; body: PublicBookingRequestBody; key: string }
+  | { kind: 'confirmed'; body: PublicBookingRequestBody; key: string }
   | {
     kind: 'resubmit';
     requestId: string;
     body: PublicBookingRequestResubmitBody;
     key: string;
   };
+
+function supportsPublicBookingMode(mode: unknown): mode is 'registrar_request' | 'confirmed_appointment' {
+  return mode === 'registrar_request' || mode === 'confirmed_appointment';
+}
 
 function getPatientBookingResubmitContext(state: unknown, now = Date.now()): PatientBookingResubmitContext | null {
   if (!state || typeof state !== 'object') return null;
@@ -262,6 +292,7 @@ function getErrorMessage(code: string | null, copy: Copy): string {
     case 'booking_mode_changed': return copy.policyChanged;
     case 'booking_request_duplicate': return copy.duplicate;
     case 'booking_request_rate_limited': return copy.rateLimited;
+    case 'booking_active_appointment_limit': return copy.activeAppointmentLimit;
     case 'patient_profile_required': return copy.profileRequired;
     case 'booking_request_idempotency_conflict': return copy.requestFailed;
     default: return copy.optionsError;
@@ -296,6 +327,7 @@ export default function PatientBookingPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [completed, setCompleted] = useState(false);
+  const [completedAsAppointment, setCompletedAsAppointment] = useState(false);
   const [completionMessage, setCompletionMessage] = useState('');
   const [needsPolicyReview, setNeedsPolicyReview] = useState(false);
   const [policyAcknowledgedVersion, setPolicyAcknowledgedVersion] = useState<number | null>(null);
@@ -326,7 +358,8 @@ export default function PatientBookingPage() {
     ? addCalendarDays(today, bookingHorizon ?? 0)
     : undefined;
   const bookingConfigurationUsable = Boolean(options?.available
-    && options.mode === 'registrar_request'
+    && (options.mode === 'registrar_request'
+      || (options.mode === 'confirmed_appointment' && !resubmitContext))
     && Number.isInteger(bookingHorizon)
     && (bookingHorizon ?? -1) >= 0);
 
@@ -364,13 +397,17 @@ export default function PatientBookingPage() {
         const selection = resume.selection;
         const compatible = result.compatible_pairs.some((pair) => pair.service_slug === selection.serviceSlug
           && pair.doctor_slug === selection.doctorSlug);
-        if (!result.available || result.mode !== 'registrar_request' || !compatible) {
+        const modeAllowed = selection.resubmit
+          ? result.mode === 'registrar_request'
+          : supportsPublicBookingMode(result.mode);
+        if (!result.available || !modeAllowed || !compatible) {
           setServiceSlug('');
           setDoctorSlug('');
           setDate('');
           setTime('');
-          setError(!result.available || result.mode !== 'registrar_request' ? copy.unavailable : copy.slotExpired);
-        } else if (result.settings_version !== selection.settingsVersion) {
+          setError(!result.available || !modeAllowed ? copy.unavailable : copy.slotExpired);
+        } else if (result.settings_version !== selection.settingsVersion
+          || (selection.mode !== undefined && result.mode !== selection.mode)) {
           setNeedsPolicyReview(true);
           setNotice(copy.policyChanged);
         }
@@ -395,7 +432,7 @@ export default function PatientBookingPage() {
     && pair.doctor_slug === doctorSlug));
 
   useEffect(() => {
-    if (!resumeLoaded || !options || !options.available || options.mode !== 'registrar_request'
+    if (!resumeLoaded || !options || !bookingConfigurationUsable
       || !pairIsAllowed || !date || !isDateWithinHorizon(date, today, maxDate)) {
       setAvailability(null);
       setAvailabilityLoading(false);
@@ -437,7 +474,7 @@ export default function PatientBookingPage() {
       if (active) setAvailabilityLoading(false);
     });
     return () => { active = false; };
-  }, [copy.policyChanged, copy.slotExpired, copy.slotsError, date, doctorSlug, maxDate, options, pairIsAllowed, resumeLoaded, serviceSlug, today]);
+  }, [bookingConfigurationUsable, copy.policyChanged, copy.slotExpired, copy.slotsError, date, doctorSlug, maxDate, options, pairIsAllowed, resumeLoaded, serviceSlug, today]);
 
   const patient = isPatientSession();
   const otherRoleSignedIn = Boolean(getState().token) && !patient;
@@ -454,6 +491,7 @@ export default function PatientBookingPage() {
       date,
       time,
       settingsVersion: availability?.settings_version ?? options.settings_version,
+      mode: options.mode,
       createdAt,
       ...(resubmitContext ? {
         resubmit: {
@@ -483,20 +521,26 @@ export default function PatientBookingPage() {
     try {
       if (attempt.kind === 'resubmit') {
         await resubmitPatientPublicBookingRequest(attempt.requestId, attempt.body, attempt.key);
+      } else if (attempt.kind === 'confirmed') {
+        await createPatientConfirmedPublicBookingAppointment(attempt.body, attempt.key);
       } else {
         await createPatientPublicBookingRequest(attempt.body, attempt.key);
       }
       attemptRef.current = null;
       setUnknownOutcome(false);
       setCompleted(true);
-      const successMessage = attempt.kind === 'resubmit' ? copy.requestResubmitted : copy.requestSent;
+      const isConfirmedAppointment = attempt.kind === 'confirmed';
+      setCompletedAsAppointment(isConfirmedAppointment);
+      const successMessage = isConfirmedAppointment
+        ? copy.appointmentCreated
+        : attempt.kind === 'resubmit' ? copy.requestResubmitted : copy.requestSent;
       setCompletionMessage(successMessage);
       setNotice(successMessage);
     } catch (requestError) {
       if (isUnknownPublicBookingOutcome(requestError)) {
         attemptRef.current = attempt;
         setUnknownOutcome(true);
-        setError(copy.requestUnknown);
+        setError(attempt.kind === 'confirmed' ? copy.appointmentUnknown : copy.requestUnknown);
       } else {
         attemptRef.current = null;
         setUnknownOutcome(false);
@@ -552,8 +596,10 @@ export default function PatientBookingPage() {
       await sendAttempt(attemptRef.current);
       return;
     }
+    const modeSupportsSubmission = options?.mode === 'registrar_request'
+      || (options?.mode === 'confirmed_appointment' && !resubmitContext);
     if ((hasResubmitNavigationState && !resubmitContext)
-      || !patient || !options || options.mode !== 'registrar_request' || !pairIsAllowed
+      || !patient || !options || !modeSupportsSubmission || !pairIsAllowed
       || !availability || !time || !date || !serviceSlug || !doctorSlug) return;
     if (resubmitContext && (serviceSlug !== resubmitContext.serviceSlug
       || doctorSlug !== resubmitContext.doctorSlug)) return;
@@ -570,7 +616,9 @@ export default function PatientBookingPage() {
     setSubmitting(true);
     try {
       const freshOptions = await getPublicBookingOptions(locale);
-      if (!freshOptions.available || freshOptions.mode !== 'registrar_request') {
+      const freshModeSupportsSubmission = freshOptions.mode === 'registrar_request'
+        || (freshOptions.mode === 'confirmed_appointment' && !resubmitContext);
+      if (!freshOptions.available || !freshModeSupportsSubmission) {
         setOptions(freshOptions);
         setError(copy.unavailable);
         return;
@@ -618,7 +666,8 @@ export default function PatientBookingPage() {
         setError(copy.slotExpired);
         return;
       }
-      if (freshOptions.settings_version !== options.settings_version) {
+      if (freshOptions.settings_version !== options.settings_version
+        || freshOptions.mode !== options.mode) {
         setNeedsPolicyReview(true);
         setPolicyAcknowledgedVersion(null);
         setNotice(copy.policyChanged);
@@ -642,7 +691,19 @@ export default function PatientBookingPage() {
           },
           key,
         }
-        : {
+        : freshOptions.mode === 'confirmed_appointment'
+          ? {
+            kind: 'confirmed',
+            body: {
+              service_slug: serviceSlug,
+              doctor_slug: doctorSlug,
+              appointment_date: date,
+              appointment_time: time,
+              expected_settings_version: freshOptions.settings_version,
+            },
+            key,
+          }
+          : {
           kind: 'create',
           body: {
             service_slug: serviceSlug,
@@ -652,7 +713,7 @@ export default function PatientBookingPage() {
             expected_settings_version: freshOptions.settings_version,
           },
           key,
-        };
+          };
       attemptRef.current = attempt;
       await sendAttempt(attempt);
     } catch {
@@ -671,13 +732,17 @@ export default function PatientBookingPage() {
       if (resume?.kind === 'selection') {
         const compatible = result.compatible_pairs.some((pair) => pair.service_slug === resume.selection.serviceSlug
           && pair.doctor_slug === resume.selection.doctorSlug);
-        if (!result.available || result.mode !== 'registrar_request' || !compatible) {
+        const modeAllowed = resume.selection.resubmit
+          ? result.mode === 'registrar_request'
+          : supportsPublicBookingMode(result.mode);
+        if (!result.available || !modeAllowed || !compatible) {
           setServiceSlug('');
           setDoctorSlug('');
           setDate('');
           setTime('');
-          setError(!result.available || result.mode !== 'registrar_request' ? copy.unavailable : copy.slotExpired);
-        } else if (result.settings_version !== resume.selection.settingsVersion) {
+          setError(!result.available || !modeAllowed ? copy.unavailable : copy.slotExpired);
+        } else if (result.settings_version !== resume.selection.settingsVersion
+          || (resume.selection.mode !== undefined && result.mode !== resume.selection.mode)) {
           setNeedsPolicyReview(true);
           setNotice(copy.policyChanged);
         }
@@ -743,7 +808,9 @@ export default function PatientBookingPage() {
       </header>
       <main id="main-content" lang={locale} className="public-site__main public-site__section" tabIndex={-1}>
         <h1>{copy.title}</h1>
-        <p className="public-site__muted">{copy.intro}</p>
+        <p className="public-site__muted">
+          {options?.mode === 'confirmed_appointment' && !resubmitContext ? copy.confirmedIntro : copy.intro}
+        </p>
 
         {notice && !(needsPolicyReview && notice === copy.policyChanged)
           ? <p role="status" aria-live="polite" className="public-site__empty">{notice}</p>
@@ -760,9 +827,14 @@ export default function PatientBookingPage() {
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
-        {!optionsLoading && options?.available && options.mode !== 'registrar_request' ? (
+        {!optionsLoading && options?.available
+          && (!supportsPublicBookingMode(options.mode)
+            || (Boolean(resubmitContext) && options.mode !== 'registrar_request')) ? (
           <section className="public-site__section" aria-labelledby="booking-mode-title">
-            <h2 id="booking-mode-title">{copy.modeClosed}</h2>
+            <h2 id="booking-mode-title">
+              {resubmitContext && options.mode === 'confirmed_appointment'
+                ? copy.resubmitModeClosed : copy.modeClosed}
+            </h2>
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
@@ -773,7 +845,8 @@ export default function PatientBookingPage() {
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
-        {!optionsLoading && options?.available && options.mode === 'registrar_request' && !bookingConfigurationUsable ? (
+        {!optionsLoading && options?.available && supportsPublicBookingMode(options.mode)
+          && !bookingConfigurationUsable ? (
           <section className="public-site__section" aria-labelledby="booking-config-unavailable-title">
             <h2 id="booking-config-unavailable-title">{copy.unavailable}</h2>
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
@@ -857,13 +930,23 @@ export default function PatientBookingPage() {
                 ) : null}
               </section>
             ) : (
-              <section className="public-site__section" aria-label={copy.requestNotice}>
-                <p><strong>{copy.nonReserving}</strong> {copy.requestNotice}</p>
-                <p className="public-site__muted">{copy.responseTime}</p>
+              <section
+                className="public-site__section"
+                aria-label={options.mode === 'confirmed_appointment' ? copy.appointmentNotice : copy.requestNotice}
+              >
+                {options.mode === 'confirmed_appointment' ? (
+                  <p>{copy.appointmentNotice}</p>
+                ) : (
+                  <>
+                    <p><strong>{copy.nonReserving}</strong> {copy.requestNotice}</p>
+                    <p className="public-site__muted">{copy.responseTime}</p>
+                  </>
+                )}
                 <button type="submit" className="public-site__button public-site__button--primary"
                   disabled={formLocked || !serviceSlug || !doctorSlug || !date || !time || !availability || !slots.includes(time)
                     || (needsPolicyReview && policyAcknowledgedVersion !== options.settings_version)}>
-                  {submitting ? copy.submitting : resubmitContext ? copy.resubmit : copy.submit}
+                  {submitting ? copy.submitting : resubmitContext ? copy.resubmit
+                    : options.mode === 'confirmed_appointment' ? copy.appointmentSubmit : copy.submit}
                 </button>
               </section>
             )}
@@ -876,9 +959,15 @@ export default function PatientBookingPage() {
         ) : null}
         {completed ? (
           <section className="public-site__section" role="status" aria-live="polite">
-            <h2>{completionMessage || copy.requestSent}</h2>
-            <p>{copy.nonReserving} {copy.requestNotice}</p>
-            <p className="public-site__muted">{copy.responseTime}</p>
+            <h2>{completionMessage || (completedAsAppointment ? copy.appointmentCreated : copy.requestSent)}</h2>
+            {completedAsAppointment ? (
+              <p>{copy.appointmentCreatedNotice}</p>
+            ) : (
+              <>
+                <p>{copy.nonReserving} {copy.requestNotice}</p>
+                <p className="public-site__muted">{copy.responseTime}</p>
+              </>
+            )}
             {selectedService && selectedDoctor ? <p>{selectedService.name} · {selectedDoctor.name} · {date} {time}</p> : null}
           </section>
         ) : null}

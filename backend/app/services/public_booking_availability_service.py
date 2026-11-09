@@ -12,6 +12,10 @@ from app.repositories.public_booking_availability_repository import (
 )
 from app.repositories.public_site_read_repository import PublicSiteReadRepository
 from app.schemas.public_booking_settings import PublicBookingSettingsOut
+from app.services.appointment_duration_snapshot import (
+    InvalidServiceSelection,
+    resolve_exact_service_selection,
+)
 from app.services.public_booking_availability import (
     MAX_SERVICE_DURATION_MINUTES,
     PUBLIC_BOOKING_TIMEZONE,
@@ -132,6 +136,16 @@ class PublicBookingAvailabilityService:
         ):
             return PublicBookingAvailabilitySnapshot(
                 slots=None, settings_version=settings.version
+            )
+        try:
+            resolve_exact_service_selection(
+                self.repository.db,
+                [int(service.id)],
+                doctor_id=int(doctor.id),
+            )
+        except InvalidServiceSelection:
+            return PublicBookingAvailabilitySnapshot(
+                slots=[], settings_version=settings.version
             )
         if self.resource_queue_route_policy(service, target_date):
             return PublicBookingAvailabilitySnapshot(

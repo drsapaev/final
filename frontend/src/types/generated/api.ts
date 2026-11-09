@@ -221,6 +221,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patients/public-booking/appointments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an appointment from the confirmed public booking mode
+         * @description Reserve an available slot as a normal Appointment for the own card.
+         *
+         *     This route is valid only while the clinic's current mode is
+         *     `confirmed_appointment`; it never falls back to a non-reserving request.
+         */
+        post: operations["patient_create_confirmed_public_booking_appointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/patients/booking-requests": {
         parameters: {
             query?: never;
@@ -34631,6 +34654,35 @@ export type components = {
             /** Document Expiry Date */
             document_expiry_date?: string | null;
         };
+        /**
+         * PatientConfirmedPublicBookingOut
+         * @description Minimal result for an immediately-created public booking appointment.
+         */
+        PatientConfirmedPublicBookingOut: {
+            /** Id */
+            id: number;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /**
+             * Appointment Time
+             * Format: time
+             */
+            appointment_time: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "scheduled";
+            /**
+             * Timezone
+             * @default Asia/Tashkent
+             * @constant
+             */
+            timezone: "Asia/Tashkent";
+        };
         /** PatientCreate */
         PatientCreate: {
             /**
@@ -36803,7 +36855,7 @@ export type components = {
              * Code
              * @enum {string}
              */
-            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict" | "booking_request_duplicate" | "booking_request_rate_limited" | "booking_request_unavailable";
+            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict" | "booking_request_duplicate" | "booking_request_rate_limited" | "booking_active_appointment_limit" | "booking_request_unavailable";
         };
         /** PublicBookingRequestErrorOut */
         PublicBookingRequestErrorOut: {
@@ -44594,6 +44646,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+        };
+    };
+    patient_create_confirmed_public_booking_appointment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for safe retries of the same appointment submission. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientConfirmedPublicBookingOut"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"] | components["schemas"]["PublicBookingRequestPatientProfileErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The patient has reached the public booking creation limit. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
                 };
             };
         };
