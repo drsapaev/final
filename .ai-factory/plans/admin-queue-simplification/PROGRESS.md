@@ -1,6 +1,36 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — #3946 journal correction validated; exact-head CI green — 2026-11-09T16:37:28+05:00
+## Current checkpoint — #3946 exact HEAD and focused guard rechecked — 2026-11-09T16:56:59+05:00
+
+Plan version: 1.0
+Current task: T18 final synthetic acceptance
+Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Ready for review / mergeable at exact HEAD `0fa5c1426b06b5183b598227cce8fde47c2e9a94`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`. Applicable exact-head checks pass; path/trigger-skipped jobs are not passes. T18/Tier-2 remains PARTIAL.
+Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`
+Branch: `codex/aqs-t18-memory-safe-staging-20261109`
+Base/current main: `476c261f848b1d04adec36807837c981a979c8fa`
+Current PR HEAD: `0fa5c1426b06b5183b598227cce8fde47c2e9a94`
+Last updated: 2026-11-09T16:56:59+05:00
+
+| Work item | Status | Evidence |
+|-----------|--------|----------|
+| T00–T17 | MERGED | Present on current main. |
+| PR #3937 | MERGED | Merge commit `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. |
+| PR #3946 staging artifact path | OPEN / Ready for review | Exact HEAD `0fa5c142`; applicable CI passed; no open review threads. Formal review/merge remains user-owned. |
+| T18 / Tier-2 | PARTIAL | Current-source RQ-18 had 13 unavailable browser response bodies, no app-asset hashes, and `served_revision_verified=false`; canonical teardown passed. |
+
+### Current checkpoint
+
+- Freshness: `origin/main` and PR base are `476c261f848b1d04adec36807837c981a979c8fa` (#3953); branch HEAD is `0fa5c1426b06b5183b598227cce8fde47c2e9a94`. `git status` was clean before this journal update. PR diff remains seven intended staging/runbook/guard-test/T18-journal paths.
+- Gate: continuation used `gate_known_root_cause` with known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and the three journal files as exact scopes. Canonical launcher result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt read. No source or test file changed.
+- Local validation: `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','-q','scripts/tests/test_wsl_staging_guard.py::test_prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance')` — PASS, 1 passed in 0.11s. `git diff --check origin/main...HEAD` passed before this journal insertion; rerun after edit.
+- Exact-head GitHub checks on `0fa5c142`: PR Required Gate, PR Review Quality Gate, Frontend unit/build/lint, Python/JavaScript/Actions analysis, CodeQL, security, Gitleaks, secret scan, Git scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope — PASS. Backend, integration, Frontend E2E, Docker build, staging/production readiness, load tests, DAST, and Supabase Preview were SKIPPED; they are not passes.
+- PR state: OPEN, Ready for review, mergeable; zero open review threads and no review submissions. Merge remains user-owned.
+- Staging: no new staging run in this checkpoint. The last owned r5 Session used current-main artifact `88012cd0a4a7f1de510541b6660a2a85f18baa62`; normal Admin/TOTP and T18.10 passed, but the tracked RQ-18 file had 1 pass / 1 fail on 13 browser response-body reads. No application asset hashes were emitted; `served_revision_verified=false`; canonical teardown passed. Do not repeat unchanged test.
+- Scope: only the three T18 journals are being reconciled. Product/runtime, E2E source, backend/API, DB/auth, staging Compose, production, deployment, foreign projects, and merge remain untouched.
+- Next exact action: finish `git diff --check` and inspect the three-file journal diff, then commit and push this checkpoint within #3946 and verify its new exact-head checks. After the user merges #3946, start a fresh worktree from current main, gate the focused RQ-18 response-body recorder correction, and continue remaining T18 plus every applicable `STAGING_VALIDATION.md` item.
+- One task-owned ignored scratch directory remains because local workspace policy previously blocked its deletion; do not use an alternate deletion route. No owned Compose resources remain.
+
+## Previous checkpoint — #3946 journal correction validated; exact-head CI green — 2026-11-09T16:37:28+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance

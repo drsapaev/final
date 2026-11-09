@@ -1,3 +1,17 @@
+## PR #3946 exact HEAD and focused guard rerun — 2026-11-09T16:56:59+05:00
+
+- Commit under test: PR branch HEAD `0fa5c1426b06b5183b598227cce8fde47c2e9a94`; base/current `origin/main` #3953 `476c261f848b1d04adec36807837c981a979c8fa`.
+- Environment: Windows session worktree `aqs-t18-memory-safe-staging`; no WSL, Docker, Compose, staging, or production services started.
+- Execution mode: `gate_known_root_cause`; known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`; exact first-touch scope was `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Canonical launcher returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read.
+- Allowed paths: the three T18 journals only. Denied: runtime/application, backend/API, E2E source, DB/auth, Dockerfile/Compose, CI workflow, production/deployment, foreign worktrees/projects, and agent merge.
+- Validation command: `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','-q','scripts/tests/test_wsl_staging_guard.py::test_prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance')` — PASS, 1 passed in 0.11s. `git diff --check origin/main...HEAD` — PASS before the journal update; rerun on the final diff.
+- Exact-head GitHub checks on `0fa5c142`: PR Required Gate, PR Review Quality Gate, Frontend unit/build/lint, Python/JavaScript/Actions analysis, CodeQL, security, Gitleaks, secret scan, Git scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope — PASS. Backend, integration, Frontend E2E, Docker build, staging/production readiness, load tests, DAST and Supabase Preview — SKIPPED by path/trigger, not passed.
+- Actual changed paths: `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` only.
+- Result: exact PR state independently rechecked as OPEN / Ready for review / mergeable at `0fa5c142`; review submissions and unresolved inline threads are both empty. #3937 is confirmed merged at `3a6d0f72`. Merge of #3946 remains user-owned.
+- Tier-2 limitation: no staging was run in this checkpoint. Last owned r5 Session passed normal Admin/TOTP and T18.10, but the exact RQ-18 asset recorder failed on 13 body reads, emitted no application-asset hashes, and left `served_revision_verified=false`; teardown passed. Overall T18/Tier-2 remains PARTIAL.
+- Scope check: no runtime, test source, staging, production, database, or deployment operation occurred. Existing task-owned scratch remains under the previously recorded local deletion restriction; no alternate removal was attempted.
+- Next: finish diff check/review, commit and push this journal reconciliation, verify exact-head CI, and leave merge to the user. After merge, use a fresh main-based worktree for the separately gated recorder fix and remaining T18 acceptance.
+
 ## T18 local synthetic browser-body navigation probe and journal gate — 2026-11-09T16:26:00+05:00
 
 - Commit under test: staging/PR branch `65c4dc0905f74bd65da81585497983b8f0cc600c`; no tracked runtime source changed for this probe.

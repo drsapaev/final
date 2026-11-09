@@ -1,3 +1,15 @@
+## Current resume — #3946 exact HEAD checked; focused guard test passes — 2026-11-09T16:56:59+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. T00–T17 are merged. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Ready for review / mergeable at HEAD `0fa5c1426b06b5183b598227cce8fde47c2e9a94`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`.
+
+Exact-head PR Required Gate, PR Review Quality Gate, frontend unit/build/lint, analysis, CodeQL, security, secret scans, scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope passed. Backend, integration, Frontend E2E, Docker, readiness, load, DAST, and Supabase Preview were skipped by path/trigger. The focused staging guard regression was rerun locally and passed 1/1. No open review threads or submitted reviews are present.
+
+T18/Tier-2 remains PARTIAL. The last owned synthetic r5 run passed normal Admin/TOTP and T18.10, but the exact tracked RQ-18 test failed while collecting 13 browser response bodies. It emitted no application-asset hashes; `served_revision_verified=false`; canonical teardown passed. Do not repeat the unchanged test. A local loopback Chromium probe reproduced response-body loss when navigation overtook the capture and succeeded when the pending body was drained first; this narrows the root cause but does not replace the application staging rerun.
+
+The journal correction is gated to `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; the canonical gate returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`, and its execution prompt was read. No product/runtime, test-source, staging, production, or deployment change was made. Finish diff validation, commit/push this checkpoint within #3946, and verify exact-head checks. Merge is user-owned. After merge, start a fresh isolated worktree from `origin/main`, gate a focused response-body recorder correction, then rerun the exact RQ-18 staging spec and continue all remaining T18 and `STAGING_VALIDATION.md` checks.
+
+---
+
 ## Current resume — #3946 journal correction CI green; recorder race reproduced — 2026-11-09T16:37:28+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. T00–T17 are merged. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Ready for review / mergeable at HEAD `65c4dc0905f74bd65da81585497983b8f0cc600c`, base/current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; merge remains user-owned.
