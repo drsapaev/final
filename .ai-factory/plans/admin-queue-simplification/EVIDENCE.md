@@ -6757,3 +6757,22 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Validation command: `scripts/run_python.ps1 -RequireModule pytest scripts/run_pr_review_gate_checks.py --body-env PR_BODY --author drsapaev` using the existing `C:\final\backend\.venv\Scripts\python.exe`.
 - Result: 19 review-template unit tests passed; both documented sample bodies passed; the proposed staging PR body passed live validation. Its body remains in the task context and was not written into a generated or tracked temp file.
 - Limitation: this is the local description-quality gate, not GitHub exact-head CI or independent code review. The PR has not yet been pushed/opened.
+
+## T18 r6 — current-main RQ-17 and targeted asset provenance — 2026-11-09T17:35:25+05:00
+
+- Commit under test: staging worktree `ade10c2bf4e6cc0cafc51dbde89df35a26467f13`; application/frontend source `476c261f848b1d04adec36807837c981a979c8fa`.
+- Environment: owned synthetic Compose project `clinic-aqs-t18-memory-20261109-r6`, `Ubuntu-24.04`, ports 19006/18082/55447. No production data or service was used.
+- Execution mode: validation-only continuation under the previously approved narrow override. Allowed tracked paths for this follow-up: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md`; staging files and results stayed in this worktree's ignored `.scratch` root. Denied: application/backend/API/auth/database source, tracked tests, gate/router, production, deployment, foreign projects, and merge.
+- Hosted artifact: workflow [42615574111](https://github.com/drsapaev/final/actions/runs/42615574111), exact `source.sha` matched the application SHA above; 261/261 `SHA256SUMS` entries passed.
+- Original limitation: the earlier exact RQ-18 run had 13 unavailable browser response bodies and no app-asset hashes. This r6 run did not rerun that unchanged spec.
+- Validation commands: canonical `ops/scripts/wsl_staging.ps1` Preflight → Start → Session; Session invoked `frontend/e2e/rq17-setup-directions-live.spec.ts` through the task-local Playwright runner. Artifact body comparison checked the browser-captured response bytes against the verified artifact manifest.
+- Preflight: first attempt failed configuration validation because `STAGING_PUBLIC_HOST` included a port; corrected only the new owned env to `127.0.0.1` and retained `127.0.0.1:18082` for `STAGING_PUBLIC_WS_HOST`. The next Preflight passed with C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3207 MiB, Docker 29.1.3, Compose 2.40.3, ports accepted, and no warnings.
+- Start: PASS, build reserve 10 GiB satisfied, WSL available memory 3206 MiB, runtime readiness PASS, no warnings.
+- Session result: PASS; Playwright `1 passed / 0 failed / 0 skipped`. The ordinary Admin password plus required TOTP enrollment/verification path succeeded. The synthetic scenario configured Doctor and QueueResource directions, explicitly published them, and verified public catalog selection.
+- Browser asset evidence: captured entry JS, entry CSS, and `AdminSetupDirections` JS response bodies; all three saved-body hashes and all three artifact-manifest hashes matched (3/3). This is targeted evidence only. The canonical helper still reports `served_revision_verified=false`; no claim is made that every served asset or the entire frontend revision was proven.
+- Teardown: canonical Session reported PASS, removed 5 containers, 3 volumes and 1 network; remaining resources 0. Independent inventory found 0 project-labeled containers, volumes and networks, and 0 Windows listeners on the three ports.
+- Post-session Preflight: first returned `WINDOWS_PORT_OWNER`. Read-only inspection then found zero Windows listeners and zero owned Compose resources; no process was stopped. A second Preflight passed, with runtime readiness `NOT_RUN` as expected for preflight.
+- Actual changed paths in the evidence commit: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md` only. No runtime, API, test-source, database, auth, gate, production or deployment change.
+- Remaining limitation: T18/Tier-2 remains PARTIAL. The exact RQ-18 response-body issue, full T18 scenario matrix, keyboard/language/viewport/latency/console checks, full `docs/runbooks/STAGING_VALIDATION.md`, and independent formal review of PR #3946 remain outstanding. No staging deferral is claimed.
+- PR: #3946, still OPEN at HEAD `ade10c2` before this journal update; user retains merge authority.
+- Merge commit: pending user action.

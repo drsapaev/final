@@ -1,34 +1,36 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — #3946 exact HEAD and focused guard rechecked — 2026-11-09T16:56:59+05:00
+## Current checkpoint — current-main artifact and RQ-17 staging PASS — 2026-11-09T17:35:25+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance
-Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Ready for review / mergeable at exact HEAD `0fa5c1426b06b5183b598227cce8fde47c2e9a94`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`. Applicable exact-head checks pass; path/trigger-skipped jobs are not passes. T18/Tier-2 remains PARTIAL.
+Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 remains OPEN / Ready for review at exact HEAD `ade10c2bf4e6cc0cafc51dbde89df35a26467f13`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; GitHub last reported mergeability `UNKNOWN`. Exact-head applicable checks passed before this journal update; skipped jobs are not passes. T18/Tier-2 remains PARTIAL.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`
 Branch: `codex/aqs-t18-memory-safe-staging-20261109`
 Base/current main: `476c261f848b1d04adec36807837c981a979c8fa`
-Current PR HEAD: `0fa5c1426b06b5183b598227cce8fde47c2e9a94`
-Last updated: 2026-11-09T16:56:59+05:00
+Current PR HEAD before journal update: `ade10c2bf4e6cc0cafc51dbde89df35a26467f13`
+Last updated: 2026-11-09T17:35:25+05:00
 
 | Work item | Status | Evidence |
 |-----------|--------|----------|
 | T00–T17 | MERGED | Present on current main. |
 | PR #3937 | MERGED | Merge commit `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. |
-| PR #3946 staging artifact path | OPEN / Ready for review | Exact HEAD `0fa5c142`; applicable CI passed; no open review threads. Formal review/merge remains user-owned. |
-| T18 / Tier-2 | PARTIAL | Current-source RQ-18 had 13 unavailable browser response bodies, no app-asset hashes, and `served_revision_verified=false`; canonical teardown passed. |
+| PR #3946 staging artifact path | OPEN / Ready for review | Exact HEAD before this journal update `ade10c2`; applicable CI passed. Formal review/merge remains user-owned. |
+| T18 / Tier-2 | PARTIAL | Current-main RQ-17 synthetic flow passed 1/1; three browser-served assets matched the verified artifact. RQ-18 exact test remains unresolved; `served_revision_verified=false`; full staging runbook remains incomplete. |
 
 ### Current checkpoint
 
-- Freshness: `origin/main` and PR base are `476c261f848b1d04adec36807837c981a979c8fa` (#3953); branch HEAD is `0fa5c1426b06b5183b598227cce8fde47c2e9a94`. `git status` was clean before this journal update. PR diff remains seven intended staging/runbook/guard-test/T18-journal paths.
-- Gate: continuation used `gate_known_root_cause` with known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and the three journal files as exact scopes. Canonical launcher result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt read. No source or test file changed.
-- Local validation: `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','-q','scripts/tests/test_wsl_staging_guard.py::test_prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance')` — PASS, 1 passed in 0.11s. `git diff --check origin/main...HEAD` passed before this journal insertion; rerun after edit.
-- Exact-head GitHub checks on `0fa5c142`: PR Required Gate, PR Review Quality Gate, Frontend unit/build/lint, Python/JavaScript/Actions analysis, CodeQL, security, Gitleaks, secret scan, Git scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope — PASS. Backend, integration, Frontend E2E, Docker build, staging/production readiness, load tests, DAST, and Supabase Preview were SKIPPED; they are not passes.
-- PR state: OPEN, Ready for review, mergeable; zero open review threads and no review submissions. Merge remains user-owned.
-- Staging: no new staging run in this checkpoint. The last owned r5 Session used current-main artifact `88012cd0a4a7f1de510541b6660a2a85f18baa62`; normal Admin/TOTP and T18.10 passed, but the tracked RQ-18 file had 1 pass / 1 fail on 13 browser response-body reads. No application asset hashes were emitted; `served_revision_verified=false`; canonical teardown passed. Do not repeat unchanged test.
-- Scope: only the three T18 journals are being reconciled. Product/runtime, E2E source, backend/API, DB/auth, staging Compose, production, deployment, foreign projects, and merge remain untouched.
-- Next exact action: finish `git diff --check` and inspect the three-file journal diff, then commit and push this checkpoint within #3946 and verify its new exact-head checks. After the user merges #3946, start a fresh worktree from current main, gate the focused RQ-18 response-body recorder correction, and continue remaining T18 plus every applicable `STAGING_VALIDATION.md` item.
-- One task-owned ignored scratch directory remains because local workspace policy previously blocked its deletion; do not use an alternate deletion route. No owned Compose resources remain.
+- Freshness: branch was clean at PR HEAD `ade10c2`; base/current `origin/main` is #3953 `476c261f848b1d04adec36807837c981a979c8fa`. The PR contains seven staging/runbook/guard-test/T18-journal paths. This follow-up changes only the three T18 journals.
+- Gate/scope: this is a validation-evidence continuation under the previously approved `narrow_override`; no runtime, API, database, auth, test-source, staging config, production, or deployment files changed. Allowed tracked paths remain `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`.
+- Artifact: hosted workflow run [42615574111](https://github.com/drsapaev/final/actions/runs/42615574111) built source `476c261f848b1d04adec36807837c981a979c8fa`. `source.sha` matched and all 261/261 `SHA256SUMS` entries passed. Artifact is stored only in this worktree's ignored `.scratch` area.
+- Canonical staging: project `clinic-aqs-t18-memory-20261109-r6`, ports 19006/18082/55447. After correcting only the owned env's public-host field, Preflight passed (C: 13 GiB free, WSL backing D: 26 GiB free, WSL 3207 MiB available, no warnings). Start passed with the 10 GiB build reserve and runtime readiness PASS.
+- Session: canonical `Session -NoBuild` ran `frontend/e2e/rq17-setup-directions-live.spec.ts` on the current-main artifact. Normal Admin password+2FA flow, Doctor and QueueResource direction setup, explicit publication, and public-catalog assertions passed: 1 passed, 0 failed, 0 skipped. Browser-captured entry JS, entry CSS, and `AdminSetupDirections` JS all matched their artifact SHA256 entries (3/3).
+- Provenance limit: the launcher continues to report `served_revision_verified=false`. This run confirms only those three required assets, not every frontend file; it does not close RQ-18 or establish full served-revision provenance.
+- Cleanup: Session teardown PASS; removed 5 containers, 3 volumes, and 1 network; remaining project resources were 0. Independent inventory also found 0 project-labeled containers/volumes/networks and 0 Windows listeners on these ports. A first post-session Preflight returned `WINDOWS_PORT_OWNER`; after read-only checks showed no listener/resources, a second Preflight passed. No process was stopped.
+- Exact-head CI before this journal-only change on `ade10c2` passed applicable PR and frontend/security checks; Backend, integration, Frontend E2E, Docker, staging/production readiness, load, and DAST jobs were skipped by scope/trigger. Re-run applicable checks after pushing the journal update.
+- Remaining: T18/Tier-2 is PARTIAL. The exact RQ-18 response-body capture issue remains; T18.1–5 and T18.8–9 are not represented as fully accepted by this single RQ-17 run; keyboard, supported viewports, language checks, console review, latency, and the complete `STAGING_VALIDATION.md` checklist remain open. No deferral is claimed.
+- Next exact action: validate the three-file journal diff, commit/push it within #3946, update its PR description, and verify exact-head checks. After the user merges #3946, start a fresh worktree from current `origin/main`, gate the focused RQ-18 response-body recorder correction, and continue the remaining T18 matrix.
+- The r6 synthetic project was torn down. Existing task-owned ignored scratch artifacts remain; do not remove another run's files or use an alternate deletion route.
 
 ## Previous checkpoint — #3946 journal correction validated; exact-head CI green — 2026-11-09T16:37:28+05:00
 
