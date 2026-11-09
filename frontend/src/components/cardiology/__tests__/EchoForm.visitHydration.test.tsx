@@ -194,3 +194,150 @@ describe('ECHO-FE-001: visit switch isolation', () => {
     expect(getEmrArgs(22)).toBeDefined();
   });
 });
+
+describe('RETRO-3941-02: hydration of the canonical EMR fails closed', () => {
+  it('a transient GET 500 blocks Save, surfaces the failure with a retry, and never POSTs', async () => {
+    // GET#1 — unexpected server error (not the expected 404).
+    apiMocks.get.mockRejectedValueOnce({ response: { status: 500 } });
+
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+
+    // Fail closed: the failure is visible…
+    await waitFor(() => {
+      expect(screen.getByTestId('echo-hydration-failure')).toBeInTheDocument();
+    });
+    // …and Save stays disabled while the stored echo state is unknown.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /загружаем сохранённые/i })).toBeDisabled();
+    });
+
+    // Even an attempted click on the disabled button must not POST.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /загружаем сохранённые/i }));
+    });
+    expect(apiMocks.post).not.toHaveBeenCalled();
+
+    // GET#2 — the retry succeeds and returns the full stored echo subtree.
+    apiMocks.get.mockResolvedValueOnce({ data: emrWithEcho('58', 'Без патологии') });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /повторить загрузку/i }));
+    });
+
+    // Canonical values are hydrated…
+    expect(await screen.findByDisplayValue('58')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('5.0')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Без патологии')).toBeInTheDocument();
+    // …the failure cleared…
+    await waitFor(() => {
+      expect(screen.queryByTestId('echo-hydration-failure')).toBeNull();
+    });
+    // …Save is enabled again…
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /сохранить/i })).toBeEnabled();
+    });
+    // …and no destructive POST ever happened on the failure path.
+    expect(apiMocks.post).not.toHaveBeenCalled();
+  });
+
+  it('the destructive overwrite path is dead: blank form + failed hydration + successful re-read never POSTs', async () => {
+    // The pre-fix scenario from the audit: GET#1 500 blanks the form; the
+    // doctor edits EF; a later Save re-reads the full stored EMR (GET#2 200)
+    // and used to overwrite EDD/conclusion with blanks. Now Save is blocked
+    // from the very start.
+    apiMocks.get.mockRejectedValueOnce({ response: { status: 500 } });
+
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('echo-hydration-failure')).toBeInTheDocument();
+    });
+
+    // Any number of GET successes afterwards cannot resurrect a save:
+    // the form only leaves the failed state through its own retry.
+    apiMocks.get.mockResolvedValue({ data: emrWithEcho('58', 'Без патологии') });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /повторить загрузку/i }));
+    });
+    expect(await screen.findByDisplayValue('58')).toBeInTheDocument();
+
+    // Pristine after a successful canonical retry → no-op save, no POST.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /сохранить/i }));
+    });
+    expect(apiMocks.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('RETRO-3941-03: edits during an in-flight save are never reported as persisted', () => {
+  it('disables every editor input while the save GET+POST is in flight', async () => {
+    apiMocks.get.mockResolvedValue({ data: emrWithEcho('58', 'Без патологии') });
+    const postGate = deferred<{ status: number; data?: unknown }>();
+    apiMocks.post.mockImplementationOnce(() => postGate.promise);
+
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    await screen.findByDisplayValue('58');
+
+    fireEvent.change(screen.getByDisplayValue('58'), { target: { value: '45' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /сохранить/i }));
+    });
+
+    // While the save (GET re-read + POST) is pending, the editor inputs are
+    // disabled: the latest displayed value cannot diverge from the submitted
+    // snapshot.
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('45')).toBeDisabled();
+    });
+    expect(screen.getByDisplayValue('Без патологии')).toBeDisabled();
+
+    await act(async () => {
+      postGate.resolve({ status: 200, data: { data: { specialty_data: { echo: {} } } } });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('45')).toBeEnabled();
+    });
+  });
+
+  it('an edit that lands mid-flight keeps the form dirty: honest info instead of success, follow-up save POSTs', async () => {
+    apiMocks.get.mockResolvedValue({ data: emrWithEcho('58', 'Без патологии') });
+    const postGate = deferred<{ status: number; data?: unknown }>();
+    apiMocks.post.mockImplementationOnce(() => postGate.promise);
+
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    await screen.findByDisplayValue('58');
+
+    fireEvent.change(screen.getByDisplayValue('58'), { target: { value: '45' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /сохранить/i }));
+    });
+
+    // An edit sneaks past the disabled inputs (programmatic race/autofill):
+    // the conclusion changes while the POST for the EF=45 snapshot flies.
+    await act(async () => {
+      fireEvent.change(screen.getByDisplayValue('Без патологии'), { target: { value: 'Новые данные' } });
+    });
+
+    await act(async () => {
+      postGate.resolve({ status: 200, data: { data: { specialty_data: { echo: {} } } } });
+      await Promise.resolve();
+    });
+
+    // The ACK proves only the EF=45 snapshot: the latest displayed value is
+    // NOT treated as persisted — no success message, an honest follow-up
+    // notice instead.
+    await waitFor(() => {
+      expect(screen.getByText(/ещё не сохранена|Сохранить» ещё раз/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/сохранены успешно/i)).toBeNull();
+
+    // The follow-up save persists the newer value on top of the saved snapshot.
+    apiMocks.post.mockResolvedValueOnce({ status: 200, data: { data: { specialty_data: { echo: {} } } } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /сохранить/i }));
+    });
+    expect(apiMocks.post).toHaveBeenCalledTimes(2);
+    const [, payload] = apiMocks.post.mock.calls[1];
+    expect(payload.data.specialty_data.echo.conclusion).toBe('Новые данные');
+    expect(payload.data.specialty_data.echo.leftVentricle.ef).toBe('45');
+  });
+});

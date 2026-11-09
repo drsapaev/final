@@ -217,9 +217,24 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   // replaced `specialty_data.echo` with the local state — an untouched
   // Save could wipe stored EF/EDD/conclusion with a blank revision.
   const [hydrating, setHydrating] = useState(false);
+  // RETRO-3941-02 (post-merge review #3944): hydration must fail CLOSED.
+  // A transient GET 500/network error used to leave a blank form with an
+  // enabled Save — a later dirty save then overwrote the stored echo
+  // subtree (EDD/valves/conclusion) with blanks at the newest row_version.
+  // While hydrationFailed is true Save stays disabled and a visible retry
+  // is offered; only an expected 404 means "no EMR yet" (blank is canonical).
+  const [hydrationFailed, setHydrationFailed] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
   const [info, setInfo] = useState('');
   const dirtyRef = useRef(false);
   const formEpochRef = useRef(0);
+  // RETRO-3941-03 (post-merge review #3944): edits made while a save request
+  // is in flight must never be reported as persisted when the ACK returns.
+  // Editor inputs are disabled during save; if an edit lands anyway (race,
+  // autofill, future refactor), dirty tracking stays true and the form
+  // honestly asks for a follow-up save instead of showing success.
+  const savingRef = useRef(false);
+  const editsDuringSaveRef = useRef(false);
   const [expandedSections, setExpandedSections] = useState({
     leftVentricle: true,
     rightVentricle: false,
@@ -241,6 +256,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     if (!visitId) {
       setEchoData(DEFAULT_ECHO_DATA as EchoData);
       setInfo('');
+      setHydrationFailed(false);
       return;
     }
 
@@ -253,6 +269,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     loadExistingEmrDraft(visitId)
       .then((existing) => {
         if (epoch !== formEpochRef.current) return; // visit switched mid-flight
+        setHydrationFailed(false);
         const storedData = (existing as Record<string, unknown> | null)?.data as Record<string, unknown> | undefined;
         const specialtyData = storedData?.specialty_data as Record<string, unknown> | undefined;
         const storedEcho = specialtyData?.echo;
@@ -265,19 +282,26 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
       })
       .catch(() => {
         if (epoch !== formEpochRef.current) return;
-        // Hydration failure must not silently block manual entry: the form
-        // stays blank and the doctor's explicit edit becomes a dirty save.
-        setEchoData(DEFAULT_ECHO_DATA as EchoData);
-        dirtyRef.current = false;
+        // RETRO-3941-02: fail CLOSED on unexpected hydration errors (only a
+        // 404 means "no EMR yet" and is handled as null inside
+        // loadExistingEmrDraft). The current values stay, Save is blocked
+        // until a retry succeeds — a blank form must never masquerade as the
+        // canonical state and silently erase stored echo measurements.
+        setHydrationFailed(true);
       })
       .finally(() => {
         if (epoch === formEpochRef.current) {
           setHydrating(false);
         }
       });
-  }, [visitId, initialData]);
+  }, [visitId, initialData, retryTick]);
 
   const handleChange = (section: string, field: string, value: unknown) => {
+    // RETRO-3941-03: an edit landing while a save is in flight must keep
+    // the form dirty — the ACK will prove only the submitted snapshot.
+    if (savingRef.current) {
+      editsDuringSaveRef.current = true;
+    }
     dirtyRef.current = true;
     setInfo('');
     setEchoData((prev) => ({
@@ -300,8 +324,16 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
 
   const handleSave = async () => {
     const epoch = formEpochRef.current;
+    // RETRO-3941-02: fail closed — no save may leave this form while the
+    // canonical EMR state is unknown (hydration in flight or failed).
+    if (hydrating || hydrationFailed) {
+      setInfo(t('cardio.cardio_echo_loading_existing'));
+      return;
+    }
     try {
       setLoading(true);
+      savingRef.current = true;
+      editsDuringSaveRef.current = false;
       setError('');
       setInfo('');
 
@@ -340,9 +372,17 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
       if (epoch !== formEpochRef.current) return; // visit switched mid-save
 
       if (response.status === 200) {
-        // The server-side state now matches the form: reset dirty tracking.
-        dirtyRef.current = false;
-        setSuccess(t('cardio.cardio_echo_saved_success'));
+        if (editsDuringSaveRef.current) {
+          // RETRO-3941-03: an edit landed after the submitted snapshot was
+          // captured — the latest displayed value is NOT persisted. Keep the
+          // form dirty and say so instead of reporting a false success.
+          dirtyRef.current = true;
+          setInfo(t('cardio.cardio_echo_edits_after_save'));
+        } else {
+          // The server-side state now matches the form: reset dirty tracking.
+          dirtyRef.current = false;
+          setSuccess(t('cardio.cardio_echo_saved_success'));
+        }
         if (onSave) {
           onSave(response.data?.data?.specialty_data?.echo || echoData);
         }
@@ -354,6 +394,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
       }
       logger.error('Echo form save error:', err);
     } finally {
+      savingRef.current = false;
       if (epoch === formEpochRef.current) {
         setLoading(false);
       }
@@ -405,7 +446,9 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             label={field.label}
             value={getNestedValue(echoData[section], field.key)}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange(section, field.key, e.target.value)}
-            placeholder={field.placeholder} />
+            placeholder={field.placeholder}
+            disabled={loading}
+            />
           
               </div>
         )}
@@ -432,10 +475,10 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={loading || hydrating}>
+              disabled={loading || hydrating || hydrationFailed}>
               
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
-              {hydrating ? t('cardio.cardio_echo_loading_existing') : t('cardio.cardio_echo_save_button')}
+              {hydrating || hydrationFailed ? t('cardio.cardio_echo_loading_existing') : t('cardio.cardio_echo_save_button')}
             </Button>
           </div>
         </div>
@@ -458,6 +501,26 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         {info && !success && !error &&
         <Alert severity="info" style={ALERT_MARGIN_STYLE}>
             {info}
+          </Alert>
+        }
+
+        {/* RETRO-3941-02 (post-merge review #3944): fail closed — a failed
+            canonical hydration is surfaced with a retry; Save stays blocked
+            until the stored echo state is actually known. */}
+        {hydrationFailed &&
+        <Alert severity="error" style={ALERT_MARGIN_STYLE}>
+            <AlertTriangle style={{ width: 16, height: 16, marginRight: 8 }} />
+            <span data-testid="echo-hydration-failure">
+              {t('cardio.cardio_echo_load_failed')}
+            </span>
+            <Button
+              variant="outline"
+              size="small"
+              style={{ marginLeft: 12 }}
+              onClick={() => setRetryTick((n) => n + 1)}
+              disabled={hydrating}>
+              {t('cardio.cardio_echo_retry')}
+            </Button>
           </Alert>
         }
 
@@ -531,6 +594,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             value={echoData.additional.comments}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('additional', 'comments', e.target.value)}
             placeholder={t('cardio.cardio_echo_ph_comments')}
+            disabled={loading}
             rows={4} />
           
         </div>
@@ -543,11 +607,16 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           <Textarea
             value={echoData.conclusion}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+              // RETRO-3941-03: same in-flight edit guard as handleChange.
+              if (savingRef.current) {
+                editsDuringSaveRef.current = true;
+              }
               dirtyRef.current = true;
               setInfo('');
               setEchoData((prev) => ({ ...prev, conclusion: e.target.value }));
             }}
             placeholder={t('cardio.cardio_echo_ph_conclusion')}
+            disabled={loading}
             rows={6} />
           
         </div>

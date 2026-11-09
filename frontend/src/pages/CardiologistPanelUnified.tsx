@@ -544,6 +544,11 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         // Очищаем EMR и visitData при смене пациента
         setEmr(null);
         setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
+        // RETRO-3941-01 (post-merge review #3944): an open data-entry form
+        // belongs to the patient it was opened for. A selection switch must
+        // close it, so patient A's unsaved form values can never be
+        // submitted under patient B's context.
+        setShowForm({ open: false });
         // CARDIO-FE-002 (audit 3886 round 20): a selection change must also
         // invalidate any in-flight loads for the PREVIOUS patient and clear
         // the four cross-patient data stores, so no late A response can land
@@ -566,6 +571,9 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       patientDataEpochRef.current += 1;
       setEmr(null);
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
+      // RETRO-3941-01 (post-merge review #3944): no patient context — no
+      // open data-entry form either.
+      setShowForm({ open: false });
       setEcgResults([]);
       setBloodTests([]);
       setPatientFiles([]);
@@ -1790,6 +1798,14 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     || selectedPatient?.patient?.full_name
     || selectedPatient?.patient?.name
     || '—';
+  // RETRO-3941-01 (post-merge review #3944): canonical owner identity for
+  // the manual ECG entry form — exactly the patient/visit ids the form's
+  // props are built from. Keying the form by this identity forces a remount
+  // (blank state) whenever the context switches, so unsaved measurements
+  // typed for patient A can never be submitted under patient B.
+  const manualEcgOwnerPatientId = ((selectedPatient?.patient?.id || selectedPatient?.patient_id) as string | number | null | undefined) ?? null;
+  const manualEcgOwnerVisitId = (selectedPatient?.visit_id ?? null) as string | number | null;
+  const manualEcgFormKey = `manual-ecg-${String(manualEcgOwnerPatientId)}-${String(manualEcgOwnerVisitId)}`;
   const appointmentSummaryItems = [
     {
       key: 'total',
@@ -1974,8 +1990,9 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
               rendered blood-test inputs and POSTed null ECG parameters. */}
           {showForm.open && showForm.type === 'ecg' && (
             <ManualEcgForm
-              patientId={((selectedPatient?.patient?.id || selectedPatient?.patient_id) as string | number | null | undefined) ?? null}
-              visitId={(selectedPatient?.visit_id ?? null) as string | number | null}
+              key={manualEcgFormKey}
+              patientId={manualEcgOwnerPatientId}
+              visitId={manualEcgOwnerVisitId}
               onCancel={() => setShowForm({ open: false })}
               onSaved={() => {
                 setShowForm({ open: false });

@@ -17,12 +17,17 @@
  *  - a missing date or a fully empty clinical set never fires the POST
  *    (no silent empty ECG records);
  *  - the submit button is disabled while the request is in flight
- *    (no duplicate submissions).
+ *    (no duplicate submissions);
+ *  - RETRO-3941-01 (post-merge review #3944): the typed content belongs
+ *    to the patient/visit context the form was OPENED for. If the props
+ *    later point at a different patient/visit (selection switch without
+ *    a remount), the submit is refused — patient A's measurements must
+ *    never be persisted under patient B's id.
  *
  * The backend stays authoritative for authorization and validation; this
  * form only stops mislabeling blood-test input as ECG measurements.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { HeartPulse, Save } from 'lucide-react';
 import { Button, Card } from '../ui/macos';
 import { api } from '../../api/client';
@@ -151,6 +156,13 @@ export function ManualEcgForm({
   });
   const [submitting, setSubmitting] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
+  // RETRO-3941-01 (post-merge review #3944): capture the owner identity at
+  // mount. The typed values below belong to THIS patient/visit; a later
+  // prop change to another context must never carry them over.
+  const ownerRef = useRef({
+    patientId: patientId ?? null,
+    visitId: visitId ?? null,
+  });
 
   const fieldWarning = useMemo(() => {
     for (const field of ECG_NUMERIC_FIELDS) {
@@ -196,6 +208,16 @@ export function ManualEcgForm({
     }
     if (!patientId) {
       setValidationMessage(t('cardio.cardio_manual_ecg_no_patient'));
+      return;
+    }
+    // RETRO-3941-01: refuse to submit when the props point at a different
+    // patient/visit than the one this form was opened for. Defense in
+    // depth for any parent that renders the form without an identity key.
+    if (
+      String(patientId) !== String(ownerRef.current.patientId)
+      || String(visitId ?? '') !== String(ownerRef.current.visitId ?? '')
+    ) {
+      setValidationMessage(t('cardio.cardio_manual_ecg_context_changed'));
       return;
     }
     if (!hasClinicalInput) {
