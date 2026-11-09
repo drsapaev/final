@@ -2612,3 +2612,20 @@ def test_prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance():
     assert "rm -f source.sha SHA256SUMS" in dockerfile
     assert "--build-arg VITE_API_BASE_URL=same-origin" in workflow
     assert "127.0.0.1:18082" not in workflow
+
+
+def test_staging_artifact_workflow_uses_per_run_compose_credentials():
+    workflow = (
+        Path(__file__).parents[2]
+        / ".github"
+        / "workflows"
+        / "staging-frontend-artifact.yml"
+    ).read_text(encoding="utf-8")
+
+    assert 'ci_identity="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"' in workflow
+    assert 'ci_secret="${ci_identity}-ephemeral"' in workflow
+    assert "POSTGRES_USER=$ci_identity" in workflow
+    assert "POSTGRES_PASSWORD=$ci_secret" in workflow
+    assert "SECRET_KEY=$ci_secret" in workflow
+    assert "ADMIN_USERNAME=$ci_identity" in workflow
+    assert "ADMIN_PASSWORD=$ci_secret" in workflow

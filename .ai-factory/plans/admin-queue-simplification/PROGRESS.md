@@ -1,5 +1,16 @@
 # Progress — T18 final acceptance
 
+## PR #3946 — GitGuardian workflow finding — 2026-11-09T23:56:46+05:00
+
+PR #3946 remains OPEN and unmerged. Worktree branch `codex/aqs-t18-memory-safe-staging-20261109` is locally synced to `origin/main` `929363c66315b2b70229439662e3a92d7b9b1ab8` at `f1312d6b096e64f750097b67b9ac7adeff76fffe`; remote PR head before this follow-up was `e2e1f65490a4d5d5d7689ffe8b0a0f09eeda2d44`.
+
+- Blocking finding: GitGuardian reported static CI-only Compose identity/secret literals in `.github/workflows/staging-frontend-artifact.yml`, first introduced at historical PR commit `169d005f68b07af08c94bda21244196868f2695a`. No real account credentials were identified; values are intentionally omitted here.
+- Execution mode: `narrow_override`; mandatory launcher gate reported `gate_misroute=no`, `override_used=yes`, and `handoff_required=yes`. The generated execution prompt was read. Known root: `.github/workflows/staging-frontend-artifact.yml`.
+- Allowed paths: `.github/workflows/staging-frontend-artifact.yml`, `scripts/tests/test_wsl_staging_guard.py`, and this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` only. Denied: production, application runtime, staging services, history rewrite/force-push, and merge.
+- Changed locally: per-run Compose identity/secret derivation from GitHub run ID/attempt; one focused workflow regression test; these three T18 journals. No staging or production service was started.
+- Local validation: focused staging guard — PASS, 296 tests; workflow YAML parse — PASS; Python compile — PASS; Black check — PASS; `git diff --check` — PASS. Local actionlint — NOT_RUN because it is not installed. Exact-head GitGuardian/CI — pending push; the earlier remote finding is not considered cleared yet.
+- Next action: inspect the final scoped diff, commit and push normally to #3946, then verify the exact-head GitGuardian and required CI results. Do not bypass the security check. If the old historical commit still blocks after the normal fix, do not rewrite history without a separate decision.
+
 ## PR #3946 — review fixes verified on exact HEAD — 2026-11-09T22:52:10+05:00
 
 PR #3946 is OPEN and unmerged at code HEAD `63834695523542962f2d99d4c189ea2ef6a12841`, based on current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`. The three review findings are fixed in the PR code: artifact API/WebSocket requests use the served origin; artifact contexts are constrained and fully inventoried; the default Compose file no longer requires `additional_contexts`.
