@@ -1141,6 +1141,7 @@ const uzLatn = {
     cardio_echo_hydration_error: "Saqlangan ehokardiografiya ko'rsatkichlarini yuklab bo'lmadi. Saqlangan ma'lumotlarni o'chirib yubormaslik uchun saqlash bloklandi — «Qaytadan yuklash» tugmasini bosing.",
     cardio_echo_retry: 'Qaytadan yuklash',
     cardio_echo_saved_stale_edit: 'Oldingi tahrir saqlandi: saqlash davomida kiritilgan tahrirlar hali saqlanmagan. Qiymatlarni tekshirib, «Saqlash» tugmasini yana bosing.',
+    cardio_echo_draft_preserved: 'Saqlangan ko‘rsatkichlar yuklandi; yuklash muvaffaqiyatsiz tugaganida kiritilgan tahrirlar shaklda saqlandi va hali yozilmagan — ularni tekshirib, «Saqlash» tugmasini bosing.',
     cardio_panel_close: "Yopish",
     cardio_panel_save: "Saqlash",
     cardio_panel_session_warning_aria: "Sessiya muddati tugashi haqida ogohlantirish",
@@ -9769,6 +9770,8 @@ const uzLatn = {
     poa_vse: 'Все',
     poa_zagruzka: 'Загрузка...',
     poa_izmeneniy_tsen_ne_naydeno: 'Изменений цен не найдено',
+    poa_vsego_zaprosov: 'Navbatdagi jami so\'rovlar',
+    poa_tsena_v_vizite: 'Vizitdagi xizmat narxi',
     // PatientPanel.jsx (pp_)
     pp_ne_udalos_zagruzit_label_obn: 'Не удалось загрузить {label}. Обновите страницу.',
     pp_zapisi: 'записи',

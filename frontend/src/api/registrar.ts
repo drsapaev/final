@@ -62,10 +62,48 @@ export interface PriceOverrideActionResponse {
 }
 
 /**
- * Загрузить список изменений цен.
+ * Загрузить одну страницу списка изменений цен.
+ * REGPRICE-BE-004 (audit #3892, group 16): the queue is offset-paginated and
+ * the FULL filtered total is exposed via ``X-Total-Count`` — a single bare
+ * 100-row request silently hid older pending requests.
  * @param options.statusFilter - pending | approved | rejected | all
- * @param options.limit
- * @returns {Promise<PriceOverrideEntry[]>} Массив overrides (домен)
+ * @param options.limit - page size (<= 100, backend cap)
+ * @param options.offset - page offset
+ * @returns {Promise<{items: PriceOverrideEntry[], total: number}>} Страница + полный total
+ */
+export async function fetchPriceOverridesPage({
+  statusFilter = 'pending',
+  limit = 100,
+  offset = 0,
+}: {
+  statusFilter?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ items: PriceOverrideEntry[]; total: number }> {
+  const response = await api.get('/registrar/price-overrides', {
+    params: { status_filter: statusFilter, limit, offset },
+  });
+  // Backend может вернуть как массив, так и объект с пагинацией.
+  const data = response.data;
+  const items: unknown = Array.isArray(data) ? data : (data as { items?: unknown; overrides?: unknown })?.items ?? (data as { overrides?: unknown })?.overrides ?? [];
+  const headerTotal = Number(response.headers?.['x-total-count'] ?? Number.NaN);
+  const list: PriceOverrideEntry[] = (Array.isArray(items) ? items : []).map(
+    (item) => item as PriceOverrideEntry,
+  );
+  // X-Total-Count is the authoritative full total; fall back to the page
+  // length for legacy responses without the header.
+  const total = Number.isFinite(headerTotal) ? headerTotal : list.length;
+  return { items: list, total };
+}
+
+/**
+ * Загрузить ВЕСЬ список изменений цен (все страницы до полного total).
+ * REGPRICE-BE-004 (audit #3892, group 16): старые заявки за пределами первой
+ * страницы больше не теряются — клиент идёт по offset-страницам, пока не
+ * соберёт полный фильтрованный список (с защитным потолком страниц).
+ * @param options.statusFilter - pending | approved | rejected | all
+ * @param options.limit - page size (<= 100, backend cap)
+ * @returns {Promise<{items: PriceOverrideEntry[], total: number}>} Полный список + total
  */
 export async function fetchPriceOverrides({
   statusFilter = 'pending',
@@ -73,14 +111,23 @@ export async function fetchPriceOverrides({
 }: {
   statusFilter?: string;
   limit?: number;
-} = {}): Promise<PriceOverrideEntry[]> {
-  const response = await api.get('/registrar/price-overrides', {
-    params: { status_filter: statusFilter, limit },
-  });
-  // Backend может вернуть как массив, так и объект с пагинацией.
-  const data = response.data;
-  const items: unknown = Array.isArray(data) ? data : (data as { items?: unknown; overrides?: unknown })?.items ?? (data as { overrides?: unknown })?.overrides ?? [];
-  return (Array.isArray(items) ? items : []).map((item) => item as PriceOverrideEntry);
+} = {}): Promise<{ items: PriceOverrideEntry[]; total: number }> {
+  const maxPages = 20; // 20 × 100 = 2000 rows — защитный потолок против зацикливания
+  let offset = 0;
+  let total = 0;
+  const all: PriceOverrideEntry[] = [];
+  // Последняя инициированная загрузка побеждает (REG-FE-073 в компоненте) —
+  // здесь просто последовательно собираем страницы одной загрузки.
+  for (let page = 0; page < maxPages; page += 1) {
+    const pageResult = await fetchPriceOverridesPage({ statusFilter, limit, offset });
+    total = pageResult.total;
+    all.push(...pageResult.items);
+    if (all.length >= total || pageResult.items.length === 0) {
+      break;
+    }
+    offset += pageResult.items.length;
+  }
+  return { items: all, total };
 }
 
 /**

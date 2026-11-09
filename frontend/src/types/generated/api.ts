@@ -6691,6 +6691,12 @@ export type paths = {
         /**
          * Получить все изменения цен для одобрения
          * @description Получить список изменений цен для одобрения регистратурой
+         *
+         *     REGPRICE-BE-004 (audit #3892, group 16): the queue is paginated over a
+         *     deterministic ``(created_at DESC, id DESC)`` order and the FULL filtered
+         *     total is exposed via the ``X-Total-Count`` header — a bare 100-row
+         *     newest-first window silently hid older pending requests with no way to
+         *     reach them from the registrar UI.
          */
         get: operations["get_pending_price_overrides_api_v1_registrar_price_overrides_get"];
         put?: never;
@@ -6713,6 +6719,14 @@ export type paths = {
         /**
          * Одобрить или отклонить изменение цены
          * @description Одобрить или отклонить изменение цены врачом
+         *
+         *     REGPRICE-BE-001/002/003/005 (audit #3892, group 16): the registrar route
+         *     now delegates to the canonical PriceOverrideApprovalService — the SAME
+         *     implementation the dental PUT route uses — so both independently exposed
+         *     routes converge on one outcome: locked decision (409 for the loser of a
+         *     concurrent race), chargeable ``VisitService.price`` update PLUS the
+         *     ``Visit.doctor_price_override`` JSON mirror in one commit, stale-intent
+         *     validation and a mandatory non-blank rejection reason.
          */
         post: operations["approve_price_override_api_v1_registrar_price_override_approve_post"];
         delete?: never;
@@ -7303,7 +7317,15 @@ export type paths = {
         get?: never;
         /**
          * Add Service To Visit
-         * @description Добавить услугу к визиту
+         * @description Добавить услугу к визиту.
+         *
+         *     DOCVISIT-BE-002: ``quantity``/``custom_price`` валидируются ДО записи —
+         *     некорректные строки не попадают в биллинг. DOCVISIT-BE-003: мутация
+         *     координируется с платёжным легером (каноничный Visit-lock + отказ при
+         *     processing-инвойсах и оплаченном остатке). DOCVISIT-BE-001: ответ
+         *     строится ТОЛЬКО из персистентного состояния — ``price`` и есть
+         *     фактическая цена (кастомная или каталожная), фантомного ``custom_price``
+         *     поля не существует.
          */
         put: operations["add_service_to_visit_api_v1_doctor_visits__visit_id__add_service_put"];
         post?: never;
@@ -7325,7 +7347,10 @@ export type paths = {
         post?: never;
         /**
          * Remove Service From Visit
-         * @description Удалить услугу из визита
+         * @description Удалить услугу из визита.
+         *
+         *     DOCVISIT-BE-003: удаление строки услуги оплаченного визита меняет базу
+         *     стоимости под неизменным чеком — отказ (409), как и для добавления.
          */
         delete: operations["remove_service_from_visit_api_v1_doctor_visits__visit_id__services__visit_service_id__delete"];
         options?: never;
@@ -35909,6 +35934,10 @@ export type components = {
             original_price: string;
             /** New Price */
             new_price: string;
+            /** Visit Price Before */
+            visit_price_before?: string | null;
+            /** Visit Price Difference */
+            visit_price_difference?: string | null;
             /** Reason */
             reason: string;
             /** Details */
@@ -56687,6 +56716,7 @@ export interface operations {
             query?: {
                 status_filter?: string | null;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -76352,6 +76382,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
