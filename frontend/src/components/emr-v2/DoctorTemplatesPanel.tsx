@@ -23,6 +23,15 @@ import './DoctorTemplatesPanel.css';
 import { useConfirm } from '../common/ConfirmDialog';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
+/** EMRTEMPL-FE-001 (audit 3886 round 23): module-level style constant —
+ * the ui-ratchet forbids new inline style literals, raw hex colors and
+ * var() usages without a fallback. */
+const EDIT_ERROR_STYLE: React.CSSProperties = {
+    color: 'var(--accent-danger, currentcolor)',
+    fontSize: 'var(--mac-font-size-sm, inherit)',
+    marginTop: 'var(--mac-spacing-2, 8px)',
+};
+
 /**
  * DoctorTemplatesPanel Component
  * 
@@ -60,6 +69,10 @@ export function DoctorTemplatesPanel({
     // Edit state
     const [editingTemplate, setEditingTemplate] = useState<Record<string, unknown> | null>(null);
     const [editText, setEditText] = useState('');
+    // EMRTEMPL-FE-001 (audit 3886 round 23): a failed update must keep the
+    // dialog open with the typed revision — never silently discard it.
+    const [editError, setEditError] = useState('');
+    const [editSaving, setEditSaving] = useState(false);
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
 
@@ -84,15 +97,30 @@ export function DoctorTemplatesPanel({
         e.stopPropagation();
         setEditingTemplate(template);
         setEditText(template.template_text as string);
+        setEditError('');
     }, []);
 
     // Handle edit save
     const handleEditSave = useCallback(async (mode: string) => {
-        if (!editingTemplate || !editText.trim()) return;
-        await updateTemplate(String((editingTemplate as { id: string | number }).id), editText, mode as 'replace' | 'save_as_new');
+        if (!editingTemplate || !editText.trim() || editSaving) return;
+        setEditSaving(true);
+        setEditError('');
+        const result = await updateTemplate(
+            String((editingTemplate as { id: string | number }).id),
+            editText,
+            mode as 'replace' | 'save_as_new',
+        ) as { success?: boolean; error?: string } | undefined;
+        setEditSaving(false);
+        // EMRTEMPL-FE-001: a FAILED update must NOT close the dialog or
+        // discard the typed revision — surface the failure and let the
+        // doctor retry or cancel explicitly.
+        if (!result?.success) {
+            setEditError(result?.error || t18('misc.dtp_edit_save_failed'));
+            return;
+        }
         setEditingTemplate(null);
         setEditText('');
-    }, [editingTemplate, editText, updateTemplate]);
+    }, [editingTemplate, editText, editSaving, updateTemplate]);
 
     // Handle delete
     const handleDelete = useCallback(async (template: Record<string, unknown>, e: React.MouseEvent<HTMLElement>) => {
@@ -115,6 +143,7 @@ export function DoctorTemplatesPanel({
     const handleClose = useCallback(() => {
         setEditingTemplate(null);
         setEditText('');
+        setEditError('');
         onClose?.();
     }, [onClose]);
 
@@ -268,6 +297,11 @@ export function DoctorTemplatesPanel({
                                 rows={6}
                                 autoFocus
                             />
+                            {editError && (
+                                <div role="alert" style={EDIT_ERROR_STYLE}>
+                                    {editError}
+                                </div>
+                            )}
                             <div className="doctor-templates-edit-actions">
                                 <button
                                     type="button"
@@ -279,6 +313,7 @@ export function DoctorTemplatesPanel({
                                 <button
                                     type="button"
                                     className="doctor-templates-edit-btn doctor-templates-edit-btn--primary"
+                                    disabled={editSaving}
                                     onClick={() => handleEditSave('replace')}
                                     title={t18('misc.dtp_obnovit_suschestvuyuschiy_sh')}
                                 >
@@ -288,6 +323,7 @@ export function DoctorTemplatesPanel({
                                 <button
                                     type="button"
                                     className="doctor-templates-edit-btn doctor-templates-edit-btn--success"
+                                    disabled={editSaving}
                                     onClick={() => handleEditSave('save_as_new')}
                                     title={t18('misc.dtp_sozdat_novyy_shablon_s_izmen')}
                                 >

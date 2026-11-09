@@ -85,6 +85,16 @@ const toEMRApiError = (err: unknown): EMRApiError => {
     return { message: String(err) };
 };
 
+/** RETRO-3930-01 follow-up 2 (Codex review on round 22): a shared cache
+ * promise may resolve with a NON-RECORD outcome marker — { stale: true } for
+ * a request dropped by a visit switch, or { accessDenied, ... } for a denied
+ * one. Those outcomes belong to the subscriber that started the request; a
+ * subscriber that JOINS the cached promise must only ever dispatch a real
+ * EMR record, never a marker (which would load an empty clinical document
+ * and clear the current dirty flag and undo history). */
+const isEmrRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value && typeof value === 'object' && (value as Record<string, unknown>).data);
+
 /**
  * useEMR Hook
  *
@@ -194,16 +204,20 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             if (cachedEntry?.promise) {
                 // audit/phase-final, BS-18: dispatch to this instance when promise resolves.
                 cachedEntry.promise.then((result: unknown) => {
-                    if (result && !forceRefresh && stillCurrentVisit()) {
-                        dispatch(emrActions.load(result as Record<string, unknown>));
+                    // Codex follow-up 2: validate the shared result — a
+                    // dropped/denied original request resolves with a
+                    // non-record marker that must never be dispatched as a
+                    // loaded EMR.
+                    if (isEmrRecord(result) && !forceRefresh && stillCurrentVisit()) {
+                        dispatch(emrActions.load(result));
                     }
                 }).catch(() => {});
                 return cachedEntry.promise;
             }
         } else if (cachedEntry?.promise) {
             cachedEntry.promise.then((result: unknown) => {
-                if (result && stillCurrentVisit()) {
-                    dispatch(emrActions.load(result as Record<string, unknown>));
+                if (isEmrRecord(result) && stillCurrentVisit()) {
+                    dispatch(emrActions.load(result));
                 }
             }).catch(() => {});
             return cachedEntry.promise;
@@ -257,11 +271,37 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 const apiError = toEMRApiError(error);
                 if (isAccessDeniedStatus(apiError?.response?.status)) {
                     emrCache.delete(cacheKey);
+                    // RETRO-3930-01 (post-merge review of PR 3930): a 403 that
+                    // belongs to a PREVIOUS visit must not lock or error the
+                    // current visit's editor — guard the denial with the
+                    // request identity, like the success path.
+                    if (!stillCurrentVisit()) {
+                        logger.warn('[FIX:EMR403] stale load denial dropped: visit switched before the rejection arrived', {
+                            visitId,
+                            specialty,
+                            status: apiError?.response?.status,
+                        });
+                        return {
+                            accessDenied: true,
+                            status: apiError?.response?.status,
+                            message: getAccessDeniedMessage(apiError),
+                            stale: true,
+                        };
+                    }
                     return handleAccessDenied('loadEMR', apiError);
                 }
 
                 logger.error('Failed to load EMR:', error);
                 emrCache.delete(cacheKey);
+                // RETRO-3930-01: same guard for late failures of the previous
+                // visit — no stale error state, no stale toast, no rejection
+                // into callers that already moved on to the new visit. The
+                // outcome is an EXPLICIT stale marker (not a fake success) so
+                // continuations like reloadFromServer can distinguish a
+                // dropped load from a completed one.
+                if (!stillCurrentVisit()) {
+                    return { stale: true };
+                }
                 if (isMountedRef.current) {
                     dispatch(emrActions.saveError(apiError.message || 'Failed to load EMR'));
                 }
@@ -335,6 +375,21 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         } catch (error) {
             const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
+                // RETRO-3930-01: a late denial of a previous visit must not
+                // lock the current visit's editor.
+                if (!stillCurrentVisit()) {
+                    logger.warn('[FIX:EMR403] stale save denial dropped: visit switched before the rejection arrived', {
+                        visitId,
+                        specialty,
+                        status: apiError?.response?.status,
+                    });
+                    return {
+                        accessDenied: true,
+                        status: apiError?.response?.status,
+                        message: getAccessDeniedMessage(apiError),
+                        stale: true,
+                    };
+                }
                 return handleAccessDenied('saveEMR', apiError);
             }
 
@@ -357,11 +412,18 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             if (apiError.response?.status === 400) {
                 const detail = apiError.response.data?.detail;
                 if (typeof detail === 'string' && detail.includes('signed')) {
-                    dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    if (stillCurrentVisit()) {
+                        dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    }
                     return { signed: true };
                 }
             }
 
+            if (!stillCurrentVisit()) {
+                // RETRO-3930-01: late failure of a previous visit — no stale
+                // error state for the current one.
+                return null;
+            }
             dispatch(emrActions.saveError(apiError.message || 'Ошибка сохранения'));
             throw error;
         }
@@ -412,6 +474,22 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         } catch (error) {
             const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
+                // RETRO-3930-01: guard the sign denial with the request
+                // identity — a previous visit's late 403 must not lock the
+                // current editor.
+                if (!stillCurrentVisit()) {
+                    logger.warn('[FIX:EMR403] stale sign denial dropped: visit switched before the rejection arrived', {
+                        visitId,
+                        specialty,
+                        status: apiError?.response?.status,
+                    });
+                    return {
+                        accessDenied: true,
+                        status: apiError?.response?.status,
+                        message: getAccessDeniedMessage(apiError),
+                        stale: true,
+                    };
+                }
                 return handleAccessDenied('signEMR', apiError);
             }
 
@@ -423,10 +501,17 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     last_edited_at: string;
                     [key: string]: unknown;
                 };
-                dispatch(emrActions.conflictDetected(conflictData));
+                if (stillCurrentVisit()) {
+                    dispatch(emrActions.conflictDetected(conflictData));
+                }
                 return { conflict: true, ...conflictData };
             }
 
+            if (!stillCurrentVisit()) {
+                // RETRO-3930-01: late failure of a previous visit — no stale
+                // error state for the current one.
+                return null;
+            }
             dispatch(emrActions.saveError(apiError.message || 'Ошибка подписания'));
             throw error;
         }
@@ -481,9 +566,29 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         } catch (error) {
             const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
+                // RETRO-3930-01: guard the amend denial with the request
+                // identity as well.
+                if (!stillCurrentVisit()) {
+                    logger.warn('[FIX:EMR403] stale amend denial dropped: visit switched before the rejection arrived', {
+                        visitId,
+                        specialty,
+                        status: apiError?.response?.status,
+                    });
+                    return {
+                        accessDenied: true,
+                        status: apiError?.response?.status,
+                        message: getAccessDeniedMessage(apiError),
+                        stale: true,
+                    };
+                }
                 return handleAccessDenied('amendEMR', apiError);
             }
 
+            if (!stillCurrentVisit()) {
+                // RETRO-3930-01: late failure of a previous visit — no stale
+                // error state for the current one.
+                return null;
+            }
             dispatch(emrActions.saveError(apiError.message || 'Ошибка внесения поправки'));
             throw error;
         }
@@ -495,6 +600,14 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     const reloadFromServer = useCallback(async () => {
         const result = await loadEMR(true);
         if (result?.accessDenied) {
+            return result;
+        }
+        // RETRO-3930-01 follow-up (Codex review on round 22): a load that was
+        // DROPPED because the visit switched mid-reload must not resolve the
+        // CURRENT visit's conflict — the «discard» continuation belongs to
+        // the visit that started it, and dispatching here would clear the
+        // new visit's dirty flag and undo history for edits it never saw.
+        if (!result || (result as { stale?: boolean }).stale) {
             return result;
         }
         // EMRCONFLICT-FE-001 (audit 3886 round 17): this is the explicit

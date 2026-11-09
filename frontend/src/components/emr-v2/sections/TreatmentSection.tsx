@@ -26,6 +26,15 @@ import logger from '@/utils/logger';
 import { useTranslation } from '@/i18n/useTranslation';
 import React from "react";
 
+/** EMRTEMPL-FE-001 (audit 3886 round 23): module-level style constant —
+ * the ui-ratchet forbids new inline style literals, raw hex colors and
+ * var() usages without a fallback. */
+const EDIT_ERROR_STYLE: React.CSSProperties = {
+  color: 'var(--accent-danger, currentcolor)',
+  fontSize: 'var(--mac-font-size-sm, inherit)',
+  marginTop: 'var(--mac-spacing-2, 8px)',
+};
+
 /**
  * TreatmentSection Component
  * 
@@ -92,6 +101,10 @@ export function TreatmentSection({
   const [showMyExperience, setShowMyExperience] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TreatmentTemplate | null>(null);
   const [editText, setEditText] = useState('');
+  // EMRTEMPL-FE-001 (audit 3886 round 23): a failed update must keep the
+  // edit dialog open with the typed revision — never silently discard it.
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   // 📜 Doctor's personal treatment patterns by ICD-10
   const {
@@ -257,7 +270,9 @@ export function TreatmentSection({
         }}
         role="button"
         tabIndex={0}
-        onClick={() => setShowMyExperience(false)}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setShowMyExperience(false);
+        }}
         onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
@@ -274,9 +289,8 @@ export function TreatmentSection({
             width: '90%',
             maxHeight: '60vh',
             overflow: 'auto'
-          }}
-          onClickCapture={(e) => e.stopPropagation()}>
-          
+          }}>
+
                         <h3 style={{ margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                             📜 Мой опыт по {icd10Code}
                         </h3>
@@ -330,6 +344,7 @@ export function TreatmentSection({
                   e.stopPropagation();
                   setEditingTemplate(tmpl);
                   setEditText(tmpl.treatment_text);
+                  setEditError('');
                 }}
                 aria-label={t('misc.ts_redaktirovat_shablon_lecheni')}
                 title={t('misc.ts_redaktirovat')}
@@ -447,7 +462,9 @@ export function TreatmentSection({
         role="button"
         tabIndex={0}
         aria-label={t('misc.ts_zakryt_okno_redaktirovaniya_')}
-        onClick={() => setEditingTemplate(null)}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setEditingTemplate(null);
+        }}
         onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
@@ -462,9 +479,8 @@ export function TreatmentSection({
             padding: 'var(--mac-spacing-5)',
             maxWidth: '500px',
             width: '90%'
-          }}
-          onClickCapture={(e) => e.stopPropagation()}>
-          
+          }}>
+
                         <h3 style={{ margin: '0 0 16px' }}>
                             ✏️ Редактировать шаблон
                         </h3>
@@ -481,12 +497,29 @@ export function TreatmentSection({
               fontSize: 'var(--mac-font-size-base)',
               resize: 'vertical'
             }} />
+
+                        {editError && (
+                          <div role="alert" style={EDIT_ERROR_STYLE}>
+                            {editError}
+                          </div>
+                        )}
           
                         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginTop: 'var(--mac-spacing-4)' }}>
                             <button
               type="button"
+              disabled={editSaving}
               onClick={async () => {
-                await updateTemplate(String(editingTemplate.id), editText, 'replace');
+                if (!editingTemplate) return;
+                setEditSaving(true);
+                setEditError('');
+                const ok = await updateTemplate(String(editingTemplate.id), editText, 'replace');
+                setEditSaving(false);
+                // EMRTEMPL-FE-001: a failed update must NOT close the dialog
+                // or discard the typed revision.
+                if (!ok) {
+                  setEditError(t('misc.ts_edit_save_failed'));
+                  return;
+                }
                 setEditingTemplate(null);
               }}
               style={{
@@ -503,8 +536,18 @@ export function TreatmentSection({
                             </button>
                             <button
               type="button"
+              disabled={editSaving}
               onClick={async () => {
-                await updateTemplate(String(editingTemplate.id), editText, 'save_as_new');
+                if (!editingTemplate) return;
+                setEditSaving(true);
+                setEditError('');
+                const ok = await updateTemplate(String(editingTemplate.id), editText, 'save_as_new');
+                setEditSaving(false);
+                // EMRTEMPL-FE-001: same contract for «Сохранить как новый».
+                if (!ok) {
+                  setEditError(t('misc.ts_edit_save_failed'));
+                  return;
+                }
                 setEditingTemplate(null);
               }}
               style={{

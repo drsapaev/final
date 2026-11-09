@@ -940,3 +940,170 @@ describe('DermaVisitGallery', () => {
     expect(screen.getByText('photo-11.jpg')).toBeTruthy();
   });
 });
+
+describe('DermaVisitGallery — RETRO-3942-01 (post-merge review #3944)', () => {
+  let createObjectURLMock: ReturnType<typeof vi.fn>;
+  let revokeObjectURLMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    apiState.get.mockReset();
+    apiState.post.mockReset();
+    apiState.delete.mockReset();
+    vi.mocked(notify.success).mockReset();
+    vi.mocked(notify.error).mockReset();
+    vi.mocked(notify.warning).mockReset();
+    vi.mocked(notify.info).mockReset();
+    createObjectURLMock = vi.fn((blob: Blob) => `blob:mock-${(blob as { size?: number }).size ?? 0}-${Math.random().toString(36).slice(2)}`);
+    revokeObjectURLMock = vi.fn();
+    URL.createObjectURL = createObjectURLMock as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURLMock as unknown as typeof URL.revokeObjectURL;
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('loading page 2 does not cancel pending page-1 previews — they attach when their responses arrive', async () => {
+    let page = 1;
+    // Страница 1: пять фото (больше PREVIEW_CONCURRENCY=4 — вторая пачка
+    // превью стартует только после первой), total 7 → есть «Показать ещё».
+    const page1 = [1, 2, 3, 4, 5].map((id) => ({
+      id, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'], title: `photo-${id}.jpg`,
+    }));
+    const page2 = [6, 7].map((id) => ({
+      id, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'], title: `photo-${id}.jpg`,
+    }));
+
+    // Превью файла 1 (первая пачка) подвешено до явного resolve.
+    const file1Preview = deferred<{ data: Blob }>();
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') {
+        return page === 1 ? { data: { files: page1, total: 7 } } : { data: { files: page2, total: 7 } };
+      }
+      if (url === '/files/1/preview') return file1Preview.promise;
+      if (/^\/files\/\d+\/preview$/.test(url)) return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    // Карточки страницы 1 уже видны; превью первой пачки приходят сразу,
+    // НО файл 5 (вторая пачка) ждёт подвешенное превью файла 1 из первой
+    // пачки — сейчас видны 3 готовых превью (файлы 2, 3, 4).
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(3);
+    });
+
+    // «Показать ещё» ДО завершения превью файла 1 (аппенд того же списка).
+    page = 2;
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_load_more' }));
+    // Карточек стало 7; превью файлов 6 и 7 прикрепились сразу.
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(5);
+    });
+
+    // Поздний ответ превью файла 1 приходит ПОСЛЕ загрузки страницы 2 —
+    // карточка файла 1 обязана получить свой blob-URL (заглушки больше нет).
+    file1Preview.resolve({ data: imageBlob });
+    await waitFor(() => {
+      const imgs = screen.getAllByRole('img');
+      expect(imgs.length).toBe(7);
+      // Все семь карточек показывают настоящие blob-превью — ни одной заглушки.
+      imgs.forEach((img) => {
+        expect((img as HTMLImageElement).getAttribute('src')).toMatch(/^blob:mock-/);
+      });
+    });
+    expect(createObjectURLMock).toHaveBeenCalledTimes(7);
+  });
+
+  it('a context switch still invalidates pending previews of the previous context', async () => {
+    // Пациент A: превью подвешено; переключаемся на пациента B до его resolve.
+    const patientAFiles = [1, 2].map((id) => ({
+      id, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'],
+    }));
+    const patientBFiles = [{ id: 9, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] }];
+    const fileA1Preview = deferred<{ data: Blob }>();
+    const filesByPatient: Record<number, Array<Record<string, unknown>>> = { 42: patientAFiles, 77: patientBFiles };
+
+    apiState.get.mockImplementation(async (url: string, config?: { params?: { patient_id?: number } }) => {
+      if (url === '/files/') {
+        return listResponse(filesByPatient[config?.params?.patient_id ?? 42] ?? []);
+      }
+      if (url === '/files/1/preview') return fileA1Preview.promise;
+      if (url === '/files/2/preview' || url === '/files/9/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    const { rerender } = render(<DermaVisitGallery patientId={42} visitId={900} />);
+    // Файл 2 с готовым превью; файл 1 — заглушка (его превью подвешено).
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(1);
+    });
+
+    rerender(<DermaVisitGallery patientId={77} visitId={901} />);
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(1);
+    });
+    const blobCallsForB = createObjectURLMock.mock.calls.length;
+
+    // Поздние превью контекста A не создают blob-URL и не трогают карточки B.
+    fileA1Preview.resolve({ data: imageBlob });
+    await new Promise((resolve) => { setTimeout(resolve, 30); });
+    expect(createObjectURLMock.mock.calls.length).toBe(blobCallsForB);
+    expect(screen.getAllByRole('img').length).toBe(1);
+    expect((screen.getByRole('img') as HTMLImageElement).getAttribute('src')).toMatch(/^blob:mock-/);
+  });
+
+  it('a full reload (new list generation) still supersedes pending append previews', async () => {
+    // Страница 1 загружена; превью файла 1 подвешено; затем происходит полный
+    // перезапуск списка (удаление файла → loadGallery) — превью старого
+    // поколения не прикрепляется, новое поколение перезапрашивает свои.
+    let files = [1, 2].map((id) => ({
+      id, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'],
+    }));
+    const stalePreview = deferred<{ data: Blob }>();
+    let stalePreviewTaken = false;
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse(files);
+      if (url === '/files/1/preview') {
+        if (!stalePreviewTaken) {
+          stalePreviewTaken = true;
+          return stalePreview.promise;
+        }
+        return { data: imageBlob };
+      }
+      if (url === '/files/2/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.delete.mockResolvedValue({ data: { success: true } });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    // Файл 2 с готовым превью; файл 1 — заглушка (его превью подвешено).
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(1);
+    });
+
+    // Удаляем файл 1 (двухшаговое подтверждение) — список перечитывается.
+    // Файлов два — кнопка удаления первой карточки принадлежит файлу 1.
+    fireEvent.click(screen.getAllByRole('button', { name: 'derma.derma_gallery_delete_aria:derma.derma_gallery_category_examination' })[0]);
+    files = [{ id: 2, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] }];
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_confirm_yes' }));
+    // Дожидаемся именно ПЕРЕЧИТЫВАНИЯ списка (второй GET /files/), чтобы
+    // поздний resolve превью старого поколения точно шёл после нового
+    // поколения, а не наперегонки с ним.
+    await waitFor(() => {
+      expect(apiState.delete).toHaveBeenCalledWith('/files/1');
+      expect(apiState.get.mock.calls.filter((call) => call[0] === '/files/').length).toBe(2);
+    });
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(1);
+    });
+
+    // Поздний ответ превью удалённого файла не «воскрешает» карточку и не
+    // создаёт лишний blob-URL.
+    const callsAfterReload = createObjectURLMock.mock.calls.length;
+    stalePreview.resolve({ data: imageBlob });
+    await new Promise((resolve) => { setTimeout(resolve, 30); });
+    expect(createObjectURLMock.mock.calls.length).toBe(callsAfterReload);
+    expect(screen.getAllByRole('img').length).toBe(1);
+  });
+});

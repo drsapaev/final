@@ -210,6 +210,13 @@ describe('EMRLAB-FE-004: read-only does not revoke read access', () => {
       </ThemeProvider>,
     );
     await waitFor(() => expect(screen.getByText('Гемоглобин')).toBeInTheDocument(), { timeout: 3000 });
+    // EMRCOLLAPSE-FE-001 (audit 3886, round 21): a collapsed section body is
+    // now inert/aria-hidden, so content actions are only in the a11y tree once
+    // the section is expanded. The pre-round-21 assertions passed through the
+    // a11y leak (querying actions inside a visually collapsed body); expanding
+    // first matches what this test has always claimed ("…and expands").
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    expect(screen.getByRole('button', { name: /Результаты анализов/ })).toHaveAttribute('aria-expanded', 'true');
     // PDF-кнопка доступна в read-only (мутации — нет):
     expect(screen.getByRole('button', { name: /Скачать PDF: Гемоглобин/ })).toBeVisible();
     expect(screen.queryByRole('button', { name: /Заказать анализы/ })).toBeNull();
@@ -223,6 +230,8 @@ describe('EMRLAB-FE-004: read-only does not revoke read access', () => {
       </ThemeProvider>,
     );
     await waitFor(() => expect(screen.getByRole('button', { name: /Заказать анализы/ })).toBeVisible(), { timeout: 3000 });
+    // EMRCOLLAPSE-FE-001 (round 21): expand before querying body content.
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
     expect(screen.getByRole('button', { name: /Скачать PDF: Лейкоциты/ })).toBeVisible();
   });
 });
