@@ -42,6 +42,21 @@ class DermaApiRepository:
     def get_doctor_by_user_id(self, user_id: int) -> Doctor | None:
         return self.db.query(Doctor).filter(Doctor.user_id == user_id).first()
 
+    def has_pending_override(self, *, visit_id: int, service_id: int) -> bool:
+        """REGPRICE-BE-003 (audit 3892, group 16): creation-side probe —
+        another pending override for the same visit/service must block a
+        second intent (reverse-order approval hazard)."""
+        return (
+            self.db.query(DoctorPriceOverride)
+            .filter(
+                DoctorPriceOverride.visit_id == visit_id,
+                DoctorPriceOverride.service_id == service_id,
+                DoctorPriceOverride.status == "pending",
+            )
+            .first()
+            is not None
+        )
+
     def get_doctor(self, doctor_id: int) -> Doctor | None:
         return self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
 

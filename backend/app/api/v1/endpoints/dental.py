@@ -900,13 +900,18 @@ async def get_pending_price_overrides(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin", "Registrar")),
     limit: int = Query(50, ge=1, le=100),
+    # REGPRICE-BE-004 (audit #3892, group 16): offset pagination so requests
+    # beyond the first page stay reachable.
+    offset: int = Query(0, ge=0),
 ):
     """
     Получить список изменений цен, ожидающих одобрения
     Доступно только для регистраторов и администраторов
     """
     try:
-        return DentalApiService(db).get_pending_price_overrides(limit=limit)
+        return DentalApiService(db).get_pending_price_overrides(
+            limit=limit, offset=offset
+        )
     except Exception:
         raise HTTPException(
             status_code=500,
