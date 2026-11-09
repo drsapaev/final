@@ -1,5 +1,11 @@
 # Progress — T18 final acceptance
 
+## PR #3946 sync candidate — 2026-11-09T18:34:42+05:00
+
+Current candidate: local merge commit `12cfd0d29b41e667fddbc68b78c60d11cc3c4e2b` includes fresh `origin/main` #3945 `38c929e220246e4c2f748eddc08c25ab7edf1208`; merge had no conflicts. The PR diff remains the seven staging/runbook/test/T18-journal paths. Python compile, focused guard (1 passed, 282 deselected), and diff checks passed. Push and exact-head CI are pending. The bounded known-root gate returned `narrow_override` with `gate_misroute=true`, `override_used=true`, handoff required; prompt read. T18/Tier-2 remains PARTIAL; no deferral. Leave merge to the user.
+
+Next: commit/push the sync checkpoint and verify exact-head CI. After the user merges #3946, start a fresh worktree and gate the focused RQ-18 response-body recorder correction.
+
 ## PR #3946 latest-main sync — pre-work checkpoint — 2026-11-09T18:28:00+05:00
 
 - Goal: synchronize the existing PR branch with fresh `origin/main` after GitHub reports `BEHIND`; no new PR, merge-to-main, staging run, or product changes.

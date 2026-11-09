@@ -1,3 +1,11 @@
+## PR #3946 sync candidate validation — 2026-11-09T18:34:42+05:00
+
+- Candidate: `12cfd0d29b41e667fddbc68b78c60d11cc3c4e2b`; fresh base #3945 `38c929e220246e4c2f748eddc08c25ab7edf1208`; merge base `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
+- Gate: `gate_known_root_cause`, root `frontend/Dockerfile.staging`, seven scoped PR paths; `narrow_override`, `gate_misroute=true`, `override_used=true`, handoff required; prompt read. Basis: user's standing authorization to continue T18 staging-only work.
+- Sync: `git merge --no-edit origin/main` passed without conflicts. Main's finreg files do not overlap the seven-path PR diff.
+- Validation: Python compile PASS; focused guard PASS, 1 passed / 282 deselected; both diff checks PASS. Local frontend build not run successfully because `nitro` is absent from the shared dependency junction; Compose config not run because Windows Docker CLI is unavailable. No staging or production services started.
+- Push and exact-head CI for this candidate are pending. T18/Tier-2 remains PARTIAL; RQ-18 asset-body capture and full `STAGING_VALIDATION.md` remain incomplete; no deferral claimed.
+
 ## PR #3946 exact-head CI — 2026-11-09T18:20:31+05:00
 
 - Commit under test: `82a60938874a641bf2ce485576b3c4b3acf4cd85`; base `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
