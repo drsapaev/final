@@ -1,4 +1,16 @@
-## Current resume — #3946 synced to #3955 main; local focused guard passed — 2026-11-09T18:05:31+05:00
+## Current resume — PR #3946 exact-head checks pass — 2026-11-09T18:20:31+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Ready for review / CLEAN at HEAD `82a60938874a641bf2ce485576b3c4b3acf4cd85`, based on current `main` `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
+
+All applicable exact-head GitHub checks passed, including frontend unit/build/lint, PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, analyzers, security and scratch guards. Backend/integration/E2E/Docker/readiness/load/DAST jobs were skipped by path/trigger and are not passes. Local focused pytest (1 passed, 282 deselected), Python compilation, diff check and commit hooks passed. Local frontend build could not start because the shared node_modules junction lacks `nitro`; Windows Docker CLI is unavailable, so Compose config was not rerun.
+
+The PR remains user-owned for merge; GitHub shows no formal approval recorded on this HEAD. T18/Tier-2 remains PARTIAL: RQ-17 targeted current-main scenario passed, while exact RQ-18 asset-body capture and the full `STAGING_VALIDATION.md` checklist remain incomplete; `served_revision_verified=false`. No deferral is claimed.
+
+Next exact action: complete the independent review requirement and merge #3946. Only after merge, fetch fresh `origin/main`, create a clean isolated worktree, run the gate for the focused RQ-18 response-body recorder correction, then continue remaining T18 acceptance. Do not begin another PR cycle before #3946 is merged.
+
+---
+
+## Previous checkpoint — #3946 synced to #3955 main; local focused guard passed — 2026-11-09T18:05:31+05:00
 
 Continue the umbrella queue-simplification task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 remains OPEN / Ready for review at its last remotely confirmed HEAD `0647b705`; after local sync, current candidate is merge commit `f2e34bf184720fc3b7ae6d8be8dde4c88493820e`, based on fresh `origin/main` #3955 `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`. Push is pending; do not merge.
 

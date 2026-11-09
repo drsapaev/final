@@ -1,5 +1,21 @@
 # Progress — T18 final acceptance
 
+## PR #3946 exact-head CI checkpoint — 2026-11-09T18:20:31+05:00
+
+Plan version: 1.0
+Current task: T18 final synthetic acceptance
+Current status: PR #3946 is OPEN, Ready for review, CLEAN / MERGEABLE at `82a60938874a641bf2ce485576b3c4b3acf4cd85`, based on current `main` `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`. T00–T17 are merged; PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. T18/Tier-2 remains PARTIAL; no deferral is claimed.
+
+| Checkpoint | Status | Evidence |
+|-----------|--------|----------|
+| Exact-head applicable GitHub checks | PASS | Frontend unit/build/lint, PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, CodeQL, language analyzers, security/Gitleaks/secret scans, scratch guards, metadata, notifications and GitGuardian all pass on `82a60938874a641bf2ce485576b3c4b3acf4cd85`. |
+| Path-aware checks | SKIPPED | Backend, integration, frontend E2E, Docker, staging/production readiness, load and DAST were skipped by path/trigger; they are not reported as passes. |
+| PR and review | OPEN / READY / CLEAN | GitHub reports mergeable and no conflicts. `reviewDecision` is blank; no formal approval is recorded on this HEAD. Merge remains user-owned. |
+| Local focused validation | PASS / LIMITATION | Python compile, focused staging guard (1 passed, 282 deselected), diff check and hooks passed. Local frontend build stopped before compilation because the shared node_modules junction lacks `nitro`; Windows Docker CLI is unavailable, so Compose config was not rerun. |
+| T18 / Tier-2 | PARTIAL | RQ-17 targeted scenario passed on prior current-main source. Exact RQ-18 asset-body capture, full `STAGING_VALIDATION.md`, and remaining T18 scenarios are still open; `served_revision_verified=false`. |
+
+Next exact action: complete the repository's independent review requirement and merge #3946 from GitHub. After the merge, start a fresh worktree from current `origin/main`, gate the focused RQ-18 browser response-body recorder correction, then continue remaining T18 acceptance. Do not start another PR cycle before #3946 is merged.
+
 ## PR #3946 latest-main sync — validation checkpoint — 2026-11-09T18:05:31+05:00
 
 Plan version: 1.0

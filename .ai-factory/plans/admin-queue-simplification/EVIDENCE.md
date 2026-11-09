@@ -1,3 +1,13 @@
+## PR #3946 exact-head CI — 2026-11-09T18:20:31+05:00
+
+- Commit under test: `82a60938874a641bf2ce485576b3c4b3acf4cd85`; base `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
+- Environment: GitHub Actions for exact PR HEAD; isolated Windows worktree `aqs-t18-memory-safe-staging` for local checks. No WSL, Docker, Compose, staging, or production services were started for this checkpoint.
+- Validation: exact-head applicable checks PASS — Frontend unit tests, build, lint, PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle recommendation, CodeQL, Python/JavaScript/Actions analysis, security/Gitleaks/secret scans, scratch guards, metadata, notifications, and GitGuardian.
+- Not run / skipped: backend, integration, frontend E2E, Docker, staging/production readiness, load, DAST, and other path-triggered checks were SKIPPED; not counted as passes. Local `npm.cmd run build` stopped before compilation because the shared `C:\final\frontend\node_modules` junction lacks `nitro`; no install was attempted. Docker Compose config validation was NOT_RUN because Windows has no Docker CLI.
+- Scope check: PR remains exactly the seven staging/runbook/test/T18-journal paths. No runtime, API, DB, auth, dependency, production, deployment, or merge changes.
+- GitHub PR state: #3946 OPEN, Ready for review, mergeable/CLEAN at the exact HEAD; `reviewDecision` blank and no formal approval recorded. Merge remains user-owned.
+- Remaining limitation: T18/Tier-2 is PARTIAL. Exact tracked RQ-18 browser asset-body capture remains unresolved, `served_revision_verified=false`, the full `STAGING_VALIDATION.md` checklist and remaining T18 scenarios are incomplete. No deferral is claimed.
+
 ## PR #3946 latest-main sync and focused validation — 2026-11-09T18:05:31+05:00
 
 - Commit under test: local sync merge `f2e34bf184720fc3b7ae6d8be8dde4c88493820e`, parents `0647b705af69a33f73af951ce647570347262918` and current `origin/main` #3955 `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
