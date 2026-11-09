@@ -63,7 +63,7 @@ const PriceOverrideApproval = () => {
   const [priceOverrides, setPriceOverrides] = useState<PriceOverrideEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
-  // REGPRICE-BE-004 (audit #3892, group 16): полный фильтрованный total с
+  // REGPRICE-BE-004 (audit 3892, group 16): полный фильтрованный total с
   // бэкенда (X-Total-Count) — раньше клиент молча терял заявки за
   // пределами первой 100-строчной страницы.
   const [totalCount, setTotalCount] = useState(0);
