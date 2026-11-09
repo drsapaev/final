@@ -7,11 +7,13 @@ on:
       - 'frontend/src/**/*.tsx'
       - 'frontend/src/**/*.ts'
       - 'scripts/i18n/**'
+      - '.github/workflows/i18n-quality-gate.yml'
   push:
     branches: [main]
     paths:
       - 'frontend/src/i18n/**'
       - 'scripts/i18n/**'
+      - '.github/workflows/i18n-quality-gate.yml'
 
 permissions:
   contents: read
@@ -45,3 +47,15 @@ jobs:
       - name: Detect hardcoded Russian text in TSX/TS
         run: |
           python3 scripts/i18n/detect_hardcoded_russian.py --max-violations 7000 --verbose
+
+  hardcoded-russian-detector-tests:
+    name: Hardcoded Russian Detector Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Test TypeScript source discovery
+        run: python3 -m unittest discover -s scripts/i18n -p 'test_detect_hardcoded_russian.py' -v
