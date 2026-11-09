@@ -1,5 +1,16 @@
 # Progress — T18 final acceptance
 
+## PR #3946 latest-main sync — pre-work checkpoint — 2026-11-09T18:28:00+05:00
+
+- Goal: synchronize the existing PR branch with fresh `origin/main` after GitHub reports `BEHIND`; no new PR, merge-to-main, staging run, or product changes.
+- Current commits: PR HEAD `c083a6a9154df80c4b1669644b872e95ce939121`; fresh `origin/main` #3945 `38c929e220246e4c2f748eddc08c25ab7edf1208`; common base is prior main `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
+- Ownership and scope: PR-owned files remain the same seven staging/runbook/guard-test/T18-journal paths. Incoming main changes are finreg code/tests/contracts and do not overlap those seven paths. `git merge-tree --write-tree HEAD origin/main` produced a merge tree without conflicts.
+- Mode/gate: mandatory `gate_known_root_cause`, known root `frontend/Dockerfile.staging`, all seven PR paths included. Gate returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; the execution prompt was read. The bounded basis is the user's standing authorization for continued T18 work; the gate misroute is recorded. No dependency or runtime edits are authorized.
+- Allowed: merge fresh main into this existing PR branch; reconcile only its three T18 journals if needed; run `git diff --check`, focused staging guard test, compile and exact-head CI.
+- Denied: production checkout, product/runtime/API/DB/auth/dependency edits, staging/Compose run, new PR, merge to main, deployment, and changes to unrelated agent files.
+- Stop condition: stop if a conflict or required resolution changes ownership/behavior outside the seven PR paths, or if a source-contract decision becomes necessary.
+- Next action: merge `origin/main` into the existing branch without altering the incoming finreg changes, then rerun the focused local checks and update this checkpoint with the exact result.
+
 ## PR #3946 exact-head CI checkpoint — 2026-11-09T18:20:31+05:00
 
 Plan version: 1.0
