@@ -739,11 +739,12 @@ class PublicBookingRequestService:
             raise PublicBookingRequestError(429, "booking_request_rate_limited")
 
     def _require_active_future_appointment_limit(self, patient_id: int) -> None:
-        today = datetime.now(PUBLIC_BOOKING_TIMEZONE).date()
+        local_now = datetime.now(PUBLIC_BOOKING_TIMEZONE)
         if (
             self.repository.count_active_future_appointments(
                 patient_id=patient_id,
-                from_date=today,
+                from_date=local_now.date(),
+                after_time=local_now.time(),
             )
             >= ACTIVE_FUTURE_APPOINTMENT_LIMIT_PER_PATIENT
         ):
