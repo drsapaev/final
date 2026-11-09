@@ -1142,6 +1142,7 @@ const en = {
     cardio_echo_hydration_error: 'Failed to load the saved echo measurements. Saving is blocked to protect the stored data — press "Retry load".',
     cardio_echo_retry: 'Retry load',
     cardio_echo_saved_stale_edit: 'An earlier revision was saved: edits made while saving are not saved yet. Review the values and press "Save" again.',
+    cardio_echo_draft_preserved: 'Stored measurements were loaded; the edits you typed while loading had failed are kept in the form and are not saved yet — review them and press "Save".',
     cardio_panel_close: 'Закрыть',
     cardio_panel_save: 'Сохранить',
     cardio_panel_session_warning_aria: 'Предупреждение об истечении сессии',
