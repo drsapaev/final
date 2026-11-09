@@ -1,6 +1,6 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — diagnostic harness ready for one fresh Session — 2026-11-09T10:47:00+05:00
+## Current checkpoint — diagnostic r4 Preflight PASS — 2026-11-09T10:49:00+05:00
 
 - Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`.
 - Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, synchronized with latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`. The only incoming main paths were two CI workflow files; application source is unchanged.
@@ -18,10 +18,11 @@
 - Canonical Session on r2: normal Admin 2FA and T18.10 passed; the QR lifecycle reached its final phase but the original spec failed its final uncaught-Admin-page-error guard. In the diagnostic copy on r3, the failure occurred earlier: 13 lazy JS assets returned `browser-response-body-unavailable` to Playwright's response-body recorder, and `reportForOrigin` aborted before outputting any hashes. One isolated browser-response test passed, but that is not artifact attestation. The diagnostic copy did not reach the page-error guard, so the earlier observed page error still needs diagnosis. Overall live RQ-18 remains PARTIAL/FAIL.
 - Both Session runs returned canonical teardown PASS and removed their exact projects. Actual browser asset hashes remain `NOT_RUN`; the wrapper output was `0/0` after the recorder threw before emitting records. No application or tracked test change was made; no raw response content, patient payload or credentials were recorded.
 - Prepared an untracked diagnostic-only copy of the RQ-18 spec. It now reports asset-body capture failures without aborting before the final pageerror guard, records only error class, active static phase and JS filename/line, and emits available actual browser-asset hashes. The original tracked test and application code are unchanged. PowerShell parser and corrected Playwright `--list` PASS: exactly two tests discovered, zero executed in this check.
+- Fresh canonical Preflight: PASS for project `clinic-aqs-t18-memory-20261109-r4` on commit `984d06112917cdd50f8f11187ab8b7f72eceecb0`, ports backend 19004/frontend 18082/PostgreSQL 55445. C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3213 MiB, warnings empty; runtime readiness `NOT_RUN`. The artifact requires frontend port 18082.
 - Fresh canonical Preflight for r3: PASS on exact code/document commit `d5cbe259accca49a5e02eec8b0eb9cac5ff9ce48`, ports backend 19003/frontend 18082/PostgreSQL 55443; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3181 MiB, no warnings. Start then passed with 3253 MiB WSL memory and runtime readiness PASS. Frontend remains on the artifact's embedded origin port 18082.
 - Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read.
 - Allowed tracked paths remain the seven recorded in the pre-edit checkpoint below. Denied: runtime/backend/auth, GitHub workflow, gate/router, production, deployment and foreign staging resources.
-- Next exact action: run a fresh r4 synthetic project using fresh backend/PostgreSQL ports and artifact-required frontend port 18082; canonical Preflight → Start → one Session with the ready diagnostic copy. Do not change tracked app or test code. If pageerror identifies application behavior, stop and use the required source gate before proposing a fix.
+- Next exact action: run canonical Start on r4, then one Session with the ready diagnostic copy. Do not change tracked app or test code. If pageerror identifies application behavior, stop and use the required source gate before proposing a fix.
 
 ---
 

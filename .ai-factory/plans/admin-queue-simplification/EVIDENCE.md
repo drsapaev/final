@@ -6602,3 +6602,11 @@ Recorded: 2026-10-01T16:41:51+05:00
 - The wrapper checks asset capture-failure count and artifact manifest equality separately, so partial asset capture cannot be mislabeled as a provenance PASS.
 - PowerShell parser check PASS. Playwright `--list` PASS: exactly two diagnostic tests discovered, zero executed. This does not validate runtime behavior.
 - Next: one fresh synthetic project with canonical Preflight → Start → Session; use frontend port 18082 required by the artifact and fresh backend/PostgreSQL ports. Inspect only the sanitized diagnostic summary, then teardown.
+
+## T18 diagnostic r4 — canonical Preflight PASS — 2026-11-09T10:49:00+05:00
+
+- Commit under test: `984d06112917cdd50f8f11187ab8b7f72eceecb0`; tracked app/test source remains the hosted artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Environment: new synthetic project `clinic-aqs-t18-memory-20261109-r4`, ports 19004/18082/55445; frontend port 18082 is fixed by the artifact's embedded origin.
+- Canonical Preflight: PASS; Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3213 MiB, warnings empty. Runtime readiness `NOT_RUN`; no services started.
+- Diagnostic-only wrapper/list checks: PASS, two tests discovered and zero executed. The wrapper reports actual app asset matches and capture failures separately.
+- Next: canonical Start then one Session with the diagnostic copy.
