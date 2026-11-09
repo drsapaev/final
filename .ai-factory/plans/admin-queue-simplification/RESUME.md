@@ -1,4 +1,16 @@
-## Current resume — PR #3946 r5 exact RQ-18 result — 2026-11-09T14:42:10+05:00
+## Current resume — PR #3946 quality-gate correction — 2026-11-09T14:56:05+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. PR #3946 is OPEN / Ready for review / mergeable at pushed HEAD `ff3b5b0d97ac542a3f9216a3f459d361861c7c79`, based on current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.
+
+The latest PR Review Quality Gate run `42596533267` failed because the PR description omitted the required `Red-check handling` field. Its log shows the 19 validator unit tests and both documented sample bodies passed; only validation of the exact `PR_BODY` failed. The `Result` field was present, so the previous checkpoint's explanation that `Result` was missing was incorrect. The PR body now includes `Red-check handling`; the exact body fetched from GitHub passed the local validator: 19 unit tests, both samples, and current PR body. The branch needs a journal-only checkpoint commit/push to trigger fresh exact-head checks. Do not claim the remote gate has passed yet.
+
+The current-main artifact r5 result remains unchanged: source `88012cd0a4a7f1de510541b6660a2a85f18baa62` and all 261 manifest checksums matched; canonical Preflight and Start passed; the exact tracked RQ-18 Session had 1 pass and 1 failure because 13 browser response bodies could not be read, so no app asset hashes were emitted and `served_revision_verified=false`. Normal Admin/TOTP and T18.10 passed, canonical teardown passed, and T18/Tier-2 remains PARTIAL. Do not repeat the unchanged test.
+
+Next: commit/push the three journal corrections, inspect fresh exact-head CI, then leave merge to the user. After #3946 merges, separately gate the browser-body recorder correction and continue remaining T18 plus full `STAGING_VALIDATION.md` checks. No runtime change, production action, or merge is part of this checkpoint.
+
+---
+
+## Previous resume — PR #3946 r5 exact RQ-18 result — 2026-11-09T14:42:10+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. PR #3946 is OPEN / Ready for review / mergeable at HEAD `85eb5f47779f24fb164ce4b763b94cb65e270e1d`, based on current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`. Applicable exact-head CI passed before these journal updates; rerun after push.
 

@@ -1,3 +1,12 @@
+## PR #3946 PR-body gate correction — 2026-11-09T14:56:05+05:00
+
+- Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), exact pushed HEAD `ff3b5b0d97ac542a3f9216a3f459d361861c7c79`, base/current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.
+- GitHub PR Review Quality Gate run `42596533267` failed. Its log records 19 validator unit tests and both documented sample PR bodies passing, followed by failure validating exact environment `PR_BODY`: `Cyclic Execution Evidence` lacked required `Red-check handling`. The `Result` field was present; the earlier checkpoint incorrectly attributed the failure to that field.
+- Corrected the PR description to include `Red-check handling` and amended its failure explanation to match the actual log. Validation command against the body fetched from GitHub: `$env:PR_BODY = (gh pr view 3946 --json body --jq '.body' | Out-String).TrimEnd(); .\scripts\run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-env','PR_BODY','--author','drsapaev')` — PASS: 19 unit tests, both documented samples, and exact current PR body.
+- Exact-head status remains not green until a fresh workflow run: the failed run is still visible on HEAD `ff3b5b0`. Other applicable checks on that HEAD passed; backend, integration, E2E, Docker, readiness, and load checks were skipped by path/trigger, not passed.
+- Scope: PR body metadata plus this PR's three T18 journals only. No application/runtime, staging configuration, test source, production, workflow, gate/router, or merge changes in this correction. The owned r5 project remains torn down; T18/Tier-2 stays PARTIAL due the previously recorded response-body capture failure and unverified browser-served provenance.
+- Next: push the journal-only correction checkpoint and verify fresh exact-head CI. Merge remains user-owned.
+
 ## T18 exact tracked RQ-18 on current-main artifact — Session result — 2026-11-09T14:39:16+05:00
 
 - Commit under test: staging worktree/Compose source `85eb5f47779f24fb164ce4b763b94cb65e270e1d`; exact frontend artifact source `88012cd0a4a7f1de510541b6660a2a85f18baa62`, from hosted workflow run `42592028425`. Source marker and all 261 manifest entries had already passed verification before startup.
