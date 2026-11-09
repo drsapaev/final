@@ -1,15 +1,17 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — hosted frontend artifact verified; staging preflight pending — 2026-11-09T09:53:04+05:00
+## Current checkpoint — hosted artifact verified; canonical Preflight PASS — 2026-11-09T10:02:00+05:00
 
 - Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`.
-- Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`. It is one commit behind latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the only intervening paths are two CI workflow files, with no application-source overlap. Sync before push/staging.
+- Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, synchronized with latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`. The only incoming main paths were two CI workflow files; application source is unchanged.
 - The opt-in `artifact-runtime` path is implemented in the staging Dockerfile/Compose. The default `runtime` target is unchanged. The build checks `source.sha` and all `SHA256SUMS` entries and removes provenance files before Nginx serves the directory.
 - Hosted artifact workflow `42563847059` completed successfully on app source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the downloaded artifact matched `source.sha` and all 261 listed files passed SHA-256 verification. Artifact is under this worktree's ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`.
 - Local checks: focused guard test PASS (1 passed, 282 deselected); Python compile PASS; `git diff --check` PASS. An initial pytest invocation used a backend-relative path and found no test; rerun from the repository Python launcher passed. Windows has no Docker CLI, so Compose config is NOT_RUN locally and must be checked through canonical WSL Preflight.
-- Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read. No staging/WSL session has started yet.
+- Canonical Preflight: PASS. Ubuntu-24.04 / Docker 29.1.3 / Compose 2.40.3; worktree disk free 13 GiB, WSL backing disk free 26 GiB, WSL available memory 3209 MiB; custom ports 19001/18082/55441 accepted; no warnings. Compose config validated with `artifact-runtime` and the existing artifact context. No containers/services were started.
+- First Preflight attempt failed before Compose mutation because a PowerShell env-file expression wrote the synthetic Admin password on a separate line. The env file was regenerated with one `key=value` line per setting; the diagnostic Compose config then succeeded through canonical Preflight. No credentials were printed.
+- Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read.
 - Allowed tracked paths remain the seven recorded in the pre-edit checkpoint below. Denied: runtime/backend/auth, GitHub workflow, gate/router, production, deployment and foreign staging resources.
-- Next exact action: synchronize this feature branch with `origin/main`, prepare one private synthetic env in the task's `.scratch`, then run canonical Preflight. If it passes, verify the artifact target in one owned Session; if memory/storage/ports fail, stop and retain the remaining checks as `NOT_RUN`.
+- Next exact action: run canonical Start, then one Session using the same project/env and verified artifact. Preflight passed; Start still checks the 10 GiB build reserve. If Start rejects storage/resources or fails, rely on its exact-project cleanup, do not retry until the cause is resolved, and keep affected checks `NOT_RUN`.
 
 ---
 

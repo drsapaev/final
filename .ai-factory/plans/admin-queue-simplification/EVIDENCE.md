@@ -6539,3 +6539,11 @@ Recorded: 2026-10-01T16:41:51+05:00
 - `docker compose config`: NOT_RUN from Windows because Docker CLI is unavailable. Canonical WSL Preflight will perform this check after latest-main sync. Compose target build, browser tests, full staging Session and teardown: NOT_RUN.
 - Scope check: no application, backend, API, auth/RBAC, database, migration, GitHub workflow, gate/router, production or deployment changes. No WSL or Compose operation was started.
 - Next: sync branch to current `origin/main`; run canonical Preflight with the artifact context; only then run the owned staging Session if resource checks pass.
+
+## Canonical staging Preflight — 2026-11-09T10:02:00+05:00
+
+- Commit under test: feature merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`, based on `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`. The incoming main commit changed only two CI workflow files; no backend or frontend application source changed relative to the hosted artifact source.
+- Environment: owned synthetic project `clinic-aqs-t18-memory-20261109`, Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3. Env and downloaded artifact are only in this worktree's ignored `.scratch/t18-memory-safe-staging-20261109/`; credentials are synthetic and not recorded.
+- Execution mode: canonical `Preflight`; first invocation failed at Compose config because the generated env file had a malformed password line. Diagnosis was read-only; no containers/services were started. Corrected the single env file and reran Preflight.
+- Result: PASS. `docker compose config --format json` succeeded with the `artifact-runtime` target and named context. Custom ports backend 19001, frontend 18082, PostgreSQL 55441 were accepted. WSL backing disk free 26 GiB, worktree disk free 13 GiB, WSL available memory 3209 MiB; warnings empty. Runtime readiness remains `NOT_RUN` by design.
+- Validation target remaining: canonical Start/Session; the Start path has a 10 GiB build storage reserve and will build backend/worker plus the lightweight Nginx artifact target. No Compose services were started as part of Preflight.

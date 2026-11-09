@@ -1,12 +1,14 @@
-# Current resume — hosted artifact verified; sync and Preflight next — 2026-11-09T09:53:04+05:00
+# Current resume — canonical Preflight passed; Start/Session next — 2026-11-09T10:02:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
 
-PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. The branch is one CI-only commit behind latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the intervening diff touches only two GitHub workflow files. Merge the fresh base into this feature branch before staging or pushing.
+PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. The feature branch is synchronized with current `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`; the incoming commit changes only two GitHub workflow files, not app sources.
 
-The memory-safe prebuilt frontend target is implemented and its focused test passes. Existing hosted artifact workflow `42563847059` built the exact latest main source; `source.sha` matched and all 261 artifact checksums passed. The artifact is in ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`. The ordinary full frontend build stays the default. Windows lacks Docker CLI; no local Compose config, WSL, or staging operation has run.
+The memory-safe prebuilt frontend target is implemented and its focused test passes. Existing hosted artifact workflow `42563847059` built the exact latest main source; `source.sha` matched and all 261 artifact checksums passed. The artifact is in ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`. The ordinary full frontend build stays the default. Windows lacks Docker CLI; canonical WSL Preflight validated Compose configuration and resources, but Start/Session have not run and no services are up.
 
-Next: synchronize to latest main, create one ephemeral synthetic env under the same `.scratch` task directory, then run `ops/scripts/wsl_staging.ps1 -Action Preflight`. Preflight must validate Compose config, storage, memory, identity, and selected ports. If it passes, run Start followed by one Session using `artifact-runtime` and the verified artifact; retain canonical teardown. If any resource check fails, stop before Compose mutation and leave the dependent T18 checks `NOT_RUN`.
+Canonical `Preflight` passed on the owned synthetic project with Compose 2.40.3 and the `artifact-runtime` target: host worktree disk 13 GiB free, WSL backing disk 26 GiB free, WSL available memory 3209 MiB, ports accepted, no warnings. The first Preflight attempt failed only because the generated env file split one password line; it started no services, and the corrected Preflight passed. Credential values remain unlogged.
+
+Next: run `Start`, then immediately run one `Session` using the same env/project and verified artifact. Start will apply the 10 GiB build reserve; it still builds backend/worker but avoids WSL `npm ci`/Vite by selecting the static Nginx target. If Start fails, rely on canonical cleanup and resolve the cause before any retry. Do not mark served revision verified from image ID alone; use the RQ-17 browser-response checksum capture plus the hosted manifest.
 
 Validation already reported: focused test 1 passed/282 deselected; Python compile passed; `git diff --check` passed; hosted artifact source/checksums passed. An initial pytest command from the backend runner used an invalid relative path and was corrected; no test ran on that first attempt. Do not claim staging or T18 completion yet.
 
