@@ -1,15 +1,15 @@
-## PR #3946 — review-fix local validation — 2026-11-09T21:52:14+05:00
+## PR #3946 — review-fix local validation — 2026-11-09T21:57:02+05:00
 
-- Commit under test: base HEAD `934f38d0764431b0a6f77ad129ddc0241b13f8df` plus an uncommitted worktree patch; exact candidate commit does not yet exist.
-- Base synchronization: fresh `origin/main` is #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`, one commit after PR base #3957. The incoming diff changes Cardiology files only; `git merge-tree --write-tree HEAD origin/main` returned a clean tree. Merge is pending and occurs only in this isolated PR worktree before push.
+- Commit under test: synchronized code commit `212348692` including code-fix commit `169d005f6` and current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`. The journal checkpoint is a documentation-only follow-up; no runtime or test source changed after the focused checks.
+- Base synchronization: fresh `origin/main` #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0` is merged into the PR branch as `212348692`, without conflict. Incoming changes are confined to Cardiology files and remain outside the PR diff.
 - Environment: Windows isolated worktree `aqs-t18-memory-safe-staging`; Python 3.11 via `scripts/run_python.ps1`; frontend dependencies resolve through the existing shared junction. Windows Docker CLI unavailable.
 - Execution mode: `gate_known_root_cause`; known root `frontend/Dockerfile.staging`. Gate outcome recorded before editing: `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt was read. Scope stayed in PR #3946.
 - Allowed paths: `.github/workflows/staging-frontend-artifact.yml`, `frontend/Dockerfile.staging`, `frontend/src/api/runtime.ts`, `frontend/src/api/__tests__/runtime.test.ts`, `ops/compose.staging.yml`, `ops/compose.staging.artifact.yml`, `scripts/wsl_staging.py`, `scripts/tests/test_wsl_staging_guard.py`, `docs/runbooks/WSL_STAGING_SESSION.md`, and the existing T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` journals.
 - Actual changed paths: the nine implementation/runbook paths above; this evidence checkpoint and companion progress/resume notes are being updated. No other worktree files are changed.
 - Original findings: artifact JS had fixed API port 18082; build context was user-selectable without worktree containment or exact file-list validation; the default Compose service required `additional_contexts` even for the ordinary runtime target.
 - Validation commands and results:
-  - `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','scripts/tests/test_wsl_staging_guard.py','-q')` — PASS, 295 tests.
-  - `npm.cmd run test:run -- src/api/__tests__/runtime.test.ts` — PASS, 7 tests.
+  - `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','scripts/tests/test_wsl_staging_guard.py','-q')` on `212348692` — PASS, 295 tests.
+  - `npm.cmd run test:run -- src/api/__tests__/runtime.test.ts` on `212348692` — PASS, 7 tests.
   - `npm.cmd exec -- eslint src/api/runtime.ts src/api/__tests__/runtime.test.ts` — PASS.
   - `scripts/run_python.ps1 -RequireModule black -PythonArgs @('-m','black','--check','scripts/wsl_staging.py','scripts/tests/test_wsl_staging_guard.py')` — PASS.
   - `py -3.11 -m py_compile scripts/wsl_staging.py scripts/tests/test_wsl_staging_guard.py` — PASS.
@@ -20,7 +20,7 @@
 - Result: local focused checks pass; hosted Compose build and exact-head CI have not yet run.
 - Scope check: `git status` contains only the recorded PR implementation/runbook/journal paths; production checkout, application backend, unrelated worktrees, and staging resources were untouched.
 - Remaining limitation: do not claim Docker target validation, staging validation, or completed Tier-2 until hosted target builds and remaining T18 acceptance are independently evidenced.
-- PR: [#3946](https://github.com/drsapaev/final/pull/3946), open; changes not yet pushed; branch currently one commit behind fresh main.
+- PR: [#3946](https://github.com/drsapaev/final/pull/3946), open; synchronized branch and documentation checkpoint have not yet been pushed; remote PR still points to `934f38d`.
 - Merge commit: none; merge remains user-owned.
 
 ## PR #3946 exact-head review readiness and stale checkpoint reconciliation — 2026-11-09T20:22:16+05:00

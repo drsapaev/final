@@ -1,13 +1,13 @@
 # Progress — T18 final acceptance
 
-## PR #3946 review fixes — local validation checkpoint — 2026-11-09T21:52:14+05:00
+## PR #3946 review fixes — synchronized local validation — 2026-11-09T21:57:02+05:00
 
-PR #3946 is OPEN and unmerged at remote HEAD `934f38d0764431b0a6f77ad129ddc0241b13f8df`, based on #3957. Its review findings are being fixed on existing branch `codex/aqs-t18-memory-safe-staging-20261109` in the isolated worktree. The changes below are local and uncommitted; no new staging project or production service was started. Fresh `origin/main` is #3959 at `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`; its Cardiology files are disjoint and `git merge-tree` reports no conflict. This branch must sync before push.
+PR #3946 is OPEN and unmerged at remote HEAD `934f38d0764431b0a6f77ad129ddc0241b13f8df`, based on #3957. Review fixes are committed as `169d005f6`; fresh `origin/main` #3959 at `562f5e97a2ff452e6dd0810a0359e0ad41b693d0` was merged without conflict as `212348692`. A documentation-only checkpoint follows that tested code commit; the synchronized branch is not pushed yet. No staging project or production service was started.
 
 - P1 API origin: portable staging artifacts now use the page's exact origin, so browser requests follow the chosen frontend port and its Nginx proxy.
 - P2 build context: the canonical launcher accepts only a verified artifact below this worktree's `.scratch`, checks source SHA/checksums/exact file inventory, and rejects symlinks/reparse points. The Docker image repeats checksum, link, and exact-inventory checks.
 - P2 Compose compatibility: `additional_contexts` moved into an artifact-only Compose override; it requires an explicit context. The default runtime Compose file has no named-context dependency.
-- Local validation: staging guard 295 passed; runtime Vitest 7 passed; ESLint, Python compilation, Black check, YAML parse, and `git diff --check` passed.
+- Local validation on `212348692`: staging guard 295 passed; runtime Vitest 7 passed; ESLint, Python compilation, Black check, YAML parse, and `git diff --check origin/main...HEAD` passed.
 - Not verified locally: Docker/Compose CLI is unavailable; the shared frontend dependency junction lacks `nitro`, so local frontend build/type-check cannot provide a clean result. A type-check attempt failed on missing `nitro` and existing Axios mock typing errors. Exact-head GitHub CI is pending because these changes are not pushed.
 - Gate: `gate_known_root_cause` for `frontend/Dockerfile.staging`, all nine changed implementation/runbook paths plus the three journals in scope. Result remains the previously recorded `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; execution prompt was read. Basis is the user's authorization to resolve review findings within PR #3946; no merge or production authority.
 
@@ -17,10 +17,10 @@ PR #3946 is OPEN and unmerged at remote HEAD `934f38d0764431b0a6f77ad129ddc0241b
 | Focused local checks | PASS | 295 staging guard tests, 7 runtime tests, ESLint, Python compile, Black, YAML parse, diff check. |
 | Docker/Compose target builds | NOT_RUN | Windows Docker CLI unavailable; new PR workflow will build both targets on hosted CI. |
 | Frontend local build/type-check | NOT_VALIDATED | Shared dependency junction lacks `nitro`; type-check also reports existing Axios mock type errors. |
-| PR push and exact-head CI | PENDING | Local worktree patch is not committed or pushed. |
+| PR push and exact-head CI | PENDING | Review fix is committed and branch synchronized; push and hosted checks are pending. |
 | T18 / Tier-2 | PARTIAL | No new staging run was started; previously recorded RQ-18 and full runbook gaps remain. |
 
-Next exact action: review the final diff and scope, commit this PR fix, merge the disjoint fresh `origin/main` update, repeat focused checks, then push and verify exact-head GitHub workflows including default and artifact-runtime Compose builds. Update the PR description with factual results and leave merge to the user.
+Next exact action: finish this journal checkpoint, commit it, push the synchronized branch, then verify exact-head GitHub workflows including default and artifact-runtime Compose builds. Update the PR description with factual results and leave merge to the user.
 
 ---
 
