@@ -945,6 +945,12 @@ const ru = {
     cardio_parser_normal_params: 'Параметры в пределах нормы.',
     cardio_parser_sinus_rhythm: 'Синусовый',
     cardio_parser_scp_not_implemented: 'Парсинг SCP-ECG формата не реализован. Загрузите файл в формате XML/HL7 aECG или обратитесь к администратору для интеграции SCP-библиотеки.',
+    // ECGPARSER-FE-001/002 (audit 3886 round 25): honest parser states —
+    // unrecognized XML is not a parsed ECG; absent measurements are
+    // explicitly "not measured", never a silent "normal".
+    cardio_parser_xml_not_ecg: 'XML не содержит распознаваемых измерений ЭКГ (HL7 aECG) — файл не будет сохранён как запись ЭКГ',
+    cardio_parser_hr_not_measured: 'ЧСС не измерена',
+    cardio_parser_axis_not_measured: 'Положение ЭОС не измерено',
 
     // ─── EchoForm (cardio.cardio_echo_*) ───
     cardio_echo_section_left_ventricle: 'Левый желудочек',

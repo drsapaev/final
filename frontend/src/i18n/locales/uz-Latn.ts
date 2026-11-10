@@ -864,6 +864,12 @@ const uzLatn = {
     cardio_parser_normal_params: 'Parametrlar normal chegarada.',
     cardio_parser_sinus_rhythm: 'Sinus',
     cardio_parser_scp_not_implemented: "SCP-ECG formatini tahlil qilish amalga oshirilmagan. Faylni XML/HL7 aECG formatida yuklang yoki SCP kutubxonasini integratsiya qilish uchun administratorga murojaat qiling.",
+    // ECGPARSER-FE-001/002 (audit 3886 round 25): honest parser states —
+    // unrecognized XML is not a parsed ECG; absent measurements are
+    // explicitly "not measured", never a silent "normal".
+    cardio_parser_xml_not_ecg: "XML faylda aniqlanadigan EKG o'lchovlari (HL7 aECG) topilmadi — fayl EKG yozuvi sifatida saqlanmaydi",
+    cardio_parser_hr_not_measured: "YSS o'lchanmagan",
+    cardio_parser_axis_not_measured: "EEO holati o'lchanmagan",
 
     // ─── EchoForm (cardio.cardio_echo_*) ───
     cardio_echo_section_left_ventricle: "Chap qorincha",
