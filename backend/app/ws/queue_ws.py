@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
+from weakref import WeakValueDictionary
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
@@ -40,6 +41,9 @@ class WSManager:
                 redis_url=(os.getenv("WS_REDIS_URL") or os.getenv("REDIS_URL")),
             )
             cls._instance._redis_handlers = {}
+            # Per-room locks serialize subscribe/unsubscribe across rapid
+            # reconnects. Weak references avoid retaining inactive rooms.
+            cls._instance._subscription_locks = WeakValueDictionary()
             log.info("WSManager: создан новый экземпляр")
         return cls._instance
 
@@ -104,22 +108,39 @@ class WSManager:
     def _room_channel(self, room: str) -> str:
         return f"room:{room}"
 
+    def _room_subscription_lock(self, room: str) -> asyncio.Lock:
+        lock = self._subscription_locks.get(room)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._subscription_locks[room] = lock
+        return lock
+
     async def _ensure_room_subscription(self, room: str) -> None:
-        if room in self._redis_handlers:
-            return
+        # Serialize per room so a new subscribe cannot race an old
+        # in-flight Redis unsubscribe on the same channel.
+        async with self._room_subscription_lock(room):
+            if room in self._redis_handlers:
+                return
+            if not self.rooms.get(room):
+                return
 
-        async def _handler(payload, _room: str = room) -> None:
-            remote_data = payload.get("data", payload)
-            await self._broadcast_room(_room, remote_data, publish=False)
+            async def _handler(payload, _room: str = room) -> None:
+                remote_data = payload.get("data", payload)
+                await self._broadcast_room(_room, remote_data, publish=False)
 
-        self._redis_handlers[room] = _handler
-        await self._pubsub.subscribe(self._room_channel(room), _handler)
+            self._redis_handlers[room] = _handler
+            await self._pubsub.subscribe(self._room_channel(room), _handler)
 
     async def _remove_room_subscription(self, room: str) -> None:
-        handler = self._redis_handlers.pop(room, None)
-        if handler is None:
-            return
-        await self._pubsub.unsubscribe(self._room_channel(room), handler)
+        async with self._room_subscription_lock(room):
+            # disconnect() scheduled cleanup when its last socket left,
+            # but a new socket may already have rejoined this room.
+            if self.rooms.get(room):
+                return
+            handler = self._redis_handlers.pop(room, None)
+            if handler is None:
+                return
+            await self._pubsub.unsubscribe(self._room_channel(room), handler)
 
     async def _broadcast_room(self, room: str, data, publish: bool) -> None:
         for ws in list(self.rooms.get(room, set())):
