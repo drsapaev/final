@@ -338,7 +338,10 @@ async def ws_queue(
 
     # PR-4: also extract token from subprotocol/Authorization header
     # so clients don't need to put JWT in the URL.
-    from app.api.v1.endpoints.ws_token import extract_ws_token
+    from app.api.v1.endpoints.ws_token import (
+        accept_echoing_subprotocol,
+        extract_ws_token,
+    )
     secure_token = extract_ws_token(websocket)
     if secure_token and not token:
         token = secure_token
@@ -372,8 +375,13 @@ async def ws_queue(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # ✅ Только после всех проверок — accept
-    await websocket.accept()
+    # Only after both checks: browsers offering bearer.<jwt> require the
+    # server to select an offered Sec-WebSocket-Protocol. Keep the plain
+    # accept() path for legacy Authorization/query-token clients.
+    if websocket.headers.get("sec-websocket-protocol"):
+        await accept_echoing_subprotocol(websocket)
+    else:
+        await websocket.accept()
 
     room = f"{department.strip()}::{date.strip()}"
     await ws_manager.connect(websocket, room)
