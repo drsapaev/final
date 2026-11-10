@@ -266,13 +266,13 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
     used it and the flag could leak to production. Tests now use TESTING=1
     (set by pytest conftest) instead.
     """
-    # TESTING is an in-process pytest convenience, never a production
-    # authentication override. A leaked TESTING=1 must not grant queue
-    # room access when ENV=prod/production.
+    # TESTING is an in-process pytest convenience, not a deployment
+    # authentication override. Only explicitly named local/test modes may
+    # bypass JWT verification; staging, QA and production always verify.
     environment = os.getenv("ENV", "dev").strip().lower()
     if (
         os.getenv("TESTING", "0") == "1"
-        and environment not in ("prod", "production")
+        and environment in ("dev", "development", "test", "testing")
     ):
         return True
     # Extract token from header (preferred) or query param (legacy)
