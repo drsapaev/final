@@ -8919,6 +8919,7 @@ const ru = {
     ps_save: 'Сохранить рецепт',
     ps_print: 'Печать рецепта',
     emr_ai_no_complaints: 'Для AI-подсказок сначала заполните поле «Жалобы»',
+    ai_popover_kb_hint: '↑↓ и Enter действуют при фокусе в списке • Esc закрыть',
     emr_ghost_unavailable: 'Ghost Mode недоступен в подписанной карте.',
     emr_sign_title: 'Подписание ЭМК',
     emr_sign_message: 'Подписать ЭМК?',

@@ -82,6 +82,10 @@ const ComplaintsField = ({
 }: ComplaintsFieldProps) => {
     const complaintsFieldId = useId();
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    // EMRCOMPLAINT-FE-001 (audit 3886 round 27): every value/editability
+    // change invalidates the in-flight suggestion request — a late response
+    // for previous text must never repopulate the panel.
+    const requestEpochRef = useRef(0);
 
     // Local state
     const [isFocused, setIsFocused] = useState(false);
@@ -107,7 +111,10 @@ const ComplaintsField = ({
     useEffect(() => {
         if (!aiEnabled || !isEditable || !isFocused) return;
         if (!debouncedValue || debouncedValue.length < 5) {
+            // the request session for the previous text is over
+            requestEpochRef.current += 1;
             setAiSuggestions([]);
+            setIsLoadingAI(false);
             return;
         }
 
@@ -117,28 +124,52 @@ const ComplaintsField = ({
         const requestSuggestions = async () => {
             if (!onRequestAI) return;
 
+            const epoch = ++requestEpochRef.current;
             setIsLoadingAI(true);
             try {
                 const suggestions = await onRequestAI(debouncedValue);
+                // EMRCOMPLAINT-FE-001: only the request that still owns the
+                // current context may commit its result or reset the spinner.
+                if (requestEpochRef.current !== epoch) return;
                 if (Array.isArray(suggestions) && suggestions.length > 0) {
                     setAiSuggestions(suggestions);
                     setSelectedIndex(0);
                 }
             } catch (e) {
-                logger.error('AI suggestion error:', e);
+                if (requestEpochRef.current === epoch) {
+                    logger.error('AI suggestion error:', e);
+                }
             } finally {
-                setIsLoadingAI(false);
+                if (requestEpochRef.current === epoch) {
+                    setIsLoadingAI(false);
+                }
             }
         };
 
         requestSuggestions();
     }, [debouncedValue, aiEnabled, isEditable, isFocused, onRequestAI, aiSuggestions.length]);
 
-    // Clear AI suggestions when value changes
+    // Clear AI suggestions when value changes — and kill any in-flight
+    // request owned by the previous text (EMRCOMPLAINT-FE-001)
     useEffect(() => {
+        requestEpochRef.current += 1;
         setAiSuggestions([]);
         setSelectedIndex(0);
+        setIsLoadingAI(false);
     }, [value]);
+
+    // A disabled editor ends the suggestion session as well
+    useEffect(() => {
+        if (!aiEnabled || !isEditable) {
+            requestEpochRef.current += 1;
+            setAiSuggestions([]);
+            setSelectedIndex(0);
+            setIsLoadingAI(false);
+        }
+    }, [aiEnabled, isEditable]);
+
+    // Unmount invalidates everything still in flight
+    useEffect(() => () => { requestEpochRef.current += 1; }, []);
 
     // Handlers
     const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -158,6 +189,9 @@ const ComplaintsField = ({
 
     const handleAcceptSuggestion = useCallback((suggestion: ComplaintsFieldSuggestion) => {
         if (!suggestion) return;
+        // EMRCOMPLAINT-FE-001: acceptance is gated against the CURRENT
+        // editability, not the one when the request started.
+        if (!isEditable) return;
 
         // Append suggestion text with proper separator
         const separator = value.trim().endsWith('.') ? ' ' : ', ';
@@ -171,7 +205,7 @@ const ComplaintsField = ({
             textareaRef.current.focus();
             textareaRef.current.setSelectionRange(newValue.length, newValue.length);
         }
-    }, [value, onChange]);
+    }, [value, onChange, isEditable]);
 
     const handleDismissAI = useCallback(() => {
         setAiSuggestions([]);

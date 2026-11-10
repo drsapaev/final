@@ -8789,6 +8789,7 @@ const en = {
     ps_save: 'Сохранить рецепт',
     ps_print: 'Печать рецепта',
     emr_ai_no_complaints: 'Для AI-подсказок сначала заполните поле «Жалобы»',
+    ai_popover_kb_hint: '↑↓ and Enter act when the list is focused • Esc closes',
     emr_ghost_unavailable: 'Ghost Mode недоступен в подписанной карте.',
     emr_sign_title: 'Sign electronic medical record',
     emr_sign_message: 'Sign this EMR?',
