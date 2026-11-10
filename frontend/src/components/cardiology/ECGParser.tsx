@@ -100,13 +100,19 @@ export const parseXMLFile = async (file: File) => {
       qrsInterval: toFiniteNumber(extractXMLValue(xmlDoc, 'qrsInterval', 'value')),
       qtInterval: toFiniteNumber(extractXMLValue(xmlDoc, 'qtInterval', 'value')),
       qtcInterval: toFiniteNumber(extractXMLValue(xmlDoc, 'qtcInterval', 'value')),
-      // ECGPARSER-FE-003: the generic `axis` feeds the −30…+90 electrical
-      // axis classification, which is a QRS-axis scale — prefer a QRS-axis
-      // tag when the document provides one, falling back to the legacy
-      // P-axis tag only when no QRS axis is present.
-      axis: toFiniteNumber(
-        extractXMLValue(xmlDoc, 'qrsAxis', 'value') ?? extractXMLValue(xmlDoc, 'pAxis', 'value')
-      ),
+      // ECGPARSER-FE-003 + RETRO-3965-01 (post-merge review 3968): the
+      // generic `axis` feeds the −30…+90 electrical axis classification
+      // AND the structured /cardio/ecg `axis` column — both are QRS-axis
+      // scales. A P-wave axis is NOT a substitute for the QRS electrical
+      // axis (a P-only document previously produced a spurious QRS
+      // left/right/normal classification and persisted the P value as
+      // the QRS axis). `axis` is therefore the qrsAxis only; when the
+      // document has no qrsAxis it stays an explicit null ("not
+      // measured"). The P-wave axis survives as its own measurement
+      // (`pAxis`) in the parsed parameters and the raw parameters dict —
+      // never relabeled, never classified on the QRS scale.
+      axis: toFiniteNumber(extractXMLValue(xmlDoc, 'qrsAxis', 'value')),
+      pAxis: toFiniteNumber(extractXMLValue(xmlDoc, 'pAxis', 'value')),
 
       // Ритм
       rhythm: extractXMLValue(xmlDoc, 'rhythm', 'code'),
