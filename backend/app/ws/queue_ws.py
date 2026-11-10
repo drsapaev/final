@@ -296,27 +296,23 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
 
         from app.core.config import settings as _settings
         payload = _jwt.decode(token, _settings.SECRET_KEY, algorithms=[_settings.ALGORITHM])
-        # Check blacklist + resolve the user (QD-1.1 Codex round-3 P2): the
-        # standalone queue stream applies the same sentinel rejection as
-        # every other auth surface — the shared resolver returns None for
-        # internal-only roles, missing users and malformed subjects.
+        # Resolve the principal before checking revocation: JWT "sub" may
+        # be a username, not a numeric ID. Both exact-JTI and all-user
+        # revocation sentinels require the stable database user ID.
         from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
         from app.db.session import SessionLocal as _SessionLocal
+        from app.services.token_blacklist_service import TokenBlacklistService
 
-        jti = payload.get("jti")
-        sub = payload.get("sub")
-        user_id = None
-        if isinstance(sub, str) and sub.isdigit():
-            user_id = int(sub)
-        elif isinstance(sub, int):
-            user_id = sub
         _db = _SessionLocal()
         try:
-            if jti and user_id:
-                from app.services.token_blacklist_service import TokenBlacklistService
-                if TokenBlacklistService.is_token_blacklisted(_db, jti, user_id=user_id):
-                    return False
-            if _resolve_websocket_user(payload, _db) is None:
+            user = _resolve_websocket_user(payload, _db)
+            if user is None:
+                return False
+            jti = payload.get("jti")
+            lookup_jti = jti if isinstance(jti, str) else ""
+            if TokenBlacklistService.is_token_blacklisted(
+                _db, lookup_jti, user_id=user.id
+            ):
                 return False
         finally:
             _db.close()
