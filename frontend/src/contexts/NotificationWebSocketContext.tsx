@@ -129,6 +129,8 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
   const ws = useRef<WebSocket | null>(null);
   const [wsState, setWsState] = useState<WebSocket | null>(null);
   const handleMessageRef = useRef<(data: WsPayload) => void>(() => {});
+  // One server-owned inbox catch-up per authenticated WebSocket session.
+  const replayRequestedForRef = useRef<WebSocket | null>(null);
   const connectRef = useRef<(() => (() => void) | undefined) | null>(null);
   const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disconnectRef = useRef<(() => void) | null>(null);
@@ -211,6 +213,21 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
           unreadCount: data.unread_count
         });
         applyUnreadSnapshot(data);
+        const currentSocket = ws.current;
+        if (
+          currentSocket &&
+          currentSocket.readyState === WebSocket.OPEN &&
+          replayRequestedForRef.current !== currentSocket
+        ) {
+          try {
+            // Restore persisted deliveries missed during disconnect. The
+            // server owns recipient scope, ordering and the bounded page.
+            currentSocket.send(JSON.stringify({ type: 'notification_sync', limit: 50 }));
+            replayRequestedForRef.current = currentSocket;
+          } catch (error) {
+            logger.warn('[NotificationWS] inbox catch-up request failed', error);
+          }
+        }
         return;
       }
 
@@ -327,6 +344,8 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
     };
 
     socket.onmessage = (event: MessageEvent) => {
+      // A replaced socket must not mutate the current user's inbox.
+      if (ws.current !== socket) return;
       try {
         const parsed = parseWsEvent(event.data as string);
         if (!parsed) return;
@@ -339,6 +358,9 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
     };
 
     socket.onclose = (event: CloseEvent) => {
+      if (replayRequestedForRef.current === socket) {
+        replayRequestedForRef.current = null;
+      }
       if (ws.current === socket) {
         ws.current = null;
         // audit/phase-4, BS-20: clear state so consumers see the disconnect.
