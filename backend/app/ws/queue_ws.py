@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from collections import defaultdict
+from datetime import date as calendar_date
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
@@ -320,6 +322,75 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
         return False
 
 
+def _queue_room_permitted(token: str | None, department: str, day: str) -> bool:
+    """Allow only staff queue managers or the selected active doctor.
+
+    This is a second, room-specific admission check after the legacy
+    _auth_ok boolean gate. Do not trust JWT subjects or room identifiers
+    without validation: specialist_N denotes Doctor.id, not User.id.
+    """
+    match = re.fullmatch(r"specialist_([1-9][0-9]*)", department.strip())
+    if match is None or not token:
+        return False
+    try:
+        parsed_day = calendar_date.fromisoformat(day.strip())
+        if parsed_day.isoformat() != day.strip():
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    try:
+        import jwt as _jwt
+
+        from app.core.config import settings as _settings
+
+        payload = _jwt.decode(
+            token, _settings.SECRET_KEY, algorithms=[_settings.ALGORITHM]
+        )
+    except Exception:
+        return False
+
+    from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
+    from app.db.session import SessionLocal as _SessionLocal
+    from app.models.clinic import Doctor
+    from app.services.authorization.staff import staff_authorization_service
+    from app.services.token_blacklist_service import TokenBlacklistService
+
+    db = _SessionLocal()
+    try:
+        user = _resolve_websocket_user(payload, db)
+        if user is None or not getattr(user, "is_active", False):
+            return False
+
+        # The all-user revocation sentinel needs the resolved database ID,
+        # even for JWTs whose subject is a username or which lack a JTI.
+        jti = payload.get("jti")
+        lookup_jti = jti if isinstance(jti, str) else ""
+        if TokenBlacklistService.is_token_blacklisted(
+            db, lookup_jti, user_id=user.id
+        ):
+            return False
+
+        if staff_authorization_service.can_manage_queue(user):
+            return True
+        if not staff_authorization_service.can_read_queue(user):
+            return False
+
+        # queue:read is granted to doctors, but not globally across the
+        # clinic. Compare the selected Doctor.id, not the JWT User.id.
+        doctor = (
+            db.query(Doctor)
+            .filter(Doctor.user_id == user.id, Doctor.active.is_(True))
+            .first()
+        )
+        return doctor is not None and doctor.id == int(match.group(1))
+    except Exception:
+        log.warning("Queue room permission lookup failed; denying subscription")
+        return False
+    finally:
+        db.close()
+
+
 # -----------------------------------------------------------------------------
 # PR-5: /ws/noauth endpoint REMOVED — was a literal no-auth WebSocket.
 # Even though it was disabled in production, it's a security risk in
@@ -369,6 +440,22 @@ async def ws_queue(
     if not _auth_ok(websocket.headers, token):
         await websocket.accept()
         await websocket.send_json({"type": "error", "reason": "auth required"})
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    # Guard the specific room after token validation and before joining.
+    # Existing local pytest fixtures may run without seeded users; deployed
+    # environments, including a leaked TESTING=1 in production, never skip
+    # this room authorization check.
+    local_test_mode = (
+        os.getenv("TESTING", "0") == "1"
+        and env in ("dev", "development", "test", "testing")
+    )
+    if not local_test_mode and not _queue_room_permitted(token, department, date):
+        await websocket.accept()
+        await websocket.send_json(
+            {"type": "error", "reason": "queue room access denied"}
+        )
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
