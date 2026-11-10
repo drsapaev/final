@@ -1704,6 +1704,10 @@ const DentalVisitScreen = ({
               <TeethChart
                 initialData={toothStatus}
                 onToothClick={handleToothClick}
+                // DENTCHART-FE-002 (audit 3886): in readOnly the chart never
+                // calls the mutation callback; the locked-record
+                // click → ToothModal inspection is routed through onInspect.
+                onInspect={handleToothClick}
                 readOnly={fieldsDisabled}
               />
               <ToothSummary toothStatus={toothStatus} />
