@@ -8911,6 +8911,7 @@ const uzLatn = {
     aia_fallback_provider_notice: '{provider} zaxira AI-provayderi orqali javob olindi. Buni faqat qoralama sifatida ishlating va klinik qoʻllashdan oldin tashqi AI sozlamalarini tekshiring.',
     aia_analyzing_via: '{provider} AI orqali tahlil...',
     aia_click_refresh: 'AI tahlilini boshlash uchun Yangilashni bosing',
+    aia_no_context_notice: "Klinik kontekstsiz AI tahlil mavjud emas: yordamchidan tashxis, shikoyatlar va natijalar bilan foydalanish uchun bemor kartasini oching.",
     aia_retry_attempt: '{count}-urinish. AI provayderini almashtiring yoki soʻrovni qaytaring.',
 
     // ─── ComponentTest.jsx (ct_) ───────────────────────────────────────────
