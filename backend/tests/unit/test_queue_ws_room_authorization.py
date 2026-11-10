@@ -196,6 +196,30 @@ def test_invalid_signature_denied_before_database(monkeypatch):
     called.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("room", "day"),
+    [(None, "2026-11-11"), ("specialist_101", None), (17, "2026-11-11")],
+)
+def test_non_string_room_fields_are_denied_without_db(
+    monkeypatch, room, day
+):
+    connect = Mock(side_effect=AssertionError("unexpected auth DB access"))
+    monkeypatch.setattr("app.db.session.SessionLocal", connect)
+    assert not queue_ws._queue_room_permitted(_signed(), room, day)
+    connect.assert_not_called()
+
+
+def test_authorization_database_unavailable_denies(monkeypatch):
+    def unavailable():
+        raise RuntimeError("synthetic database unavailable")
+
+    monkeypatch.setattr("app.db.session.SessionLocal", unavailable)
+    assert not queue_ws._queue_room_permitted(
+        _signed(), "specialist_101", "2026-11-11"
+    )
+
+
+
 class _Socket:
     def __init__(self):
         self.headers = {"origin": "http://localhost:5173"}
