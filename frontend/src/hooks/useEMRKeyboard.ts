@@ -48,17 +48,40 @@ export function useEMRKeyboard({
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!enabled) return;
 
-    // QW-2 (UX audit): Ignore hotkeys when typing in input/textarea/select/contenteditable.
-    // The previous code had `void (target.id?.startsWith('emr-') || target.closest?.('.emr-section'))`
-    // which was a no-op — it computed the expression but discarded the result. The check never
-    // actually prevented hotkeys from firing inside form fields.
-    // Now we properly skip hotkeys when the user is typing in ANY input field, UNLESS the target
-    // is inside an EMR section (where Ctrl+S/Z/Enter should work for EMR autosave/undo/sign).
+    // EMRKEY-FE-001 (audit 3886, round 30): Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are
+    // the NATIVE per-field text-editing undo/redo inside any editable control.
+    // The document-wide reducer history must never hijack them: a doctor
+    // pressing Ctrl+Z in a diagnosis textarea expects the last typed word to
+    // disappear, not the whole EMR state to rewind to an earlier snapshot
+    // (which silently rolls back unrelated clinical fields). Whole-document
+    // undo/redo therefore stays available ONLY when the focus is outside
+    // editable controls — plus through the explicit toolbar buttons, which
+    // call onUndo/onRedo directly regardless of focus.
     const target = e.target as HTMLElement;
     const isTypingInInput = target.tagName === 'INPUT' ||
       target.tagName === 'TEXTAREA' ||
       target.tagName === 'SELECT' ||
       target.isContentEditable;
+
+    // Check for Ctrl/Cmd key
+    const isCtrl = e.ctrlKey || e.metaKey;
+
+    const isUndoKey = isCtrl && (e.key === 'z' || e.key === 'я') && !e.shiftKey; // 'я' for Russian keyboard
+    const isRedoKey = isCtrl && (((e.key === 'z' || e.key === 'я') && e.shiftKey) || e.key === 'y' || e.key === 'н'); // 'н' for Russian keyboard
+
+    if (isTypingInInput && (isUndoKey || isRedoKey)) {
+      // Native per-field undo/redo stays untouched inside text inputs —
+      // no preventDefault, no reducer dispatch, even inside .emr-section.
+      return;
+    }
+
+    // QW-2 (UX audit): Ignore hotkeys when typing in input/textarea/select/contenteditable.
+    // The previous code had `void (target.id?.startsWith('emr-') || target.closest?.('.emr-section'))`
+    // which was a no-op — it computed the expression but discarded the result. The check never
+    // actually prevented hotkeys from firing inside form fields.
+    // Now we properly skip hotkeys when the user is typing in ANY input field, UNLESS the target
+    // is inside an EMR section (where Ctrl+S/Enter still work for EMR autosave/sign; undo/redo
+    // keys are always left to the browser inside text inputs — EMRKEY-FE-001 above).
     const isInsideEMR = target.closest?.('.emr-section') ||
       target.id?.startsWith('emr-') ||
       target.closest?.('[data-emr-field]');
@@ -66,9 +89,6 @@ export function useEMRKeyboard({
     if (isTypingInInput && !isInsideEMR) {
       return; // Don't intercept hotkeys in non-EMR form fields
     }
-
-    // Check for Ctrl/Cmd key
-    const isCtrl = e.ctrlKey || e.metaKey;
 
     if (!isCtrl) return;
 
@@ -81,29 +101,29 @@ export function useEMRKeyboard({
       return;
     }
 
-    // Ctrl+Z: Undo
+    // Ctrl+Z: Undo — document-wide reducer history, only when the focus is
+    // OUTSIDE editable controls (handled above). EMRKEY-FE-001: preventDefault
+    // only when the action is actually available — an unavailable action must
+    // not swallow the event.
     if ((e.key === 'z' || e.key === 'я') && !e.shiftKey) {// 'я' for Russian keyboard
+      if (!canUndo || !onUndo) return;
       e.preventDefault();
-      if (canUndo && onUndo) {
-        onUndo();
-      }
+      onUndo();
       return;
     }
 
     // Ctrl+Shift+Z or Ctrl+Y: Redo
-    if ((e.key === 'z' || e.key === 'я') && e.shiftKey) {
+    if ((e.key === 'z' || e.key === 'я') && e.shiftKey) {// 'я' for Russian keyboard
+      if (!canRedo || !onRedo) return;
       e.preventDefault();
-      if (canRedo && onRedo) {
-        onRedo();
-      }
+      onRedo();
       return;
     }
 
     if (e.key === 'y' || e.key === 'н') {// 'н' for Russian keyboard
+      if (!canRedo || !onRedo) return;
       e.preventDefault();
-      if (canRedo && onRedo) {
-        onRedo();
-      }
+      onRedo();
       return;
     }
 
