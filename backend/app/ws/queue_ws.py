@@ -74,13 +74,13 @@ class WSManager:
             log.info("WSManager: sent message to websocket in room")
         except Exception as e:
             log.error("WSManager: error sending to websocket: %s", e)
-            # удалить «мертвый» сокет из всех комнат
-            for r, set_ws in list(self.rooms.items()):
-                if ws in set_ws:
-                    set_ws.discard(ws)
-                    if not set_ws:
-                        self.rooms.pop(r, None)
-                        log.info("WSManager: removed dead websocket from room %s", r)
+            # Use the canonical room lifecycle: direct set.discard()
+            # removed the last socket but skipped Redis unsubscribe,
+            # leaving a stale handler for future connections. A socket
+            # may belong to multiple rooms, so disconnect each one.
+            for room, sockets in list(self.rooms.items()):
+                if ws in sockets:
+                    self.disconnect(ws, room)
 
     def broadcast(self, room: str, data) -> None:
         log.info("WSManager: broadcasting to room %s", room)
