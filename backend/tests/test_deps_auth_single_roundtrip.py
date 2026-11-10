@@ -373,14 +373,18 @@ def test_notification_websocket_respects_username_subject_sentinel(
     assert asyncio.run(authenticate_websocket_token(token, db_session)) is None
 
 
-def test_notification_websocket_allows_unrevoked_username_subject(db_session, auth_user):
+def test_notification_websocket_allows_unrevoked_username_subject(
+    db_session, auth_user
+):
     token = create_access_token({"sub": auth_user.username})
     authenticated = asyncio.run(authenticate_websocket_token(token, db_session))
     assert authenticated is not None
     assert authenticated.id == auth_user.id
 
 
-def test_notification_websocket_denies_individually_revoked_username_jti(db_session, auth_user):
+def test_notification_websocket_denies_individually_revoked_username_jti(
+    db_session, auth_user
+):
     token = create_access_token({"sub": auth_user.username})
     payload = _decode(token)
     db_session.add(
