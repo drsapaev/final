@@ -90,7 +90,7 @@ def wire(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("request", "expected_limit"),
+    ("sync_request", "expected_limit"),
     [
         ({"type": "notification_sync"}, 50),
         ({"type": "notification_sync", "limit": None}, 50),
@@ -100,10 +100,10 @@ def wire(monkeypatch):
     ],
 )
 async def test_sync_accepts_rest_contract_limit_and_keeps_cursor(
-    monkeypatch, request, expected_limit
+    monkeypatch, sync_request, expected_limit
 ):
     user, db, manager, platform = wire(monkeypatch)
-    socket = FakeSocket([{**request, "cursor": "123"}])
+    socket = FakeSocket([{**sync_request, "cursor": "123"}])
 
     await endpoint.websocket_notifications(socket)
 
