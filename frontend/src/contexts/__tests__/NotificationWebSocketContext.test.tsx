@@ -268,7 +268,7 @@ describe('NotificationWebSocketContext', () => {
     expect(notification.title).toBe('Повторная диагностика');
     expect(source).toBe('ws');
   });
-}
+
   it.each([
     ['lab_results', 'Результат анализа', 'info'],
     ['new_appointment', 'Новая запись', 'info'],
