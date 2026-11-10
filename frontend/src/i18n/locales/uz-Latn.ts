@@ -8785,6 +8785,7 @@ const uzLatn = {
     ps_save: 'Retseptni saqlash',
     ps_print: 'Retseptni chop etish',
     emr_ai_no_complaints: 'AI-tavsiyalar uchun avval «Shikoyatlar» maydonini toʻldiring',
+    ai_popover_kb_hint: '↑↓ va Enter roʻyxat fokusida ishlaydi • Esc yopish',
     emr_ghost_unavailable: 'Ghost Mode imzolangan kartada mavjud emas.',
     emr_sign_title: 'EMK imzolash',
     emr_sign_message: 'EMK imzolansinmi?',

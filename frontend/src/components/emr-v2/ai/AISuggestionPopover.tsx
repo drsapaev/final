@@ -33,7 +33,9 @@ interface AISuggestionDto {
 interface AISuggestionPopoverProps {
     suggestions?: AISuggestionDto[];
     onApply?: (suggestion: AISuggestionDto) => void;
-    onDismiss?: (suggestionId: string | number | undefined) => void;
+    /** EMRAI-FE-003 (audit 3886 round 27): receives the full suggestion so the
+     * owner can key the dismissal even when the suggestion has no id. */
+    onDismiss?: (suggestion: AISuggestionDto) => void;
     disabled?: boolean;
     position?: 'top' | 'bottom' | 'right';
     isOpen?: boolean;
@@ -144,10 +146,36 @@ export function AISuggestionPopover({
     }, [isOpen, anchorRef, position]);
 
     // Keyboard navigation
+    // EMRAI-FE-002 (audit 3886 round 27): the document-level listener must be
+    // SCOPED. Enter/arrows originating from a text-editing element outside
+    // the popover (the anchored clinical textarea/input) are normal editing
+    // keys — they must keep their native behavior. When focus is inside the
+    // popover, the focused item's own keyboard handler owns Enter/Space
+    // activation, so the document listener must not double-apply.
     useEffect(() => {
         if (!isOpen || suggestions.length === 0) return;
 
         const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            const insidePopover = Boolean(target && popoverRef.current?.contains(target));
+            const isTextEditingTarget = Boolean(
+                target
+                && !insidePopover
+                && (target.tagName === 'TEXTAREA'
+                    || target.tagName === 'INPUT'
+                    || target.isContentEditable),
+            );
+
+            if (isTextEditingTarget && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) {
+                // The doctor is typing in their clinical text: arrows move the
+                // caret and Enter inserts a newline — never navigate/apply.
+                return;
+            }
+            if (insidePopover && e.key === 'Enter') {
+                // The focused item/button already handles activation itself.
+                return;
+            }
+
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 setSelectedIndex(prev => (prev + 1) % suggestions.length);
@@ -257,7 +285,7 @@ export function AISuggestionPopover({
                                     className="ai-popover__dismiss"
                                     onClick={(e: ReactMouseEvent<HTMLElement>) => {
                                         e.stopPropagation();
-                                        onDismiss?.(suggestion.id);
+                                        onDismiss?.(suggestion);
                                     }}
                                 >
                                     ×
@@ -270,7 +298,7 @@ export function AISuggestionPopover({
 
             {/* Footer */}
             <div className="ai-popover__footer">
-                <span>↑↓ выбрать • Enter применить • Esc закрыть</span>
+                <span>{t('misc.ai_popover_kb_hint')}</span>
             </div>
         </div>
     );
