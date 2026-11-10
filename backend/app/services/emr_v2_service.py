@@ -22,6 +22,7 @@ from app.models.visit import Visit  # noqa: F401
 from app.services.emr_contract import (  # noqa: F401
     extract_diagnosis_main,
     extract_icd10_code,
+    get_emr_text_field,
     normalize_emr_data,
 )
 
@@ -471,15 +472,17 @@ class EMRV2Service:
         Учит шаблоны только если есть ICD-10 код и лечение.
         """
         try:
-            icd10_code = data.get("icd10_code") or ""
-
-            # Лечение может быть в разных полях
-            treatment = data.get("treatment") or ""
-            if not treatment:
-                medications = data.get("medications", {})
-                treatment = (
-                    medications.get("text", "") if isinstance(medications, dict) else ""
-                )
+            # EMRLEARN-FE-001 (audit 3886): use the canonical extractors —
+            # the canonical EMR places the code at diagnosis.icd10_code
+            # (extract_icd10_code resolves nested-first with the legacy
+            # flat fallback), and the treatment text lives in treatment /
+            # medications.text / plan.treatment (get_emr_text_field's
+            # 'treatment' chain). Reading only the flat legacy keys
+            # silently skipped personalization for every canonical
+            # nested-ICD record — and could learn the text under a wrong
+            # coexisting flat code.
+            icd10_code = extract_icd10_code(data) or ""
+            treatment = get_emr_text_field(data, "treatment")
 
             if not icd10_code or not treatment:
                 return
