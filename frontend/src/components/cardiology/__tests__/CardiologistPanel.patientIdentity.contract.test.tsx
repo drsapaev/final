@@ -98,9 +98,16 @@ describe('CARDPAT-FE-003: late edit fetch cannot overwrite or reopen the edit mo
 });
 
 describe('CARDVISIT-FE-001: latest navigation intent wins the visit selection', () => {
-  it('every ensureCanonicalVisitId entry path captures and rechecks a navigation epoch', () => {
-    expect((panel.match(/\+\+navigationEpochRef\.current/g) ?? []).length).toBe(3);
-    expect((panel.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(3);
+  it('every async selection entry path captures or invalidates a navigation epoch (RETRO-3963-01)', () => {
+    // RETRO-3963-01 (review 3968) widened the contract: the three
+    // appointment paths plus handleDoctorQueueOpenVisit take a ticket
+    // (++), and the remaining authoritative selections invalidate
+    // outstanding tickets (+= 1) — search pick, queue start-visit,
+    // URL-appointment sync, completion deselect, explicit cancel and
+    // unmount. 12 post-await rechecks cover every async boundary.
+    expect((panel.match(/\+\+navigationEpochRef\.current/g) ?? []).length).toBe(4);
+    expect((panel.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(12);
+    expect((panel.match(/navigationEpochRef\.current \+= 1/g) ?? []).length).toBe(6);
   });
 
   it('row-click branch rechecks before touching selection/EMR/tab', () => {
