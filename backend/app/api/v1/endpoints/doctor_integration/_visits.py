@@ -103,12 +103,15 @@ def _find_recent_identical_schedule_next(
     discount_mode: str,
     notes: str | None,
     service_lines: list[tuple[int, int, float]],
+    confirmation_channel: str,
 ) -> Visit | None:
     """DOCSCHED-BE-001: недавний идентичный pending_confirmation визит.
 
     Совпадение полного intent'а: пациент, врач (или его отсутствие), дата,
-    время, каноничный discount_mode, заметки и все строки услуг с их
-    эффективными ценами. Возвращённый визит — основа для replay-ответа;
+    время, каноничный discount_mode, заметки, все строки услуг с их
+    эффективными ценами и канал подтверждения (RETRO-3960-01: канал входит
+    в равенство intent'а — replay честен только для повторной отправки ТОГО
+    ЖЕ запроса). Возвращённый визит — основа для replay-ответа;
     новый визит и токен подтверждения НЕ создаются.
     """
     cutoff = datetime.now(UTC) - timedelta(seconds=_SCHEDULE_NEXT_DEDUP_WINDOW_SECONDS)
@@ -120,6 +123,66 @@ def _find_recent_identical_schedule_next(
             Visit.status == "pending_confirmation",
             Visit.discount_mode == discount_mode,
             Visit.created_at >= cutoff,
+            # RETRO-3960-01: идентичный replay обязан запрашивать тот же
+            # канал подтверждения, что и сохранённый визит.
+            Visit.confirmation_channel == confirmation_channel,
+        )
+    )
+    if doctor_id is None:
+        query = query.filter(Visit.doctor_id.is_(None))
+    else:
+        query = query.filter(Visit.doctor_id == doctor_id)
+    candidates = query.order_by(Visit.id.desc()).all()
+    for candidate in candidates:
+        if (candidate.visit_time or None) != (visit_time or None):
+            continue
+        if (candidate.notes or None) != (notes or None):
+            continue
+        stored_lines = (
+            db.query(VisitService)
+            .filter(VisitService.visit_id == candidate.id)
+            .all()
+        )
+        if _schedule_next_service_lines_match(stored_lines, service_lines):
+            return candidate
+    return None
+
+
+def _find_recent_channel_mismatch_schedule_next(
+    db: Session,
+    *,
+    patient_id: int,
+    doctor_id: int | None,
+    visit_date: date,
+    visit_time: str | None,
+    discount_mode: str,
+    notes: str | None,
+    service_lines: list[tuple[int, int, float]],
+    confirmation_channel: str,
+) -> Visit | None:
+    """RETRO-3960-01: тот же intent, но с ДРУГИМ каналом подтверждения.
+
+    Возвращает недавний pending_confirmation визит, у которого совпадают
+    пациент/врач/дата/время/скидка/заметки/услуги, но сохранённый
+    confirmation_channel отличается от запрошенного. Вызов обязан обработать
+    такой визит ЯВНО (правдивый конфликт), а не молча дедуплицировать его
+    с подменой канала в ответе: сохранённый визит остаётся на исходном
+    канале, приглашение на новый канал не отправлялось, и ответ не имеет
+    права заявлять новый канал.
+    """
+    cutoff = datetime.now(UTC) - timedelta(seconds=_SCHEDULE_NEXT_DEDUP_WINDOW_SECONDS)
+    query = (
+        db.query(Visit)
+        .filter(
+            Visit.patient_id == patient_id,
+            Visit.visit_date == visit_date,
+            Visit.status == "pending_confirmation",
+            Visit.discount_mode == discount_mode,
+            Visit.created_at >= cutoff,
+            # SQL NULL-семантика: визиты без канала (легаси) не попадают
+            # ни в идентичный replay, ни в mismatch — для них поведение
+            # не меняется.
+            Visit.confirmation_channel != confirmation_channel,
         )
     )
     if doctor_id is None:
@@ -378,7 +441,41 @@ async def schedule_next_visit(
             discount_mode=normalized_discount_mode,
             notes=request.notes,
             service_lines=intended_lines,
+            confirmation_channel=request.confirmation_channel,
         )
+        # RETRO-3960-01 (post-merge review 3968): the same terms but a
+        # DIFFERENT confirmation channel is NOT an identical replay. It must
+        # never be silently deduplicated into a response that claims the
+        # requested channel: the persisted visit keeps the ORIGINAL channel
+        # and no invitation was sent to the new one. Handle it explicitly
+        # with a truthful conflict instead.
+        channel_mismatch_visit = (
+            None
+            if replay_visit is not None
+            else _find_recent_channel_mismatch_schedule_next(
+                db,
+                patient_id=request.patient_id,
+                doctor_id=doctor.id if doctor else None,
+                visit_date=request.visit_date,
+                visit_time=request.visit_time,
+                discount_mode=normalized_discount_mode,
+                notes=request.notes,
+                service_lines=intended_lines,
+                confirmation_channel=request.confirmation_channel,
+            )
+        )
+        if channel_mismatch_visit is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Недавняя заявка на этот же визит уже ожидает подтверждения "
+                    f"по каналу «{channel_mismatch_visit.confirmation_channel}». "
+                    f"Запрошенный канал «{request.confirmation_channel}» не применён: "
+                    "визит сохранён на исходном канале и приглашение на новый канал "
+                    "не отправлялось. Отмените существующую заявку или повторите "
+                    "после закрытия окна дедупликации."
+                ),
+            )
         if replay_visit is not None:
             stored_lines = (
                 db.query(VisitService)

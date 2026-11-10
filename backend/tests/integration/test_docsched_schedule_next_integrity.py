@@ -706,3 +706,131 @@ class TestDOCSCHEDServiceInputValidation:
         assert math.isclose(
             response.json()["confirmation"]["total_amount"], 0.0
         )
+
+
+@pytest.mark.integration
+@pytest.mark.confirmation
+class TestRETRO396601ChannelTruthfulness:
+    """RETRO-3960-01 (post-merge review 3968): schedule-next deduplication
+    игнорировал канал подтверждения — повторная заявка в окне дедупликации
+    с ДРУГИМ каналом молча возвращала success-ответ, заявлявший
+    ``confirmation.channel = запрошенный канал``, при том что сохранённый
+    визит оставался на исходном канале и приглашение на новый канал не
+    отправлялось. Теперь канал входит в равенство intent'а, а смена канала
+    в окне — явный правдивый конфликт (409)."""
+
+    def _spy_invitation(self, monkeypatch) -> list[tuple[int, str]]:
+        calls: list[tuple[int, str]] = []
+
+        async def _spy(self, db, visit_id, channel="auto"):
+            calls.append((visit_id, channel))
+            return {"success": True, "channel": channel}
+
+        monkeypatch.setattr(
+            NotificationService, "send_visit_confirmation_invitation", _spy
+        )
+        return calls
+
+    def test_channel_change_in_dedup_window_is_truthful_conflict(
+        self,
+        client,
+        db_session,
+        cardio_auth_headers,
+        test_doctor,
+        test_service,
+        monkeypatch,
+    ):
+        """phone → telegram в окне дедупликации: 409, один визит, исходный
+        канал сохранён, приглашение на telegram НЕ отправлено, ни один
+        успешный ответ не заявляет telegram."""
+        patient = _make_patient(db_session)
+        _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
+        calls = self._spy_invitation(monkeypatch)
+        visit_date = _clinic_today(db_session) + timedelta(days=1)
+        first_payload = _schedule_payload(
+            patient, test_service, visit_date=visit_date,
+            confirmation_channel="phone",
+        )
+        changed_payload = _schedule_payload(
+            patient, test_service, visit_date=visit_date,
+            confirmation_channel="telegram",
+        )
+
+        first = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=first_payload,
+            headers=cardio_auth_headers,
+        )
+        assert first.status_code == 200, first.text
+        first_data = first.json()
+        assert first_data["confirmation"]["channel"] == "phone"
+
+        second = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=changed_payload,
+            headers=cardio_auth_headers,
+        )
+        # Правдивый конфликт вместо молчаливой дедупликации.
+        assert second.status_code == 409, second.text
+        detail = second.json().get("detail", "")
+        assert "phone" in detail, "конфликт не называет сохранённый канал"
+        assert "telegram" in detail, "конфликт не называет запрошенный канал"
+
+        # Ровно один pending-визит, канал — исходный.
+        pending = _pending_visits(db_session, patient_id=patient.id)
+        assert len(pending) == 1, "смена канала создала второй визит"
+        assert pending[0].confirmation_channel == "phone", (
+            "визит перезаписан новым каналом без отправки"
+        )
+
+        # Ни один успешный ответ не заявляет telegram; приглашение на
+        # telegram не отправлялось.
+        assert all(
+            resp.get("confirmation", {}).get("channel") != "telegram"
+            for resp in (first_data,)
+        )
+        assert [c[1] for c in calls] == ["phone"], (
+            f"приглашения отправлены не только на исходный канал: {calls}"
+        )
+
+    def test_same_channel_replay_still_returns_original_visit(
+        self,
+        client,
+        db_session,
+        cardio_auth_headers,
+        test_doctor,
+        test_service,
+        monkeypatch,
+    ):
+        """Контроль: идентичный повтор (тот же канал) в окне остаётся честным
+        replay — response.channel совпадает с сохранённым визитом."""
+        self._spy_invitation(monkeypatch)
+        patient = _make_patient(db_session)
+        _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
+        visit_date = _clinic_today(db_session) + timedelta(days=1)
+        payload = _schedule_payload(
+            patient, test_service, visit_date=visit_date,
+            confirmation_channel="telegram",
+        )
+
+        first = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=payload,
+            headers=cardio_auth_headers,
+        )
+        assert first.status_code == 200, first.text
+
+        second = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=payload,
+            headers=cardio_auth_headers,
+        )
+        assert second.status_code == 200, second.text
+        second_data = second.json()
+        assert second_data.get("idempotent_replay") is True
+        assert second_data["visit_id"] == first.json()["visit_id"]
+        # Ответ обязан называть СОХРАНЁННЫЙ канал.
+        assert second_data["confirmation"]["channel"] == "telegram"
+        pending = _pending_visits(db_session, patient_id=patient.id)
+        assert len(pending) == 1
+        assert pending[0].confirmation_channel == "telegram"
