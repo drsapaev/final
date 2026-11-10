@@ -122,6 +122,22 @@ export function useDoctorSectionTemplates({
     const canUseCache = cacheOwner !== null;
     const cacheKey = `${cacheOwner ?? 'anonymous'}:${section || ''}:${icd10Code || ''}:${limit}`;
 
+    // RETRO-3953-01 (dossier PR 3958): the rendered list belongs to the
+    // PREVIOUS principal once the authenticated owner changes inside a
+    // still-mounted hook. The module cache is already owner-scoped, but the
+    // per-hook `templates` state was initialized once and survived an owner
+    // swap, so doctor B could see doctor A's personal phrases until B's GET
+    // resolved (or failed). The render-time reset drops the stale list
+    // SYNCHRONOUSLY, before the new principal's fetch can paint anything;
+    // async completions stay gated by the request epoch and an owner check
+    // captured at request start.
+    const [renderedOwner, setRenderedOwner] = useState(cacheOwner);
+    if (renderedOwner !== cacheOwner) {
+        setRenderedOwner(cacheOwner);
+        setTemplates([]);
+        setError(null);
+    }
+
     /**
      * Subscribe THIS hook instance to a shared in-flight promise so a second
      * mounted hook receives the fetched result too (EMRTMPL-FE-002).
@@ -151,6 +167,10 @@ export function useDoctorSectionTemplates({
         if (!section) return;
 
         const epoch = ++requestEpochRef.current;
+        // RETRO-3953-01: the owner whose authorization produced this request.
+        // A response that completes after another principal took over must not
+        // park its data in the (already cleared) module cache.
+        const ownerAtRequest = sectionTemplateCacheOwner;
         const cachedEntry = canUseCache ? sectionTemplateCache.get(cacheKey) : undefined;
         if (!forceRefresh) {
             if (cachedEntry?.data) {
@@ -188,7 +208,9 @@ export function useDoctorSectionTemplates({
                 );
 
                 const templatesData = (response.data as Record<string, unknown>).templates || [];
-                if (canUseCache) {
+                // RETRO-3953-01: an owner-swapped request may not repopulate
+                // the cache with the previous principal's data.
+                if (canUseCache && sectionTemplateCacheOwner === ownerAtRequest) {
                     sectionTemplateCache.set(cacheKey, {
                         data: templatesData,
                         promise: null,
