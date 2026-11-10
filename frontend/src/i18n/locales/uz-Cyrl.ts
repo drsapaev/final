@@ -8796,6 +8796,7 @@ const uzCyrl = {
     ps_save: 'Сохранить рецепт',
     ps_print: 'Печать рецепта',
     emr_ai_no_complaints: 'Для AI-подсказок сначала заполните поле «Жалобы»',
+    ai_popover_kb_hint: '↑↓ ва Enter рўйхат фокусида ишлайди • Esc ёпиш',
     emr_ghost_unavailable: 'Ghost Mode недоступен в подписанной карте.',
     emr_sign_title: 'Подписание ЭМК',
     emr_sign_message: 'Подписать ЭМК?',
