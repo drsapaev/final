@@ -18,7 +18,7 @@
  * - Explicit commit required (Tab/Enter)
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { SmartAssistButton } from '../ai/SmartAssistButton';
 import { AISuggestionPopover } from '../ai/AISuggestionPopover';
 import './EMRSmartFieldV2.css';
@@ -115,15 +115,37 @@ export function EMRSmartFieldV2({
     showAIButton = true,
     experimentalGhostMode = false,
     onTelemetry,
+    // EMRSMART-FE-001 (audit 3886 round 27): label/required were declared
+    // but never destructured — the editable field had no accessible name.
+    label,
+    required,
 }: EMRSmartFieldV2Props) {
     const [isFocused, setIsFocused] = useState(false);
     const [showPopover, setShowPopover] = useState(false);
     const [ghostText, setGhostText] = useState('');
+    // EMRAI-FE-003 (audit 3886 round 27): locally rejected suggestions and
+    // the batch the user explicitly closed must not reappear on the next
+    // render while the field stays focused.
+    const [dismissedKeys, setDismissedKeys] = useState<string[]>([]);
+    const closedAgainstRef = useRef<unknown[] | null>(null);
     const fieldRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
+    // Visible suggestions = current batch minus locally rejected ones
+    const visibleSuggestions = useMemo(() => {
+        const keyOf = (s: EMRSmartFieldV2Suggestion) =>
+            (s.id !== undefined ? `id:${String(s.id)}` : `content:${String(s.content ?? s.text ?? '')}`);
+        const list = suggestions as EMRSmartFieldV2Suggestion[];
+        return list.filter(s => !dismissedKeys.includes(keyOf(s)));
+    }, [suggestions, dismissedKeys]);
+
     // Has pending suggestions
-    const hasSuggestions = suggestions.length > 0;
+    const hasSuggestions = visibleSuggestions.length > 0;
+
+    // A brand-new batch resets per-batch dismissal state
+    useEffect(() => {
+        setDismissedKeys([]);
+    }, [suggestions]);
 
     // Handle value change
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -183,28 +205,54 @@ export function EMRSmartFieldV2({
         if (!experimentalGhostMode) {
             onTelemetry?.({ type: 'ai_popover.accepted', payload: { suggestionId: suggestion.id, source: suggestion.source } });
         }
+        // EMRAI-FE-003: the applied batch is finished — do not auto-reopen it
+        closedAgainstRef.current = suggestions;
         setShowPopover(false);
-    }, [value, onChange, onApplySuggestion, experimentalGhostMode, onTelemetry]);
+    }, [value, onChange, onApplySuggestion, experimentalGhostMode, onTelemetry, suggestions]);
 
     // Handle dismiss
-    const handleDismiss = useCallback((suggestionId: string | number | undefined) => {
-        onTelemetry?.({ type: 'ai.dismissed', payload: { suggestionId } });
-        onDismissSuggestion?.(suggestionId);
-        if (suggestions.length <= 1) {
+    const handleDismiss = useCallback((suggestion: EMRSmartFieldV2Suggestion) => {
+        const key = suggestion.id !== undefined
+            ? `id:${String(suggestion.id)}`
+            : `content:${String(suggestion.content ?? suggestion.text ?? '')}`;
+        onTelemetry?.({ type: 'ai.dismissed', payload: { suggestionId: suggestion.id } });
+        onDismissSuggestion?.(suggestion);
+        // EMRAI-FE-003: remove the rejected suggestion locally so it
+        // disappears immediately and cannot re-render while focused.
+        setDismissedKeys(prev => [...prev, key]);
+        const remaining = visibleSuggestions.filter(s => {
+            const k = s.id !== undefined ? `id:${String(s.id)}` : `content:${String(s.content ?? s.text ?? '')}`;
+            return k !== key;
+        }).length;
+        if (remaining === 0) {
+            closedAgainstRef.current = suggestions;
             setShowPopover(false);
         }
-    }, [onDismissSuggestion, suggestions.length, onTelemetry]);
+    }, [onDismissSuggestion, onTelemetry, visibleSuggestions, suggestions]);
+
+    // EMRAI-FE-003: explicit user close (header ×, Esc, click outside) —
+    // remember WHICH batch was closed so the auto-open effect does not
+    // resurrect the same suggestions on the next render. A fresh batch or
+    // an explicit AI-button click still reopens.
+    const handlePopoverClose = useCallback(() => {
+        closedAgainstRef.current = suggestions;
+        setShowPopover(false);
+    }, [suggestions]);
 
     // Show popover when suggestions arrive and field is focused
     useEffect(() => {
         if (hasSuggestions && isFocused) {
             if (!showPopover && !experimentalGhostMode) {
-                // Auto-show popover when new suggestions arrive (standard mode)
-                setShowPopover(true);
+                // Auto-show popover when new suggestions arrive (standard mode).
+                // EMRAI-FE-003: never resurrect the batch the user explicitly
+                // closed or finished applying.
+                if (closedAgainstRef.current !== suggestions) {
+                    setShowPopover(true);
+                }
             }
 
             // Ghost Text Logic
-            const firstSuggestion = suggestions[0] as EMRSmartFieldV2Suggestion | undefined;
+            const firstSuggestion = visibleSuggestions[0] as EMRSmartFieldV2Suggestion | undefined;
             if (experimentalGhostMode && firstSuggestion?.content && value) {
                 const topSuggestion = String(firstSuggestion.content);
                 if (topSuggestion.startsWith(value) && topSuggestion.length > value.length) {
@@ -218,23 +266,23 @@ export function EMRSmartFieldV2({
         } else {
             setGhostText('');
         }
-    }, [hasSuggestions, isFocused, showPopover, experimentalGhostMode, suggestions, value]);
+    }, [hasSuggestions, isFocused, showPopover, experimentalGhostMode, suggestions, visibleSuggestions, value]);
 
     // Keyboard: Tab to accept first suggestion
     useEffect(() => {
-        if (!showPopover || suggestions.length === 0) return;
+        if (!showPopover || visibleSuggestions.length === 0) return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Tab' && !e.shiftKey && document.activeElement === fieldRef.current) {
                 e.preventDefault();
-                const first = suggestions[0] as EMRSmartFieldV2Suggestion;
+                const first = visibleSuggestions[0] as EMRSmartFieldV2Suggestion;
                 handleApply(first);
             }
         };
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [showPopover, suggestions, handleApply]);
+    }, [showPopover, visibleSuggestions, handleApply]);
 
     const InputComponent = multiline ? 'textarea' : 'input';
 
@@ -256,6 +304,8 @@ export function EMRSmartFieldV2({
                     placeholder={placeholder}
                     disabled={disabled}
                     rows={multiline ? rows : undefined}
+                    aria-label={label || undefined}
+                    aria-required={required ? true : undefined}
                 />
 
                 {/* Ghost Text Overlay */}
@@ -284,12 +334,12 @@ export function EMRSmartFieldV2({
             {/* Suggestion Popover */}
             {showPopover && (
                 <AISuggestionPopover
-                    suggestions={suggestions as unknown as never[]}
+                    suggestions={visibleSuggestions as unknown as never[]}
                     onApply={handleApply}
                     onDismiss={handleDismiss}
                     disabled={disabled}
                     isOpen={showPopover}
-                    onClose={() => setShowPopover(false)}
+                    onClose={handlePopoverClose}
                     position="bottom"
                     anchorRef={containerRef}
                 />

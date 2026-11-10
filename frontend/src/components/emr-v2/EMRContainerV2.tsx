@@ -31,7 +31,7 @@ import { useAppData } from '../../contexts/AppDataContext';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
-import { readSavedEMRForCompletion } from './emrCompletion';
+import { readSavedEMRForCompletion, emrTextValue, emrTreatmentText } from './emrCompletion';
 // Analytics is handled via handleTelemetry callback
 
 // Import modular sections
@@ -125,16 +125,14 @@ interface EMRDataShape {
     [key: string]: unknown;
 }
 
-/** Normalize legacy field values that may be a string OR an object with `.text`. */
-function fieldText(value: unknown): string {
-    if (typeof value === 'string') return value;
-    if (value && typeof value === 'object' && 'text' in value) {
-        const t = (value as { text?: unknown }).text;
-        return typeof t === 'string' ? t : '';
-    }
-    return '';
-}
-
+/**
+ * EMRPROGRESS-FE-001 / EMRAI-FE-001 (audit 3886, round 27): field values can
+ * be a plain string OR a structured object (the canonical new-record draft
+ * seeds `diagnosis: {main, icd10_code, secondary[]}`). Every consumer that
+ * needs the clinical TEXT of a field must go through the canonical
+ * `emrTextValue` selector (unit-tested in emrCompletion.test.ts) instead of
+ * raw truthiness or string methods on a union type.
+ */
 type PersistAndSignResult = 'cancelled' | 'save_failed' | 'sign_failed' | 'sign_attempted';
 
 function isRejectedEMRWrite(value: unknown): boolean {
@@ -442,8 +440,11 @@ export function EMRContainerV2({
 
     const buildAiCacheKey = useCallback((fieldName: string) => {
         const specialty = data?.specialty || 'general';
-        const complaints = (data?.complaints || '').trim().toLowerCase();
-        const diagnosis = (data?.diagnosis || '').trim().toLowerCase();
+        // EMRAI-FE-001 (audit 3886 round 27): complaints/diagnosis may be the
+        // structured diagnosis OBJECT — .trim() on it threw a TypeError before
+        // the request even started. Normalize through the canonical selector.
+        const complaints = emrTextValue(data?.complaints).trim().toLowerCase();
+        const diagnosis = emrTextValue(data?.diagnosis).trim().toLowerCase();
         const patientAge = typeof data?.patient_age === 'number' ? data?.patient_age : String(data?.patient_age ?? '');
         const patientGender = typeof data?.patient_gender === 'string' ? data?.patient_gender : String(data?.patient_gender ?? '');
         return cacheService.generateKey(
@@ -478,11 +479,14 @@ export function EMRContainerV2({
 
     // Handle AI Request - calls MCP API for suggestions
     const handleRequestAI = useCallback(async (fieldName: string) => {
+        // EMRAI-FE-001: same normalization applies to the debug preview —
+        // `substring` on an object value would throw the same way.
+        const complaintsPreviewText = emrTextValue(data?.complaints);
         logger.info('[EMR AI Request]', {
             fieldName,
             specialty: data?.specialty || 'general',
-            complaintsLength: data?.complaints?.length || 0,
-            complaintsPreview: data?.complaints?.substring(0, 50) || '(empty)'
+            complaintsLength: complaintsPreviewText.length,
+            complaintsPreview: complaintsPreviewText.substring(0, 50) || '(empty)'
         });
         handleTelemetry({ type: 'ai.requested', payload: { fieldName } });
 
@@ -530,10 +534,15 @@ export function EMRContainerV2({
 
             switch (fieldName) {
                 case 'diagnosis': {
+                    // EMRAI-FE-001 (audit 3886 round 27): send the normalized
+                    // diagnosis TEXT — the structured object must never reach
+                    // the request body, and an absent main must be ''.
+                    const diagnosisText = emrTextValue(data?.diagnosis);
+                    const complaintsText = emrTextValue(data?.complaints);
                     // Use ICD-10 suggestions
                     result = await mcpAPI.suggestICD10({
-                        symptoms: data?.complaints ? [data?.complaints] : [],
-                        diagnosis: data?.diagnosis || '',
+                        symptoms: complaintsText ? [complaintsText] : [],
+                        diagnosis: diagnosisText,
                         specialty,
                         maxSuggestions: 5
                     }, requestOptions) as AiResult;
@@ -573,11 +582,14 @@ export function EMRContainerV2({
                 }
 
                 case 'examination':
-                case 'treatment':
+                case 'treatment': {
                     // Use complaint analysis for general suggestions
-                    if (data?.complaints) {
+                    // EMRAI-FE-001: normalize before the request — an object
+                    // complaints value would be sent as raw JSON otherwise.
+                    const complaintsText = emrTextValue(data?.complaints);
+                    if (complaintsText) {
                         result = await mcpAPI.analyzeComplaint({
-                            complaint: data?.complaints,
+                            complaint: complaintsText,
                             patientAge: data?.patient_age,
                             patientGender: data?.patient_gender
                         }, requestOptions) as AiResult;
@@ -642,6 +654,7 @@ export function EMRContainerV2({
                         logger.info('[EMR AI] No complaints to analyze - showing info message');
                     }
                     break;
+                }
 
                 default:
                     logger.info('[EMR AI] No AI handler for field:', fieldName);
@@ -1018,13 +1031,20 @@ export function EMRContainerV2({
                     {/* UX Audit Doctor M-48: progress indicator for EMR sections. */}
                     {(() => {
                         const sections = [
-                            { name: t('misc.emr_sec_complaints'), filled: !!(data?.complaints || fieldText(data?.complaints)) },
-                            { name: t('misc.emr_sec_anamnesis'), filled: !!(data?.anamnesis_morbi || fieldText(data?.anamnesis_morbi)) },
-                            { name: t('misc.emr_sec_examination'), filled: !!(data?.examination || fieldText(data?.examination)) },
-                            { name: t('misc.emr_sec_diagnosis'), filled: !!(data?.diagnosis || fieldText(data?.diagnosis)) },
-                            { name: t('misc.emr_sec_treatment'), filled: !!(data?.treatment || fieldText(data?.treatment)) },
-                            { name: t('misc.emr_sec_recommendations'), filled: !!(data?.recommendations || fieldText(data?.recommendations)) },
-                            { name: t('misc.emr_sec_notes'), filled: !!(data?.notes || fieldText(data?.notes)) },
+                            { name: t('misc.emr_sec_complaints'), filled: emrTextValue(data?.complaints).trim() !== '' },
+                            { name: t('misc.emr_sec_anamnesis'), filled: emrTextValue(data?.anamnesis_morbi).trim() !== '' },
+                            { name: t('misc.emr_sec_examination'), filled: emrTextValue(data?.examination).trim() !== '' },
+                            { name: t('misc.emr_sec_diagnosis'), filled: emrTextValue(data?.diagnosis).trim() !== '' },
+                            // EMRTREAT-FE-001 (audit 3886): the treatment row counts
+                            // the CANONICAL treatment text (treatment →
+                            // medications.text → plan.treatment, mirroring the
+                            // backend's get_emr_text_field chain) — the visible
+                            // TreatmentSection editor is bound to
+                            // medications.text, so a genuine treatment plan typed
+                            // there must mark «Лечение» as filled.
+                            { name: t('misc.emr_sec_treatment'), filled: emrTreatmentText(data) !== '' },
+                            { name: t('misc.emr_sec_recommendations'), filled: emrTextValue(data?.recommendations).trim() !== '' },
+                            { name: t('misc.emr_sec_notes'), filled: emrTextValue(data?.notes).trim() !== '' },
                         ];
                         const filledCount = sections.filter(s => s.filled).length;
                         return (

@@ -8789,6 +8789,7 @@ const en = {
     ps_save: 'Сохранить рецепт',
     ps_print: 'Печать рецепта',
     emr_ai_no_complaints: 'Для AI-подсказок сначала заполните поле «Жалобы»',
+    ai_popover_kb_hint: '↑↓ and Enter act when the list is focused • Esc closes',
     emr_ghost_unavailable: 'Ghost Mode недоступен в подписанной карте.',
     emr_sign_title: 'Sign electronic medical record',
     emr_sign_message: 'Sign this EMR?',
@@ -8914,6 +8915,7 @@ const en = {
     aia_fallback_provider_notice: 'Ответ получен через резервный AI-провайдер {provider}. Используйте его только как черновик и проверьте настройки внешнего AI перед клиническим применением.',
     aia_analyzing_via: 'Анализ через {provider} AI...',
     aia_click_refresh: 'Нажмите Обновить для запуска AI анализа',
+    aia_no_context_notice: 'AI analysis is unavailable without clinical context: open a patient record to use the assistant with its diagnosis, complaints and results.',
     aia_retry_attempt: 'Попытка {count}. Попробуйте сменить AI провайдер или повторить запрос.',
 
     // ─── ComponentTest.jsx (ct_) ───────────────────────────────────────────
