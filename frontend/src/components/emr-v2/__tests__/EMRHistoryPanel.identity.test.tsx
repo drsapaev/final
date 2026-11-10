@@ -75,7 +75,13 @@ describe('EMRHIST-FE-001: canonical DTO keys created_at/created_by', () => {
     await waitFor(() => expect(getMock).toHaveBeenCalledWith('/v2/emr/5/history'));
 
     // Pre-fix: formatDate(revision.edited_at) rendered «—» and no author.
-    const dateText = screen.getByText(/2026/).textContent ?? '';
+    // Flake stabilization (3 CI strikes on 2026-11-10: main ef13052eb,
+    // #3971 head d87ad687, main 4f42f84f — all passed on re-run with
+    // identical trees): the waitFor above only confirms the FETCH CALL,
+    // not that the mocked response has resolved and React has committed
+    // the rows to the DOM. A synchronous getByText races that commit.
+    // findByText waits for the first date render.
+    const dateText = (await screen.findByText(/2026/)).textContent ?? '';
     expect(dateText).not.toBe('—');
     expect(dateText).toMatch(/\d{2}\.\d{2}\.\d{4}/);
     expect(screen.getByText(/#17/)).toBeInTheDocument();
