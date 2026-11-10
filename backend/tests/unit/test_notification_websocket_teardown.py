@@ -110,7 +110,10 @@ def wire_endpoint(
     [
         (None, None),
         ("[]", status.WS_1011_INTERNAL_ERROR),
-        ('{"type":"notification_sync","limit":"invalid"}', status.WS_1011_INTERNAL_ERROR),
+        (
+            '{"type":"notification_sync","limit":"invalid"}',
+            status.WS_1011_INTERNAL_ERROR,
+        ),
     ],
 )
 async def test_registered_socket_removed_on_disconnect_and_unexpected_errors(
@@ -165,6 +168,22 @@ async def test_cancelled_receive_still_disconnects_and_closes_session(monkeypatc
 
     assert manager.disconnect_calls == [(socket, user.id)]
     assert manager.active == {}
+    assert db.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_disconnect_failure_still_closes_database_session(monkeypatch):
+    db, manager, _user = wire_endpoint(monkeypatch)
+    socket = FakeSocket()
+
+    def failing_disconnect(_socket, _user_id):
+        raise RuntimeError("synthetic unsubscribe failure")
+
+    manager.disconnect = failing_disconnect
+
+    with pytest.raises(RuntimeError, match="synthetic unsubscribe failure"):
+        await endpoint.websocket_notifications(socket)
+
     assert db.close_calls == 1
 
 
