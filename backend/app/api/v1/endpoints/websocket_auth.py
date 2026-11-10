@@ -76,23 +76,27 @@ async def authenticate_websocket_token(
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        # AUTH-REAUDIT-28 P1: check token blacklist (jti + sentinel)
-        jti = payload.get("jti")
-        sub = payload.get("sub")
-        token_user_id = None
-        if isinstance(sub, str) and sub.isdigit():
-            token_user_id = int(sub)
-        elif isinstance(sub, int):
-            token_user_id = sub
-        if jti:
-            from app.services.token_blacklist_service import TokenBlacklistService
-            if TokenBlacklistService.is_token_blacklisted(db, jti, user_id=token_user_id):
-                logger.warning("WebSocket auth rejected: token blacklisted jti=%s", jti)
-                return None
     except JWTError:
         return None
 
-    return _resolve_websocket_user(payload, db)
+    user = _resolve_websocket_user(payload, db)
+    if user is None:
+        return None
+
+    # The subject may be a username instead of a numeric ID. Resolve the
+    # principal first, then check both the token JTI and the all-user
+    # revocation sentinel against the stable database user ID.
+    from app.services.token_blacklist_service import TokenBlacklistService
+
+    jti = payload.get("jti")
+    lookup_jti = jti if isinstance(jti, str) else ""
+    if TokenBlacklistService.is_token_blacklisted(db, lookup_jti, user_id=user.id):
+        logger.warning(
+            "WebSocket auth rejected: token revoked for user_id=%s", user.id
+        )
+        return None
+
+    return user
 
 
 # ===================== АУТЕНТИФИЦИРОВАННЫЕ WEBSOCKET ENDPOINTS =====================
