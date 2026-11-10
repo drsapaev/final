@@ -68562,7 +68562,7 @@
           "queue-position"
         ],
         "summary": "Get Queue Positions Stats",
-        "description": "Получить статистику позиций в очереди\n\nВозвращает список всех записей с их позициями.",
+        "description": "Получить статистику позиций в очереди\n\nВозвращает список всех записей с их позициями.\n\nДоступно: Admin, Registrar, Doctor (и SuperAdmin).",
         "operationId": "get_queue_positions_stats_api_v1_queue_position_stats_queue__queue_id__get",
         "security": [
           {
