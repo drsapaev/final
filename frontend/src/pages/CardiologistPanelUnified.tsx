@@ -40,6 +40,7 @@ import { useTranslation } from '../i18n/useTranslation';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import tokenManager from '../utils/tokenManager';
 import { countAppointmentsByStatuses, SPECIALTY_KEYS, getAllPatientServices, makeEnsureCanonicalVisitId } from '../utils/doctorPanelShared';
+import { openPatientFilePreview } from '../utils/patientFilePreview';
 import { selectEntriesForSpecialist } from '../utils/cardiologyQueue';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 import { emrTextValue } from '../components/emr-v2/emrCompletion';
@@ -1835,31 +1836,28 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
   };
 
-  const previewPatientFile = async (file: Record<string, unknown> | null | undefined) => {
+  const previewPatientFile = (file: Record<string, unknown> | null | undefined): void => {
     if (!file?.id) {
       return;
     }
 
-    try {
-      const token = tokenManager.getAccessToken();
-      const response = await fetch(`${API_V1_BASE}/files/${file.id}/preview`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        throw new Error(tI18n('cardio.cardio_panel_preview_unavailable_short'));
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
-      const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!previewWindow) {
-        throw new Error(tI18n('cardio.cardio_panel_preview_blocked_short'));
-      }
-    } catch (error: unknown) {
-      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_open_file_failed')));
-    }
+    // CARDHIST-FE-001 (audit 3886): delegate to the honest preview
+    // transport — the browsing context is reserved synchronously inside
+    // the click gesture, opener isolation is preserved by severing the
+    // opener before navigation, and a successful open is never reported
+    // as blocked (the old code treated the `noopener` null return —
+    // which happens on SUCCESS — as a popup block).
+    void openPatientFilePreview({
+      apiBase: API_V1_BASE,
+      fileId: file.id as string | number,
+      getAccessToken: () => tokenManager.getAccessToken(),
+      onNotifyError: (message) => notify.error(message),
+      messages: {
+        previewUnavailable: tI18n('cardio.cardio_panel_preview_unavailable_short'),
+        previewBlocked: tI18n('cardio.cardio_panel_preview_blocked_short'),
+        openFailed: tI18n('cardio.cardio_panel_open_file_failed'),
+      },
+    });
   };
 
   const historyEntries = [
