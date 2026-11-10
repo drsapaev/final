@@ -6,16 +6,21 @@
  * steal a NEWER patient selection made through any other authoritative
  * entry path while the appointment lookup or EMR fetch is still pending:
  *
- *  - handlePatientSearchPick, handleDoctorQueueStartVisit, the URL-derived
- *    selections, completion deselect, the explicit cancel and unmount are
- *    authoritative selection changes: each invalidates outstanding
- *    navigation tickets.
+ *  - handlePatientSearchPick, handleDoctorQueueStartVisit, completion
+ *    deselect, the explicit cancel and unmount are authoritative selection
+ *    changes: each invalidates outstanding navigation tickets.
  *  - handleDoctorQueueOpenVisit and the URL hydration capture a ticket and
- *    recheck after every await.
- *  - loadEMR rechecks its ticket after each await, so a late EMR payload
- *    cannot be displayed under a newer patient selection.
+ *    recheck after every await; the hydration additionally bails when the
+ *    live committed selection is a DIFFERENT patient than the deep link
+ *    (independent re-review: a shared ticket let the URL merge produce a
+ *    hybrid record over a newer human selection).
+ *  - loadEMR rechecks its ticket after each await (including the catch
+ *    block), so a late EMR payload cannot be displayed under a newer
+ *    patient selection.
  *  - The three appointment paths recheck after `await loadEMR` before
  *    switching the tab.
+ *  - The synchronous URL-appointment sync never touches the epoch: a
+ *    background status refresh must not cancel an in-flight human click.
  *
  * Repo-precedent source-contract pattern (see
  * CardiologistPanel.patientIdentity.contract.test.tsx and
@@ -72,13 +77,17 @@ describe('RETRO-3963-01: every authoritative selection invalidates or owns the n
     expect(tabIdx).toBeGreaterThan(guardIdx);
   });
 
-  it('loadEMR rechecks its ticket after every await so a late EMR cannot land on a newer selection', () => {
+  it('loadEMR rechecks its ticket after every await — including the catch block — so a late EMR cannot land on a newer selection', () => {
     const fn = panel.slice(
       panel.indexOf('const loadEMR = async'),
       panel.indexOf('// Сохранение EMR'),
     );
-    expect(fn).toContain('const epoch = navigationEpochRef.current');
-    expect((fn.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(3);
+    // the epoch is captured OUTSIDE the try so the catch block can recheck too
+    const epochDecl = fn.indexOf('const epoch = navigationEpochRef.current');
+    const tryIdx = fn.indexOf('try {');
+    expect(epochDecl).toBeGreaterThan(-1);
+    expect(tryIdx).toBeGreaterThan(epochDecl);
+    expect((fn.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(4);
     const fetchIdx = fn.indexOf('await fetch(');
     const firstGuard = fn.indexOf('epoch !== navigationEpochRef.current');
     expect(firstGuard).toBeGreaterThan(fetchIdx);
@@ -88,6 +97,12 @@ describe('RETRO-3963-01: every authoritative selection invalidates or owns the n
     const setEmrIdx = fn.indexOf('setEmr(emrData)');
     expect(okGuard).toBeGreaterThan(jsonIdx);
     expect(setEmrIdx).toBeGreaterThan(okGuard);
+    // the catch block rechecks before toasting (stale failure ≠ user-visible)
+    const catchIdx = fn.indexOf('} catch (error: unknown) {');
+    const catchGuard = fn.indexOf('epoch !== navigationEpochRef.current', catchIdx);
+    const catchNotify = fn.indexOf('notify.error(', catchIdx);
+    expect(catchGuard).toBeGreaterThan(catchIdx);
+    expect(catchNotify).toBeGreaterThan(catchGuard);
   });
 
   it('row-click branch rechecks after await loadEMR before goToTab', () => {
@@ -126,33 +141,42 @@ describe('RETRO-3963-01: every authoritative selection invalidates or owns the n
     expect(tabIdx).toBeGreaterThan(guardIdx);
   });
 
-  it('URL hydration captures a ticket and rechecks after both awaits', () => {
+  it('URL hydration bails when a newer human selection exists — live-selection guard plus epoch (independent re-review)', () => {
     const fn = panel.slice(
       panel.indexOf('const hydratePatientFromUrl'),
       panel.indexOf('useEffect(() => {', panel.indexOf('const hydratePatientFromUrl')),
     );
+    // the live-selection guard reads the committed selection via the ref
+    expect(fn).toContain('const liveSelectionIsOtherPatient = (): boolean =>');
+    expect(fn).toContain('selectedPatientRef.current');
+    expect((fn.match(/liveSelectionIsOtherPatient\(\)/g) ?? []).length).toBe(3);
+    // entry guard fires BEFORE the fetch
+    const entryGuard = fn.indexOf('if (liveSelectionIsOtherPatient()) return;');
+    const fetchIdx = fn.indexOf('await fetch(');
+    expect(entryGuard).toBeGreaterThan(-1);
+    expect(fetchIdx).toBeGreaterThan(entryGuard);
+    // epoch guards stay (newer intent took a ticket while fetching)
     expect(fn).toContain('const epoch = navigationEpochRef.current');
     expect((fn.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(2);
-    const fetchIdx = fn.indexOf('await fetch(');
+    // both post-await guards precede the identity merge
     const jsonIdx = fn.indexOf('await patientResponse.json()');
-    const firstGuard = fn.indexOf('epoch !== navigationEpochRef.current');
-    const secondGuard = fn.indexOf('epoch !== navigationEpochRef.current', firstGuard + 1);
-    expect(firstGuard).toBeGreaterThan(fetchIdx);
-    expect(secondGuard).toBeGreaterThan(jsonIdx);
+    const lastLiveGuard = fn.lastIndexOf('if (liveSelectionIsOtherPatient()) return;');
     const selectIdx = fn.indexOf('setSelectedPatient((prev');
-    expect(selectIdx).toBeGreaterThan(secondGuard);
+    expect(lastLiveGuard).toBeGreaterThan(jsonIdx);
+    expect(selectIdx).toBeGreaterThan(lastLiveGuard);
   });
 
-  it('URL-appointment sync invalidates tickets only when the selection actually changes', () => {
+  it('URL-appointment sync stays pure and never bumps the epoch (independent re-review)', () => {
     const fn = panel.slice(
-      panel.indexOf('const didChange ='),
+      panel.indexOf('const matchingAppointment'),
       panel.indexOf('}, [appointments, patientIdFromUrl, visitIdFromUrl, setSelectedPatient]);'),
     );
-    expect(fn).toContain('if (didChange) {');
-    const bumpIdx = fn.indexOf('navigationEpochRef.current += 1');
-    const returnIdx = fn.indexOf('return nextPatient');
-    expect(bumpIdx).toBeGreaterThan(-1);
-    expect(returnIdx).toBeGreaterThan(bumpIdx);
+    // the updater must be PURE: no render-phase side effects, and no epoch
+    // bump — a background status refresh must not cancel an in-flight
+    // human click (the pre-review-fix bump did exactly that).
+    expect(fn).not.toContain('navigationEpochRef.current += 1');
+    expect(fn).not.toContain('navigationEpochRef');
+    expect(fn).toContain('return didChange ? nextPatient : prev;');
   });
 
   it('completion deselect and the explicit visit cancel invalidate in-flight tickets', () => {

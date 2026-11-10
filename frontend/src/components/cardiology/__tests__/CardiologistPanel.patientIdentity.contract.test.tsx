@@ -99,15 +99,17 @@ describe('CARDPAT-FE-003: late edit fetch cannot overwrite or reopen the edit mo
 
 describe('CARDVISIT-FE-001: latest navigation intent wins the visit selection', () => {
   it('every async selection entry path captures or invalidates a navigation epoch (RETRO-3963-01)', () => {
-    // RETRO-3963-01 (review 3968) widened the contract: the three
-    // appointment paths plus handleDoctorQueueOpenVisit take a ticket
-    // (++), and the remaining authoritative selections invalidate
-    // outstanding tickets (+= 1) — search pick, queue start-visit,
-    // URL-appointment sync, completion deselect, explicit cancel and
-    // unmount. 12 post-await rechecks cover every async boundary.
+    // RETRO-3963-01 (review 3968 + independent re-review) widened the
+    // contract: the three appointment paths plus handleDoctorQueueOpenVisit
+    // take a ticket (++), and the remaining authoritative HUMAN selections
+    // invalidate outstanding tickets (+= 1) — search pick, queue start-visit,
+    // completion deselect, explicit cancel and unmount. The synchronous
+    // URL-appointment sync deliberately does NOT bump (a background status
+    // refresh must never cancel an in-flight human click). 13 post-await
+    // rechecks cover every async boundary including loadEMR's catch block.
     expect((panel.match(/\+\+navigationEpochRef\.current/g) ?? []).length).toBe(4);
-    expect((panel.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(12);
-    expect((panel.match(/navigationEpochRef\.current \+= 1/g) ?? []).length).toBe(6);
+    expect((panel.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(13);
+    expect((panel.match(/navigationEpochRef\.current \+= 1/g) ?? []).length).toBe(5);
   });
 
   it('row-click branch rechecks before touching selection/EMR/tab', () => {
