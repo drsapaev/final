@@ -109,7 +109,7 @@ describe('DentistrySection clinical data contracts (audit 3886 round 26)', () =>
     fireEvent.change(tooth46, { target: { value: '20' } });
     expect(calls.at(-1)).toEqual(['periodontal_pockets', { 46: 7.5 }]);
     fireEvent.change(tooth16, { target: { value: '6' } });
-    expect(calls.at(-1)).toEqual(['periodontal_pockets', { 46: 7.5, 16: 6 } });
+    expect(calls.at(-1)).toEqual(['periodontal_pockets', { 46: 7.5, 16: 6 }]);
     expect(tooth46).toHaveProperty('value', '7.5');
   });
 
