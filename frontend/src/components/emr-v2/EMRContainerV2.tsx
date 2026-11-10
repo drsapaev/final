@@ -31,7 +31,7 @@ import { useAppData } from '../../contexts/AppDataContext';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
-import { readSavedEMRForCompletion, emrTextValue } from './emrCompletion';
+import { readSavedEMRForCompletion, emrTextValue, emrTreatmentText } from './emrCompletion';
 // Analytics is handled via handleTelemetry callback
 
 // Import modular sections
@@ -1035,7 +1035,14 @@ export function EMRContainerV2({
                             { name: t('misc.emr_sec_anamnesis'), filled: emrTextValue(data?.anamnesis_morbi).trim() !== '' },
                             { name: t('misc.emr_sec_examination'), filled: emrTextValue(data?.examination).trim() !== '' },
                             { name: t('misc.emr_sec_diagnosis'), filled: emrTextValue(data?.diagnosis).trim() !== '' },
-                            { name: t('misc.emr_sec_treatment'), filled: emrTextValue(data?.treatment).trim() !== '' },
+                            // EMRTREAT-FE-001 (audit 3886): the treatment row counts
+                            // the CANONICAL treatment text (treatment →
+                            // medications.text → plan.treatment, mirroring the
+                            // backend's get_emr_text_field chain) — the visible
+                            // TreatmentSection editor is bound to
+                            // medications.text, so a genuine treatment plan typed
+                            // there must mark «Лечение» as filled.
+                            { name: t('misc.emr_sec_treatment'), filled: emrTreatmentText(data) !== '' },
                             { name: t('misc.emr_sec_recommendations'), filled: emrTextValue(data?.recommendations).trim() !== '' },
                             { name: t('misc.emr_sec_notes'), filled: emrTextValue(data?.notes).trim() !== '' },
                         ];

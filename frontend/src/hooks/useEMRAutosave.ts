@@ -144,15 +144,24 @@ export function useEMRAutosave({
                 return;
             }
 
-            lastSaveTimeRef.current = Date.now();
-            errorCountRef.current = 0; // Reset on success
-
-            // Check for conflict
+            // EMRAUTOSAVE-FE-001 (audit 3886): a 409 conflict is NOT a
+            // successful save. Conflict handling must precede ANY success
+            // bookkeeping — the last-successful timestamp and the error
+            // counter describe only genuinely successful saves. Policy: a
+            // conflict is a deterministic state the doctor must resolve
+            // (the UI shows the Conflict status); it neither resets the
+            // transient-error counter (that would hide flaky-network
+            // backoff state) nor increments it (backoff cannot fix a
+            // version conflict).
             if (result?.conflict) {
                 onAutosaveError?.({ type: 'conflict', ...(result as Record<string, unknown>) });
-            } else {
-                onAutosaveSuccess?.(result);
+                return;
             }
+
+            lastSaveTimeRef.current = Date.now();
+            errorCountRef.current = 0; // Reset on success only
+
+            onAutosaveSuccess?.(result);
         } catch (error) {
             const err = error as Record<string, unknown>;
             const response = err?.response as Record<string, unknown> | undefined;
