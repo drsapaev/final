@@ -266,9 +266,14 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
     used it and the flag could leak to production. Tests now use TESTING=1
     (set by pytest conftest) instead.
     """
-    # PR-5: WS_DEV_ALLOW bypass removed. Only TESTING=1 (pytest) skips auth
-    # so unit tests that don't seed users can still connect.
-    if os.getenv("TESTING", "0") == "1":
+    # TESTING is an in-process pytest convenience, never a production
+    # authentication override. A leaked TESTING=1 must not grant queue
+    # room access when ENV=prod/production.
+    environment = os.getenv("ENV", "dev").strip().lower()
+    if (
+        os.getenv("TESTING", "0") == "1"
+        and environment not in ("prod", "production")
+    ):
         return True
     # Extract token from header (preferred) or query param (legacy)
     auth = headers.get("authorization") or headers.get("Authorization")
