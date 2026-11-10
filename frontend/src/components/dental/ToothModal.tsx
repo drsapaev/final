@@ -250,7 +250,13 @@ const ToothModal = ({
   onSave,
   visitId,
   suggestedStatus,
-}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown, rowVersion?: number) => void; toothNumber?: string | number; visitId?: string | number; suggestedStatus?: string; open?: boolean; [k: string]: unknown }) => {
+  // RETRO-3966-01 (post-merge review #3968): explicit inspection-only mode.
+  // A locked/signed (or otherwise non-editable) visit opens this modal for
+  // clinical inspection ONLY: no editable control may receive input and no
+  // save path may fire — the modal must never offer or attempt an EMR write
+  // while the declared UI contract is read-only.
+  readOnly = false,
+}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown, rowVersion?: number) => void; toothNumber?: string | number; visitId?: string | number; suggestedStatus?: string; open?: boolean; readOnly?: boolean; [k: string]: unknown }) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [formData, setFormData] = useState<ToothFormData>({
@@ -361,6 +367,12 @@ const ToothModal = ({
 
   // Сохранение данных
   const handleSave = async () => {
+    // RETRO-3966-01: defense in depth — even a programmatic/keyboard-triggered
+    // save can never reach the EMR endpoint in inspection-only mode.
+    if (readOnly) {
+      logger.warn('[ToothModal] save blocked: inspection-only mode', { toothNumber: String(toothNumber) });
+      return;
+    }
     if (missingVisit) {
       notify.error(t('dental2.tooth_save_requires_visit'));
       return;
@@ -418,6 +430,18 @@ const ToothModal = ({
         </div>
       </DialogTitle>
       <DialogContent style={styles.content}>
+        {readOnly && (
+          // RETRO-3966-01: honest inspection-only state — the modal is opened
+          // from a locked/signed record; it shows the tooth's current clinical
+          // data and offers no editing affordance at all.
+          <Alert severity="info">
+            <span className="dental-flex dental-gap-8">
+              <AlertTriangle size={16} aria-hidden="true" />
+              {t('dental.dental_tm_inspection_only')}
+            </span>
+          </Alert>
+        )}
+
         {missingVisit && (
           // DENTDIALOG-FE-001 (audit 3892): honest failure state — a tooth
           // record cannot be saved without a canonical visit to write to.
@@ -440,6 +464,7 @@ const ToothModal = ({
                 size="small"
                 variant="outline"
                 onClick={() => addProcedure(key)}
+                disabled={readOnly}
               >
                 <Plus size={iconSize} aria-hidden="true" />
                 {procedure.name}
@@ -464,6 +489,7 @@ const ToothModal = ({
                     title={t('dental.dental_tm_delete')}
                     style={styles.iconButton}
                     onClick={() => removeProcedure(procedure.id)}
+                    disabled={readOnly}
                   >
                     <Trash2 size={16} aria-hidden="true" />
                   </button>
@@ -482,6 +508,7 @@ const ToothModal = ({
             label={t('dental.dental_tm_status_label')}
             value={formData.status}
             onValueChange={(value) => setFormData({ ...formData, status: String(value) })}
+            disabled={readOnly}
             options={[
               { value: '', label: '—' },
               ...Object.entries(TOOTH_STATUS).map(([, status]) => ({
@@ -495,6 +522,7 @@ const ToothModal = ({
             label={t('dental.dental_tm_material_label')}
             value={formData.material}
             onValueChange={(value) => setFormData({ ...formData, material: String(value) })}
+            disabled={readOnly}
             options={[
               { value: '', label: t('dental.dental_tm_no_material') },
               ...Object.entries(MATERIALS).map(([key, material]) => ({
@@ -509,6 +537,7 @@ const ToothModal = ({
             label={t('dental.dental_tm_next_visit_label')}
             value={formData.nextVisitDate}
             onChange={(e) => setFormData({ ...formData, nextVisitDate: e.target.value })}
+            disabled={readOnly}
             style={{ width: '100%', boxSizing: 'border-box' }}
           />
         </div>
@@ -526,12 +555,14 @@ const ToothModal = ({
                 value={formData.shade}
                 onChange={(e) => setFormData({ ...formData, shade: e.target.value })}
                 placeholder={t('dental.dental_tm_shade_placeholder')}
+                disabled={readOnly}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
               <Select
                 label={t('dental.dental_tm_fit_quality_label')}
                 value={formData.fitQuality}
                 onValueChange={(value) => setFormData({ ...formData, fitQuality: String(value) })}
+                disabled={readOnly}
                 options={[
                   { value: '', label: '—' },
                   { value: 'excellent', label: t('dental.dental_tm_fit_excellent') },
@@ -547,12 +578,14 @@ const ToothModal = ({
                 onChange={(e) => setFormData({ ...formData, warrantyPeriod: e.target.value })}
                 placeholder={t('dental.dental_tm_warranty_placeholder')}
                 min="0"
+                disabled={readOnly}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
               <Select
                 label={t('dental.dental_tm_patient_satisfaction_label')}
                 value={formData.patientSatisfaction}
                 onValueChange={(value) => setFormData({ ...formData, patientSatisfaction: String(value) })}
+                disabled={readOnly}
                 options={[
                   { value: '', label: '—' },
                   { value: '5', label: t('dental.dental_tm_sat_5') },
@@ -572,6 +605,7 @@ const ToothModal = ({
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           placeholder={t('dental.dental_tm_notes_placeholder')}
           minRows={3}
+          disabled={readOnly}
           textareaStyle={{ width: '100%', boxSizing: 'border-box' }}
         />
 
@@ -581,6 +615,7 @@ const ToothModal = ({
             aria-label={t('dental.dental_tm_follow_up_label')}
             checked={formData.requiresFollowUp}
             onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
+            disabled={readOnly}
           />
           <span>{t('dental.dental_tm_follow_up_label')}</span>
         </label>
@@ -602,15 +637,17 @@ const ToothModal = ({
         <Button type="button" onClick={onClose}>
           {t('dental.dental_tm_cancel')}
         </Button>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={handleSave}
-          disabled={loading || missingVisit || !hasMeaningfulToothRecord}
-          loading={loading}
-        >
-          {t('dental.dental_tm_save')}
-        </Button>
+        {!readOnly && (
+          <Button
+            type="button"
+            variant="primary"
+            onClick={handleSave}
+            disabled={loading || missingVisit || !hasMeaningfulToothRecord}
+            loading={loading}
+          >
+            {t('dental.dental_tm_save')}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

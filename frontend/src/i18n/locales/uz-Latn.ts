@@ -2303,6 +2303,7 @@ const uzLatn = {
     dental_tm_material_prefix: 'material',
     dental_tm_cancel: 'Bekor qilish',
     dental_tm_save: 'Saqlash',
+    dental_tm_inspection_only: "Faqat ko'rish: yozuv tahrirlash uchun yopiq",
 
     // ─── DentalPriceManager.jsx (dental_dpm_*) ──────────────────────────────
     dental_dpm_reason_extra_manipulations: 'Qo\'shimcha manipulyatsiyalar',

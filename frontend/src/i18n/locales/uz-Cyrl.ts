@@ -2314,6 +2314,7 @@ const uzCyrl = {
     dental_tm_material_prefix: 'материал',
     dental_tm_cancel: 'Отмена',
     dental_tm_save: 'Сохранить',
+    dental_tm_inspection_only: 'Только осмотр: запись закрыта для редактирования',
 
     // ─── DentalPriceManager.jsx (dental_dpm_*) ──────────────────────────────
     dental_dpm_reason_extra_manipulations: 'Дополнительные манипуляции',

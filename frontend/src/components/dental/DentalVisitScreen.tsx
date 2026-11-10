@@ -1750,6 +1750,11 @@ const DentalVisitScreen = ({
           suggestedStatus={selectedTooth.suggestedStatus}
           onSave={(data: unknown, rowVersion?: number) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>, rowVersion)}
           visitId={visitId}
+          // RETRO-3966-01 (post-merge review #3968): a locked/signed (or not
+          // yet loaded / completing) record opens the modal in an explicit
+          // inspection-only mode — no editable control, no Save, no POST to
+          // /v2/emr, matching the read-only clinical UI contract of the chart.
+          readOnly={fieldsDisabled}
         />
       )}
 
