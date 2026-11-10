@@ -329,6 +329,8 @@ def _queue_room_permitted(token: str | None, department: str, day: str) -> bool:
     _auth_ok boolean gate. Do not trust JWT subjects or room identifiers
     without validation: specialist_N denotes Doctor.id, not User.id.
     """
+    if not isinstance(department, str) or not isinstance(day, str):
+        return False
     match = re.fullmatch(r"specialist_([1-9][0-9]*)", department.strip())
     if match is None or not token:
         return False
@@ -356,7 +358,12 @@ def _queue_room_permitted(token: str | None, department: str, day: str) -> bool:
     from app.services.authorization.staff import staff_authorization_service
     from app.services.token_blacklist_service import TokenBlacklistService
 
-    db = _SessionLocal()
+    try:
+        db = _SessionLocal()
+    except Exception:
+        log.warning("Queue room authorization DB unavailable; denying subscription")
+        return False
+
     try:
         user = _resolve_websocket_user(payload, db)
         if user is None or not getattr(user, "is_active", False):
