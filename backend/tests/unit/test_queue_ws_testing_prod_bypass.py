@@ -19,7 +19,9 @@ from app.core.config import settings
 from app.ws import queue_ws
 
 
-@pytest.mark.parametrize("environment", ["prod", "production", "PRODUCTION"])
+@pytest.mark.parametrize(
+    "environment", ["prod", "production", "PRODUCTION", "staging", "qa"]
+)
 @pytest.mark.parametrize(
     "headers, token", [({}, None), ({"authorization": "Bearer not-a-jwt"}, None)]
 )
