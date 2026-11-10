@@ -103,6 +103,7 @@ interface MockWebSocketInstance {
   onclose: ((e: MockWsEvent) => void) | null;
   onerror: ((e?: unknown) => void) | null;
   close: ReturnType<typeof vi.fn>;
+  send: ReturnType<typeof vi.fn>;
   triggerOpen: () => void;
   triggerMessage: (payload: unknown) => void;
 }
@@ -121,6 +122,7 @@ class MockWebSocket {
   onclose: ((e: MockWsEvent) => void) | null;
   onerror: ((e?: unknown) => void) | null;
   close: ReturnType<typeof vi.fn>;
+  send: ReturnType<typeof vi.fn>;
 
   constructor(url: string) {
     this.url = url;
@@ -129,6 +131,7 @@ class MockWebSocket {
     this.onmessage = null;
     this.onclose = null;
     this.onerror = null;
+    this.send = vi.fn();
     this.close = vi.fn(() => {
       this.readyState = MockWebSocket.CLOSED;
       this.onclose?.({ code: 1000, reason: 'Unmount' });
@@ -342,5 +345,116 @@ describe('NotificationWebSocketContext', () => {
     expect(notifyMock.info).not.toHaveBeenCalled();
     expect(notifyMock.warning).not.toHaveBeenCalled();
   });
+
+  it('requests bounded inbox replay only after handshake, once per connection', async () => {
+    renderProvider('/doctor/cardiology');
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    const socket = MockWebSocket.instances[0];
+    await act(async () => {
+      socket.triggerOpen();
+    });
+    expect(socket.send).not.toHaveBeenCalled();
+
+    await act(async () => {
+      socket.triggerMessage({
+        type: 'connection_established',
+        user_id: 41,
+        unread_count: 3,
+      });
+      socket.triggerMessage({
+        type: 'connection_established',
+        user_id: 41,
+        unread_count: 3,
+      });
+    });
+
+    expect(socket.send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(socket.send.mock.calls[0][0] as string)).toEqual({
+      type: 'notification_sync',
+      limit: 50,
+    });
+    expect(notificationCenterMockTyped.updateUnreadSnapshot).toHaveBeenCalled();
+    expect(notifyMock.info).not.toHaveBeenCalled();
+    expect(notificationCenterMockTyped.appendNotification).not.toHaveBeenCalled();
+  });
+
+  it('reconciles replayed persisted delivery without a second toast', async () => {
+    renderProvider('/doctor/cardiology');
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    const socket = MockWebSocket.instances[0];
+    await act(async () => {
+      socket.triggerOpen();
+      socket.triggerMessage({ type: 'connection_established', unread_count: 2 });
+      socket.triggerMessage({
+        type: 'notification_sync_response',
+        unread_count: 2,
+        items: [{
+          delivery_id: 'synthetic-offline-1',
+          sequence_id: 77,
+          event_type: 'lab_results',
+          title: 'Synthetic result',
+          message: 'Persisted offline',
+        }],
+      });
+    });
+
+    expect(socket.send).toHaveBeenCalledTimes(1);
+    expect(notificationCenterMockTyped.replaceNotifications).toHaveBeenCalledTimes(1);
+    const [items, meta] =
+      notificationCenterMockTyped.replaceNotifications.mock.calls[0] as [
+        Array<{ delivery_id: string; event_type: string }>,
+        { source: string; unreadSnapshot: { total: number }; lastSyncAt: string },
+      ];
+    expect(items).toEqual([expect.objectContaining({
+      delivery_id: 'synthetic-offline-1',
+      event_type: 'lab_results',
+    })]);
+    expect(meta.source).toBe('ws');
+    expect(meta.unreadSnapshot.total).toBe(2);
+    expect(meta.lastSyncAt).toEqual(expect.any(String));
+    expect(notificationCenterMockTyped.appendNotification).not.toHaveBeenCalled();
+    expect(notifyMock.info).not.toHaveBeenCalled();
+    expect(notifyMock.warning).not.toHaveBeenCalled();
+  });
+
+  it('replays again on a fresh reconnect but never responds to stale socket messages', async () => {
+    renderProvider('/doctor/cardiology');
+    await act(async () => {
+      vi.runAllTimers();
+    });
+    const first = MockWebSocket.instances[0];
+
+    await act(async () => {
+      first.triggerOpen();
+      first.triggerMessage({ type: 'connection_established', unread_count: 1 });
+    });
+    expect(first.send).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      first.close();
+      vi.advanceTimersByTime(3000);
+    });
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const second = MockWebSocket.instances[1];
+
+    await act(async () => {
+      second.triggerOpen();
+      first.triggerMessage({ type: 'connection_established', unread_count: 7 });
+      second.triggerMessage({ type: 'connection_established', unread_count: 2 });
+    });
+    expect(first.send).toHaveBeenCalledTimes(1);
+    expect(second.send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(second.send.mock.calls[0][0] as string)).toEqual({
+      type: 'notification_sync',
+      limit: 50,
+    });
+  });
+
 
 });
