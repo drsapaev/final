@@ -24,9 +24,20 @@ import { getState as getAuthState } from '../stores/auth';
 // switch inside the same JS runtime). The server stays the canonical
 // authorization boundary; the cache may never hand another principal's
 // templates to a hook. Mirrors the EMRCACHE-FE-001 pattern in useEMR.
-const sectionTemplateCache = new Map();
-let sectionTemplateCacheOwner: string | null = null;
+// RETRO-3953-04 (dossier PR 3958): the shared in-flight outcome is TYPED — a
+// failed GET is carried to every subscriber as { ok: false, error }, never
+// laundered into a resolved empty list that reads as an honest success.
+export type TemplateFetchOutcome =
+    | { ok: true; data: unknown[] }
+    | { ok: false; error: string };
 
+interface SectionTemplateCacheEntry {
+    data: unknown[] | null;
+    promise: Promise<TemplateFetchOutcome> | null;
+}
+
+const sectionTemplateCache = new Map<string, SectionTemplateCacheEntry>();
+let sectionTemplateCacheOwner: string | null = null;
 const getCacheOwner = (): string | null => {
     try {
         const profile = getAuthState()?.profile;
@@ -138,24 +149,43 @@ export function useDoctorSectionTemplates({
         setError(null);
     }
 
+    // RETRO-3953-02 (dossier PR 3958): the same honesty rule applies to the
+    // section/ICD/limit context itself — an in-place change must invalidate
+    // the displayed phrases SYNCHRONOUSLY (they must not stay rendered or
+    // actionable while the new context's request is pending). The new
+    // context's cached list, if any, is seeded immediately; otherwise the
+    // panel shows the honest empty state until its own fetch commits.
+    const contextKey = `${section || ''}:${icd10Code || ''}:${limit}`;
+    const [renderedContext, setRenderedContext] = useState(contextKey);
+    if (renderedContext !== contextKey) {
+        setRenderedContext(contextKey);
+        const seed = canUseCache ? sectionTemplateCache.get(cacheKey) : undefined;
+        setTemplates(seed?.data ?? []);
+        setError(null);
+    }
+
     /**
      * Subscribe THIS hook instance to a shared in-flight promise so a second
      * mounted hook receives the fetched result too (EMRTMPL-FE-002).
      */
-    const joinInFlightRequest = useCallback((epoch: number, promise: Promise<unknown>) => {
+    const joinInFlightRequest = useCallback((epoch: number, promise: Promise<TemplateFetchOutcome>) => {
         if (isMountedRef.current) {
             setLoading(true);
         }
-        promise.then((result: unknown) => {
+        promise.then((outcome) => {
             // EMRTMPL-FE-003: only commit while this request context is still current.
             if (!isMountedRef.current || epoch !== requestEpochRef.current) return;
-            setTemplates(Array.isArray(result) ? result : []);
-            setError(null);
-            setLoading(false);
-        }).catch(() => {
-            if (isMountedRef.current && epoch === requestEpochRef.current) {
-                setLoading(false);
+            // RETRO-3953-04: the shared outcome carries the typed failure — a
+            // joining subscriber shows the same error as the originator
+            // instead of a laundered empty success.
+            if (outcome.ok) {
+                setTemplates(outcome.data);
+                setError(null);
+            } else {
+                setError(outcome.error);
+                setTemplates([]);
             }
+            setLoading(false);
         });
         return promise;
     }, []);
@@ -163,8 +193,19 @@ export function useDoctorSectionTemplates({
     /**
      * Fetch templates from API
      */
-    const fetchTemplates = useCallback(async (forceRefresh: boolean = false) => {
-        if (!section) return;
+    const fetchTemplates = useCallback(async (forceRefresh: boolean = false): Promise<TemplateFetchOutcome> => {
+        if (!section) {
+            // RETRO-3953-02: no section → no query, and the previous
+            // context's request epoch is invalidated so its late response can
+            // never repopulate the (already synchronously cleared) list.
+            requestEpochRef.current += 1;
+            if (isMountedRef.current) {
+                setTemplates([]);
+                setError(null);
+                setLoading(false);
+            }
+            return { ok: true, data: [] };
+        }
 
         const epoch = ++requestEpochRef.current;
         // RETRO-3953-01: the owner whose authorization produced this request.
@@ -179,25 +220,30 @@ export function useDoctorSectionTemplates({
                     setError(null);
                     setLoading(false);
                 }
-                return cachedEntry.data;
+                return { ok: true, data: cachedEntry.data };
             }
 
             if (cachedEntry?.promise) {
                 // EMRTMPL-FE-002: joining an in-flight request must also
                 // deliver the result to THIS instance, not only to the one
                 // that started it.
-                return joinInFlightRequest(epoch, cachedEntry.promise as Promise<unknown>);
+                return joinInFlightRequest(epoch, cachedEntry.promise);
             }
-        } else if (cachedEntry?.promise) {
-            return joinInFlightRequest(epoch, cachedEntry.promise as Promise<unknown>);
         }
+        // RETRO-3953-03: a forced refresh NEVER joins a pre-mutation in-flight
+        // promise — after a successful PUT the stale GET's payload must not
+        // overwrite the post-edit view while the mutation reports success.
+        // Force always issues a fresh read whose loadPromise replaces the
+        // cached one, so subsequent ordinary readers join the fresh request.
 
         if (isMountedRef.current) {
             setLoading(true);
             setError(null);
         }
 
-        const loadPromise = (async () => {
+        // Annotated: keeps the outcome literals narrow (ok: true / ok: false)
+        // so the shared promise matches the cached-entry type.
+        const loadPromise = (async (): Promise<TemplateFetchOutcome> => {
             const params = new URLSearchParams();
             if (icd10Code) params.append('icd10_code', String(icd10Code));
             params.append('limit', limit.toString());
@@ -207,10 +253,17 @@ export function useDoctorSectionTemplates({
                     `/section-templates/${section}?${params.toString()}`
                 );
 
-                const templatesData = (response.data as Record<string, unknown>).templates || [];
+                const templatesData = ((response.data as Record<string, unknown>).templates || []) as unknown[];
                 // RETRO-3953-01: an owner-swapped request may not repopulate
                 // the cache with the previous principal's data.
-                if (canUseCache && sectionTemplateCacheOwner === ownerAtRequest) {
+                // RETRO-3953-03: a superseded request's late response must not
+                // poison the cache either — only the CURRENT request context
+                // may claim the cache entry.
+                if (
+                    canUseCache &&
+                    sectionTemplateCacheOwner === ownerAtRequest &&
+                    epoch === requestEpochRef.current
+                ) {
                     sectionTemplateCache.set(cacheKey, {
                         data: templatesData,
                         promise: null,
@@ -218,13 +271,12 @@ export function useDoctorSectionTemplates({
                 }
 
                 // EMRTMPL-FE-003: commit only if this request context is
-                // still the current one (the cache write above stays valid —
-                // it is keyed to its own section/ICD context).
+                // still the current one.
                 if (isMountedRef.current && epoch === requestEpochRef.current) {
-                    setTemplates(templatesData as unknown[]);
+                    setTemplates(templatesData);
                 }
 
-                return templatesData;
+                return { ok: true, data: templatesData };
             } catch (err: unknown) {
                 logger.error('[useDoctorSectionTemplates] Fetch error:', err);
                 if (isMountedRef.current && epoch === requestEpochRef.current) {
@@ -234,7 +286,9 @@ export function useDoctorSectionTemplates({
                 if (canUseCache) {
                     sectionTemplateCache.delete(cacheKey);
                 }
-                return [];
+                // RETRO-3953-04: the failure is part of the shared outcome, so
+                // a joining subscriber sees it too.
+                return { ok: false, error: (err as Error).message || 'Failed to load templates' };
             }
         })();
 
