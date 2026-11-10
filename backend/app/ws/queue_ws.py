@@ -222,19 +222,24 @@ def broadcast_queue_update(
     }
 
     try:
-        loop = asyncio.get_event_loop()
-        loop.create_task(ws_manager.broadcast(room, message))
-        log.info(
-            "broadcast_queue_update: queued broadcast to room %s, event=%s",
-            room,
-            event_type,
-        )
+        asyncio.get_running_loop()
     except RuntimeError:
         # No event loop running (e.g., in sync test context) — log and skip.
         log.warning(
             "broadcast_queue_update: no event loop, skipping broadcast to %s",
             room,
         )
+        return
+
+    # WSManager.broadcast() is synchronous and already schedules its
+    # _broadcast_room coroutine via _dispatch(). Passing its None return
+    # value to create_task() raises TypeError and interrupts QR mutations.
+    ws_manager.broadcast(room, message)
+    log.info(
+        "broadcast_queue_update: queued broadcast to room %s, event=%s",
+        room,
+        event_type,
+    )
 
 
 def _origin_allowed(origin: str | None) -> bool:
