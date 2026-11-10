@@ -1210,6 +1210,8 @@ export function EMRContainerV2({
                                 [field]: value
                             })}
                             disabled={editingDisabled}
+                            visitId={visitId}
+                            patientId={patientId}
                         />
                     )}
 
