@@ -13,12 +13,12 @@
 
 ## Mandatory gate and explicit scope before runtime edits
 
-**Project instruction:** [`AGENTS.md`](https://github.com/drsapaev/final/blob/4f42f84f31266f7149cfb75d422adf2098e93425/AGENTS.md) requires a mandatory gate for frontend/backend contract work, and [`.agents/skills/final-ssot-contract-repair/SKILL.md`](https://github.com/drsapaev/final/blob/4f42f84f31266f7149cfb75d422adf2098e93425/.agents/skills/final-ssot-contract-repair/SKILL.md) requires backend SSOT and bounded regression. Selected prospective mode: **`gate_known_root_cause`** because the frontend root cause and its source file are source-pinned. **The gate has NOT been run** here: the GitHub connector has no local PowerShell launcher. The owner explicitly authorized only remote, unverified Draft staging, **not merge or deployment**. The merge gate remains blocked until a real operator executes this command in the project checkout and records evidence against the final PR head.
+**Project instruction:** [`AGENTS.md`](https://github.com/drsapaev/final/blob/4f42f84f31266f7149cfb75d422adf2098e93425/AGENTS.md) requires a mandatory gate for frontend/backend contract work, and [`.agents/skills/final-ssot-contract-repair/SKILL.md`](https://github.com/drsapaev/final/blob/4f42f84f31266f7149cfb75d422adf2098e93425/.agents/skills/final-ssot-contract-repair/SKILL.md) requires backend SSOT and bounded regression. Selected prospective mode: **`gate_known_root_cause`** because the frontend root cause and its source file are source-pinned. **The gate has NOT been run** here: the GitHub connector has no local PowerShell launcher. The gate CLI requires a positional task description, supplied in the corrected command below. The owner explicitly authorized only remote, unverified Draft staging, **not merge or deployment**. The merge gate remains blocked until a real operator executes this command in the project checkout and records evidence against the final PR head.
 
 On a real project checkout, from `ai/langgraph`, use the project's documented launcher, with exact scope and root cause:
 
 ```powershell
-.\scripts\run_agent_gate.ps1 --known-root-cause frontend/src/contexts/NotificationWebSocketContext.tsx --scope frontend/src/contexts/NotificationWebSocketContext.tsx --scope frontend/src/contexts/__tests__/NotificationWebSocketContext.test.tsx
+.\scripts\run_agent_gate.ps1 "Fix canonical personal WebSocket notification transport routing (NOTIFYEVENT-FE-001); preserve backend domain event semantics" --known-root-cause frontend/src/contexts/NotificationWebSocketContext.tsx --scope frontend/src/contexts/NotificationWebSocketContext.tsx --scope frontend/src/contexts/__tests__/NotificationWebSocketContext.test.tsx
 ```
 
 Read the **actual returned execution prompt**, and obey its first-touch/stop conditions before editing. If the gate fails, stop; if it misroutes, follow the repository's one-time retry and approved-override policy, not a bypass.
@@ -43,7 +43,7 @@ Extend the existing mocked `MockWebSocket` provider suite, using **synthetic del
 
 Preserve `normalizePayload` as the domain-event normalizer. Inside `handleMessageRef.current`, derive a **separate transport discriminator** from the validated **top-level** `data.type`. Then route a canonical `transportType === 'notification'` through the existing append/cache/notify branch **regardless of the normalized nested `event_type`**. Retain existing direct `queue_update`, `diagnostics_return_needed`, `system_alert` behavior and early returns for connection/sync/ack frames.
 
-The staged implementation adds a separate top-level transport discriminator and admits canonical `type:'notification'` alongside the existing recognized controls. The staged test has synthetic cases for four domain events and five non-notification controls. **Neither project Vitest nor PowerShell gate was executed locally in this session.**
+The staged implementation adds a separate top-level transport discriminator and admits canonical `type:'notification'` alongside the existing recognized controls. The staged test has synthetic cases for four domain events and five non-notification controls. **No Vitest or PowerShell gate was executed locally.** GitHub Actions (commit `ca91b6e`) executed `NotificationWebSocketContext.test.tsx` with **13 passing tests**; frontend build and lint passed. Entire pipeline/e2e and merge gate remain separate requirements.
 
 Do not introduce a list of permitted domain event names (`lab_results`, `new_appointment`, etc.) in the frontend. The backend source of truth may add new domain event types; the consumer should still accept the canonical notification transport envelope. Retain the original `normalized.type` value for role-specific rendering, rather than replacing it with the generic string `notification`.
 
@@ -60,7 +60,7 @@ npm run type-check
 npx eslint src/contexts/NotificationWebSocketContext.tsx src/contexts/__tests__/NotificationWebSocketContext.test.tsx
 ```
 
-Check `git diff --check`, branch diff against fresh `origin/main`, PR template headings, review and CI. The browser WebSocket smoke and staging role-level validation remain needed before any production claim. **These commands have not been executed locally.** GitHub Actions started after the code commit; full conclusions must be verified. Stop **merge/deployment** if backend event shape, canonical vs legacy ownership or test fixture differs from pinned source, or if the mandatory gate cannot be completed.
+Check `git diff --check`, branch diff against fresh `origin/main`, PR template headings, review and CI. The browser WebSocket smoke and staging role-level validation remain needed before any production claim. **These commands have not been executed locally.** GitHub Actions ran the frontend unit-test job successfully, including **13 passing `NotificationWebSocketContext.test.tsx` tests**; build and lint also passed on code commit `ca91b6e`. E2E and final branch-head CI conclusions must still be verified. Stop **merge/deployment** if backend event shape, canonical vs legacy ownership or test fixture differs from pinned source, or if the mandatory gate cannot be completed.
 
 ## Follow-on PRs — do not combine with this slice
 
@@ -69,5 +69,5 @@ Keep separate: **NOTIFYAUTH-BE-001** (JWT all-user revocation), **NOTIFYSESSION-
 ## Status / rollback
 
 - **Done:** confirmed canonical transport-vs-event contract; created separate Draft PR #3974; committed a narrow frontend TSX repair and focused synthetic Vitest test cases, plus this handoff.
-- **Not done:** mandatory PowerShell gate, local/complete Vitest proof, complete CI and staging smoke, merge, deployment.
+- **Not done:** mandatory PowerShell gate, local execution, full E2E/branch-head CI and staging smoke, merge, deployment. **Done in GitHub CI:** targeted 13 Vitest tests, full frontend unit job, frontend build and lint on code commit `ca91b6e`.
 - **Rollback:** close Draft PR #3974 or revert only the staged code/test/docs commits; no changes to main or production were made.
