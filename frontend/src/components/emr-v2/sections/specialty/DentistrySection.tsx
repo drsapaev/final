@@ -15,6 +15,7 @@ import EMRSection from '../EMRSection';
 import React from 'react';
 import EMRTextField from '../EMRTextField';
 import TeethChart from '@/components/dental/TeethChart';
+import ToothModal from '@/components/dental/ToothModal';
 import './DentistrySection.css';
 import { Input, Checkbox } from '@/components/ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -87,6 +88,12 @@ export function DentistrySection({
   const measurements = measurementsRaw as Record<string, any>;
   const radiographs = radiographsRaw as Record<string, any>;
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'hygiene' | 'periodontal' | 'occlusion' | 'radiographs'
+  // RETRO-3966-01 (post-merge review 3968): a readOnly chart previously
+  // received onToothClick but no onInspect — tooth buttons were enabled
+  // yet did nothing on inspection. The locked record now opens the SAME
+  // inspection-only ToothModal (readOnly: no editable controls, no Save,
+  // no EMR write attempt) as the DentalVisitScreen consumer.
+  const [inspectedTooth, setInspectedTooth] = useState<{ number: string | number; data: Record<string, unknown> } | null>(null);
 
     // Handlers
     const handleToothChange = useCallback((toothNumber: string | number, toothData: unknown) => {
@@ -182,6 +189,11 @@ export function DentistrySection({
                         initialData={toothStatus}
                         onToothClick={handleToothChange}
                         onClearAll={handleClearToothStatus}
+                        // RETRO-3966-01: inspection stays available on a
+                        // readOnly chart — clicks route to the inspection
+                        // modal, never to the mutation callback (TeethChart
+                        // never calls onToothClick when readOnly).
+                        onInspect={(toothNumber, toothData) => setInspectedTooth({ number: toothNumber, data: (toothData as Record<string, unknown>) || {} })}
                         readOnly={disabled}
                     />
                 </div>
@@ -458,6 +470,21 @@ export function DentistrySection({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* RETRO-3966-01: inspection-only tooth modal for a locked
+                record — renders with readOnly (no editable controls, no
+                Save, no /v2/emr write attempt), mirroring the
+                DentalVisitScreen locked-record inspection contract. */}
+            {inspectedTooth && (
+                <ToothModal
+                    open
+                    readOnly
+                    onClose={() => setInspectedTooth(null)}
+                    toothNumber={inspectedTooth.number}
+                    toothData={inspectedTooth.data}
+                    visitId={visitId ?? undefined}
+                />
             )}
         </EMRSection>
     );
