@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
+from uuid import uuid4
 
 import jwt
 import pytest
@@ -218,6 +219,54 @@ def test_authorization_database_unavailable_denies(monkeypatch):
         _signed(), "specialist_101", "2026-11-11"
     )
 
+
+
+@pytest.mark.parametrize("use_own_room", [True, False])
+def test_sqlalchemy_doctor_profile_owner_id_is_not_user_id(
+    db_session, monkeypatch, use_own_room
+):
+    """Real ORM filter must bind Doctor.user_id, not JWT User.id as room."""
+    from app.models.clinic import Doctor
+    from app.models.user import User
+
+    suffix = uuid4().hex[:12]
+    user = User(
+        username=f"synthetic_ws_{suffix}",
+        email=f"synthetic_ws_{suffix}@example.test",
+        full_name="Synthetic doctor",
+        hashed_password="!disabled:synthetic-websocket-test",
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    # Intentional explicit mismatch: the room's Doctor.id is never User.id.
+    doctor = Doctor(
+        id=user.id + 500000,
+        user_id=user.id,
+        specialty="cardiology",
+        active=True,
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+    assert doctor.id != user.id
+
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("TESTING", "0")
+    monkeypatch.setattr("app.db.session.SessionLocal", lambda: db_session)
+    monkeypatch.setattr(
+        "app.services.token_blacklist_service.TokenBlacklistService.is_token_blacklisted",
+        lambda _db, _jti, user_id=None: False,
+    )
+
+    selected = doctor.id if use_own_room else doctor.id + 1
+    assert queue_ws._queue_room_permitted(
+        _signed(str(user.id)), f"specialist_{selected}", "2026-11-11"
+    ) is use_own_room
 
 
 class _Socket:
