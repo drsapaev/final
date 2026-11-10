@@ -250,7 +250,7 @@ const ToothModal = ({
   onSave,
   visitId,
   suggestedStatus,
-  // RETRO-3966-01 (post-merge review #3968): explicit inspection-only mode.
+  // RETRO-3966-01 (post-merge review PR 3968): explicit inspection-only mode.
   // A locked/signed (or otherwise non-editable) visit opens this modal for
   // clinical inspection ONLY: no editable control may receive input and no
   // save path may fire — the modal must never offer or attempt an EMR write

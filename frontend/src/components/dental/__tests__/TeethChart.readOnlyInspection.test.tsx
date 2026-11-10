@@ -1,5 +1,5 @@
 /**
- * RETRO-3966-01 (post-merge code review #3968 of round-26 PR #3966) —
+ * RETRO-3966-01 (post-merge code review PR 3968 of round-26 PR #3966) —
  * fail-first regression for the read-only tooth chart enablement rule.
  *
  * In readOnly the chart enabled a tooth button whenever EITHER callback was

@@ -1,5 +1,5 @@
 /**
- * RETRO-3966-01 (post-merge code review #3968 of round-26 PR #3966) —
+ * RETRO-3966-01 (post-merge code review PR 3968 of round-26 PR #3966) —
  * fail-first regressions for the inspection-only tooth modal.
  *
  * The locked/signed DentalVisitScreen routed locked-record tooth clicks into

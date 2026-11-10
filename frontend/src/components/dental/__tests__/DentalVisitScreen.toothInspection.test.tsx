@@ -1,5 +1,5 @@
 /**
- * RETRO-3966-01 (post-merge code review #3968 of round-26 PR #3966) —
+ * RETRO-3966-01 (post-merge code review PR 3968 of round-26 PR #3966) —
  * fail-first regression at the DentalVisitScreen wiring level.
  *
  * A signed/locked record opened the tooth modal in its fully editable form

@@ -146,7 +146,7 @@ const TeethChart = ({ onToothClick, onInspect, onClearAll, initialData = {}, rea
         key={toothNumber}
         title={t('dental.dental_tc_tooth_title', { toothNumber, status: STATUS_NAMES[status as keyof typeof STATUS_NAMES] })}>
         
-        {/* RETRO-3966-01 (post-merge review #3968): in readOnly a tooth
+        {/* RETRO-3966-01 (post-merge review PR 3968): in readOnly a tooth
             button is enabled only when a genuine inspection callback exists.
             Enabling on onToothClick alone (the DentistrySection consumer
             passes it without onInspect) rendered a live-looking button whose
