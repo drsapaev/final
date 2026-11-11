@@ -20,7 +20,8 @@ class TestDisplayWebSocketApiService:
             get_queue_entry=lambda entry_id: None,
             save=lambda: None,
             list_active_entries_for_day=lambda day: [],
-            get_active_doctor_by_specialty=lambda specialty: None,
+            # DISPLAYQUICK-BE-001: the service passes the canonical clinic day.
+            get_active_doctor_by_specialty=lambda specialty, day=None: None,
             get_daily_queue_for_specialist=lambda day, specialist_id: None,
             get_next_waiting_entry=lambda queue_id: None,
         )
@@ -134,7 +135,8 @@ class TestDisplayWebSocketApiService:
             get_queue_entry=lambda entry_id: None,
             save=lambda: None,
             list_active_entries_for_department=lambda day, department: [entry],
-            get_active_doctor_by_specialty=lambda specialty: None,
+            # DISPLAYQUICK-BE-001: the service passes the canonical clinic day.
+            get_active_doctor_by_specialty=lambda specialty, day=None: None,
             get_daily_queue_for_specialist=lambda day, specialist_id: None,
             get_next_waiting_entry=lambda queue_id: None,
         )
@@ -152,7 +154,8 @@ class TestDisplayWebSocketApiService:
             get_queue_entry=lambda entry_id: None,
             save=lambda: None,
             list_active_entries_for_day=lambda day: [],
-            get_active_doctor_by_specialty=lambda specialty: None,
+            # DISPLAYQUICK-BE-001: the service passes the canonical clinic day.
+            get_active_doctor_by_specialty=lambda specialty, day=None: None,
             get_daily_queue_for_specialist=lambda day, specialist_id: None,
             get_next_waiting_entry=lambda queue_id: None,
         )
@@ -179,7 +182,8 @@ class TestDisplayWebSocketApiService:
             get_queue_entry=lambda entry_id: None,
             save=lambda: None,
             list_active_entries_for_day=lambda day: [],
-            get_active_doctor_by_specialty=lambda specialty: SimpleNamespace(
+            # DISPLAYQUICK-BE-001: the service passes the canonical clinic day.
+            get_active_doctor_by_specialty=lambda specialty, day=None: SimpleNamespace(
                 id=4,
                 user_id=9,
             ),
