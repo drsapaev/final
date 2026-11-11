@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.db.session import get_db
 from app.models.clinic import Doctor
 from app.models.user import User
@@ -132,7 +133,12 @@ async def get_queue_position(
     # linkage (QR walk-in / legacy row) used to skip the check entirely —
     # absence of a patient_id is not proof of ownership, so non-staff reads
     # of unlinked entries fail closed.
-    if current_user.role not in ("Admin", "Registrar", "Doctor", "SuperAdmin"):
+    # RETRO-3996-02 (post-merge review 3969–#3996, group 2): the staff
+    # vocabulary must admit the WHOLE doctor family (cardio/derma/dentist
+    # and the legacy spellings), not only the exact "Doctor" spelling —
+    # per the D-3 RBAC unification SSOT (app/core/roles.py,
+    # DOCTOR_FAMILY_GATE_ROLES / is_doctor_role_spelling).
+    if current_user.role not in ("Admin", "Registrar", "SuperAdmin") and not is_doctor_role_spelling(current_user.role):
         patient_id = getattr(entry, "patient_id", None)
         if not patient_id:
             raise HTTPException(status_code=403, detail="Нет доступа к этой записи очереди")
@@ -173,7 +179,9 @@ async def get_queue_position_by_number(
     # Ownership check for non-staff. QPOSAUTH-BE-002 (audit PR #3961 round
     # 29): unlinked (patient_id=NULL) rows fail closed for non-staff callers
     # here too — number+specialist scanning must not fetch walk-in entries.
-    if current_user.role not in ("Admin", "Registrar", "Doctor", "SuperAdmin"):
+    # RETRO-3996-02: same doctor-family staff vocabulary as the by-id read
+    # above (D-3 SSOT), never the exact-"Doctor"-only spelling.
+    if current_user.role not in ("Admin", "Registrar", "SuperAdmin") and not is_doctor_role_spelling(current_user.role):
         patient_id = getattr(entry, "patient_id", None)
         if not patient_id:
             raise HTTPException(status_code=403, detail="Нет доступа к этой записи очереди")
@@ -368,7 +376,7 @@ async def get_queue_positions_stats(
     # entry (IDs, numbers, statuses, priorities, timestamps, cabinet,
     # specialist name) of any queue. Staff-only mirrors the module's own
     # policy for the notify endpoints; SuperAdmin passes via is_superuser.
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
+    current_user: User = Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     """
     Получить статистику позиций в очереди
