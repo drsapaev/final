@@ -703,13 +703,31 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         const livePatientId = live?.patient?.id || live?.patient_id || null;
         return livePatientId !== null && String(livePatientId) !== String(patientIdFromUrl);
       };
-      if (liveSelectionIsOtherPatient()) return;
+      // RETRO-3969-01 (post-merge review of the 3969–3996 window): the
+      // VISIT dimension of the same steal scenario. This effect re-fires
+      // on every selection change, so a committed same-patient /
+      // different-visit selection (the doctor row-clicked P1 at V_row
+      // while the URL still carries ?patientId=P1&visitId=V1) reached the
+      // merge, which stamped the stale URL visit over the doctor's chosen
+      // one and hijacked the tab. The dermatology panel guards this exact
+      // class (selectionContradictsUrl: patient AND visit) and this
+      // panel's own URL-appointment sync bails on a visit mismatch — the
+      // patient-identity hydration must not be the one surface without
+      // it. A visitless live selection (search pick) is NOT a conflict:
+      // the deep link still supplies the visit for it.
+      const liveSelectionContradictsVisit = (): boolean => {
+        const live = selectedPatientRef.current;
+        const liveVisitId = live?.visit_id ?? null;
+        const urlVisitId = visitIdFromUrl ?? null;
+        return urlVisitId !== null && liveVisitId !== null && String(liveVisitId) !== String(urlVisitId);
+      };
+      if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;
 
       const patientResponse = await fetch(`${API_V1_BASE}/patients/${patientIdFromUrl}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (epoch !== navigationEpochRef.current) return;
-      if (liveSelectionIsOtherPatient()) return;
+      if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;
 
       if (!patientResponse.ok) {
         return;
@@ -717,7 +735,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
       const patientData = await patientResponse.json();
       if (epoch !== navigationEpochRef.current) return;
-      if (liveSelectionIsOtherPatient()) return;
+      if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;
       const patientName = `${patientData?.last_name || ''} ${patientData?.first_name || ''} ${patientData?.middle_name || ''}`.trim();
 
       setSelectedPatient((prev: SelectedPatient | null) => ({

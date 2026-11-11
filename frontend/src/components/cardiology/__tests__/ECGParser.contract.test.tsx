@@ -317,6 +317,97 @@ describe('ECGPARSER-FE-003: parsed QRS/QTc reach the structured /cardio/ecg colu
   });
 });
 
+describe('RETRO-3965-01: a P-wave axis is never relabeled as the QRS electrical axis', () => {
+  // Post-merge review 3968 (origin #3965): the parser used pAxis as a
+  // fallback for the generic `axis`, so a P-only document (e.g.
+  // <pAxis value="-55"/> with no qrsAxis) was classified on the QRS
+  // −30…+90 scale (spurious left-axis) and persisted axis="-55" into the
+  // structured /cardio/ecg record instead of null.
+
+  it('parser-level: a P-only document keeps axis null and exposes pAxis separately', async () => {
+    const xml = `<?xml version="1.0"?>
+<ECG>
+  <heartRate value="75"/>
+  <pAxis value="-55"/>
+  <rhythm code="sinus"/>
+</ECG>`;
+    const result = (await parseECGFile(new File([xml], 'p-only.xml', { type: 'text/xml' }))) as {
+      success: boolean;
+      parameters: Record<string, unknown>;
+    };
+    expect(result.success).toBe(true);
+    expect(result.parameters.axis).toBeNull();
+    expect(result.parameters.pAxis).toBe(-55);
+  });
+
+  it('parser-level: both axes present keeps them distinct (axis=QRS, pAxis=P)', async () => {
+    const xml = `<?xml version="1.0"?>
+<ECG>
+  <heartRate value="75"/>
+  <pAxis value="10"/>
+  <qrsAxis value="90"/>
+</ECG>`;
+    const result = (await parseECGFile(new File([xml], 'two-axes.xml', { type: 'text/xml' }))) as {
+      success: boolean;
+      parameters: Record<string, unknown>;
+    };
+    expect(result.success).toBe(true);
+    expect(result.parameters.axis).toBe(90);
+    expect(result.parameters.pAxis).toBe(10);
+  });
+
+  it('viewer-level: a P-only document persists axis=null, never the P value as QRS', async () => {
+    const xml = `<?xml version="1.0"?>
+<ECG>
+  <heartRate value="75"/>
+  <pAxis value="-55"/>
+  <rhythm code="sinus"/>
+</ECG>`;
+    await dropAndViewer(new File([xml], 'p-only.xml', { type: 'text/xml' }));
+
+    await waitFor(() => {
+      expect(ecgPersistCall()).toBeDefined();
+    });
+    const [, payload] = ecgPersistCall()!;
+    // The structured column is the QRS electrical axis: absent qrsAxis →
+    // explicit null, never "-55".
+    expect(payload.axis).toBeNull();
+    // The P-wave axis survives only inside the raw parameters dict.
+    const parameters = payload.parameters as Record<string, unknown>;
+    expect(parameters.pAxis).toBe(-55);
+    expect(parameters.axis).toBeNull();
+  });
+
+  it('findings: a P-only document reports axis-not-measured, never a QRS left-axis label', async () => {
+    const xml = `<?xml version="1.0"?>
+<ECG>
+  <heartRate value="75"/>
+  <pAxis value="-55"/>
+  <rhythm code="sinus"/>
+</ECG>`;
+    await dropAndViewer(new File([xml], 'p-only-findings.xml', { type: 'text/xml' }));
+
+    await waitFor(() => {
+      expect(ecgPersistCall()).toBeDefined();
+    });
+    const [, payload] = ecgPersistCall()!;
+    const parameters = payload.parameters as Record<string, unknown>;
+    const findings = parameters.findings as string[];
+    expect(findings).toContain(T('cardio.cardio_parser_axis_not_measured'));
+    expect(findings).not.toContain(T('cardio.cardio_parser_axis_left'));
+    expect(findings).not.toContain(T('cardio.cardio_parser_axis_normal'));
+    expect(findings).not.toContain(T('cardio.cardio_parser_axis_right'));
+  });
+
+  it('unit-level control: analyzeECGParameters still classifies a true QRS axis value', () => {
+    // A genuine qrsAxis of -55 (both-tags document where qrsAxis itself is
+    // negative) is still classified as left-axis — the fix removes only
+    // the P→QRS relabeling, not the QRS classification itself.
+    const { findings } = analyzeECGParameters({ heartRate: 75, axis: -55 });
+    expect(findings).toContain(T('cardio.cardio_parser_axis_left'));
+  });
+});
+
 describe('controls: previously fixed contracts stay intact', () => {
   it('C-1 control: SCP parsing still refuses to fabricate parameters', async () => {
     const scpBytes = new Uint8Array(16);

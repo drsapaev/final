@@ -163,7 +163,11 @@ const TeethChart = ({ onToothClick, onInspect, onClearAll, initialData = {}, rea
             justifyContent: 'center',
             cursor: 'pointer'
           }}
-          disabled={readOnly && !onToothClick && !onInspect}>
+          disabled={readOnly && !onInspect}>
+          {/* RETRO-3966-01 (review 3968): the disabled contract is honest by
+              itself — a readOnly chart without an inspection handler renders
+              DISABLED teeth, never enabled-but-dead ones. With onInspect the
+              tooth stays clickable for inspection only. */}
           
           {status === TOOTH_STATUS.MISSING ?
           <X /> :
