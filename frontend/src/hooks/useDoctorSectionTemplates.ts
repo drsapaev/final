@@ -34,9 +34,29 @@ export type TemplateFetchOutcome =
 interface SectionTemplateCacheEntry {
     data: unknown[] | null;
     promise: Promise<TemplateFetchOutcome> | null;
+    // RETRO-3995-02 (ledger PR 4000): install generation of the request that
+    // last replaced this entry — the SHARED write/delete identity.
+    token: number;
 }
 
 const sectionTemplateCache = new Map<string, SectionTemplateCacheEntry>();
+// RETRO-3995-02: monotonic per-key install generation. The request epoch is
+// per hook INSTANCE and cannot see another instance's newer write into the
+// SHARED map, so a last responder can pass its own epoch check and replace a
+// newer successful entry with its stale payload (and a stale failure can
+// delete it). Every cache write and every cache delete must still hold the
+// newest token; a stale-generation response adopts the newer shared truth
+// (or chains onto its pending read) instead of painting its own payload.
+const sectionTemplateCacheTokens = new Map<string, number>();
+
+const acquireCacheToken = (cacheKey: string): number => {
+    const next = (sectionTemplateCacheTokens.get(cacheKey) ?? 0) + 1;
+    sectionTemplateCacheTokens.set(cacheKey, next);
+    return next;
+};
+
+const currentCacheToken = (cacheKey: string): number =>
+    sectionTemplateCacheTokens.get(cacheKey) ?? 0;
 let sectionTemplateCacheOwner: string | null = null;
 const getCacheOwner = (): string | null => {
     try {
@@ -52,6 +72,7 @@ const syncSectionTemplateCacheOwner = (): void => {
     const owner = getCacheOwner();
     if (owner !== sectionTemplateCacheOwner) {
         sectionTemplateCache.clear();
+        sectionTemplateCacheTokens.clear();
         sectionTemplateCacheOwner = owner;
     }
 };
@@ -258,6 +279,13 @@ export function useDoctorSectionTemplates({
             setError(null);
         }
 
+        // RETRO-3995-02: the per-key install token of THIS read. Every cache
+        // write/delete below must still hold the newest token: a newer
+        // same-key install (another instance's forced post-mutation refresh)
+        // invalidates this request's cache claims, and its stale response
+        // adopts the newer shared truth instead of overwriting it.
+        const myCacheToken = canUseCache ? acquireCacheToken(cacheKey) : 0;
+
         // Annotated: keeps the outcome literals narrow (ok: true / ok: false)
         // so the shared promise matches the cached-entry type.
         const loadPromise = (async (): Promise<TemplateFetchOutcome> => {
@@ -276,15 +304,41 @@ export function useDoctorSectionTemplates({
                 // RETRO-3953-03: a superseded request's late response must not
                 // poison the cache either — only the CURRENT request context
                 // may claim the cache entry.
+                // RETRO-3995-02: and only the holder of the newest per-key
+                // install token may write it — a stale cross-instance
+                // responder adopts the newer shared truth (pending read or
+                // committed data) instead of replacing it with its payload.
+                let committedData = templatesData;
                 if (
                     canUseCache &&
                     sectionTemplateCacheOwner === ownerAtRequest &&
-                    epoch === requestEpochRef.current
+                    epoch === requestEpochRef.current &&
+                    myCacheToken === currentCacheToken(cacheKey)
                 ) {
                     sectionTemplateCache.set(cacheKey, {
                         data: templatesData,
                         promise: null,
+                        token: myCacheToken,
                     });
+                } else if (canUseCache) {
+                    const newerEntry = sectionTemplateCache.get(cacheKey);
+                    if (newerEntry?.promise && newerEntry.token !== myCacheToken) {
+                        // A newer same-key read is still in flight: its
+                        // outcome is the freshest shared truth — chain onto it
+                        // so this instance AND every joiner of this stale
+                        // request converge on the newer result. The token
+                        // comparison never chains onto THIS request's own
+                        // install: the same key can be stale by EPOCH (this
+                        // instance switched context) while the install token
+                        // is still ours — a self reference would create a
+                        // promise cycle.
+                        return newerEntry.promise;
+                    }
+                    if (newerEntry?.data && newerEntry.token !== myCacheToken) {
+                        // A newer same-key read already committed successful
+                        // data: prefer it over this stale payload.
+                        committedData = newerEntry.data;
+                    }
                 }
 
                 // EMRTMPL-FE-003: commit only if this request context is
@@ -292,22 +346,40 @@ export function useDoctorSectionTemplates({
                 // still the LIVE context (a stale-closure forced refresh may
                 // own the newest epoch yet paint a context the doctor left).
                 if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {
-                    setTemplates(templatesData);
+                    setTemplates(committedData);
                 }
 
-                return { ok: true, data: templatesData };
+                return { ok: true, data: committedData };
             } catch (err: unknown) {
                 logger.error('[useDoctorSectionTemplates] Fetch error:', err);
-                if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {
-                    setError((err as Error).message || 'Failed to load templates');
-                    setTemplates([]);
+                const message = (err as Error).message || 'Failed to load templates';
+                // RETRO-3995-02: only the newest generation may own its
+                // failure. A stale-generation failure must never delete a
+                // newer successful entry or pending promise, nor paint a
+                // false failure over fresher known data — it adopts the
+                // newer shared truth instead.
+                if (myCacheToken === currentCacheToken(cacheKey)) {
+                    if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {
+                        setError(message);
+                        setTemplates([]);
+                    }
+                    if (canUseCache && sectionTemplateCacheOwner === ownerAtRequest) {
+                        sectionTemplateCache.delete(cacheKey);
+                    }
+                    return { ok: false, error: message };
                 }
-                if (canUseCache) {
-                    sectionTemplateCache.delete(cacheKey);
+                const newerEntry = canUseCache ? sectionTemplateCache.get(cacheKey) : undefined;
+                if (newerEntry?.promise && newerEntry.token !== myCacheToken) {
+                    return newerEntry.promise;
                 }
-                // RETRO-3953-04: the failure is part of the shared outcome, so
-                // a joining subscriber sees it too.
-                return { ok: false, error: (err as Error).message || 'Failed to load templates' };
+                if (newerEntry?.data && newerEntry.token !== myCacheToken) {
+                    if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {
+                        setTemplates(newerEntry.data);
+                        setError(null);
+                    }
+                    return { ok: true, data: newerEntry.data };
+                }
+                return { ok: false, error: message };
             }
         })();
 
@@ -315,6 +387,7 @@ export function useDoctorSectionTemplates({
             sectionTemplateCache.set(cacheKey, {
                 data: cachedEntry?.data || null,
                 promise: loadPromise,
+                token: myCacheToken,
             });
         }
 
@@ -327,6 +400,7 @@ export function useDoctorSectionTemplates({
                     sectionTemplateCache.set(cacheKey, {
                         data: currentEntry.data || null,
                         promise: null,
+                        token: currentEntry.token,
                     });
                 }
             }
