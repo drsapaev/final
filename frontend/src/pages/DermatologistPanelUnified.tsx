@@ -1702,6 +1702,7 @@ const DermatologistPanelUnified = () => {
                     {t('derma.derma_panel_emr_title')}
                   </h4>
                   <EMRContainerV2
+                  key={(currentAppointment?.visit_id ?? 'no-visit') as string | number}
                   visitId={(currentAppointment?.visit_id ?? undefined) as string | number}
                   patientId={(currentAppointment?.patient_id ?? undefined) as string | number | null | undefined}
                   specialty="dermatology"
