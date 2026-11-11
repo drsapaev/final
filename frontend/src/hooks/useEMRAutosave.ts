@@ -234,6 +234,22 @@ export function useEMRAutosave({
     // the time the timer was scheduled.
     doAutosaveRef.current = doAutosave;
 
+    // RETRO-3971-04 (post-merge review of the 3969–3996 window): a pending
+    // autosave debounce must not be silently discarded when the editor
+    // unmounts (SPA navigation / visit switch). Only the browser
+    // beforeunload was guarded; the dirty-effect cleanup merely cleared
+    // the timers, so keystrokes inside the debounce window never reached
+    // the server. On unmount, invoke the LATEST doAutosave once — the
+    // last-chance flush. Its own guards (canSave, the error-pause policy,
+    // isDirty) decide whether a POST actually fires, and the BS-17
+    // latest-ref guarantees the latest saveEMR closure over the LATEST
+    // state.data snapshot. saveEMR itself already guards stale-visit
+    // dispatches (RETRO-3930-01), so a post-unmount resolution cannot
+    // touch the unmounted editor's state.
+    useEffect(() => () => {
+        doAutosaveRef.current?.();
+    }, []);
+
     /**
      * Clear all timers
      */
