@@ -1,3 +1,15 @@
+## Resume — T18 RQ-18 browser recorder — 2026-11-11T23:06:57+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111, based on fresh origin/main 360924867d5364d7fd1cb801891a22f300103d25.
+
+The RQ-18 recorder now reads asset bytes after requestfinished, drains outstanding assets before goto/reload/back/forward document navigation, and waits before closing synthetic QR contexts. Source commits `cbb512e8c84dffff8f0243e269215b9f0cedc8c2` and `1e5787eeb4987f558d54a26b85c70d32683701c5` contain the change. The focused 1 MiB streaming-body regression fails when the navigation drain is bypassed (browser-response-body-unavailable) and passes with the fix (3/3), including a forward-history transition. Targeted TypeScript compile, Playwright discovery and diff checks pass; scoped ESLint reports no errors and two existing warnings at lines 291/310. Local npm run build is blocked before compilation by missing nitro in shared C:\final\frontend\node_modules; do not install into the shared tree.
+
+Current tracked changes: frontend/e2e/rq18-permanent-qr-live.spec.ts and the three T18 journals. Gate gate_known_root_cause was rerun for all four paths; latest result narrow_override, no misroute, override used, handoff required, prompt read. No staging, production, DB, or deployment was run. T18/Tier-2 remains PARTIAL; full RQ-18 live flow, artifact provenance, other T18 cases and STAGING_VALIDATION.md checks remain outstanding.
+
+Next exact action: commit the three journal updates, push the focused branch and create a Draft PR, then verify exact-head GitHub CI. After merge, run canonical Preflight → Start → Session using only a unique synthetic Compose project and the exact-head frontend artifact; record actual results and teardown. Keep the main checkout untouched and preserve unrelated worktrees.
+
+---
+
 ## Resume — PR #3946 GitGuardian follow-up — 2026-11-10T00:22:20+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3946 is OPEN, Ready for review, mergeable, and pushed at HEAD `2ca1255fbdd8bf39601ae81ab487476fb31d08ee` on base `origin/main` `929363c66315b2b70229439662e3a92d7b9b1ab8`.

@@ -1,5 +1,13 @@
 # Progress — T18 final acceptance
 
+## Current checkpoint — RQ-18 browser asset recorder — 2026-11-11T23:06:57+05:00
+
+- Umbrella task: bd2f7564-bd3d-449d-8d85-5a9325722a80. T18/Tier-2 remains PARTIAL; PR #3946 is merged at e2fd5a0d498645f541fc9948bc5809a8228bd7dd. Current fresh origin/main and worktree base: 360924867d5364d7fd1cb801891a22f300103d25.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final; branch codex/aqs-t18-rq18-recorder-fix-20261111. Source commits: cbb512e8c84dffff8f0243e269215b9f0cedc8c2 and 1e5787eeb4987f558d54a26b85c70d32683701c5. Journal changes are being prepared as a follow-up evidence commit for one focused PR.
+- Root cause: RQ-18 starts asynchronous browser Response.body() reads on response headers while page transitions or closing anonymous contexts can cancel body retrieval. Recorder now drains active JS/CSS/service-worker requests before goto/reload/back/forward document transitions, reads only after requestfinished, and waits before closing synthetic contexts. A duplicate canceled request does not override an already captured body for the same origin/path.
+- Validation: local regression passed 3/3, including a slow body before document and forward-history navigation; deliberate no-drain control failed with browser-response-body-unavailable; targeted TypeScript compile passed; Playwright collected 2 tests in the RQ-18 file; scoped ESLint had 0 errors and 2 existing raw-fetch warnings at lines 291/310; git diff --check passed. npm run build was attempted and failed before compilation because shared C:\final\frontend\node_modules lacks nitro; no package install was attempted. Both source commits' applicable pre-commit hooks passed.
+- Not completed: exact-head GitHub CI, full RQ-18 scenario on synthetic staging, served-artifact provenance verification, remaining T18 scenarios, and all checks in docs/runbooks/STAGING_VALIDATION.md. No staging, production, DB, or deployment was touched.
+- Next exact action: commit the three journal updates, push the focused branch and open a Draft PR, then verify exact-head CI. After merge, continue the exact-head synthetic RQ-18 staging cycle. Keep Tier-2 PARTIAL until every required check has evidence.
 ## PR #3946 — GitGuardian workflow finding — 2026-11-10T00:22:20+05:00
 
 PR #3946 remains OPEN and unmerged at pushed HEAD `2ca1255fbdd8bf39601ae81ab487476fb31d08ee`, based on current main `929363c66315b2b70229439662e3a92d7b9b1ab8`. Commit `2ca1255` replaces fixed CI-only Compose values with per-run values and adds a focused guard test. PR description was refreshed and passes the local review-template validator.

@@ -1,3 +1,24 @@
+## T18 — RQ-18 browser response-body recorder — 2026-11-11T23:06:57+05:00
+
+- Commit under test: source commit `1e5787eeb4987f558d54a26b85c70d32683701c5` (includes recorder fix `cbb512e8c84dffff8f0243e269215b9f0cedc8c2` plus the forward-history navigation drain), based on `360924867d5364d7fd1cb801891a22f300103d25`; evidence journal changes are a follow-up documentation commit.
+- Environment: isolated Windows worktree; Node v24.15.0; local Chromium via Playwright. No app server, Compose, staging, production, or database was started.
+- Execution mode: gate_known_root_cause; gate run from ai/langgraph/scripts/run_agent_gate.ps1. Known root: frontend/e2e/rq18-permanent-qr-live.spec.ts. Gate result: narrow_override, gate_misroute=no, override_used=yes; initial handoff_required=no. After adding the three T18 journals to the reviewed scope, the gate returned narrow_override, gate_misroute=no, override_used=yes, handoff_required=yes; generated execution prompt read.
+- Allowed paths: frontend/e2e/rq18-permanent-qr-live.spec.ts and .ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md; ignored generated-only worktree .scratch/ for temporary Playwright config/results. Denied: runtime/API/database/auth changes, gate/router edits, production, foreign Compose projects, merge and deployment.
+- Actual changed tracked paths: the RQ-18 E2E spec and the three T18 journals. No product runtime changed.
+- Original failure: earlier T18 run recorded 13 browser-response-body-unavailable failures and no application asset hashes. Prior synthetic A/B evidence in the project journal showed navigation during a streaming body could cause resource-id-missing.
+- Validation commands/results:
+  - Focused Chromium regression with protected document and forward-history navigation barriers, `--repeat-each=3` — PASS, 3/3. The test streams a 1 MiB browser-only JavaScript body, requests navigation before the body completes, returns to the page, requests it again, and exercises forward navigation; it checks the browser-delivered hash against an independent response with different bytes.
+  - Negative control with only the regression navigation changed to bypass the drain — expected FAIL, browser-response-body-unavailable; protection restored and the 3/3 run passed.
+  - Playwright collection for this spec — PASS, 2 tests discovered; only the local provenance regression was executed. Full live RQ-18 scenario remains NOT_RUN.
+  - Targeted TypeScript compile on the spec with `--ignoreConfig --noEmit --target ES2022 --module ESNext --moduleResolution bundler --strict` — PASS.
+  - Scoped ESLint — PASS with 0 errors and 2 existing warnings at unchanged raw-fetch lines 291 and 310.
+  - git diff --check — PASS.
+  - Source-commit pre-commit hooks on both source commits — PASS for large files, merge markers, private-key detection, YAML/JSON/TOML applicability, whitespace/end-of-file, branch policy, and Gitleaks; language-specific hooks were skipped because no matching files were staged.
+  - npm.cmd run build — FAIL before app compilation: Vite could not import nitro from shared C:\final\frontend\node_modules; dependencies were not installed or modified.
+- Result: recorder fix locally validated; full T18/Tier-2 remains PARTIAL.
+- Scope check: no tracked files outside the four allowed paths; no secrets, patient data, real network target, staging, or production was used.
+- Remaining limitation: exact-head CI and synthetic staging RQ-18 are pending. served_revision_verified is not claimed. PR: pending creation. Merge commit: not applicable.
+
 ## PR #3946 GitGuardian workflow follow-up — 2026-11-10T00:22:20+05:00
 
 - Commit under test: `2ca1255fbdd8bf39601ae81ab487476fb31d08ee`; base/current main `929363c66315b2b70229439662e3a92d7b9b1ab8`.
