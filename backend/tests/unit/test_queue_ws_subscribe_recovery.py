@@ -1,6 +1,6 @@
 """Queue WS Redis SUBSCRIBE truthfulness and reconnect race regressions.
 
-QUEUESUB-POST4008-01 (audit #3961). All data and sockets are synthetic;
+QUEUEWS-POST4008-SUBSCRIBE-01 (audit #3961). All data and sockets are synthetic;
 no real Redis, patient records, or network calls. Tests were staged before
 the implementation and must be run with the repo's mandatory gate.
 """
