@@ -61,6 +61,11 @@ async function goBackWithServedAssetDrain(page: Page) {
   return page.goBack();
 }
 
+async function goForwardWithServedAssetDrain(page: Page) {
+  await servedAssetDrainByPage.get(page)?.();
+  return page.goForward();
+}
+
 type QueueProfileRow = {
   key?: string;
   name?: string;
@@ -537,7 +542,7 @@ async function verifyT18SpecialistsNavigation(page: Page) {
   await assertReturnContext('queue-profiles');
   await goBackWithServedAssetDrain(page);
   await assertReturnContext('catalog');
-  await page.goForward();
+  await goForwardWithServedAssetDrain(page);
   await assertReturnContext('queue-profiles');
   await page.getByTestId('queue-setup-return-link').click();
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
@@ -943,17 +948,23 @@ test('RQ-18 provenance hashes the browser response body before navigation cancel
       headers: { ...route.request().headers(), 'x-rq18-browser-probe': 'browser' },
     }));
     await gotoWithServedAssetDrain(page, origin, { waitUntil: 'domcontentloaded' });
-    const browserResponsePromise = page.waitForResponse((response) => response.url() === probeUrl);
-    await page.evaluate((url) => {
-      const script = document.createElement('script');
-      script.src = url;
-      document.head.append(script);
-    }, probeUrl);
-    const browserResponse = await browserResponsePromise;
-    expect(browserResponse.status()).toBe(200);
+    const requestBrowserProbeScript = async () => {
+      const browserResponsePromise = page.waitForResponse((response) => response.url() === probeUrl);
+      await page.evaluate((url) => {
+        const script = document.createElement('script');
+        script.src = url;
+        document.head.append(script);
+      }, probeUrl);
+      const browserResponse = await browserResponsePromise;
+      expect(browserResponse.status()).toBe(200);
+    };
+    await requestBrowserProbeScript();
     await gotoWithServedAssetDrain(page, new URL('/after-capture', origin).toString(), {
       waitUntil: 'domcontentloaded',
     });
+    await goBackWithServedAssetDrain(page);
+    await requestBrowserProbeScript();
+    await goForwardWithServedAssetDrain(page);
     const independentResponse = await independentRequest.get(probeUrl);
     const independentHash = crypto.createHash('sha256').update(await independentResponse.body()).digest('hex');
     expect(independentHash).not.toBe(browserHash);
