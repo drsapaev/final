@@ -22683,6 +22683,8 @@ export type paths = {
          * @description Получить статистику позиций в очереди
          *
          *     Возвращает список всех записей с их позициями.
+         *
+         *     Доступно: Admin, Registrar, Doctor (и SuperAdmin).
          */
         get: operations["get_queue_positions_stats_api_v1_queue_position_stats_queue__queue_id__get"];
         put?: never;
