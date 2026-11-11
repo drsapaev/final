@@ -158,6 +158,23 @@ export function useEMRAutosave({
                 return;
             }
 
+            // RETRO-3971-02 (post-merge review of the 3969–3996 window):
+            // saveEMR resolves null/undefined when the save never actually
+            // ran for the CURRENT visit — useEMR's stale-visit bail returns
+            // null for a late failure of a previous visit, and the
+            // dermatology panel mounts its EMR container without a
+            // per-visit key, so the surviving hook instance carried the
+            // previous visit's failure into the success bookkeeping and
+            // the status indicator rendered "saved" for the new visit's
+            // fresh editor. A save that did not happen is not a success:
+            // no timestamp stamp, no error-counter reset; the drop is
+            // reported through onAutosaveError (type 'staleVisit') and the
+            // counter keeps the conflict policy (no reset, no increment).
+            if (result == null) {
+                onAutosaveError?.({ type: 'staleVisit', error: result, retryCount: errorCountRef.current });
+                return;
+            }
+
             lastSaveTimeRef.current = Date.now();
             errorCountRef.current = 0; // Reset on success only
 
