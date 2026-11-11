@@ -63,6 +63,12 @@ class TestDisplayWebSocketApiService:
             def get_active_doctor_by_user_id(self, user_id):
                 return SimpleNamespace(id=7, user_id=100, specialty="cardio")
 
+            def claim_waiting_entry(self, entry, *, called_at, called_by_user_id):
+                entry.status = "called"
+                entry.called_at = called_at
+                entry.called_by_user_id = called_by_user_id
+                return True
+
             def save(self):
                 return None
 
@@ -127,7 +133,7 @@ class TestDisplayWebSocketApiService:
         repository = SimpleNamespace(
             get_queue_entry=lambda entry_id: None,
             save=lambda: None,
-            list_active_entries_for_day=lambda day: [entry],
+            list_active_entries_for_department=lambda day, department: [entry],
             get_active_doctor_by_specialty=lambda specialty: None,
             get_daily_queue_for_specialist=lambda day, specialist_id: None,
             get_next_waiting_entry=lambda queue_id: None,

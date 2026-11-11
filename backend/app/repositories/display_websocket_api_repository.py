@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
@@ -30,11 +30,50 @@ class DisplayWebSocketApiRepository:
     def save(self) -> None:
         self.db.commit()
 
-    def list_active_entries_for_day(self, *, day: date) -> list[OnlineQueueEntry]:
+    def list_active_entries_for_department(
+        self, *, day: date, department: str
+    ) -> list[OnlineQueueEntry]:
+        """DISPLAYWS-BE-003 (audit PR #3961 round 30): the department queue
+        snapshot is scoped to the requested department through the two SSOT
+        ownership axes — never "every active queue of the day" again:
+
+        - registry tag axis: ``DailyQueue.queue_tag`` equals any family
+          spelling of the department key (doctorless resource surfaces:
+          lab, ecg, ...);
+        - doctor specialty axis: ``Doctor.specialty`` equals any family
+          spelling (``specialty_variants`` — 'stomatology' reaches doctors
+          stored as 'dentistry', D-1 canonical vocabulary).
+
+        An unknown department resolves to zero matching queues and returns
+        an honest empty list instead of mislabeled cross-department PHI.
+        Comparisons are case-insensitive on both sides (legacy rows keep
+        mixed-case stored spellings).
+        """
+        key = (department or "").strip().lower()
+        if not key:
+            return []
+        spellings = {
+            spelling.strip().lower()
+            for spelling in specialty_variants(key)
+            if spelling and spelling.strip()
+        }
+        spellings.add(key)
         return (
             self.db.query(OnlineQueueEntry)
-            .join(DailyQueue)
-            .filter(DailyQueue.day == day, DailyQueue.active.is_(True))
+            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+            .outerjoin(Doctor, DailyQueue.specialist_id == Doctor.id)
+            .filter(
+                DailyQueue.day == day,
+                DailyQueue.active.is_(True),
+                or_(
+                    func.lower(func.coalesce(DailyQueue.queue_tag, "")).in_(
+                        sorted(spellings)
+                    ),
+                    func.lower(func.coalesce(Doctor.specialty, "")).in_(
+                        sorted(spellings)
+                    ),
+                ),
+            )
             .all()
         )
 
@@ -167,12 +206,62 @@ class DisplayWebSocketApiRepository:
         )
 
     def get_next_waiting_entry(self, *, queue_id: int) -> OnlineQueueEntry | None:
+        """DISPLAYCALL-BE-002 (audit PR #3961 round 30): quick-call 'next'
+        follows the canonical staff fairness selector (queue_svc
+        ``staff_call_next_patient``): priority DESC, then
+        coalesce(queue_time, created_at) ASC, then id ASC as the
+        deterministic tie-break — NOT the printed ticket number, which
+        would bypass restored (priority=1) patients."""
         return (
             self.db.query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == queue_id,
                 OnlineQueueEntry.status == "waiting",
             )
-            .order_by(OnlineQueueEntry.number)
+            .order_by(
+                OnlineQueueEntry.priority.desc(),
+                func.coalesce(
+                    OnlineQueueEntry.queue_time,
+                    OnlineQueueEntry.created_at,
+                ).asc(),
+                OnlineQueueEntry.id.asc(),
+            )
             .first()
         )
+
+    def claim_waiting_entry(
+        self,
+        entry: OnlineQueueEntry,
+        *,
+        called_at: datetime,
+        called_by_user_id: int | None,
+    ) -> bool:
+        """DISPLAYCALL-BE-003 (audit PR #3961 round 30): the waiting→called
+        transition is ONE conditional UPDATE keyed on status='waiting' —
+        two concurrent display quick-calls can never both claim the same
+        entry. Returns True iff THIS caller won the row; the service turns
+        a False return into a 409 without any broadcast.
+
+        The ORM row is refreshed here so the caller reads committed state
+        without touching the session directly (service/repository boundary
+        guard)."""
+        updated = (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.id == entry.id,
+                OnlineQueueEntry.status == "waiting",
+            )
+            .update(
+                {
+                    "status": "called",
+                    "called_at": called_at,
+                    "called_by_user_id": called_by_user_id,
+                    "updated_at": called_at,
+                },
+                synchronize_session=False,
+            )
+        )
+        self.db.commit()
+        if updated:
+            self.db.refresh(entry)
+        return updated == 1

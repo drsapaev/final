@@ -285,6 +285,7 @@ class TestQueueCabinetManagementApiService:
                     queue=doctor_queue,
                 ),
                 save=lambda: None,
+                claim_waiting_entry=lambda entry, called_at, called_by_user_id: True,
             ),
             manager_provider=lambda: manager,
         )
