@@ -77,7 +77,11 @@ class QueuePositionNotificationService:
         return metadata
 
     async def notify_patient_called(
-        self, entry: OnlineQueueEntry, cabinet_number: str | None = None
+        self,
+        entry: OnlineQueueEntry,
+        cabinet_number: str | None = None,
+        *,
+        manual_resend: bool = False,
     ) -> dict[str, Any]:
         """
         Уведомление о вызове пациента
@@ -85,6 +89,11 @@ class QueuePositionNotificationService:
         Args:
             entry: Запись в очереди
             cabinet_number: Номер кабинета
+            manual_resend: True — намерение «ручной повтор»
+                (``POST /queue/position/notify/call``); только для него
+                действует антидубль-окно. Канонические переходы очереди
+                (QR call-next, nurse serving, GraphQL-мутация) вызывают
+                метод без флага и никогда не подавляются кулдауном.
 
         Returns:
             Результат отправки уведомления
@@ -113,27 +122,31 @@ class QueuePositionNotificationService:
                 ),
             }
 
-        # Антидубль: повторный вызов того же билета в окно кулдауна
-        # подавляется с честным отчётом (без спама пациенту).
+        # QPOSCALL-BE-001 + пост-merge ревью PR #4013: антидубль-окно
+        # guardирует ТОЛЬКО намерение «ручной повтор» (manual_resend=True).
+        # Канонический вызов после перехода waiting→called реестр не
+        # проверяет и подавлен быть не может. Неудачная попытка (нет
+        # канала/пользователя, ошибка отправителя, raise) кулдаун не
+        # начинает — повтор обязан иметь возможность фактического повтора.
         now = datetime.now(UTC)
         entry_key = int(getattr(entry, "id", 0) or 0)
-        last_sent = self._manual_call_log.get(entry_key)
-        if last_sent is not None:
-            elapsed = (now - last_sent).total_seconds()
-            if elapsed < self.MANUAL_CALL_COOLDOWN_SECONDS:
-                logger.info(
-                    "Повторное вызов-уведомление для записи %s подавлено "
-                    "(антидубль-окно %.0fс)",
-                    entry_key,
-                    self.MANUAL_CALL_COOLDOWN_SECONDS - elapsed,
-                )
-                return {
-                    "success": True,
-                    "sent": False,
-                    "reason": "duplicate_suppressed",
-                    "error": None,
-                }
-        self._manual_call_log[entry_key] = now
+        if manual_resend:
+            last_sent = self._manual_call_log.get(entry_key)
+            if last_sent is not None:
+                elapsed = (now - last_sent).total_seconds()
+                if elapsed < self.MANUAL_CALL_COOLDOWN_SECONDS:
+                    logger.info(
+                        "Повторное вызов-уведомление для записи %s подавлено "
+                        "(антидубль-окно %.0fс)",
+                        entry_key,
+                        self.MANUAL_CALL_COOLDOWN_SECONDS - elapsed,
+                    )
+                    return {
+                        "success": True,
+                        "sent": False,
+                        "reason": "duplicate_suppressed",
+                        "error": None,
+                    }
 
         patient_name = entry.patient_name or "Пациент"
         cabinet_info = f"\nКабинет: {cabinet_number}" if cabinet_number else ""
@@ -154,7 +167,7 @@ class QueuePositionNotificationService:
             "timestamp": datetime.now(UTC).isoformat(),
         }
 
-        return await self._send_notification_to_patient(
+        result = await self._send_notification_to_patient(
             entry=entry,
             title=title,
             body=body,
@@ -162,6 +175,28 @@ class QueuePositionNotificationService:
             sound="call_notification",  # Специальный звонок
             priority="high",
         )
+
+        # Кулдаун фиксируется только фактической доставкой (sent=True):
+        # no_user_found / ошибка отправителя не подавляют последующий
+        # легитимный повтор. Просроченные ключи вытесняются при записи
+        # (bounded, in-process only — кросс-воркерная дедупликация не
+        # заявляется).
+        if result.get("sent"):
+            self._prune_manual_call_log(now)
+            self._manual_call_log[entry_key] = now
+        return result
+
+    def _prune_manual_call_log(self, now: datetime) -> None:
+        """Вытеснить просроченные ключи антидубль-реестра — размер
+        реестра ограничен живым окном кулдауна (не растёт всё время
+        жизни воркера)."""
+        expired = [
+            key
+            for key, ts in self._manual_call_log.items()
+            if (now - ts).total_seconds() >= self.MANUAL_CALL_COOLDOWN_SECONDS
+        ]
+        for key in expired:
+            self._manual_call_log.pop(key, None)
 
     async def notify_position_update(
         self,
