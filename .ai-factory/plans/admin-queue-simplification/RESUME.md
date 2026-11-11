@@ -1,3 +1,16 @@
+## Resume — PR #4026 synced to current main; exact-head validation pending — 2026-11-11T23:49:30+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
+
+PR #4026 remote head is 90a93c074193544eaf76753510516ad77dc546c4. The branch is locally synchronized with fresh origin/main 3f703c1b5c6cbf215614bc45f6d235c3cab06ad8 (#4021) in merge candidate 455488c271d147eb20c07222b276e46bafb59a85. Incoming main changes are only the four generated OpenAPI/API type and UI-baseline files; merge had no conflicts. The three-journal update is not yet committed; push, PR body refresh, and exact-head checks remain pending.
+
+Exact-head CI on 90a93c0 passed: Unified CI #43075842982 (frontend unit/build/E2E/lint and PR Required Gate), PR Review Quality Gate #43075843113, Agent Workflow Guards #43075843125, Gitleaks #43075843151, Security #43075842996, and PR Lifecycle Recommendation #43075842956. Backend/integration/Docker/staging-readiness/production-readiness/parity/load checks were skipped by scope. The local 1 MiB streaming-response regression passed 3/3; its no-drain control failed as expected; TypeScript and scoped lint passed (0 errors, 2 existing warnings). Local app build was blocked before compilation by missing nitro in shared dependencies; do not install into C:\final.
+
+A canonical Preflight previously passed on 90a93c0, but runtime_readiness=NOT_RUN and served_revision_verified=false. It found C: free 9.24 GiB against the 10 GiB build/Session reserve, D: 26 GiB free, and WSL available memory 3217 MiB. The exact-head runtime images/artifact were not confirmed; Start/Session were not run. A read-only Docker inventory reported 63 images, 86 volumes and 6.064 GB build cache; no cleanup/prune was performed.
+
+The RQ-18 browser recorder reads asset bytes after requestfinished, drains outstanding assets before goto/reload/back/forward, and waits before closing synthetic QR contexts. Source commits: cbb512e8c84dffff8f0243e269215b9f0cedc8c2 and 1e5787eeb4987f558d54a26b85c70d32683701c5. No application runtime/API/database/auth changes.
+
+Next exact actions: run git diff --check; commit and push the three journal changes plus the main sync; refresh the PR #4026 description to the resulting exact HEAD, green checks, and staging limitation; then inspect all newly triggered exact-head CI and review status. Keep Tier-2 PARTIAL and the PR in Draft until those checks are confirmed. No staging start until a fresh canonical Preflight confirms the required reserve and usable exact-head images/artifact. Merge remains user-owned.
 ## Resume — T18 RQ-18 browser recorder — 2026-11-11T23:06:57+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111, based on fresh origin/main 360924867d5364d7fd1cb801891a22f300103d25.
