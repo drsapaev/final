@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from collections import defaultdict
+from datetime import date as calendar_date
+from weakref import WeakValueDictionary
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
@@ -74,13 +77,13 @@ class WSManager:
             log.info("WSManager: sent message to websocket in room")
         except Exception as e:
             log.error("WSManager: error sending to websocket: %s", e)
-            # удалить «мертвый» сокет из всех комнат
-            for r, set_ws in list(self.rooms.items()):
-                if ws in set_ws:
-                    set_ws.discard(ws)
-                    if not set_ws:
-                        self.rooms.pop(r, None)
-                        log.info("WSManager: removed dead websocket from room %s", r)
+            # Use the canonical room lifecycle: direct set.discard()
+            # removed the last socket but skipped Redis unsubscribe,
+            # leaving a stale handler for future connections. A socket
+            # may belong to multiple rooms, so disconnect each one.
+            for room, sockets in list(self.rooms.items()):
+                if ws in sockets:
+                    self.disconnect(ws, room)
 
     def broadcast(self, room: str, data) -> None:
         log.info("WSManager: broadcasting to room %s", room)
@@ -104,22 +107,39 @@ class WSManager:
     def _room_channel(self, room: str) -> str:
         return f"room:{room}"
 
+    def _room_subscription_lock(self, room: str) -> asyncio.Lock:
+        lock = self._subscription_locks.get(room)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._subscription_locks[room] = lock
+        return lock
+
     async def _ensure_room_subscription(self, room: str) -> None:
-        if room in self._redis_handlers:
-            return
+        # Serialize per room so a new subscribe cannot race an old
+        # in-flight Redis unsubscribe on the same channel.
+        async with self._room_subscription_lock(room):
+            if room in self._redis_handlers:
+                return
+            if not self.rooms.get(room):
+                return
 
-        async def _handler(payload, _room: str = room) -> None:
-            remote_data = payload.get("data", payload)
-            await self._broadcast_room(_room, remote_data, publish=False)
+            async def _handler(payload, _room: str = room) -> None:
+                remote_data = payload.get("data", payload)
+                await self._broadcast_room(_room, remote_data, publish=False)
 
-        self._redis_handlers[room] = _handler
-        await self._pubsub.subscribe(self._room_channel(room), _handler)
+            self._redis_handlers[room] = _handler
+            await self._pubsub.subscribe(self._room_channel(room), _handler)
 
     async def _remove_room_subscription(self, room: str) -> None:
-        handler = self._redis_handlers.pop(room, None)
-        if handler is None:
-            return
-        await self._pubsub.unsubscribe(self._room_channel(room), handler)
+        async with self._room_subscription_lock(room):
+            # disconnect() scheduled cleanup when its last socket left,
+            # but a new socket may already have rejoined this room.
+            if self.rooms.get(room):
+                return
+            handler = self._redis_handlers.pop(room, None)
+            if handler is None:
+                return
+            await self._pubsub.unsubscribe(self._room_channel(room), handler)
 
     async def _broadcast_room(self, room: str, data, publish: bool) -> None:
         for ws in list(self.rooms.get(room, set())):
@@ -222,19 +242,24 @@ def broadcast_queue_update(
     }
 
     try:
-        loop = asyncio.get_event_loop()
-        loop.create_task(ws_manager.broadcast(room, message))
-        log.info(
-            "broadcast_queue_update: queued broadcast to room %s, event=%s",
-            room,
-            event_type,
-        )
+        asyncio.get_running_loop()
     except RuntimeError:
         # No event loop running (e.g., in sync test context) — log and skip.
         log.warning(
             "broadcast_queue_update: no event loop, skipping broadcast to %s",
             room,
         )
+        return
+
+    # WSManager.broadcast() is synchronous and already schedules its
+    # _broadcast_room coroutine via _dispatch(). Passing its None return
+    # value to create_task() raises TypeError and interrupts QR mutations.
+    ws_manager.broadcast(room, message)
+    log.info(
+        "broadcast_queue_update: queued broadcast to room %s, event=%s",
+        room,
+        event_type,
+    )
 
 
 def _origin_allowed(origin: str | None) -> bool:
@@ -266,9 +291,14 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
     used it and the flag could leak to production. Tests now use TESTING=1
     (set by pytest conftest) instead.
     """
-    # PR-5: WS_DEV_ALLOW bypass removed. Only TESTING=1 (pytest) skips auth
-    # so unit tests that don't seed users can still connect.
-    if os.getenv("TESTING", "0") == "1":
+    # TESTING is an in-process pytest convenience, not a deployment
+    # authentication override. Only explicitly named local/test modes may
+    # bypass JWT verification; staging, QA and production always verify.
+    environment = os.getenv("ENV", "dev").strip().lower()
+    if (
+        os.getenv("TESTING", "0") == "1"
+        and environment in ("dev", "development", "test", "testing")
+    ):
         return True
     # Extract token from header (preferred) or query param (legacy)
     auth = headers.get("authorization") or headers.get("Authorization")
@@ -291,33 +321,105 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
 
         from app.core.config import settings as _settings
         payload = _jwt.decode(token, _settings.SECRET_KEY, algorithms=[_settings.ALGORITHM])
-        # Check blacklist + resolve the user (QD-1.1 Codex round-3 P2): the
-        # standalone queue stream applies the same sentinel rejection as
-        # every other auth surface — the shared resolver returns None for
-        # internal-only roles, missing users and malformed subjects.
+        # Resolve the principal before checking revocation: JWT "sub" may
+        # be a username, not a numeric ID. Both exact-JTI and all-user
+        # revocation sentinels require the stable database user ID.
         from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
         from app.db.session import SessionLocal as _SessionLocal
+        from app.services.token_blacklist_service import TokenBlacklistService
 
-        jti = payload.get("jti")
-        sub = payload.get("sub")
-        user_id = None
-        if isinstance(sub, str) and sub.isdigit():
-            user_id = int(sub)
-        elif isinstance(sub, int):
-            user_id = sub
         _db = _SessionLocal()
         try:
-            if jti and user_id:
-                from app.services.token_blacklist_service import TokenBlacklistService
-                if TokenBlacklistService.is_token_blacklisted(_db, jti, user_id=user_id):
-                    return False
-            if _resolve_websocket_user(payload, _db) is None:
+            user = _resolve_websocket_user(payload, _db)
+            if user is None:
+                return False
+            jti = payload.get("jti")
+            lookup_jti = jti if isinstance(jti, str) else ""
+            if TokenBlacklistService.is_token_blacklisted(
+                _db, lookup_jti, user_id=user.id
+            ):
                 return False
         finally:
             _db.close()
         return True
     except Exception:
         return False
+
+
+def _queue_room_permitted(token: str | None, department: str, day: str) -> bool:
+    """Allow only staff queue managers or the selected active doctor.
+
+    This is a second, room-specific admission check after the legacy
+    _auth_ok boolean gate. Do not trust JWT subjects or room identifiers
+    without validation: specialist_N denotes Doctor.id, not User.id.
+    """
+    if not isinstance(department, str) or not isinstance(day, str):
+        return False
+    match = re.fullmatch(r"specialist_([1-9][0-9]*)", department.strip())
+    if match is None or not token:
+        return False
+    try:
+        parsed_day = calendar_date.fromisoformat(day.strip())
+        if parsed_day.isoformat() != day.strip():
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    try:
+        import jwt as _jwt
+
+        from app.core.config import settings as _settings
+
+        payload = _jwt.decode(
+            token, _settings.SECRET_KEY, algorithms=[_settings.ALGORITHM]
+        )
+    except Exception:
+        return False
+
+    from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
+    from app.db.session import SessionLocal as _SessionLocal
+    from app.models.clinic import Doctor
+    from app.services.authorization.staff import staff_authorization_service
+    from app.services.token_blacklist_service import TokenBlacklistService
+
+    try:
+        db = _SessionLocal()
+    except Exception:
+        log.warning("Queue room authorization DB unavailable; denying subscription")
+        return False
+
+    try:
+        user = _resolve_websocket_user(payload, db)
+        if user is None or not getattr(user, "is_active", False):
+            return False
+
+        # The all-user revocation sentinel needs the resolved database ID,
+        # even for JWTs whose subject is a username or which lack a JTI.
+        jti = payload.get("jti")
+        lookup_jti = jti if isinstance(jti, str) else ""
+        if TokenBlacklistService.is_token_blacklisted(
+            db, lookup_jti, user_id=user.id
+        ):
+            return False
+
+        if staff_authorization_service.can_manage_queue(user):
+            return True
+        if not staff_authorization_service.can_read_queue(user):
+            return False
+
+        # queue:read is granted to doctors, but not globally across the
+        # clinic. Compare the selected Doctor.id, not the JWT User.id.
+        doctor = (
+            db.query(Doctor)
+            .filter(Doctor.user_id == user.id, Doctor.active.is_(True))
+            .first()
+        )
+        return doctor is not None and doctor.id == int(match.group(1))
+    except Exception:
+        log.warning("Queue room permission lookup failed; denying subscription")
+        return False
+    finally:
+        db.close()
 
 
 # -----------------------------------------------------------------------------
@@ -338,7 +440,10 @@ async def ws_queue(
 
     # PR-4: also extract token from subprotocol/Authorization header
     # so clients don't need to put JWT in the URL.
-    from app.api.v1.endpoints.ws_token import extract_ws_token
+    from app.api.v1.endpoints.ws_token import (
+        accept_echoing_subprotocol,
+        extract_ws_token,
+    )
     secure_token = extract_ws_token(websocket)
     if secure_token and not token:
         token = secure_token
@@ -372,8 +477,29 @@ async def ws_queue(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # ✅ Только после всех проверок — accept
-    await websocket.accept()
+    # Guard the specific room after token validation and before joining.
+    # Existing local pytest fixtures may run without seeded users; deployed
+    # environments, including a leaked TESTING=1 in production, never skip
+    # this room authorization check.
+    local_test_mode = (
+        os.getenv("TESTING", "0") == "1"
+        and env in ("dev", "development", "test", "testing")
+    )
+    if not local_test_mode and not _queue_room_permitted(token, department, date):
+        await websocket.accept()
+        await websocket.send_json(
+            {"type": "error", "reason": "queue room access denied"}
+        )
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    # Only after both checks: browsers offering bearer.<jwt> require the
+    # server to select an offered Sec-WebSocket-Protocol. Keep the plain
+    # accept() path for legacy Authorization/query-token clients.
+    if websocket.headers.get("sec-websocket-protocol"):
+        await accept_echoing_subprotocol(websocket)
+    else:
+        await websocket.accept()
 
     room = f"{department.strip()}::{date.strip()}"
     await ws_manager.connect(websocket, room)
