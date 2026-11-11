@@ -36,6 +36,7 @@ from app.schemas.emr_v2 import (
     EMRSaveRequest,
     EMRSignRequest,
 )
+from app.services.emr_contract import extract_icd10_code, get_emr_text_field
 from app.services.emr_doctor_history_service import (
     EMRDoctorHistoryDomainError,
     EMRDoctorHistoryService,
@@ -495,13 +496,23 @@ async def sign_emr(
         # 🧠 Learn from signed EMR - create section templates
         try:
             template_service = DoctorSectionTemplatesService(db)
-            icd10_code = payload.data.get('icd10_code') or payload.data.get('icd_10_code')
+            # RETRO-3971-01 (post-merge review of the 3969–3996 window): the
+            # canonical EMR places the code at diagnosis.icd10_code and the
+            # treatment text at plan.treatment — the service-level path
+            # already resolves both through the emr_contract SSOT
+            # (emr_v2_service.py). The flat-only reads here learned
+            # unkeyed templates for nested payloads (and keyed them under
+            # a STALE flat code when both shapes coexisted), while
+            # `.get('medications', {}).get('text')` raised AttributeError
+            # on the canonical LIST-shaped medications and silently
+            # skipped ALL section learning for that sign.
+            icd10_code = extract_icd10_code(payload.data)
 
             # Learn from each section with content
             sections_to_learn = [
                 ('anamnesis', payload.data.get('anamnesis_morbi')),
                 ('examination', payload.data.get('examination')),
-                ('treatment', payload.data.get('treatment') or payload.data.get('medications', {}).get('text')),
+                ('treatment', get_emr_text_field(payload.data, 'treatment')),
                 ('recommendations', payload.data.get('recommendations')),
             ]
 
