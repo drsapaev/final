@@ -26,6 +26,9 @@ from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.schemas.misc_endpoints import AnnouncementRequest, CallPatientRequest
+from app.repositories.display_websocket_api_repository import (
+    resolve_display_board_targets,
+)
 from app.services.display_websocket import get_display_manager
 from app.services.display_websocket_api_service import (
     DisplayWebSocketApiDomainError,
@@ -321,25 +324,67 @@ async def send_announcement_to_board(
 
         # Транслируем объявление
         manager = get_display_manager()
-        await manager.broadcast_announcement(
+
+        # DISPLAYTARGET-BE-001 (audit PR #3961): REST board_ids are integer
+        # DB ids while WS rooms are keyed by the board NAME string — resolve
+        # int ids to their DisplayBoard.name room keys before the broadcast.
+        # Unresolvable ids are reported; an explicit unresolvable request
+        # must NOT silently fall back to broadcasting on every live room.
+        explicit_targets = bool(board_ids)
+        resolved_names: list[str] = []
+        unknown_ids: list[int] = []
+        if explicit_targets:
+            resolved_names, unknown_ids = resolve_display_board_targets(
+                db, board_ids
+            )
+        target_board_ids = resolved_names if explicit_targets else None
+
+        delivery_raw = await manager.broadcast_announcement(
             announcement_text=text,
             announcement_type=announcement_type,
             duration=duration,
-            board_ids=board_ids if board_ids else None,
+            board_ids=target_board_ids,
         )
+        delivery = delivery_raw if isinstance(delivery_raw, dict) else {}
 
-        return {
+        # DISPLAYDELIVERY-BE-001 (audit PR #3961): the response reports the
+        # actual transport outcome. boards_notified counts ONLY boards with
+        # a live local delivery — never the raw request count; a failed
+        # broadcast is reported as failed, never as an unconditional "sent".
+        boards_notified = sum(
+            1 for board_status in delivery.values() if board_status == "delivered_local"
+        )
+        status_set = set(delivery.values())
+        if explicit_targets and not resolved_names:
+            display_delivery = "failed"
+        elif not delivery:
+            display_delivery = "unknown"
+        elif status_set == {"delivered_local"}:
+            display_delivery = "delivered"
+        elif status_set == {"failed"}:
+            display_delivery = "failed"
+        elif "failed" in status_set:
+            display_delivery = "partial"
+        else:
+            display_delivery = "unknown"
+
+        response: dict[str, Any] = {
             "success": True,
-            "message": "Объявление отправлено на табло",
+            "announcement_accepted": True,
+            "message": "Объявление принято для трансляции на табло",
             "announcement": {
                 "text": text,
                 "type": announcement_type,
                 "duration": duration,
             },
-            "boards_notified": (
-                len(board_ids) if board_ids else len(manager.connections)
-            ),
+            "boards_requested": len(resolved_names) if explicit_targets else len(delivery),
+            "boards_notified": boards_notified,
+            "display_delivery": display_delivery,
+            "board_delivery": delivery,
         }
+        if unknown_ids:
+            response["unknown_board_ids"] = unknown_ids
+        return response
 
     except HTTPException:
         raise
