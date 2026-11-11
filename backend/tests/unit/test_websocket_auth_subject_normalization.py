@@ -2,7 +2,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.v1.endpoints.display_websocket import authenticate_websocket_token as authenticate_display_token
+from app.api.v1.endpoints.display_websocket import (
+    authenticate_websocket_token as authenticate_display_token,
+)
 from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
 from app.ws.chat_ws import authenticate_websocket as authenticate_chat_websocket
 
@@ -60,8 +62,12 @@ async def test_display_websocket_auth_reuses_subject_normalization(monkeypatch):
     user = SimpleNamespace(id=19, username="admin@example.com")
     db = DummyDB(user)
 
+    # DISPLAYAUTH-BE-001 (audit PR #3961): the display board WebSocket no
+    # longer carries its own decode fork — it reuses the canonical
+    # websocket_auth.authenticate_websocket_token (subject normalization +
+    # TokenBlacklist revocation). Patch the canonical module only.
     monkeypatch.setattr(
-        "app.api.v1.endpoints.display_websocket.jwt.decode",
+        "app.api.v1.endpoints.websocket_auth.jwt.decode",
         lambda *_args, **_kwargs: {"sub": "19"},
     )
     monkeypatch.setattr(

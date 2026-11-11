@@ -47,7 +47,9 @@ def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
         return None
 
     if user is None:
-        logger.warning("WebSocket auth rejected: no user matched token subject %r", subject)
+        logger.warning(
+            "WebSocket auth rejected: no user matched token subject %r", subject
+        )
         return None
 
     # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
@@ -60,12 +62,20 @@ def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
         )
         return None
 
+    # DISPLAYAUTH-BE-002 (audit PR #3961, round 34): a disabled account must
+    # not authenticate ANY WebSocket handshake. Canonical HTTP auth denies
+    # deactivated principals (deps.get_current_user_strict family); the
+    # WebSocket resolver previously did not, so a signed unexpired token of
+    # ``is_active=False`` user opened board/queue/notify sockets. Enforced
+    # here — the single SSOT resolver — so every WS surface inherits it.
+    if not bool(getattr(user, "is_active", True)):
+        logger.warning("WebSocket auth rejected: inactive user_id=%s", user.id)
+        return None
+
     return user
 
 
-async def authenticate_websocket_token(
-    token: str | None, db: Session
-) -> User | None:
+async def authenticate_websocket_token(token: str | None, db: Session) -> User | None:
     """
     Аутентификация WebSocket соединения по JWT токену
     """
@@ -86,7 +96,10 @@ async def authenticate_websocket_token(
             token_user_id = sub
         if jti:
             from app.services.token_blacklist_service import TokenBlacklistService
-            if TokenBlacklistService.is_token_blacklisted(db, jti, user_id=token_user_id):
+
+            if TokenBlacklistService.is_token_blacklisted(
+                db, jti, user_id=token_user_id
+            ):
                 logger.warning("WebSocket auth rejected: token blacklisted jti=%s", jti)
                 return None
     except JWTError:
@@ -114,10 +127,12 @@ async def ws_queue_authenticated(
         # ✅ SECURITY: Rate limiting check
         allowed, reason = websocket_rate_limiter.check_rate_limit(ip_address)
         if not allowed:
-            logger.warning(f"WebSocket rate limit exceeded for IP {ip_address}: {reason}")
+            logger.warning(
+                f"WebSocket rate limit exceeded for IP {ip_address}: {reason}"
+            )
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION,
-                reason=f"Rate limit exceeded: {reason}"
+                reason=f"Rate limit exceeded: {reason}",
             )
             return
 
@@ -160,11 +175,12 @@ async def ws_queue_authenticated(
             while True:
                 try:
                     await asyncio.sleep(HEARTBEAT_INTERVAL)
-                    await websocket.send_json({
-                        "type": "ping",
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-                    logger.debug(f"Sent heartbeat ping to user {authenticated_user.username}")
+                    await websocket.send_json(
+                        {"type": "ping", "timestamp": asyncio.get_event_loop().time()}
+                    )
+                    logger.debug(
+                        f"Sent heartbeat ping to user {authenticated_user.username}"
+                    )
                 except Exception as e:
                     logger.error(f"Error sending heartbeat: {e}")
                     break
@@ -176,8 +192,7 @@ async def ws_queue_authenticated(
                 try:
                     # ✅ SECURITY: Set receive timeout
                     data = await asyncio.wait_for(
-                        websocket.receive_text(),
-                        timeout=CONNECTION_TIMEOUT
+                        websocket.receive_text(), timeout=CONNECTION_TIMEOUT
                     )
                     message = json.loads(data)
 
@@ -185,7 +200,9 @@ async def ws_queue_authenticated(
                     if message.get("type") == "pong":
                         # ✅ BUGFIX: Update list element to modify outer scope variable
                         last_pong[0] = asyncio.get_event_loop().time()
-                        logger.debug(f"Received pong from user {authenticated_user.username}")
+                        logger.debug(
+                            f"Received pong from user {authenticated_user.username}"
+                        )
                         continue
 
                     # Обрабатываем сообщения от аутентифицированного клиента
@@ -198,14 +215,18 @@ async def ws_queue_authenticated(
                     # ✅ BUGFIX: Access list element to get current value
                     time_since_pong = asyncio.get_event_loop().time() - last_pong[0]
                     if time_since_pong > CONNECTION_TIMEOUT:
-                        logger.warning(f"Connection timeout for user {authenticated_user.username}, closing...")
+                        logger.warning(
+                            f"Connection timeout for user {authenticated_user.username}, closing..."
+                        )
                         break
                     # Send ping to check connection
                     try:
-                        await websocket.send_json({
-                            "type": "ping",
-                            "timestamp": asyncio.get_event_loop().time()
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "ping",
+                                "timestamp": asyncio.get_event_loop().time(),
+                            }
+                        )
                     except Exception:
                         break  # Connection is dead
 
@@ -234,7 +255,7 @@ async def ws_queue_authenticated(
     finally:
         # ✅ SECURITY: Remove connection from rate limiter
         websocket_rate_limiter.remove_connection(ip_address)
-        if 'room' in locals():
+        if "room" in locals():
             ws_manager.disconnect(websocket, room)
         db.close()
 
@@ -253,7 +274,7 @@ async def ws_queue_optional_auth(
     if not token:
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
-            reason="Authentication required. Use /ws/queue/auth endpoint."
+            reason="Authentication required. Use /ws/queue/auth endpoint.",
         )
         return
 
@@ -265,8 +286,7 @@ async def ws_queue_optional_auth(
         authenticated_user = await authenticate_websocket_token(token, db)
         if not authenticated_user:
             await websocket.close(
-                code=status.WS_1008_POLICY_VIOLATION,
-                reason="Invalid or missing token"
+                code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token"
             )
             return
 
@@ -305,7 +325,7 @@ async def ws_queue_optional_auth(
         except Exception:
             pass
     finally:
-        if 'room' in locals():
+        if "room" in locals():
             ws_manager.disconnect(websocket, room)
         db.close()
 
@@ -453,7 +473,7 @@ async def _broadcast_patient_call(
     }
 
     # Используем существующий ws_manager для рассылки
-    if hasattr(ws_manager, 'broadcast'):
+    if hasattr(ws_manager, "broadcast"):
         await ws_manager.broadcast(room, json.dumps(message))
 
 
