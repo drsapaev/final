@@ -703,7 +703,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         const livePatientId = live?.patient?.id || live?.patient_id || null;
         return livePatientId !== null && String(livePatientId) !== String(patientIdFromUrl);
       };
-      // RETRO-3969-01 (post-merge review of the #3969–#3996 window): the
+      // RETRO-3969-01 (post-merge review of the 3969–3996 window): the
       // VISIT dimension of the same steal scenario. This effect re-fires
       // on every selection change, so a committed same-patient /
       // different-visit selection (the doctor row-clicked P1 at V_row
