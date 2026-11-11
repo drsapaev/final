@@ -809,17 +809,22 @@ jobs:
     - name: 🧪 Registrar time e2e (Chromium)
       run: |
         cd frontend
-        # 2026-11-11: a sustained DNS outage of the runner's azure apt mirror
-        # failed the apt layer of --with-deps on six consecutive main runs
-        # (the Chromium binary itself downloads from the Playwright CDN and
-        # the runner image already ships the system libraries - only the font
-        # packages needed downloading). Fall back to the global Ubuntu
-        # archive and retry once before giving up.
-        npx playwright install --with-deps chromium || {
-          echo "WARN: --with-deps failed on the runner's azure apt mirror; switching apt to the global Ubuntu archive"
+        # 2026-11-11: a sustained DNS outage of the runner's Ubuntu apt
+        # mirrors failed the apt layer of --with-deps on six consecutive main
+        # runs AND on the global-archive fallback. The Chromium binary
+        # downloads from the Playwright CDN (no apt), the runner image
+        # already ships the required system libraries, and only the extra
+        # font packages need apt - while Chromium's Cyrillic/Latin rendering
+        # uses the preinstalled DejaVu/Liberation/Noto fonts anyway. Install
+        # the browser first, then the font/system layer best-effort with the
+        # global-archive fallback: a mirror outage must degrade the install,
+        # never kill the e2e job before any test runs.
+        npx playwright install chromium
+        if ! npx playwright install-deps chromium; then
+          echo "WARN: apt mirror unreachable - retrying system deps from the global Ubuntu archive"
           sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
-          npx playwright install --with-deps chromium
-        }
+          npx playwright install-deps chromium || echo "WARN: extra font packages unavailable; continuing on the runner's preinstalled fonts"
+        fi
         # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
         npx playwright test e2e/registrar-time.spec.ts --project=chromium
 
@@ -2418,17 +2423,22 @@ jobs:
     - name: рџ§Є Telegram Mini App browser QA artifacts
       run: |
         cd frontend
-        # 2026-11-11: a sustained DNS outage of the runner's azure apt mirror
-        # failed the apt layer of --with-deps on six consecutive main runs
-        # (the Chromium binary itself downloads from the Playwright CDN and
-        # the runner image already ships the system libraries - only the font
-        # packages needed downloading). Fall back to the global Ubuntu
-        # archive and retry once before giving up.
-        npx playwright install --with-deps chromium || {
-          echo "WARN: --with-deps failed on the runner's azure apt mirror; switching apt to the global Ubuntu archive"
+        # 2026-11-11: a sustained DNS outage of the runner's Ubuntu apt
+        # mirrors failed the apt layer of --with-deps on six consecutive main
+        # runs AND on the global-archive fallback. The Chromium binary
+        # downloads from the Playwright CDN (no apt), the runner image
+        # already ships the required system libraries, and only the extra
+        # font packages need apt - while Chromium's Cyrillic/Latin rendering
+        # uses the preinstalled DejaVu/Liberation/Noto fonts anyway. Install
+        # the browser first, then the font/system layer best-effort with the
+        # global-archive fallback: a mirror outage must degrade the install,
+        # never kill the e2e job before any test runs.
+        npx playwright install chromium
+        if ! npx playwright install-deps chromium; then
+          echo "WARN: apt mirror unreachable - retrying system deps from the global Ubuntu archive"
           sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
-          npx playwright install --with-deps chromium
-        }
+          npx playwright install-deps chromium || echo "WARN: extra font packages unavailable; continuing on the runner's preinstalled fonts"
+        fi
         # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
         npx playwright test e2e/telegram-miniapp-release-gate.spec.ts --project=chromium --workers=1 --reporter=line
 
