@@ -124,7 +124,7 @@ class WSManager:
         return lock
 
     async def _ensure_room_subscription(self, room: str) -> None:
-        # QUEUESUB-POST4008-01: a handler is cached only after the bridge
+        # QUEUEWS-POST4008-SUBSCRIBE-01: a handler is cached only after the bridge
         # confirms Redis SUBSCRIBE. Serializing first connects also prevents a
         # second socket from treating an in-flight subscription as established.
         async with self._room_subscription_lock(room):
