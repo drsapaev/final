@@ -66,8 +66,14 @@ export function useEMRKeyboard({
     // Check for Ctrl/Cmd key
     const isCtrl = e.ctrlKey || e.metaKey;
 
-    const isUndoKey = isCtrl && (e.key === 'z' || e.key === 'я') && !e.shiftKey; // 'я' for Russian keyboard
-    const isRedoKey = isCtrl && (((e.key === 'z' || e.key === 'я') && e.shiftKey) || e.key === 'y' || e.key === 'н'); // 'н' for Russian keyboard
+    // RETRO-3994-02 (post-merge review 4000): real browsers report the
+    // SHIFTED key — 'Z'/'Я' with Shift held — so redo detection must
+    // match both cases; the lowercase-only match never fired outside
+    // jsdom (only Ctrl+Y worked).
+    const isZKey = e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я';
+
+    const isUndoKey = isCtrl && isZKey && !e.shiftKey; // 'я' for Russian keyboard
+    const isRedoKey = isCtrl && ((isZKey && e.shiftKey) || e.key === 'y' || e.key === 'н'); // 'н' for Russian keyboard
 
     if (isTypingInInput && (isUndoKey || isRedoKey)) {
       // Native per-field undo/redo stays untouched inside text inputs —
@@ -105,15 +111,16 @@ export function useEMRKeyboard({
     // OUTSIDE editable controls (handled above). EMRKEY-FE-001: preventDefault
     // only when the action is actually available — an unavailable action must
     // not swallow the event.
-    if ((e.key === 'z' || e.key === 'я') && !e.shiftKey) {// 'я' for Russian keyboard
+    if (isZKey && !e.shiftKey) {// 'я' for Russian keyboard
       if (!canUndo || !onUndo) return;
       e.preventDefault();
       onUndo();
       return;
     }
 
-    // Ctrl+Shift+Z or Ctrl+Y: Redo
-    if ((e.key === 'z' || e.key === 'я') && e.shiftKey) {// 'я' for Russian keyboard
+    // Ctrl+Shift+Z or Ctrl+Y: Redo — RETRO-3994-02: matches the real
+    // browser's shifted 'Z'/'Я' as well as the jsdom lowercase legacy.
+    if (isZKey && e.shiftKey) {// 'я' for Russian keyboard
       if (!canRedo || !onRedo) return;
       e.preventDefault();
       onRedo();

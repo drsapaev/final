@@ -962,7 +962,12 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
                       <p style={styles.metricValue}>{t('cardio.cardio_ecg_ms_value', { count: ecgParameters.qtInterval })}</p>
                     </div>
 
-                    {ecgParameters.axis && (
+                    {/* RETRO-3972-02 (post-merge review 4000): a legally
+                        measured 0° axis is falsy — `axis && (...)` hid the
+                        «Электрическая ось сердца» card and leaked a bare "0"
+                        text node. Absence is null/undefined/''; 0 renders. */}
+                    {((ecgParameters.axis ?? null) !== null &&
+                      ecgParameters.axis !== '') && (
                       <div style={styles.metricCard}>
                         <p style={styles.caption}>{t('cardio.cardio_ecg_heart_axis')}</p>
                         <p style={styles.metricValue}>{ecgParameters.axis}°</p>
