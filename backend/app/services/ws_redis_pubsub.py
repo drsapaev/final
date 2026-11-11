@@ -26,6 +26,7 @@ class RedisPubSubBridge:
         channel_prefix: str,
         redis_url: str | None = None,
         instance_id: str | None = None,
+        reconnect_backoff_base: float = 1.0,
     ) -> None:
         self.channel_prefix = channel_prefix
         self.redis_url = (
@@ -33,6 +34,10 @@ class RedisPubSubBridge:
         )
         self.instance_id = instance_id or os.getenv("WS_INSTANCE_ID") or uuid4().hex
         self.enabled = bool(self.redis_url)
+
+        # DISPLAYRELAY-BE-002 (audit PR #3961): bounded reconnect backoff
+        # for a crashed listener; base delay in seconds, doubled per attempt.
+        self._reconnect_backoff_base = reconnect_backoff_base
 
         self._redis_mod = None
         self._redis_client = None
@@ -109,12 +114,19 @@ class RedisPubSubBridge:
                         type(exc).__name__,
                     )
 
-    async def subscribe(self, logical_channel: str, handler: Handler) -> None:
+    async def subscribe(self, logical_channel: str, handler: Handler) -> bool:
+        """Добавить обработчик канала.
+
+        DISPLAYRELAY-BE-003 (audit PR #3961): возвращает честный статус —
+        ``True`` только после успешного Redis SUBSCRIBE (или когда канал уже
+        был подписан); ``False`` при сбое подписки/недоступном Redis.
+        Вызывающий код решает, кэшировать ли обработчик.
+        """
         handlers = self._handlers[logical_channel]
         was_added = handler not in handlers
         handlers.add(handler)
         if not await self._ensure_ready():
-            return
+            return False
 
         assert self._pubsub is not None
         if was_added and len(handlers) == 1:
@@ -127,12 +139,14 @@ class RedisPubSubBridge:
                 logger.warning(
                     "Redis pub/sub subscription failed: %s", type(exc).__name__
                 )
+                return False
             else:
                 # redis-py's listen() iterator exits immediately when the
                 # PubSub has no channels. Start it only after the first
                 # subscription is active, and restart it after an idle period.
                 if self._listener_task is None or self._listener_task.done():
                     self._listener_task = asyncio.create_task(self._listen_loop())
+        return True
 
     async def unsubscribe(self, logical_channel: str, handler: Handler) -> None:
         handlers = self._handlers.get(logical_channel)
@@ -226,3 +240,52 @@ class RedisPubSubBridge:
             return
         except Exception:
             logger.exception("Redis pub/sub listener crashed")
+            # DISPLAYRELAY-BE-002 (audit PR #3961): сбой листенера больше не
+            # означает постоянную потерю кросс-воркерных событий для уже
+            # подключённых табло — ограниченный reconnect с бэкоффом
+            # восстанавливает pubsub и переподписывает живые каналы.
+            await self._recover_listener()
+
+    async def _recover_listener(self) -> None:
+        """Ограниченное восстановление листенера (bounded backoff)."""
+        for attempt in range(1, 6):
+            delay = self._reconnect_backoff_base * (2 ** (attempt - 1))
+            await asyncio.sleep(delay)
+            try:
+                await self._reset_pubsub()
+                await self._resubscribe_all()
+                self._listener_task = asyncio.create_task(self._listen_loop())
+                logger.info(
+                    "Redis pub/sub listener recovered after %d attempt(s)", attempt
+                )
+                return
+            except Exception as exc:
+                logger.warning(
+                    "Redis pub/sub recovery attempt %d failed: %s",
+                    attempt,
+                    exc,
+                )
+        logger.error(
+            "Redis pub/sub recovery exhausted after %d attempts; "
+            "cross-worker events stay unavailable until a new subscribe",
+            5,
+        )
+
+    async def _reset_pubsub(self) -> None:
+        """Пересоздать pubsub-соединение (старое могло умереть)."""
+        self._pubsub = None
+        if self._redis_client is not None:
+            try:
+                await self._redis_client.aclose()
+            except Exception:
+                pass
+            self._redis_client = None
+        if not await self._ensure_ready():
+            raise RuntimeError("redis pub/sub unavailable")
+
+    async def _resubscribe_all(self) -> None:
+        """Переподписать все каналы с живыми обработчиками."""
+        assert self._pubsub is not None
+        for logical_channel, handlers in list(self._handlers.items()):
+            if handlers:
+                await self._pubsub.subscribe(self._channel(logical_channel))

@@ -55,10 +55,10 @@ class DisplayWebSocketManager:
 
             # Сохраняем информацию о пользователе для этого соединения
             if user:
-                if not hasattr(websocket, '_user_info'):
+                if not hasattr(websocket, "_user_info"):
                     websocket._user_info = {}
-                websocket._user_info['user'] = user
-                websocket._user_info['authenticated'] = True
+                websocket._user_info["user"] = user
+                websocket._user_info["authenticated"] = True
                 logger.info(
                     f"Аутентифицированный WebSocket подключен к табло {board_id} (пользователь: {user.username})"
                 )
@@ -132,8 +132,24 @@ class DisplayWebSocketManager:
         async def _handler(payload: dict[str, Any], _board_id: str = board_id) -> None:
             await self._broadcast_to_board_local(_board_id, payload)
 
-        self._redis_handlers[board_id] = _handler
-        await self._pubsub.subscribe(self._board_channel(board_id), _handler)
+        # DISPLAYRELAY-BE-003 (audit PR #3961): подписка выполняется ПЕРЕД
+        # кэшированием обработчика. Мост возвращает честный статус подписки;
+        # сбой НЕ кэшируется — следующее подключение к тому же табло
+        # повторит попытку (раньше мёртвый кэш жил вечно для живых сокетов).
+        subscribed = False
+        try:
+            subscribed = bool(
+                await self._pubsub.subscribe(self._board_channel(board_id), _handler)
+            )
+        except Exception as e:
+            logger.error(f"Ошибка Redis-подписки для табло {board_id}: {e}")
+        if subscribed:
+            self._redis_handlers[board_id] = _handler
+        else:
+            logger.warning(
+                f"Redis-подписка табло {board_id} не выполнена; "
+                "повтор при следующем подключении"
+            )
 
     async def _remove_redis_subscription(self, board_id: str) -> None:
         handler = self._redis_handlers.pop(board_id, None)
@@ -299,6 +315,7 @@ class DisplayWebSocketManager:
         event_type: str | None = None,
     ) -> None:
         """Трансляция обновления очереди"""
+        db = None
         try:
             db = SessionLocal()
 
@@ -315,27 +332,44 @@ class DisplayWebSocketManager:
             name_format = self._resolve_name_format(board_ids)
             queue_data = []
             for entry in queue_entries:
-                queue_data.append(
-                    {
-                        # QR-FE-008: queue-scoped identity — каждая строка
-                        # несёт владельца (daily_queue.id) и собственный id,
-                        # чтобы табло могло влить этот per-queue сабсет в
-                        # мультиочередной борд, не затирая строки других
-                        # очередей (зеркало initial_state).
-                        "id": entry.id,
-                        "queue_id": daily_queue.id,
-                        "number": entry.number,
-                        "patient_name": self._format_patient_name(
-                            entry.patient_name, name_format
-                        ),
-                        "status": entry.status,
-                        "source": entry.source,
-                        "created_at": entry.created_at.isoformat(),
-                        "called_at": (
-                            entry.called_at.isoformat() if entry.called_at else None
-                        ),
-                    }
-                )
+                try:
+                    queue_data.append(
+                        {
+                            # QR-FE-008: queue-scoped identity — каждая строка
+                            # несёт владельца (daily_queue.id) и собственный id,
+                            # чтобы табло могло влить этот per-queue сабсет в
+                            # мультиочередной борд, не затирая строки других
+                            # очередей (зеркало initial_state).
+                            "id": entry.id,
+                            "queue_id": daily_queue.id,
+                            "number": entry.number,
+                            "patient_name": self._format_patient_name(
+                                entry.patient_name, name_format
+                            ),
+                            "status": entry.status,
+                            "source": entry.source,
+                            # DISPLAYSESSION-BE-001 (audit PR #3961):
+                            # created_at nullable — легаси-строки без даты
+                            # сериализуются в null, как в initial_state,
+                            # вместо убийства всего обновления табло.
+                            "created_at": (
+                                entry.created_at.isoformat()
+                                if entry.created_at
+                                else None
+                            ),
+                            "called_at": (
+                                entry.called_at.isoformat() if entry.called_at else None
+                            ),
+                        }
+                    )
+                except Exception as row_exc:
+                    # Управляемый построчный отказ: битая строка пропускается
+                    # с логом, обновление остальных строк доставляется.
+                    logger.error(
+                        f"Пропущена строка очереди "
+                        f"id={getattr(entry, 'id', '?')} при сериализации: "
+                        f"{row_exc}"
+                    )
 
             # Codex P2 (round-14): resource/bridged очередь — владелец и
             # кабинет с оси ресурса (реестр), как в call-обёртках
@@ -407,10 +441,17 @@ class DisplayWebSocketManager:
             for board_id in board_ids:
                 await self.broadcast_to_board(board_id, update_message)
 
-            db.close()
-
         except Exception as e:
             logger.error(f"Ошибка трансляции обновления очереди: {e}")
+        finally:
+            # DISPLAYSESSION-BE-001 (audit PR #3961): сессия закрывается на
+            # успехе И на сбое — раньше close() стоял в конце happy-path и
+            # любой эксепшен оставлял соединение до GC.
+            if db is not None:
+                try:
+                    db.close()
+                except Exception:
+                    pass
 
     async def broadcast_announcement(
         self,
@@ -615,10 +656,10 @@ class DisplayWebSocketManager:
                             .filter(DisplayBoard.name == b)
                             .first()
                         )
-                        if (
-                            row is not None
-                            and row.show_patient_names
-                            in ("full", "initials", "none")
+                        if row is not None and row.show_patient_names in (
+                            "full",
+                            "initials",
+                            "none",
                         ):
                             cached = row.show_patient_names
                             cache[b] = cached
@@ -669,7 +710,14 @@ class DisplayWebSocketManager:
         return len(self.connections.get(board_id, set()))
 
     def get_all_boards_status(self) -> dict[str, dict[str, Any]]:
-        """Получить статус всех табло"""
+        """Статус табло с живыми ЛОКАЛЬНЫМИ соединениями этого воркера.
+
+        DISPLAYSTATUS-BE-001 (audit PR #3961): в multi-Uvicorn-топологии
+        это только соединения ЭТОГО процесса — отсутствие табло здесь не
+        означает «офлайн системно»: реальный TV может быть подключён к
+        другому воркеру. Эндпоинт обязан помечать такой статус как
+        неопределённый (online_scope=worker_local).
+        """
         status = {}
         for board_id, connections in self.connections.items():
             status[board_id] = {
@@ -678,8 +726,6 @@ class DisplayWebSocketManager:
                 "active": len(connections) > 0,
             }
         return status
-
-
 
     async def broadcast_queue_update(self, queue_entry, event_type: str) -> None:
         """Трансляция обновления очереди"""
