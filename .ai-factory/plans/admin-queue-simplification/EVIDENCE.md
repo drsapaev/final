@@ -1,3 +1,18 @@
+## T18 — PR #4026 exact-head CI completed — 2026-11-12T02:12:26+05:00
+
+- Commit under test: 592d327d7053a1031cef157e1c34adbb2e0d978a; base 80a616d16e407362bac16b9b2092e83070676711 (#4031). This head includes the prior test-only synchronization changes at 9869a837 and an evidence-only commit; application/test source did not change after 9869a837.
+- Environment: isolated Windows worktree and GitHub Actions. No staging, Compose, database, production, or deployment was started.
+- Hosted validation: Unified CI #43098989561 completed SUCCESS on exact HEAD. Frontend unit tests, frontend build, lint and E2E all PASS; PR Required Gate and CI Scope PASS. The 13m22s E2E job completed the enabled Registrar, UX, Lab, Business/Security/Concurrency and Load/Chaos groups.
+- Other exact-head checks: Analyze Actions/JavaScript-TypeScript/Python #43098984906 PASS; CodeQL PASS; Agent Workflow Guards #43098989498 PASS; Regression Audit #43098989650 PASS; i18n #43098989645 PASS; PR Review Quality Gate #43099387949 PASS; Lifecycle Recommendation #43099387783 PASS; Gitleaks #43098989585 PASS; Security #43098989707 PASS; GitGuardian PASS.
+- Skipped, not passed: Backend, integration, Docker, staging readiness, production readiness, load/k6, frontend/backend parity, DAST, documentation generation, and other path-gated jobs.
+- Local validation limits remain: focused Dermatologist and booking tests passed; PatientBookingPage module 18/18 passed. Full Dermatologist module was 2/4 using shared Vitest 3.2.7 vs lockfile 5.0.3; local build stopped before compilation because shared node_modules lacks nitro. No dependencies installed. Hosted exact-head checks above are the authoritative CI result.
+- Historical GitGuardian signal: PR #3946 / commit 169d005f. The user's selected false-positive disposition was recorded in comment #6805189423 based on synthetic CI-only Compose placeholder evidence and the bot's statement that no secrets remain. No GitGuardian dashboard dismissal is claimed.
+- Staging: NOT_RUN. Last canonical Preflight found 9.24 GiB free on C: against the 10 GiB build/Session reserve. No Compose was started; served_revision_verified is not claimed.
+- Result: PR #4026 remains OPEN / Ready for review / mergeable at tested HEAD; user retains merge authority. T18/Tier-2 remains PARTIAL; no deferral.
+- Actual changed paths in this evidence follow-up: .ai-factory/plans/admin-queue-simplification/PROGRESS.md, EVIDENCE.md, RESUME.md only. No runtime or data changes.
+- PR: https://github.com/drsapaev/final/pull/4026
+- Merge commit: none.
+
 ## T18 — PR #4026 exact-head unit-test synchronization and CI follow-up — 2026-11-12T01:53:23+05:00
 
 - Commit under test: 9869a837d5eca654db6c9a4834582c20d31d96ca; base 80a616d16e407362bac16b9b2092e83070676711 (#4031).

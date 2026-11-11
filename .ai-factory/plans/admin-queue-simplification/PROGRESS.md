@@ -1,3 +1,15 @@
+## Current checkpoint — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
+
+- Umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80: T00–T17 are MERGED; T18/Tier-2 is still PARTIAL. User owns merge/deployment.
+- At this checkpoint PR #4026 is OPEN / Ready for review / mergeable at HEAD 592d327d7053a1031cef157e1c34adbb2e0d978a, base main 80a616d16e407362bac16b9b2092e83070676711 (#4031).
+- Exact-head checks passed: Unified CI #43098989561 including Frontend unit tests, build, lint, E2E, PR Required Gate and CI Scope; CodeQL analysis #43098984906; PR Review Quality Gate #43099387949; PR Lifecycle Recommendation #43099387783; Agent Workflow Guards #43098989498; Regression Audit #43098989650; i18n #43098989645; Gitleaks #43098989585; Security #43098989707; GitGuardian. Backend, integration, Docker, staging/production readiness, load, parity, DAST, and other path-skipped checks were SKIPPED, not passed.
+- Local focused tests passed; the full Dermatologist test module remains 2/4 under the shared stale Vitest 3.2.7 environment, while the lockfile requires 5.0.3. Local build could not start because shared node_modules lacks nitro. Exact-head hosted CI is the authoritative pass for this PR.
+- The E2E suite took 13m22s and completed successfully, including Lab dirty-guard/full-path and Business/Security/Concurrency/Load/Chaos groups.
+- Historical GitGuardian signal on PR #3946 / commit 169d005f: the user's selected false-positive disposition is recorded in comment #6805189423. No dashboard dismissal is claimed. Current #4026 GitGuardian check passes.
+- No staging was started. Last canonical Preflight measured C: free 9.24 GiB against the 10 GiB reserve. Full live RQ-18, served artifact provenance and remaining T18/STAGING_VALIDATION.md scenarios are still NOT_RUN/PARTIAL. No deferral is claimed.
+- Changes in this evidence checkpoint are limited to the three T18 journals. No application runtime/API/DB/auth, production, staging, or deployment change. No merge.
+- Next: record the exact-head CI result in the PR description and continue only after the user's merge, from fresh origin/main. Keep Tier-2 PARTIAL until the remaining acceptance evidence is obtained.
+
 ## Current checkpoint — PR #4026 post-push CI and T18 status — 2026-11-12T01:53:23+05:00
 
 - Umbrella task: bd2f7564-bd3d-449d-8d85-5a9325722a80. T00–T17 are merged; T18/Tier-2 remains PARTIAL. The user owns merge and deployment.

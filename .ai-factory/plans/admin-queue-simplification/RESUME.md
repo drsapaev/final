@@ -1,3 +1,17 @@
+## Resume — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged. T18/Tier-2 remains PARTIAL, without a deferral; user owns merge/deployment.
+
+PR #4026 was OPEN / Ready for review / mergeable at tested HEAD 592d327d7053a1031cef157e1c34adbb2e0d978a, base 80a616d16e407362bac16b9b2092e83070676711. Exact-head Unified CI #43098989561 passed: frontend unit, build, lint, E2E and PR Required Gate all PASS. E2E ran 13m22s and completed the enabled groups. CodeQL/Analyze, PR Review Quality Gate, lifecycle, security, Gitleaks, GitGuardian, i18n, Regression Audit and Agent Workflow Guards also PASS. Backend/integration/Docker/staging/production/load/parity/DAST jobs were skipped by scope; they are not passes.
+
+The latest test-source fix is synchronization-only: the deferred EMR assertion waits for the mock dirty callback, and booking reconfirmation waits for submit re-enablement. No application runtime code changed. Local dependency caveats are recorded in the newest EVIDENCE entry.
+
+The user's historical GitGuardian false-positive decision on PR #3946 / commit 169d005f is recorded in comment #6805189423. No dashboard dismissal was available and none is claimed.
+
+Do not start staging yet: the last canonical Preflight measured C: free 9.24 GiB vs 10 GiB required. Full live RQ-18, served artifact provenance, remaining T18 scenarios, and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Keep Tier-2 PARTIAL.
+
+Next exact action: refresh the PR description with the exact-head CI PASS and current journal commit, then wait for the user's merge. After merge, start the next authorized T18 action in a fresh worktree from current origin/main.
+
 ## Resume — PR #4026 exact-head CI follow-up — 2026-11-12T01:53:23+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 is PARTIAL. User owns merge/deployment.
