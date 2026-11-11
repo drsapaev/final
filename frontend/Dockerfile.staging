@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM node:20.19.6-slim AS builder
 
 ARG VITE_API_BASE=/api/v1
@@ -33,6 +35,30 @@ COPY vite.config.ts /app/vite.config.ts
 COPY sw.template.js /app/sw.template.js
 
 RUN npm run build
+
+FROM nginx:1.27-alpine AS artifact-runtime
+
+ARG VERCEL_GIT_COMMIT_SHA=
+
+COPY docker/nginx.staging.conf /etc/nginx/conf.d/default.conf
+RUN find /usr/share/nginx/html -mindepth 1 -maxdepth 1 -exec rm -rf {} \;
+COPY --from=staging_artifact . /usr/share/nginx/html/
+
+# The hosted artifact is built from an exact Git revision and carries a
+# checksum manifest. Reject a missing/mismatched source or modified files
+# before the static bundle can be used by a staging container.
+RUN set -eu; \
+    cd /usr/share/nginx/html; \
+    test -n "$VERCEL_GIT_COMMIT_SHA"; \
+    test "$(cat source.sha)" = "$VERCEL_GIT_COMMIT_SHA"; \
+    sha256sum -c SHA256SUMS; \
+    test -z "$(find . -type l -print -quit)"; \
+    manifest_files="$(awk 'NF == 2 { print $2 } NF != 2 { exit 1 }' SHA256SUMS | LC_ALL=C sort)"; \
+    copied_files="$(find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort)"; \
+    test "$manifest_files" = "$copied_files"; \
+    rm -f source.sha SHA256SUMS
+
+EXPOSE 80
 
 FROM nginx:1.27-alpine AS runtime
 

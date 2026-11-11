@@ -1,3 +1,241 @@
+## PR #3946 GitGuardian workflow follow-up — 2026-11-10T00:22:20+05:00
+
+- Commit under test: `2ca1255fbdd8bf39601ae81ab487476fb31d08ee`; base/current main `929363c66315b2b70229439662e3a92d7b9b1ab8`.
+- Environment: isolated Windows worktree and GitHub Actions. No Compose services or staging were started.
+- Execution mode: `narrow_override`; gate result `gate_misroute=no`, `override_used=yes`, `handoff_required=yes`; execution prompt read. Known root: `.github/workflows/staging-frontend-artifact.yml`.
+- Allowed files: the staging artifact workflow, its focused guard test, and T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. No runtime, production, deployment, staging, or history rewrite.
+- Actual changed paths committed and pushed: workflow, `scripts/tests/test_wsl_staging_guard.py`, and the three T18 journals.
+- Original failure: GitGuardian reported fixed CI-only Compose values in historical PR commit `169d005f68b07af08c94bda21244196868f2695a`. The current workflow uses run-scoped values, but the PR-history scan still reports that old occurrence.
+- Validation: 296 focused staging-guard tests — PASS; YAML parse — PASS; `py_compile` — PASS; Black check — PASS; local `git diff --check` — PASS; local actionlint — NOT_RUN (not installed); PR-body template validator — PASS.
+- Hosted: target validation [#42679243165](https://github.com/drsapaev/final/actions/runs/42679243165) — PASS. Unified exact-head checks: 34 success, 12 skipped, 1 failure. Backend, frontend unit/E2E, PR Required Gate, Gitleaks, CodeQL, Security Scan, frontend build/lint, and scope checks — PASS. The final PR description update passed PR Review Quality Gate [#42682574773](https://github.com/drsapaev/final/actions/runs/42682574773). GitGuardian's [incident comment](https://github.com/drsapaev/final/pull/3946#issuecomment-6746135174) remains FAIL on historical commit `169d005f68b07af08c94bda21244196868f2695a`.
+- Result: code and documentation are validated, but required checks are not all green because the historical GitGuardian incident remains unresolved. No checks are pending on the code and body snapshot at this status read.
+- Scope check: the pushed fix changed the workflow, its test, and three T18 journals; the PR body is updated. This latest evidence-only checkpoint also updates those same journals. No staging or production resources changed.
+- Remaining limitation: clearing the old occurrence requires either a GitGuardian false-positive disposition or rewriting branch history. No scanner bypass or force-push was performed.
+- PR: [#3946](https://github.com/drsapaev/final/pull/3946), OPEN, Ready for review, mergeable, HEAD `2ca1255fbdd8bf39601ae81ab487476fb31d08ee`.
+- Merge commit: none; merge remains user-owned.
+
+## PR #3946 exact-head review-fix validation — 2026-11-09T22:52:10+05:00
+
+- Commit under test: code HEAD `63834695523542962f2d99d4c189ea2ef6a12841`; base/current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`. This entry records that code commit; the three journal-only checkpoint edits are being prepared separately.
+- Environment: GitHub Actions hosted runner plus isolated Windows worktree `aqs-t18-memory-safe-staging`; no staging or production service was started.
+- Execution mode: prior `gate_known_root_cause` for `frontend/Dockerfile.staging`; known root confirmed and all nine implementation/runbook paths plus T18 journals were scoped. Gate outcome was `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt was read. No new source edit was made in this checkpoint.
+- Allowed paths: the existing PR #3946 staging workflow, Dockerfile, API runtime/targeted test, staging Compose files, launcher/guard tests, staging runbook, and T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Actual changed paths in this checkpoint: only the three T18 journal files. The earlier code fix in this PR remains limited to its reviewed staging build/configuration scope.
+- Original review findings: P1 fixed API origin for customized frontend ports; P2 limits artifact path and validates exact checksummed inventory; P2 isolates Compose named-context support to the optional target. Initial hosted artifact build exposed Nginx's stock `50x.html`; Dockerfile/test correction clears the stock document root before copying the verified artifact.
+- Validation commands/results:
+  - Focused staging guard tests — PASS, 295 tests.
+  - `npm.cmd run test:run -- src/api/__tests__/runtime.test.ts` — PASS, 7 tests.
+  - Scoped ESLint, Black check, Python compilation, YAML parsing and `git diff --check` — PASS.
+  - `scripts/check_pr_review_template.py` on the revised PR body — PASS.
+  - Hosted target validation [#42660993022](https://github.com/drsapaev/final/actions/runs/42660993022) — SUCCESS; default `runtime` and optional `artifact-runtime` PR target configs/builds passed.
+  - Exact-head Unified CI [#42660993069](https://github.com/drsapaev/final/actions/runs/42660993069) — SUCCESS. Initial backend attempt: 6,091 passed and one failure in unchanged lab-report test `test_finalized_catalog_based_report_keeps_flag_snapshot_after_catalog_changes`, caused by unknown analyte code `hgb`. Only failed jobs were rerun; backend passed on retry with no source changes. Frontend E2E and all other applicable jobs passed. PR Required Gate passed.
+  - PR Review Quality Gate [#42662431018](https://github.com/drsapaev/final/actions/runs/42662431018) — SUCCESS after adding the required exact field labels to the PR body's Validation section.
+  - DAST, backend integration, Docker build, staging/production readiness, load and Frontend–Backend Parity — SKIPPED by configured path/trigger; not treated as passes.
+- Result: P1/P2 source fixes and both hosted target builds PASS; required exact-head CI PASS after retry; PR body quality PASS. The one unrelated lab-report failure was not changed and did not recur on retry.
+- Scope check: no backend/lab/clinical application code, database, auth, production, deployment, staging resources, or main checkout changed. GitGuardian flagged explicit synthetic-only Compose placeholders; no account credential was present and no staging service was started. Gitleaks and the separate Security workflow passed.
+- Remaining limitation: local Docker/Compose was unavailable; local frontend build/type-check remains unverified due to missing `nitro` in the shared dependency junction and existing Axios mock typing errors. Full T18/Tier-2 remains PARTIAL; RQ-18 response-body asset provenance and complete `STAGING_VALIDATION.md` remain outstanding; no deferral is claimed.
+- PR: [#3946](https://github.com/drsapaev/final/pull/3946), OPEN / unmerged; code HEAD `63834695523542962f2d99d4c189ea2ef6a12841`; merge remains user-owned.
+- Merge commit: none.
+
+---
+
+## PR #3946 — artifact inventory CI correction — 2026-11-09T22:02:44+05:00
+
+- Commit under test: remote PR HEAD `09318ded6f718d028d1ab8fa1c8f9ff38a0e371e`; local correction to `frontend/Dockerfile.staging` and its guard test is uncommitted. Parent synchronized code commit `212348692` includes fix `169d005f6` and current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`.
+- Base synchronization: fresh `origin/main` #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0` is merged into the PR branch as `212348692`, without conflict. Incoming changes are confined to Cardiology files and remain outside the PR diff.
+- Environment: Windows isolated worktree `aqs-t18-memory-safe-staging`; Python 3.11 via `scripts/run_python.ps1`; frontend dependencies resolve through the existing shared junction. Windows Docker CLI unavailable.
+- Execution mode: `gate_known_root_cause`; known root `frontend/Dockerfile.staging`. Gate outcome recorded before editing: `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt was read. Scope stayed in PR #3946.
+- Allowed paths: `.github/workflows/staging-frontend-artifact.yml`, `frontend/Dockerfile.staging`, `frontend/src/api/runtime.ts`, `frontend/src/api/__tests__/runtime.test.ts`, `ops/compose.staging.yml`, `ops/compose.staging.artifact.yml`, `scripts/wsl_staging.py`, `scripts/tests/test_wsl_staging_guard.py`, `docs/runbooks/WSL_STAGING_SESSION.md`, and the existing T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` journals.
+- Actual changed paths: the nine implementation/runbook paths above; this evidence checkpoint and companion progress/resume notes are being updated. No other worktree files are changed.
+- Original findings: artifact JS had fixed API port 18082; build context was user-selectable without worktree containment or exact file-list validation; the default Compose service required `additional_contexts` even for the ordinary runtime target.
+- Hosted build evidence: PR run [#42660251143](https://github.com/drsapaev/final/actions/runs/42660251143) completed the base Compose config and ordinary runtime build. Artifact Compose config passed, but artifact-runtime failed the exact copied-file inventory because the Nginx base image's preinstalled `50x.html` remained in its document root. This is a harness/image-layer mismatch, not an unlisted source artifact.
+- Correction: clear existing Nginx document-root entries before copying the verified named context; add a focused guard assertion that cleanup precedes the artifact COPY.
+- Validation commands and results:
+  - `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','scripts/tests/test_wsl_staging_guard.py','-q')` after the correction — PASS, 295 tests.
+  - `npm.cmd run test:run -- src/api/__tests__/runtime.test.ts` on `212348692` — PASS, 7 tests.
+  - `npm.cmd exec -- eslint src/api/runtime.ts src/api/__tests__/runtime.test.ts` — PASS.
+  - `scripts/run_python.ps1 -RequireModule black -PythonArgs @('-m','black','--check','scripts/wsl_staging.py','scripts/tests/test_wsl_staging_guard.py')` — PASS.
+  - `py -3.11 -m py_compile scripts/wsl_staging.py scripts/tests/test_wsl_staging_guard.py` — PASS.
+  - PyYAML parse of `ops/compose.staging.yml`, `ops/compose.staging.artifact.yml`, and `.github/workflows/staging-frontend-artifact.yml` — PASS.
+  - `git diff --check` — PASS.
+  - `npm run type-check` — FAIL / not clean: missing `nitro` through the shared dependency junction and existing Axios mock typing errors; no changed runtime file was reported as a failure in the prior run.
+  - Docker/Compose config and actual target builds — NOT_RUN because the Windows Docker CLI is unavailable. Full local frontend build — NOT_RUN because `nitro` is absent from the shared dependency junction. Exact-head GitHub CI — PENDING push.
+- Result: local focused checks pass; the prior hosted artifact target failed as described above; exact-head CI for the correction is pending.
+- Scope check: `git status` contains only the recorded PR implementation/runbook/journal paths; production checkout, application backend, unrelated worktrees, and staging resources were untouched.
+- Remaining limitation: do not claim Docker target validation, staging validation, or completed Tier-2 until hosted target builds and remaining T18 acceptance are independently evidenced.
+- PR: [#3946](https://github.com/drsapaev/final/pull/3946), open; remote HEAD `09318ded`; correction and updated evidence are not yet pushed.
+- Merge commit: none; merge remains user-owned.
+
+## PR #3946 exact-head review readiness and stale checkpoint reconciliation — 2026-11-09T20:22:16+05:00
+
+- Commit under review at checkpoint start: `41977694f825c14e5360af9e358073fbae882ccc`; base/current `origin/main` #3957 `6fee1cf957a312970142fd36486b944aaabe6f45`. The current documentation patch is confined to the existing PR journals.
+- Actual GitHub state: #3946 OPEN, Ready for review, mergeable; no review submissions and no review requests. Branch protection requires one approving review.
+- Exact-head applicable checks: PR Required Gate, latest PR Review Quality Gate, frontend unit/build/lint, CI Scope, lifecycle recommendation, CodeQL and language analyzers, security/Gitleaks/GitGuardian, scratch guards, metadata, and notifications — PASS. Backend, integration, frontend E2E, Docker, readiness, load, DAST, and other path/trigger-skipped jobs are not counted as passes.
+- Root cause: the top entries of `PROGRESS.md` and `RESUME.md` still said the #3957 sync push and exact-head CI were pending, although the PR had since been pushed and its applicable checks passed. A fresh checkpoint is added above those preserved historical entries.
+- Execution mode: mandatory `gate_known_root_cause`; known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`; first-touch scope `PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, handoff required; the generated prompt was read. The bounded override uses the user's standing authorization for T18 work within the existing #3946 scope.
+- Allowed: reconcile the three T18 journals in the existing #3946 PR. Denied: product runtime/API/DB/auth, staging/Compose execution, production/deployment, a new PR cycle, or merging.
+- Validation target: manually compare the updated checkpoint with current GitHub state and run `git diff --check`; no application tests are needed for journal-only edits. Push and exact-head CI are pending for the resulting journal commit.
+- T18 result remains PARTIAL: RQ-18 browser response-body capture and `served_revision_verified` remain unconfirmed; remaining T18 scenarios and the full `STAGING_VALIDATION.md` checklist are not complete. No deferral is claimed. No staging or production services were started in this checkpoint.
+- Next: validate this journal-only patch, commit/push it in #3946, verify the new head's required checks, obtain independent approval, then user merges. Continue with the RQ-18 recorder correction in a fresh gated worktree only after merge.
+
+---
+
+## PR #3946 synchronization with #3957 — 2026-11-09T19:49:30+05:00
+
+- Candidate: local merge commit `3339565dbe7eb926cac991ea06fcbf56842b12f5`; fresh base #3957 `6fee1cf957a312970142fd36486b944aaabe6f45`; prior PR HEAD `8c9835b66cd1061b99e148f62fad205a2c6784d6`; merge base `38c929e220246e4c2f748eddc08c25ab7edf1208`.
+- Gate: mandatory `gate_known_root_cause`, known root `frontend/Dockerfile.staging`, all seven PR paths scoped. Result `narrow_override`, `gate_misroute=true`, `override_used=true`, handoff required; prompt read. Basis: user's standing authorization for continued T18 staging-only work.
+- Merge: `git merge --no-edit origin/main` completed without conflict. #3957 finreg/doctor changes are disjoint from the seven PR files.
+- Validation: Python compile PASS; focused staging guard PASS (1 passed / 282 deselected); both diff checks PASS.
+- Not run: local frontend build cannot import `nitro` from the shared dependency junction; Windows Docker CLI is unavailable, so Compose and staging were not run.
+- Pending: push the sync checkpoint and verify exact-head GitHub checks. T18/Tier-2 remains PARTIAL; RQ-18 asset-body capture and full `STAGING_VALIDATION.md` are incomplete, `served_revision_verified=false`, and no deferral is claimed.
+
+## PR #3946 sync candidate validation — 2026-11-09T18:34:42+05:00
+
+- Candidate: `12cfd0d29b41e667fddbc68b78c60d11cc3c4e2b`; fresh base #3945 `38c929e220246e4c2f748eddc08c25ab7edf1208`; merge base `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
+- Gate: `gate_known_root_cause`, root `frontend/Dockerfile.staging`, seven scoped PR paths; `narrow_override`, `gate_misroute=true`, `override_used=true`, handoff required; prompt read. Basis: user's standing authorization to continue T18 staging-only work.
+- Sync: `git merge --no-edit origin/main` passed without conflicts. Main's finreg files do not overlap the seven-path PR diff.
+- Validation: Python compile PASS; focused guard PASS, 1 passed / 282 deselected; both diff checks PASS. Local frontend build not run successfully because `nitro` is absent from the shared dependency junction; Compose config not run because Windows Docker CLI is unavailable. No staging or production services started.
+- Push and exact-head CI for this candidate are pending. T18/Tier-2 remains PARTIAL; RQ-18 asset-body capture and full `STAGING_VALIDATION.md` remain incomplete; no deferral claimed.
+
+## PR #3946 exact-head CI — 2026-11-09T18:20:31+05:00
+
+- Commit under test: `82a60938874a641bf2ce485576b3c4b3acf4cd85`; base `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
+- Environment: GitHub Actions for exact PR HEAD; isolated Windows worktree `aqs-t18-memory-safe-staging` for local checks. No WSL, Docker, Compose, staging, or production services were started for this checkpoint.
+- Validation: exact-head applicable checks PASS — Frontend unit tests, build, lint, PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle recommendation, CodeQL, Python/JavaScript/Actions analysis, security/Gitleaks/secret scans, scratch guards, metadata, notifications, and GitGuardian.
+- Not run / skipped: backend, integration, frontend E2E, Docker, staging/production readiness, load, DAST, and other path-triggered checks were SKIPPED; not counted as passes. Local `npm.cmd run build` stopped before compilation because the shared `C:\final\frontend\node_modules` junction lacks `nitro`; no install was attempted. Docker Compose config validation was NOT_RUN because Windows has no Docker CLI.
+- Scope check: PR remains exactly the seven staging/runbook/test/T18-journal paths. No runtime, API, DB, auth, dependency, production, deployment, or merge changes.
+- GitHub PR state: #3946 OPEN, Ready for review, mergeable/CLEAN at the exact HEAD; `reviewDecision` blank and no formal approval recorded. Merge remains user-owned.
+- Remaining limitation: T18/Tier-2 is PARTIAL. Exact tracked RQ-18 browser asset-body capture remains unresolved, `served_revision_verified=false`, the full `STAGING_VALIDATION.md` checklist and remaining T18 scenarios are incomplete. No deferral is claimed.
+
+## PR #3946 latest-main sync and focused validation — 2026-11-09T18:05:31+05:00
+
+- Commit under test: local sync merge `f2e34bf184720fc3b7ae6d8be8dde4c88493820e`, parents `0647b705af69a33f73af951ce647570347262918` and current `origin/main` #3955 `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`.
+- Environment: isolated Windows worktree `aqs-t18-memory-safe-staging`; no WSL, Docker, Compose, staging, or production services were started for this sync.
+- Execution mode: `gate_known_root_cause`; known root `frontend/Dockerfile.staging`; exact scope was the seven existing PR paths. Gate returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. The scoped override relies on the user's standing authorization to continue the T18 plan within this existing staging-only PR; it does not authorize dependency edits, new PR, merge, or deploy.
+- Incoming base change: #3955 updates only root `package.json` and `package-lock.json`. No overlap with the seven-file #3946 diff. The latest-main merge completed without conflict.
+- Validation commands/results: `scripts/run_python.ps1 -PythonArgs @('-m','py_compile','scripts/tests/test_wsl_staging_guard.py')` — PASS; `scripts/run_python.ps1 -PythonArgs @('-m','pytest','scripts/tests/test_wsl_staging_guard.py','-k','prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance','-q')` — PASS, 1 passed / 282 deselected; `git diff --check origin/main...HEAD` — PASS.
+- Local build limitation: `npm.cmd run build` — FAIL before compilation because the worktree's `frontend/node_modules` junction points at `C:\final\frontend\node_modules`, where Vite's config import `nitro` is missing. No dependency installation or mutation of that shared tree was attempted. Exact-head hosted frontend build is pending after push.
+- Compose validation: `docker compose -f ops/compose.staging.yml config -q` — NOT_RUN because Windows has no `docker` command. The same PR Dockerfile/Compose artifact target was exercised by canonical r6 Preflight/Start/Session on application source #3953 `476c261f`; this base-only sync did not change those files. No new staging run was performed.
+- Actual changed tracked paths in this checkpoint: `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only; the target PR diff remains exactly its seven staging/runbook/test/T18-journal paths.
+- GitHub state before sync: PR #3946 OPEN / Ready for review at `0647b705`, based on `476c261f`, `mergeStateStatus=BEHIND`, `reviewDecision` blank. Previous applicable checks on that head passed; path-skipped backend/integration/E2E/Docker/readiness/load/DAST are not passes. Exact-head checks after pushing the new sync/journal commit remain pending.
+- T18 limitation: RQ-17 r6 passed 1/1 and three browser-observed assets matched the hosted artifact. Exact tracked RQ-18 remains incomplete after 13 browser response-body reads were unavailable; no app asset hashes were emitted and `served_revision_verified=false`. Full T18 and `STAGING_VALIDATION.md` remain PARTIAL; no deferral is claimed.
+- Scope check: only the existing PR worktree was synced. No product runtime, API, DB, auth, dependency versions, production, deployment, other worktree, or staging project changed.
+- Next: validate the three journal checkpoint, push the current-main sync inside #3946, update PR body and verify exact-head checks; user retains review/merge authority.
+
+## PR #3946 exact HEAD and focused guard rerun — 2026-11-09T16:56:59+05:00
+
+- Commit under test: PR branch HEAD `0fa5c1426b06b5183b598227cce8fde47c2e9a94`; base/current `origin/main` #3953 `476c261f848b1d04adec36807837c981a979c8fa`.
+- Environment: Windows session worktree `aqs-t18-memory-safe-staging`; no WSL, Docker, Compose, staging, or production services started.
+- Execution mode: `gate_known_root_cause`; known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`; exact first-touch scope was `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Canonical launcher returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read.
+- Allowed paths: the three T18 journals only. Denied: runtime/application, backend/API, E2E source, DB/auth, Dockerfile/Compose, CI workflow, production/deployment, foreign worktrees/projects, and agent merge.
+- Validation command: `scripts/run_python.ps1 -RequireModule pytest -PythonArgs @('-m','pytest','-q','scripts/tests/test_wsl_staging_guard.py::test_prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance')` — PASS, 1 passed in 0.11s. `git diff --check origin/main...HEAD` — PASS before the journal update; rerun on the final diff.
+- Exact-head GitHub checks on `0fa5c142`: PR Required Gate, PR Review Quality Gate, Frontend unit/build/lint, Python/JavaScript/Actions analysis, CodeQL, security, Gitleaks, secret scan, Git scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope — PASS. Backend, integration, Frontend E2E, Docker build, staging/production readiness, load tests, DAST and Supabase Preview — SKIPPED by path/trigger, not passed.
+- Actual changed paths: `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` only.
+- Result: exact PR state independently rechecked as OPEN / Ready for review / mergeable at `0fa5c142`; review submissions and unresolved inline threads are both empty. #3937 is confirmed merged at `3a6d0f72`. Merge of #3946 remains user-owned.
+- Tier-2 limitation: no staging was run in this checkpoint. Last owned r5 Session passed normal Admin/TOTP and T18.10, but the exact RQ-18 asset recorder failed on 13 body reads, emitted no application-asset hashes, and left `served_revision_verified=false`; teardown passed. Overall T18/Tier-2 remains PARTIAL.
+- Scope check: no runtime, test source, staging, production, database, or deployment operation occurred. Existing task-owned scratch remains under the previously recorded local deletion restriction; no alternate removal was attempted.
+- Next: finish diff check/review, commit and push this journal reconciliation, verify exact-head CI, and leave merge to the user. After merge, use a fresh main-based worktree for the separately gated recorder fix and remaining T18 acceptance.
+
+## T18 local synthetic browser-body navigation probe and journal gate — 2026-11-09T16:26:00+05:00
+
+- Commit under test: staging/PR branch `65c4dc0905f74bd65da81585497983b8f0cc600c`; no tracked runtime source changed for this probe.
+- Environment: local Windows Node 24.15, Playwright 1.63.0, bundled headless Chromium, and a synthetic HTTP server bound only to `127.0.0.1` on an ephemeral port.
+- Execution mode: validation-only synthetic probe in `.scratch`; no staging or application data. Separate journal-update gate: initial `gate` stopped because the reviewed scope required the confirmed root-cause file; retry with `--known-root-cause frontend/e2e/rq18-permanent-qr-live.spec.ts` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the execution prompt was read. Only the three T18 journals were edited; the source file remained unchanged.
+- Allowed paths: `.scratch/t18-memory-safe-staging-20261109/response-body-navigation-probe.cjs` for the disposable probe; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md` for the checkpoint. Denied: runtime, API, database, production, deployment, Compose, and foreign resources.
+- Original failure: the tracked RQ-18 staging run reported 13 `browser-response-body-unavailable` errors, classified by the diagnostic copy as `resource-id-missing`.
+- Validation commands: `node .scratch/t18-memory-safe-staging-20261109/response-body-navigation-probe.cjs` — PASS; `git diff --check` — PASS for the journal diff; required `npm.cmd run build` — FAIL before compilation because the worktree's `frontend/node_modules` is a junction to `C:\final\frontend\node_modules`, where the Vite config's imported `nitro` package is missing. No install or mutation of the shared dependency tree was attempted.
+- Result: PASS for the synthetic A/B. Navigating away while the synthetic asset body was still in flight produced `unavailable:resource-id-missing`; awaiting the pending body before navigation succeeded and read/hash-processed all 8,388,638 bytes.
+- Relevant artifact: `.scratch/t18-memory-safe-staging-20261109/response-body-navigation-probe.cjs`.
+- Actual changed paths: the three T18 journal files only. No source or Compose changes.
+- Scope check: all network requests were served by the test's loopback server; no external host, production, or clinic data was involved.
+- Remaining limitation: this confirms the Playwright/CDP navigation race in a synthetic page, not successful capture of the actual application's assets. T18/Tier-2 remains PARTIAL; the exact RQ-18 staging rerun is still required after a focused recorder fix. The local frontend build failure is specific to the shared worktree dependency junction and remains unresolved; exact-head GitHub frontend build/unit/lint all passed on PR HEAD `94a7c45`.
+- PR: #3946 was OPEN / Ready for review, HEAD `94a7c45faf07dfedc36d2c9c6c8b959665de3eb7` at the last exact check; all applicable checks passed and path/trigger-skipped jobs are not counted as passing. This final journal-only follow-up is on the branch; query GitHub for its resulting exact HEAD/checks. Merge is user-owned.
+
+## PR #3946 sync to current main and exact-head CI — 2026-11-09T15:50:04+05:00
+
+- Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), HEAD `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`, base/current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`.
+- Freshness: `origin/main` advanced by #3950 (dermatology) and #3953 (EMR) from the previous base #3947. `git merge-tree` showed no conflicts; the branch synced in merge commit `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`. After sync, `git diff --name-only origin/main...HEAD` still contains the seven allowed PR paths.
+- Validation: `git diff --check origin/main...HEAD` — PASS. Local focused `pytest` — NOT_RUN: Windows launcher found no configured Python 3.11+ interpreter; Ubuntu Python 3.12.3 has no pytest module. No dependency installation or environment mutation was performed.
+- Exact-head GitHub checks on `ab23f1e`: PR Required Gate, PR Review Quality Gate, frontend unit tests (9m24s), frontend build, frontend lint/type-check, Python/JavaScript/Actions analysis, security, CodeQL, Gitleaks, secret scanning, Git scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope — PASS.
+- Backend tests, integration tests, frontend E2E, Docker build, staging/production readiness, load tests, DAST and other path/trigger-dependent jobs were SKIPPED; they are not counted as passing. This PR sync did not rerun staging.
+- Review/lifecycle: GitHub Codex review summary has no findings for this HEAD. Review submissions and formal human approvals are absent; lifecycle recommendation still requests human review. PR is OPEN / Ready for review / CLEAN / MERGEABLE; merge remains user-owned.
+- Execution mode: continuation of the existing approved `gate_known_root_cause` T18/staging scope; the existing recorded gate outcome and handoff prompt remain applicable. This checkpoint updates only the three T18 journals. Allowed: `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`; denied: product/runtime, production/deploy, DB/auth, gate/router, foreign worktrees/projects, agent merge.
+- Result: PR branch is current with main and applicable checks pass. T18/Tier-2 remains PARTIAL: the previously executed exact tracked RQ-18 test still has 13 browser response-body capture failures, emits no application asset hashes, and leaves `served_revision_verified=false`; canonical teardown passed. Do not repeat the unchanged run.
+- Next: user review/merge of #3946. After merge, create a fresh isolated worktree, run the required gate for a focused browser response-body recorder correction, and continue T18 plus the complete `STAGING_VALIDATION.md` checklist.
+
+## PR #3946 exact-head checks after body correction — 2026-11-09T15:15:52+05:00
+
+- Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), HEAD `6a69d42a352e671a594ee17c2f2768a2de32bacc`, base/current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.
+- The corrected PR body was fetched from GitHub and validated locally with `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-env','PR_BODY','--author','drsapaev')`: 19 unit tests, both documented sample bodies, and exact current PR body — PASS.
+- On exact HEAD `6a69d42`, PR Required Gate, PR Review Quality Gate, Frontend unit/build/lint, CI Scope, security, CodeQL, Gitleaks, secret scan, Git scratch guards, GitGuardian, lifecycle recommendation, metadata, and notification checks — PASS.
+- Backend, integration, frontend E2E, Docker build, staging/production readiness, load tests, and path-dependent checks were skipped by configured conditions; they are not represented as passing. No staging run was performed for this documentation checkpoint.
+- PR remains OPEN / Ready for review / mergeable. The preceding run `42596533267` was the body-field failure; after correction, the exact-head PR Review Quality Gate passed. The earlier checkpoint's attribution to a missing `Result` field was incorrect; `Red-check handling` was the omitted field.
+- Scope: PR description metadata and the three T18 journals; no product/runtime, staging configuration, test code, production, workflow, gate/router, or database changes. T18/Tier-2 remains PARTIAL from the prior RQ-18 Session result; browser-served provenance is unverified. Merge remains user-owned.
+- Next: wait for user-owned merge of #3946 before starting a separate response-body recorder correction cycle.
+
+## PR #3946 PR-body gate correction — 2026-11-09T14:56:05+05:00
+
+- Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), exact pushed HEAD `ff3b5b0d97ac542a3f9216a3f459d361861c7c79`, base/current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.
+- GitHub PR Review Quality Gate run `42596533267` failed. Its log records 19 validator unit tests and both documented sample PR bodies passing, followed by failure validating exact environment `PR_BODY`: `Cyclic Execution Evidence` lacked required `Red-check handling`. The `Result` field was present; the earlier checkpoint incorrectly attributed the failure to that field.
+- Corrected the PR description to include `Red-check handling` and amended its failure explanation to match the actual log. Validation command against the body fetched from GitHub: `$env:PR_BODY = (gh pr view 3946 --json body --jq '.body' | Out-String).TrimEnd(); .\scripts\run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-env','PR_BODY','--author','drsapaev')` — PASS: 19 unit tests, both documented samples, and exact current PR body.
+- Exact-head status remains not green until a fresh workflow run: the failed run is still visible on HEAD `ff3b5b0`. Other applicable checks on that HEAD passed; backend, integration, E2E, Docker, readiness, and load checks were skipped by path/trigger, not passed.
+- Scope: PR body metadata plus this PR's three T18 journals only. No application/runtime, staging configuration, test source, production, workflow, gate/router, or merge changes in this correction. The owned r5 project remains torn down; T18/Tier-2 stays PARTIAL due the previously recorded response-body capture failure and unverified browser-served provenance.
+- Next: push the journal-only correction checkpoint and verify fresh exact-head CI. Merge remains user-owned.
+
+## T18 exact tracked RQ-18 on current-main artifact — Session result — 2026-11-09T14:39:16+05:00
+
+- Commit under test: staging worktree/Compose source `85eb5f47779f24fb164ce4b763b94cb65e270e1d`; exact frontend artifact source `88012cd0a4a7f1de510541b6660a2a85f18baa62`, from hosted workflow run `42592028425`. Source marker and all 261 manifest entries had already passed verification before startup.
+- Environment: own synthetic project `clinic-aqs-t18-memory-safe-20261109-r5`, Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; backend/frontend/PostgreSQL ports 19005/18082/55446. Admin account came from the worktree-private synthetic env; normal password + TOTP flow, no auth bypass. No production or patient data.
+- Execution mode/scope: existing approved `gate_known_root_cause` validation-only scope; previous result `narrow_override`, no misroute, override used, handoff required, prompt read. Exact tracked test and the three T18 journals only; no runtime, backend, API, auth policy, DB, production, workflow, gate/router or foreign project changes.
+- Validation command: canonical `ops/scripts/wsl_staging.ps1 -Action Session -EnvFile .scratch/t18-memory-safe-staging-20261109/staging-r4.env -NoBuild -CommandArgs @('powershell.exe','-NoProfile','-File','.scratch/t18-memory-safe-staging-20261109/run-playwright.ps1')`; wrapper config targeted the exact tracked `frontend/e2e/rq18-permanent-qr-live.spec.ts`. Playwright collection had found both tests before Session.
+- Playwright result from the saved output after ANSI-stripping: `1 failed, 1 passed (1.1m)`. The isolated browser-body provenance regression passed. The live lifecycle logged normal Admin/TOTP completion and `RQ18_T18_10=PASS`; it reached `RQ18_PHASE=completed`, and the final Admin page-error guard did not fail. It then failed in the asset recorder with 13 `browser-response-body-unavailable` results. No actual application JS/CSS hashes were emitted (`0` app-asset records); the only hash/count belonged to the isolated synthetic probe and is excluded. Browser-served revision therefore remains unverified; the launcher’s `served_revision_verified=false` is not overridden.
+- Session result was `FAIL` because the Playwright run had one failed test. Separately, the temporary post-run summary wrapper had an agent-authored PowerShell interpolation bug (`elseif ( -eq 0)`) after Playwright finished, so it did not print its summary and returned a nonzero child exit. A separate sanitized read-only parser of the saved log established the Playwright outcomes above. Do not count the wrapper error as an application defect, and do not conceal the Playwright asset-recorder failure.
+- Cleanup: canonical Session reported `STAGING_TEARDOWN=PASS`; owned r5 containers/volumes/networks were removed by the launcher. No manual Docker cleanup or foreign-resource action.
+- Result: T18.10 PASS within this run; lifecycle reached its final phase; full RQ-18 and served-asset provenance FAIL/NOT_RUN due recorder limitations; overall T18/Tier-2 remains PARTIAL. No new product defect is confirmed by this result.
+- Actual tracked changes at this checkpoint: `.ai-factory/plans/admin-queue-simplification/{EVIDENCE,PROGRESS,RESUME}.md`. Temporary config, runner outputs, env and downloaded artifact remain under the task-owned ignored `.scratch/` root; no credentials or raw payloads are recorded in Git.
+- Next: do not repeat the unchanged staging test. Finish the three journal updates and PR #3946 description, validate/push the checkpoint, wait for exact-head CI, and leave merge to the user. After that PR merges, use a separately gated narrow fix/verification for browser response-body capture and resume remaining T18 acceptance.
+
+## T18 current-main artifact, Preflight and Start — 2026-11-09T14:29:42+05:00
+
+- Application commit under test: current `main` #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`. Staging configuration under test: PR #3946 HEAD `85eb5f47779f24fb164ce4b763b94cb65e270e1d`, base `88012cd0a4a7f1de510541b6660a2a85f18baa62`.
+- Execution mode: continue the previously approved `gate_known_root_cause` validation-only scope. Root cause remains the memory-heavy in-WSL frontend build. Prior gate result for this unchanged artifact-runtime scope: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. No source/gate/router changes are proposed.
+- Allowed paths/actions: task-owned ignored artifact and synthetic staging env under `.scratch/t18-memory-safe-staging-20261109/`; canonical Preflight → Start → one Session; T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied: product/runtime/backend/API/auth, DB/migrations, workflow/gate/router, production/deploy, foreign projects/worktrees, merge.
+- Artifact workflow: manual `staging-frontend-artifact.yml` run `42592028425`, status SUCCESS, dispatched on `main` at exact SHA `88012cd0a4a7f1de510541b6660a2a85f18baa62`. Artifact name: `clinic-staging-frontend-88012cd0a4a7f1de510541b6660a2a85f18baa62`; GitHub artifact digest `sha256:2e90bc87f62d83aa0b3ffda45fa3c92e48281023f49409fff42c1c4d1a8ebe95`.
+- Local validation: downloaded under `.scratch/t18-memory-safe-staging-20261109/frontend-artifact-88012/`; `source.sha` matched `88012cd0a4a7f1de510541b6660a2a85f18baa62`; every manifest file was present and its SHA-256 matched. Result: 261/261 entries PASS; artifact files total 13,540,627 bytes. Artifact preparation itself did not start services; the canonical staging lifecycle follows below.
+- Original failure being revisited: exact tracked RQ-18 on older artifact `215472cadbbdc8cd4046ca2c8eae0e9205594521` completed the lifecycle but failed the final Admin page-error guard. The r4 diagnostic copy is not equivalent and reported incomplete asset-body capture. This new artifact verification alone does not close either issue.
+- Validation target: exact tracked `frontend/e2e/rq18-permanent-qr-live.spec.ts` against the artifact above, ordinary synthetic Admin password + TOTP, actual browser response-body hashes compared against the verified manifest, and canonical teardown.
+- Canonical Preflight command: `ops/scripts/wsl_staging.ps1 -Action Preflight -EnvFile .scratch/t18-memory-safe-staging-20261109/staging-r4.env` — PASS for owned project `clinic-aqs-t18-memory-safe-20261109-r5`. Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; worktree volume C: 13 GiB free, WSL backing D: 26 GiB free, Linux `/` and Docker root 909 GiB free, WSL available memory 3189 MiB, warnings empty. Accepted ports: backend 19005, frontend 18082, PostgreSQL 55446. Runtime readiness `NOT_RUN`; no Compose services were started by Preflight. Launcher reported `worktree_dirty=true` because the only tracked modifications are this T18 evidence and progress update; `served_revision_verified=false` remains until browser bytes are compared. `git diff --check` PASS.
+- Canonical Start command: `ops/scripts/wsl_staging.ps1 -Action Start -EnvFile .scratch/t18-memory-safe-staging-20261109/staging-r4.env -TimeoutSec 180` — PASS for the same owned r5 project. Build reserve 10 GiB passed (C: 13 GiB; WSL backing D: 26 GiB); WSL available memory 3203 MiB; warnings empty; runtime readiness PASS. Artifact path avoided the frontend dependency/build step in WSL. Image IDs: backend `sha256:9630016de46b70079a8c81fed266066fee127ba83720b17c4fc572600a363f73`, frontend `sha256:7eaa5064aed85219fcb71bae0193476732b0c4b7c47053b03953dad5bc04c9ad`, worker `sha256:7203cdfc9a7b2c6d0769b3dd6b7361e21d2134eb47034e39e5a1ed2b229386f4`. Start returned `teardown=PENDING_SESSION`; exact owned resources must be removed by the following Session.
+- Result: hosted artifact source/checksum verification PASS; canonical Preflight PASS; Start/runtime readiness PASS; browser test, browser-byte provenance and teardown pending. T18/Tier-2 remains PARTIAL.
+- First stop condition: if Session reports lost keeper/boot identity or any ownership mismatch, do not reboot WSL or clean resources by other means; record its teardown status and stop.
+- Next exact action: run one canonical Session without rebuilding, using the exact tracked RQ-18 test and normal Admin password+TOTP; compare actual browser response-body hashes with the verified artifact manifest, then confirm canonical teardown.
+
+## PR #3946 main sync — local validation — 2026-11-09T13:56:00+05:00
+
+- Main freshness: fetched `origin/main` `88012cd0a4a7f1de510541b6660a2a85f18baa62`; PR base was #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`. The main delta adds 17 EMR files and has no overlap with the seven PR paths.
+- Sync candidate: merge commit `77bef757253bdee40b041ac4f1b338c8d2a59536`, merged cleanly into the PR branch. It is local only at this record; push and exact-head hosted CI remain pending.
+- Validation after sync: `scripts/run_python.ps1 -RequireModule pytest -m pytest scripts/tests/test_wsl_staging_guard.py -k prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance -q` — PASS (1 passed, 282 deselected); `git diff --check origin/main...HEAD` — PASS.
+- Prior PR exact-head `08335b295b762986936428b1f6556c231551876b` passed applicable CI. This evidence does not attest the new sync candidate; rerun checks after push.
+- No application, backend, API, database, auth, production, deployment, staging-project, gate or workflow code changed in this sync. T18/Tier-2 remains PARTIAL; merge remains user-owned.
+
+## PR #3946 Ready-for-review checkpoint — exact-head CI on 535cc — 2026-11-09T13:39:00+05:00
+
+- At verification, PR #3946 was OPEN / Ready for review / mergeable at HEAD `535cc03667cf6f3244c38b66d792a839504e5e90`, based on current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`. This checkpoint changes journals only. No review approval or merge is claimed; merge remains user-owned.
+- Exact-head CI on 535cc passed PR Required Gate, PR Review Quality Gate, lifecycle recommendation, frontend unit/build/lint, CI Scope, security, Gitleaks, CodeQL, Git scratch guards, and GitGuardian. Backend, integration, frontend E2E, Docker build, staging readiness, production readiness and k6 were skipped by configured path/trigger conditions.
+- Local PR body gate passed after correcting source attribution: 19 tests, two samples, and the proposed body. PR body states exact tracked RQ-18 failure was on artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`, not current main #3943.
+- PR #3946 changes remain limited to seven staging/configuration/test/runbook/evidence paths. Default frontend build remains unchanged. The synthetic r4 project was torn down.
+- T18/Tier-2 remains PARTIAL: exact tracked RQ-18 did not pass; the r4 diagnostic copy is not equivalent, 13 response-body reads failed, five unique paths lacked hashes, and `served_revision_verified=false`. No full T18 or production validation is claimed.
+- The task-owned ignored `.scratch/t18-memory-safe-staging-20261109` remains because local policy blocked deletion. No alternate deletion method was used.
+
+## PR #3946 exact-head CI and corrected source attribution — 2026-11-09T13:23:00+05:00
+
+- Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), staging-only artifact path; exact HEAD `da54660bbe8289b644f91621bb32f847bf551666`, base/current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`.
+- GitHub exact-head checks: PR Required Gate, PR Review Quality Gate, lifecycle recommendation, frontend unit/build/lint, CI Scope, security scan, Gitleaks, CodeQL, Git scratch guards, and GitGuardian — PASS. Backend tests, integration, frontend E2E, Docker build, staging readiness, production readiness and k6 — SKIPPED by configured scope/conditions, not PASS.
+- PR-description correction: exact tracked `rq18-permanent-qr-live.spec.ts` failure belongs to artifact/source `215472cadbbdc8cd4046ca2c8eae0e9205594521`, before #3943. Current main #3943 artifact was not exercised by that RQ-18 run. Corrected body passed `scripts/run_pr_review_gate_checks.py --body-env PR_BODY --author drsapaev`: 19 tests, both sample descriptions, and live proposed body PASS.
+- PR remains OPEN / Draft / mergeable; no independent formal review is recorded. No merge or deployment was performed.
+- Tier-2 remains PARTIAL. r4 used an untracked diagnostic copy, not the exact tracked spec; 13 response-body reads failed, five unique JS/CSS paths lack captured hashes, and canonical `served_revision_verified=false` remains. The earlier exact tracked test failed its final Admin page-error guard on source `215472...`; cause unresolved. Do not claim full RQ-18 or current-main browser provenance.
+- Scope: no runtime, backend, API, database, auth, production, deployment, workflow, or gate changes. Only the existing three-journal checkpoint is being updated before a new normal-hook commit; existing staging implementation scope remains unchanged.
+
 ## PR #3937 journal checkpoint push — 2026-11-08T22:48:28+05:00
 
 - Commit `8ef2302065d93d5f4eff512016d8572e4e6e18f2` was pushed to `codex/aqs-t18-completion-20261108`; four changed paths are the plan, PROGRESS, EVIDENCE, and RESUME journals only.
@@ -6519,3 +6757,145 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next exact action: finish the final journal status correction, run `git diff --check`, commit and push normally, refresh the PR description to the new documentation-only head, then verify exact-head workflows and review threads. Do not merge.
 - PR: #3937.
 - Merge commit: pending user action.
+## Memory-safe frontend artifact path — pre-edit checkpoint — 2026-11-09T09:39:19+05:00
+
+- Base under review: `origin/main` `3a6d0f72dd72191de32c216dbdb145e0e407ae96` (merge commit for PR #3937).
+- Execution mode: `gate_known_root_cause`; canonical launcher result `narrow_override`; `gate_misroute=false`; `override_used=true`; `handoff_required=true`; execution prompt read.
+- Confirmed cause: normal staging uses the frontend Dockerfile's `npm ci` and `npm run build`; the staging launcher runs Compose with `--build` unless the caller explicitly promises no image build. Earlier T18 evidence records host free RAM falling from 1.76 GiB to 0.13 GiB during that frontend image build.
+- Scope: Dockerfile/Compose opt-in prebuilt path, focused staging guard test, operator runbook, and these T18 journals. No runtime or staging action has been executed in this cycle.
+- Result: `NOT_RUN` for artifact build, WSL Preflight, Compose Start/Session, browser checks, and teardown; this is a pre-edit checkpoint, not a PASS.
+
+## Memory-safe frontend artifact implementation — 2026-11-09T09:53:04+05:00
+
+- Commit under test: feature worktree at base `3a6d0f72dd72191de32c216dbdb145e0e407ae96`; implementation changes are uncommitted at this checkpoint. Latest `origin/main` advanced to `215472cadbbdc8cd4046ca2c8eae0e9205594521`; only `.github/workflows/i18n-quality-gate.yml` and `.github/workflows/role-system-check.yml` differ, so sync before staging and push.
+- Environment / mode: Windows worktree; `gate_known_root_cause`; canonical gate returned `narrow_override`, no misroute, override used, handoff required; prompt read.
+- Allowed paths: `frontend/Dockerfile.staging`, `ops/compose.staging.yml`, `scripts/tests/test_wsl_staging_guard.py`, `docs/runbooks/WSL_STAGING_SESSION.md`, and the T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` journals.
+- Actual changed paths: the seven allowed paths above.
+- Original failure: prior canonical T18 Session lost Windows free RAM from 1.76 GiB to 0.13 GiB during local frontend image build before producing a browser report; its owned Docker resources were later cleaned.
+- Validation: focused `scripts/run_python.ps1 -m pytest scripts/tests/test_wsl_staging_guard.py -k prebuilt_frontend_target -q` PASS (1 passed, 282 deselected); `scripts/run_python.ps1 -m py_compile scripts/tests/test_wsl_staging_guard.py` PASS; `git diff --check` PASS.
+- Hosted artifact: workflow run `42563847059`, source `215472cadbbdc8cd4046ca2c8eae0e9205594521`, PASS. `source.sha` matched; all 261 listed payload files matched their SHA-256 values, and the manifest covered every downloaded payload file.
+- `docker compose config`: NOT_RUN from Windows because Docker CLI is unavailable. Canonical WSL Preflight will perform this check after latest-main sync. Compose target build, browser tests, full staging Session and teardown: NOT_RUN.
+- Scope check: no application, backend, API, auth/RBAC, database, migration, GitHub workflow, gate/router, production or deployment changes. No WSL or Compose operation was started.
+- Next: sync branch to current `origin/main`; run canonical Preflight with the artifact context; only then run the owned staging Session if resource checks pass.
+
+## Canonical staging Preflight — 2026-11-09T10:02:00+05:00
+
+- Commit under test: feature merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`, based on `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`. The incoming main commit changed only two CI workflow files; no backend or frontend application source changed relative to the hosted artifact source.
+- Environment: owned synthetic project `clinic-aqs-t18-memory-20261109`, Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3. Env and downloaded artifact are only in this worktree's ignored `.scratch/t18-memory-safe-staging-20261109/`; credentials are synthetic and not recorded.
+- Execution mode: canonical `Preflight`; first invocation failed at Compose config because the generated env file had a malformed password line. Diagnosis was read-only; no containers/services were started. Corrected the single env file and reran Preflight.
+- Result: PASS. `docker compose config --format json` succeeded with the `artifact-runtime` target and named context. Custom ports backend 19001, frontend 18082, PostgreSQL 55441 were accepted. WSL backing disk free 26 GiB, worktree disk free 13 GiB, WSL available memory 3209 MiB; warnings empty. Runtime readiness remains `NOT_RUN` by design.
+- Validation target remaining: canonical Start/Session; the Start path has a 10 GiB build storage reserve and will build backend/worker plus the lightweight Nginx artifact target. No Compose services were started as part of Preflight.
+
+## T18 current-source Start and first Session harness failure — 2026-11-09T10:15:00+05:00
+
+- Commit under test: worktree `a5fb043cca701498a0941b72ca91941c70ddde7a`, synchronized with `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`; frontend artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`, verified from hosted run `42563847059` with 261/261 SHA-256 entries matching.
+- Environment: owned synthetic project `clinic-aqs-t18-memory-20261109`, Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; ports 19001/18082/55441; WSL boot ID `56811d79-eb55-458a-bd60-ca5850959453`. No production systems or data used.
+- Start command: canonical `ops/scripts/wsl_staging.ps1 -Action Start`; result PASS, runtime readiness PASS, worktree disk 13 GiB free, WSL backing disk 26 GiB free, WSL available memory 3200 MiB, warnings empty. Start returned `teardown=PENDING_SESSION`; helper reported `served_revision_verified=false`.
+- Session command: canonical `ops/scripts/wsl_staging.ps1 -Action Session -NoBuild` with a task-owned Playwright wrapper. The wrapper set both `NO_COLOR` and `FORCE_COLOR`; Node emitted a warning on stderr and Windows PowerShell promoted it to a terminating native-command error. The Playwright log contains no test or phase markers, so the two RQ-18 tests and T18.10 are `NOT_RUN`, not PASS or product FAIL.
+- Session result: FAIL because the child harness exited before Playwright results; canonical owned-project teardown reported PASS. The project is removed and must not be reused. No runtime, tracked test, database, authentication, workflow, gate, production or deployment source was changed.
+- Harness dependencies: sibling cache `C:\final\frontend\node_modules` reused through a worktree-only ignored junction after confirming matching `frontend/package-lock.json` SHA-256; Playwright 1.62.0 and its Chromium 1234 executable are present. The result was test collection only: exactly two RQ-18 cases were discovered, zero executed during `--list`.
+- Next: use a new project with fresh backend/PostgreSQL ports while retaining frontend port 18082 (the artifact embeds that origin); remove the conflicting color variable and capture Node stdout/stderr using separate redirected files so PowerShell cannot promote a warning to a harness exception. Run canonical Preflight → Start → one Session; only report results actually emitted by that run.
+
+## T18 corrected harness and fresh Preflight — 2026-11-09T10:17:00+05:00
+
+- Commit under test: `27929062fe61eec14b53bbf8e5d2c7830595f83b`; application frontend/backend source remains the hosted artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Harness correction: removed `NO_COLOR`/`FORCE_COLOR` and redirected Node stdout/stderr to separate task-local files with `Start-Process`. PowerShell parser validation PASS. Playwright test execution remains `NOT_RUN` until Session.
+- Environment: new synthetic project `clinic-aqs-t18-memory-20261109-r2`, ports 19002/18082/55442, same verified frontend artifact and embedded origin. No credentials or patient data are recorded.
+- Canonical Preflight: PASS; Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3206 MiB, warnings empty. The 2 GiB reserve applies to this non-build Preflight; canonical Start still checks the 10 GiB build reserve. Runtime readiness `NOT_RUN`; no services were started by this Preflight.
+- Prior exact project `clinic-aqs-t18-memory-20261109` teardown: PASS from canonical Session. The retry uses a fresh project and fresh backend/PostgreSQL ports; only the artifact-required frontend port 18082 is reused after teardown.
+- Next: canonical Start followed by one Session with the corrected wrapper. A Session result must include successful Playwright exit, T18.10 and RQ-18 completion markers, and browser-served JS/CSS hashes matching the verified 261-file manifest before those checks can be reported PASS.
+
+## T18.10 and RQ-18 current-source Session — 2026-11-09T10:28:17+05:00
+
+- Commit under test: `1263ac589a50a7653829a1e14efea873aa2e1b61`; runtime application source matches artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`. Hosted artifact run `42563847059`, 261/261 manifest checks were verified before startup.
+- Environment: owned synthetic project `clinic-aqs-t18-memory-20261109-r2`, Ubuntu-24.04, ports 19002/18082/55442. Fresh Preflight PASS; Start PASS with runtime readiness PASS and 3201 MiB WSL available memory. No clinical/production data used.
+- Execution: canonical `Session -NoBuild` ran the two targeted Chromium tests on the actual frontend at `http://127.0.0.1:18082`. Playwright summary: one test passed, one failed.
+- PASS within the run: synthetic Admin password login and normal TOTP enrollment completed; `RQ18_T18_10=PASS` after loading the real `specialists` profile, preserving typed selected-profile/day return context across editor navigation/reload/history and receiving the protected DELETE 409 with the row retained. The isolated provenance regression comparing browser response bytes to a different independent HTTP response also passed; it is not actual artifact attestation.
+- Partial live RQ-18: phases reached `completed` after profile/service/resource creation, explicit publication, permanent QR provision, anonymous booking to the resource owner, archive/restore and reactivation. The test then failed because its final Admin `pageerror` counter was nonzero (`Unexpected uncaught Admin browser errors were observed.` at `frontend/e2e/rq18-permanent-qr-live.spec.ts:1162`). This is a real observed browser-error condition with unresolved cause, not a passing RQ-18 result; no error stack or details were captured by the original spec.
+- Served frontend provenance: `NOT_RUN`. The test checks the page-error counter before it emits asset records, so no actual JS/CSS response hash was available. Canonical launcher still returned `served_revision_verified=false`.
+- Session result: child FAIL; canonical teardown PASS, removing the exact owned r2 project. No tracked application/test source was edited. Safe phase summary and failing test result are in the task `.scratch`; no patient payload, URL tokens or secret values are journaled.
+- Next: make a task-local copy of the E2E spec solely to record page-error class, current static phase, and script basename/line; move only the asset-hash report before the final page-error guard. Run it in a fresh synthetic project and inspect the sanitized result. Any confirmed product defect requires a new source gate before code changes.
+
+## T18 RQ-18 diagnostic retry — Preflight PASS — 2026-11-09T10:31:00+05:00
+
+- Commit under test: `6f41d13a2e84c06b0d174134b7cfecdaade1180d`; tracked app/test code unchanged from app source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Scope: untracked diagnostic copy of `rq18-permanent-qr-live.spec.ts` only. It captures page-error class, static phase label, and sanitized JS frame locations without error messages or payloads, and emits the existing actual-browser asset hash report before the existing page-error assertion. No tracked test or runtime changes.
+- Corrected local `--list` wrapper: PASS, exactly two diagnostic tests discovered and zero executed. This validates discovery only.
+- Environment: fresh owned synthetic project `clinic-aqs-t18-memory-20261109-r3`, ports 19003/18082/55443; same checked artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Canonical Preflight: PASS; Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3199 MiB; warnings empty. Runtime readiness `NOT_RUN`; no services started yet.
+- Next: canonical Start and one Session. Staging/browser behavior is not yet checked on r3.
+
+## T18 RQ-18 diagnostic Session — response-body recorder failure — 2026-11-09T10:37:24+05:00
+
+- Commit under test: `d5cbe259accca49a5e02eec8b0eb9cac5ff9ce48`; frontend artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Environment: owned synthetic project `clinic-aqs-t18-memory-20261109-r3`, Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3, ports 19003/18082/55443. Exact-commit Preflight PASS (3181 MiB WSL available memory); Start PASS (3253 MiB, runtime readiness PASS, 10 GiB build reserve).
+- Execution: canonical Session ran the two RQ-18 tests. Result `1 passed, 1 failed`; `RQ18_T18_10=PASS`; lifecycle phases reached `completed`.
+- Failure: the diagnostic copy's browser-response recorder rejected before printing the actual app-asset hashes. It recorded 13 `/assets/*.js` body reads as `browser-response-body-unavailable`; the reported `1` asset belongs only to the synthetic probe in the isolated provenance test and is explicitly excluded from artifact matching. Thus actual app assets matched `0/0`; served artifact provenance remains `NOT_RUN`. The page-error guard was not reached on this diagnostic copy, so the earlier r2 page-error result remains unresolved.
+- Teardown: canonical Session result FAIL for the test command, teardown PASS; r3 project removed. No tracked source/test changes, no secrets or response contents recorded.
+- Next: on a task-local copy only, summarize recorder failures instead of throwing before the final guard and instrument the exact Admin pageerror listener to emit only error class, active static phase, and JS basename/line. Then run a fresh canonical synthetic Preflight → Start → Session. No product conclusion or source edit until the diagnostic distinguishes recorder behavior from application behavior.
+
+## T18 diagnostic harness adjustment — discovery only — 2026-11-09T10:47:00+05:00
+
+- Commit under test remains `6ec5c1e67...`; no tracked changes were made. The diagnostic copy in `.scratch/t18-memory-safe-staging-20261109/` now summarizes browser response-body errors without aborting before the final guard and instruments the Admin pageerror callback with only class, static phase and script basename/line.
+- The wrapper checks asset capture-failure count and artifact manifest equality separately, so partial asset capture cannot be mislabeled as a provenance PASS.
+- PowerShell parser check PASS. Playwright `--list` PASS: exactly two diagnostic tests discovered, zero executed. This does not validate runtime behavior.
+- Next: one fresh synthetic project with canonical Preflight → Start → Session; use frontend port 18082 required by the artifact and fresh backend/PostgreSQL ports. Inspect only the sanitized diagnostic summary, then teardown.
+
+## T18 diagnostic r4 — canonical Preflight PASS — 2026-11-09T10:49:00+05:00
+
+- Commit under test: `984d06112917cdd50f8f11187ab8b7f72eceecb0`; tracked app/test source remains the hosted artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Environment: new synthetic project `clinic-aqs-t18-memory-20261109-r4`, ports 19004/18082/55445; frontend port 18082 is fixed by the artifact's embedded origin.
+- Canonical Preflight: PASS; Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3213 MiB, warnings empty. Runtime readiness `NOT_RUN`; no services started.
+- Diagnostic-only wrapper/list checks: PASS, two tests discovered and zero executed. The wrapper reports actual app asset matches and capture failures separately.
+- Superseded: canonical Start and one diagnostic Session completed on r4; see the following record.
+
+## T18 memory-safe staging path — r4 synthetic diagnostic Session — 2026-11-09T11:03:46+05:00
+
+- Commit under test: staging worktree `9d75b1262708c2bf7e68a5d3076305ec4d2bfae1`; application/frontend artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+- Environment: Windows host with `Ubuntu-24.04`, Docker 29.1.3 and Compose 2.40.3; owned synthetic project `clinic-aqs-t18-memory-20261109-r4`, ports 19004/18082/55445. Frontend port 18082 is required by the artifact's embedded API/WebSocket origin.
+- Execution mode: previously recorded `gate_known_root_cause` → `narrow_override`, no misroute, override used, handoff required; generated prompt was read. Runtime and application behavior were not edited in this Session.
+- Allowed tracked paths for this PR: `frontend/Dockerfile.staging`, `ops/compose.staging.yml`, `scripts/tests/test_wsl_staging_guard.py`, `docs/runbooks/WSL_STAGING_SESSION.md`, and the three T18 journals. Reference-only: app/backend/auth, CI workflow, WSL lifecycle implementation and production configuration. Denied: production, deployment, app/runtime/backend/API/auth, migrations, gate/router, foreign worktrees/projects and merge by agent.
+- Original failure: r2 ran the exact tracked `rq18-permanent-qr-live.spec.ts`; T18.10 passed, but the QR-flow test failed its final uncaught-Admin-page-error guard. The error itself was not captured. In r3, a diagnostic copy stopped earlier after 13 JS response bodies could not be read by Playwright.
+- Validation command: canonical `wsl_staging.ps1` Preflight → Start → Session for r4, with the task-local diagnostic copy of the two RQ-18 Playwright tests. Preflight and Start passed; runtime readiness passed. The diagnostic Playwright summary was `2 passed (48.0s)`; T18.10 and its final page-error guard passed, and the QR lifecycle reached its final phase.
+- Result: memory-safe artifact path PASS for this synthetic run. The Session did not execute the exact tracked spec: diagnostic code made asset-body capture errors nonfatal so the final guard could be observed. It recorded 13 body-capture errors (`resource-id-missing`); 63 actual app JS/CSS response hashes matched the artifact manifest, 5 unique paths had no hash, and 8 capture errors overlapped paths with a successful capture. Full RQ-18/browser-provenance result remains PARTIAL/NOT_RUN, not PASS.
+- Artifact evidence: hosted build workflow `42563847059`, exact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; `source.sha` matched and 261/261 `SHA256SUMS` entries passed before startup. The canonical launcher still reported `served_revision_verified=false`; partial browser hash matches do not override that field or prove every loaded asset.
+- Harness limitation: the scratch wrapper's summary selected the first failure-count marker (zero from the separate synthetic probe) rather than the later main-flow value (13). The raw sanitized main-flow result was used for this record. Do not reuse that aggregate until the parser selects the main-flow marker explicitly.
+- Cleanup: canonical Session teardown PASS; the exact r4 Compose project and its owned resources were removed. No other project was touched.
+- Scope check: no product runtime, backend, API, auth, database, workflow, production, merge or deployment changes. The isolated result does not complete T18 or the full `STAGING_VALIDATION.md` checklist.
+- Remaining limitation: resolve the exact-test page-error discrepancy and response-body read failures, then rerun the exact tracked spec on a future fresh artifact/source revision. T18.1–5, T18.8–9 and cross-cutting keyboard, viewport, latency, language, console and complete runbook checks remain open as recorded in PROGRESS.md.
+- PR: staging-only artifact-path PR not opened at this record; exact-head CI and PR are pending.
+- Merge commit: not applicable.
+
+## T18 staging artifact PR preparation — synced and locally validated — 2026-11-09T11:17:10+05:00
+
+- Commit under test: staging implementation `9d75b1262708c2bf7e68a5d3076305ec4d2bfae1`; branch sync merge `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`.
+- Base: current `origin/main` #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`. The incoming main commit touched EMR files only; it did not overlap the staging change. Current branch PR diff remains the seven scoped files listed above.
+- Validation command: after main sync, `scripts/run_python.ps1 -RequireModule pytest -m pytest scripts/tests/test_wsl_staging_guard.py -k prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance -q` using the existing `C:\final\backend\.venv\Scripts\python.exe` — PASS (1 passed, 282 deselected). `git diff --check` — PASS. An earlier malformed launcher invocation omitted `-RequireModule pytest` and did not start pytest; it is not counted.
+- Scratch cleanup: the attempted command named only `.scratch/t18-memory-safe-staging-20261109` under this worktree and included guards against paths outside `.scratch` or reparse points. Local workspace policy rejected the command before PowerShell ran, so neither the guard checks nor deletion executed. No alternate deletion route was used; one task-owned scratch folder remains for manual removal. The synthetic Compose project itself was already removed by canonical Session teardown.
+- PR: not yet opened; commit, push, and PR creation are the next action.
+- Result: branch is synchronized and the focused guard passes; the full T18 acceptance remains PARTIAL as in the preceding r4 record.
+
+## T18 staging PR body quality gate — PASS — 2026-11-09T11:23:56+05:00
+
+- Commit under test: current branch code is unchanged from the staging implementation and sync recorded above; only the three T18 journals carry final checkpoint edits.
+- Validation command: `scripts/run_python.ps1 -RequireModule pytest scripts/run_pr_review_gate_checks.py --body-env PR_BODY --author drsapaev` using the existing `C:\final\backend\.venv\Scripts\python.exe`.
+- Result: 19 review-template unit tests passed; both documented sample bodies passed; the proposed staging PR body passed live validation. Its body remains in the task context and was not written into a generated or tracked temp file.
+- Limitation: this is the local description-quality gate, not GitHub exact-head CI or independent code review. The PR has not yet been pushed/opened.
+
+## T18 r6 — current-main RQ-17 and targeted asset provenance — 2026-11-09T17:35:25+05:00
+
+- Commit under test: staging worktree `ade10c2bf4e6cc0cafc51dbde89df35a26467f13`; application/frontend source `476c261f848b1d04adec36807837c981a979c8fa`.
+- Environment: owned synthetic Compose project `clinic-aqs-t18-memory-20261109-r6`, `Ubuntu-24.04`, ports 19006/18082/55447. No production data or service was used.
+- Execution mode: validation-only continuation under the previously approved narrow override. Allowed tracked paths for this follow-up: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md`; staging files and results stayed in this worktree's ignored `.scratch` root. Denied: application/backend/API/auth/database source, tracked tests, gate/router, production, deployment, foreign projects, and merge.
+- Hosted artifact: workflow [42615574111](https://github.com/drsapaev/final/actions/runs/42615574111), exact `source.sha` matched the application SHA above; 261/261 `SHA256SUMS` entries passed.
+- Original limitation: the earlier exact RQ-18 run had 13 unavailable browser response bodies and no app-asset hashes. This r6 run did not rerun that unchanged spec.
+- Validation commands: canonical `ops/scripts/wsl_staging.ps1` Preflight → Start → Session; Session invoked `frontend/e2e/rq17-setup-directions-live.spec.ts` through the task-local Playwright runner. Artifact body comparison checked the browser-captured response bytes against the verified artifact manifest.
+- Preflight: first attempt failed configuration validation because `STAGING_PUBLIC_HOST` included a port; corrected only the new owned env to `127.0.0.1` and retained `127.0.0.1:18082` for `STAGING_PUBLIC_WS_HOST`. The next Preflight passed with C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3207 MiB, Docker 29.1.3, Compose 2.40.3, ports accepted, and no warnings.
+- Start: PASS, build reserve 10 GiB satisfied, WSL available memory 3206 MiB, runtime readiness PASS, no warnings.
+- Session result: PASS; Playwright `1 passed / 0 failed / 0 skipped`. The ordinary Admin password plus required TOTP enrollment/verification path succeeded. The synthetic scenario configured Doctor and QueueResource directions, explicitly published them, and verified public catalog selection.
+- Browser asset evidence: captured entry JS, entry CSS, and `AdminSetupDirections` JS response bodies; all three saved-body hashes and all three artifact-manifest hashes matched (3/3). This is targeted evidence only. The canonical helper still reports `served_revision_verified=false`; no claim is made that every served asset or the entire frontend revision was proven.
+- Teardown: canonical Session reported PASS, removed 5 containers, 3 volumes and 1 network; remaining resources 0. Independent inventory found 0 project-labeled containers, volumes and networks, and 0 Windows listeners on the three ports.
+- Post-session Preflight: first returned `WINDOWS_PORT_OWNER`. Read-only inspection then found zero Windows listeners and zero owned Compose resources; no process was stopped. A second Preflight passed, with runtime readiness `NOT_RUN` as expected for preflight.
+- Actual changed paths in the evidence commit: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md` only. No runtime, API, test-source, database, auth, gate, production or deployment change.
+- Remaining limitation: T18/Tier-2 remains PARTIAL. The exact RQ-18 response-body issue, full T18 scenario matrix, keyboard/language/viewport/latency/console checks, full `docs/runbooks/STAGING_VALIDATION.md`, and independent formal review of PR #3946 remain outstanding. No staging deferral is claimed.
+- PR: #3946, still OPEN at HEAD `ade10c2` before this journal update; user retains merge authority.
