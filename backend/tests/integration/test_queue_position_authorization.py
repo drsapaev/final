@@ -39,6 +39,9 @@ _ROLE_PASSWORDS = {
     "Patient": "patient123",
     "Registrar": "registrar123",
     "Doctor": "doctor123",
+    # RETRO-3996-02: doctor-family spellings are canonical level-7 roles
+    # (app/core/roles.py) — same credential literal as the generic doctor.
+    "cardio": "doctor123",
 }
 
 
@@ -76,9 +79,11 @@ def _create_patient_with_profile(db_session, *, label: str) -> tuple[User, Patie
 
 def _create_queue_with_entries(
     db_session,
+    *,
+    doctor_role: str = "Doctor",
 ) -> tuple[Doctor, DailyQueue, OnlineQueueEntry, OnlineQueueEntry, OnlineQueueEntry]:
     suffix = _suffix()
-    doctor_user = _create_user(db_session, label="doc", role="Doctor")
+    doctor_user = _create_user(db_session, label="doc", role=doctor_role)
     doctor = Doctor(user_id=doctor_user.id, specialty="general", active=True, cabinet="101")
     db_session.add(doctor)
     db_session.commit()
@@ -244,3 +249,81 @@ class TestQPOSAUTHBE002UnlinkedEntryOwnership:
         )
         assert response.status_code == 200, response.text
         assert response.json()["entry_id"] == unlinked.id
+
+
+@pytest.mark.integration
+class TestRETRO399602DoctorFamilyReadAccess:
+    """RETRO-3996-02 (post-merge review of #3969–#3996, group 2): the
+    position read endpoints must admit the WHOLE doctor family.
+
+    PR #3996 (QPOSAUTH-BE-001/002) introduced `require_roles("Admin",
+    "Registrar", "Doctor")` for the stats endpoint and rewrote the inline
+    staff tuples of the by-id/by-number reads as ("Admin", "Registrar",
+    "Doctor", "SuperAdmin") — admitting only the EXACT "Doctor" spelling.
+    The canonical doctor-family roles (cardio/derma/dentist, plus the
+    legacy spellings) are staff for this module per its own notify
+    vocabulary (QUEUE_POSITION_DOCTOR_NOTIFY_ROLES) and the D-3 RBAC
+    unification SSOT (app/core/roles.py: DOCTOR_FAMILY_GATE_ROLES) —
+    pre-#3996 the by-id/by-number reads admitted cardio via
+    get_current_user, so this window REGRESSED the family's access
+    (empirically: role `cardio` → stats 403, entry-by-id 403, by-number
+    403, even for the cardio doctor's own queue).
+    """
+
+    def test_cardio_doctor_reads_own_queue_stats(self, client, db_session):
+        """RETRO-3996-02: a cardio-role doctor is staff for the stats endpoint."""
+        doctor, queue, _unlinked, _linked, _served = _create_queue_with_entries(
+            db_session, doctor_role="cardio"
+        )
+        cardio_user = doctor.user
+
+        response = client.get(
+            f"/api/v1/queue/position/stats/queue/{queue.id}",
+            headers=_headers(client, cardio_user),
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["queue_id"] == queue.id
+
+    def test_cardio_doctor_reads_unlinked_entry_by_global_id(self, client, db_session):
+        """RETRO-3996-02: the by-id read's staff branch admits the doctor family."""
+        doctor, _queue, unlinked, _linked, _served = _create_queue_with_entries(
+            db_session, doctor_role="cardio"
+        )
+        cardio_user = doctor.user
+
+        response = client.get(
+            f"/api/v1/queue/position/{unlinked.id}",
+            headers=_headers(client, cardio_user),
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["entry_id"] == unlinked.id
+
+    def test_cardio_doctor_reads_entry_by_number(self, client, db_session):
+        """RETRO-3996-02: the by-number read's staff branch admits the family too."""
+        doctor, _queue, unlinked, _linked, _served = _create_queue_with_entries(
+            db_session, doctor_role="cardio"
+        )
+        cardio_user = doctor.user
+
+        response = client.get(
+            f"/api/v1/queue/position/by-number/{unlinked.number}?specialist_id={doctor.id}",
+            headers=_headers(client, cardio_user),
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["entry_id"] == unlinked.id
+
+    def test_patient_is_still_denied_after_the_family_spread(self, client, db_session):
+        """Control: widening the staff vocabulary does not widen patient access."""
+        patient_user, _patient = _create_patient_with_profile(db_session, label="fam")
+        _doctor, _queue, unlinked, _linked, _served = _create_queue_with_entries(db_session)
+
+        stats = client.get(
+            f"/api/v1/queue/position/stats/queue/{_queue.id}",
+            headers=_headers(client, patient_user),
+        )
+        by_id = client.get(
+            f"/api/v1/queue/position/{unlinked.id}",
+            headers=_headers(client, patient_user),
+        )
+        assert stats.status_code == 403, stats.text
+        assert by_id.status_code == 403, by_id.text
