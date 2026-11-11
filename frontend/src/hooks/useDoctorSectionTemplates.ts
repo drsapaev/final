@@ -133,6 +133,20 @@ export function useDoctorSectionTemplates({
     const canUseCache = cacheOwner !== null;
     const cacheKey = `${cacheOwner ?? 'anonymous'}:${section || ''}:${icd10Code || ''}:${limit}`;
 
+    // RETRO-3995-01 (post-merge review of the #3969–#3996 wave): the LIVE
+    // context key of this hook instance, updated on every render. The epoch
+    // guard alone cannot stop a STALE-CLOSURE request from painting the
+    // panel: a mutation (updateTemplate/pinTemplate/unpinTemplate/
+    // deleteTemplate) that completes after the doctor switched the
+    // section/ICD context called its captured fetchTemplates(true), which
+    // took the NEWEST epoch for the OLD context and committed the previous
+    // diagnosis's phrases under the current one (while the live context's
+    // own in-flight response was discarded and never cached). Every state
+    // commit below therefore additionally requires the request's context to
+    // still be the live one.
+    const liveCacheKeyRef = useRef(cacheKey);
+    liveCacheKeyRef.current = cacheKey;
+
     // RETRO-3953-01 (dossier PR 3958): the rendered list belongs to the
     // PREVIOUS principal once the authenticated owner changes inside a
     // still-mounted hook. The module cache is already owner-scoped, but the
@@ -168,13 +182,16 @@ export function useDoctorSectionTemplates({
      * Subscribe THIS hook instance to a shared in-flight promise so a second
      * mounted hook receives the fetched result too (EMRTMPL-FE-002).
      */
-    const joinInFlightRequest = useCallback((epoch: number, promise: Promise<TemplateFetchOutcome>) => {
+    const joinInFlightRequest = useCallback((epoch: number, promise: Promise<TemplateFetchOutcome>, contextKey: string) => {
         if (isMountedRef.current) {
             setLoading(true);
         }
         promise.then((outcome) => {
             // EMRTMPL-FE-003: only commit while this request context is still current.
             if (!isMountedRef.current || epoch !== requestEpochRef.current) return;
+            // RETRO-3995-01: and only while the joined request's context is
+            // still the LIVE context of this hook instance.
+            if (liveCacheKeyRef.current !== contextKey) return;
             // RETRO-3953-04: the shared outcome carries the typed failure — a
             // joining subscriber shows the same error as the originator
             // instead of a laundered empty success.
@@ -215,7 +232,7 @@ export function useDoctorSectionTemplates({
         const cachedEntry = canUseCache ? sectionTemplateCache.get(cacheKey) : undefined;
         if (!forceRefresh) {
             if (cachedEntry?.data) {
-                if (isMountedRef.current && epoch === requestEpochRef.current) {
+                if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {
                     setTemplates(cachedEntry.data);
                     setError(null);
                     setLoading(false);
@@ -227,7 +244,7 @@ export function useDoctorSectionTemplates({
                 // EMRTMPL-FE-002: joining an in-flight request must also
                 // deliver the result to THIS instance, not only to the one
                 // that started it.
-                return joinInFlightRequest(epoch, cachedEntry.promise);
+                return joinInFlightRequest(epoch, cachedEntry.promise, cacheKey);
             }
         }
         // RETRO-3953-03: a forced refresh NEVER joins a pre-mutation in-flight
@@ -271,15 +288,17 @@ export function useDoctorSectionTemplates({
                 }
 
                 // EMRTMPL-FE-003: commit only if this request context is
-                // still the current one.
-                if (isMountedRef.current && epoch === requestEpochRef.current) {
+                // still the current one — and RETRO-3995-01: only if it is
+                // still the LIVE context (a stale-closure forced refresh may
+                // own the newest epoch yet paint a context the doctor left).
+                if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {
                     setTemplates(templatesData);
                 }
 
                 return { ok: true, data: templatesData };
             } catch (err: unknown) {
                 logger.error('[useDoctorSectionTemplates] Fetch error:', err);
-                if (isMountedRef.current && epoch === requestEpochRef.current) {
+                if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {
                     setError((err as Error).message || 'Failed to load templates');
                     setTemplates([]);
                 }
@@ -318,6 +337,17 @@ export function useDoctorSectionTemplates({
         }
     }, [cacheKey, canUseCache, icd10Code, joinInFlightRequest, limit, section]);
 
+    // RETRO-3995-01: mutations must refresh the LIVE context. The mutation
+    // callbacks below used to call their captured fetchTemplates(true); when
+    // the mutation completed after a section/ICD switch, that captured
+    // (stale) fetch became the newest epoch and repainted the previous
+    // diagnosis's phrases under the current one. The latest-ref indirection
+    // guarantees the post-mutation refresh always targets what the doctor is
+    // looking at NOW; the live-context commit guards above are the defense
+    // in depth for any other stale-closure caller (e.g. a captured refetch).
+    const liveFetchRef = useRef<((forceRefresh?: boolean) => Promise<TemplateFetchOutcome>) | null>(null);
+    liveFetchRef.current = fetchTemplates;
+
     // Fetch on mount and when dependencies change
     useEffect(() => {
         fetchTemplates();
@@ -330,13 +360,14 @@ export function useDoctorSectionTemplates({
     const pinTemplate = useCallback(async (templateId: string) => {
         try {
             await apiClient.post(`/section-templates/${section}/${templateId}/pin`);
-            await fetchTemplates(true); // Refresh list
+            // RETRO-3995-01: refresh the LIVE context, never the captured one.
+            await liveFetchRef.current?.(true); // Refresh list
             return { success: true };
         } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Pin error:', err);
             return { success: false, error: (err as Error).message };
         }
-    }, [section, fetchTemplates]);
+    }, [section]);
 
     /**
      * Unpin a template
@@ -345,13 +376,14 @@ export function useDoctorSectionTemplates({
     const unpinTemplate = useCallback(async (templateId: string) => {
         try {
             await apiClient.delete(`/section-templates/${section}/${templateId}/pin`);
-            await fetchTemplates(true);
+            // RETRO-3995-01: refresh the LIVE context, never the captured one.
+            await liveFetchRef.current?.(true);
             return { success: true };
         } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Unpin error:', err);
             return { success: false, error: (err as Error).message };
         }
-    }, [section, fetchTemplates]);
+    }, [section]);
 
     /**
      * Update a template
@@ -365,13 +397,14 @@ export function useDoctorSectionTemplates({
                 `/section-templates/${section}/${templateId}`,
                 { new_text: newText, mode }
             );
-            await fetchTemplates(true);
+            // RETRO-3995-01: refresh the LIVE context, never the captured one.
+            await liveFetchRef.current?.(true);
             return { success: true, template: response.data };
         } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Update error:', err);
             return { success: false, error: (err as Error).message };
         }
-    }, [section, fetchTemplates]);
+    }, [section]);
 
     /**
      * Delete a template
@@ -380,13 +413,14 @@ export function useDoctorSectionTemplates({
     const deleteTemplate = useCallback(async (templateId: string) => {
         try {
             await apiClient.delete(`/section-templates/${section}/${templateId}`);
-            await fetchTemplates(true);
+            // RETRO-3995-01: refresh the LIVE context, never the captured one.
+            await liveFetchRef.current?.(true);
             return { success: true };
         } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Delete error:', err);
             return { success: false, error: (err as Error).message };
         }
-    }, [section, fetchTemplates]);
+    }, [section]);
 
     return {
         // Data
