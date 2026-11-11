@@ -46,6 +46,7 @@ import {
   Progress,
   SegmentedControl,
   Select,
+  Tooltip,
 } from '../ui/macos';
 import { DataTable } from '../ui/DataTable';
 
@@ -458,45 +459,48 @@ const FileManager = () => {
 
   const renderFileActions = (file: FileItem) => (
     <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-      <Button
-        variant="ghost"
-        size="small"
-        onClick={(event: React.MouseEvent<HTMLElement>) => {
-          event.stopPropagation();
-          handlePreview(file.id);
-        }}
-        aria-label={t('misc.fm_aria_preview_file', { name: getFileDisplayName(file) })}
-        title={t('misc.fm_title_preview')}
-        style={iconButtonStyle}
-      >
-        <Eye size={16} />
-      </Button>
-      <Button
-        variant="ghost"
-        size="small"
-        onClick={(event: React.MouseEvent<HTMLElement>) => {
-          event.stopPropagation();
-          handleDownload(file.id, file.filename);
-        }}
-        aria-label={t('misc.fm_aria_download_file', { name: getFileDisplayName(file) })}
-        title={t('misc.fm_title_download')}
-        style={iconButtonStyle}
-      >
-        <Download size={16} />
-      </Button>
-      <Button
-        variant="ghost"
-        size="small"
-        onClick={(event: React.MouseEvent<HTMLElement>) => {
-          event.stopPropagation();
-          handleDelete(file.id);
-        }}
-        aria-label={t('misc.fm_aria_delete_file', { name: getFileDisplayName(file) })}
-        title={t('misc.delete')}
-        style={{ ...iconButtonStyle, color: 'var(--mac-danger)' }}
-      >
-        <Trash2 size={16} />
-      </Button>
+      <Tooltip content={t('misc.fm_title_preview')}>
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={(event: React.MouseEvent<HTMLElement>) => {
+            event.stopPropagation();
+            handlePreview(file.id);
+          }}
+          aria-label={t('misc.fm_aria_preview_file', { name: getFileDisplayName(file) })}
+          style={iconButtonStyle}
+        >
+          <Eye size={16} aria-hidden="true" />
+        </Button>
+      </Tooltip>
+      <Tooltip content={t('misc.fm_title_download')}>
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={(event: React.MouseEvent<HTMLElement>) => {
+            event.stopPropagation();
+            handleDownload(file.id, file.filename);
+          }}
+          aria-label={t('misc.fm_aria_download_file', { name: getFileDisplayName(file) })}
+          style={iconButtonStyle}
+        >
+          <Download size={16} aria-hidden="true" />
+        </Button>
+      </Tooltip>
+      <Tooltip content={t('misc.delete')}>
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={(event: React.MouseEvent<HTMLElement>) => {
+            event.stopPropagation();
+            handleDelete(file.id);
+          }}
+          aria-label={t('misc.fm_aria_delete_file', { name: getFileDisplayName(file) })}
+          style={{ ...iconButtonStyle, color: 'var(--mac-danger)' }}
+        >
+          <Trash2 size={16} aria-hidden="true" />
+        </Button>
+      </Tooltip>
     </div>
   );
 
@@ -738,16 +742,17 @@ const FileManager = () => {
           )}
         </div>
 
-        <Button
-          variant="ghost"
-          size="small"
-          onClick={loadFiles}
-          aria-label={t('misc.fm_aria_refresh')}
-          title={t('misc.fm_title_refresh')}
-          style={iconButtonStyle}
-        >
-          <RefreshCw size={16} />
-        </Button>
+        <Tooltip content={t('misc.fm_title_refresh')}>
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={loadFiles}
+            aria-label={t('misc.fm_aria_refresh')}
+            style={iconButtonStyle}
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+          </Button>
+        </Tooltip>
       </div>
 
       {loading ? (
