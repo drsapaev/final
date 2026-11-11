@@ -293,8 +293,13 @@ async def send_call_notification(
             ),
         )
 
+    # QPOSCALL-BE-001 + пост-merge ревью PR #4013: антидубль-окно
+    # действует ТОЛЬКО для намерения «ручной повтор» — endpoint явно
+    # помечает вызов как manual_resend. Канонические вызовы (QR/nurse/
+    # GraphQL) остаются без флага и кулдауном не подавляются; неудачная
+    # ручная попытка кулдаун не начинает — повтор фактически повторяется.
     result = await get_queue_position_service(db).notify_patient_called(
-        entry=entry, cabinet_number=request.cabinet_number
+        entry=entry, cabinet_number=request.cabinet_number, manual_resend=True
     )
 
     return NotificationResult(**result)
