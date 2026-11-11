@@ -1,3 +1,17 @@
+## Resume — PR #4026 exact-head CI and false-positive disposition — 2026-11-12T00:21:09+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 is PARTIAL. User owns merge.
+
+PR #4026 is OPEN / Ready for review / mergeable at remote HEAD 27d014751e51c9ae9821d39ddb51b1df9809b623. Fresh origin/main #4030 is ae656f664d3e91f3765a1b5595775a0747e96aa1; its tree is identical to prior main 3f703c1b5c6cbf215614bc45f6d235c3cab06ad8. Local merge candidate is 235855af08ed707fa13f16188f454fb21d6679e2. Finish the three-journal update, run diff checks, commit normally, push, then refresh the PR body to the final SHA and verify all new checks. Do not merge.
+
+Unified CI #43081976007 passed on exact source HEAD 27d0147, including frontend lint/type-check, build, unit, E2E and PR Required Gate. CodeQL, Gitleaks, GitGuardian, Security and Agent Workflow Guards also passed. Backend, integration, Docker, staging/production readiness, parity, load and DAST were skipped by workflow scope. Two PR-body metadata gates passed for an earlier body version; after the latest factual body correction, rerun/read their newly triggered checks before calling the metadata state green.
+
+The user approved classifying the historical GitGuardian signal on merged PR #3946 as false positive. A safe disposition comment (#6805189423) is posted; GitGuardian's bot comment says no secrets remain, and prior review evidence identifies the value as synthetic CI-only Compose placeholders. No GitGuardian dashboard dismissal control was available through the connected interface; do not claim one. Current #4026 GitGuardian check is green. Remove the unrelated #3946 signal note from #4026's body in the final body refresh.
+
+Keep Tier-2 PARTIAL and no deferral. Full live RQ-18/Admin 2FA, byte-level served artifact provenance, remaining T18 scenarios and docs/runbooks/STAGING_VALIDATION.md are NOT_RUN/PARTIAL. Prior canonical Preflight measured C: 9.24 GiB free against the 10 GiB staging build/Session reserve; do not start Compose until fresh Preflight confirms the reserve and exact-head artifact/image availability. No Docker prune or production action.
+
+Next exact action: finish the journal commit/push and final PR-body update; inspect new exact-head checks. After user merge, continue T18 in a fresh worktree from current origin/main.
+
 ## Resume — PR #4026 synced to current main; exact-head validation pending — 2026-11-11T23:49:30+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.

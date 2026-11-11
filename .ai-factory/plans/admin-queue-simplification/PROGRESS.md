@@ -1,5 +1,15 @@
 # Progress — T18 final acceptance
 
+## Current checkpoint — PR #4026 CI, main sync, and GitGuardian disposition — 2026-11-12T00:21:09+05:00
+
+- Umbrella task: bd2f7564-bd3d-449d-8d85-5a9325722a80. T00–T17 are merged; T18/Tier-2 remains PARTIAL. User owns merge and deployment.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final; branch codex/aqs-t18-rq18-recorder-fix-20261111. Fresh origin/main is ae656f664d3e91f3765a1b5595775a0747e96aa1 (#4030). Its tree matches prior main 3f703c1b5c6cbf215614bc45f6d235c3cab06ad8; the new commit is empty-tree. Local merge candidate 235855af08ed707fa13f16188f454fb21d6679e2 was created without conflict. Journal follow-up and push are pending.
+- PR #4026 is OPEN / Ready for review / mergeable at remote HEAD 27d014751e51c9ae9821d39ddb51b1df9809b623; after the fresh-main sync, this worktree is ahead of the remote branch. The only planned tracked changes are the three T18 journals. No app runtime or schema changed.
+- Unified CI #43081976007 passed on exact remote HEAD 27d0147: frontend lint/type-check, build, unit, E2E, generated API freshness and PR Required Gate. CodeQL, Gitleaks, GitGuardian, Security and Agent Workflow Guards passed. Backend, integration, Docker, staging/production readiness, load, parity and DAST were skipped by workflow scope. PR Review Quality Gate #43085524241 and Lifecycle Recommendation #43085524451 passed for an earlier PR-body update; the latest factual body correction has newly triggered metadata checks and must be rechecked.
+- The historical GitGuardian signal is on PR #3946, not this PR. The GitGuardian bot's comment says no secrets remain in that PR; prior review evidence identifies the flagged value as synthetic CI-only Compose placeholders, not account credentials. Per the user's explicit decision, a false-positive disposition was posted to PR #3946 as comment #6805189423. The GitHub connector does not expose a GitGuardian dashboard dismissal control; no dashboard dismissal is claimed. The current #4026 GitGuardian check passes.
+- Tier-2 remains PARTIAL and no deferral is claimed. Full live RQ-18, Admin 2FA, served-artifact provenance, remaining T18 scenarios and the full STAGING_VALIDATION.md checklist remain NOT_RUN/PARTIAL. Previous canonical Preflight found C: free 9.24 GiB against the runbook's 10 GiB build/Session reserve; no Compose was started and no Docker cleanup was performed.
+- Next exact action: finish and review this three-journal update, run git diff --check, commit with normal hooks, push the current-main sync plus evidence, refresh PR #4026 metadata with the final pushed HEAD, remove the unrelated historical GitGuardian note from that PR body, and verify the resulting exact-head checks. Leave merge to the user.
+
 ## Current checkpoint — PR #4026 synchronized; exact-head CI and staging reserve recorded — 2026-11-11T23:49:30+05:00
 
 - Umbrella task: bd2f7564-bd3d-449d-8d85-5a9325722a80. T00–T17 are MERGED; T18/Tier-2 remains PARTIAL. PR #3946 is merged at e2fd5a0d498645f541fc9948bc5809a8228bd7dd; user owns merge for #4026.
