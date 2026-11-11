@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
+from weakref import WeakValueDictionary
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
@@ -40,6 +41,9 @@ class WSManager:
                 redis_url=(os.getenv("WS_REDIS_URL") or os.getenv("REDIS_URL")),
             )
             cls._instance._redis_handlers = {}
+            # Per-room critical sections survive while operations await; unused
+            # locks are released once no task is holding or awaiting them.
+            cls._instance._subscription_locks = WeakValueDictionary()
             log.info("WSManager: создан новый экземпляр")
         return cls._instance
 
@@ -112,22 +116,67 @@ class WSManager:
     def _room_channel(self, room: str) -> str:
         return f"room:{room}"
 
+    def _room_subscription_lock(self, room: str) -> asyncio.Lock:
+        lock = self._subscription_locks.get(room)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._subscription_locks[room] = lock
+        return lock
+
     async def _ensure_room_subscription(self, room: str) -> None:
-        if room in self._redis_handlers:
-            return
+        # QUEUESUB-POST4008-01: a handler is cached only after the bridge
+        # confirms Redis SUBSCRIBE. Serializing first connects also prevents a
+        # second socket from treating an in-flight subscription as established.
+        async with self._room_subscription_lock(room):
+            if room in self._redis_handlers or not self.rooms.get(room):
+                return
 
-        async def _handler(payload, _room: str = room) -> None:
-            remote_data = payload.get("data", payload)
-            await self._broadcast_room(_room, remote_data, publish=False)
+            async def _handler(payload, _room: str = room) -> None:
+                remote_data = payload.get("data", payload)
+                await self._broadcast_room(_room, remote_data, publish=False)
 
-        self._redis_handlers[room] = _handler
-        await self._pubsub.subscribe(self._room_channel(room), _handler)
+            channel = self._room_channel(room)
+            try:
+                subscribed = await self._pubsub.subscribe(channel, _handler)
+            except Exception as exc:
+                log.warning(
+                    "WSManager: Redis subscribe failed for room %s: %s",
+                    room,
+                    type(exc).__name__,
+                )
+                subscribed = False
+
+            if subscribed is True:
+                self._redis_handlers[room] = _handler
+                return
+
+            # RedisPubSubBridge.subscribe can return False after adding its
+            # handler if _ensure_ready failed. Explicitly undo that state,
+            # otherwise a subsequent connect may get a false True result.
+            try:
+                await self._pubsub.unsubscribe(channel, _handler)
+            except Exception as exc:
+                log.warning(
+                    "WSManager: Redis failed-subscribe cleanup for room %s: %s",
+                    room,
+                    type(exc).__name__,
+                )
+            log.warning(
+                "WSManager: Redis room %s not subscribed; will retry on next connect",
+                room,
+            )
 
     async def _remove_room_subscription(self, room: str) -> None:
-        handler = self._redis_handlers.pop(room, None)
-        if handler is None:
-            return
-        await self._pubsub.unsubscribe(self._room_channel(room), handler)
+        # A queued unsubscribe can run after a new socket joins the same
+        # room; do not remove its live handler. Holding this lock also
+        # prevents an old in-flight unsubscribe from erasing a new subscribe.
+        async with self._room_subscription_lock(room):
+            if self.rooms.get(room):
+                return
+            handler = self._redis_handlers.pop(room, None)
+            if handler is None:
+                return
+            await self._pubsub.unsubscribe(self._room_channel(room), handler)
 
     async def _broadcast_room(self, room: str, data, publish: bool) -> None:
         for ws in list(self.rooms.get(room, set())):
