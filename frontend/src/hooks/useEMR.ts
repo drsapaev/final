@@ -400,8 +400,29 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     your_version: unknown;
                     last_edited_by: string;
                     last_edited_at: string;
+                    error?: string;
+                    message?: string;
                     [key: string]: unknown;
                 };
+                // RETRO-3971-03 (post-merge review of the 3969–3996 window):
+                // a structured FINALIZED_STATE 409 is amendment routing, not
+                // a version conflict — the backend deliberately returns it
+                // when the record was signed/amended on the server (it was
+                // never “another user changed the document”). Dispatching
+                // conflictDetected here rendered the false conflict dialog
+                // with literal vundefined/vundefined versions (no version
+                // fields on this payload) and gated the amendment affordance
+                // behind the LOCAL isSigned flag, false in this scenario.
+                // Route honestly: the same saveError surfacing the 400-branch
+                // uses for signed documents, plus a `finalized: true` marker
+                // the autosave hook classifies as deterministic (never
+                // stamped as a successful save).
+                if (conflictData?.error === 'FINALIZED_STATE') {
+                    if (stillCurrentVisit()) {
+                        dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    }
+                    return { finalized: true, ...conflictData };
+                }
                 if (stillCurrentVisit()) {
                     dispatch(emrActions.conflictDetected(conflictData));
                 }
@@ -499,8 +520,19 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     your_version: unknown;
                     last_edited_by: string;
                     last_edited_at: string;
+                    error?: string;
+                    message?: string;
                     [key: string]: unknown;
                 };
+                // RETRO-3971-03: same honest routing on the sign path — a
+                // FINALIZED_STATE 409 is amendment routing, never a version
+                // conflict (see the save-path branch above for the rationale).
+                if (conflictData?.error === 'FINALIZED_STATE') {
+                    if (stillCurrentVisit()) {
+                        dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    }
+                    return { finalized: true, ...conflictData };
+                }
                 if (stillCurrentVisit()) {
                     dispatch(emrActions.conflictDetected(conflictData));
                 }
