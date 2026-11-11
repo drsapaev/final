@@ -1,3 +1,19 @@
+## T18 — PR #4026 exact-head unit-test synchronization and CI follow-up — 2026-11-12T01:53:23+05:00
+
+- Commit under test: 9869a837d5eca654db6c9a4834582c20d31d96ca; base 80a616d16e407362bac16b9b2092e83070676711 (#4031).
+- Environment: isolated Windows worktree and GitHub Actions. No staging, Compose, database, production, or deployment was started.
+- Execution mode/gate: gate; one prescribed --known-root-cause retry. Result narrow_override, gate_misroute=no, override_used=yes, handoff_required=yes; generated execution prompt read. Allowed tracked paths were two unit-test files and three T18 journals; denied runtime/API/DB/auth, CI router, production, staging, and merge.
+- Changes at the tested HEAD: the deferred-ack test now waits until its mock observes onDirtyChange(true) before discard; the booking reconfirmation test waits for submission to become enabled after policy acknowledgement. No application runtime code changed.
+- Original failure: earlier exact-head CI attempt 1 failed the deferred EMR discard test; attempt 2 failed the booking settings reconfirmation test. These are asynchronous test-ordering repairs, not product behavior changes.
+- Validation commands/results: focused Dermatologist deferred-ack tests including positive control — PASS; focused booking reconfirmation — PASS; full PatientBookingPage test module — 18/18 PASS; scoped ESLint — PASS with one existing React-hooks warning; git diff --check — PASS; pre-commit hooks — PASS; PR-body validator — 19 tests PASS. Full Dermatologist module — 2/4 PASS under shared Vitest 3.2.7; two other completion tests failed locally. Shared dependencies differ from lockfile (Vitest 3.2.7 vs 5.0.3, Playwright 1.62 vs 1.63). Local build stopped before compilation because shared node_modules lacks nitro; no packages installed.
+- Hosted validation: Unified CI #43097376662 on exact HEAD was queued at 01:53+05:00. gh run list --commit 9869a837... showed 11 queued workflows; CodeQL #43097370927 completed with startup_failure. Required checks are not yet green; inspect startup diagnostics and exact-head runs. Do not treat queued/skipped checks as PASS.
+- GitGuardian: historical signal is from PR #3946 / commit 169d005f, not a finding in this PR. The user selected false-positive disposition; PR #3946 comment #6805189423 records it. Basis: the historical value was a synthetic CI-only Compose placeholder and the bot reported no secrets remain. A dashboard incident dismissal was not available and is not claimed. Current #4026 must be evaluated on its own exact-head checks.
+- Staging: NOT_RUN. Previous canonical Preflight measured C: free 9.24 GiB against 10 GiB required reserve; no Compose was started. served_revision_verified is not claimed.
+- Result: synchronization-only test patch pushed; PR #4026 is OPEN/Ready for review/mergeable at the tested HEAD. CI is pending with one CodeQL startup failure; T18/Tier-2 remains PARTIAL.
+- Actual changed paths in this evidence update: .ai-factory/plans/admin-queue-simplification/PROGRESS.md, EVIDENCE.md, RESUME.md. No runtime, database, auth, staging, production, or deployment changes.
+- PR: https://github.com/drsapaev/final/pull/4026
+- Merge commit: none.
+
 ## T18 — PR #4026 current-head checks and GitGuardian disposition — 2026-11-12T00:21:09+05:00
 
 - Commit under test: RQ-18 recorder source 1e5787eeb4987f558d54a26b85c70d32683701c5 (fix commit cbb512e8c84dffff8f0243e269215b9f0cedc8c2); source PR HEAD 27d014751e51c9ae9821d39ddb51b1df9809b623. Fresh-main sync candidate 235855af08ed707fa13f16188f454fb21d6679e2 includes origin/main #4030 ae656f664d3e91f3765a1b5595775a0747e96aa1, whose tree is identical to prior main.

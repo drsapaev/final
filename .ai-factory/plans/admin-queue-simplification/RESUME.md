@@ -1,3 +1,19 @@
+## Resume — PR #4026 exact-head CI follow-up — 2026-11-12T01:53:23+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 is PARTIAL. User owns merge/deployment.
+
+PR #4026: OPEN, Ready for review, mergeable. Exact HEAD 9869a837d5eca654db6c9a4834582c20d31d96ca; base/main 80a616d16e407362bac16b9b2092e83070676711 (#4031). Current PR body reflects the head/base and pending CI. Do not merge.
+
+The two synchronization-only test changes target prior hosted failures in deferred EMR discard and booking reconfirmation. Local focused tests and the full booking module passed; the full Dermatologist module was 2/4 under stale shared dependencies. Local build could not start because shared node_modules lacks nitro; no packages were installed. See the newest EVIDENCE entry for exact commands and limitations.
+
+At 2026-11-12T01:53+05:00, Unified CI #43097376662 and 10 other current-head workflows were queued; CodeQL #43097370927 had startup_failure. Inspect its diagnostics and monitor the current-head run list. Do not call CI green while required checks are queued/failed. Prior exact-head checks on 27d0147 are not proof for 9869a837.
+
+The user chose a false-positive disposition for the historical GitGuardian event on PR #3946 / commit 169d005f. Comment #6805189423 is already posted with the synthetic-placeholder rationale. No dashboard dismissal control was available; do not claim a dashboard status change. This is separate from #4026.
+
+Staging remains NOT_RUN. Last canonical Preflight measured C: free 9.24 GiB versus the 10 GiB reserve. Do not start Compose until a fresh canonical Preflight and exact-head artifact availability satisfy the runbook. Full live RQ-18, served frontend provenance, remaining T18 cases and docs/runbooks/STAGING_VALIDATION.md remain unverified; keep Tier-2 PARTIAL and no deferral.
+
+Next: inspect CodeQL startup diagnostics and current-head workflows; resolve any exact-head failures, update journals/PR description with final statuses, then wait for user merge. Continue the plan from fresh origin/main afterward.
+
 ## Resume — PR #4026 exact-head CI and false-positive disposition — 2026-11-12T00:21:09+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 is PARTIAL. User owns merge.
