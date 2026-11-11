@@ -15,6 +15,7 @@ import EMRSection from '../EMRSection';
 import React from 'react';
 import EMRTextField from '../EMRTextField';
 import TeethChart from '@/components/dental/TeethChart';
+import ToothModal from '@/components/dental/ToothModal';
 import './DentistrySection.css';
 import { Input, Checkbox } from '@/components/ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -40,8 +41,34 @@ interface DentistrySectionProps {
   radiographs?: Record<string, unknown>;
   onChange?: ((field: string, value: unknown) => void) | undefined;
   disabled?: boolean;
+  /**
+   * Visit identity (DENTCHART-FE-001, audit 3886): the tooth chart is
+   * remounted when the patient/visit identity changes, so no local chart
+   * state (selection, palette choice) can survive a patient switch.
+   */
+  visitId?: string | number | null;
+  /** Patient identity (DENTCHART-FE-001, audit 3886). */
+  patientId?: string | number | null;
 }
 
+
+/**
+ * DENTDATA-FE-001 (audit 3886): records saved by the previous version can
+ * hold legacy event-shaped objects ({ target: { value } }) instead of the
+ * scalar the doctor actually typed. Normalize such values at the read
+ * boundary so the controlled inputs recover instead of rendering
+ * "[object Object]".
+ */
+const scalarText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (value && typeof value === 'object') {
+    const legacy = (value as { target?: { value?: unknown } }).target?.value;
+    if (typeof legacy === 'string') return legacy;
+    if (typeof legacy === 'number' && Number.isFinite(legacy)) return String(legacy);
+  }
+  return '';
+};
 
 export function DentistrySection({
     toothStatus: toothStatusRaw = {},
@@ -51,6 +78,8 @@ export function DentistrySection({
     radiographs: radiographsRaw = {},
     onChange,
     disabled = false,
+    visitId,
+    patientId,
 }: DentistrySectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
     const hygieneIndices = hygieneIndicesRaw as Record<string, any>;
@@ -59,6 +88,12 @@ export function DentistrySection({
   const measurements = measurementsRaw as Record<string, any>;
   const radiographs = radiographsRaw as Record<string, any>;
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'hygiene' | 'periodontal' | 'occlusion' | 'radiographs'
+  // RETRO-3966-01 (post-merge review 3968): a readOnly chart previously
+  // received onToothClick but no onInspect — tooth buttons were enabled
+  // yet did nothing on inspection. The locked record now opens the SAME
+  // inspection-only ToothModal (readOnly: no editable controls, no Save,
+  // no EMR write attempt) as the DentalVisitScreen consumer.
+  const [inspectedTooth, setInspectedTooth] = useState<{ number: string | number; data: Record<string, unknown> } | null>(null);
 
     // Handlers
     const handleToothChange = useCallback((toothNumber: string | number, toothData: unknown) => {
@@ -67,6 +102,12 @@ export function DentistrySection({
             [toothNumber]: toothData
         });
     }, [toothStatus, onChange]);
+
+    // DENTCHART-FE-003 (audit 3886): Clear All must clear the CANONICAL
+    // specialty_data.tooth_status, not only the chart's local copy.
+    const handleClearToothStatus = useCallback(() => {
+        onChange?.('tooth_status', {});
+    }, [onChange]);
 
     const handleHygieneIndexChange = useCallback((field: string, value: unknown) => {
         onChange?.('hygiene_indices', {
@@ -138,9 +179,21 @@ export function DentistrySection({
             {/* Tooth Chart Tab */}
             {activeTab === 'chart' && (
                 <div className="dentistry-tab-content">
+                    {/* DENTCHART-FE-001 (audit 3886): key the chart by the
+                        patient/visit identity so a same-mounted switch to
+                        another patient remounts the chart with fresh local
+                        state instead of reusing the previous patient's
+                        selection/palette remnants. */}
                     <TeethChart
+                        key={`dentchart-${String(patientId ?? 'no-patient')}-${String(visitId ?? 'no-visit')}`}
                         initialData={toothStatus}
                         onToothClick={handleToothChange}
+                        onClearAll={handleClearToothStatus}
+                        // RETRO-3966-01: inspection stays available on a
+                        // readOnly chart — clicks route to the inspection
+                        // modal, never to the mutation callback (TeethChart
+                        // never calls onToothClick when readOnly).
+                        onInspect={(toothNumber, toothData) => setInspectedTooth({ number: toothNumber, data: (toothData as Record<string, unknown>) || {} })}
                         readOnly={disabled}
                     />
                 </div>
@@ -152,32 +205,32 @@ export function DentistrySection({
                     <div className="dentistry-indices-grid">
                         <EMRTextField
                             label="OHIS (Oral Hygiene Index Simplified)"
-                            value={hygieneIndices?.ohis || ''}
-                            onChange={(e) => handleHygieneIndexChange('ohis', e as unknown as string)}
+                            value={scalarText(hygieneIndices?.ohis)}
+                            onValueChange={(value) => handleHygieneIndexChange('ohis', value)}
                             disabled={disabled}
                             type="number"
                             placeholder="0.0 - 6.0"
                         />
                         <EMRTextField
                             label="PLI (Plaque Index)"
-                            value={hygieneIndices?.pli || ''}
-                            onChange={(e) => handleHygieneIndexChange('pli', e as unknown as string)}
+                            value={scalarText(hygieneIndices?.pli)}
+                            onValueChange={(value) => handleHygieneIndexChange('pli', value)}
                             disabled={disabled}
                             type="number"
                             placeholder="0.0 - 3.0"
                         />
                         <EMRTextField
                             label="CPI (Community Periodontal Index)"
-                            value={hygieneIndices?.cpi || ''}
-                            onChange={(e) => handleHygieneIndexChange('cpi', e as unknown as string)}
+                            value={scalarText(hygieneIndices?.cpi)}
+                            onValueChange={(value) => handleHygieneIndexChange('cpi', value)}
                             disabled={disabled}
                             type="number"
                             placeholder="0 - 4"
                         />
                         <EMRTextField
                             label="Bleeding Index (%)"
-                            value={hygieneIndices?.bleeding || ''}
-                            onChange={(e) => handleHygieneIndexChange('bleeding', e as unknown as string)}
+                            value={scalarText(hygieneIndices?.bleeding)}
+                            onValueChange={(value) => handleHygieneIndexChange('bleeding', value)}
                             disabled={disabled}
                             type="number"
                             placeholder="0 - 100"
@@ -201,8 +254,11 @@ export function DentistrySection({
                         <h5 className="periodontal-jaw-title">{t('misc.ds_verhnyaya_chelyust')}</h5>
                         <div className="periodontal-teeth-grid upper">
                             {[18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28].map(toothNum => {
-                                const depth = periodontalPockets?.[toothNum] || 0;
-                                const severityClass = depth >= 6 ? 'severe' : depth >= 4 ? 'moderate' : 'normal';
+                                const depth = periodontalPockets?.[toothNum];
+                                const measured = typeof depth === 'number' && Number.isFinite(depth);
+                                const severityClass = measured
+                                    ? (depth >= 6 ? 'severe' : depth >= 4 ? 'moderate' : 'normal')
+                                    : 'normal';
                                 return (
                                     <div key={toothNum} className={`periodontal-tooth ${severityClass}`}>
                                         <span className="tooth-number">{toothNum}</span>
@@ -211,11 +267,36 @@ export function DentistrySection({
                                             aria-label={`Periodontal pocket depth for tooth ${toothNum}`}
                                             min="0"
                                             max="15"
-                                            value={depth}
-                                            onChange={(e) => onChange?.('periodontal_pockets', {
-                                                ...periodontalPockets,
-                                                [toothNum]: parseFloat(e as unknown as string) || 0
-                                            })}
+                                            value={measured ? depth : ''}
+                                            onChange={(e) => {
+                                                // DENTPOCKET-FE-001 (audit 3886): read the
+                                                // input's value, not the event object. The old
+                                                // parseFloat(eventObject) || 0 collapsed EVERY
+                                                // entered depth (4/6/7.5 mm, including severe
+                                                // 6+ mm pockets) into a fabricated 0 mm
+                                                // "normal" measurement.
+                                                const raw = e.target.value;
+                                                const parsed = Number.parseFloat(raw);
+                                                if (raw.trim() === '' || !Number.isFinite(parsed)) {
+                                                    // Explicitly unmeasured — never a silent 0 mm.
+                                                    if (!(toothNum in periodontalPockets)) return;
+                                                    const next = { ...periodontalPockets };
+                                                    delete next[toothNum];
+                                                    onChange?.('periodontal_pockets', next);
+                                                    return;
+                                                }
+                                                if (parsed < 0 || parsed > 15) {
+                                                    // Out of the declared 0–15 mm range: refuse
+                                                    // the change; the next committed change snaps
+                                                    // the field back to the last valid value
+                                                    // instead of silently rewriting it.
+                                                    return;
+                                                }
+                                                onChange?.('periodontal_pockets', {
+                                                    ...periodontalPockets,
+                                                    [toothNum]: parsed
+                                                });
+                                            }}
                                             disabled={disabled}
                                             className="pocket-depth-input"
                                         />
@@ -231,8 +312,11 @@ export function DentistrySection({
                         <h5 className="periodontal-jaw-title">{t('misc.ds_nizhnyaya_chelyust')}</h5>
                         <div className="periodontal-teeth-grid lower">
                             {[48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38].map(toothNum => {
-                                const depth = periodontalPockets?.[toothNum] || 0;
-                                const severityClass = depth >= 6 ? 'severe' : depth >= 4 ? 'moderate' : 'normal';
+                                const depth = periodontalPockets?.[toothNum];
+                                const measured = typeof depth === 'number' && Number.isFinite(depth);
+                                const severityClass = measured
+                                    ? (depth >= 6 ? 'severe' : depth >= 4 ? 'moderate' : 'normal')
+                                    : 'normal';
                                 return (
                                     <div key={toothNum} className={`periodontal-tooth ${severityClass}`}>
                                         <span className="tooth-number">{toothNum}</span>
@@ -241,11 +325,36 @@ export function DentistrySection({
                                             aria-label={`Periodontal pocket depth for tooth ${toothNum}`}
                                             min="0"
                                             max="15"
-                                            value={depth}
-                                            onChange={(e) => onChange?.('periodontal_pockets', {
-                                                ...periodontalPockets,
-                                                [toothNum]: parseFloat(e as unknown as string) || 0
-                                            })}
+                                            value={measured ? depth : ''}
+                                            onChange={(e) => {
+                                                // DENTPOCKET-FE-001 (audit 3886): read the
+                                                // input's value, not the event object. The old
+                                                // parseFloat(eventObject) || 0 collapsed EVERY
+                                                // entered depth (4/6/7.5 mm, including severe
+                                                // 6+ mm pockets) into a fabricated 0 mm
+                                                // "normal" measurement.
+                                                const raw = e.target.value;
+                                                const parsed = Number.parseFloat(raw);
+                                                if (raw.trim() === '' || !Number.isFinite(parsed)) {
+                                                    // Explicitly unmeasured — never a silent 0 mm.
+                                                    if (!(toothNum in periodontalPockets)) return;
+                                                    const next = { ...periodontalPockets };
+                                                    delete next[toothNum];
+                                                    onChange?.('periodontal_pockets', next);
+                                                    return;
+                                                }
+                                                if (parsed < 0 || parsed > 15) {
+                                                    // Out of the declared 0–15 mm range: refuse
+                                                    // the change; the next committed change snaps
+                                                    // the field back to the last valid value
+                                                    // instead of silently rewriting it.
+                                                    return;
+                                                }
+                                                onChange?.('periodontal_pockets', {
+                                                    ...periodontalPockets,
+                                                    [toothNum]: parsed
+                                                });
+                                            }}
                                             disabled={disabled}
                                             className="pocket-depth-input"
                                         />
@@ -298,24 +407,24 @@ export function DentistrySection({
                     <div className="dentistry-measurements-grid">
                         <EMRTextField
                             label={t('misc.ds_overjet_mm')}
-                            value={measurements?.overjet || ''}
-                            onChange={(e) => handleMeasurementChange('overjet', e as unknown as string)}
+                            value={scalarText(measurements?.overjet)}
+                            onValueChange={(value) => handleMeasurementChange('overjet', value)}
                             disabled={disabled}
                             type="number"
                             placeholder={t('misc.ds_gorizontalnoe_perekrytie')}
                         />
                         <EMRTextField
                             label={t('misc.ds_overbite_mm')}
-                            value={measurements?.overbite || ''}
-                            onChange={(e) => handleMeasurementChange('overbite', e as unknown as string)}
+                            value={scalarText(measurements?.overbite)}
+                            onValueChange={(value) => handleMeasurementChange('overbite', value)}
                             disabled={disabled}
                             type="number"
                             placeholder={t('misc.ds_vertikalnoe_perekrytie')}
                         />
                         <EMRTextField
                             label={t('misc.ds_midline_deviation_mm')}
-                            value={measurements?.midline || ''}
-                            onChange={(e) => handleMeasurementChange('midline', e as unknown as string)}
+                            value={scalarText(measurements?.midline)}
+                            onValueChange={(value) => handleMeasurementChange('midline', value)}
                             disabled={disabled}
                             type="number"
                             placeholder={t('misc.ds_otklonenie_sredinnoy_linii')}
@@ -344,15 +453,15 @@ export function DentistrySection({
                     <div className="dentistry-radiographs-grid">
                         <EMRTextField
                             label={t('misc.ds_panoramnyy_snimok')}
-                            value={radiographs?.panoramic || ''}
-                            onChange={(e) => handleRadiographChange('panoramic', e as unknown as string)}
+                            value={scalarText(radiographs?.panoramic)}
+                            onValueChange={(value) => handleRadiographChange('panoramic', value)}
                             disabled={disabled}
                             placeholder={t('misc.ds_url_ili_put_k_faylu')}
                         />
                         <EMRTextField
                             label={t('misc.ds_klkt')}
-                            value={radiographs?.cbct || ''}
-                            onChange={(e) => handleRadiographChange('cbct', e as unknown as string)}
+                            value={scalarText(radiographs?.cbct)}
+                            onValueChange={(value) => handleRadiographChange('cbct', value)}
                             disabled={disabled}
                             placeholder={t('misc.ds_url_ili_put_k_faylu')}
                         />
@@ -361,6 +470,21 @@ export function DentistrySection({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* RETRO-3966-01: inspection-only tooth modal for a locked
+                record — renders with readOnly (no editable controls, no
+                Save, no /v2/emr write attempt), mirroring the
+                DentalVisitScreen locked-record inspection contract. */}
+            {inspectedTooth && (
+                <ToothModal
+                    open
+                    readOnly
+                    onClose={() => setInspectedTooth(null)}
+                    toothNumber={inspectedTooth.number}
+                    toothData={inspectedTooth.data}
+                    visitId={visitId ?? undefined}
+                />
             )}
         </EMRSection>
     );

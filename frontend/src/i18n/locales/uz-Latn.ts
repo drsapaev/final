@@ -864,6 +864,12 @@ const uzLatn = {
     cardio_parser_normal_params: 'Parametrlar normal chegarada.',
     cardio_parser_sinus_rhythm: 'Sinus',
     cardio_parser_scp_not_implemented: "SCP-ECG formatini tahlil qilish amalga oshirilmagan. Faylni XML/HL7 aECG formatida yuklang yoki SCP kutubxonasini integratsiya qilish uchun administratorga murojaat qiling.",
+    // ECGPARSER-FE-001/002 (audit 3886 round 25): honest parser states —
+    // unrecognized XML is not a parsed ECG; absent measurements are
+    // explicitly "not measured", never a silent "normal".
+    cardio_parser_xml_not_ecg: "XML faylda aniqlanadigan EKG o'lchovlari (HL7 aECG) topilmadi — fayl EKG yozuvi sifatida saqlanmaydi",
+    cardio_parser_hr_not_measured: "YSS o'lchanmagan",
+    cardio_parser_axis_not_measured: "EEO holati o'lchanmagan",
 
     // ─── EchoForm (cardio.cardio_echo_*) ───
     cardio_echo_section_left_ventricle: "Chap qorincha",
@@ -6618,6 +6624,7 @@ const uzLatn = {
     visit_emr_status_signed: 'Подписана',
     visit_emr_status_amended: 'Изменена после подписания',
     tooth_save_requires_visit: 'Сохранение зубной карты требует открытый визит. Откройте пациента из очереди.',
+    tooth_inspection_only: 'Запись приёма доступна только для просмотра — зуб открыт в режиме осмотра, редактирование и сохранение недоступны.',
   },
   payment: {
     timeout: 'Время ожидания истекло',
@@ -8779,6 +8786,7 @@ const uzLatn = {
     ps_save: 'Retseptni saqlash',
     ps_print: 'Retseptni chop etish',
     emr_ai_no_complaints: 'AI-tavsiyalar uchun avval «Shikoyatlar» maydonini toʻldiring',
+    ai_popover_kb_hint: '↑↓ va Enter roʻyxat fokusida ishlaydi • Esc yopish',
     emr_ghost_unavailable: 'Ghost Mode imzolangan kartada mavjud emas.',
     emr_sign_title: 'EMK imzolash',
     emr_sign_message: 'EMK imzolansinmi?',
@@ -8904,6 +8912,7 @@ const uzLatn = {
     aia_fallback_provider_notice: '{provider} zaxira AI-provayderi orqali javob olindi. Buni faqat qoralama sifatida ishlating va klinik qoʻllashdan oldin tashqi AI sozlamalarini tekshiring.',
     aia_analyzing_via: '{provider} AI orqali tahlil...',
     aia_click_refresh: 'AI tahlilini boshlash uchun Yangilashni bosing',
+    aia_no_context_notice: "Klinik kontekstsiz AI tahlil mavjud emas: yordamchidan tashxis, shikoyatlar va natijalar bilan foydalanish uchun bemor kartasini oching.",
     aia_retry_attempt: '{count}-urinish. AI provayderini almashtiring yoki soʻrovni qaytaring.',
 
     // ─── ComponentTest.jsx (ct_) ───────────────────────────────────────────

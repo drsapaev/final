@@ -39,7 +39,7 @@ import { api } from '../../api/client';
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import { getErrorMessage } from '../../utils/errorHandler';
-import { parseECGFile, analyzeECGParameters } from './ECGParser';
+import { parseECGFile, analyzeECGParameters, toFiniteNumber } from './ECGParser';
 
 
 const iconSize = 16;
@@ -49,6 +49,10 @@ interface EcgParameters {
   prInterval?: number;
   qrsInterval?: number;
   qtInterval?: number;
+  // ECGPARSER-FE-003 (audit 3886 round 25): the XML parser emits
+  // `qtcInterval` (device-measured corrected QT) — declared here so the
+  // structured persistence mapping can read it type-safely.
+  qtcInterval?: number;
   qtCorrected?: number;
   rhythm?: string;
   stSegment?: string;
@@ -454,21 +458,40 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         // to review the ECG; we surface a non-blocking toast instead.
         if (patientId) {
           try {
+            // ECGPARSER-FE-003 (audit 3886 round 25): canonical typed
+            // mapping for device measurements. The old payload read only
+            // `qrs_duration ?? qrsDuration` and `qt_corrected ??
+            // qtCorrected` — keys the parser never emits — so every parsed
+            // QRS/QTc silently disappeared from the structured
+            // cardio_ecg_records columns (the values survived only inside
+            // the raw `parameters` dict). The mapping now reads the
+            // parser's actual keys (`qrsInterval`, `qtcInterval`), keeps QT
+            // and QTc distinct sources, and normalizes each measurement to
+            // a finite number — never a fabricated one.
+            const p = enrichedParams as Record<string, unknown>;
+            const firstFiniteNumber = (...values: unknown[]): number | null => {
+              for (const value of values) {
+                const numeric = toFiniteNumber(value);
+                if (numeric !== null) return numeric;
+              }
+              return null;
+            };
+            const axisValue = toFiniteNumber(p.axis);
             await api.post('/cardio/ecg', {
               patient_id: Number(patientId),
               visit_id: visitId ? Number(visitId) : null,
               file_id: uploadedFile.id,
               ecg_date: new Date().toISOString().slice(0, 10),
-              heart_rate: (enrichedParams as Record<string, unknown>).heart_rate ?? (enrichedParams as Record<string, unknown>).heartRate ?? null,
-              pr_interval: (enrichedParams as Record<string, unknown>).pr_interval ?? (enrichedParams as Record<string, unknown>).prInterval ?? null,
-              qrs_duration: (enrichedParams as Record<string, unknown>).qrs_duration ?? (enrichedParams as Record<string, unknown>).qrsDuration ?? null,
-              qt_interval: (enrichedParams as Record<string, unknown>).qt_interval ?? (enrichedParams as Record<string, unknown>).qtInterval ?? null,
-              qt_corrected: (enrichedParams as Record<string, unknown>).qt_corrected ?? (enrichedParams as Record<string, unknown>).qtCorrected ?? null,
-              rhythm: (enrichedParams as Record<string, unknown>).rhythm ?? null,
-              st_segment: (enrichedParams as Record<string, unknown>).st_segment ?? (enrichedParams as Record<string, unknown>).stSegment ?? null,
-              t_wave: (enrichedParams as Record<string, unknown>).t_wave ?? (enrichedParams as Record<string, unknown>).tWave ?? null,
-              axis: (enrichedParams as Record<string, unknown>).axis ?? null,
-              interpretation: (enrichedParams as Record<string, unknown>).interpretation ?? null,
+              heart_rate: firstFiniteNumber(p.heart_rate, p.heartRate),
+              pr_interval: firstFiniteNumber(p.pr_interval, p.prInterval),
+              qrs_duration: firstFiniteNumber(p.qrs_duration, p.qrsDuration, p.qrsInterval),
+              qt_interval: firstFiniteNumber(p.qt_interval, p.qtInterval),
+              qt_corrected: firstFiniteNumber(p.qt_corrected, p.qtCorrected, p.qtcInterval),
+              rhythm: (p.rhythm as string | null | undefined) ?? null,
+              st_segment: ((p.st_segment ?? p.stSegment) as string | null | undefined) ?? null,
+              t_wave: ((p.t_wave ?? p.tWave) as string | null | undefined) ?? null,
+              axis: axisValue === null ? null : String(axisValue),
+              interpretation: (p.interpretation as string | null | undefined) ?? null,
               source: 'device',
               parameters: enrichedParams,
             });
@@ -480,6 +503,22 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
             notify.error(t('final.ecg_not_saved'));
           }
         }
+      } else if (parseResult.success === false) {
+        // ECGPARSER-FE-001 (audit 3886 round 25): a failed parse must be a
+        // visible negative state for the doctor. Previously the failure was
+        // completely silent: an unrecognizable XML (or an unsupported
+        // binary) stayed in the file list as an ordinary attachment while
+        // nothing told the doctor that it was never analyzed and never
+        // persisted to the structured ECG history. This branch also
+        // finally surfaces the C-1 "SCP parsing not implemented" contract
+        // of parseSCPFile. View-only formats (PDF: success:true with
+        // parameters:null) intentionally stay silent.
+        if (isStaleContext(epochAtStart)) return;
+        logger.warn('Файл не распознан как ЭКГ:', {
+          fileName: originalFile?.name,
+          error: parseResult.error,
+        });
+        notify.warning(String(parseResult.error || t('final.ecg_parse_warning')));
       }
     } catch (error) {
       if (isStaleContext(epochAtStart)) return;

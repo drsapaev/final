@@ -865,6 +865,12 @@ const kk = {
     cardio_parser_normal_params: 'Параметры в пределах нормы.',
     cardio_parser_sinus_rhythm: 'Синусовый',
     cardio_parser_scp_not_implemented: 'Парсинг SCP-ECG формата не реализован. Загрузите файл в формате XML/HL7 aECG или обратитесь к администратору для интеграции SCP-библиотеки.',
+    // ECGPARSER-FE-001/002 (audit 3886 round 25): honest parser states —
+    // unrecognized XML is not a parsed ECG; absent measurements are
+    // explicitly "not measured", never a silent "normal".
+    cardio_parser_xml_not_ecg: 'XML не содержит распознаваемых измерений ЭКГ (HL7 aECG) — файл не будет сохранён как запись ЭКГ',
+    cardio_parser_hr_not_measured: 'ЧСС не измерена',
+    cardio_parser_axis_not_measured: 'Положение ЭОС не измерено',
 
     // ─── EchoForm (cardio.cardio_echo_*) ───
     cardio_echo_section_left_ventricle: 'Левый желудочек',
@@ -6618,6 +6624,7 @@ const kk = {
     visit_emr_status_signed: 'Подписана',
     visit_emr_status_amended: 'Изменена после подписания',
     tooth_save_requires_visit: 'Сохранение зубной карты требует открытый визит. Откройте пациента из очереди.',
+    tooth_inspection_only: 'Запись приёма доступна только для просмотра — зуб открыт в режиме осмотра, редактирование и сохранение недоступны.',
   },
   payment: {
     timeout: 'Время ожидания истекло',
@@ -8779,6 +8786,7 @@ const kk = {
     ps_save: 'Сохранить рецепт',
     ps_print: 'Печать рецепта',
     emr_ai_no_complaints: 'Для AI-подсказок сначала заполните поле «Жалобы»',
+    ai_popover_kb_hint: '↑↓ және Enter тізім фокусында жұмыс істейді • Esc жабу',
     emr_ghost_unavailable: 'Ghost Mode недоступен в подписанной карте.',
     emr_sign_title: 'Подписание ЭМК',
     emr_sign_message: 'Подписать ЭМК?',
@@ -8904,6 +8912,7 @@ const kk = {
     aia_fallback_provider_notice: 'Ответ получен через резервный AI-провайдер {provider}. Используйте его только как черновик и проверьте настройки внешнего AI перед клиническим применением.',
     aia_analyzing_via: 'Анализ через {provider} AI...',
     aia_click_refresh: 'Нажмите Обновить для запуска AI анализа',
+    aia_no_context_notice: 'Клиникалық контекстсіз AI-талдау қолжетімсіз: көмекшіні диагноз, шағымдар мен нәтижелермен қолдану үшін пациент картасын ашыңыз.',
     aia_retry_attempt: 'Попытка {count}. Попробуйте сменить AI провайдер или повторить запрос.',
 
     // ─── ComponentTest.jsx (ct_) ───────────────────────────────────────────

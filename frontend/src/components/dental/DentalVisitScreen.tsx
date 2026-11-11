@@ -1704,6 +1704,10 @@ const DentalVisitScreen = ({
               <TeethChart
                 initialData={toothStatus}
                 onToothClick={handleToothClick}
+                // DENTCHART-FE-002 (audit 3886): in readOnly the chart never
+                // calls the mutation callback; the locked-record
+                // click → ToothModal inspection is routed through onInspect.
+                onInspect={handleToothClick}
                 readOnly={fieldsDisabled}
               />
               <ToothSummary toothStatus={toothStatus} />
@@ -1744,6 +1748,11 @@ const DentalVisitScreen = ({
           toothNumber={selectedTooth.number}
           toothData={selectedTooth.data}
           suggestedStatus={selectedTooth.suggestedStatus}
+          // RETRO-3966-01 (review 3968): the chart routes locked-record
+          // clicks through onInspect into this modal — it must open in
+          // inspection-only mode (no editable controls, no Save, no EMR
+          // write attempt) whenever the visit screen is read-only.
+          readOnly={fieldsDisabled}
           onSave={(data: unknown, rowVersion?: number) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>, rowVersion)}
           visitId={visitId}
         />
