@@ -277,8 +277,9 @@ async def test_canonical_call_after_failed_resend_is_delivered(
     failed = await _manual_resend(db_session, entry)
     assert failed["sent"] is False
 
-    # The canonical plane (QR/nurse/GraphQL call shape — no manual flag)
-    # must deliver despite the failed manual attempt seconds earlier.
+    # The sender recovers; the canonical plane (QR/nurse/GraphQL call shape
+    # — no manual flag) must deliver despite the failed manual attempt.
+    fake_push.return_value = True
     canonical = await get_queue_position_service(db_session).notify_patient_called(
         entry, cabinet_number="12"
     )
