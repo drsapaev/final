@@ -8,7 +8,6 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-import jwt
 from fastapi import (
     APIRouter,
     Depends,
@@ -17,13 +16,12 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
-from jwt import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
+from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
 from app.api.v1.endpoints.ws_token import extract_ws_token
-from app.core.config import settings
+from app.core.roles import DOCTOR_ROLES, Roles, normalize_role_value
 from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
 from app.models.user import User
@@ -40,24 +38,37 @@ router = APIRouter()
 
 # ===================== WEBSOCKET АУТЕНТИФИКАЦИЯ =====================
 
+# DISPLAYWS-BE-002 (audit PR #3961, round 30): the board WebSocket must not
+# trust "a token resolved to some user" as an entitlement. The policy below
+# mirrors the mounted display HTTP surface (require_roles Admin/Doctor/
+# Registrar) extended with the canonical doctor-specialty spellings; Patient
+# and every other role is rejected. Board-scoped kiosk credentials remain a
+# separate product decision (DISPLAYBOOT-FE-001) and are NOT invented here.
+_DISPLAY_WS_ALLOWED_ROLES: frozenset[str] = frozenset(
+    value.strip().lower()
+    for value in (
+        Roles.ADMIN.value,
+        Roles.REGISTRAR.value,
+        Roles.DOCTOR.value,
+        *(role.value for role in DOCTOR_ROLES),
+    )
+)
 
-async def authenticate_websocket_token(
-    token: str | None, db: Session
-) -> User | None:
-    """
-    Аутентификация WebSocket соединения по JWT токену
-    """
-    if not token:
-        return None
 
-    try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
-    except JWTError:
-        return None
+def _is_display_staff(user: User | None) -> bool:
+    """Display-plane authorization: staff principals only."""
+    if user is None:
+        return False
+    if bool(getattr(user, "is_superuser", False)):
+        return True
+    role = normalize_role_value(getattr(user, "role", None))
+    return role in _DISPLAY_WS_ALLOWED_ROLES
 
-    return _resolve_websocket_user(payload, db)
+
+# Canonical WebSocket authentication (JWT decode + TokenBlacklist jti/
+# all_user_tokens revocation + subject resolution) is reused from
+# websocket_auth — DISPLAYAUTH-BE-001 removed the display-local decode fork
+# that silently skipped revocation checks.
 
 
 # ===================== WEBSOCKET ПОДКЛЮЧЕНИЯ =====================
@@ -65,7 +76,8 @@ async def authenticate_websocket_token(
 
 @router.websocket("/ws/board/{board_id}")
 async def websocket_display_board(
-    websocket: WebSocket, board_id: str,
+    websocket: WebSocket,
+    board_id: str,
 ):
     """
     WebSocket подключение для табло очереди с аутентификацией.
@@ -88,12 +100,27 @@ async def websocket_display_board(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Token required"
             )
             return
+        # DISPLAYAUTH-BE-001: canonical auth now also rejects blacklisted
+        # tokens (exact jti + all_user_tokens sentinel).
         authenticated_user = await authenticate_websocket_token(token, db)
         if not authenticated_user:
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
             )
             return
+        # DISPLAYWS-BE-002: knowing a board_id is not an entitlement —
+        # staff-only subscription policy.
+        if not _is_display_staff(authenticated_user):
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Insufficient role for board subscription",
+            )
+            return
+
+        # DISPLAYSESSION-BE-002: authentication is complete — release the DB
+        # session BEFORE suspending in the long-lived receive loop (close is
+        # idempotent; the finally below keeps failure paths covered).
+        db.close()
 
         await manager.connect(websocket, board_id, authenticated_user)
 
@@ -120,6 +147,9 @@ async def websocket_display_board(
     except Exception as e:
         logger.error("Ошибка WebSocket: %s", e, exc_info=True)
     finally:
+        # DISPLAYSESSION-BE-002: the handshake session must not outlive the
+        # handler on rejected/errored paths either.
+        db.close()
         await manager.disconnect(websocket, board_id)
 
 
@@ -161,7 +191,8 @@ async def call_patient_to_board(
 
 @router.websocket("/ws/queue/{department}")
 async def websocket_queue_department(
-    websocket: WebSocket, department: str,
+    websocket: WebSocket,
+    department: str,
 ):
     """
     WebSocket подключение для очереди по отделению
@@ -173,21 +204,46 @@ async def websocket_queue_department(
     - queue.completed: пациент обслужен
     - queue.cancelled: запись отменена
 
-    PR-4: token is extracted via ``extract_ws_token`` — preferred sources
-    are Sec-WebSocket-Protocol subprotocol ``bearer.<jwt>`` and
-    Authorization header. Query param ``?token=`` still works but emits
-    a deprecation warning. Note: this endpoint currently does NOT
-    enforce token presence (no auth check) — that's a separate audit
-    item (PR-5). This PR only ensures that when auth IS added, the
-    token can come from a secure source.
+    DISPLAYWS-BE-001 (audit PR #3961, round 30): this route previously had
+    NO authentication at all — an anonymous socket received patient names,
+    queue numbers and statuses for the department snapshot. Contract now:
+    a valid, unrevoked JWT of an active display-staff principal is required
+    BEFORE ``manager.connect`` and BEFORE any snapshot payload; otherwise
+    the socket is closed with policy code 1008. Public-kiosk credential
+    provisioning remains the separate DISPLAYBOOT-FE-001 product decision.
     """
     manager = get_display_manager()
 
     # Используем department как board_id для совместимости с существующей системой
     board_id = f"dept_{department}"
 
+    db = SessionLocal()
     try:
-        await manager.connect(websocket, board_id)
+        token = extract_ws_token(websocket)
+        if not token:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION, reason="Token required"
+            )
+            return
+        authenticated_user = await authenticate_websocket_token(token, db)
+        if not authenticated_user:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
+            )
+            return
+        if not _is_display_staff(authenticated_user):
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Insufficient role for department queue",
+            )
+            return
+    finally:
+        # Auth is done either way; never hold the session into the
+        # long-lived receive loop (DISPLAYSESSION-BE-002 parity).
+        db.close()
+
+    try:
+        await manager.connect(websocket, board_id, authenticated_user)
 
         # Отправляем начальное состояние очереди отделения
         await _send_department_queue_state(websocket, department)
