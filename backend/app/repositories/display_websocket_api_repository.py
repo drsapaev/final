@@ -10,8 +10,48 @@ from sqlalchemy.orm import Session
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import specialty_variants
 from app.models.clinic import Doctor
+from app.models.display_config import DisplayBoard
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
+
+
+def resolve_display_board_targets(
+    db: Session, board_ids: list[int] | list[str]
+) -> tuple[list[str], list[int]]:
+    """DISPLAYTARGET-BE-001 (audit PR #3961): REST call/announcement
+    ``board_ids`` arrive as integer DB ids, while the WebSocket manager keys
+    rooms by the board *name* string (``DisplayBoard.name`` — e.g.
+    ``"main_board"``). Map int ids to their name room keys; string elements
+    (the quick-call plane passes board names directly) pass through
+    unchanged.
+
+    Returns ``(names, unknown_ids)`` — order-preserving. Ids with no
+    ``DisplayBoard`` row land in ``unknown_ids`` so the caller can report
+    them honestly; an explicit unresolvable request must NOT silently fall
+    back to broadcasting on every live room.
+    """
+    int_ids = [
+        b for b in board_ids if isinstance(b, int) and not isinstance(b, bool)
+    ]
+    id_to_name: dict[int, str] = {}
+    if int_ids:
+        rows = db.query(DisplayBoard).filter(DisplayBoard.id.in_(int_ids)).all()
+        id_to_name = {row.id: row.name for row in rows}
+
+    names: list[str] = []
+    unknown: list[int] = []
+    for b in board_ids:
+        if isinstance(b, str):
+            names.append(b)
+        elif isinstance(b, int) and not isinstance(b, bool):
+            name = id_to_name.get(b)
+            if name is None:
+                unknown.append(b)
+            else:
+                names.append(name)
+        else:
+            unknown.append(b)
+    return names, unknown
 
 
 class DisplayWebSocketApiRepository:
@@ -26,6 +66,12 @@ class DisplayWebSocketApiRepository:
             .filter(OnlineQueueEntry.id == entry_id)
             .first()
         )
+
+    def resolve_display_board_targets(
+        self, board_ids: list[int] | list[str]
+    ) -> tuple[list[str], list[int]]:
+        """Delegate to the module-level resolver (DISPLAYTARGET-BE-001)."""
+        return resolve_display_board_targets(self.db, board_ids)
 
     def save(self) -> None:
         self.db.commit()

@@ -206,15 +206,57 @@ class DisplayWebSocketApiService:
             cabinet = daily_cabinet or (doctor.cabinet if doctor else None)
 
         manager = self._manager_provider()
-        await manager.broadcast_patient_call(
+
+        # DISPLAYTARGET-BE-001 (audit PR #3961): REST board_ids arrive as
+        # integer DB ids while WS rooms are keyed by the board NAME string.
+        # Resolve int ids to their DisplayBoard.name room keys before the
+        # broadcast (quick-call passes names as strings — they pass through).
+        # Unresolvable ids are reported; an explicit unresolvable request
+        # must NOT silently fall back to broadcasting on every live room.
+        explicit_targets = bool(board_ids)
+        resolved_names: list[str] = []
+        unknown_ids: list[int] = []
+        if explicit_targets:
+            resolved_names, unknown_ids = self.repository.resolve_display_board_targets(
+                board_ids
+            )
+        target_board_ids = resolved_names if explicit_targets else None
+
+        delivery_raw = await manager.broadcast_patient_call(
             queue_entry=queue_entry,
             doctor_name=doctor_name,
             cabinet=cabinet,
-            board_ids=board_ids if board_ids else None,
+            board_ids=target_board_ids,
         )
+        # Injected managers (tests) may return mocks; only real dicts count.
+        delivery = delivery_raw if isinstance(delivery_raw, dict) else {}
 
-        return {
+        # DISPLAYDELIVERY-BE-001 (audit PR #3961): the queue transition stays
+        # committed regardless of transport; the display verdict is reported
+        # separately and honestly. boards_notified counts ONLY boards with a
+        # live local delivery — never the raw request count.
+        boards_notified = sum(
+            1 for status in delivery.values() if status == "delivered_local"
+        )
+        status_set = set(delivery.values())
+        if explicit_targets and not resolved_names:
+            display_delivery = "failed"
+        elif not delivery:
+            display_delivery = "unknown"
+        elif status_set == {"delivered_local"}:
+            display_delivery = "delivered"
+        elif status_set == {"failed"}:
+            display_delivery = "failed"
+        elif "failed" in status_set:
+            display_delivery = "partial"
+        else:
+            # published_only present without failures: cross-worker
+            # delivery is unverifiable from here (no ACK semantics).
+            display_delivery = "unknown"
+
+        response: dict = {
             "success": True,
+            "call_committed": True,
             "message": f"Пациент #{queue_entry.number} вызван на табло",
             "call_data": {
                 "number": queue_entry.number,
@@ -225,10 +267,14 @@ class DisplayWebSocketApiService:
                     queue_entry.called_at or changed_at
                 ).isoformat(),
             },
-            "boards_notified": (
-                len(board_ids) if board_ids else len(manager.connections)
-            ),
+            "boards_requested": len(resolved_names) if explicit_targets else len(delivery),
+            "boards_notified": boards_notified,
+            "display_delivery": display_delivery,
+            "board_delivery": delivery,
         }
+        if unknown_ids:
+            response["unknown_board_ids"] = unknown_ids
+        return response
 
     def get_department_queue_state_payload(self, *, department: str) -> dict:
         # Codex round-30 P2: день снапшота отделения — clinic_today SSOT
