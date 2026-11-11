@@ -150,8 +150,7 @@ class DisplayWebSocketApiService:
             raise DisplayWebSocketApiDomainError(
                 status_code=409,
                 detail=(
-                    "Вызывать можно только waiting, текущий: "
-                    f"{queue_entry.status}"
+                    f"Вызывать можно только waiting, текущий: {queue_entry.status}"
                 ),
             )
         queue = queue_entry.queue
@@ -180,8 +179,7 @@ class DisplayWebSocketApiService:
             raise DisplayWebSocketApiDomainError(
                 status_code=409,
                 detail=(
-                    "Талон больше не в статусе waiting — "
-                    "конкурентный вызов отклонён"
+                    "Талон больше не в статусе waiting — конкурентный вызов отклонён"
                 ),
             )
 
@@ -263,11 +261,11 @@ class DisplayWebSocketApiService:
                 "patient_name": queue_entry.patient_name,
                 "doctor": doctor_name,
                 "cabinet": cabinet,
-                "called_at": (
-                    queue_entry.called_at or changed_at
-                ).isoformat(),
+                "called_at": (queue_entry.called_at or changed_at).isoformat(),
             },
-            "boards_requested": len(resolved_names) if explicit_targets else len(delivery),
+            "boards_requested": len(resolved_names)
+            if explicit_targets
+            else len(delivery),
             "boards_notified": boards_notified,
             "display_delivery": display_delivery,
             "board_delivery": delivery,
@@ -344,7 +342,14 @@ class DisplayWebSocketApiService:
             # doctor selection stays for non-registry specialties.
             registry_surface = self._resolve_registry_surface(specialty)
             if registry_surface is None:
-                doctor = self.repository.get_active_doctor_by_specialty(specialty)
+                doctor = self.repository.get_active_doctor_by_specialty(
+                    # DISPLAYQUICK-BE-001 (audit PR #3961): the least-loaded
+                    # chooser must count the SAME clinic-local day the queue
+                    # lookup uses below (queue-settings timezone SSOT) — the
+                    # host-local date disagreed across the clinic midnight.
+                    specialty,
+                    day=self._clinic_today(),
+                )
             if not doctor and registry_surface is None:
                 raise DisplayWebSocketApiDomainError(
                     status_code=404,
