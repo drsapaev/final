@@ -25,10 +25,10 @@ from app.core.roles import DOCTOR_ROLES, Roles, normalize_role_value
 from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
 from app.models.user import User
-from app.schemas.misc_endpoints import AnnouncementRequest, CallPatientRequest
 from app.repositories.display_websocket_api_repository import (
     resolve_display_board_targets,
 )
+from app.schemas.misc_endpoints import AnnouncementRequest, CallPatientRequest
 from app.services.display_websocket import get_display_manager
 from app.services.display_websocket_api_service import (
     DisplayWebSocketApiDomainError,
@@ -334,9 +334,7 @@ async def send_announcement_to_board(
         resolved_names: list[str] = []
         unknown_ids: list[int] = []
         if explicit_targets:
-            resolved_names, unknown_ids = resolve_display_board_targets(
-                db, board_ids
-            )
+            resolved_names, unknown_ids = resolve_display_board_targets(db, board_ids)
         target_board_ids = resolved_names if explicit_targets else None
 
         delivery_raw = await manager.broadcast_announcement(
@@ -377,7 +375,9 @@ async def send_announcement_to_board(
                 "type": announcement_type,
                 "duration": duration,
             },
-            "boards_requested": len(resolved_names) if explicit_targets else len(delivery),
+            "boards_requested": len(resolved_names)
+            if explicit_targets
+            else len(delivery),
             "boards_notified": boards_notified,
             "display_delivery": display_delivery,
             "board_delivery": delivery,
@@ -426,7 +426,12 @@ def get_boards_status(
                     "theme": board.theme,
                     "websocket_connections": ws_status["connections"],
                     "last_update": ws_status["last_update"],
-                    "online": ws_status["active"],
+                    # DISPLAYSTATUS-BE-001 (audit PR #3961): соединения
+                    # пер-воркерные. Ноль ЛОКАЛЬНЫХ сокетов — это
+                    # «неизвестно» (None), а не системный офлайн: реальный
+                    # TV может держать соединение с другим воркером.
+                    "online": True if ws_status["active"] else None,
+                    "online_scope": "worker_local",
                     "config": {
                         "show_patient_names": board.show_patient_names,
                         "queue_display_count": board.queue_display_count,
@@ -442,6 +447,7 @@ def get_boards_status(
             "total_connections": sum(
                 board["websocket_connections"] for board in result
             ),
+            "connections_scope": "worker_local",
         }
 
     except Exception:
