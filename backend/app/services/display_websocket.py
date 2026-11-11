@@ -91,14 +91,36 @@ class DisplayWebSocketManager:
         except Exception as e:
             logger.error(f"Ошибка отключения WebSocket: {e}")
 
-    async def broadcast_to_board(self, board_id: str, message: dict[str, Any]) -> None:
-        """Отправка сообщения всем подключенным к табло"""
-        try:
-            await self._broadcast_to_board_local(board_id, message)
-            await self._pubsub.publish(self._board_channel(board_id), message)
+    async def broadcast_to_board(self, board_id: str, message: dict[str, Any]) -> str:
+        """Отправка сообщения всем подключенным к табло.
 
+        DISPLAYDELIVERY-BE-001 (audit PR #3961): возвращает статус доставки
+        по табло вместо молчаливого проглатывания сбоя. Возможные значения:
+
+        - ``"delivered_local"`` — на этом воркере живой сокет получил
+          сообщение и Redis publish для других воркеров прошёл;
+        - ``"published_only"`` — на этом воркере нет сокетов; сообщение
+          опубликовано для других воркеров (их доставка отсюда не
+          подтверждается — ACK-семантики нет);
+        - ``"failed"`` — локальная отправка или publish возбудили ошибку.
+
+        Никогда не бросает исключение наружу.
+        """
+        try:
+            sent = await self._broadcast_to_board_local(board_id, message)
+            if not isinstance(sent, int):
+                sent = int(sent or 0)
         except Exception as e:
-            logger.error(f"Ошибка broadcast сообщения: {e}")
+            logger.error(f"Ошибка локальной отправки для табло {board_id}: {e}")
+            return "failed"
+        try:
+            await self._pubsub.publish(self._board_channel(board_id), message)
+        except Exception as e:
+            logger.error(f"Ошибка publish для табло {board_id}: {e}")
+            return "failed"
+        if sent > 0:
+            return "delivered_local"
+        return "published_only"
 
     def _board_channel(self, board_id: str) -> str:
         return f"board:{board_id}"
@@ -119,9 +141,13 @@ class DisplayWebSocketManager:
             return
         await self._pubsub.unsubscribe(self._board_channel(board_id), handler)
 
-    async def _broadcast_to_board_local(self, board_id: str, message: dict[str, Any]) -> None:
+    async def _broadcast_to_board_local(
+        self, board_id: str, message: dict[str, Any]
+    ) -> int:
+        """Локальная доставка сокетам табло; возвращает число успешных
+        отправок (0 — нет живых сокетов на этом воркере)."""
         if board_id not in self.connections:
-            return
+            return 0
 
         # Обновляем состояние табло
         self.board_states[board_id] = {
@@ -132,9 +158,11 @@ class DisplayWebSocketManager:
 
         # Отправляем всем подключенным
         disconnected = set()
+        sent = 0
         for websocket in self.connections[board_id].copy():
             try:
                 await websocket.send_text(json.dumps(message, ensure_ascii=False))
+                sent += 1
             except WebSocketDisconnect:
                 disconnected.add(websocket)
             except Exception as e:
@@ -147,6 +175,7 @@ class DisplayWebSocketManager:
 
         if disconnected:
             logger.info(f"Удалено {len(disconnected)} отключенных соединений")
+        return sent
 
     def build_patient_call_message(
         self,
@@ -196,16 +225,25 @@ class DisplayWebSocketManager:
         self,
         call_message: dict,
         board_ids: list[str] = None,
-    ) -> None:
-        """Отправить ПРЕДВАРИТЕЛЬНО СОБРАННЫЙ payload вызова на табло."""
+    ) -> dict[str, str]:
+        """Отправить ПРЕДВАРИТЕЛЬНО СОБРАННЫЙ payload вызова на табло.
+
+        DISPLAYDELIVERY-BE-001 (audit PR #3961): возвращает статусы доставки
+        по каждому табло (см. ``broadcast_to_board``); сбои логируются и
+        возвращаются, не бросаются наружу.
+        """
+        statuses: dict[str, str] = {}
         try:
-            # Если не указаны конкретные табло, отправляем на все активные
-            if not board_ids:
+            # DISPLAYTARGET-BE-001: [] означает «явный пустой набор целей»
+            # (ничего не отправлять); None — «все активные табло».
+            if board_ids is None:
                 board_ids = list(self.connections.keys())
 
             # Отправляем на указанные табло
             for board_id in board_ids:
-                await self.broadcast_to_board(board_id, call_message)
+                statuses[board_id] = await self.broadcast_to_board(
+                    board_id, call_message
+                )
 
             logger.info(
                 f"Вызов пациента #{call_message['data']['queue_number']} "
@@ -214,6 +252,7 @@ class DisplayWebSocketManager:
 
         except Exception as e:
             logger.error(f"Ошибка трансляции вызова пациента: {e}")
+        return statuses
 
     async def broadcast_patient_call(
         self,
@@ -221,22 +260,29 @@ class DisplayWebSocketManager:
         doctor_name: str,
         cabinet: str = None,
         board_ids: list[str] = None,
-    ) -> None:
-        """Трансляция вызова пациента на табло"""
+    ) -> dict[str, str]:
+        """Трансляция вызова пациента на табло.
+
+        DISPLAYDELIVERY-BE-001 (audit PR #3961): возвращает статусы доставки
+        по каждому табло (см. ``broadcast_to_board``); сбои логируются и
+        возвращаются, не бросаются наружу.
+        """
+        statuses: dict[str, str] = {}
         try:
             # RQ-24.a.1: формат имён резолвится внутри
             # build_patient_call_message по show_patient_names целевых
             # табло (board_ids передается явно; kwarg name_format не
             # существует в сигнатуре — CI RED HEAD был TypeError).
-            if not board_ids:
+            # DISPLAYTARGET-BE-001: [] — явный пустой набор целей;
+            # None — все активные табло.
+            if board_ids is None:
                 board_ids = list(self.connections.keys())
             call_message = self.build_patient_call_message(
                 queue_entry, doctor_name, cabinet, board_ids=board_ids
             )
-
-            # Отправляем на указанные табло
-            for board_id in board_ids:
-                await self.broadcast_to_board(board_id, call_message)
+            statuses = await self.broadcast_patient_call_data(
+                call_message, board_ids=board_ids
+            )
 
             logger.info(
                 f"Вызов пациента #{queue_entry.number} отправлен на {len(board_ids)} табло"
@@ -244,6 +290,7 @@ class DisplayWebSocketManager:
 
         except Exception as e:
             logger.error(f"Ошибка трансляции вызова пациента: {e}")
+        return statuses
 
     async def broadcast_daily_queue_state(
         self,
@@ -371,8 +418,14 @@ class DisplayWebSocketManager:
         announcement_type: str = "info",
         duration: int = 60,
         board_ids: list[str] = None,
-    ) -> None:
-        """Трансляция объявления"""
+    ) -> dict[str, str]:
+        """Трансляция объявления.
+
+        DISPLAYDELIVERY-BE-001 (audit PR #3961): возвращает статусы доставки
+        по каждому табло (см. ``broadcast_to_board``); сбои логируются и
+        возвращаются, не бросаются наружу.
+        """
+        statuses: dict[str, str] = {}
         try:
             announcement_message = {
                 "type": "announcement",
@@ -388,16 +441,21 @@ class DisplayWebSocketManager:
                 ),
             }
 
-            if not board_ids:
+            # DISPLAYTARGET-BE-001: [] — явный пустой набор целей;
+            # None — все активные табло.
+            if board_ids is None:
                 board_ids = list(self.connections.keys())
 
             for board_id in board_ids:
-                await self.broadcast_to_board(board_id, announcement_message)
+                statuses[board_id] = await self.broadcast_to_board(
+                    board_id, announcement_message
+                )
 
             logger.info(f"Объявление отправлено на {len(board_ids)} табло")
 
         except Exception as e:
             logger.error(f"Ошибка трансляции объявления: {e}")
+        return statuses
 
     async def _send_current_state(self, websocket: WebSocket, board_id: str) -> None:
         """Отправка текущего состояния табло новому подключению"""
@@ -526,20 +584,27 @@ class DisplayWebSocketManager:
     def _resolve_name_format(self, board_ids: list[str] | None) -> str:
         """Строгий формат имён среди целевых табло (PHI: none ⊂ initials ⊂ full).
 
-        Нет целевых табло / нет строки борда → 'initials' (прежнее
-        поведение). Кэш на board_id; обновляется после рестарта.
+        DISPLAYPRIVACY-BE-002 (audit PR #3961): fail-closed masking. Любая
+        неудача резолва политики приватности — ошибка БД/сессии, неизвестное
+        табло (нет строки), невалидное сохранённое значение, отсутствие
+        целевых табло — резолвится в ``'none'`` (маскировать имя), НИКОГДА не
+        деградирует в ``'initials'``/``'full'``. Результаты неудач НЕ
+        кэшируются: временный сбой не должен маскировать (или раскрывать)
+        табло навсегда; кэшируются только реальные строки с валидными
+        значениями (обновление кэша — после рестарта).
         """
+        formats: list[str] = []
         try:
             ids = board_ids if board_ids else list(self.connections.keys())
             if not ids:
-                return "initials"
+                # Fail-closed: нет целевых табло — маскируем (было 'initials').
+                return "none"
             cache = getattr(self, "_name_format_cache", None)
             if cache is None:
                 # Минимальные инстансы (тесты строят менеджер через
                 # __new__ в обход __init__) — кэш инициализируется лениво.
                 cache = {}
                 self._name_format_cache = cache
-            formats: list[str] = []
             db = SessionLocal()
             try:
                 for b in ids:
@@ -550,20 +615,26 @@ class DisplayWebSocketManager:
                             .filter(DisplayBoard.name == b)
                             .first()
                         )
-                        cached = (
-                            row.show_patient_names
-                            if row and row.show_patient_names in ("full", "initials", "none")
-                            else "initials"
-                        )
-                        cache[b] = cached
+                        if (
+                            row is not None
+                            and row.show_patient_names
+                            in ("full", "initials", "none")
+                        ):
+                            cached = row.show_patient_names
+                            cache[b] = cached
+                        else:
+                            # Fail-closed: неизвестное табло или невалидное
+                            # значение маскирует имя; НЕ кэшируем — строка
+                            # может появиться/стать валидной позже.
+                            cached = "none"
                     formats.append(cached)
             finally:
                 db.close()
         except Exception:
-            # PHI-осторожность: любой сбой резолва (БД недоступна,
-            # минимальный инстанс без соединений) деградирует к прежнему
-            # поведению — 'initials' — не роняя broadcast-путь.
-            return "initials"
+            # Fail-closed: любой сбой резолва (БД недоступна, минимальный
+            # инстанс без соединений) маскирует имя — 'none', не 'initials'.
+            # Не кэшируем: после восстановления политики резолвятся заново.
+            return "none"
         if any(f == "none" for f in formats):
             return "none"
         if any(f == "initials" for f in formats):
