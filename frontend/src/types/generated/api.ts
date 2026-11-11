@@ -9615,15 +9615,33 @@ export type paths = {
         };
         /**
          * Состояние очереди для табло
-         * @description Return the legacy board stats snapshot.
+         * @description Return the legacy board stats snapshot plus board-scoped settings.
          *
          *     The board state endpoint is intentionally public: it only exposes
          *     aggregate counters (``last_ticket``/``waiting``/``serving``/``done``)
-         *     and the day's open/start-number flags. It must NOT leak live queue
+         *     and non-PHI presentation settings. It must NOT leak live queue
          *     entries, current calls, or announcements — those are owned by the
          *     display board WebSocket initial_state/update stream, which is
          *     separately authenticated. Keeping this REST endpoint public lets the
          *     stats-only contract be verified without auth headers.
+         *
+         *     DISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is
+         *     board-scoped — an optional ``board`` name selects THAT board's row
+         *     (a missing board is an honest 404) instead of always ``main_board``;
+         *     the privacy setting of the selected board must not be replaced by
+         *     the main board's.
+         *
+         *     DISPLAYOPTIONS-FE-001 (audit PR #3961): the response additionally
+         *     exposes the selected board's non-PHI presentation fields
+         *     (``queue_display_count``/``show_announcements``/``voice_announcements``
+         *     /``sound_enabled``) so the live TV screen can apply what the admin
+         *     saved.
+         *
+         *     DISPLAYDEPT-FE-001 (audit PR #3961): ``department`` is now optional —
+         *     a public board route without a configured department (multi-
+         *     department kiosk) suppresses the legacy counters honestly
+         *     (``stats_available: false``) instead of inferring them from literal
+         *     ``undefined`` URL text.
          */
         get: operations["board_state_api_v1_board_state_get"];
         put?: never;
@@ -25309,7 +25327,7 @@ export type components = {
         AuthStatusResponse: {
             /** Authenticated */
             authenticated: boolean;
-            user?: components["schemas"]["app__schemas__authentication__UserProfileResponse"] | null;
+            user?: components["schemas"]["UserProfileResponse"] | null;
             session?: components["schemas"]["UserSessionResponse"] | null;
             /**
              * Two Factor Required
@@ -25744,7 +25762,10 @@ export type components = {
         };
         /** Body_admin_upload_public_site_media */
         Body_admin_upload_public_site_media: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
             /**
              * Asset Kind
@@ -25756,7 +25777,10 @@ export type components = {
         };
         /** Body_analyze_skin_api_v1_ai_skin_analyze_post */
         Body_analyze_skin_api_v1_ai_skin_analyze_post: {
-            /** Image */
+            /**
+             * Image
+             * Format: binary
+             */
             image: string;
             /** Metadata */
             metadata?: string | null;
@@ -25780,7 +25804,10 @@ export type components = {
         };
         /** Body_import_files_api_v1_files_import_post */
         Body_import_files_api_v1_files_import_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
             /** Target Folder Id */
             target_folder_id?: number | null;
@@ -25816,7 +25843,10 @@ export type components = {
         };
         /** Body_mcp_analyze_image_api_v1_mcp_imaging_analyze_post */
         Body_mcp_analyze_image_api_v1_mcp_imaging_analyze_post: {
-            /** Image */
+            /**
+             * Image
+             * Format: binary
+             */
             image: string;
             /** Image Type */
             image_type: string;
@@ -25829,7 +25859,10 @@ export type components = {
         };
         /** Body_mcp_analyze_skin_lesion_api_v1_mcp_imaging_skin_lesion_post */
         Body_mcp_analyze_skin_lesion_api_v1_mcp_imaging_skin_lesion_post: {
-            /** Image */
+            /**
+             * Image
+             * Format: binary
+             */
             image: string;
             /** Lesion Info */
             lesion_info?: string | null;
@@ -25840,7 +25873,10 @@ export type components = {
         };
         /** Body_replace_file_content_api_v1_files__file_id__content_put */
         Body_replace_file_content_api_v1_files__file_id__content_put: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
             /** Change Description */
             change_description?: string | null;
@@ -25854,7 +25890,10 @@ export type components = {
         Body_send_voice_message_api_v1_messages_send_voice_post: {
             /** Recipient Id */
             recipient_id: number;
-            /** Audio File */
+            /**
+             * Audio File
+             * Format: binary
+             */
             audio_file: string;
         };
         /** Body_update_file_api_v1_files__file_id__put */
@@ -25872,22 +25911,34 @@ export type components = {
         };
         /** Body_upload_avatar_api_v1_mobile_profile_avatar_post */
         Body_upload_avatar_api_v1_mobile_profile_avatar_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
         };
         /** Body_upload_banner_image_api_v1_admin_display_upload_banner_post */
         Body_upload_banner_image_api_v1_admin_display_upload_banner_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
         };
         /** Body_upload_clinic_logo_api_v1_admin_clinic_logo_post */
         Body_upload_clinic_logo_api_v1_admin_clinic_logo_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
         };
         /** Body_upload_dental_media_api_v1_dental_media_post */
         Body_upload_dental_media_api_v1_dental_media_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
             /** Patient Id */
             patient_id: number;
@@ -25909,7 +25960,10 @@ export type components = {
         };
         /** Body_upload_file_api_v1_files_upload_post */
         Body_upload_file_api_v1_files_upload_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
             /** Title */
             title?: string | null;
@@ -25941,19 +25995,28 @@ export type components = {
         Body_upload_file_message_api_v1_messages_upload_post: {
             /** Recipient Id */
             recipient_id: number;
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
         };
         /** Body_upload_file_simple_api_v1_files_upload_simple_post */
         Body_upload_file_simple_api_v1_files_upload_simple_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
             /** Title */
             title?: string | null;
         };
         /** Body_upload_template_file_api_v1_print_templates_templates_upload__template_type__post */
         Body_upload_template_file_api_v1_print_templates_templates_upload__template_type__post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
         };
         /** Body_validate_emr_data_api_v1_emr_ai_validate_post */
@@ -27616,6 +27679,40 @@ export type components = {
             notes: string;
         };
         /**
+         * DepartmentCreate
+         * @description Схема для создания отделения
+         */
+        DepartmentCreate: {
+            /** Key */
+            key: string;
+            /** Name Ru */
+            name_ru: string;
+            /** Name Uz */
+            name_uz?: string | null;
+            /**
+             * Icon
+             * @default folder
+             */
+            icon: string | null;
+            /** Color */
+            color?: string | null;
+            /** Gradient */
+            gradient?: string | null;
+            /**
+             * Display Order
+             * @default 999
+             */
+            display_order: number | null;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean | null;
+            /** Description */
+            description?: string | null;
+            integration?: components["schemas"]["DepartmentIntegrationOptions"] | null;
+        };
+        /**
          * DepartmentInfoResponse
          * @description Схема ответа с информацией об отделении
          */
@@ -28189,7 +28286,7 @@ export type components = {
             name: string;
             /** Description */
             description?: string | null;
-            discount_type: components["schemas"]["app__models__discount_benefits__DiscountType"];
+            discount_type: components["schemas"]["DiscountType"];
             /** Value */
             value: number;
             /**
@@ -28231,6 +28328,12 @@ export type components = {
              */
             priority: number;
         };
+        /**
+         * DiscountType
+         * @description Типы скидок
+         * @enum {string}
+         */
+        DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "loyalty_points" | "seasonal" | "referral";
         /** DiscountUpdate */
         DiscountUpdate: {
             /** Name */
@@ -28486,6 +28589,22 @@ export type components = {
             doctors: components["schemas"]["DoctorInfoResponse"][];
             /** Total Count */
             total_count: number;
+        };
+        /** DoctorOut */
+        DoctorOut: {
+            /** Id */
+            id: number;
+            /** Specialty */
+            specialty: string;
+            /** Cabinet */
+            cabinet?: string | null;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /** Display Name */
+            display_name?: string | null;
         };
         /**
          * DoctorPerformanceReportRequest
@@ -30975,7 +31094,7 @@ export type components = {
              */
             created_at: string;
             /** Payments */
-            payments: components["schemas"]["app__api__v1__endpoints__cashier___helpers__PaymentResponse"][];
+            payments: components["schemas"]["PaymentResponse"][];
             /** Allocations */
             allocations: components["schemas"]["GroupedPaymentAllocationItem"][];
         };
@@ -33719,6 +33838,26 @@ export type components = {
             /** Severity */
             severity?: string | null;
         };
+        /**
+         * NotificationStatsResponse
+         * @description Схема статистики уведомлений
+         */
+        NotificationStatsResponse: {
+            /** Total Sent */
+            total_sent: number;
+            /** Successful Deliveries */
+            successful_deliveries: number;
+            /** Failed Deliveries */
+            failed_deliveries: number;
+            /** Channels Stats */
+            channels_stats: {
+                [key: string]: number;
+            };
+            /** Recent Notifications */
+            recent_notifications: {
+                [key: string]: unknown;
+            }[];
+        };
         /** NotificationTemplate */
         NotificationTemplate: {
             /**
@@ -34519,6 +34658,16 @@ export type components = {
         PasswordChangeRequest: {
             /** Current Password */
             current_password: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
+         * PasswordResetConfirmRequest
+         * @description Запрос на подтверждение сброса пароля
+         */
+        PasswordResetConfirmRequest: {
+            /** Token */
+            token: string;
             /** New Password */
             new_password: string;
         };
@@ -35686,6 +35835,33 @@ export type components = {
             max_amount?: number | null;
         };
         /**
+         * PaymentResponse
+         * @description Ответ при создании/получении платежа
+         */
+        PaymentResponse: {
+            /** Id */
+            id: number;
+            /** Visit Id */
+            visit_id?: number | null;
+            /** Patient Id */
+            patient_id?: number | null;
+            /** Amount */
+            amount: string;
+            /** Method */
+            method: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Paid At */
+            paid_at?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
          * PaymentStatusResponse
          * @description Ответ на запрос статуса платежа
          */
@@ -35915,6 +36091,15 @@ export type components = {
              * @description ID изменения цены
              */
             price_override_id: number;
+        };
+        /** PriceOverrideApprovalRequest */
+        PriceOverrideApprovalRequest: {
+            /** Override Id */
+            override_id: number;
+            /** Action */
+            action: string;
+            /** Rejection Reason */
+            rejection_reason?: string | null;
         };
         /** PriceOverrideListResponse */
         PriceOverrideListResponse: {
@@ -37552,6 +37737,70 @@ export type components = {
             online_bookings_remaining?: number | null;
         };
         /**
+         * QRTokenResponse
+         * @description Ответ с QR токеном
+         */
+        QRTokenResponse: {
+            /**
+             * Token
+             * @description Уникальный токен для QR
+             */
+            token: string;
+            /**
+             * Qr Url
+             * @description URL для QR кода
+             */
+            qr_url: string;
+            /**
+             * Specialist Name
+             * @description Имя специалиста
+             */
+            specialist_name: string;
+            /**
+             * Specialty
+             * @description Специальность
+             */
+            specialty: string;
+            /**
+             * Cabinet
+             * @description Номер кабинета
+             */
+            cabinet?: string | null;
+            /**
+             * Day
+             * Format: date
+             * @description Дата приема
+             */
+            day: string;
+            /**
+             * Start Time
+             * @description Время начала онлайн-записи
+             */
+            start_time: string;
+            /**
+             * End Time
+             * @description Время cutoff онлайн-записи; null для legacy policy
+             */
+            end_time: string | null;
+            /**
+             * Policy Version
+             * @description Политика очереди на выбранный день
+             * @enum {string}
+             */
+            policy_version: "legacy" | "daily_online_issuances_v1";
+            /**
+             * Max Slots
+             * @description Максимум мест в очереди
+             */
+            max_slots: number;
+            /**
+             * Current Count
+             * @description Текущее количество записавшихся
+             * @default 0
+             */
+            current_count: number;
+        };
+        /**
          * QrData
          * @description QR code data for queue notifications.
          */
@@ -37752,6 +38001,35 @@ export type components = {
              * @default false
              */
             outside_hours: boolean;
+        };
+        /** QueueJoinRequest */
+        QueueJoinRequest: {
+            /** Token */
+            token: string;
+            /** Phone */
+            phone?: string | null;
+            /** Telegram Id */
+            telegram_id?: string | null;
+            /** Patient Name */
+            patient_name?: string | null;
+        };
+        /** QueueJoinResponse */
+        QueueJoinResponse: {
+            /** Success */
+            success: boolean;
+            /** Number */
+            number?: number | null;
+            /** Message */
+            message: string;
+            /**
+             * Duplicate
+             * @default false
+             */
+            duplicate: boolean;
+            /** Queue Info */
+            queue_info?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * QueueLimitResponse
@@ -38463,6 +38741,48 @@ export type components = {
             additional_info?: string | null;
         };
         /**
+         * QueueStatusResponse
+         * @description Статус очереди с лимитами
+         */
+        QueueStatusResponse: {
+            /** Doctor Id */
+            doctor_id: number;
+            /** Doctor Name */
+            doctor_name: string;
+            /** Specialty */
+            specialty: string;
+            /** Cabinet */
+            cabinet: string | null;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Queue Id */
+            queue_id: number | null;
+            /** Current Entries */
+            current_entries: number;
+            /** Queue Length */
+            queue_length: number;
+            /** Max Entries */
+            max_entries: number;
+            /**
+             * Policy Version
+             * @enum {string}
+             */
+            policy_version: "legacy" | "daily_online_issuances_v1";
+            /** Online Issued Count */
+            online_issued_count: number | null;
+            /** Online Bookings Remaining */
+            online_bookings_remaining: number | null;
+            /** Limit Reached */
+            limit_reached: boolean;
+            /** Queue Opened */
+            queue_opened: boolean;
+            /** Online Available */
+            online_available: boolean;
+        };
+        /**
          * QueueTestRequest
          * @description Запрос на тестирование очереди
          */
@@ -39172,7 +39492,7 @@ export type components = {
          */
         RoleListResponse: {
             /** Roles */
-            roles: components["schemas"]["app__schemas__role__RoleResponse"][];
+            roles: components["schemas"]["RoleResponse"][];
             /** Total */
             total: number;
         };
@@ -39193,6 +39513,41 @@ export type components = {
         RoleOptionsListResponse: {
             /** Options */
             options: components["schemas"]["RoleOptionResponse"][];
+        };
+        /**
+         * RoleResponse
+         * @description Schema for role response
+         */
+        RoleResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Display Name */
+            display_name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Level
+             * @default 0
+             */
+            level: number;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Is System
+             * @default false
+             */
+            is_system: boolean;
+            /** Parent Role Id */
+            parent_role_id?: number | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
         };
         /**
          * RoleUpdate
@@ -39881,6 +40236,26 @@ export type components = {
         };
         /** ServiceCategoryCreate */
         ServiceCategoryCreate: {
+            /** Code */
+            code: string;
+            /** Name Ru */
+            name_ru?: string | null;
+            /** Name Uz */
+            name_uz?: string | null;
+            /** Name En */
+            name_en?: string | null;
+            /** Specialty */
+            specialty?: string | null;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+        };
+        /** ServiceCategoryOut */
+        ServiceCategoryOut: {
+            /** Id */
+            id: number;
             /** Code */
             code: string;
             /** Name Ru */
@@ -41033,6 +41408,16 @@ export type components = {
             phraseId?: number | null;
             /** Timems */
             timeMs?: number | null;
+        };
+        /**
+         * TelemetryResponse
+         * @description Response for telemetry submission
+         */
+        TelemetryResponse: {
+            /** Accepted */
+            accepted: number;
+            /** Rejected */
+            rejected: number;
         };
         /**
          * TelemetryStatsResponse
@@ -42266,6 +42651,65 @@ export type components = {
             }[] | null;
         };
         /**
+         * UserProfileResponse
+         * @description Схема для ответа профиля пользователя
+         */
+        UserProfileResponse: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Full Name */
+            full_name?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Middle Name */
+            middle_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Avatar Url */
+            avatar_url?: string | null;
+            /** Bio */
+            bio?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Language */
+            language?: string | null;
+            /** Timezone */
+            timezone?: string | null;
+            /** Nationality */
+            nationality?: string | null;
+            /** Date Of Birth */
+            date_of_birth?: string | null;
+            /** Gender */
+            gender?: string | null;
+            /** Role */
+            role: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Superuser */
+            is_superuser: boolean;
+            /** Email Verified */
+            email_verified: boolean;
+            /** Phone Verified */
+            phone_verified: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Last Login */
+            last_login?: string | null;
+            /**
+             * Two Factor Enabled
+             * @default false
+             */
+            two_factor_enabled: boolean;
+        };
+        /**
          * UserProfileUpdate
          * @description Схема обновления профиля пользователя
          */
@@ -42499,10 +42943,6 @@ export type components = {
             msg: string;
             /** Error Type */
             type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
         };
         /**
          * VerifyCodeRequest
@@ -43435,40 +43875,6 @@ export type components = {
              */
             use_new_wizard: boolean;
         };
-        /**
-         * DepartmentCreate
-         * @description Схема для создания отделения
-         */
-        app__api__v1__endpoints__admin_departments___helpers__DepartmentCreate: {
-            /** Key */
-            key: string;
-            /** Name Ru */
-            name_ru: string;
-            /** Name Uz */
-            name_uz?: string | null;
-            /**
-             * Icon
-             * @default folder
-             */
-            icon: string | null;
-            /** Color */
-            color?: string | null;
-            /** Gradient */
-            gradient?: string | null;
-            /**
-             * Display Order
-             * @default 999
-             */
-            display_order: number | null;
-            /**
-             * Active
-             * @default true
-             */
-            active: boolean | null;
-            /** Description */
-            description?: string | null;
-            integration?: components["schemas"]["DepartmentIntegrationOptions"] | null;
-        };
         /** PaymentResponse */
         app__api__v1__endpoints__billing__PaymentResponse: {
             /** Id */
@@ -43502,33 +43908,6 @@ export type components = {
              */
             created_at: string;
         };
-        /**
-         * PaymentResponse
-         * @description Ответ при создании/получении платежа
-         */
-        app__api__v1__endpoints__cashier___helpers__PaymentResponse: {
-            /** Id */
-            id: number;
-            /** Visit Id */
-            visit_id?: number | null;
-            /** Patient Id */
-            patient_id?: number | null;
-            /** Amount */
-            amount: string;
-            /** Method */
-            method: string;
-            /** Status */
-            status: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Paid At */
-            paid_at?: string | null;
-            /** Note */
-            note?: string | null;
-        };
         /** PriceOverrideApprovalRequest */
         app__api__v1__endpoints__dental__PriceOverrideApprovalRequest: {
             /** Action */
@@ -43554,16 +43933,6 @@ export type components = {
             is_system: boolean;
             /** Permissions Count */
             permissions_count: number;
-        };
-        /**
-         * PasswordResetConfirmRequest
-         * @description Запрос на подтверждение сброса пароля
-         */
-        app__api__v1__endpoints__password_reset__PasswordResetConfirmRequest: {
-            /** Token */
-            token: string;
-            /** New Password */
-            new_password: string;
         };
         /**
          * TelemetryResponse
@@ -43611,35 +43980,6 @@ export type components = {
                 [key: string]: unknown;
             }[];
         };
-        /** QueueJoinRequest */
-        app__api__v1__endpoints__queue__QueueJoinRequest: {
-            /** Token */
-            token: string;
-            /** Phone */
-            phone?: string | null;
-            /** Telegram Id */
-            telegram_id?: string | null;
-            /** Patient Name */
-            patient_name?: string | null;
-        };
-        /** QueueJoinResponse */
-        app__api__v1__endpoints__queue__QueueJoinResponse: {
-            /** Success */
-            success: boolean;
-            /** Number */
-            number?: number | null;
-            /** Message */
-            message: string;
-            /**
-             * Duplicate
-             * @default false
-             */
-            duplicate: boolean;
-            /** Queue Info */
-            queue_info?: {
-                [key: string]: unknown;
-            } | null;
-        };
         /** QueueStatusResponse */
         app__api__v1__endpoints__queue__QueueStatusResponse: {
             /** Queue Id */
@@ -43663,129 +44003,6 @@ export type components = {
             entries: components["schemas"]["QueueEntryResponse"][];
         };
         /**
-         * QueueStatusResponse
-         * @description Статус очереди с лимитами
-         */
-        app__api__v1__endpoints__queue_limits__QueueStatusResponse: {
-            /** Doctor Id */
-            doctor_id: number;
-            /** Doctor Name */
-            doctor_name: string;
-            /** Specialty */
-            specialty: string;
-            /** Cabinet */
-            cabinet: string | null;
-            /**
-             * Day
-             * Format: date
-             */
-            day: string;
-            /** Queue Id */
-            queue_id: number | null;
-            /** Current Entries */
-            current_entries: number;
-            /** Queue Length */
-            queue_length: number;
-            /** Max Entries */
-            max_entries: number;
-            /**
-             * Policy Version
-             * @enum {string}
-             */
-            policy_version: "legacy" | "daily_online_issuances_v1";
-            /** Online Issued Count */
-            online_issued_count: number | null;
-            /** Online Bookings Remaining */
-            online_bookings_remaining: number | null;
-            /** Limit Reached */
-            limit_reached: boolean;
-            /** Queue Opened */
-            queue_opened: boolean;
-            /** Online Available */
-            online_available: boolean;
-        };
-        /**
-         * NotificationStatsResponse
-         * @description Схема статистики уведомлений
-         */
-        app__api__v1__endpoints__registrar_notifications__NotificationStatsResponse: {
-            /** Total Sent */
-            total_sent: number;
-            /** Successful Deliveries */
-            successful_deliveries: number;
-            /** Failed Deliveries */
-            failed_deliveries: number;
-            /** Channels Stats */
-            channels_stats: {
-                [key: string]: number;
-            };
-            /** Recent Notifications */
-            recent_notifications: {
-                [key: string]: unknown;
-            }[];
-        };
-        /** PriceOverrideApprovalRequest */
-        app__api__v1__endpoints__registrar_wizard___cart__PriceOverrideApprovalRequest: {
-            /** Override Id */
-            override_id: number;
-            /** Action */
-            action: string;
-            /** Rejection Reason */
-            rejection_reason?: string | null;
-        };
-        /** ServiceCategoryOut */
-        app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut: {
-            /** Id */
-            id: number;
-            /** Code */
-            code: string;
-            /** Name Ru */
-            name_ru?: string | null;
-            /** Name Uz */
-            name_uz?: string | null;
-            /** Name En */
-            name_en?: string | null;
-            /** Specialty */
-            specialty?: string | null;
-            /**
-             * Active
-             * @default true
-             */
-            active: boolean;
-        };
-        /** DoctorOut */
-        app__api__v1__endpoints__services_ep___services__DoctorOut: {
-            /** Id */
-            id: number;
-            /** Specialty */
-            specialty: string;
-            /** Cabinet */
-            cabinet?: string | null;
-            /**
-             * Active
-             * @default true
-             */
-            active: boolean;
-            /** Display Name */
-            display_name?: string | null;
-        };
-        /**
-         * TelemetryResponse
-         * @description Response for telemetry submission
-         */
-        app__api__v1__endpoints__telemetry__TelemetryResponse: {
-            /** Accepted */
-            accepted: number;
-            /** Rejected */
-            rejected: number;
-        };
-        /**
-         * DiscountType
-         * @description Типы скидок
-         * @enum {string}
-         */
-        app__models__discount_benefits__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "loyalty_points" | "seasonal" | "referral";
-        /**
          * DiscountType
          * @description Типы скидок
          * @enum {string}
@@ -43800,65 +44017,6 @@ export type components = {
             token: string;
             /** New Password */
             new_password: string;
-        };
-        /**
-         * UserProfileResponse
-         * @description Схема для ответа профиля пользователя
-         */
-        app__schemas__authentication__UserProfileResponse: {
-            /** Id */
-            id: number;
-            /** Username */
-            username: string;
-            /** Full Name */
-            full_name?: string | null;
-            /** First Name */
-            first_name?: string | null;
-            /** Last Name */
-            last_name?: string | null;
-            /** Middle Name */
-            middle_name?: string | null;
-            /** Email */
-            email?: string | null;
-            /** Phone */
-            phone?: string | null;
-            /** Avatar Url */
-            avatar_url?: string | null;
-            /** Bio */
-            bio?: string | null;
-            /** Website */
-            website?: string | null;
-            /** Language */
-            language?: string | null;
-            /** Timezone */
-            timezone?: string | null;
-            /** Nationality */
-            nationality?: string | null;
-            /** Date Of Birth */
-            date_of_birth?: string | null;
-            /** Gender */
-            gender?: string | null;
-            /** Role */
-            role: string;
-            /** Is Active */
-            is_active: boolean;
-            /** Is Superuser */
-            is_superuser: boolean;
-            /** Email Verified */
-            email_verified: boolean;
-            /** Phone Verified */
-            phone_verified: boolean;
-            /** Created At */
-            created_at?: string | null;
-            /** Updated At */
-            updated_at?: string | null;
-            /** Last Login */
-            last_login?: string | null;
-            /**
-             * Two Factor Enabled
-             * @default false
-             */
-            two_factor_enabled: boolean;
         };
         /** DoctorOut */
         app__schemas__clinic__DoctorOut: {
@@ -44011,70 +44169,6 @@ export type components = {
             recent_activity: components["schemas"]["NotificationStatsItem"][];
         };
         /**
-         * QRTokenResponse
-         * @description Ответ с QR токеном
-         */
-        app__schemas__online_queue__QRTokenResponse: {
-            /**
-             * Token
-             * @description Уникальный токен для QR
-             */
-            token: string;
-            /**
-             * Qr Url
-             * @description URL для QR кода
-             */
-            qr_url: string;
-            /**
-             * Specialist Name
-             * @description Имя специалиста
-             */
-            specialist_name: string;
-            /**
-             * Specialty
-             * @description Специальность
-             */
-            specialty: string;
-            /**
-             * Cabinet
-             * @description Номер кабинета
-             */
-            cabinet?: string | null;
-            /**
-             * Day
-             * Format: date
-             * @description Дата приема
-             */
-            day: string;
-            /**
-             * Start Time
-             * @description Время начала онлайн-записи
-             */
-            start_time: string;
-            /**
-             * End Time
-             * @description Время cutoff онлайн-записи; null для legacy policy
-             */
-            end_time: string | null;
-            /**
-             * Policy Version
-             * @description Политика очереди на выбранный день
-             * @enum {string}
-             */
-            policy_version: "legacy" | "daily_online_issuances_v1";
-            /**
-             * Max Slots
-             * @description Максимум мест в очереди
-             */
-            max_slots: number;
-            /**
-             * Current Count
-             * @description Текущее количество записавшихся
-             * @default 0
-             */
-            current_count: number;
-        };
-        /**
          * QueueJoinRequest
          * @description Запрос на вступление в очередь
          */
@@ -44132,41 +44226,6 @@ export type components = {
             cabinet?: string | null;
             /** Estimated Time */
             estimated_time?: string | null;
-        };
-        /**
-         * RoleResponse
-         * @description Schema for role response
-         */
-        app__schemas__role__RoleResponse: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Display Name */
-            display_name: string;
-            /** Description */
-            description?: string | null;
-            /**
-             * Level
-             * @default 0
-             */
-            level: number;
-            /**
-             * Is Active
-             * @default true
-             */
-            is_active: boolean;
-            /**
-             * Is System
-             * @default false
-             */
-            is_system: boolean;
-            /** Parent Role Id */
-            parent_role_id?: number | null;
-            /** Created At */
-            created_at?: string | null;
-            /** Updated At */
-            updated_at?: string | null;
         };
         /**
          * UserProfileResponse
@@ -45949,7 +46008,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"][];
+                    "application/json": components["schemas"]["ServiceCategoryOut"][];
                 };
             };
             /** @description Validation Error */
@@ -45982,7 +46041,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"];
+                    "application/json": components["schemas"]["ServiceCategoryOut"];
                 };
             };
             /** @description Validation Error */
@@ -46017,7 +46076,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"];
+                    "application/json": components["schemas"]["ServiceCategoryOut"];
                 };
             };
             /** @description Validation Error */
@@ -46390,7 +46449,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__services_ep___services__DoctorOut"][];
+                    "application/json": components["schemas"]["DoctorOut"][];
                 };
             };
             /** @description Validation Error */
@@ -51348,7 +51407,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__queue_limits__QueueStatusResponse"][];
+                    "application/json": components["schemas"]["QueueStatusResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -52784,7 +52843,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__registrar_notifications__NotificationStatsResponse"];
+                    "application/json": components["schemas"]["NotificationStatsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -55627,7 +55686,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__schemas__online_queue__QRTokenResponse"];
+                    "application/json": components["schemas"]["QRTokenResponse"];
                 };
             };
             /** @description Validation Error */
@@ -56761,7 +56820,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__api__v1__endpoints__registrar_wizard___cart__PriceOverrideApprovalRequest"];
+                "application/json": components["schemas"]["PriceOverrideApprovalRequest"];
             };
         };
         responses: {
@@ -61414,9 +61473,10 @@ export interface operations {
     board_state_api_v1_board_state_get: {
         parameters: {
             query: {
-                department: string;
+                department?: string | null;
                 /** @description YYYY-MM-DD */
                 date: string;
+                board?: string | null;
             };
             header?: never;
             path?: never;
@@ -63938,7 +63998,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__api__v1__endpoints__admin_departments___helpers__DepartmentCreate"];
+                "application/json": components["schemas"]["DepartmentCreate"];
             };
         };
         responses: {
@@ -73484,7 +73544,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__api__v1__endpoints__password_reset__PasswordResetConfirmRequest"];
+                "application/json": components["schemas"]["PasswordResetConfirmRequest"];
             };
         };
         responses: {
@@ -75278,7 +75338,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__api__v1__endpoints__queue__QueueJoinRequest"];
+                "application/json": components["schemas"]["QueueJoinRequest"];
             };
         };
         responses: {
@@ -75288,7 +75348,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__queue__QueueJoinResponse"];
+                    "application/json": components["schemas"]["QueueJoinResponse"];
                 };
             };
             /** @description Validation Error */
@@ -80169,7 +80229,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__schemas__authentication__UserProfileResponse"];
+                    "application/json": components["schemas"]["UserProfileResponse"];
                 };
             };
         };
@@ -80193,7 +80253,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__schemas__authentication__UserProfileResponse"];
+                    "application/json": components["schemas"]["UserProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -81247,7 +81307,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__schemas__role__RoleResponse"];
+                    "application/json": components["schemas"]["RoleResponse"];
                 };
             };
             /** @description Validation Error */
@@ -81310,7 +81370,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__schemas__role__RoleResponse"];
+                    "application/json": components["schemas"]["RoleResponse"];
                 };
             };
             /** @description Validation Error */
@@ -81345,7 +81405,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__schemas__role__RoleResponse"];
+                    "application/json": components["schemas"]["RoleResponse"];
                 };
             };
             /** @description Validation Error */
@@ -84296,7 +84356,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__cashier___helpers__PaymentResponse"];
+                    "application/json": components["schemas"]["PaymentResponse"];
                 };
             };
             /** @description Validation Error */
@@ -84396,7 +84456,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__cashier___helpers__PaymentResponse"];
+                    "application/json": components["schemas"]["PaymentResponse"];
                 };
             };
             /** @description Validation Error */
@@ -86163,7 +86223,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__api__v1__endpoints__telemetry__TelemetryResponse"];
+                    "application/json": components["schemas"]["TelemetryResponse"];
                 };
             };
             /** @description Validation Error */

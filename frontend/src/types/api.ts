@@ -181,8 +181,8 @@ export type QueueGroupsResponse = Schemas['QueueGroupsResponse'];
 export type QueuePositionResponse = Schemas['QueuePositionResponse'];
 export type QueueTokenResponse = Schemas['QueueTokenResponse'];
 export type QueueStatusNotificationRequest = Schemas['QueueStatusNotificationRequest'];
-export type QueueJoinRequest = Schemas['app__api__v1__endpoints__queue__QueueJoinRequest'];
-export type QueueJoinResponse = Schemas['app__api__v1__endpoints__queue__QueueJoinResponse'];
+export type QueueJoinRequest = Schemas['QueueJoinRequest'];
+export type QueueJoinResponse = Schemas['QueueJoinResponse'];
 
 // ============================================================================
 // Payments
