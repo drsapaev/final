@@ -33,6 +33,7 @@ Corrected contract (fail-first per the review):
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from itertools import count
 from unittest.mock import AsyncMock
 
 import pytest
@@ -142,17 +143,23 @@ def fake_push(monkeypatch):
     return push
 
 
+_user_seq = count(1)
+
+
 async def _manual_resend(db_session, entry) -> dict:
     """Drive the manual resend through the real endpoint (the intent switch
-    manual_resend=True lives inside the endpoint, not in the tests)."""
-    admin = _make_user(db_session, f"resend_admin_{entry.id}")
+    manual_resend=True lives inside the endpoint, not in the tests). The
+    endpoint returns a NotificationResult model — unwrapped to a dict so the
+    assertions can read ``reason`` exactly like the service contract."""
+    admin = _make_user(db_session, f"resend_admin_{entry.id}_{next(_user_seq)}")
     request = SendCallNotificationRequest(entry_id=entry.id, cabinet_number="12")
-    return await send_call_notification(
+    response = await send_call_notification(
         request=request,
         background_tasks=BackgroundTasks(),
         db=db_session,
         current_user=admin,
     )
+    return response.model_dump()
 
 
 # ---------------------------------------------------------------------------
