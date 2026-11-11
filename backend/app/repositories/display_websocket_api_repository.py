@@ -30,9 +30,7 @@ def resolve_display_board_targets(
     them honestly; an explicit unresolvable request must NOT silently fall
     back to broadcasting on every live room.
     """
-    int_ids = [
-        b for b in board_ids if isinstance(b, int) and not isinstance(b, bool)
-    ]
+    int_ids = [b for b in board_ids if isinstance(b, int) and not isinstance(b, bool)]
     id_to_name: dict[int, str] = {}
     if int_ids:
         rows = db.query(DisplayBoard).filter(DisplayBoard.id.in_(int_ids)).all()
@@ -123,7 +121,9 @@ class DisplayWebSocketApiRepository:
             .all()
         )
 
-    def get_active_doctor_by_specialty(self, specialty: str) -> Doctor | None:
+    def get_active_doctor_by_specialty(
+        self, specialty: str, day: date | None = None
+    ) -> Doctor | None:
         """Least-loaded quick-call target (D-2) over every family-spelling
         match (D-1): /queues/profiles/public still exposes the supported
         legacy profile key 'stomatology', so a quick call with any family
@@ -133,7 +133,13 @@ class DisplayWebSocketApiRepository:
         With several active doctors of the specialty, the display board
         calls next for the doctor whose ACTIVE queue (waiting+called
         entries) is shortest today; ties break to the lowest Doctor.id
-        (deterministic)."""
+        (deterministic).
+
+        DISPLAYQUICK-BE-001 (audit PR #3961): the load-counting day is a
+        canonical parameter — the service passes the CLINIC-local day
+        (queue-settings timezone SSOT, the same day the queue lookup
+        uses). ``day=None`` keeps the legacy host-local ``date.today()``
+        fallback for old callers; no timezone logic lives here."""
         doctors = (
             self.db.query(Doctor)
             .join(User, Doctor.user_id == User.id)
@@ -155,7 +161,12 @@ class DisplayWebSocketApiRepository:
         if len(doctors) == 1:
             return doctors[0]
 
-        today = date.today()
+        # DISPLAYQUICK-BE-001 (audit PR #3961): canonical day from the
+        # service (clinic-local SSOT) — the host-local date disagreed with
+        # the queue lookup across the clinic midnight window (UTC host
+        # 19:00-24:00Z for Asia/Tashkent) and elected a doctor whose
+        # current-clinic-day queue was empty/missing.
+        effective_day = day if day is not None else date.today()
         doctor_ids = [d.id for d in doctors]
         load_rows = (
             self.db.query(
@@ -165,7 +176,7 @@ class DisplayWebSocketApiRepository:
             )
             .join(OnlineQueueEntry, OnlineQueueEntry.queue_id == DailyQueue.id)
             .filter(
-                DailyQueue.day == today,
+                DailyQueue.day == effective_day,
                 DailyQueue.specialist_id.in_(doctor_ids),
                 # Codex round-2 P1: an active doctor may retain a same-day
                 # INACTIVE queue with waiting entries — counting them can
@@ -199,9 +210,7 @@ class DisplayWebSocketApiRepository:
         # does the legacy least-active-load pick stand (the downstream
         # 404/queue_empty is then the same signal the single-doctor flow
         # produced).
-        candidates_with_waiting = [
-            d for d in doctors if waiting_loads.get(d.id, 0) > 0
-        ]
+        candidates_with_waiting = [d for d in doctors if waiting_loads.get(d.id, 0) > 0]
         if candidates_with_waiting:
             return min(
                 candidates_with_waiting,
