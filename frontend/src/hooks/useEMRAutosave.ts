@@ -129,7 +129,7 @@ export function useEMRAutosave({
         try {
             onAutosaveStart?.();
 
-            const result = await saveEMR({ isDraft: true }) as { accessDenied?: boolean; conflict?: unknown } | undefined;
+            const result = await saveEMR({ isDraft: true }) as { accessDenied?: boolean; conflict?: unknown; finalized?: boolean } | undefined;
 
             if (result?.accessDenied) {
                 errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
@@ -155,6 +155,18 @@ export function useEMRAutosave({
             // version conflict).
             if (result?.conflict) {
                 onAutosaveError?.({ type: 'conflict', ...(result as Record<string, unknown>) });
+                return;
+            }
+
+            // RETRO-3971-03 (post-merge review of the 3969–3996 window):
+            // saveEMR resolves { finalized: true } when the document was
+            // signed/amended on the server — deterministic amendment routing,
+            // never a successful save (and never "another user changed the
+            // document"). The same honesty policy as a conflict: no
+            // timestamp stamp, no error-counter reset — retrying cannot fix
+            // a finalized state; the doctor must use the amend flow.
+            if (result?.finalized) {
+                onAutosaveError?.({ type: 'finalized', ...(result as Record<string, unknown>) });
                 return;
             }
 
