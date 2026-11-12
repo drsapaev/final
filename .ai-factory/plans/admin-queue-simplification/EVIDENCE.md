@@ -1,6 +1,6 @@
-## T18 — RQ-18 duplicate asset request failure regression — 2026-11-12T08:59:53+05:00
+## T18 — RQ-18 duplicate asset request failure regression — 2026-11-12T09:07:06+05:00
 
-- Commit under test: source changes in worktree based on `9091141b87170fcc4430e7ca57ac4ecd9a3d2081` (`origin/main`, PR #4026 merge); source diff was uncommitted during focused local validation.
+- Commit under test: `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8`; exact source content was locally tested before commit and did not change afterward. Base: `9091141b87170fcc4430e7ca57ac4ecd9a3d2081` (`origin/main`, PR #4026 merge).
 - Environment: isolated Windows worktree; Playwright 1.62.0 Chromium; local loopback HTTP server and synthetic CSS only. No staging, Compose, database, production, or deployment was used.
 - Execution mode/gate: `gate_known_root_cause`; canonical launcher returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. The known root cause is the `requestfailed` handler in `frontend/e2e/rq18-permanent-qr-live.spec.ts`.
 - Allowed tracked paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md`. Denied: product runtime/API/DB/auth, gate/router, production/staging, unrelated worktrees, merge and deployment.
@@ -8,10 +8,10 @@
 - Change: retain genuine request failures regardless of previous or later hashes; report every recorded failure; ignore only Chromium `net::ERR_ABORTED` when a complete matching browser response body already exists. The local regression loads CSS successfully, verifies the known abort marker stays non-fatal, then fails that same URL on a second context and requires the provenance report to reject.
 - Validation: from `frontend`, `./node_modules/.bin/playwright.cmd test --config ../.scratch/rq18-requestfailed.playwright.config.ts --grep "RQ-18 provenance"` — PASS, 2 passed on Chromium (streaming-body check plus new abort/failure regression). Scoped ESLint on `e2e/rq18-permanent-qr-live.spec.ts` — PASS, 0 errors and 2 existing raw-fetch warnings at lines 291/310. `git diff --check` passed before journal updates; rerun after them.
 - Failed/limited checks: an initial exploratory slow-response navigation-cancel harness timed out waiting for `requestfailed`; it was replaced by a deterministic abort-code positive control. `npm.cmd run type-check -- --pretty false` — FAIL in shared dependencies with missing `nitro` and unrelated existing mock-typing errors; no error was reported in the changed E2E spec. `npm.cmd run build -- --outDir ..\\.scratch\\rq18-requestfailed-build` — FAIL before compilation because shared `C:\\final\\frontend\\node_modules` lacks `nitro`. No dependency install was attempted.
-- Result: focused browser regression PASS. Hosted exact-head CI is NOT_RUN pending PR creation. The positive control uses Playwright's deterministic Chromium `aborted` route reason; it does not claim a full live navigation cancellation run.
+- Result: focused browser regression PASS. Hosted exact-head CI is pending for PR #4034. The positive control uses Playwright's deterministic Chromium `aborted` route reason; it does not claim a full live navigation cancellation run.
 - Scope check: only the E2E recorder/test and these three T18 journals changed. No patient data, credentials, runtime, API, database, staging, production, or deployment touched.
 - Remaining limitation: T18/Tier-2 remains PARTIAL. Full live RQ-18, served frontend revision provenance, remaining T18 scenarios and the complete `STAGING_VALIDATION.md` checklist remain NOT_RUN/PARTIAL. No staging deferral is claimed.
-- PR: follow-up PR not yet opened; branch `codex/aqs-t18-rq18-failure-20261112`.
+- PR: [#4034](https://github.com/drsapaev/final/pull/4034), OPEN / Draft; tested HEAD `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8`; user retains merge authority.
 - Merge commit: none.
 
 ## T18 — PR #4026 exact-head CI completed — 2026-11-12T02:12:26+05:00
