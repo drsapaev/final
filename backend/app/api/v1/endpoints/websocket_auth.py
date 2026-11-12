@@ -333,6 +333,26 @@ async def ws_queue_optional_auth(
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
+# WS-POSTMERGE-02: the staff role family is matched case-insensitively so
+# the canonical specialty spellings used across the codebase
+# (messages_api_service, context_facades/iam_facade) — cardio, derma,
+# dentist, cardiology, cardiologist, dermatologist — are no longer closed
+# with WS 1008 on their own departments' queue rooms. Deliberately NOT
+# widened: lab/laboratory, Nurse, Cashier and unknown roles keep being
+# rejected, exactly as before.
+_STAFF_DOCTOR_ROLES = frozenset(
+    {
+        "doctor",
+        "cardio",
+        "cardiology",
+        "cardiologist",
+        "derma",
+        "dermatologist",
+        "dentist",
+    }
+)
+
+
 def _has_department_access(user: User, department: str) -> bool:
     """
     Проверяет, имеет ли пользователь доступ к отделению
@@ -346,7 +366,7 @@ def _has_department_access(user: User, department: str) -> bool:
         return True
 
     # Врачи имеют доступ только к своему отделению
-    if user.role in ["Doctor", "Cardiologist", "Dermatologist", "Dentist"]:
+    if str(user.role).casefold() in _STAFF_DOCTOR_ROLES:
         # Здесь можно добавить более сложную логику проверки отделения
         return True
 
