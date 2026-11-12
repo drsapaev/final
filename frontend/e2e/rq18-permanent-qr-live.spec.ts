@@ -38,6 +38,17 @@ const resourceName = 'SYNTHETIC-RQ18 resource ' + suffixKey;
 const patientName = 'SYNTHETIC-RQ18 patient ' + suffixKey;
 const patientPhone = '+99890' + suffixDigits;
 const servedAssetDrainByPage = new WeakMap<Page, () => Promise<void>>();
+const servedAssetDiagnosticsByPage = new WeakMap<Page, () => string>();
+
+async function withServedAssetDiagnostics<T>(page: Page, operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const diagnostics = servedAssetDiagnosticsByPage.get(page);
+    if (diagnostics) process.stdout.write('RQ18_CAPTURE_DIAGNOSTICS=' + diagnostics() + '\n');
+    throw error;
+  }
+}
 
 async function gotoWithServedAssetDrain(
   page: Page,
@@ -45,7 +56,7 @@ async function gotoWithServedAssetDrain(
   options?: Parameters<Page['goto']>[1],
 ) {
   await servedAssetDrainByPage.get(page)?.();
-  return page.goto(url, options);
+  return withServedAssetDiagnostics(page, () => page.goto(url, options));
 }
 
 async function reloadWithServedAssetDrain(
@@ -53,17 +64,17 @@ async function reloadWithServedAssetDrain(
   options?: Parameters<Page['reload']>[0],
 ) {
   await servedAssetDrainByPage.get(page)?.();
-  return page.reload(options);
+  return withServedAssetDiagnostics(page, () => page.reload(options));
 }
 
 async function goBackWithServedAssetDrain(page: Page) {
   await servedAssetDrainByPage.get(page)?.();
-  return page.goBack();
+  return withServedAssetDiagnostics(page, () => page.goBack());
 }
 
 async function goForwardWithServedAssetDrain(page: Page) {
   await servedAssetDrainByPage.get(page)?.();
-  return page.goForward();
+  return withServedAssetDiagnostics(page, () => page.goForward());
 }
 
 type QueueProfileRow = {
@@ -790,7 +801,8 @@ function isVerifiedSupersededMainFrameAbort(
     && state.supersededMainLoaderIds.has(aborted.loaderId);
 }
 
-function createServedAssetRecorder() {
+function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
+  const drainTimeoutMs = options.drainTimeoutMs ?? 30_000;
   type BrowserBodyReadFailure =
     | 'cdp-body-evicted'
     | 'cdp-body-unavailable'
@@ -818,6 +830,8 @@ function createServedAssetRecorder() {
   type PageCaptureState = {
     activeRequests: Map<Request, AssetReference>;
     cdpActiveRequestIds: Set<string>;
+    cdpActiveRequestPaths: Map<string, string>;
+    browserAbortedByKey: Map<string, number>;
     browserFinishedByKey: Map<string, number>;
     cdpFinishedByKey: Map<string, number>;
     responseBodies: Map<Request, { status: number; body: Promise<BrowserBodyRead> }>;
@@ -826,12 +840,40 @@ function createServedAssetRecorder() {
     mainFrameLoaderId: string | null;
     supersededMainLoaderIds: Set<string>;
     pendingNavigationAborts: PendingNavigationAbort[];
+    fetchStats: {
+      paused: number;
+      bodyReadStarted: number;
+      bodyReadCompleted: number;
+      continueCompleted: number;
+      continueFailed: number;
+    };
     usesCdp: boolean;
   };
   const pageCaptureStates = new Map<Page, PageCaptureState>();
 
   const incrementCount = (counts: Map<string, number>, key: string) => {
     counts.set(key, (counts.get(key) || 0) + 1);
+  };
+
+  const formatCaptureDiagnostics = (state: PageCaptureState) => {
+    const pendingPaths = new Set([
+      ...Array.from(state.activeRequests.values(), (asset) => asset.path),
+      ...state.cdpActiveRequestPaths.values(),
+    ]);
+    const pendingPathHashes = Array.from(pendingPaths)
+      .map((path) => crypto.createHash('sha256').update(path).digest('hex').slice(0, 16))
+      .sort();
+    return [
+      'active=' + state.activeRequests.size,
+      'cdp=' + state.cdpActiveRequestIds.size,
+      'pendingCaptures=' + state.pending.size,
+      'fetchPaused=' + state.fetchStats.paused,
+      'bodyReadStarted=' + state.fetchStats.bodyReadStarted,
+      'bodyReadCompleted=' + state.fetchStats.bodyReadCompleted,
+      'fetchContinued=' + state.fetchStats.continueCompleted,
+      'fetchContinueFailed=' + state.fetchStats.continueFailed,
+      'pendingPathHashes=' + (pendingPathHashes.join(',') || 'none'),
+    ].join(' ');
   };
 
   const recordHash = (asset: AssetReference, bytes: Buffer) => {
@@ -858,12 +900,16 @@ function createServedAssetRecorder() {
       return { key: url.origin + url.pathname, path: url.pathname };
     };
 
-    const cdpAssetKeyFor = (rawUrl: string): AssetReference | null => {
+    const cdpAssetKeyFor = (rawUrl: string, resourceType?: string): AssetReference | null => {
       let pathname: string;
       try {
         pathname = new URL(rawUrl).pathname;
       } catch {
         return null;
+      }
+      const normalizedType = resourceType?.toLowerCase();
+      if (normalizedType === 'script' || normalizedType === 'stylesheet') {
+        return assetKeyFor(rawUrl, normalizedType);
       }
       if (pathname === '/sw.js' || /\.m?js$/i.test(pathname)) return assetKeyFor(rawUrl, 'script');
       if (/\.css$/i.test(pathname)) return assetKeyFor(rawUrl, 'stylesheet');
@@ -877,6 +923,8 @@ function createServedAssetRecorder() {
     const state: PageCaptureState = {
       activeRequests: new Map<Request, { key: string; path: string }>(),
       cdpActiveRequestIds: new Set<string>(),
+      cdpActiveRequestPaths: new Map<string, string>(),
+      browserAbortedByKey: new Map<string, number>(),
       browserFinishedByKey: new Map<string, number>(),
       cdpFinishedByKey: new Map<string, number>(),
       responseBodies: new Map<Request, { status: number; body: Promise<BrowserBodyRead> }>(),
@@ -885,10 +933,19 @@ function createServedAssetRecorder() {
       mainFrameLoaderId: null,
       supersededMainLoaderIds: new Set<string>(),
       pendingNavigationAborts: [],
+      fetchStats: {
+        paused: 0,
+        bodyReadStarted: 0,
+        bodyReadCompleted: 0,
+        continueCompleted: 0,
+        continueFailed: 0,
+      },
       usesCdp: cdpSession !== null,
     };
     pageCaptureStates.set(assetPage, state);
     servedAssetDrainByPage.set(assetPage, () => waitForPage(assetPage));
+    const diagnostics = () => formatCaptureDiagnostics(state);
+    servedAssetDiagnosticsByPage.set(assetPage, diagnostics);
 
     const addPendingCapture = (capture: Promise<void>) => {
       state.pending.add(capture);
@@ -902,7 +959,6 @@ function createServedAssetRecorder() {
     if (cdpSession) {
       const cdpAssets = new Map<string, {
         asset: AssetReference;
-        status?: number;
         frameId?: string;
         loaderId: string;
       }>();
@@ -918,7 +974,7 @@ function createServedAssetRecorder() {
         state.mainFrameLoaderId = frame.loaderId;
       });
       cdpSession.on('Network.requestWillBeSent', (event) => {
-        const asset = cdpAssetKeyFor(event.request.url);
+        const asset = cdpAssetKeyFor(event.request.url, event.type);
         if (!asset) return;
         cdpAssets.set(event.requestId, {
           asset,
@@ -926,50 +982,33 @@ function createServedAssetRecorder() {
           loaderId: event.loaderId,
         });
         state.cdpActiveRequestIds.add(event.requestId);
+        state.cdpActiveRequestPaths.set(event.requestId, asset.path);
       });
       cdpSession.on('Network.responseReceived', (event) => {
         const asset = assetKeyFor(event.response.url, event.type.toLowerCase());
         if (!asset) return;
         cdpAssets.set(event.requestId, {
           asset,
-          status: event.response.status,
           frameId: event.frameId,
           loaderId: event.loaderId,
         });
         state.cdpActiveRequestIds.add(event.requestId);
+        state.cdpActiveRequestPaths.set(event.requestId, asset.path);
       });
       cdpSession.on('Network.loadingFinished', (event) => {
         const cdpAsset = cdpAssets.get(event.requestId);
         if (!cdpAsset) return;
         cdpAssets.delete(event.requestId);
         state.cdpActiveRequestIds.delete(event.requestId);
+        state.cdpActiveRequestPaths.delete(event.requestId);
         incrementCount(state.cdpFinishedByKey, cdpAsset.asset.key);
-
-        const capture = (async () => {
-          if (cdpAsset.status !== 200) {
-            captureFailures.set(cdpAsset.asset.key, 'http-' + String(cdpAsset.status ?? 'unknown'));
-            return;
-          }
-          try {
-            const body = await cdpSession.send('Network.getResponseBody', { requestId: event.requestId });
-            const bytes = body.base64Encoded
-              ? Buffer.from(body.body, 'base64')
-              : Buffer.from(body.body, 'utf8');
-            recordHash(cdpAsset.asset, bytes);
-          } catch (error) {
-            captureFailures.set(
-              cdpAsset.asset.key,
-              'browser-response-body-unavailable-' + bodyReadFailureCode(error),
-            );
-          }
-        })();
-        addPendingCapture(capture);
       });
       cdpSession.on('Network.loadingFailed', (event) => {
         const cdpAsset = cdpAssets.get(event.requestId);
         if (!cdpAsset) return;
         cdpAssets.delete(event.requestId);
         state.cdpActiveRequestIds.delete(event.requestId);
+        state.cdpActiveRequestPaths.delete(event.requestId);
         if (isCdpNavigationAbortCandidate(event, cdpAsset, state.mainFrameId)) {
           state.pendingNavigationAborts.push({
             asset: cdpAsset.asset,
@@ -981,12 +1020,52 @@ function createServedAssetRecorder() {
           captureFailures.set(cdpAsset.asset.key, 'request-failed');
         }
       });
+      cdpSession.on('Fetch.requestPaused', (event) => {
+        state.fetchStats.paused += 1;
+        const asset = assetKeyFor(event.request.url, event.resourceType.toLowerCase());
+        if (!asset) {
+          const continuation = cdpSession.send('Fetch.continueResponse', { requestId: event.requestId })
+            .then(() => { state.fetchStats.continueCompleted += 1; })
+            .catch(() => { state.fetchStats.continueFailed += 1; });
+          addPendingCapture(continuation);
+          return;
+        }
+        const capture = (async () => {
+          try {
+            if (event.responseStatusCode !== 200) {
+              captureFailures.set(asset.key, 'http-' + String(event.responseStatusCode ?? 'unknown'));
+              return;
+            }
+            state.fetchStats.bodyReadStarted += 1;
+            const response = await cdpSession.send('Fetch.getResponseBody', { requestId: event.requestId });
+            state.fetchStats.bodyReadCompleted += 1;
+            const bytes = response.base64Encoded ? Buffer.from(response.body, 'base64') : Buffer.from(response.body, 'utf8');
+            recordHash(asset, bytes);
+          } catch (error) {
+            captureFailures.set(asset.key, 'browser-response-body-unavailable-' + bodyReadFailureCode(error));
+          } finally {
+            try {
+              await cdpSession.send('Fetch.continueResponse', { requestId: event.requestId });
+              state.fetchStats.continueCompleted += 1;
+            } catch {
+              state.fetchStats.continueFailed += 1;
+              captureFailures.set(asset.key, 'browser-response-continuation-failed');
+            }
+          }
+        })();
+        addPendingCapture(capture);
+      });
       await cdpSession.send('Page.enable');
       const frameTree = await cdpSession.send('Page.getFrameTree');
       state.mainFrameId = frameTree.frameTree.frame.id;
       state.mainFrameLoaderId = frameTree.frameTree.frame.loaderId;
       await cdpSession.send('Network.enable');
       await cdpSession.send('Network.setCacheDisabled', { cacheDisabled: true });
+      await cdpSession.send('Fetch.enable', { patterns: [
+        { urlPattern: '*://*/assets/*', resourceType: 'Script', requestStage: 'Response' },
+        { urlPattern: '*://*/assets/*', resourceType: 'Stylesheet', requestStage: 'Response' },
+        { urlPattern: '*://*/sw.js', resourceType: 'Script', requestStage: 'Response' },
+      ] });
       assetPage.once('close', () => {
         void cdpSession.detach().catch(() => undefined);
       });
@@ -998,7 +1077,7 @@ function createServedAssetRecorder() {
     });
 
     assetPage.on('response', (browserResponse) => {
-      if (cdpSession) return;
+      if (state.usesCdp) return;
       const browserRequest = browserResponse.request();
       if (!state.activeRequests.has(browserRequest)) return;
 
@@ -1022,7 +1101,7 @@ function createServedAssetRecorder() {
       if (!asset) return;
       state.activeRequests.delete(browserRequest);
       incrementCount(state.browserFinishedByKey, asset.key);
-      if (cdpSession) return;
+      if (state.usesCdp) return;
       const responseBody = state.responseBodies.get(browserRequest);
       state.responseBodies.delete(browserRequest);
 
@@ -1052,21 +1131,29 @@ function createServedAssetRecorder() {
       if (!asset) return;
       state.activeRequests.delete(browserRequest);
       state.responseBodies.delete(browserRequest);
-      // Non-CDP browsers do not expose enough frame/loader evidence to prove
-      // that an abort followed a committed navigation, so fail closed.
-      captureFailures.set(asset.key, 'request-failed');
+      const failure = browserRequest.failure()?.errorText;
+      if (!cdpSession || failure !== 'net::ERR_ABORTED') {
+        captureFailures.set(asset.key, 'request-failed');
+        return;
+      }
+      // Chromium may classify a navigation cancellation as ERR_ABORTED. Keep
+      // it pending until CDP proves the main-frame loader was superseded by a
+      // committed navigation; unmatched aborts fail closed.
+      incrementCount(state.browserAbortedByKey, asset.key);
     });
   };
 
   const waitForPage = async (assetPage: Page) => {
     const state = pageCaptureStates.get(assetPage);
     if (!state) return;
-    const deadline = Date.now() + 30_000;
+    const deadline = Date.now() + drainTimeoutMs;
     while (state.activeRequests.size > 0 || state.cdpActiveRequestIds.size > 0 || state.pending.size > 0) {
       if (Date.now() >= deadline) {
+        const diagnostics = servedAssetDiagnosticsByPage.get(assetPage);
+        const diagnosticSummary = diagnostics ? diagnostics() : formatCaptureDiagnostics(state);
+        process.stdout.write('RQ18_CAPTURE_DIAGNOSTICS=' + diagnosticSummary + '\n');
         throw new Error('Timed out waiting for browser-served asset bodies to settle '
-          + '(active=' + state.activeRequests.size + ', cdp=' + state.cdpActiveRequestIds.size
-          + ', bodyReads=' + state.pending.size + ').');
+          + '(' + diagnosticSummary + ').');
       }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
@@ -1077,9 +1164,17 @@ function createServedAssetRecorder() {
     while (pendingCaptures.size > 0) await Promise.all(Array.from(pendingCaptures));
     const origin = new URL(expectedOrigin).origin;
     for (const state of pageCaptureStates.values()) {
+      const verifiedNavigationAbortCounts = new Map<string, number>();
       for (const aborted of state.pendingNavigationAborts) {
         if (!isVerifiedSupersededMainFrameAbort(aborted, state)) {
           captureFailures.set(aborted.asset.key, 'request-failed');
+        } else {
+          incrementCount(verifiedNavigationAbortCounts, aborted.asset.key);
+        }
+      }
+      for (const [key, browserAbortCount] of state.browserAbortedByKey) {
+        if (browserAbortCount > (verifiedNavigationAbortCounts.get(key) || 0)) {
+          captureFailures.set(key, 'request-failed');
         }
       }
     }
@@ -1144,10 +1239,10 @@ test('RQ-18 provenance hashes the browser response body before navigation cancel
       outgoing.end('<!doctype html><html><head></head><body></body></html>');
       return;
     }
-    if (incoming.url === probePath) {
+    if (incoming.url === probePath || incoming.url === probePath + '?independent=1') {
       outgoing.setHeader('content-type', 'application/javascript; charset=utf-8');
       outgoing.setHeader('cache-control', 'no-store');
-      if (incoming.headers['x-rq18-browser-probe'] === 'browser') {
+      if (incoming.url === probePath) {
         outgoing.flushHeaders();
         outgoing.write(browserBody.slice(0, 1024));
         setTimeout(() => outgoing.end(browserBody.slice(1024)), 200);
@@ -1179,9 +1274,6 @@ test('RQ-18 provenance hashes the browser response body before navigation cancel
     const servedAssets = createServedAssetRecorder();
     await servedAssets.recordPage(page);
     independentRequest = await request.newContext();
-    await page.route(probeUrl, (route) => route.continue({
-      headers: { ...route.request().headers(), 'x-rq18-browser-probe': 'browser' },
-    }));
     await gotoWithServedAssetDrain(page, origin, { waitUntil: 'domcontentloaded' });
     const requestBrowserProbeScript = async () => {
       const browserResponsePromise = page.waitForResponse((response) => response.url() === probeUrl);
@@ -1200,7 +1292,7 @@ test('RQ-18 provenance hashes the browser response body before navigation cancel
     await goBackWithServedAssetDrain(page);
     await requestBrowserProbeScript();
     await goForwardWithServedAssetDrain(page);
-    const independentResponse = await independentRequest.get(probeUrl);
+    const independentResponse = await independentRequest.get(probeUrl + '?independent=1');
     const independentHash = crypto.createHash('sha256').update(await independentResponse.body()).digest('hex');
     expect(independentHash).not.toBe(browserHash);
     await context.close();
@@ -1341,6 +1433,69 @@ test('RQ-18 provenance reports a failed duplicate asset even when another page c
     await expect(genuineFailureRecorder.reportForOrigin(origin)).rejects.toThrow(`${cssPath}:request-failed`);
   } finally {
     await Promise.all(contexts.map((context) => context.close().catch(() => undefined)));
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    });
+  }
+});
+
+test('RQ-18 provenance timeout reports safe capture counters', async ({ browser, browserName }) => {
+  test.skip(browserName !== 'chromium', 'RQ-18 timeout diagnostics regression uses Chromium request routing.');
+  test.setTimeout(30_000);
+  const cssPath = `/assets/rq18-timeout-diagnostics-${suffixKey}.css`;
+  const server = createServer((_incoming, outgoing) => {
+    outgoing.statusCode = 200;
+    outgoing.setHeader('content-type', 'text/html; charset=utf-8');
+    outgoing.end('<!doctype html><html><head></head><body></body></html>');
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error('Could not start local timeout-diagnostics regression server.');
+  }
+
+  const origin = `http://127.0.0.1:${address.port}`;
+  const cssUrl = new URL(cssPath, origin).toString();
+  let releaseHeldRoute = () => {};
+  const heldRoute = new Promise<void>((resolve) => { releaseHeldRoute = resolve; });
+  let routeIntercepted = () => {};
+  const intercepted = new Promise<void>((resolve) => { routeIntercepted = resolve; });
+  let context: BrowserContext | undefined;
+
+  try {
+    context = await browser.newContext({ serviceWorkers: 'block' });
+    const page = await context.newPage();
+    const servedAssets = createServedAssetRecorder({ drainTimeoutMs: 100 });
+    await servedAssets.recordPage(page);
+    await page.route(cssUrl, async (route) => {
+      routeIntercepted();
+      await heldRoute;
+      await route.abort('aborted').catch(() => undefined);
+    });
+    await page.goto(origin, { waitUntil: 'domcontentloaded' });
+    const requestStarted = page.waitForEvent('request', (browserRequest) => browserRequest.url() === cssUrl);
+    await page.evaluate((url) => {
+      const stylesheet = document.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = url;
+      document.head.append(stylesheet);
+    }, cssUrl);
+    await requestStarted;
+    await intercepted;
+    const expectedPathHash = crypto.createHash('sha256').update(cssPath).digest('hex').slice(0, 16);
+    await expect(servedAssets.waitForPage(page)).rejects.toThrow(
+      new RegExp('Timed out waiting for browser-served asset bodies to settle '
+        + '\\(active=1 cdp=\\d+ pendingCaptures=\\d+ fetchPaused=\\d+ bodyReadStarted=\\d+'
+        + ' bodyReadCompleted=\\d+ fetchContinued=\\d+ fetchContinueFailed=\\d+'
+        + ' pendingPathHashes=' + expectedPathHash + '\\)\\.'),
+    );
+  } finally {
+    releaseHeldRoute();
+    await context?.close().catch(() => undefined);
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     });

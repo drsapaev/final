@@ -1,3 +1,25 @@
+## Current checkpoint — PR #4034 duplicate browser asset failures locally fixed; sync pending — 2026-11-12T19:59:46+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. Its reported duplicate-asset failure P2 is being carried in follow-up PR #4034, not retroactively changed in #4026.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final; branch codex/aqs-t18-rq18-failure-20261112; remote PR HEAD a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8. Local E2E recorder and journal changes are uncommitted. Fresh origin/main is 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d; the PR is behind.
+- The recorder no longer suppresses a later failed asset request because another page captured that URL's hash. Only an abort proven by Chromium CDP to be a canceled main-frame request superseded by a committed navigation is accepted.
+- Validation on the current local tracked source: duplicate-failure regression PASS 1/1; provenance suite PASS 12/12 with three repetitions; scoped ESLint exit 0 with 0 errors and 2 existing warnings; git diff --check PASS. Exact-head CI for the local changes is pending.
+- Latest current-main synthetic staging artifact stopped at compose-up and was torn down; it did not reach browser checks. The older cdp6 live PASS used artifact source c586346f; do not treat that as validation of current main 7c3459ef. served_revision_verified=false; overall T18 remains PARTIAL.
+- Next exact action: review and commit only the four scoped tracked files, rebase this feature branch onto origin/main 7c3459ef, rerun the focused regression/checks, push the branch, update #4034 evidence, and inspect CI on the exact pushed HEAD. Do not merge or deploy.
+
+## Current checkpoint — RQ-18 Fetch recorder and synthetic Session PASS; PR sync pending — 2026-11-12T17:34:36+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns PR merge and deployment.
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`, pre-journal HEAD `a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8`. The RQ-18 E2E spec has the current uncommitted recorder fix; these three journals are being updated in the same follow-up.
+- PR #4034 is OPEN / Ready for review. GitHub reports head `a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8`, base snapshot `c409d80ebefbf171876b57cb24755d24f9080241`, `mergeable=true`, `mergeStateStatus=BEHIND`. Current `origin/main` has advanced to `6d4ccfdf6002d65741571283603e92458957bf25` (#4043), so branch synchronization and exact-head CI remain pending.
+- RQ-18 recorder now captures the actual Chromium response bytes at CDP Fetch response pause, registers the pause listener before enabling interception, preserves fail-closed duplicate network-error handling, and emits numeric-only diagnostics on timeout. Product runtime/API/DB/auth code is unchanged.
+- Local checks after the latest source edit: focused Chromium provenance tests 9/9 PASS (`--repeat-each=3`); scoped ESLint 0 errors with 2 existing raw-fetch warnings; `npm.cmd run build` PASS; `git diff --check` PASS.
+- Synthetic RQ-18 Session attempt 4 on owned project `clinic-aqs4034-rq18-cdp6-20261112`: canonical Preflight PASS (artifact validation PASS, C: 13 GiB free, WSL backing D: 26 GiB free, WSL available 3219 MiB, ports 18895/18896/55623 free). Canonical Session PASS: ordinary Admin password+TOTP flow, full RQ-18 permanent-QR booking/archive/reactivation test, 63 browser JS/CSS records all matched `SHA256SUMS` from frontend artifact source `c586346f84b43afe7fb20fa1fe1ef4304237cf3e` (artifact workflow #43205982129). Session teardown PASS; independent exact-project inventory is zero containers, volumes, networks, images and listeners on all three ports.
+- Previous failures are retained in EVIDENCE: cdp5 lost a CDP Network body; cdp6 attempts 1–3 exposed listener-order/navigation timeout issues; one automatic cleanup returned `NATIVE_UNAVAILABLE`, then exact project-scoped teardown succeeded. Do not erase those failures from the audit.
+- Canonical helper field `served_revision_verified` still reports `false`; the separate custom browser-byte-to-artifact-manifest comparison above is PASS and must be described as that custom check, not as a helper-field change. Full `STAGING_VALIDATION.md` and remaining T18 checks are incomplete.
+- Latest frontend artifact build for current main `6d4ccfdf6002d65741571283603e92458957bf25` is queued as workflow #43219021958. Next exact action: obtain its artifact, rebase this PR branch on current `origin/main`, re-run local checks, then run the RQ-18 Session once with the current-main artifact if Preflight passes. Record the result, update PR metadata/body, push with lease, and inspect exact-head checks. Do not merge or deploy.
+
 ## Current checkpoint — PR #4034 WSL recovery and RQ-18 Session build failure — 2026-11-12T15:03:41+05:00
 
 - Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns PR merge and deployment.

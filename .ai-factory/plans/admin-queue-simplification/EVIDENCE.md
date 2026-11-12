@@ -1,3 +1,33 @@
+## T18 — PR #4034 duplicate browser asset failure regression — 2026-11-12T19:59:46+05:00
+
+- Commit under test: branch HEAD a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8 plus the local E2E recorder and journal changes; current origin/main is 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d. These changes are not yet committed or pushed.
+- Environment: Windows host, local Chromium Playwright, synthetic local HTTP server; no staging credentials, patient data, production services, or live clinic data.
+- Execution mode/gate: exact-scope gate returned narrow_override, gate_misroute=false, override_used=true, handoff_required=true; the generated execution prompt was read. Allowed tracked scope is the RQ-18 E2E spec and its three T18 journals.
+- Original P2: a failed duplicate JS/CSS request could be hidden by a successful hash from another page/context.
+- Change: ordinary requestfailed events remain failures even when a matching hash exists. Only a Chromium ERR_ABORTED can be deferred, and it is ignored only when CDP confirms a canceled main-frame request from a superseded loader, a committed replacement navigation, and a previously captured matching browser hash. Other browsers fail closed.
+- Validation: targeted duplicate-failure regression — PASS, 1/1; all local RQ-18 provenance cases with --repeat-each=3 — PASS, 12/12; scoped ESLint — exit 0, 0 errors and 2 existing raw-fetch warnings; git diff --check — PASS.
+- Result: this P2 is covered by a regression where one page captures the CSS hash and a later page fails to load the same CSS; the report rejects both a failed request and an abort not proven to be a committed-navigation cancellation.
+- Staging limitation: the latest artifact was built from current main 7c3459ef; its synthetic Session stopped at compose-up and teardown passed, so this source revision was NOT_RUN in live RQ-18. An earlier cdp6 Session passed against artifact source c586346f, but that does not validate current main. served_revision_verified remains false and overall T18/Tier-2 remains PARTIAL.
+- PR: #4034 OPEN / Ready for review, remote HEAD a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8, behind current main. Merge commit: none; user owns merge/deploy.
+
+## T18 — PR #4034 RQ-18 Fetch capture and cdp6 synthetic Session PASS — 2026-11-12T17:34:36+05:00
+
+- Commit under test: worktree HEAD `a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8` plus the uncommitted E2E recorder update; base at that run `c409d80ebefbf171876b57cb24755d24f9080241`. Frontend artifact source SHA: `c586346f84b43afe7fb20fa1fe1ef4304237cf3e`, built by GitHub workflow #43205982129.
+- Environment: isolated Windows worktree; synthetic WSL2 Ubuntu-24.04 project `clinic-aqs4034-rq18-cdp6-20261112`; Docker 29.1.3 / Compose 2.40.3; artifact-runtime frontend; no production services or data.
+- Execution mode/gate: `gate_known_root_cause` with explicit `narrow_override`; latest gate result `gate_misroute=false`, `override_used=true`, `handoff_required=true`. The generated prompt was read. Allowed tracked files are this E2E spec and the three T18 journals; generated harness and safe reports remain in this worktree `.scratch/`.
+- Original P2: a real later asset request failure could be hidden by a hash captured from another browser context. The source retains fail-closed duplicate-failure handling and classifies only a proven superseded main-frame abort as benign. Browser bytes are captured at CDP Fetch response pause, before response continuation; timeout diagnostics contain only numeric counters.
+- Actual changed tracked paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts`, `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. No product runtime/API/database/auth changes.
+- Local validation after the latest source edit:
+  - `node node_modules/@playwright/test/cli.js test --config=../.scratch/t18-rq18-cdp-validation-20261112/playwright-staging-cdp6.config.mjs --grep='RQ-18 provenance' --repeat-each=3 --output=../.scratch/t18-rq18-cdp-validation-20261112/playwright-navigation-diagnostics-regressions` — PASS, 9/9.
+  - `node node_modules/eslint/bin/eslint.js e2e/rq18-permanent-qr-live.spec.ts` — exit 0, 0 errors; 2 existing raw-fetch warnings at the Admin API helper lines.
+  - `npm.cmd run build` — PASS. Existing Rollup/esbuild annotation and CSS warnings only.
+  - `git diff --check` — PASS.
+- Staging history: cdp5 failed at final byte provenance (`cdp-resource-unavailable`); cdp6 attempts 1 and 2 timed out with 13 active requests, attempt 2 required manual exact-project cleanup after `NATIVE_UNAVAILABLE`; attempt 3 timed out at `admin-login-navigation`. These were recorded as failures, not passes. Exact cdp6 cleanup after those attempts was verified before reuse.
+- Final cdp6 attempt: canonical Preflight PASS; canonical Session PASS. Safe result markers: `RQ18_ADMIN_2FA_FLOW=PASS`, `RQ18_TARGET_TEST=PASS`, `RQ18_BROWSER_ASSET_RECORDS=63`, `RQ18_BROWSER_JS_CSS_ASSETS=63`, `RQ18_ARTIFACT_MATCH=PASS`, `RQ18_ARTIFACT_SOURCE_SHA=c586346f84b43afe7fb20fa1fe1ef4304237cf3e`. The validator compared each captured browser JS/CSS hash to the artifact `SHA256SUMS`. A sanitized path/hash summary exists locally at `.scratch/t18-rq18-cdp-validation-20261112/browser-asset-summary-cdp6.txt`; this journal records its durable verification summary without patient data or credentials.
+- Cleanup: Session reports teardown PASS (5 containers, 3 volumes, 1 network removed; zero remaining). Independent project-label inventory: 0 containers, volumes, networks and images; host listeners on 18895/18896/55623 all 0.
+- Limitation: canonical Preflight/Session still emit `served_revision_verified=false`; do not claim that field changed. The separate byte-level browser-to-artifact check is PASS for artifact source `c586346f`. GitHub main advanced afterward to `6d4ccfdf6002d65741571283603e92458957bf25`; workflow #43219021958 is building a fresh artifact for that SHA. Full `STAGING_VALIDATION.md`, remaining T18 cases and exact-head CI after current-main sync remain pending; Tier-2 stays PARTIAL, no deferral.
+- PR: #4034, OPEN / Ready for review; user owns merge. Merge commit: none.
+
 ## T18 — PR #4034 exact-head CI and review gates — 2026-11-12T14:09:00+05:00
 
 - Commit under test: RQ-18 E2E source fix `a6149855d810b5bcba2955371e11c08ed7fa7279`; exact PR HEAD tested by hosted CI `b293dda8ff2449e26d220f513abec3d8814212d7`; base `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`.

@@ -1,3 +1,25 @@
+## Resume — PR #4034 duplicate browser asset failure regression — 2026-11-12T19:59:46+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.
+
+PR #4026 is already merged. Its review P2 about a failed duplicate asset being masked by a hash is addressed in the local follow-up work for PR #4034. The recorder accepts a browser abort only when Chromium CDP proves it came from a superseded main-frame loader and a replacement navigation committed; all unproven aborts and other request failures fail closed.
+
+The targeted Chromium regression passed 1/1, and the provenance group passed 12/12 across three repetitions. Scoped ESLint had 0 errors and 2 existing raw-fetch warnings; git diff --check passed. These results are from the tracked spec at local worktree state atop a27a0c2a7, with local changes not yet committed/pushed.
+
+PR #4034 is OPEN / Ready for review at remote HEAD a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8, base snapshot c409d80ebefbf171876b57cb24755d24f9080241. Current origin/main is 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d; the PR is behind. Stage and commit only the E2E spec and three T18 journals, rebase onto current main, rerun focused checks, push with an explicit lease, refresh PR evidence, and inspect exact-head CI. User owns merge/deploy.
+
+The latest synthetic artifact was built from current main but its Session failed at compose-up; teardown passed and no browser validation ran. The prior live cdp6 PASS used an older artifact and does not prove current-main provenance. served_revision_verified remains false; full Tier-2/T18 remains PARTIAL. No merge/deploy.
+
+## Resume — RQ-18 synthetic browser provenance passed; current-main sync pending — 2026-11-12T17:34:36+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.
+
+PR #4034 remains open / Ready for review; local pre-checkpoint HEAD is `a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8`. The PR base snapshot is `c409d80ebefbf171876b57cb24755d24f9080241`, while current origin/main is `6d4ccfdf6002d65741571283603e92458957bf25`; GitHub reports the PR behind. Do not merge or deploy; the user owns those actions.
+
+The current RQ-18 recorder source fix passes focused local Chromium provenance tests (9/9 across three repetitions), scoped ESLint (0 errors, 2 existing warnings), frontend build, and diff check. Synthetic cdp6 Session attempt 4 passed ordinary Admin password+TOTP, full permanent-QR booking/archive/reactivation, and browser-derived manifest comparison for 63/63 JS/CSS assets against artifact SHA `c586346f84b43afe7fb20fa1fe1ef4304237cf3e` from workflow #43205982129. Canonical teardown and independent exact-project cleanup passed. Earlier cdp5/cdp6 failures remain recorded in EVIDENCE; do not remove their history.
+
+A fresh frontend artifact for current main `6d4ccfdf6002d65741571283603e92458957bf25` is queued in workflow #43219021958. Next: wait for completion and download that exact artifact, rebase the feature branch onto fetched `origin/main`, resolve only owned changes, then rerun focused checks. If artifact workflow succeeds and canonical Preflight passes, run one RQ-18 Session against the current-main artifact; cleanup must be confirmed afterward. Then commit/push with a lease, update PR #4034 body to the tested SHA and results, inspect all exact-head checks, and report status. Keep T18/Tier-2 PARTIAL and do not claim the whole runbook is complete.
+
 ## Resume — PR #4034 RQ-18 compose-up failure; owned stack cleaned — 2026-11-12T15:03:41+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.
