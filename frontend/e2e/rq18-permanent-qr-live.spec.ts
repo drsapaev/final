@@ -673,7 +673,7 @@ async function openPublicAddress(
 }> {
   const context = await browser.newContext({ baseURL: origin });
   const page = await context.newPage();
-  servedAssets.recordPage(page);
+  await servedAssets.recordPage(page);
   const startCount = countDirectionStartRequests(page);
   const responsePromise = page.waitForResponse((response) => {
     if (response.request().method() !== 'POST') return false;
@@ -767,7 +767,7 @@ function createServedAssetRecorder() {
     pending: Set<Promise<void>>;
   }>();
 
-  const recordPage = (assetPage: Page) => {
+  const recordPage = async (assetPage: Page) => {
     const assetKeyFor = (rawUrl: string, resourceType: string) => {
       let url: URL;
       try {
@@ -780,6 +780,11 @@ function createServedAssetRecorder() {
             || (resourceType !== 'script' && resourceType !== 'stylesheet'))) return null;
       return { key: url.origin + url.pathname, path: url.pathname };
     };
+
+    // Browser cache can evict a response body before CDP serves a later
+    // Network.getResponseBody call. Route only static assets and continue them
+    // unchanged so this provenance check hashes bytes fetched from this origin.
+    await assetPage.route(/\/(?:assets\/[^?#]+|sw\.js)(?:[?#]|$)/, (route) => route.continue());
 
     const state = {
       activeRequests: new Map<Request, { key: string; path: string }>(),
@@ -962,7 +967,7 @@ test('RQ-18 provenance hashes the browser response body before navigation cancel
     context = await browser.newContext({ serviceWorkers: 'block' });
     const page = await context.newPage();
     const servedAssets = createServedAssetRecorder();
-    servedAssets.recordPage(page);
+    await servedAssets.recordPage(page);
     independentRequest = await request.newContext();
     await page.route(probeUrl, (route) => route.continue({
       headers: { ...route.request().headers(), 'x-rq18-browser-probe': 'browser' },
@@ -1041,7 +1046,7 @@ test('RQ-18 provenance reports genuine duplicate asset failures but ignores a ve
     const firstContext = await browser.newContext({ serviceWorkers: 'block' });
     contexts.push(firstContext);
     const firstPage = await firstContext.newPage();
-    servedAssets.recordPage(firstPage);
+    await servedAssets.recordPage(firstPage);
     await firstPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'load' });
     await servedAssets.waitForPage(firstPage);
     const firstCapture = await servedAssets.reportForOrigin(origin);
@@ -1051,7 +1056,7 @@ test('RQ-18 provenance reports genuine duplicate asset failures but ignores a ve
     const navigationContext = await browser.newContext({ serviceWorkers: 'block' });
     contexts.push(navigationContext);
     const navigationPage = await navigationContext.newPage();
-    servedAssets.recordPage(navigationPage);
+    await servedAssets.recordPage(navigationPage);
     await navigationPage.route(cssUrl, (route) => route.abort('aborted'));
     const navigationAbort = navigationPage.waitForEvent('requestfailed', (browserRequest) => browserRequest.url() === cssUrl);
     await navigationPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'domcontentloaded' });
@@ -1063,7 +1068,7 @@ test('RQ-18 provenance reports genuine duplicate asset failures but ignores a ve
     const failedContext = await browser.newContext({ serviceWorkers: 'block' });
     contexts.push(failedContext);
     const failedPage = await failedContext.newPage();
-    servedAssets.recordPage(failedPage);
+    await servedAssets.recordPage(failedPage);
     await failedPage.route(cssUrl, (route) => route.abort('failed'));
     const failedRequestPromise = failedPage.waitForEvent('requestfailed', (browserRequest) => browserRequest.url() === cssUrl);
     await failedPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'domcontentloaded' });
@@ -1085,7 +1090,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   page.setDefaultTimeout(30_000);
   page.setDefaultNavigationTimeout(30_000);
   const servedAssets = createServedAssetRecorder();
-  servedAssets.recordPage(page);
+  await servedAssets.recordPage(page);
   let pageErrors = 0;
   page.on('pageerror', () => { pageErrors += 1; });
   markRq18Phase('admin-login');
