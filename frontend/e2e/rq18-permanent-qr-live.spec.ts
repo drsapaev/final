@@ -757,11 +757,13 @@ function markRq18Phase(phase: string) {
 }
 
 function createServedAssetRecorder() {
+  type BrowserBodyRead = { ok: true; bytes: Buffer } | { ok: false };
   const capturedAssetHashes = new Map<string, string>();
   const captureFailures = new Map<string, string>();
   const pendingCaptures = new Set<Promise<void>>();
   const pageCaptureStates = new Map<Page, {
     activeRequests: Map<Request, { key: string; path: string }>;
+    responseBodies: Map<Request, { status: number; body: Promise<BrowserBodyRead> }>;
     pending: Set<Promise<void>>;
   }>();
 
@@ -781,6 +783,7 @@ function createServedAssetRecorder() {
 
     const state = {
       activeRequests: new Map<Request, { key: string; path: string }>(),
+      responseBodies: new Map<Request, { status: number; body: Promise<BrowserBodyRead> }>(),
       pending: new Set<Promise<void>>(),
     };
     pageCaptureStates.set(assetPage, state);
@@ -791,37 +794,55 @@ function createServedAssetRecorder() {
       if (asset) state.activeRequests.set(browserRequest, asset);
     });
 
+    assetPage.on('response', (browserResponse) => {
+      const browserRequest = browserResponse.request();
+      if (!state.activeRequests.has(browserRequest)) return;
+
+      // Start reading while the browser response is still available. The body
+      // promise resolves only after the response bytes have arrived; retaining
+      // it here avoids a late CDP body lookup after requestfinished/navigation.
+      // Convert rejection to a safe result immediately so failed requests do
+      // not create unhandled promises or expose browser error text.
+      const body = browserResponse.body().then<BrowserBodyRead, BrowserBodyRead>(
+        (bytes) => ({ ok: true, bytes }),
+        () => ({ ok: false }),
+      );
+      state.responseBodies.set(browserRequest, {
+        status: browserResponse.status(),
+        body,
+      });
+    });
+
     assetPage.on('requestfinished', (browserRequest) => {
       const asset = state.activeRequests.get(browserRequest);
       if (!asset) return;
       state.activeRequests.delete(browserRequest);
+      const responseBody = state.responseBodies.get(browserRequest);
+      state.responseBodies.delete(browserRequest);
 
-      // requestfinished means Chromium received the complete response body.
-      // Reading only after that event avoids the CDP body lookup racing a
-      // navigation that cancels an in-flight script or stylesheet response.
       const capture = (async () => {
-        try {
-          const response = await browserRequest.response();
-          if (!response) {
-            captureFailures.set(asset.key, 'browser-response-unavailable');
-            return;
-          }
-          if (response.status() !== 200) {
-            captureFailures.set(asset.key, 'http-' + response.status());
-            return;
-          }
-
-          const body = await response.body();
-          const sha256 = crypto.createHash('sha256').update(body).digest('hex');
-          const previous = capturedAssetHashes.get(asset.key);
-          if (previous && previous !== sha256) {
-            captureFailures.set(asset.key, 'multiple-browser-response-bodies');
-            return;
-          }
-          capturedAssetHashes.set(asset.key, sha256);
-        } catch {
-          captureFailures.set(asset.key, 'browser-response-body-unavailable');
+        if (!responseBody) {
+          captureFailures.set(asset.key, 'browser-response-unavailable');
+          return;
         }
+        if (responseBody.status !== 200) {
+          captureFailures.set(asset.key, 'http-' + responseBody.status);
+          return;
+        }
+
+        const result = await responseBody.body;
+        if (!result.ok) {
+          captureFailures.set(asset.key, 'browser-response-body-unavailable');
+          return;
+        }
+
+        const sha256 = crypto.createHash('sha256').update(result.bytes).digest('hex');
+        const previous = capturedAssetHashes.get(asset.key);
+        if (previous && previous !== sha256) {
+          captureFailures.set(asset.key, 'multiple-browser-response-bodies');
+          return;
+        }
+        capturedAssetHashes.set(asset.key, sha256);
       })();
       state.pending.add(capture);
       pendingCaptures.add(capture);
@@ -835,6 +856,7 @@ function createServedAssetRecorder() {
       const asset = state.activeRequests.get(browserRequest);
       if (!asset) return;
       state.activeRequests.delete(browserRequest);
+      state.responseBodies.delete(browserRequest);
       // Only ignore Chromium's navigation-abort marker when another completed
       // browser response already proved these exact asset bytes. A successful
       // capture from one page must never hide a genuine failure on another.
