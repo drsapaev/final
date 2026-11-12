@@ -58,6 +58,14 @@ export interface UseEMRLeaveGuardOptions {
     reloadFromServer: () => Promise<unknown>;
     /** Read-only observers / access-denied mounts register nothing. */
     enabled?: boolean;
+    /**
+     * RETRO-3971-04 P1: синхронная подавка автосейва перед явным Discard
+     * (useEMRAutosave.suppressOnDiscard). Вызывается ДО запуска асинхронного
+     * reload: деструктор размонтирования (#4009 flush) обязан увидеть запрет
+     * раньше, чем transition уводит маршрут, — отброшенный черновик не уходит
+     * на сервер POST-ом из деструктора.
+     */
+    onDiscard?: () => void;
 }
 
 export function useEMRLeaveGuard({
@@ -67,6 +75,7 @@ export function useEMRLeaveGuard({
     saveEMR,
     reloadFromServer,
     enabled = true,
+    onDiscard,
 }: UseEMRLeaveGuardOptions): void {
     const guard = useLabDirtyGuard();
 
@@ -78,6 +87,8 @@ export function useEMRLeaveGuard({
     saveEMRRef.current = saveEMR;
     const reloadRef = useRef(reloadFromServer);
     reloadRef.current = reloadFromServer;
+    const onDiscardRef = useRef(onDiscard);
+    onDiscardRef.current = onDiscard;
 
     const hasVisit = visitId !== null && visitId !== undefined && visitId !== '';
     const sourceId = `emr-visit-${visitId}`;
@@ -112,6 +123,10 @@ export function useEMRLeaveGuard({
             // (EMRCONFLICT-FE-001 «discard my edits» path). The transition
             // runs after this; the draft cannot «resurrect» from the reload.
             discard: () => {
+                // RETRO-3971-04 P1: СИНХРОННО запретить автосейв ДО запуска
+                // асинхронного reload — деструктор размонтирования (#4009
+                // flush) срабатывает раньше, чем GET успеет что-либо решить.
+                onDiscardRef.current?.();
                 void reloadRef.current?.();
             },
         });
