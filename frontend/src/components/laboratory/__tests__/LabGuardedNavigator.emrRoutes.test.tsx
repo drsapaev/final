@@ -94,8 +94,10 @@ function renderEmrRouteApp({
 }: {
   registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] };
 }) {
-  // Предшественник /profile + SPA-переход на doctor-маршрут (router idx).
-  window.history.replaceState(null, '', '/profile');
+  // beforeEach уже вернул окно к самой ранней записи и переименовал её в
+  // /profile; первый SPA-push теста обрежет forward-хвосты предыдущих
+  // тестов (стандарт push-семантики) — история каждого теста чиста:
+  // [profile, derm, sentinel].
   const utils = render(
     <ThemeProvider>
       <BrowserRouter>
@@ -127,12 +129,18 @@ async function registerEmrDraftSource(
   });
 }
 
-async function settleRouter() {
+async function settleRouter(expectedPath?: string) {
   await act(async () => {
     for (let i = 0; i < 6; i += 1) await Promise.resolve();
-    // jsdom History.go/back выполняет traversal ЗАДАЧОЙ (макротаска):
-    // микротасок недостаточно для приземления POP-рендера роутера.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // jsdom History.go/back выполняет traversal ЗАДАЧОЙ (макротаска): на
+    // нагруженных CI-воркерах одиночный setTimeout(0) может отработать до
+    // фактического popstate+POP-рендера — поллим до детерминированного
+    // приземления (максимум 1500 мс, тик 25 мс).
+    const deadline = Date.now() + 1500;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      if (!expectedPath || window.location.pathname === expectedPath) break;
+    }
   });
 }
 
@@ -141,6 +149,16 @@ describe('Route-level leave guard on EMR doctor routes (RETRO-3971-04 residual)'
     await act(async () => {
       await i18n.changeLanguage('ru');
     });
+    // Изоляция истории: jsdom-окно одно на файл; хвосты sentinel-записей
+    // предыдущих тестов ЛОМАЮТ дельту -2 подтверждённого Back-ухода
+    // (приземление на устаревшую помеченную копию вместо реальной страницы).
+    // Возврат к самой ранней записи + замена её на /profile: первый push
+    // теста обрезает все forward-записи — история чиста.
+    window.history.go(-window.history.length + 1);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+    window.history.replaceState(null, '', '/profile');
   });
 
   it('browser Back on a doctor route with a dirty EMR draft opens the guard dialog and keeps the panel URL', async () => {
@@ -149,7 +167,7 @@ describe('Route-level leave guard on EMR doctor routes (RETRO-3971-04 residual)'
 
     // SPA-переход profile → doctor route (clean registry: сразу выполняется).
     fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
-    await settleRouter();
+    await settleRouter('/doctor/dermatology');
     expect(screen.getByTestId('location')).toHaveTextContent('/doctor/dermatology');
     expect(screen.getByText('dermatology panel page')).toBeInTheDocument();
 
@@ -183,17 +201,17 @@ describe('Route-level leave guard on EMR doctor routes (RETRO-3971-04 residual)'
     renderEmrRouteApp({ registration });
 
     fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
-    await settleRouter();
+    await settleRouter('/doctor/dermatology');
 
     await registerEmrDraftSource(registration);
 
     window.history.back();
-    await settleRouter();
+    await settleRouter('/doctor/dermatology');
 
     const dialog = await screen.findByRole('dialog');
     // Discard — осознанный уход: черновик сброшен, переход выполняется.
     fireEvent.click(within(dialog).getByRole('button', { name: 'Выйти без сохранения' }));
-    await settleRouter();
+    await settleRouter('/profile');
 
     expect(screen.getByTestId('location')).toHaveTextContent('/profile');
     expect(screen.getByText('profile page')).toBeInTheDocument();
