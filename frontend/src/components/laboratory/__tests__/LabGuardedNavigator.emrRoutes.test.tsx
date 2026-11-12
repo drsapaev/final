@@ -73,6 +73,17 @@ function DermPage() {
     <div>
       dermatology panel page
       <button type="button" onClick={() => navigate('/profile')}>leave</button>
+      <button type="button" onClick={() => navigate('/lab')}>to-lab</button>
+    </div>
+  );
+}
+
+function LabPage() {
+  const navigate = useGuardedLabNavigate();
+  return (
+    <div>
+      laboratory page
+      <button type="button" onClick={() => navigate('/doctor/dermatology')}>to-derm</button>
     </div>
   );
 }
@@ -107,6 +118,7 @@ function renderEmrRouteApp({
           <Routes>
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/doctor/dermatology" element={<DermPage />} />
+            <Route path="/lab" element={<LabPage />} />
           </Routes>
         </LabDirtyGuardProvider>
       </BrowserRouter>
@@ -236,6 +248,119 @@ describe('Route-level leave guard on EMR doctor routes (RETRO-3971-04 residual)'
     await settleRouter();
     expect(screen.getByTestId('location')).toHaveTextContent('/doctor/dermatology');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('a dirty doctor to lab navigation awaits the guard save decision', async () => {
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+    renderEmrRouteApp({ registration });
+    fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
+    await settleRouter('/doctor/dermatology');
+
+    let acknowledgeSave: () => void = () => { throw new Error('save was not started'); };
+    const serverAck = new Promise<void>((resolve) => { acknowledgeSave = resolve; });
+    const save = vi.fn(() => serverAck);
+    await act(async () => {
+      registration.current?.({
+        id: 'emr-visit-42',
+        isDirty: () => true,
+        save,
+        discard: vi.fn(),
+      });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'to-lab' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(screen.getByTestId('location')).toHaveTextContent('/doctor/dermatology');
+    expect(screen.getByText('dermatology panel page')).toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+
+    // Save is in-flight: the editor may not unmount before an ACK.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить и перейти' }));
+    await settleRouter();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('location')).toHaveTextContent('/doctor/dermatology');
+
+    await act(async () => { acknowledgeSave(); });
+    await settleRouter('/lab');
+    expect(screen.getByText('laboratory page')).toBeInTheDocument();
+  });
+
+  it('a clean doctor to lab navigation remains immediate and dialog-free', async () => {
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+    renderEmrRouteApp({ registration });
+    fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
+    await settleRouter('/doctor/dermatology');
+    fireEvent.click(screen.getByRole('button', { name: 'to-lab' }));
+    await settleRouter('/lab');
+    expect(screen.getByText('laboratory page')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('after a confirmed lab to doctor transition the sentinel re-arms on the doctor route (Back stays guarded)', async () => {
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+    renderEmrRouteApp({ registration });
+
+    // Clean entry into /lab, then register a dirty lab workbench source.
+    fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
+    await settleRouter('/doctor/dermatology');
+    fireEvent.click(screen.getByRole('button', { name: 'to-lab' }));
+    await settleRouter('/lab');
+    await registerEmrDraftSource(registration);
+    expect(sentinelMarkerPresent()).toBe(true);
+
+    // Guarded SPA leave lab → doctor route (target is NOT lab → guardRouteLeave).
+    fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Выйти без сохранения' }));
+    await settleRouter('/doctor/dermatology');
+    expect(screen.getByText('dermatology panel page')).toBeInTheDocument();
+
+    // A NEW dirty EMR draft registers on the doctor route: the sentinel must
+    // arm again (the confirmed leave landed on ANOTHER guarded route — the
+    // leave intent must not linger and keep the layout effect passive).
+    await act(async () => {
+      registration.current?.({
+        id: 'emr-visit-43',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+        discard: vi.fn(),
+      });
+    });
+    expect(sentinelMarkerPresent()).toBe(true);
+
+    // Browser Back must open the dialog — not silently unmount the draft.
+    window.history.back();
+    await settleRouter();
+    expect(screen.getByTestId('location')).toHaveTextContent('/doctor/dermatology');
+    expect(screen.getByText('dermatology panel page')).toBeInTheDocument();
+    const backDialog = await screen.findByRole('dialog');
+    expect(backDialog).toBeInTheDocument();
+  });
+
+  it('after a confirmed dirty doctor to lab transition the sentinel re-arms on /lab', async () => {
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+    renderEmrRouteApp({ registration });
+
+    fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
+    await settleRouter('/doctor/dermatology');
+    await registerEmrDraftSource(registration);
+
+    // Confirmed Discard leave doctor → lab (dialog-confirmed, lands guarded).
+    fireEvent.click(screen.getByRole('button', { name: 'to-lab' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Выйти без сохранения' }));
+    await settleRouter('/lab');
+    expect(screen.getByText('laboratory page')).toBeInTheDocument();
+
+    // A dirty lab source registers on /lab: the sentinel must arm again.
+    await registerEmrDraftSource(registration);
+    expect(sentinelMarkerPresent()).toBe(true);
+
+    window.history.back();
+    await settleRouter();
+    expect(screen.getByTestId('location')).toHaveTextContent('/lab');
+    const backDialog = await screen.findByRole('dialog');
+    expect(backDialog).toBeInTheDocument();
   });
 
   it('CommandPalette shell navigations route through the guarded navigator (App passes the guarded navigate prop)', () => {

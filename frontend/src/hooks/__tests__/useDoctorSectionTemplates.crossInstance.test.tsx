@@ -195,3 +195,144 @@ describe('RETRO-3995-02: cross-instance cache generations', () => {
     expect(apiGet).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('RETRO-4014-01: the newest GET fails — a stale success must not read as current', () => {
+  it('a stale completion after a newer FAILED refresh surfaces the failure, never its own OLD payload', async () => {
+    // A starts the slow GET(OLD) — generation 1.
+    const gateOld = deferred<{ data: { templates: Record<string, unknown>[] } }>();
+    apiGet.mockImplementationOnce(() => gateOld.promise);
+    const a = renderTemplatesHook({ section: 'treatment', icd10Code: 'I10' });
+
+    // C (same key) joins, PUTs successfully, and its forced post-PUT
+    // refresh FAILS (503): the catch deletes the shared entry…
+    apiPut.mockResolvedValueOnce({ data: { id: 1, template_text: 'Новый текст' } });
+    apiGet.mockRejectedValueOnce({ message: '503 Service Unavailable' });
+    const c = renderTemplatesHook({ section: 'treatment', icd10Code: 'I10' });
+
+    let updateResult: { success: boolean } | undefined;
+    c.result.current.updateTemplate('1', 'Новый текст', 'replace').then((r) => {
+      updateResult = r as { success: boolean };
+    });
+    await act(async () => {
+      await flush();
+    });
+    expect(updateResult?.success).toBe(true);
+    // C's own forced refresh paints its honest failure (RETRO-3995-03).
+    await waitFor(() => {
+      expect(c.result.current.error).toBe('503 Service Unavailable');
+    });
+
+    // …generation 2 failed LAST, and now A's stale GET succeeds with OLD.
+    await act(async () => {
+      gateOld.resolve({ data: { templates: [tmpl(1, 'Старый текст')] } });
+      await flush();
+    });
+
+    // The stale payload must NOT fall through as a successful current
+    // response: A surfaces the newer generation's failure instead.
+    await waitFor(() => {
+      expect(a.result.current.error).toBe('503 Service Unavailable');
+    });
+    expect(a.result.current.templates).toEqual([]);
+
+    // The shared map holds no stale data: the next ordinary reader issues a
+    // REAL network GET (cache miss) instead of being served OLD.
+    apiGet.mockResolvedValueOnce({ data: { templates: [tmpl(1, 'Свежий текст')] } });
+    const d = renderTemplatesHook({ section: 'treatment', icd10Code: 'I10' });
+    await waitFor(() => {
+      expect(apiGet).toHaveBeenCalledTimes(3);
+    });
+    await waitFor(() => {
+      expect((d.result.current.templates as Record<string, unknown>[])[0]?.template_text).toBe('Свежий текст');
+    });
+    expect((d.result.current.templates as Record<string, unknown>[])[0]?.template_text).not.toBe('Старый текст');
+  });
+
+  it('a pending newer read keeps precedence over the failure tombstone — the stale completion chains onto it', async () => {
+    const gateOld = deferred<{ data: { templates: Record<string, unknown>[] } }>();
+    apiGet.mockImplementationOnce(() => gateOld.promise);
+    const a = renderTemplatesHook({ section: 'complaints', icd10Code: null });
+
+    // C's forced refresh fails (tombstone generation 2, entry deleted)…
+    apiPut.mockResolvedValueOnce({ data: { id: 1, template_text: 'Новый текст' } });
+    apiGet.mockRejectedValueOnce({ message: '503 Service Unavailable' });
+    const c = renderTemplatesHook({ section: 'complaints', icd10Code: null });
+    let updateResult: { success: boolean } | undefined;
+    c.result.current.updateTemplate('1', 'Новый текст', 'replace').then((r) => {
+      updateResult = r as { success: boolean };
+    });
+    await act(async () => {
+      await flush();
+    });
+    expect(updateResult?.success).toBe(true);
+
+    // …and generation 3 (D's ordinary read) is STILL PENDING when A settles.
+    const gateD = deferred<{ data: { templates: Record<string, unknown>[] } }>();
+    apiGet.mockImplementationOnce(() => gateD.promise);
+    const d = renderTemplatesHook({ section: 'complaints', icd10Code: null });
+    await waitFor(() => {
+      expect(apiGet).toHaveBeenCalledTimes(3);
+    });
+
+    // A's stale GET resolves while the newer read is in flight: it must
+    // CHAIN onto generation 3 (pending truth beats the tombstone)…
+    await act(async () => {
+      gateOld.resolve({ data: { templates: [tmpl(1, 'Старый текст')] } });
+      await flush();
+    });
+
+    // …and converge on D's eventual NEW data, not on its own OLD payload.
+    await act(async () => {
+      gateD.resolve({ data: { templates: [tmpl(1, 'Новый текст')] } });
+      await flush();
+    });
+    await waitFor(() => {
+      expect((a.result.current.templates as Record<string, unknown>[])[0]?.template_text).toBe('Новый текст');
+    });
+    expect((d.result.current.templates as Record<string, unknown>[])[0]?.template_text).toBe('Новый текст');
+    expect(a.result.current.error).toBeNull();
+  });
+
+  it('a newer SUCCESS clears the failure tombstone — a late stale responder adopts the newer data', async () => {
+    const gateOld = deferred<{ data: { templates: Record<string, unknown>[] } }>();
+    apiGet.mockImplementationOnce(() => gateOld.promise);
+    const a = renderTemplatesHook({ section: 'anamnesis', icd10Code: 'J45' });
+
+    // Generation 2 (C's forced refresh) fails and leaves the tombstone…
+    apiPut.mockResolvedValueOnce({ data: { id: 1, template_text: 'Новый текст' } });
+    apiGet.mockRejectedValueOnce({ message: '503 Service Unavailable' });
+    const c = renderTemplatesHook({ section: 'anamnesis', icd10Code: 'J45' });
+    let updateResult: { success: boolean } | undefined;
+    c.result.current.updateTemplate('1', 'Новый текст', 'replace').then((r) => {
+      updateResult = r as { success: boolean };
+    });
+    await act(async () => {
+      await flush();
+    });
+    expect(updateResult?.success).toBe(true);
+
+    // …and generation 3 (D's ordinary read) SUCCEEDS: the tombstone must be
+    // cleared and the entry restored with the fresh truth.
+    apiGet.mockResolvedValueOnce({ data: { templates: [tmpl(1, 'Новый текст')] } });
+    const d = renderTemplatesHook({ section: 'anamnesis', icd10Code: 'J45' });
+    await waitFor(() => {
+      expect((d.result.current.templates as Record<string, unknown>[])[0]?.template_text).toBe('Новый текст');
+    });
+
+    // A's stale GET resolves LAST: the shared truth is generation 3's
+    // success — adopt it as ok:true, never fall through to OLD.
+    await act(async () => {
+      gateOld.resolve({ data: { templates: [tmpl(1, 'Старый текст')] } });
+      await flush();
+    });
+    expect((a.result.current.templates as Record<string, unknown>[])[0]?.template_text).toBe('Новый текст');
+    expect(a.result.current.error).toBeNull();
+
+    // The cache serves the fresh truth with no extra traffic.
+    const e = renderTemplatesHook({ section: 'anamnesis', icd10Code: 'J45' });
+    expect(apiGet).toHaveBeenCalledTimes(3);
+    await waitFor(() => {
+      expect((e.result.current.templates as Record<string, unknown>[])[0]?.template_text).toBe('Новый текст');
+    });
+  });
+});

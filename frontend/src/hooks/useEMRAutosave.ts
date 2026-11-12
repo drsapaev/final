@@ -64,6 +64,7 @@ export function useEMRAutosave({
     const maxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastSaveTimeRef = useRef<number | null>(null);
     const pendingSaveRef = useRef(false);
+    const discardedRef = useRef(false);
 
     // audit/phase-1, BS-17: keep latest `doAutosave` in a ref so the
     // maxWait / debounce timers always invoke the CURRENT closure.
@@ -80,6 +81,8 @@ export function useEMRAutosave({
      */
     const canSave = useCallback(() => {
         // Guard conditions - do NOT save if:
+        // RETRO-3971-04 P1: явный Discard — синхронный запрет, не асинхронный GET.
+        if (discardedRef.current) return false;
         if (!isDirty) return false;           // No changes to save
         if (isSaving) return false;           // Already saving
         if (isSigned) return false;           // EMR is signed (readonly)
@@ -275,7 +278,9 @@ export function useEMRAutosave({
     // dispatches (RETRO-3930-01), so a post-unmount resolution cannot
     // touch the unmounted editor's state.
     useEffect(() => () => {
-        doAutosaveRef.current?.();
+        // RETRO-3971-04 P1: явный Discard запрещает и last-chance flush —
+        // сброшенный врачом черновик не должен уйти на сервер из деструктора.
+        if (!discardedRef.current) doAutosaveRef.current?.();
     }, []);
 
     /**
@@ -358,6 +363,16 @@ export function useEMRAutosave({
         }
     }, [clearTimers, canSave, doAutosave]);
 
+    // RETRO-3971-04 P1: явный Discard отличён от принудительного/неконтролируемого
+    // unmount: отменяет ждущие таймеры, сбрасывает pending-флаг и
+    // синхронно запрещает все последующие сейвы этого черновика (включая
+    // деструктор #4009). Обычный unmount продолжает использовать flush.
+    const suppressOnDiscard = useCallback(() => {
+        discardedRef.current = true;
+        pendingSaveRef.current = false;
+        clearTimers();
+    }, [clearTimers]);
+
     /**
      * Reset error count (for manual retry)
      */
@@ -389,6 +404,11 @@ export function useEMRAutosave({
 
         // Clear pending autosave
         cancel: clearTimers,
+
+        // RETRO-3971-04 P1: синхронно подавить все последующие автосейвы
+        // для явного пользовательского Discard (route-level guard диалог);
+        // обычные unmount'ы продолжают использовать flush #4009.
+        suppressOnDiscard,
 
         // Config info (for UI)
         config: {
