@@ -757,7 +757,23 @@ function markRq18Phase(phase: string) {
 }
 
 function createServedAssetRecorder() {
-  type BrowserBodyRead = { ok: true; bytes: Buffer } | { ok: false };
+  type BrowserBodyReadFailure =
+    | 'cdp-body-evicted'
+    | 'cdp-body-unavailable'
+    | 'cdp-resource-unavailable'
+    | 'context-closed'
+    | 'read-failed';
+  type BrowserBodyRead = { ok: true; bytes: Buffer } | { ok: false; reason: BrowserBodyReadFailure };
+
+  const bodyReadFailureCode = (error: unknown): BrowserBodyReadFailure => {
+    const message = error instanceof Error ? error.message : '';
+    if (/was evicted!$/i.test(message)) return 'cdp-body-evicted';
+    if (message === 'Response body is unavailable') return 'cdp-body-unavailable';
+    if (message.includes('No resource with given identifier found')) return 'cdp-resource-unavailable';
+    if (message.includes('Target page, context or browser has been closed')) return 'context-closed';
+    return 'read-failed';
+  };
+
   const capturedAssetHashes = new Map<string, string>();
   const captureFailures = new Map<string, string>();
   const pendingCaptures = new Set<Promise<void>>();
@@ -781,10 +797,19 @@ function createServedAssetRecorder() {
       return { key: url.origin + url.pathname, path: url.pathname };
     };
 
-    // Browser cache can evict a response body before CDP serves a later
-    // Network.getResponseBody call. Route only static assets and continue them
-    // unchanged so this provenance check hashes bytes fetched from this origin.
-    await assetPage.route(/\/(?:assets\/[^?#]+|sw\.js)(?:[?#]|$)/, (route) => route.continue());
+    // Keep the browser's HTTP cache disabled for this Chromium provenance run:
+    // CDP cannot return bodies that Chromium has already evicted from cache.
+    // This changes no request URL, headers, or response and leaves API traffic
+    // un-routed, while ensuring asset bytes are fetched from the staging origin.
+    const browser = assetPage.context().browser();
+    if (browser?.browserType().name() === 'chromium') {
+      const cacheControl = await assetPage.context().newCDPSession(assetPage);
+      await cacheControl.send('Network.enable');
+      await cacheControl.send('Network.setCacheDisabled', { cacheDisabled: true });
+      assetPage.once('close', () => {
+        void cacheControl.detach().catch(() => undefined);
+      });
+    }
 
     const state = {
       activeRequests: new Map<Request, { key: string; path: string }>(),
@@ -810,7 +835,7 @@ function createServedAssetRecorder() {
       // not create unhandled promises or expose browser error text.
       const body = browserResponse.body().then<BrowserBodyRead, BrowserBodyRead>(
         (bytes) => ({ ok: true, bytes }),
-        () => ({ ok: false }),
+        (error: unknown) => ({ ok: false, reason: bodyReadFailureCode(error) }),
       );
       state.responseBodies.set(browserRequest, {
         status: browserResponse.status(),
@@ -837,7 +862,7 @@ function createServedAssetRecorder() {
 
         const result = await responseBody.body;
         if (!result.ok) {
-          captureFailures.set(asset.key, 'browser-response-body-unavailable');
+          captureFailures.set(asset.key, 'browser-response-body-unavailable-' + result.reason);
           return;
         }
 
@@ -878,7 +903,8 @@ function createServedAssetRecorder() {
     const deadline = Date.now() + 30_000;
     while (state.activeRequests.size > 0 || state.pending.size > 0) {
       if (Date.now() >= deadline) {
-        throw new Error('Timed out waiting for browser-served asset bodies to settle.');
+        throw new Error('Timed out waiting for browser-served asset bodies to settle '
+          + '(active=' + state.activeRequests.size + ', bodyReads=' + state.pending.size + ').');
       }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
