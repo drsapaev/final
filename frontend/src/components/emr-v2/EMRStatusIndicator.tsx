@@ -153,9 +153,16 @@ export function EMRStatusIndicator({
         className += ' emr-status-indicator--saving';
     }
 
-    else if (isSigned) {
+    else if (isSigned || isAmended) {
+        // EMRSTATUS-FE-001 (audit 3886, round 30): `amended` is a FINALIZED
+        // state of the same signed document. The flags arrive from useEMR as
+        // mutually exclusive booleans (status === 'signed' | 'amended'), so
+        // the previous nesting of isAmended INSIDE the isSigned branch made
+        // a clean amended record fall through to the ordinary green
+        // "✓ saved" indicator and hide the signed-with-amendments provenance
+        // from the primary status UI.
         content = isAmended ? t('misc.esi_podpisana_s_popravkami') : t('misc.esi_podpisana');
-        tooltip = isSigned && lastSaved
+        tooltip = lastSaved
             ? t('misc.esi_podpisana_formatabsolutetime', { lastSaved: formatAbsoluteTime(lastSaved) })
             : t('misc.esi_dokument_podpisan_i_zaschisc');
         className += ' emr-status-indicator--signed';

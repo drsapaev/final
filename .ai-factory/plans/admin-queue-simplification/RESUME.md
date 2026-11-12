@@ -1,3 +1,288 @@
+## Resume — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged. T18/Tier-2 remains PARTIAL, without a deferral; user owns merge/deployment.
+
+PR #4026 was OPEN / Ready for review / mergeable at tested HEAD 592d327d7053a1031cef157e1c34adbb2e0d978a, base 80a616d16e407362bac16b9b2092e83070676711. Exact-head Unified CI #43098989561 passed: frontend unit, build, lint, E2E and PR Required Gate all PASS. E2E ran 13m22s and completed the enabled groups. CodeQL/Analyze, PR Review Quality Gate, lifecycle, security, Gitleaks, GitGuardian, i18n, Regression Audit and Agent Workflow Guards also PASS. Backend/integration/Docker/staging/production/load/parity/DAST jobs were skipped by scope; they are not passes.
+
+The latest test-source fix is synchronization-only: the deferred EMR assertion waits for the mock dirty callback, and booking reconfirmation waits for submit re-enablement. No application runtime code changed. Local dependency caveats are recorded in the newest EVIDENCE entry.
+
+The user's historical GitGuardian false-positive decision on PR #3946 / commit 169d005f is recorded in comment #6805189423. No dashboard dismissal was available and none is claimed.
+
+Do not start staging yet: the last canonical Preflight measured C: free 9.24 GiB vs 10 GiB required. Full live RQ-18, served artifact provenance, remaining T18 scenarios, and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Keep Tier-2 PARTIAL.
+
+Next exact action: refresh the PR description with the exact-head CI PASS and current journal commit, then wait for the user's merge. After merge, start the next authorized T18 action in a fresh worktree from current origin/main.
+
+## Resume — PR #4026 exact-head CI follow-up — 2026-11-12T01:53:23+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 is PARTIAL. User owns merge/deployment.
+
+PR #4026: OPEN, Ready for review, mergeable. Exact HEAD 9869a837d5eca654db6c9a4834582c20d31d96ca; base/main 80a616d16e407362bac16b9b2092e83070676711 (#4031). Current PR body reflects the head/base and pending CI. Do not merge.
+
+The two synchronization-only test changes target prior hosted failures in deferred EMR discard and booking reconfirmation. Local focused tests and the full booking module passed; the full Dermatologist module was 2/4 under stale shared dependencies. Local build could not start because shared node_modules lacks nitro; no packages were installed. See the newest EVIDENCE entry for exact commands and limitations.
+
+At 2026-11-12T01:53+05:00, Unified CI #43097376662 and 10 other current-head workflows were queued; CodeQL #43097370927 had startup_failure. Inspect its diagnostics and monitor the current-head run list. Do not call CI green while required checks are queued/failed. Prior exact-head checks on 27d0147 are not proof for 9869a837.
+
+The user chose a false-positive disposition for the historical GitGuardian event on PR #3946 / commit 169d005f. Comment #6805189423 is already posted with the synthetic-placeholder rationale. No dashboard dismissal control was available; do not claim a dashboard status change. This is separate from #4026.
+
+Staging remains NOT_RUN. Last canonical Preflight measured C: free 9.24 GiB versus the 10 GiB reserve. Do not start Compose until a fresh canonical Preflight and exact-head artifact availability satisfy the runbook. Full live RQ-18, served frontend provenance, remaining T18 cases and docs/runbooks/STAGING_VALIDATION.md remain unverified; keep Tier-2 PARTIAL and no deferral.
+
+Next: inspect CodeQL startup diagnostics and current-head workflows; resolve any exact-head failures, update journals/PR description with final statuses, then wait for user merge. Continue the plan from fresh origin/main afterward.
+
+## Resume — PR #4026 exact-head CI and false-positive disposition — 2026-11-12T00:21:09+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 is PARTIAL. User owns merge.
+
+PR #4026 is OPEN / Ready for review / mergeable at remote HEAD 27d014751e51c9ae9821d39ddb51b1df9809b623. Fresh origin/main #4030 is ae656f664d3e91f3765a1b5595775a0747e96aa1; its tree is identical to prior main 3f703c1b5c6cbf215614bc45f6d235c3cab06ad8. Local merge candidate is 235855af08ed707fa13f16188f454fb21d6679e2. Finish the three-journal update, run diff checks, commit normally, push, then refresh the PR body to the final SHA and verify all new checks. Do not merge.
+
+Unified CI #43081976007 passed on exact source HEAD 27d0147, including frontend lint/type-check, build, unit, E2E and PR Required Gate. CodeQL, Gitleaks, GitGuardian, Security and Agent Workflow Guards also passed. Backend, integration, Docker, staging/production readiness, parity, load and DAST were skipped by workflow scope. Two PR-body metadata gates passed for an earlier body version; after the latest factual body correction, rerun/read their newly triggered checks before calling the metadata state green.
+
+The user approved classifying the historical GitGuardian signal on merged PR #3946 as false positive. A safe disposition comment (#6805189423) is posted; GitGuardian's bot comment says no secrets remain, and prior review evidence identifies the value as synthetic CI-only Compose placeholders. No GitGuardian dashboard dismissal control was available through the connected interface; do not claim one. Current #4026 GitGuardian check is green. Remove the unrelated #3946 signal note from #4026's body in the final body refresh.
+
+Keep Tier-2 PARTIAL and no deferral. Full live RQ-18/Admin 2FA, byte-level served artifact provenance, remaining T18 scenarios and docs/runbooks/STAGING_VALIDATION.md are NOT_RUN/PARTIAL. Prior canonical Preflight measured C: 9.24 GiB free against the 10 GiB staging build/Session reserve; do not start Compose until fresh Preflight confirms the reserve and exact-head artifact/image availability. No Docker prune or production action.
+
+Next exact action: finish the journal commit/push and final PR-body update; inspect new exact-head checks. After user merge, continue T18 in a fresh worktree from current origin/main.
+
+## Resume — PR #4026 synced to current main; exact-head validation pending — 2026-11-11T23:49:30+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
+
+PR #4026 remote head is 90a93c074193544eaf76753510516ad77dc546c4. The branch is locally synchronized with fresh origin/main 3f703c1b5c6cbf215614bc45f6d235c3cab06ad8 (#4021) in merge candidate 455488c271d147eb20c07222b276e46bafb59a85. Incoming main changes are only the four generated OpenAPI/API type and UI-baseline files; merge had no conflicts. The three-journal update is not yet committed; push, PR body refresh, and exact-head checks remain pending.
+
+Exact-head CI on 90a93c0 passed: Unified CI #43075842982 (frontend unit/build/E2E/lint and PR Required Gate), PR Review Quality Gate #43075843113, Agent Workflow Guards #43075843125, Gitleaks #43075843151, Security #43075842996, and PR Lifecycle Recommendation #43075842956. Backend/integration/Docker/staging-readiness/production-readiness/parity/load checks were skipped by scope. The local 1 MiB streaming-response regression passed 3/3; its no-drain control failed as expected; TypeScript and scoped lint passed (0 errors, 2 existing warnings). Local app build was blocked before compilation by missing nitro in shared dependencies; do not install into C:\final.
+
+A canonical Preflight previously passed on 90a93c0, but runtime_readiness=NOT_RUN and served_revision_verified=false. It found C: free 9.24 GiB against the 10 GiB build/Session reserve, D: 26 GiB free, and WSL available memory 3217 MiB. The exact-head runtime images/artifact were not confirmed; Start/Session were not run. A read-only Docker inventory reported 63 images, 86 volumes and 6.064 GB build cache; no cleanup/prune was performed.
+
+The RQ-18 browser recorder reads asset bytes after requestfinished, drains outstanding assets before goto/reload/back/forward, and waits before closing synthetic QR contexts. Source commits: cbb512e8c84dffff8f0243e269215b9f0cedc8c2 and 1e5787eeb4987f558d54a26b85c70d32683701c5. No application runtime/API/database/auth changes.
+
+Next exact actions: run git diff --check; commit and push the three journal changes plus the main sync; refresh the PR #4026 description to the resulting exact HEAD, green checks, and staging limitation; then inspect all newly triggered exact-head CI and review status. Keep Tier-2 PARTIAL and the PR in Draft until those checks are confirmed. No staging start until a fresh canonical Preflight confirms the required reserve and usable exact-head images/artifact. Merge remains user-owned.
+## Resume — T18 RQ-18 browser recorder — 2026-11-11T23:06:57+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111, based on fresh origin/main 360924867d5364d7fd1cb801891a22f300103d25.
+
+The RQ-18 recorder now reads asset bytes after requestfinished, drains outstanding assets before goto/reload/back/forward document navigation, and waits before closing synthetic QR contexts. Source commits `cbb512e8c84dffff8f0243e269215b9f0cedc8c2` and `1e5787eeb4987f558d54a26b85c70d32683701c5` contain the change. The focused 1 MiB streaming-body regression fails when the navigation drain is bypassed (browser-response-body-unavailable) and passes with the fix (3/3), including a forward-history transition. Targeted TypeScript compile, Playwright discovery and diff checks pass; scoped ESLint reports no errors and two existing warnings at lines 291/310. Local npm run build is blocked before compilation by missing nitro in shared C:\final\frontend\node_modules; do not install into the shared tree.
+
+Current tracked changes: frontend/e2e/rq18-permanent-qr-live.spec.ts and the three T18 journals. Gate gate_known_root_cause was rerun for all four paths; latest result narrow_override, no misroute, override used, handoff required, prompt read. No staging, production, DB, or deployment was run. T18/Tier-2 remains PARTIAL; full RQ-18 live flow, artifact provenance, other T18 cases and STAGING_VALIDATION.md checks remain outstanding.
+
+PR #4026 is open as Draft at exact HEAD `bb60d29e9c8357655a0ee1dc7fdea708e42fcaca`. The PR Review Quality Gate initially failed because labeled Validation fields were missing from the body; the updated body passed its rerun. Unified CI frontend lint/unit/build/E2E were still running at last check; CodeQL was queued. Security, Gitleaks, Agent Workflow Guards, and PR Lifecycle Recommendation passed.
+
+Next exact action: wait for and inspect all exact-head CI results on PR #4026; fix any code failure in this PR. After merge, run canonical Preflight → Start → Session using only a unique synthetic Compose project and the exact-head frontend artifact; record actual results and teardown. Keep the main checkout untouched and preserve unrelated worktrees.
+
+---
+
+## Resume — PR #3946 GitGuardian follow-up — 2026-11-10T00:22:20+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3946 is OPEN, Ready for review, mergeable, and pushed at HEAD `2ca1255fbdd8bf39601ae81ab487476fb31d08ee` on base `origin/main` `929363c66315b2b70229439662e3a92d7b9b1ab8`.
+
+The scoped workflow fix uses per-run Compose values and has a regression assertion. Local checks passed: 296 staging-guard tests, YAML parse, Python compile, Black, `git diff --check`, and PR body template validation. Hosted target validation passed. Unified exact-head checks completed: 34 success, 12 skipped, 1 failure. Backend/frontend unit/E2E, PR Required Gate, Gitleaks, CodeQL, Security Scan, frontend build/lint and target validation passed. The final PR description update passed PR Review Quality Gate. GitGuardian still fails on historical PR commit `169d005f68b07af08c94bda21244196868f2695a`.
+
+The PR description was updated and validated. This latest evidence-only journal update is not yet pushed. The remaining external blocker requires choosing between GitGuardian false-positive disposition and history rewrite. Do not force-push or merge without user authorization. T18/Tier-2 remains PARTIAL; `served_revision_verified` and full `STAGING_VALIDATION.md` acceptance are incomplete.
+
+## Resume — PR #3946 review fixes verified — 2026-11-09T22:52:10+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3946 remains OPEN and unmerged at code HEAD `63834695523542962f2d99d4c189ea2ef6a12841`, based on current main #3959 `562f5e97a2ff452e6dd0810a0359e0ad41b693d0`.
+
+All three review findings are fixed. Hosted target run #42660993022 passed the default runtime and opt-in artifact-runtime builds. Exact-head Unified CI #42660993069 and PR Required Gate succeeded after retrying only failed jobs; the first backend attempt had one unrelated lab-report failure (`Unknown analyte code 'hgb'`) among 6,091 passes, and the retry passed without a source change. PR Review Quality Gate #42662431018 passed after the PR-body Validation fields were labeled exactly as required. The PR body now records the outcomes and skipped checks.
+
+Local focused evidence: staging guard 295 passed, API runtime Vitest 7 passed, scoped ESLint, Black, Python compilation, YAML parsing, diff checks, and local PR-body template validation passed. Local Docker/Compose is unavailable; frontend local build/type-check has the recorded shared `nitro` dependency gap and unrelated Axios mock typing errors. No staging or production services were started. GitGuardian flagged synthetic-only Compose placeholder values; no real account credentials were found in those values, and Gitleaks/Security workflows passed.
+
+T18/Tier-2 remains PARTIAL; full RQ-18 browser response-body provenance, `served_revision_verified`, remaining T18 scenarios, and the full `STAGING_VALIDATION.md` checklist are not complete. No deferral is claimed.
+
+Next exact action: validate and commit/push the current three journal-only updates to the existing PR; update the PR body to the resulting documentation commit and verify the new required checks. Then obtain the independent approval required by repository policy. The user owns merge. Continue T18 after merge in a fresh worktree from current `origin/main`.
+
+---
+
+## Resume — PR #3946 artifact inventory CI correction — 2026-11-09T22:02:44+05:00
+
+Continue the existing #3946 code-review fix in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. Remote HEAD is `09318ded6f718d028d1ab8fa1c8f9ff38a0e371e`; new CI run #42660251143 passed default Compose/runtime build but failed artifact-runtime exact inventory because Nginx's stock `50x.html` remained. A local correction removes default docroot contents before copying the manifest-verified artifact and adds a guard test; this correction and checkpoint are not committed yet.
+
+The P1 port mismatch is addressed by building the hosted artifact with `VITE_API_BASE_URL=same-origin`; the frontend resolves API and notification WebSocket origins from the served page. P2 arbitrary build context is addressed by launcher checks requiring an exact verified artifact beneath the current worktree `.scratch`, plus Docker image checksum/inventory verification. P2 Compose-version compatibility is addressed by moving named build contexts to `ops/compose.staging.artifact.yml`, loaded only for the opt-in artifact target and requiring an explicit context. The ordinary target uses only the base Compose file.
+
+Local evidence after the inventory correction: 295 focused staging-guard tests, 7 API runtime tests, ESLint, Black check, Python compilation, YAML parse, and diff check passed. Hosted #42660251143 confirms the default target build and exposes the artifact inventory mismatch. Local Docker/Compose checks are unavailable. Local frontend type-check failed on missing `nitro` through the shared junction and existing Axios mock type mismatches; full build was not run. No staging project was started. A new exact-head GitHub workflow must confirm both targets after the fix.
+
+Gate context: `gate_known_root_cause`, known root `frontend/Dockerfile.staging`; result `narrow_override`, `gate_misroute=true`, `override_used=true`, handoff required; prompt read. The bounded basis is the user's continued authorization for the existing #3946 scope. No merge or production action is authorized.
+
+Next exact action: commit the targeted Dockerfile/test correction and updated checkpoint, push to the existing PR, then wait for exact-head checks and both target builds. Update the PR description with factual results. Leave merge to the user. T18/Tier-2 remains PARTIAL; the RQ-18 browser asset capture and full staging acceptance are still open.
+
+---
+
+## Current resume — PR #3946 review readiness — 2026-11-09T20:22:16+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3946 was verified OPEN, Ready, and mergeable at HEAD `41977694f825c14e5360af9e358073fbae882ccc`, based on #3957 `6fee1cf957a312970142fd36486b944aaabe6f45`. This snapshot precedes the journal-only reconciliation in this same PR.
+
+Applicable exact-head checks are green, including PR Required Gate and the latest PR Review Quality Gate. Backend, integration, E2E, Docker, readiness, load, and DAST checks are skipped by path/trigger and are not passes. There are no submitted or requested reviews; branch protection requires one independent approval.
+
+The PR changes only the staging artifact build path, its guard test/runbook, and T18 journals. No staging or production services were started in this checkpoint. T18/Tier-2 remains PARTIAL: browser-served RQ-18 asset provenance and full `STAGING_VALIDATION.md` are incomplete; `served_revision_verified=false`; no deferral is claimed.
+
+Next: review the journal diff, commit/push it to #3946, and confirm exact-head checks. Then an independent reviewer must approve and the user merges. After merge, create a fresh worktree from current `origin/main`, run the required gate for the focused RQ-18 response-body recorder correction, and continue the outstanding T18 scenarios and staging checklist.
+
+---
+
+## Previous resume — PR #3946 synced with #3957 — 2026-11-09T19:49:30+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. Local candidate `3339565dbe7eb926cac991ea06fcbf56842b12f5` merges fresh `origin/main` #3957 `6fee1cf957a312970142fd36486b944aaabe6f45` without conflict; the seven-file PR scope is preserved. Python compile, focused staging guard (1 passed, 282 deselected), and diff checks passed. Push and exact-head CI are pending; merge remains user-owned.
+
+T18/Tier-2 remains PARTIAL. RQ-18 asset-body capture and the full `STAGING_VALIDATION.md` checklist are incomplete; `served_revision_verified=false`. No deferral is claimed. The previous remote #3946 head's checks are superseded by this main sync.
+
+Next: commit/push this sync checkpoint and verify exact-head CI. After the user merges #3946, fetch fresh `origin/main`, create a clean worktree, and gate the focused RQ-18 response-body recorder correction.
+
+---
+
+## Previous checkpoint — PR #3946 sync with #3945 — 2026-11-09T18:34:42+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. Local candidate `12cfd0d29b41e667fddbc68b78c60d11cc3c4e2b` merges fresh `origin/main` #3945 `38c929e220246e4c2f748eddc08c25ab7edf1208` without conflict; the PR's seven-path scope is preserved. Python compile, focused guard (1 passed, 282 deselected), and diff checks passed. Gate returned the bounded `narrow_override` and prompt was read. Push and exact-head CI are pending. T18/Tier-2 remains PARTIAL; no deferral. Keep merge user-owned.
+
+The previous remote head `82a60938874a641bf2ce485576b3c4b3acf4cd85` passed all applicable checks, including frontend unit/build/lint, Required Gate, Review Quality Gate, CI Scope, lifecycle, analyzers and security scans. Those results do not yet validate local merge candidate `12cfd0d`; exact-head CI must be rechecked after push. Backend/integration/E2E/Docker/readiness/load/DAST were skipped by path/trigger. Local compile and focused pytest passed; frontend build could not start because the shared node_modules junction lacks `nitro`, and Windows Docker CLI is unavailable.
+
+No formal approval was recorded on the previous remote HEAD; refresh review status after push. T18/Tier-2 remains PARTIAL: RQ-17 targeted current-main scenario passed, while exact RQ-18 asset-body capture and the full `STAGING_VALIDATION.md` checklist remain incomplete; `served_revision_verified=false`. No deferral is claimed. Merge remains user-owned.
+
+Next exact action: commit/push this sync checkpoint and verify exact-head CI. After the user merges #3946, fetch fresh `origin/main`, create a clean isolated worktree, and run the gate for the focused RQ-18 response-body recorder correction.
+
+---
+
+## Previous checkpoint — #3946 synced to #3955 main; local focused guard passed — 2026-11-09T18:05:31+05:00
+
+Continue the umbrella queue-simplification task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 remains OPEN / Ready for review at its last remotely confirmed HEAD `0647b705`; after local sync, current candidate is merge commit `f2e34bf184720fc3b7ae6d8be8dde4c88493820e`, based on fresh `origin/main` #3955 `1d4b1f936bb05cd5f75a1eb35bdb18b153764bf1`. Push is pending; do not merge.
+
+Main #3955 changes only root `package.json` and `package-lock.json`; the existing PR diff still contains exactly the seven staging Docker/Compose, guard test, runbook and T18 journal paths. Local focused guard passed 1/282 (282 deselected); Python compilation and diff check passed. Local frontend build failed before compilation because the worktree dependency junction targets `C:\final\frontend\node_modules`, where `nitro` is missing; no install was attempted. Windows Docker CLI is absent, so Compose config was not rerun; canonical r6 Start already validated the unchanged PR Dockerfile/Compose on source `476c261f`.
+
+The sync gate used the known staging Dockerfile root and exact existing PR scope, but returned `narrow_override`, `gate_misroute=true`, `override_used=true`, with handoff required. The prompt was read. Record this as a bounded scope misroute; no code or dependency edit was made. The #3946 code review summary had no findings at `94a7c45`; later changes were journals only, but no formal approval is recorded. Recheck exact-head CI and PR state after push.
+
+T18/Tier-2 remains PARTIAL. Current-main RQ-17 staging passed 1/1 with normal Admin 2FA and Doctor/QueueResource publication; 3 browser-captured assets matched the 261-file artifact manifest and teardown was clean. The exact RQ-18 recorder still lacks 13 browser response bodies; `served_revision_verified=false`; full runbook and other required T18 checks remain incomplete. No deferral is claimed.
+
+Next: validate the three-file journal diff and scope, commit/push the sync on #3946, refresh its PR body and confirm exact-head checks. Leave merge to the user. After merge, create a fresh worktree from current `origin/main`, run the gate for the focused RQ-18 response-body recorder fix, then continue remaining T18 and `STAGING_VALIDATION.md` items.
+
+---
+
+## Current resume — current-main RQ-17 staging and three-asset match — 2026-11-09T17:35:25+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. T00–T17 are merged. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 remains OPEN / Ready for review at HEAD `ade10c2bf4e6cc0cafc51dbde89df35a26467f13`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; merge remains user-owned.
+
+Hosted artifact run [42615574111](https://github.com/drsapaev/final/actions/runs/42615574111) built exact current-main source `476c261f`; source metadata matched and 261/261 manifest entries verified. One owned synthetic project passed canonical Preflight → Start → Session. The current-source RQ-17 live scenario passed 1/1 with normal Admin 2FA, Doctor and QueueResource setup, explicit publication, and public catalog checks. Three browser-served assets (entry JS, entry CSS, AdminSetupDirections JS) matched the artifact manifest. Session teardown and independent project inventory passed; post-session Preflight passed after a read-only check resolved an initial listener refusal.
+
+T18/Tier-2 remains PARTIAL. The launcher still reports `served_revision_verified=false`; this run matches three required assets only. The exact tracked RQ-18 body-capture failure and remaining T18 scenarios are not closed. Full `docs/runbooks/STAGING_VALIDATION.md` is incomplete; no deferral is claimed.
+
+Only `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` are being updated; no product/runtime, backend/API, DB/auth, test-source, production, or deployment change was made. Validate the diff, commit/push this checkpoint within #3946, update its PR description, and verify exact-head checks. After the user merges #3946, start a fresh isolated worktree from current `origin/main`, gate the focused response-body recorder correction, then rerun exact RQ-18 and complete the remaining T18/runbook checks.
+
+---
+
+## Current resume — #3946 journal correction CI green; recorder race reproduced — 2026-11-09T16:37:28+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. T00–T17 are merged. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Ready for review / mergeable at HEAD `65c4dc0905f74bd65da81585497983b8f0cc600c`, base/current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; merge remains user-owned.
+
+The latest progress journal previously named stale PR HEAD `ab23f1e`; the correction was pushed as commit `94a7c45`. Applicable exact-head CI on `94a7c45` is green, including frontend unit/build/lint, PR Required Gate, PR Review Quality Gate, CodeQL, security, secret scans, and scratch guards. Backend/integration/E2E/Docker/staging-readiness/load checks were skipped by path/trigger and are not claimed as passes. This final journal-only follow-up must be pushed and its exact resulting head/checks verified before merge.
+
+The exact tracked RQ-18 synthetic staging run remains 1 passed / 1 failed: 13 browser response-body reads failed, no actual app JS/CSS hashes were emitted, and `served_revision_verified=false`. Canonical teardown passed. A new local loopback Chromium A/B reproduced `resource-id-missing` if navigation cancels an in-flight response body and succeeded when the body was drained before navigation. This narrows the root cause but is not proof of actual application asset provenance and does not close Tier-2.
+
+Next exact action: user reviews/merges #3946. After merge, fetch fresh `origin/main`, start a clean isolated worktree, run the required gate for a focused RQ-18 recorder fix, add regression coverage for pending body capture across document navigation and public QR context closure, run targeted validation, then rerun the exact RQ-18 spec in the owned synthetic staging Session and continue the remaining T18 / `STAGING_VALIDATION.md` checks. Do not repeat the unchanged staging spec.
+
+The scope-gate result for this journal update was `narrow_override` after a confirmed-root-cause retry; `gate_misroute=false`, `override_used=true`, `handoff_required=true`, and the execution prompt was read. Only the three T18 journals changed. `git diff --check` and normal commit hooks passed. The required local `npm.cmd run build` failed before compilation because the worktree dependency junction points to `C:\final\frontend\node_modules`, where `nitro` is missing; no package install was attempted. GitHub frontend build/unit/lint passed on exact head `94a7c45`. The owned Compose project remains torn down; one task-owned ignored scratch directory remains under local workspace deletion policy.
+
+---
+
+## Current resume — PR #3946 current-main sync and CI pass — 2026-11-09T15:50:04+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. PR #3946 is OPEN / Ready for review at HEAD `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; GitHub reports CLEAN / MERGEABLE.
+
+The branch was synced to current main with no conflicts. The PR diff still contains only the seven staging/runbook/test/T18-journal paths. Exact-head applicable CI passed, including PR Required Gate, PR Review Quality Gate, frontend unit/build/lint, analyzers, security, secret checks, guards, lifecycle, metadata, notifications, GitGuardian and CI Scope. Backend, integration, E2E, Docker, readiness, load and DAST jobs were skipped by scope/trigger. Local focused pytest was NOT_RUN because Windows has no configured Python 3.11+ and Ubuntu lacks pytest; no packages were installed.
+
+Codex's current review summary reports no findings, but there is no formal human review/approval. The lifecycle recommendation requests human review. Leave merge to the user.
+
+T18/Tier-2 remains PARTIAL. Current-main artifact source and all 261 manifest entries matched; canonical Preflight/Start and ordinary Admin/TOTP passed. The exact tracked RQ-18 run had one pass and one failure because 13 browser response bodies were unavailable; no app asset hashes were emitted and `served_revision_verified=false`. Canonical teardown passed. Do not repeat the unchanged test.
+
+Next: user reviews/merges #3946. After merge, create a fresh worktree from current `origin/main`, gate a focused correction to browser response-body capture, then continue the remaining T18 scenarios and all `STAGING_VALIDATION.md` checks. The task-owned Compose project is gone; one ignored scratch directory remains because local workspace policy blocks deletion.
+
+---
+
+## Previous resume — PR #3946 exact-head checks pass — 2026-11-09T15:15:52+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. PR #3946 is OPEN / Ready for review / mergeable at HEAD `6a69d42a352e671a594ee17c2f2768a2de32bacc`, based on current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`.
+
+The earlier PR Review Quality Gate run failed because the PR description omitted required `Red-check handling`; `Result` was present. The correction was pushed, and all applicable exact-head checks on `6a69d42` passed, including PR Required Gate, PR Review Quality Gate, frontend unit/build/lint, security scans, CodeQL, guards, and lifecycle. Backend, integration, frontend E2E, Docker, staging/production readiness, and load checks were skipped by configured scope/trigger, not passed. The updated exact PR body also passed local validation: 19 validator tests, both samples, and the current body.
+
+The current-main artifact r5 result remains unchanged: source `88012cd0a4a7f1de510541b6660a2a85f18baa62` and all 261 manifest checksums matched; canonical Preflight and Start passed; the exact tracked RQ-18 Session had 1 pass and 1 failure because 13 browser response bodies could not be read, so no app asset hashes were emitted and `served_revision_verified=false`. Normal Admin/TOTP and T18.10 passed, canonical teardown passed, and T18/Tier-2 remains PARTIAL. Do not repeat the unchanged test.
+
+Next: wait for the user-owned merge of #3946. After it merges, clean this PR cycle and start a new worktree from fresh `origin/main`; separately gate the browser-body recorder correction and continue remaining T18 plus full `STAGING_VALIDATION.md` checks. No runtime change, production action, or agent merge is part of this checkpoint.
+
+---
+
+## Previous resume — PR #3946 quality-gate correction — 2026-11-09T14:56:05+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. PR #3946 is OPEN / Ready for review / mergeable at HEAD `85eb5f47779f24fb164ce4b763b94cb65e270e1d`, based on current main #3947 `88012cd0a4a7f1de510541b6660a2a85f18baa62`. Applicable exact-head CI passed before these journal updates; rerun after push.
+
+Current-main staging frontend artifact run `42592028425` succeeded on SHA `88012cd0a4a7f1de510541b6660a2a85f18baa62`. Local source marker and all 261 manifest hashes matched. Canonical r5 Preflight and Start passed on own synthetic Compose; ordinary staging frontend artifact path was used, so frontend dependencies were not rebuilt in WSL. The exact tracked RQ-18 file ran in one canonical Session: 1 passed, 1 failed. Normal Admin/TOTP and T18.10 passed; the live lifecycle reached its final phase. The asset recorder then failed on 13 browser response-body reads, emitted no actual app asset hashes, and left served-revision provenance unverified. The final page-error guard did not fail. A separate post-run PowerShell summary bug also made the Session child exit nonzero, but sanitized parsing confirmed the test results. Canonical teardown passed and removed owned r5 resources.
+
+Do not rerun the unchanged exact test. The current blocker is the browser response-body collector, not a confirmed application defect. T18/Tier-2 remains PARTIAL. Finish the three journal updates and PR #3946 description, validate and push, verify exact-head CI, then leave merge to the user. After merge, create a separately gated narrow correction for the response-body collector and continue remaining T18 plus `STAGING_VALIDATION.md` Checks 0–10.
+
+The task-owned ignored `.scratch/t18-memory-safe-staging-20261109` remains because workspace policy previously blocked its deletion. Keep secrets private; do not use an alternate deletion path. No owned r5 Compose resources remain.
+
+---
+
+## Previous resume — r4 artifact PR creation checkpoint — 2026-11-09T13:23:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Draft / mergeable, HEAD `da54660bbe8289b644f91621bb32f847bf551666`, based on current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`.
+
+PR #3946 applicable exact-head CI passed. The PR-description gate also passed locally (19 tests plus both examples and the exact body). Backend/integration/E2E/Docker/staging/production/load checks are skipped by path conditions and are not claimed as passes. The PR body now attributes the exact tracked RQ-18 page-error failure to the earlier artifact/source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the current #3943 artifact has not been exercised by that exact test.
+
+The staging change is seven paths: staging Dockerfile/Compose, one focused guard test, WSL staging runbook, and the three T18 journals. Default frontend build remains unchanged. The owned synthetic r4 Compose project was torn down. The exact tracked RQ-18 browser test has not passed; r4's untracked diagnostic copy is not equivalent, 13 response-body reads failed, five unique assets have no captured hash, and `served_revision_verified=false`. T18/Tier-2 stays PARTIAL.
+
+Next: commit/push the current three-journal CI checkpoint with normal hooks, verify new exact-head checks, then mark #3946 Ready for review. Leave merge to the user. After the user merges it, refresh main in a new worktree and continue with the exact tracked RQ-18 recorder/page-error discrepancy and remaining T18 acceptance. One task-owned ignored `.scratch/t18-memory-safe-staging-20261109` folder remains because local host policy blocked removal; no alternate deletion route was attempted.
+
+## Current resume — PR #3946 Ready; waiting for user merge — 2026-11-09T13:39:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. At the last verification, PR #3946 was OPEN / Ready for review / mergeable at HEAD `535cc03667cf6f3244c38b66d792a839504e5e90`, based on current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`; applicable exact-head checks passed. This checkpoint changes journals only; merge is user-owned.
+
+The change adds an opt-in `artifact-runtime` target for the canonical synthetic staging path. Normal frontend build stays default; artifact source SHA and manifest are verified in-image. One synthetic r4 Session and teardown passed. The exact tracked RQ-18 test still has no complete pass: it failed its final Admin page-error guard on artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`. The diagnostic copy is not equivalent; 13 response-body reads failed, five unique assets lacked a captured hash, and canonical `served_revision_verified=false` remains. Current main #3943's artifact was not tested by that exact run.
+
+T18/Tier-2 remains PARTIAL; no deferral is claimed. After user merges #3946, refresh current main in a new isolated worktree and continue the exact tracked RQ-18 recorder/page-error investigation, then the remaining T18 and `STAGING_VALIDATION.md` checks. Do not merge or deploy from the agent session. One task-owned ignored `.scratch/t18-memory-safe-staging-20261109` folder remains because local policy blocked deletion; the Compose project itself is gone.
+
+# Previous resume — diagnostic r4 Preflight checkpoint (superseded) — 2026-11-09T10:49:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
+
+PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. The feature branch is synchronized with current `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`; the incoming commit changes only two GitHub workflow files, not app sources.
+
+The memory-safe prebuilt frontend target is implemented and its focused test passes. Existing hosted artifact workflow `42563847059` built the exact latest main source; `source.sha` matched and all 261 artifact checksums passed. The artifact is in ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`. The ordinary full frontend build stays the default. Windows lacks Docker CLI; canonical WSL Preflight validated Compose configuration and resources, but Start/Session have not run and no services are up.
+
+The first canonical Session stopped before tests due to a local PowerShell/Node stderr handling mistake; teardown passed. A corrected run on fresh project `clinic-aqs-t18-memory-20261109-r2` ran both RQ-18 tests. T18.10 passed, including normal Admin 2FA and the protected `specialists` delete guard. The main QR flow reached its completion marker but failed the final page-error guard because at least one Admin `pageerror` occurred. The actual browser asset report was not emitted because the guard comes first. Overall RQ-18 is PARTIAL, and served revision provenance remains `NOT_RUN`. Canonical teardown passed and removed r2.
+
+The first failed session's root cause was the harness (conflicting color flags plus native stderr promotion), not the app. In the successful Playwright launch, the test itself failed specifically at its final `pageErrors !== 0` check. The actual page error has not been diagnosed.
+
+The untracked diagnostic copy ran in fresh r3. T18.10 passed, but the RQ-18 test stopped in its asset recorder: 13 JS body reads returned `browser-response-body-unavailable`; the recorder threw before the final page-error guard or actual asset hashes. The one printed hash was from the synthetic probe and is not artifact evidence. Canonical teardown passed and removed r3. The original r2 page-error failure is still unresolved.
+
+The task-local diagnostic copy and wrapper are ready. They keep body-capture failures separate from manifest matches and expose only page-error class, static phase and JS basename/line. PowerShell parsing and `--list` both passed; two tests were discovered and none ran in that check. Tracked application and test sources are unchanged. Canonical Preflight passed for r4 on ports 19004/18082/55445; C: 13 GiB free, WSL backing D: 26 GiB free, WSL memory 3213 MiB.
+
+Superseded: canonical Start and the r4 diagnostic Session completed; see the current resume below and the latest EVIDENCE.md record.
+
+Historical snapshot (superseded): focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; diagnostic `--list` found exactly two RQ-18 tests. The later r4 Session result is recorded in the current EVIDENCE.md entry. No T18 completion claim.
+
+---
+
+# Current resume — r4 diagnostic Session recorded; prepare the staging artifact PR — 2026-11-09T11:23:56+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. After the r4 Session, this branch was synced with current `origin/main` #3943 (`4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`) in merge commit `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`; the incoming change is EMR-only and does not overlap this staging PR. The r4 Session itself used application/artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
+
+The memory-safe `artifact-runtime` path preserves the default full frontend build, verifies `source.sha` and all `SHA256SUMS` entries, and was exercised by canonical Preflight → Start → Session using hosted artifact run `42563847059`. The exact r4 diagnostic project was torn down successfully. Its diagnostic Playwright copy reported 2 passed, but 13 browser response-body reads failed; 63 captured asset hashes matched, while 5 unique paths have no hash. `served_revision_verified=false` remains. The focused staging guard test was rerun after main #3943 sync (1 passed, 282 deselected), and `git diff --check` passed. Do not claim the exact tracked RQ-18 spec or full served-asset provenance passed.
+
+The prior exact tracked spec run failed its final Admin page-error guard; the r4 diagnostic copy passed that guard, so the discrepancy remains unresolved. T18/Tier-2 is PARTIAL. Other open work includes current-source T18.1–5 and T18.8–9 browser acceptance, the full `STAGING_VALIDATION.md` checks, and cross-cutting language, keyboard, viewport, latency, and console review.
+
+Next exact action: commit the final journal checkpoint, push the seven-file staging branch, and open one Draft PR. The local PR review-body gate passed; exact-head GitHub CI remains pending. After it passes, mark the PR Ready for review; the user owns merge. The r4 Compose project is gone, but workspace policy blocked removal of its one task-owned `.scratch/t18-memory-safe-staging-20261109` folder; no bypass was attempted. After merge, fetch fresh `origin/main` and continue with a separate focused correction/validation for the exact RQ-18 browser recorder and unresolved page-error discrepancy. Do not start another Compose cycle just to repeat r4 infrastructure validation.
+
+---
+
+# Previous resume — PR #3937 merged; memory-safe staging path pre-edit — 2026-11-09
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`, based on merged `origin/main` `3a6d0f72dd72191de32c216dbdb145e0e407ae96` (PR #3937).
+
+T00–T17 are merged. T18/Tier-2 remain PARTIAL. The previous T18 Session stopped during the local frontend image build when host free RAM dropped from 1.76 GiB to 0.13 GiB; it produced no complete browser evidence, and its owned Compose resources were cleaned. Do not reuse another worktree's env or scratch.
+
+Current scope is a single staging-only PR: add a checksum-verified prebuilt frontend target to `frontend/Dockerfile.staging` and `ops/compose.staging.yml`, test the opt-in config, document it in `docs/runbooks/WSL_STAGING_SESSION.md`, and update the three T18 journals. Gate `gate_known_root_cause` returned `narrow_override`, no misroute, override used, handoff required; its prompt was read. No local WSL/Compose run has started.
+
+Next exact action: implement the recorded opt-in target. Preserve `runtime` as default. The artifact context is passed from this worktree's ignored `.scratch/`, and the target must fail closed unless `source.sha` equals the requested source revision and every file matches `SHA256SUMS`; remove verification metadata from the served document root. Then run the focused guard test, Python compile, `docker compose config`, and `git diff --check`; open one PR and let the user merge it. Only after merge, fetch fresh main, acquire the hosted artifact for that exact app commit, and run canonical Preflight → Start → one Session with the remaining T18 checks.
+
+Denied: production/deployment, app runtime/backend/API/auth changes, CI workflow or gate/router changes, foreign worktrees/projects, merge by agent, and unapproved file deletion. If artifact verification fails, named build contexts are unsupported, or Preflight rejects memory/storage/ports, stop that staging attempt and keep the affected checks `NOT_RUN`.
+
+---
+
 # Current resume — #3937 synchronized and pushed; T18 still partial — 2026-11-09T02:11:10+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. T00–T17 are merged. PR #3937 is synchronized with current `origin/main` #3941 (`34da7981fe6985c1cc33be127fd3b32fd89c8f6f`) by merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`; the push to PR HEAD `620c3c13313e543f6b290ccd5fa6b2b17971ee59` succeeded. The PR description was refreshed to that base/head. Review #5819382573's two P2 fixes remain in `25d981667a148005f549b102e32b3ffc8470d850`; both threads are resolved. Agent Workflow Guards, Lifecycle Recommendation, corrected PR Review Quality Gate, Security and Gitleaks passed on head `620c3c1`; Unified CI was still in progress at last check. The final candidate type-check, isolated Chromium browser-byte regression (1/1), frontend build and earlier scoped ESLint result are recorded in EVIDENCE; the full RQ-18 synthetic Admin/2FA run is NOT_RUN. Do not treat the isolated regression as full Tier-2.

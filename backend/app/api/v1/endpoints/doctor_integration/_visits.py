@@ -103,13 +103,18 @@ def _find_recent_identical_schedule_next(
     discount_mode: str,
     notes: str | None,
     service_lines: list[tuple[int, int, float]],
+    confirmation_channel: str,
 ) -> Visit | None:
     """DOCSCHED-BE-001: недавний идентичный pending_confirmation визит.
 
     Совпадение полного intent'а: пациент, врач (или его отсутствие), дата,
-    время, каноничный discount_mode, заметки и все строки услуг с их
-    эффективными ценами. Возвращённый визит — основа для replay-ответа;
-    новый визит и токен подтверждения НЕ создаются.
+    время, каноничный discount_mode, заметки, все строки услуг с их
+    эффективными ценами И канал подтверждения (RETRO-3960-01, пост-merge
+    обзор #3968: канал — часть обещания операции; изменённый канал — другой
+    intent, а не replay, иначе replay-ответ объявляет канал, который не
+    хранится и по которому приглашение не отправлялось).
+    Возвращённый визит — основа для replay-ответа; новый визит и токен
+    подтверждения НЕ создаются.
     """
     cutoff = datetime.now(UTC) - timedelta(seconds=_SCHEDULE_NEXT_DEDUP_WINDOW_SECONDS)
     query = (
@@ -131,6 +136,11 @@ def _find_recent_identical_schedule_next(
         if (candidate.visit_time or None) != (visit_time or None):
             continue
         if (candidate.notes or None) != (notes or None):
+            continue
+        # RETRO-3960-01: канал подтверждения — часть intent'а. Replay
+        # возможен только для того же канала, что сохранён в визите, чтобы
+        # confirmation.channel ответа всегда совпадал с persisted-каналом.
+        if (candidate.confirmation_channel or None) != (confirmation_channel or None):
             continue
         stored_lines = (
             db.query(VisitService)
@@ -378,6 +388,7 @@ async def schedule_next_visit(
             discount_mode=normalized_discount_mode,
             notes=request.notes,
             service_lines=intended_lines,
+            confirmation_channel=request.confirmation_channel,
         )
         if replay_visit is not None:
             stored_lines = (
@@ -397,6 +408,8 @@ async def schedule_next_visit(
                 # Приглашение уже отправлено исходным запросом (результат
                 # недоступен replay'у) — не заявляем доставку, которой не
                 # видели, и не спамим пациента повторной отправкой.
+                # RETRO-3960-01: replay бывает только при равенстве канала,
+                # поэтому заявленный channel == каналу сохранённого визита.
                 notification_sent=False,
             )
             return ScheduleNextVisitResponse(

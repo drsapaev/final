@@ -28060,17 +28060,24 @@
           "board"
         ],
         "summary": "Состояние очереди для табло",
-        "description": "Return the legacy board stats snapshot.\n\nThe board state endpoint is intentionally public: it only exposes\naggregate counters (``last_ticket``/``waiting``/``serving``/``done``)\nand the day's open/start-number flags. It must NOT leak live queue\nentries, current calls, or announcements — those are owned by the\ndisplay board WebSocket initial_state/update stream, which is\nseparately authenticated. Keeping this REST endpoint public lets the\nstats-only contract be verified without auth headers.",
+        "description": "Return the legacy board stats snapshot plus board-scoped settings.\n\nThe board state endpoint is intentionally public: it only exposes\naggregate counters (``last_ticket``/``waiting``/``serving``/``done``)\nand non-PHI presentation settings. It must NOT leak live queue\nentries, current calls, or announcements — those are owned by the\ndisplay board WebSocket initial_state/update stream, which is\nseparately authenticated. Keeping this REST endpoint public lets the\nstats-only contract be verified without auth headers.\n\nDISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is\nboard-scoped — an optional ``board`` name selects THAT board's row\n(a missing board is an honest 404) instead of always ``main_board``;\nthe privacy setting of the selected board must not be replaced by\nthe main board's.\n\nDISPLAYOPTIONS-FE-001 (audit PR #3961): the response additionally\nexposes the selected board's non-PHI presentation fields\n(``queue_display_count``/``show_announcements``/``voice_announcements``\n/``sound_enabled``) so the live TV screen can apply what the admin\nsaved.\n\nDISPLAYDEPT-FE-001 (audit PR #3961): ``department`` is now optional —\na public board route without a configured department (multi-\ndepartment kiosk) suppresses the legacy counters honestly\n(``stats_available: false``) instead of inferring them from literal\n``undefined`` URL text.",
         "operationId": "board_state_api_v1_board_state_get",
         "parameters": [
           {
             "name": "department",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Department"
             }
           },
@@ -28084,6 +28091,23 @@
               "title": "Date"
             },
             "description": "YYYY-MM-DD"
+          },
+          {
+            "name": "board",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Board"
+            }
           }
         ],
         "responses": {
@@ -68562,7 +68586,7 @@
           "queue-position"
         ],
         "summary": "Get Queue Positions Stats",
-        "description": "Получить статистику позиций в очереди\n\nВозвращает список всех записей с их позициями.",
+        "description": "Получить статистику позиций в очереди\n\nВозвращает список всех записей с их позициями.\n\nДоступно: Admin, Registrar, Doctor (и SuperAdmin).",
         "operationId": "get_queue_positions_stats_api_v1_queue_position_stats_queue__queue_id__get",
         "security": [
           {

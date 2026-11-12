@@ -96,6 +96,10 @@ interface Announcement {
   created_at?: string;
   announcement_type?: string;
   text?: string;
+  // DISPLAYANNOUNCE-FE-001 (audit PR #3961): backend-owned expiry
+  // (display_duration seconds) — the notice must leave the TV when the
+  // requested window passes, not stay for the whole session.
+  expires_at?: number;
 }
 
 interface WindowItem {
@@ -110,6 +114,9 @@ interface BoardSettingsState {
   soundEnabled: boolean;
   voiceEnabled: boolean;
   displayCount: number;
+  // DISPLAYOPTIONS-FE-001 (audit PR #3961): show_announcements табло
+  // управляет показом блока объявлений на живом экране.
+  showAnnouncements: boolean;
   contrastMode: boolean;
   kioskMode: boolean;
   fontScale: number;
@@ -191,9 +198,19 @@ export default function DisplayBoardUnified({
   // Параметры из URL или пропсов
   // PR #1910 bugfix: department destructured as departmentProp, но использовался
   // как department — ReferenceError. Возвращаем корректное имя.
-  const department = departmentProp;
+  // DISPLAYDEPT-FE-001 (audit PR #3961): публичный роут /display-board не
+  // имеет department-пропа — литеральная строка "undefined" больше не
+  // уходит в REST-статистику как ключ отдела; без валидного отдела
+  // статистика подавляется (backend stats_available=false).
+  const department = (() => {
+    const raw = typeof departmentProp === 'string' ? departmentProp.trim() : '';
+    if (!raw || raw.toLowerCase() === 'undefined' || raw.toLowerCase() === 'null') {
+      return undefined;
+    }
+    return raw;
+  })();
   const qs = useMemo(
-    () => ({ department: String(department).trim(), d: String(dateStr).trim() }),
+    () => ({ department, d: String(dateStr).trim() }),
     [department, dateStr]
   );
 
@@ -234,12 +251,16 @@ export default function DisplayBoardUnified({
   const [windows, setWindows] = useState<WindowItem[]>([]);
 
   // Настройки (объединенные)
+  // DISPLAYAUDIO-FE-001 (audit PR #3961): явный soundInitial=false
+  // применяется на первом рендере — дефолт true только когда проп
+  // не задан.
   const [boardSettings, setBoardSettings] = useState<BoardSettingsState>({
     theme: 'light',
     showPatientNames: 'initials',
-    soundEnabled: true,
+    soundEnabled: soundInitial === undefined ? true : soundInitial,
     voiceEnabled: false,
     displayCount: 5,
+    showAnnouncements: true,
     contrastMode: contrast,
     kioskMode: kiosk,
     fontScale: fontScale,
@@ -255,12 +276,42 @@ export default function DisplayBoardUnified({
   const lastTicketRef = useRef(0);
   const [online, setOnline] = useState(true);
 
+  // DISPLAYAUDIO-FE-001 (audit PR #3961): сессионное ручное решение звука.
+  // Пока оператор не трогал кнопку мьюта, применяется бэкенд-дефолт;
+  // после ручного мьюта/включения опрос НЕ перезатирает выбор.
+  const soundOverrideRef = useRef<boolean | null>(
+    soundInitial === undefined ? null : soundInitial
+  );
+  // DISPLAYCALL-FE-001 (audit PR #3961): таймер истечения подсветки вызова
+  // (display_duration секунд из payload, бэкенд-владелец решения).
+  const callExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearCallExpiry = () => {
+    if (callExpiryRef.current !== null) {
+      clearTimeout(callExpiryRef.current);
+      callExpiryRef.current = null;
+    }
+  };
+  // DISPLAYANNOUNCE-FE-001 (audit PR #3961): независимые таймеры
+  // истечения объявлений (display_duration секунд каждое).
+  const announceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const clearAnnounceTimers = () => {
+    announceTimersRef.current.forEach((timer) => clearTimeout(timer));
+    announceTimersRef.current.clear();
+  };
+  // DISPLAYERROR-FE-001 (audit PR #3961): ошибка снапшота initial_state —
+  // честный видимый баннер вместо маскировки под пустую живую очередь;
+  // последние корректные строки сохраняются (не затираются пустым payload).
+  const [snapshotError, setSnapshotError] = useState('');
+
   // Получаем board_id из URL или используем переданный
   const currentBoardId = new URLSearchParams(window.location.search).get('board') || boardId;
   const isBoardView = window.location.pathname.startsWith('/queue-board') || window.location.pathname.startsWith('/display-board');
 
   // /board/state is a stats/settings snapshot; live rows/calls/announcements come from WebSocket initial_state.
-  async function loadBoardState() {setErr('');try {const st = (await api.get('/board/state', { params: { department: qs.department, date: qs.d } })).data as Record<string, unknown> | undefined;if (st && typeof st === 'object') {
+  // DISPLAYDEPT-FE-001: department уходит в params только когда валиден —
+  // литеральный "undefined" не отправляется; DISPLAYCONFIG-FE-001:
+  // снапшот настроек запрашивается для ТЕКУЩЕГО табло (board=...).
+  async function loadBoardState() {setErr('');try {const st = (await api.get('/board/state', { params: { date: qs.d, ...(qs.department ? { department: qs.department } : {}), board: currentBoardId } })).data as Record<string, unknown> | undefined;if (st && typeof st === 'object') {
         setStats(extractBoardStats(st));
         setBoard({
           brand: String(st.brand ?? st.title ?? 'Clinic'),
@@ -278,15 +329,37 @@ export default function DisplayBoardUnified({
           kiosk_default: !!st.kiosk_default,
           sound_default: st.sound_default !== false
         });
-        if (soundInitial === undefined && typeof st.sound_default !== 'undefined') {
+        // DISPLAYAUDIO-FE-001: бэкенд-дефолт применяется, пока оператор
+        // не сделал ручной выбор в этой сессии (иначе мьют переживает опрос).
+        if (
+          soundInitial === undefined &&
+          soundOverrideRef.current === null &&
+          typeof st.sound_default !== 'undefined'
+        ) {
           setBoardSettings((prev) => ({ ...prev, soundEnabled: st.sound_default !== false }));
         }
         // RQ-24.a.1: sync the board privacy setting (full/initials/none)
+        // DISPLAYCONFIG-FE-001: значение ТЕКУЩЕГО табло (/board/state?board=),
+        // а не main_board.
         if (typeof st.show_patient_names === 'string') {
           const fmt = st.show_patient_names;
           if (fmt === 'none' || fmt === 'initials' || fmt === 'full') {
             setBoardSettings((prev) => ({ ...prev, showPatientNames: fmt }));
           }
+        }
+        // DISPLAYOPTIONS-FE-001: сохранённые админом настройки показа
+        // применяются живым экраном (непубличные поля не затрагиваются).
+        if (typeof st.queue_display_count === 'number' && st.queue_display_count >= 1) {
+          const count = Math.min(Math.floor(st.queue_display_count), 20);
+          setBoardSettings((prev) => ({ ...prev, displayCount: count }));
+        }
+        if (typeof st.voice_announcements === 'boolean') {
+          const voiceAnnouncements = st.voice_announcements as boolean;
+          setBoardSettings((prev) => ({ ...prev, voiceEnabled: voiceAnnouncements }));
+        }
+        if (typeof st.show_announcements === 'boolean') {
+          const showAnnouncements = st.show_announcements as boolean;
+          setBoardSettings((prev) => ({ ...prev, showAnnouncements }));
         }
         try {localStorage.setItem('board.state', JSON.stringify(st));} catch {
 
@@ -371,20 +444,50 @@ export default function DisplayBoardUnified({
     switch (message.type) {
       case 'initial_state': {
         const data = message.data || {};
+        // DISPLAYERROR-FE-001 (audit PR #3961): сбой снапшота бэкенда
+        // приходит как initial_state с data.error и пустыми строками —
+        // это НЕ «живая пустая очередь». Показываем видимый баннер,
+        // последние корректные строки сохраняем (не затираем), повтор
+        // — кнопка Retry / авто-реконнект WS.
+        if (typeof data.error === 'string' && data.error.trim()) {
+          setSnapshotError(data.error);
+          break;
+        }
+        setSnapshotError('');
         setQueueData(Array.isArray(data.queue_entries) ? data.queue_entries : []);
         setCurrentCall(data.current_call ?? null);
-        setAnnouncements(Array.isArray(data.announcements) ? data.announcements : []);
+        setAnnouncements(
+          (Array.isArray(data.announcements) ? data.announcements : []).map(
+            (item: Announcement) => ({
+              ...item,
+              expires_at: undefined,
+            })
+          )
+        );
         break;
       }
 
-      case 'patient_call':
+      case 'patient_call': {
+        // DISPLAYCALL-FE-001 (audit PR #3961): подсветка последнего вызова
+        // истекает по display_duration из payload (бэкенд-контракт, 30с
+        // по умолчанию) — больше не «навсегда» до следующего вызова.
         setCurrentCall(message.data);
+        clearCallExpiry();
+        const durationSeconds = Number(message.data?.display_duration ?? 30);
+        if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+          callExpiryRef.current = setTimeout(() => {
+            setCurrentCall(null);
+            callExpiryRef.current = null;
+          }, durationSeconds * 1000);
+        }
         if (boardSettings.soundEnabled) {
           playCallSound(message);
         }
         break;
+      }
 
       case 'call_completed':
+        clearCallExpiry();
         setCurrentCall(null);
         break;
 
@@ -427,7 +530,8 @@ export default function DisplayBoardUnified({
           // waiting/called (бэкенд _send_current_state фильтрует так же),
           // поэтому completed/cancelled/no-show строки из per-queue сабсета
           // на борд не возвращаются.
-          const scopedEntries = (Array.isArray(data.queue_entries) ? data.queue_entries : [])
+          const rawEntries = Array.isArray(data.queue_entries) ? data.queue_entries : [];
+          const scopedEntries = rawEntries
             .filter((entry) => entry.status === 'waiting' || entry.status === 'called')
             .map((entry) => ({
               ...entry,
@@ -436,6 +540,28 @@ export default function DisplayBoardUnified({
               specialty: entry.specialty ?? queueSpecialty,
               cabinet: entry.cabinet ?? queueCabinet,
             }));
+          // DISPLAYCALL-FE-001 (audit PR #3961): реальный жизненный цикл
+          // вызова приходит как queue_update — если вызванная строка ушла
+          // в терминальный статус (served/completed/no_show/cancelled),
+          // подсветка последнего вызова гаснет, а не висит до следующего.
+          // Проверка по СЫРОМУ payload (терминальные строки отфильтрованы
+          // из read-model) и функциональный setCurrentCall: WS-хэндлер
+          // держит замыкание на момент подключения, prev-состояние в
+          // updater — единственный честный источник.
+          const terminalStatuses = ['served', 'completed', 'no_show', 'cancelled'];
+          const terminalNumbers = new Set(
+            rawEntries
+              .filter((entry) => terminalStatuses.includes(String(entry.status)))
+              .map((entry) => String(entry.number))
+          );
+          if (terminalNumbers.size > 0) {
+            clearCallExpiry();
+            setCurrentCall((prev) =>
+              prev && terminalNumbers.has(String(prev.queue_number ?? ''))
+                ? null
+                : prev
+            );
+          }
           setQueueData((prev) => {
             if (eventQueueId === undefined) {
               // Защита от дрифта контракта (старый бэкенд без queue_id):
@@ -460,12 +586,31 @@ export default function DisplayBoardUnified({
       }
 
       case 'announcement': {
+        // DISPLAYANNOUNCE-FE-001 (audit PR #3961): display_duration из
+        // payload — каждое объявление живёт запрошенное окно и исчезает
+        // без зависимости от новых событий (раньше оставалось навсегда).
+        const durationSeconds = Number(message.data?.display_duration ?? 0);
+        const announcementKey =
+          typeof message.data?.created_at === 'string'
+            ? message.data.created_at
+            : `announce-${Date.now()}-${Math.random()}`;
         const newAnnouncement: Announcement = {
-          created_at: typeof message.data?.created_at === 'string' ? message.data.created_at : undefined,
+          created_at: announcementKey,
           announcement_type: typeof message.data?.announcement_type === 'string' ? message.data.announcement_type : undefined,
           text: typeof message.data?.text === 'string' ? message.data.text : undefined,
+          expires_at:
+            Number.isFinite(durationSeconds) && durationSeconds > 0
+              ? Date.now() + durationSeconds * 1000
+              : undefined,
         };
         setAnnouncements((prev) => [newAnnouncement, ...prev.slice(0, 4)]);
+        if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+          const timer = setTimeout(() => {
+            setAnnouncements((prev) => prev.filter((a) => a !== newAnnouncement));
+            announceTimersRef.current.delete(announcementKey);
+          }, durationSeconds * 1000);
+          announceTimersRef.current.set(announcementKey, timer);
+        }
         if (boardSettings.soundEnabled) {
           playAnnouncementSound(message);
         }
@@ -613,6 +758,8 @@ export default function DisplayBoardUnified({
       if (tb) clearInterval(tb);
       if (tw) clearInterval(tw);
       clearInterval(clock);
+      clearCallExpiry();
+      clearAnnounceTimers();
       if (wsRef.current) {
         const closeWS = wsRef.current;
         wsRef.current = null;
@@ -649,8 +796,13 @@ export default function DisplayBoardUnified({
   };
 
   // Переключение звука (объединенное)
+  // DISPLAYAUDIO-FE-001: ручное решение живёт в ref — опрос /board/state
+  // больше не перезатирает мьют оператора бэкенд-дефолтом.
   const toggleSound = () => {
-    setBoardSettings((prev) => ({ ...prev, soundEnabled: !prev.soundEnabled }));
+    setBoardSettings((prev) => {
+      soundOverrideRef.current = !prev.soundEnabled;
+      return { ...prev, soundEnabled: !prev.soundEnabled };
+    });
   };
 
   // Переключение контрастного режима (старое)
@@ -874,6 +1026,22 @@ export default function DisplayBoardUnified({
         </div>
       }
 
+      {/* DISPLAYERROR-FE-001: сбой снапшота бэкенда виден как ошибка, а не
+          как «живая пустая очередь»; последние строки сохранены. */}
+      {snapshotError &&
+      <div className="displayboard-banner displayboard-banner--danger" data-testid="dbu-snapshot-error">
+          <span>⚠ {snapshotError}</span>
+          <button
+            type="button"
+            className="displayboard-banner-retry"
+            data-testid="dbu-snapshot-retry"
+            aria-label="Retry"
+            onClick={() => connectWebSocketRef.current()}>
+            ⟳
+          </button>
+        </div>
+      }
+
       {board.is_closed &&
       <div className="displayboard-banner displayboard-banner--danger">
           {tBoard('closed', boardSettings.language)}
@@ -920,8 +1088,9 @@ export default function DisplayBoardUnified({
         }
       </div>
 
-      {/* Объявления */}
-      {announcements.length > 0 &&
+      {/* Объявления: DISPLAYOPTIONS-FE-001 — show_announcements табло
+          управляет показом; DISPLAYANNOUNCE-FE-001 — истёкшие уходят. */}
+      {boardSettings.showAnnouncements && announcements.length > 0 &&
       <div className="displayboard-announcements-wrap">
           {announcements.map((announcement) =>
         <div

@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import logging
 from collections.abc import Awaitable, Callable
 
@@ -117,12 +118,43 @@ class NotificationWebSocketManager:
         elif loop.is_running():
             loop.call_soon_threadsafe(_start)
 
+    def _prune_failed_connection(self, connection: WebSocket, user_id: int) -> None:
+        """Discard a failed socket on its owning loop, retaining healthy peers."""
+
+        def _remove() -> None:
+            if connection in self.active_connections.get(user_id, []):
+                # Use canonical disconnect: it releases Redis when the last
+                # user socket is removed.
+                self.disconnect(connection, user_id)
+
+        home_loop = self._connection_loops.get(id(connection))
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        if (
+            home_loop is not None
+            and current_loop is not home_loop
+            and home_loop.is_running()
+            and not home_loop.is_closed()
+        ):
+            try:
+                home_loop.call_soon_threadsafe(_remove)
+                return
+            except RuntimeError:
+                # Home loop closed between checks.
+                pass
+        _remove()
+
     async def _send_json_local(self, data: dict, user_id: int) -> None:
         # Iterate over a copy in case disconnect modifies the list.
         for connection in self.active_connections.get(user_id, [])[:]:
             try:
                 send_coro = connection.send_json(data)
-                if self._schedule_if_foreign_loop(connection, send_coro):
+                if self._schedule_if_foreign_loop(
+                    connection, send_coro, user_id=user_id
+                ):
                     continue
                 await send_coro
             except Exception as exc:
@@ -131,11 +163,12 @@ class NotificationWebSocketManager:
                     user_id,
                     type(exc).__name__,
                 )
+                self._prune_failed_connection(connection, user_id)
 
-    def _schedule_if_foreign_loop(self, connection: WebSocket, coro) -> bool:
-        """Run ``coro`` on the connection's home loop when the caller is on a
-        different loop (worker thread). Fire-and-forget: delivery errors are
-        logged. Returns True when the send was marshalled away."""
+    def _schedule_if_foreign_loop(
+        self, connection: WebSocket, coro, *, user_id: int | None = None
+    ) -> bool:
+        """Schedule a send on its home loop, pruning failed JSON recipients."""
         home_loop = self._connection_loops.get(id(connection))
         try:
             current_loop = asyncio.get_running_loop()
@@ -144,12 +177,34 @@ class NotificationWebSocketManager:
         if home_loop is None or current_loop is home_loop:
             return False
 
-        fut = asyncio.run_coroutine_threadsafe(coro, home_loop)
+        if home_loop.is_closed() or not home_loop.is_running():
+            coro.close()  # No event loop will await the new coroutine.
+            logger.warning("Notification WebSocket home loop unavailable")
+            if user_id is not None:
+                self._prune_failed_connection(connection, user_id)
+            return True
+
+        try:
+            fut = asyncio.run_coroutine_threadsafe(coro, home_loop)
+        except RuntimeError:
+            coro.close()
+            logger.warning("Notification WebSocket cross-loop schedule failed")
+            if user_id is not None:
+                self._prune_failed_connection(connection, user_id)
+            return True
 
         def _log_error(done) -> None:
-            exc = done.exception()
+            try:
+                exc = done.exception()
+            except concurrent.futures.CancelledError:
+                exc = RuntimeError("WebSocket send was cancelled")
             if exc is not None:
-                logger.error(f"Cross-loop WebSocket delivery failed: {exc}")
+                logger.error(
+                    "Cross-loop WebSocket delivery failed: %s",
+                    type(exc).__name__,
+                )
+                if user_id is not None:
+                    self._prune_failed_connection(connection, user_id)
 
         fut.add_done_callback(_log_error)
         return True
