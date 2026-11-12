@@ -1,3 +1,17 @@
+## T18 — PR #4034 source-head CI completed — 2026-11-12T09:27:43+05:00
+
+- Commit under test: `a744496951854ac1af6013cf1d643746c8fbc3c3`; RQ-18 source change is commit `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8`, unchanged in this evidence-only follow-up. Base: `9091141b87170fcc4430e7ca57ac4ecd9a3d2081`.
+- Environment: GitHub Actions on PR #4034. No local staging, Compose, production, or deployment.
+- Unified CI: run #43152783047 SUCCESS. Frontend build; frontend unit; frontend lint/type-check, generated API freshness, config check and type-debt gates; frontend E2E spec type-check; Registrar time, UX/visual, Lab dirty-guard, Lab full-path, Business/Security/Concurrency, Load/Chaos groups; and PR Required Gate all PASS. Visual snapshot update was SKIPPED as manual-only.
+- Other checks: security scan #43152782977 PASS; Gitleaks #43152783083 PASS; Agent Workflow Guards #43152783048 PASS; PR Review Quality Gate #43153005794 PASS; PR Lifecycle Recommendation #43153005803 PASS.
+- Review-gate correction: initial Quality Gate #43152783070 failed because the PR body omitted required `Targeted tests or smoke run`, `Result`, and `Not checked` answers. Updated the description; rerun #43153005794 passed. The initial run is retained as an addressed metadata failure, not a current blocker.
+- Skipped, not passed: backend, integration, Docker build, staging/production readiness, frontend/backend parity, k6, DAST, documentation generation and unrelated path-aware jobs. Full live RQ-18/T18 staging was NOT_RUN.
+- Result: source-head checks PASS on `a744496`; the PR remains OPEN / Draft. This check does not prove browser-served revision provenance or complete Tier-2 acceptance.
+- Scope: PR #4034 remains a test/evidence-only change; no product runtime/API/DB/auth, staging, production, or deployment changes.
+- Remaining limitation: T18/Tier-2 remains PARTIAL; no deferral accepted.
+- PR: [#4034](https://github.com/drsapaev/final/pull/4034), user retains merge authority.
+- Merge commit: none.
+
 ## T18 — RQ-18 duplicate asset request failure regression — 2026-11-12T09:07:06+05:00
 
 - Commit under test: `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8`; exact source content was locally tested before commit and did not change afterward. Base: `9091141b87170fcc4430e7ca57ac4ecd9a3d2081` (`origin/main`, PR #4026 merge).

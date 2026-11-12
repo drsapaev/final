@@ -1,3 +1,13 @@
+## Current checkpoint — PR #4034 source checks pass — 2026-11-12T09:27:43+05:00
+
+- Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL. User owns merge/deployment.
+- PR #4034 is OPEN / Draft. Source commit `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8` is included in branch HEAD `a744496951854ac1af6013cf1d643746c8fbc3c3`, based on PR #4026 merge `9091141b87170fcc4430e7ca57ac4ecd9a3d2081`.
+- Exact-head Unified CI #43152783047 completed SUCCESS: frontend unit, build, lint/type-check, configured E2E groups and PR Required Gate passed. Security, Gitleaks and Agent Workflow Guards passed. PR Review Quality Gate #43153005794 and Lifecycle Recommendation #43153005803 passed after the PR body was corrected; the first Quality Gate run failed only because three required validation labels were missing.
+- Skipped checks are not passes: backend, integration, Docker, staging/production readiness, frontend/backend parity, load/k6, DAST and path-irrelevant jobs. The RQ-18 live staging scenario was not run.
+- This checkpoint records the exact-head CI result for source-tested commit `a744496`; these journal additions do not change the E2E source. Local full type-check/build remain unavailable with shared dependencies missing `nitro`; no packages installed.
+- The latest hosted CI still does not complete full T18. Keep Tier-2 PARTIAL and no deferral. No staging/Compose was run.
+- Next: after this evidence-only update is pushed, verify the resulting PR HEAD and its checks, refresh the PR description, then mark #4034 Ready for review if applicable checks are green. User owns merge.
+
 ## Current checkpoint — PR #4034 opened for RQ-18 asset failure regression — 2026-11-12T09:07:06+05:00
 
 - Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`: T00–T17 are merged; T18/Tier-2 remains PARTIAL. User owns merge/deployment.
