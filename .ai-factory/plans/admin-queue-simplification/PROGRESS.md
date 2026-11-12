@@ -1,3 +1,13 @@
+## Current checkpoint — PR #4034 P2 fixed; exact-head checks pass — 2026-11-12T20:59:22+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4026 is merged. The duplicate browser asset failure P2 is fixed in follow-up PR #4034.
+- Worktree branch codex/aqs-t18-rq18-failure-20261112; verified current base origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27; source PR HEAD 8b4e58d3f13b091d3fe0aa19275e40801c649851. The fix ensures a failed duplicate request cannot be hidden by a prior hash; only CDP-proven superseded main-frame navigation aborts are ignored.
+- Local checks: duplicate-failure regression PASS 1/1; provenance group PASS 12/12 across three repetitions; scoped ESLint 0 errors/2 existing warnings; isolated PatientBookingPage.test.tsx PASS 18/18; diff check PASS.
+- Hosted exact-head CI attempt 1 had a failure in PatientBookingPage.test.tsx; attempt 2 passed at the same SHA. Frontend unit/E2E/lint/build, CI Scope and PR Required Gate PASS; Review Quality Gate, Lifecycle Recommendation, security, Gitleaks, GitGuardian and CodeQL PASS. Path-skipped backend/integration/Docker/parity/readiness/load/DAST jobs are not passes.
+- Current-main synthetic staging failed at compose-up and was torn down without browser checks. Earlier cdp6 live evidence uses artifact source c586346f; served_revision_verified=false; full T18 remains PARTIAL.
+- PR body now reflects current base, HEAD, CI retry, and staging limitation. PR #4034 is OPEN / Ready for review / mergeState CLEAN; no independent approval or merge. Next step: await required independent review or user merge decision; do not deploy.
+
 ## Current checkpoint — PR #4034 rebased on current main; exact-head CI pending — 2026-11-12T20:25:12+05:00
 
 - Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.

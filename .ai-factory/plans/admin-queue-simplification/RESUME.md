@@ -1,3 +1,13 @@
+## Resume — PR #4034 P2 fix and exact-head CI complete — 2026-11-12T20:59:22+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.
+
+PR #4026 is merged; its P2 is addressed in PR #4034 at HEAD 8b4e58d3f13b091d3fe0aa19275e40801c649851, based on main d3ea3fdc82339b97ed484e7a2a2d649887763a27. Local duplicate-failure regression passed 1/1, full provenance group 12/12, scoped ESLint had zero errors, and isolated PatientBookingPage.test.tsx passed 18/18.
+
+Unified CI #43247800937 attempt 2 passed on the exact HEAD after attempt 1 failed in the unrelated PatientBookingPage unit file. Frontend unit/E2E/lint/build and PR Required Gate passed; quality/lifecycle/security gates passed. Skipped backend/integration/Docker/readiness jobs are not passes. PR body was updated with these results and the Tier-2 limitation.
+
+The latest current-main synthetic staging Session failed at compose-up, teardown passed, and no browser checks ran. The prior cdp6 live pass used an older artifact. served_revision_verified remains false and full T18/Tier-2 remains PARTIAL. PR is OPEN, Ready for review, mergeable clean at last check. User owns approval/merge/deploy.
+
 ## Resume — PR #4034 sync after WS-POSTMERGE-04 — 2026-11-12T20:25:12+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.

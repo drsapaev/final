@@ -1,3 +1,13 @@
+## T18 — PR #4034 exact-head CI after current-main sync — 2026-11-12T20:59:22+05:00
+
+- Commit under test: PR HEAD 8b4e58d3f13b091d3fe0aa19275e40801c649851, based on current origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27.
+- Environment: GitHub Actions plus local Windows Chromium/Vitest. No production or patient data was used.
+- Local regression: duplicate-asset failure test PASS 1/1 after the latest rebase; RQ-18 provenance group PASS 12/12 with three repetitions on the same tracked source blob; isolated PatientBookingPage.test.tsx PASS 18/18.
+- Hosted CI: Unified workflow #43247800937 attempt 1 failed only in the unrelated Frontend unit test file PatientBookingPage.test.tsx; attempt 2 passed on the same exact SHA. Frontend unit, E2E, lint/type-check, build, CI Scope, and PR Required Gate all PASS on attempt 2. PR Review Quality Gate #43247896543 and Lifecycle Recommendation #43247896233 PASS. CodeQL, security scan, Gitleaks, GitGuardian, and scratch guards PASS. Backend, integration, Docker, parity, staging/production readiness, load, and DAST jobs were skipped, not passed.
+- The RQ-18 E2E source is the only non-journal runtime-adjacent file in the PR; no product application/API/database/auth changes.
+- Staging limitation: the latest current-main synthetic Session stopped at compose-up and teardown passed before browser checks. Earlier cdp6 live evidence used artifact source c586346f. served_revision_verified remains false; overall T18/Tier-2 remains PARTIAL.
+- PR #4034 is OPEN / Ready for review, mergeState CLEAN at HEAD 8b4e58d3f13b091d3fe0aa19275e40801c649851. No independent review decision or merge is recorded. User owns merge/deploy.
+
 ## T18 — PR #4034 rebase on WS-POSTMERGE-04 — 2026-11-12T20:25:12+05:00
 
 - Commit under test: local source branch HEAD 13da1a2250dcb1a4618344ceafa313c7c3202164, rebased on current origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27. The tracked RQ-18 E2E spec blob matches the source tested on the previous base.
