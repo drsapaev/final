@@ -1,3 +1,13 @@
+## Resume — PR #4034 sync after WS-POSTMERGE-04 — 2026-11-12T20:25:12+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.
+
+PR #4026 is merged. Its duplicate-asset failure P2 is implemented in PR #4034. The latest rebase is onto origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27; local HEAD 13da1a2250dcb1a4618344ceafa313c7c3202164. The targeted P2 test passed 1/1 after rebase, and its E2E file blob matches the code that passed the full 12/12 provenance suite and scoped ESLint. Exact-head CI on this new base is pending.
+
+Remote PR #4034 still points to 34b4c940b58220cceb99d1abee9ee2c7a3e33117. Commit this checkpoint, verify the remote SHA, push with an explicit lease, update PR evidence, and inspect checks on the final pushed SHA. User owns merge/deploy.
+
+Current-main staging failed at compose-up and tore down successfully without browser checks. The old cdp6 live PASS is not current-main evidence. served_revision_verified is false; Tier-2/T18 remains PARTIAL.
+
 ## Resume — PR #4034 final current-main sync — 2026-11-12T20:05:59+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.

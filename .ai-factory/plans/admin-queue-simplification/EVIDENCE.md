@@ -1,3 +1,12 @@
+## T18 — PR #4034 rebase on WS-POSTMERGE-04 — 2026-11-12T20:25:12+05:00
+
+- Commit under test: local source branch HEAD 13da1a2250dcb1a4618344ceafa313c7c3202164, rebased on current origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27. The tracked RQ-18 E2E spec blob matches the source tested on the previous base.
+- Environment: Windows host, local Chromium Playwright, synthetic local HTTP server; no staging credentials, patient data, or production services.
+- Validation after this rebase: duplicate-failure regression PASS, 1/1; git diff --check origin/main...HEAD PASS. Full provenance group 12/12 and ESLint 0 errors/2 existing warnings ran on the same E2E source blob before this rebase.
+- Hosted CI #43244313950 passed on previous exact HEAD 34b4c940b58220cceb99d1abee9ee2c7a3e33117, based on main 6b8b14c6. It is not an exact-head result for this new base. Current exact-head CI will run after push.
+- Staging remains limited: current-main Session failed at compose-up and teardown passed without reaching browser checks. Earlier cdp6 live evidence used artifact source c586346f. served_revision_verified remains false; overall T18/Tier-2 remains PARTIAL.
+- Remote PR #4034 still points to 34b4c940b58220cceb99d1abee9ee2c7a3e33117 before the next push. No merge/deploy.
+
 ## T18 — PR #4034 final main sync and targeted regression — 2026-11-12T20:05:59+05:00
 
 - Commit under test: branch HEAD a2633a8f18788710e2bd3be0e0361cb97ae4058e, based on current origin/main 6b8b14c6f6a5319a174b8222ffb5bff25d4d715b. The tracked RQ-18 spec blob is unchanged from the previously tested rebased source.

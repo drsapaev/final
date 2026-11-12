@@ -1,3 +1,12 @@
+## Current checkpoint — PR #4034 rebased on current main; exact-head CI pending — 2026-11-12T20:25:12+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4026 is merged. Its duplicate-asset request failure P2 is fixed in follow-up PR #4034.
+- Worktree branch codex/aqs-t18-rq18-failure-20261112; local HEAD 13da1a2250dcb1a4618344ceafa313c7c3202164 is based on origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27. Remote PR HEAD remains 34b4c940b58220cceb99d1abee9ee2c7a3e33117; worktree currently has only the three journal files uncommitted.
+- After latest rebase, the targeted duplicate-failure Playwright regression passed 1/1 and diff check passed. Full provenance group 12/12 with three repetitions and scoped ESLint exit 0 with 0 errors/2 existing warnings ran on the identical source blob before the unrelated main commit. Unified CI passed on prior exact head 34b4c940, not on this rebased head.
+- Latest current-main synthetic Session failed at compose-up, teardown passed, and no browser checks ran. Earlier live cdp6 evidence used artifact source c586346f. served_revision_verified=false; overall T18 remains PARTIAL.
+- Next exact action: commit this checkpoint, confirm the remote head is still 34b4c940, push with explicit lease, update PR #4034 description, and inspect exact-head CI. Do not merge/deploy.
+
 ## Current checkpoint — PR #4034 synced to current main; exact-head CI pending — 2026-11-12T20:05:59+05:00
 
 - Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
