@@ -2,7 +2,7 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import i18n from '@/i18n';
@@ -24,9 +24,12 @@ function Location() {
   return <div data-testid="path">{pathname}</div>;
 }
 
+type SaveMock = Mock<(opts?: Record<string, unknown>) => Promise<unknown>>;
+type ReloadMock = Mock<() => Promise<unknown>>;
+
 interface Harness {
-  saveEMR: ReturnType<typeof vi.fn>;
-  reload: ReturnType<typeof vi.fn>;
+  saveEMR: SaveMock;
+  reload: ReloadMock;
 }
 
 function DraftEditor({ control }: { control: Harness }) {
@@ -91,10 +94,14 @@ async function flush() {
 
 function makeHarness(): Harness {
   return {
-    saveEMR: vi.fn(async () => ({ status: 'in_progress', row_version: 5 })),
+    saveEMR: vi.fn<(opts?: Record<string, unknown>) => Promise<unknown>>(
+      async () => ({ status: 'in_progress', row_version: 5 }),
+    ),
     // Intentionally never resolves: waiting on a GET cannot be the mechanism
     // protecting a discarded draft from an unmount autosave.
-    reload: vi.fn(() => new Promise<unknown>(() => undefined)),
+    reload: vi.fn<() => Promise<unknown>>(
+      () => new Promise<unknown>(() => undefined),
+    ),
   };
 }
 
