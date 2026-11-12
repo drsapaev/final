@@ -7063,3 +7063,18 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Actual changed paths in the evidence commit: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md` only. No runtime, API, test-source, database, auth, gate, production or deployment change.
 - Remaining limitation: T18/Tier-2 remains PARTIAL. The exact RQ-18 response-body issue, full T18 scenario matrix, keyboard/language/viewport/latency/console checks, full `docs/runbooks/STAGING_VALIDATION.md`, and independent formal review of PR #3946 remain outstanding. No staging deferral is claimed.
 - PR: #3946, still OPEN at HEAD `ade10c2` before this journal update; user retains merge authority.
+
+## PR #4034 — WSL recovery, exact cleanup, and RQ-18 Session compose-up failure — 2026-11-12T15:03:41+05:00
+
+- Commit under test: PR #4034 HEAD `e5691754cfdbdcfde1d569b883ee7c6145ad2be2`; base `c409d80ebefbf171876b57cb24755d24f9080241`.
+- Environment: Windows host, Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3. Synthetic data only; no production service or data.
+- Execution mode: previously authorized validation-only `narrow_override`; no runtime, API, database, auth, gate/router, production or deployment edits.
+- Allowed paths: task-local `.scratch/t18-rq18-cdp-validation-20261112/` and the three plan journals. Denied: foreign projects, global Docker prune/GC, production, deployment and merge.
+- Recovery/cleanup: exact old project `clinic-aqs4034-rq18-cdp-20261112` had matching `clinic.lifecycle=ephemeral`, owner `codex-t18-rq18-cdp`, expiry `2026-11-12T15:58:23+05:00`, project, worktree and Compose-file labels across all five containers, three volumes and network. Canonical `ops/scripts/wsl_staging.ps1 -Action Stop` PASS; `scripts/staging_down.ps1` exact project teardown PASS. Follow-up count: 0 containers, 0 volumes, 0 networks, 0 project-labeled images. Ports 18831/18832/55533 free. Eight project names recorded in this task's RQ-18 scratch inventory had zero resources.
+- Harness correction: previous live env lacked `STAGING_PUBLIC_BASE_URL`; the new private env set loopback URL and fresh ports. No credential values were printed. Canonical Preflight PASS at 14 GiB free on C:, 26 GiB on WSL backing D:, 3189 MiB WSL available memory, artifact validation PASS; ports 18851/18852/55581 free. Artifact source `08325168a98d3950c6de8a4a6a503de65c462c93`; selected frontend build-input paths had no diff against tested HEAD.
+- Validation command: canonical `ops/scripts/wsl_staging.ps1 -Action Session` with task-local `validate-rq18.ps1`. Result: FAIL at Compose `up` (`NATIVE_FAILED (compose-up): exit 1; category unclassified`); launcher reported automatic `STAGING_TEARDOWN=PASS`. No later browser command ran.
+- Follow-up scope check: exact new project `clinic-aqs4034-rq18-live-20261112` had 0 containers, 0 volumes, 0 networks, 0 project-labeled images; Windows ports 18851/18852/55581 free. Docker event history query returned no retained events. No Compose retry was launched.
+- Result: Preflight PASS; Session FAIL at compose-up; RQ-18 browser workflow, ordinary Admin 2FA, permanent-QR workflow and browser asset comparison NOT_RUN. `served_revision_verified=false`; Tier-2/T18 remains PARTIAL; no deferral.
+- Remaining limitation: sanitized launcher output does not identify the compose-up cause. A later diagnostic retry must use a fresh project, record `KEEP_STAGING=1` in the checkpoint before execution, inspect only safe project state, and teardown that exact project. Do not infer OOM/build/runtime cause without evidence.
+- PR: #4034 OPEN / Ready for review at `e5691754cfdbdcfde1d569b883ee7c6145ad2be2`; merge remains user-owned.
+- Merge commit: NOT_MERGED.

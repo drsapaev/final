@@ -1,3 +1,15 @@
+## Resume — PR #4034 RQ-18 compose-up failure; owned stack cleaned — 2026-11-12T15:03:41+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.
+
+PR #4034 is OPEN / Ready for review / mergeable at `e5691754cfdbdcfde1d569b883ee7c6145ad2be2`; exact-head CI and required metadata/security gates passed. The RQ-18 recorder P2 fix and focused 9/9 Chromium tests are validated. The user owns merge.
+
+WSL has recovered. The previous exact project `clinic-aqs4034-rq18-cdp-20261112` was verified against its private owner/expiry/Compose labels, stopped canonically, fully torn down, and independently inventoried at zero containers/volumes/networks/images. A new project passed Preflight but Session failed at `compose-up` with sanitized `exit 1; category unclassified`; automatic teardown passed and follow-up inventory/ports were zero/free. No browser checks ran, so RQ-18 live, Admin 2FA and served asset hashes remain NOT_RUN. No deferral is accepted.
+
+The prior Session env omitted `STAGING_PUBLIC_BASE_URL`; the new env corrected it and Preflight passed. Do not reuse its project name. Before another Session, check safe BuildKit diagnostics. If a fresh diagnostic Session is needed, record `KEEP_STAGING=1` in the task checkpoint; successful Session still tears down, while a failure may be inspected and then cleaned only for its verified project. Do not repeat a failed `compose-up` blindly, run global prune, or infer the root cause.
+
+Next smallest action: inspect current-source compose/build behavior and any retained BuildKit diagnostics without running Compose. Then, if appropriate, create one fresh uniquely owned project, run Preflight and a single diagnostic Session, inspect/teardown exact resources, and update evidence. Keep Tier-2 PARTIAL.
+
 ## Resume — PR #4034 CI passed; WSL cleanup still pending — 2026-11-12T14:09:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.

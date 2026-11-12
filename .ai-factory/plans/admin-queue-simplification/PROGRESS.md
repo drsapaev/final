@@ -1,3 +1,14 @@
+## Current checkpoint — PR #4034 WSL recovery and RQ-18 Session build failure — 2026-11-12T15:03:41+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns PR merge and deployment.
+- PR #4034 is OPEN / Ready for review / mergeable at exact HEAD `e5691754cfdbdcfde1d569b883ee7c6145ad2be2`, based on `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`. Exact-head Unified CI, applicable frontend checks, Required Gate, security, Gitleaks, Review Quality Gate and Lifecycle Recommendation passed. Backend/integration/Docker/staging/production jobs were skipped, not passed.
+- RQ-18 recorder P2 fix remains verified: only a canceled main-frame `ERR_ABORTED` superseded by a committed navigation and backed by the captured matching asset hash is ignored. Focused tracked-spec Playwright passed 9/9 over three repetitions; targeted TypeScript passed; scoped ESLint had 0 errors and 2 existing raw-fetch warnings.
+- Recovered WSL and reconciled project `clinic-aqs4034-rq18-cdp-20261112`: owner/expiry/lifecycle/project/worktree/Compose labels matched its private env. Canonical `Stop` PASS and project-scoped final teardown PASS. Follow-up inventory found zero containers, volumes, networks or labeled images for all eight T18 RQ-18 project names checked; ports 18831/18832/55533 were free. Old private env files with no remaining resources were removed.
+- A fresh project `clinic-aqs4034-rq18-live-20261112` passed canonical Preflight: artifact validation PASS, C: 14 GiB free, WSL backing D: 26 GiB free, WSL available memory 3189 MiB, ports 18851/18852/55581 free. Its canonical Session failed at `compose-up` (`exit 1`, sanitized category `unclassified`); Session reported `STAGING_TEARDOWN=PASS`. Follow-up project inventory and port checks were zero/free. The browser command did not run.
+- `served_revision_verified` remains false. This attempt proves neither Admin 2FA nor the live permanent-QR lifecycle or browser-served hashes. Full `STAGING_VALIDATION.md` and remaining T18 acceptance remain incomplete.
+- Diagnostic retry checkpoint: the next Session may set `KEEP_STAGING=1` so a failed exact project is preserved for diagnosis; successful Session still tears down. Inspect and remove only that project's resources. Do not run global prune, touch other projects, or claim the compose-up failure root cause before evidence.
+- Next exact action: determine whether safe BuildKit/Docker diagnostics exist for the failed compose-up; then prepare one fresh unique project with `KEEP_STAGING=1` recorded and run canonical Preflight/Session. Keep T18 PARTIAL and do not merge/deploy.
+
 ## Current checkpoint — PR #4034 exact-head checks pass; WSL cleanup pending — 2026-11-12T14:09:00+05:00
 
 - Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
