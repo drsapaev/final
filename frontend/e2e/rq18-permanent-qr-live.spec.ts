@@ -756,6 +756,40 @@ function markRq18Phase(phase: string) {
   process.stdout.write('RQ18_PHASE=' + phase + '\n');
 }
 
+type NavigationAbortEvidence = {
+  frameId?: string;
+  loaderId: string;
+  hadMatchingHash: boolean;
+};
+
+type MainFrameLoaderEvidence = {
+  mainFrameId: string | null;
+  mainFrameLoaderId: string | null;
+  supersededMainLoaderIds: ReadonlySet<string>;
+};
+
+function isCdpNavigationAbortCandidate(
+  failure: { errorText: string; canceled?: boolean },
+  request: { frameId?: string; loaderId: string },
+  mainFrameId: string | null,
+) {
+  return failure.errorText === 'net::ERR_ABORTED'
+    && failure.canceled === true
+    && request.frameId === mainFrameId
+    && request.loaderId.length > 0;
+}
+
+function isVerifiedSupersededMainFrameAbort(
+  aborted: NavigationAbortEvidence,
+  state: MainFrameLoaderEvidence,
+) {
+  return aborted.hadMatchingHash
+    && aborted.frameId !== undefined
+    && aborted.frameId === state.mainFrameId
+    && aborted.loaderId !== state.mainFrameLoaderId
+    && state.supersededMainLoaderIds.has(aborted.loaderId);
+}
+
 function createServedAssetRecorder() {
   type BrowserBodyReadFailure =
     | 'cdp-body-evicted'
@@ -778,6 +812,9 @@ function createServedAssetRecorder() {
   const captureFailures = new Map<string, string>();
   const pendingCaptures = new Set<Promise<void>>();
   type AssetReference = { key: string; path: string };
+  type PendingNavigationAbort = NavigationAbortEvidence & {
+    asset: AssetReference;
+  };
   type PageCaptureState = {
     activeRequests: Map<Request, AssetReference>;
     cdpActiveRequestIds: Set<string>;
@@ -785,6 +822,10 @@ function createServedAssetRecorder() {
     cdpFinishedByKey: Map<string, number>;
     responseBodies: Map<Request, { status: number; body: Promise<BrowserBodyRead> }>;
     pending: Set<Promise<void>>;
+    mainFrameId: string | null;
+    mainFrameLoaderId: string | null;
+    supersededMainLoaderIds: Set<string>;
+    pendingNavigationAborts: PendingNavigationAbort[];
     usesCdp: boolean;
   };
   const pageCaptureStates = new Map<Page, PageCaptureState>();
@@ -840,6 +881,10 @@ function createServedAssetRecorder() {
       cdpFinishedByKey: new Map<string, number>(),
       responseBodies: new Map<Request, { status: number; body: Promise<BrowserBodyRead> }>(),
       pending: new Set<Promise<void>>(),
+      mainFrameId: null,
+      mainFrameLoaderId: null,
+      supersededMainLoaderIds: new Set<string>(),
+      pendingNavigationAborts: [],
       usesCdp: cdpSession !== null,
     };
     pageCaptureStates.set(assetPage, state);
@@ -855,17 +900,42 @@ function createServedAssetRecorder() {
     };
 
     if (cdpSession) {
-      const cdpAssets = new Map<string, { asset: AssetReference; status?: number }>();
+      const cdpAssets = new Map<string, {
+        asset: AssetReference;
+        status?: number;
+        frameId?: string;
+        loaderId: string;
+      }>();
+      cdpSession.on('Page.frameNavigated', (event) => {
+        const frame = event.frame;
+        if (frame.parentId) return;
+        if (state.mainFrameId && state.mainFrameId !== frame.id) return;
+        const previousLoaderId = state.mainFrameLoaderId;
+        if (previousLoaderId && previousLoaderId !== frame.loaderId) {
+          state.supersededMainLoaderIds.add(previousLoaderId);
+        }
+        state.mainFrameId = frame.id;
+        state.mainFrameLoaderId = frame.loaderId;
+      });
       cdpSession.on('Network.requestWillBeSent', (event) => {
         const asset = cdpAssetKeyFor(event.request.url);
         if (!asset) return;
-        cdpAssets.set(event.requestId, { asset });
+        cdpAssets.set(event.requestId, {
+          asset,
+          frameId: event.frameId,
+          loaderId: event.loaderId,
+        });
         state.cdpActiveRequestIds.add(event.requestId);
       });
       cdpSession.on('Network.responseReceived', (event) => {
         const asset = assetKeyFor(event.response.url, event.type.toLowerCase());
         if (!asset) return;
-        cdpAssets.set(event.requestId, { asset, status: event.response.status });
+        cdpAssets.set(event.requestId, {
+          asset,
+          status: event.response.status,
+          frameId: event.frameId,
+          loaderId: event.loaderId,
+        });
         state.cdpActiveRequestIds.add(event.requestId);
       });
       cdpSession.on('Network.loadingFinished', (event) => {
@@ -900,12 +970,21 @@ function createServedAssetRecorder() {
         if (!cdpAsset) return;
         cdpAssets.delete(event.requestId);
         state.cdpActiveRequestIds.delete(event.requestId);
-        const verifiedNavigationAbort = event.errorText === 'net::ERR_ABORTED'
-          && capturedAssetHashes.has(cdpAsset.asset.key);
-        if (!verifiedNavigationAbort) {
+        if (isCdpNavigationAbortCandidate(event, cdpAsset, state.mainFrameId)) {
+          state.pendingNavigationAborts.push({
+            asset: cdpAsset.asset,
+            frameId: cdpAsset.frameId,
+            loaderId: cdpAsset.loaderId,
+            hadMatchingHash: capturedAssetHashes.has(cdpAsset.asset.key),
+          });
+        } else {
           captureFailures.set(cdpAsset.asset.key, 'request-failed');
         }
       });
+      await cdpSession.send('Page.enable');
+      const frameTree = await cdpSession.send('Page.getFrameTree');
+      state.mainFrameId = frameTree.frameTree.frame.id;
+      state.mainFrameLoaderId = frameTree.frameTree.frame.loaderId;
       await cdpSession.send('Network.enable');
       await cdpSession.send('Network.setCacheDisabled', { cacheDisabled: true });
       assetPage.once('close', () => {
@@ -973,13 +1052,9 @@ function createServedAssetRecorder() {
       if (!asset) return;
       state.activeRequests.delete(browserRequest);
       state.responseBodies.delete(browserRequest);
-      // Only ignore Chromium's navigation-abort marker when another completed
-      // browser response already proved these exact asset bytes. A successful
-      // capture from one page must never hide a genuine failure on another.
-      const errorText = browserRequest.failure()?.errorText;
-      const verifiedNavigationAbort = errorText === 'net::ERR_ABORTED'
-        && capturedAssetHashes.has(asset.key);
-      if (!verifiedNavigationAbort) captureFailures.set(asset.key, 'request-failed');
+      // Non-CDP browsers do not expose enough frame/loader evidence to prove
+      // that an abort followed a committed navigation, so fail closed.
+      captureFailures.set(asset.key, 'request-failed');
     });
   };
 
@@ -1001,6 +1076,13 @@ function createServedAssetRecorder() {
     await Promise.all(Array.from(pageCaptureStates.keys(), waitForPage));
     while (pendingCaptures.size > 0) await Promise.all(Array.from(pendingCaptures));
     const origin = new URL(expectedOrigin).origin;
+    for (const state of pageCaptureStates.values()) {
+      for (const aborted of state.pendingNavigationAborts) {
+        if (!isVerifiedSupersededMainFrameAbort(aborted, state)) {
+          captureFailures.set(aborted.asset.key, 'request-failed');
+        }
+      }
+    }
     const finishedCounts = new Map<string, { browser: number; cdp: number }>();
     for (const state of pageCaptureStates.values()) {
       if (!state.usesCdp) continue;
@@ -1134,8 +1216,48 @@ test('RQ-18 provenance hashes the browser response body before navigation cancel
   }
 });
 
-test('RQ-18 provenance reports genuine duplicate asset failures but ignores a verified Chromium abort', async ({ browser, browserName }) => {
-  test.skip(browserName !== 'chromium', 'RQ-18 staging provenance runs on Chromium and classifies its navigation-abort code.');
+test('RQ-18 provenance accepts only canceled assets from a committed superseded main-frame loader', () => {
+  const oldMainFrameLoader = {
+    frameId: 'main-frame',
+    loaderId: 'old-loader',
+    hadMatchingHash: true,
+  };
+  const committedNavigation = {
+    mainFrameId: 'main-frame',
+    mainFrameLoaderId: 'new-loader',
+    supersededMainLoaderIds: new Set(['old-loader']),
+  };
+
+  expect(isCdpNavigationAbortCandidate(
+    { errorText: 'net::ERR_ABORTED', canceled: true },
+    oldMainFrameLoader,
+    'main-frame',
+  )).toBe(true);
+  expect(isVerifiedSupersededMainFrameAbort(oldMainFrameLoader, committedNavigation)).toBe(true);
+  expect(isVerifiedSupersededMainFrameAbort(oldMainFrameLoader, {
+    ...committedNavigation,
+    mainFrameLoaderId: 'old-loader',
+  })).toBe(false);
+  expect(isVerifiedSupersededMainFrameAbort(oldMainFrameLoader, {
+    ...committedNavigation,
+    supersededMainLoaderIds: new Set<string>(),
+  })).toBe(false);
+  expect(isVerifiedSupersededMainFrameAbort({ ...oldMainFrameLoader, hadMatchingHash: false }, committedNavigation)).toBe(false);
+  expect(isVerifiedSupersededMainFrameAbort({ ...oldMainFrameLoader, frameId: 'child-frame' }, committedNavigation)).toBe(false);
+  expect(isCdpNavigationAbortCandidate(
+    { errorText: 'net::ERR_ABORTED', canceled: false },
+    oldMainFrameLoader,
+    'main-frame',
+  )).toBe(false);
+  expect(isCdpNavigationAbortCandidate(
+    { errorText: 'net::ERR_FAILED', canceled: true },
+    oldMainFrameLoader,
+    'main-frame',
+  )).toBe(false);
+});
+
+test('RQ-18 provenance reports a failed duplicate asset even when another page captured its hash', async ({ browser, browserName }) => {
+  test.skip(browserName !== 'chromium', 'RQ-18 duplicate asset failure regression uses Chromium CDP request events.');
   test.setTimeout(30_000);
   const cssPath = `/assets/rq18-duplicate-failure-${suffixKey}.css`;
   const cssBody = ':root { --rq18-asset-probe: 1; }';
@@ -1168,43 +1290,55 @@ test('RQ-18 provenance reports genuine duplicate asset failures but ignores a ve
 
   const origin = `http://127.0.0.1:${address.port}`;
   const cssUrl = new URL(cssPath, origin).toString();
-  const servedAssets = createServedAssetRecorder();
   const contexts: BrowserContext[] = [];
+  const newTrackedPage = async (servedAssets: ReturnType<typeof createServedAssetRecorder>) => {
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    contexts.push(context);
+    const page = await context.newPage();
+    await servedAssets.recordPage(page);
+    return page;
+  };
+  const captureCss = async (servedAssets: ReturnType<typeof createServedAssetRecorder>) => {
+    const page = await newTrackedPage(servedAssets);
+    await page.goto(new URL('/with-css', origin).toString(), { waitUntil: 'load' });
+    await servedAssets.waitForPage(page);
+    const records = await servedAssets.reportForOrigin(origin);
+    expect(records).toContainEqual({
+      path: cssPath,
+      sha256: crypto.createHash('sha256').update(cssBody).digest('hex'),
+    });
+    return page;
+  };
+
   try {
-    const firstContext = await browser.newContext({ serviceWorkers: 'block' });
-    contexts.push(firstContext);
-    const firstPage = await firstContext.newPage();
-    await servedAssets.recordPage(firstPage);
-    await firstPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'load' });
-    await servedAssets.waitForPage(firstPage);
-    const firstCapture = await servedAssets.reportForOrigin(origin);
-    expect(firstCapture.some((record) => record.path === cssPath
-      && record.sha256 === crypto.createHash('sha256').update(cssBody).digest('hex'))).toBe(true);
+    const activeAbortRecorder = createServedAssetRecorder();
+    await captureCss(activeAbortRecorder);
+    const activeAbortPage = await newTrackedPage(activeAbortRecorder);
+    await activeAbortPage.route(cssUrl, (route) => route.abort('aborted'));
+    const activeAbortPromise = activeAbortPage.waitForEvent(
+      'requestfailed',
+      (browserRequest) => browserRequest.url() === cssUrl,
+    );
+    await activeAbortPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'domcontentloaded' });
+    const activeAbort = await activeAbortPromise;
+    expect(activeAbort.failure()?.errorText).toBe('net::ERR_ABORTED');
+    await activeAbortRecorder.waitForPage(activeAbortPage);
+    await expect(activeAbortRecorder.reportForOrigin(origin)).rejects.toThrow(`${cssPath}:request-failed`);
 
-    const navigationContext = await browser.newContext({ serviceWorkers: 'block' });
-    contexts.push(navigationContext);
-    const navigationPage = await navigationContext.newPage();
-    await servedAssets.recordPage(navigationPage);
-    await navigationPage.route(cssUrl, (route) => route.abort('aborted'));
-    const navigationAbort = navigationPage.waitForEvent('requestfailed', (browserRequest) => browserRequest.url() === cssUrl);
-    await navigationPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'domcontentloaded' });
-    const cancelledRequest = await navigationAbort;
-    expect(cancelledRequest.failure()?.errorText).toBe('net::ERR_ABORTED');
-    await servedAssets.waitForPage(navigationPage);
-    await expect(servedAssets.reportForOrigin(origin)).resolves.toContainEqual(expect.objectContaining({ path: cssPath }));
-
-    const failedContext = await browser.newContext({ serviceWorkers: 'block' });
-    contexts.push(failedContext);
-    const failedPage = await failedContext.newPage();
-    await servedAssets.recordPage(failedPage);
+    const genuineFailureRecorder = createServedAssetRecorder();
+    await captureCss(genuineFailureRecorder);
+    const failedPage = await newTrackedPage(genuineFailureRecorder);
     await failedPage.route(cssUrl, (route) => route.abort('failed'));
-    const failedRequestPromise = failedPage.waitForEvent('requestfailed', (browserRequest) => browserRequest.url() === cssUrl);
+    const failedRequestPromise = failedPage.waitForEvent(
+      'requestfailed',
+      (browserRequest) => browserRequest.url() === cssUrl,
+    );
     await failedPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'domcontentloaded' });
     const failedRequest = await failedRequestPromise;
     expect(failedRequest.failure()?.errorText).toBeTruthy();
     expect(failedRequest.failure()?.errorText).not.toBe('net::ERR_ABORTED');
-    await servedAssets.waitForPage(failedPage);
-    await expect(servedAssets.reportForOrigin(origin)).rejects.toThrow(`${cssPath}:request-failed`);
+    await genuineFailureRecorder.waitForPage(failedPage);
+    await expect(genuineFailureRecorder.reportForOrigin(origin)).rejects.toThrow(`${cssPath}:request-failed`);
   } finally {
     await Promise.all(contexts.map((context) => context.close().catch(() => undefined)));
     await new Promise<void>((resolve, reject) => {
