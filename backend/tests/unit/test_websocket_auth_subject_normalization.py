@@ -140,6 +140,10 @@ async def test_display_websocket_auth_reuses_subject_normalization(monkeypatch):
         "app.api.v1.endpoints.websocket_auth.crud_user.get",
         lambda _db, id: user if id == 19 else None,
     )
+    monkeypatch.setattr(
+        "app.services.token_blacklist_service.TokenBlacklistService.is_token_blacklisted",
+        lambda _db, _jti, user_id=None: False,
+    )
 
     authenticated = await authenticate_display_token("token", db)
 
