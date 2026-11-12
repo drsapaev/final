@@ -102,7 +102,7 @@ interface MockWebSocketInstance {
   onmessage: ((e: MockWsEvent) => void) | null;
   onclose: ((e: MockWsEvent) => void) | null;
   onerror: ((e?: unknown) => void) | null;
-  close: ReturnType<typeof vi.fn>;
+  close: () => void;
   send: ReturnType<typeof vi.fn>;
   triggerOpen: () => void;
   triggerMessage: (payload: unknown) => void;
@@ -121,7 +121,7 @@ class MockWebSocket {
   onmessage: ((e: MockWsEvent) => void) | null;
   onclose: ((e: MockWsEvent) => void) | null;
   onerror: ((e?: unknown) => void) | null;
-  close: ReturnType<typeof vi.fn>;
+  close: () => void;
   send: ReturnType<typeof vi.fn>;
 
   constructor(url: string) {
