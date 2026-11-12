@@ -207,6 +207,22 @@ def update_display_board(
             board_id,
             extra={"fields": sorted(payload.keys())},
         )
+        # DISPLAYPRIVACY-BE-001 (audit PR #3961): успешное обновление
+        # show_patient_names обязано инвалидировать per-worker кэш формата
+        # имён — иначе устаревший 'full' продолжает раскрывать имена на
+        # живом табло до рестарта. Локальный сброс синхронный; другие
+        # воркеры получают best-effort control-сообщение (nameformat_ctl).
+        if "show_patient_names" in payload:
+            try:
+                from app.services.display_websocket import get_display_manager
+
+                get_display_manager().invalidate_name_format_cache(updated_board.name)
+            except Exception as hook_exc:
+                logger.warning(
+                    "DISPLAYPRIVACY-BE-001: name-format cache invalidation "
+                    "hook failed (board update stays committed): %s",
+                    hook_exc,
+                )
         return {
             "success": True,
             "message": "Настройки табло обновлены",

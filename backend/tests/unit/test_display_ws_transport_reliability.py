@@ -269,7 +269,12 @@ async def test_failed_subscribe_not_cached_next_connection_retries():
 
     await manager.connect(ws2, "main_board")
     assert len(manager._redis_handlers) == 1
-    assert len(bridge.subscriptions) == 1
+    # DISPLAYPRIVACY-BE-001 (audit PR #3961): the manager also holds ONE
+    # nameformat control-channel subscription (cache-invalidation plane);
+    # the board channel still carries exactly one handler.
+    board_subs = [c for c, _h in bridge.subscriptions if c == "board:main_board"]
+    assert len(board_subs) == 1
+    assert any(c == "nameformat_ctl" for c, _h in bridge.subscriptions)
 
     await bridge.publish("board:main_board", {"type": "remote_event"})
     assert ws1.messages[0]["type"] == "remote_event"
@@ -278,7 +283,10 @@ async def test_failed_subscribe_not_cached_next_connection_retries():
     await manager.disconnect(ws1, "main_board")
     await manager.disconnect(ws2, "main_board")
     assert not manager._redis_handlers
-    assert not bridge.subscriptions
+    # The board subscription is released with the last socket; the
+    # nameformat control subscription stays (cache-invalidation plane is
+    # connection-independent).
+    assert not [c for c, _h in bridge.subscriptions if c.startswith("board:")]
 
 
 # ---------------------------------------------------------------------------
@@ -351,9 +359,9 @@ async def test_listener_crash_reconnects_and_restores_subscription(monkeypatch):
         ):
             break
     assert fake.listen_calls >= 2, "listener must restart after the crash"
-    assert fake.subscribed.count("test_relay:board:main_board") >= 2, (
-        "the old channel must be re-SUBSCRIBED on recovery"
-    )
+    assert (
+        fake.subscribed.count("test_relay:board:main_board") >= 2
+    ), "the old channel must be re-SUBSCRIBED on recovery"
 
     fake.pending.append(
         {
