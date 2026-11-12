@@ -135,7 +135,9 @@ def fresh_manager():
     mgr.rooms = defaultdict(set)
     mgr._redis_handlers = {}
     mgr._pubsub = SimpleNamespace(
-        subscribe=AsyncMock(), unsubscribe=AsyncMock(), publish=AsyncMock()
+        subscribe=AsyncMock(return_value=True),
+        unsubscribe=AsyncMock(),
+        publish=AsyncMock(),
     )
     yield mgr
     mgr.rooms, mgr._redis_handlers, mgr._pubsub = saved
