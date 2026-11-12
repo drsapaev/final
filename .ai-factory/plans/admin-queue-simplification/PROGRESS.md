@@ -1,3 +1,13 @@
+## Current checkpoint — PR #4034 pushed and exact-head CI passed — 2026-11-13T02:10:08+05:00
+
+- Umbrella plan T00–T17 remains merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4034 is OPEN / Ready for review. Branch `codex/aqs-t18-rq18-failure-20261112` is pushed at `5073ca58ac702349ecaf889e957cb120d70387d0`, based on `origin/main` `58e79581c8f2e2039afaa18c3b0b5273a7a45585`. The sync merge `9a94cf8a15c7d34b4f86ebbf17fae18819ec1ed2` is on the remote branch; this checkpoint update is pending commit/push.
+- Exact-head Unified CI run `43304335736` on `5073ca58` completed SUCCESS. Frontend unit, lint/type-check, build, configured E2E, CI Scope, and PR Required Gate passed. Security, Gitleaks, PR Review Quality Gate, Lifecycle Recommendation, and Agent Workflow Guards passed. Backend, docs, metadata, Telegram, code-quality, context-boundary, Docker, parity, integration, k6, readiness, and DAST jobs were skipped by scope and are not reported as passes.
+- Scope remains the RQ-18 E2E spec and three T18 journals; the main-sync merge also contains the already reviewed upstream changes. No production application behavior was changed in this checkpoint.
+- Synthetic T18 evidence remains limited: Admin 2FA, T18.10 navigation, hidden profile/service/resource setup, explicit publication, permanent-address provisioning, teardown and post-session Preflight passed. One anonymous `start-session` returned HTTP 400; its detailed reason and persisted clinic window were not captured, so a before-window explanation is only an inference. Booking completion, QR reopen, archive/reactivation and browser asset-hash reporting remain NOT_RUN; `served_revision_verified=false`.
+- Owned synthetic Compose resources are absent and ports are closed. Local policy blocked removal of task-owned ignored scratch files; no alternate deletion method was used. Safe aggregate evidence is `.scratch/t18-rq18-live-20261112/LIVE-RESULT.md`.
+- Next exact action: refresh PR #4034's body to state that exact-head CI `43304335736` passed on `5073ca58`, then leave merge to the user. After the user merges, continue T18 by safely capturing the HTTP 400 reason/effective booking window and completing only remaining acceptance steps. Do not claim T18/Tier-2 complete.
+
 ## Current checkpoint — PR #4034 synced locally to origin/main; exact-head checks pending — 2026-11-13T01:47:45+05:00
 
 - Umbrella plan: T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns PR merge and deployment.

@@ -1,3 +1,16 @@
+## T18 — PR #4034 synchronized-head CI — 2026-11-13T02:10:08+05:00
+
+- Commit under test: pushed branch HEAD `5073ca58ac702349ecaf889e957cb120d70387d0`; base `58e79581c8f2e2039afaa18c3b0b5273a7a45585`.
+- Environment: GitHub Actions; prior synthetic staging report is `.scratch/t18-rq18-live-20261112/LIVE-RESULT.md`.
+- Mode: `gate_known_root_cause` for the T18 journal checkpoint update; the recorded execution handoff remains limited to the three journal files. The same task/scope continued; no product runtime file was edited.
+- Actual changed paths in this checkpoint: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`.
+- Validation command/result: exact-head Unified CI run `43304335736` — SUCCESS. Frontend unit, lint/type-check, build, configured E2E, CI Scope, and PR Required Gate passed. Separate Security, Gitleaks, PR Review Quality Gate, Lifecycle Recommendation, and Agent Workflow Guards passed. Backend, docs, metadata, Telegram, code-quality, context-boundary, Docker, parity, integration, k6, staging/production readiness, and DAST were skipped by scope.
+- Scope check: PR #4034 remains a test-and-evidence change; no application runtime/API/database/auth, production, merge, or deployment action was taken.
+- Remaining limitation: live synthetic session evidence is still partial. The anonymous start-session request returned HTTP 400 once without retaining safe response detail or effective clinic-window evidence; cause not established. Booking completion and later QR/archive/provenance steps remain NOT_RUN; `served_revision_verified=false`.
+- Result: exact pushed HEAD checks PASS; T18/Tier-2 PARTIAL, no deferral accepted. User owns merge. PR body should be refreshed to reflect this exact run before hand-back.
+- PR: #4034, OPEN / Ready for review.
+- Merge commit: pending user action.
+
 ## T18 — PR #4034 main sync and current RQ-18 checkpoint — 2026-11-13T01:47:45+05:00
 
 - Commit under test: live RQ-18 diagnostic change `dd3cf32d5c293a45689fef4fd7c66306d0f47189`; staging artifact source SHA `73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d`. PR remote HEAD at the sync check was `22c4a95dfed46cecc8af648147a3c57a350c744c`.

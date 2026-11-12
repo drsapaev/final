@@ -1,3 +1,15 @@
+## Resume — PR #4034 synchronized head validated — 2026-11-13T02:10:08+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged. T18/Tier-2 remains PARTIAL, no deferral accepted; user owns merge and deployment.
+
+PR #4034 is OPEN / Ready for review at pushed HEAD `5073ca58ac702349ecaf889e957cb120d70387d0`, based on `origin/main` `58e79581c8f2e2039afaa18c3b0b5273a7a45585`. Exact-head Unified CI run `43304335736` and applicable Security, Gitleaks, PR Quality, Lifecycle, and Agent Workflow checks passed. Path-skipped checks are not passes. Update the PR body with this result; do not merge.
+
+The latest synthetic T18 session passed Admin 2FA, T18.10 navigation/context, profile/service/resource setup, explicit publication and permanent-address provisioning. One anonymous `start-session` request returned HTTP 400 without retaining its detailed safe reason or the effective clinic booking window. Treat a before-window explanation as inference only. Booking completion, resource ownership, QR reopen, archive/reactivation and browser asset-hash reporting remain NOT_RUN; `served_revision_verified=false`.
+
+Canonical teardown and post-session Preflight passed; owned Compose resources are absent and ports are closed. Local policy blocked deletion of task-owned ignored scratch files; do not use alternate deletion methods. Safe aggregate report: `.scratch/t18-rq18-live-20261112/LIVE-RESULT.md`.
+
+Next: update PR #4034 metadata to record the exact-head CI result, then wait for the user's merge. After merge, continue T18 by capturing the synthetic booking-window failure reason safely and completing the remaining RQ-18 acceptance. Do not claim full T18/Tier-2 completion.
+
 ## Resume — PR #4034 synchronized with latest main; new exact-head checks pending — 2026-11-13T01:47:45+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged; T18/Tier-2 is PARTIAL, no deferral accepted, and user owns merge/deployment.
