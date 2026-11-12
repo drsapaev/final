@@ -1,3 +1,13 @@
+## Current checkpoint — PR #4034 exact-head CI pending; live RQ-18 stopped by HTTP 400 — 2026-11-13T01:16:00+05:00
+
+- T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4034 is OPEN / Ready for review. Branch codex/aqs-t18-rq18-failure-20261112; code HEAD dd3cf32d5c293a45689fef4fd7c66306d0f47189; base 73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d. Unified CI is still in progress; Security, Review Quality Gate, Lifecycle, Agent Workflow Guards and Gitleaks are PASS. No review threads or submitted reviews were present at this checkpoint.
+- The test-only follow-up adds safe numeric diagnostics to the anonymous booking assertion. Local RQ-18 recorder tests passed 5/5; TypeScript and diff-check passed; ESLint had 0 errors and 2 existing warnings; normal commit hooks passed.
+- Latest isolated staging attempt used project clinic-aqs-t18-rq18-final2-20261113 and a hosted frontend artifact from source SHA 73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d. Preflight and Start passed. Admin password+TOTP, T18.10, profile/service/resource setup, explicit publication and permanent-address provisioning passed.
+- The live scenario then failed: one anonymous start-session POST returned HTTP 400. Backend defaults and local run time make a before-07:00 refusal plausible, but response detail and persisted settings were not captured; do not treat that cause as confirmed. Booking completion, archive/reactivation and asset-hash reporting were NOT_RUN. served_revision_verified=false.
+- Session automatic teardown PASS; post-session Preflight PASS; owned containers/volumes/networks are 0 and ports 19374/19375/55974 are closed. Deleting the task-owned secret env was blocked by local policy; it remains at .scratch/t18-rq18-live-20261112/final-run/staging.env. No alternate deletion method was used. Raw Playwright output is retained until cleanup.
+- Evidence detail: .scratch/t18-rq18-live-20261112/LIVE-RESULT.md. No runtime/API/database/production changes.
+- Next exact action: commit/push the three-journal evidence update, refresh the PR body and wait for exact-head CI. The user must remove the exact private env file noted above because this session was denied file deletion. After this PR cycle closes, make the RQ-18 test's synthetic booking window deterministic in a separate scoped cycle, then repeat only the still-missing RQ-18 legs. Do not mark T18/Tier-2 complete.
 ## Current checkpoint — PR #4034 exact-head CI passed — 2026-11-12T22:20:28+05:00
 
 - T00–T17 are merged. Full T18/Tier-2 remains PARTIAL; `served_revision_verified` and the complete live RQ-18/Admin 2FA/permanent-QR flow are not proven. No deferral accepted. User owns merge/deployment.

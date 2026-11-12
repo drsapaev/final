@@ -7215,3 +7215,22 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: sanitized launcher output does not identify the compose-up cause. A later diagnostic retry must use a fresh project, record `KEEP_STAGING=1` in the checkpoint before execution, inspect only safe project state, and teardown that exact project. Do not infer OOM/build/runtime cause without evidence.
 - PR: #4034 OPEN / Ready for review at `e5691754cfdbdcfde1d569b883ee7c6145ad2be2`; merge remains user-owned.
 - Merge commit: NOT_MERGED.
+
+## PR #4034 — RQ-18 synthetic live attempt — 2026-11-13T01:16:00+05:00
+
+- Commit under test: dd3cf32d5c293a45689fef4fd7c66306d0f47189; base 73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d.
+- Environment: Ubuntu-24.04; Docker 29.1.3; Compose 2.40.3; owned synthetic project clinic-aqs-t18-rq18-final2-20261113; hosted frontend artifact source SHA 73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d, 261 manifest files.
+- Execution mode: previously authorized validation-only override; no runtime source fix or policy change.
+- Allowed paths: RQ-18 E2E test and this task scratch folder; existing T18 journals. Denied: runtime/API/database/auth policy, production, foreign Compose projects, merge and deployment.
+- Actual changed paths in this evidence follow-up: frontend/e2e/rq18-permanent-qr-live.spec.ts (safe numeric error detail) and the three T18 journals.
+- Original failure: anonymous permanent QR check failed with a generic message, leaving status/count unknown.
+- Validation: local Chromium RQ-18 provenance 5/5 PASS; single-file TypeScript PASS; scoped ESLint 0 errors / 2 existing warnings; git diff check PASS; normal commit hooks PASS. Canonical Preflight PASS (C: 12 GiB, WSL backing: 26 GiB, build reserve 10 GiB). Start PASS, runtime readiness PASS. Session ran the live scenario.
+- Result: Session FAIL at anonymous booking; exactly one start-session POST returned HTTP 400. Admin password+TOTP, T18.10, hidden profile/service/resource creation, explicit publication and permanent address provisioning PASS. Anonymous booking completion, resource ownership, QR reopen, archive/reactivation and asset hash report NOT_RUN.
+- Diagnostic interpretation: session started around 01:07 Asia/Tashkent. Backend code defaults queue_start_hour to 7 and maps session ValueError to HTTP 400; before-start refusal is plausible but persisted settings and response detail were not captured. This is an inference, not a confirmed root cause.
+- Served revision: artifact validation PASS for source SHA above; browser body hashes were not emitted because the test stopped before recorder finalization. served_revision_verified=false / NOT_VERIFIED.
+- Teardown: canonical Session reported STAGING_TEARDOWN=PASS; post-session Preflight PASS; 0 project containers, volumes, networks; ports 19374/19375/55974 closed. The exact synthetic env file remains because local policy denied deletion from this session; no alternative deletion method was used.
+- Relevant sanitized artifact: .scratch/t18-rq18-live-20261112/LIVE-RESULT.md.
+- Scope check: no application runtime/API/DB/auth, production, foreign project or deployment change.
+- Remaining limitation: Tier-2/T18 PARTIAL; no deferral accepted. A deterministic synthetic admission-window precondition is needed before the remaining live RQ-18 legs can be evaluated.
+- PR: #4034; exact CI on dd3cf32d still running at checkpoint; user owns merge.
+- Merge commit: NOT_MERGED.

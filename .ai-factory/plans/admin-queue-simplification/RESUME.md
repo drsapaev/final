@@ -1,3 +1,14 @@
+## Resume — PR #4034 staging result captured; Tier-2 remains partial — 2026-11-13T01:16:00+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.
+
+PR #4034 is OPEN / Ready for review; current code commit is dd3cf32d5c293a45689fef4fd7c66306d0f47189, base 73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d. Latest Unified CI was still in progress when checked; the other applicable PR gates passed. No review submissions or threads were present.
+
+The RQ-18 browser asset recorder regression passed locally 5/5 on Chromium; TypeScript, diff-check and normal hooks passed, ESLint had 0 errors and 2 existing warnings. A synthetic staging run passed canonical Preflight and Start, ordinary Admin password/TOTP and T18.10, and reached profile/service/resource setup, explicit publication and permanent QR provisioning. The anonymous start-session call occurred exactly once and returned HTTP 400. The detailed response reason was not captured. Because run time was approximately 01:07 Asia/Tashkent and the legacy default start hour is 07:00, a before-window refusal is plausible but remains an inference.
+
+Canonical Session teardown and post-session Preflight passed; project containers/volumes/networks are zero and ports are closed. No asset hash report was emitted, so served_revision_verified remains false. Anonymous booking completion, resource ownership, reopen, archive/reactivation and full RQ-18 provenance remain NOT_RUN. See .scratch/t18-rq18-live-20261112/LIVE-RESULT.md.
+
+Next: the sanitized evidence is appended to the T18 journals. The local policy blocked deleting the task-owned synthetic env; remove only .scratch/t18-rq18-live-20261112/final-run/staging.env. Then commit/push the journals, update PR #4034's body, and wait for exact-head CI. Do not use an alternate deletion method. User owns merge. After this PR cycle closes, make the live test's synthetic opening window deterministic in a separate scoped PR and repeat only the missing RQ-18 steps. T18/Tier-2 remains PARTIAL; no deferral is claimed.
 ## Resume — PR #4034 exact-head CI passed — 2026-11-12T22:20:28+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.
