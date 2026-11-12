@@ -1439,6 +1439,122 @@ test('RQ-18 provenance reports a failed duplicate asset even when another page c
   }
 });
 
+test('RQ-18 provenance accepts a duplicate script canceled by a committed browser navigation', async ({ browser, browserName }) => {
+  test.skip(browserName !== 'chromium', 'RQ-18 navigation-cancellation regression requires Chromium CDP loader evidence.');
+  test.setTimeout(30_000);
+  const scriptPath = `/assets/rq18-navigation-abort-${suffixKey}.js`;
+  const scriptBody = 'window.__rq18NavigationAbortProbe = true;';
+  let scriptRequestCount = 0;
+  let signalSecondScriptRequest = () => {};
+  const secondScriptRequestStarted = new Promise<void>((resolve) => { signalSecondScriptRequest = resolve; });
+  let signalSecondScriptConnectionClosed = () => {};
+  const secondScriptConnectionClosed = new Promise<void>((resolve) => { signalSecondScriptConnectionClosed = resolve; });
+  let secondScriptClosedWithoutResponse = false;
+  const server = createServer((incoming, outgoing) => {
+    if (incoming.url === '/with-script' || incoming.url === '/with-script-then-navigate') {
+      outgoing.statusCode = 200;
+      outgoing.setHeader('content-type', 'text/html; charset=utf-8');
+      const scheduledNavigation = incoming.url === '/with-script-then-navigate'
+        ? '<script>setTimeout(() => window.location.assign("/next"), 250);</script>'
+        : '';
+      outgoing.end(`<!doctype html><html><head>${scheduledNavigation}<script src="${scriptPath}"></script></head><body>old page</body></html>`);
+      return;
+    }
+    if (incoming.url === '/next') {
+      outgoing.statusCode = 200;
+      outgoing.setHeader('content-type', 'text/html; charset=utf-8');
+      outgoing.end('<!doctype html><html><head></head><body>committed destination</body></html>');
+      return;
+    }
+    if (incoming.url === scriptPath) {
+      scriptRequestCount += 1;
+      outgoing.statusCode = 200;
+      outgoing.setHeader('content-type', 'text/javascript; charset=utf-8');
+      outgoing.setHeader('cache-control', 'no-store');
+      if (scriptRequestCount === 1) {
+        outgoing.end(scriptBody);
+      } else if (scriptRequestCount === 2) {
+        // Keep the duplicate response genuinely in flight. The browser, not
+        // a Playwright route abort, must cancel it when /next commits.
+        signalSecondScriptRequest();
+        outgoing.once('close', () => {
+          secondScriptClosedWithoutResponse = !outgoing.writableEnded;
+          signalSecondScriptConnectionClosed();
+        });
+      } else {
+        outgoing.end(scriptBody);
+      }
+      return;
+    }
+    outgoing.statusCode = 404;
+    outgoing.end();
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error('Could not start local navigation-abort regression server.');
+  }
+
+  const origin = `http://127.0.0.1:${address.port}`;
+  const oldPageUrl = new URL('/with-script', origin).toString();
+  const navigatingPageUrl = new URL('/with-script-then-navigate', origin).toString();
+  const nextPageUrl = new URL('/next', origin).toString();
+  const contexts: BrowserContext[] = [];
+  const recorder = createServedAssetRecorder();
+  const newTrackedPage = async () => {
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    contexts.push(context);
+    const page = await context.newPage();
+    await recorder.recordPage(page);
+    return page;
+  };
+
+  try {
+    const completedPage = await newTrackedPage();
+    await completedPage.goto(oldPageUrl, { waitUntil: 'load' });
+    await recorder.waitForPage(completedPage);
+    const priorRecords = await recorder.reportForOrigin(origin);
+    expect(priorRecords).toContainEqual({
+      path: scriptPath,
+      sha256: crypto.createHash('sha256').update(scriptBody).digest('hex'),
+    });
+
+    const navigatingPage = await newTrackedPage();
+    const browserAssetFailure = navigatingPage.waitForEvent('requestfailed', (request) => {
+      return request.url() === new URL(scriptPath, origin).toString();
+    });
+    const destinationNavigation = navigatingPage.waitForEvent(
+      'framenavigated',
+      (frame) => frame === navigatingPage.mainFrame() && frame.url() === nextPageUrl,
+    );
+    await navigatingPage.goto(navigatingPageUrl, { waitUntil: 'commit' });
+    await secondScriptRequestStarted;
+    await destinationNavigation;
+    expect(navigatingPage.url()).toBe(nextPageUrl);
+    await expect(navigatingPage.locator('body')).toHaveText('committed destination');
+    const failedAssetRequest = await browserAssetFailure;
+    expect(failedAssetRequest.failure()?.errorText).toBe('net::ERR_ABORTED');
+    await secondScriptConnectionClosed;
+    expect(scriptRequestCount).toBe(2);
+    expect(secondScriptClosedWithoutResponse).toBe(true);
+    await recorder.waitForPage(navigatingPage);
+    const records = await recorder.reportForOrigin(origin);
+    expect(records).toContainEqual({
+      path: scriptPath,
+      sha256: crypto.createHash('sha256').update(scriptBody).digest('hex'),
+    });
+  } finally {
+    await Promise.all(contexts.map((context) => context.close().catch(() => undefined)));
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    });
+  }
+});
+
 test('RQ-18 provenance timeout reports safe capture counters', async ({ browser, browserName }) => {
   test.skip(browserName !== 'chromium', 'RQ-18 timeout diagnostics regression uses Chromium request routing.');
   test.setTimeout(30_000);

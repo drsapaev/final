@@ -1,3 +1,37 @@
+## T18 — PR #4034 real Chromium navigation-abort regression — 2026-11-12T21:55:12+05:00
+
+- Commit under test: uncommitted test diff based on PR HEAD `18d227f184c537d10023d409e962408d5f7583ad`; branch `codex/aqs-t18-rq18-failure-20261112`; base `origin/main` `d3ea3fdc82339b97ed484e7a2a2d649887763a27`. New commit pending.
+- Environment: Windows local Chromium with an in-process synthetic HTTP server; no application API, database, patient data, production, or Compose staging was used.
+- Execution mode: mandatory `gate_known_root_cause` for `frontend/e2e/rq18-permanent-qr-live.spec.ts` plus the three plan journals. Gate returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt read. This is validation/test work only.
+- Allowed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts`, `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Actual tracked paths are these four only. Denied: product runtime/API/DB/auth, staging/production config or execution, other Compose, merge/deployment.
+- Original gap: prior coverage had negative tests for active-page abort and non-aborted network failure, and unit coverage for CDP loader predicates, but no real browser request cancellation caused by a committed navigation.
+- Implementation: new browser test captures an earlier JS hash in one context, starts a duplicate parser-blocking JS request in another context, and schedules a same-tab main-frame navigation from the page itself. It requires the browser `requestfailed` event to report `net::ERR_ABORTED`, requires the destination page to commit and render, verifies the server observed the in-flight response close before it was written, then requires `reportForOrigin()` to pass. The report path only accepts this when CDP records a canceled request on the old main-frame loader, a later committed main-frame navigation supersedes that loader, and the matching prior hash exists.
+- Validation commands/results:
+  - Focused new Chromium test: PASS 1/1.
+  - Full local `RQ-18 provenance` Chromium group: PASS 5/5, including existing active-page-abort and non-aborted-failure tests.
+  - New browser navigation test repeated with `--repeat-each=3`: PASS 3/3.
+  - `npm.cmd run build`: PASS; Rollup/esbuild emitted existing dependency/CSS warnings.
+  - Scoped `npm.cmd exec -- eslint -- e2e/rq18-permanent-qr-live.spec.ts`: PASS, 0 errors, 2 existing raw-fetch warnings at lines 302 and 321.
+  - `git diff --check`: pending at checkpoint; hosted exact-head CI: pending push.
+- Exploratory failures: two earlier held-response prototypes that invoked `page.goto()` externally timed out without producing a deterministic browser cancellation. They were discarded. The page-authored timer navigation used in the passing test produces the real `ERR_ABORTED` and destination commit.
+- Result: PASS for the targeted navigation-cancellation behavior; not a full live RQ-18 acceptance.
+- Remaining limitation: `served_revision_verified` remains unproven; Admin 2FA/permanent QR and complete T18/Tier-2 remain NOT_RUN/PARTIAL. No deferral accepted.
+- PR: #4034; commit/push and exact-head checks pending; user owns merge.
+- Merge commit: pending user action.
+
+## T18 — PR #4034 navigation-abort regression pre-edit checkpoint — 2026-11-12T21:36:21+05:00
+
+- Commit under test: PR HEAD 18d227f184c537d10023d409e962408d5f7583ad; base origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27.
+- Environment: isolated PR worktree on Windows; only synthetic local HTTP/Chromium test data is allowed.
+- Execution mode: `gate_known_root_cause`, known root `frontend/e2e/rq18-permanent-qr-live.spec.ts`; gate result `narrow_override`, `gate_misroute=false`, `override_used=true`, handoff prompt read.
+- Allowed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and the plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied: application runtime, backend/API/DB/auth, staging/production, foreign Compose, merge/deployment.
+- Original failure: the current synthetic tests reject an abort on an active page and unit-test CDP loader predicates, but do not exercise a browser asset request that is actually canceled when a committed navigation supersedes its loader.
+- Validation command(s): NOT_RUN; pre-edit only. Planned: focused Chromium Playwright cases, provenance group, frontend build, scoped ESLint and `git diff --check`.
+- Result: NOT_RUN.
+- Remaining limitation: current-source live RQ-18/Tier-2 remains PARTIAL; this test work does not prove served frontend provenance.
+- PR: #4034; user owns merge.
+- Merge commit: pending user action.
+
 ## T18 — PR #4034 exact-head CI after current-main sync — 2026-11-12T20:59:22+05:00
 
 - Commit under test: PR HEAD 8b4e58d3f13b091d3fe0aa19275e40801c649851, based on current origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27.

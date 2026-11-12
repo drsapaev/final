@@ -1,3 +1,13 @@
+## Resume — PR #4034 navigation-abort regression locally validated — 2026-11-12T21:55:12+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.
+
+PR #4034 remains open at prior HEAD `18d227f184c537d10023d409e962408d5f7583ad`, based on current `origin/main` `d3ea3fdc82339b97ed484e7a2a2d649887763a27`. New test and journal changes are uncommitted at this checkpoint. Before edits, mandatory `gate_known_root_cause` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the execution prompt was read. Scope is limited to the RQ-18 E2E spec and its three T18 journals.
+
+The new Chromium test passed 1/1 and then 3/3 repeated runs. The full `RQ-18 provenance` group passed 5/5, including active-page abort and genuine network failure. Frontend build passed; scoped ESLint had 0 errors and 2 existing raw-fetch warnings. `git diff --check`, commit/push, and exact-head hosted CI remain next. Initial direct-`goto` prototypes failed to establish genuine cancellation and were replaced by a page-authored timer navigation; evidence records this honestly.
+
+No runtime/API/database/auth, staging/production, Compose, merge, or deployment changes. Remove only the generated frontend `.scratch/rq18-navigation.playwright.config.ts`. Full RQ-18 live provenance, Admin 2FA/permanent QR, and complete T18/Tier-2 remain PARTIAL; no deferral accepted. Next exact action: diff check, commit/push the scoped test/evidence, update #4034 with current results, inspect exact-head CI. Stop if remote HEAD diverged or required checks fail.
+
 ## Resume — PR #4034 P2 fix and exact-head CI complete — 2026-11-12T20:59:22+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.

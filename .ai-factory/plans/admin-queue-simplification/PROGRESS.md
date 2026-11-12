@@ -1,3 +1,14 @@
+## Current checkpoint — PR #4034 navigation-abort regression locally validated — 2026-11-12T21:55:12+05:00
+
+- T00–T17 are merged. Full T18/Tier-2 remains PARTIAL; `served_revision_verified` and the complete live RQ-18/Admin 2FA/permanent-QR flow are not proven. No deferral accepted. User owns merge/deployment.
+- PR #4034 remains OPEN / Ready for review at base `d3ea3fdc82339b97ed484e7a2a2d649887763a27`; local changes are based on PR HEAD `18d227f184c537d10023d409e962408d5f7583ad`. Source commit and push are pending; exact new PR HEAD/CI must be checked after push.
+- Added a real Chromium scenario: the page schedules a same-tab main-frame navigation while its duplicate JS asset is genuinely in flight. The test requires Playwright `requestfailed` = `net::ERR_ABORTED`, destination-page commit, server-side response cancellation, and successful recorder report; the report can pass only with CDP evidence that the canceled request's main-frame loader was superseded and an earlier matching browser hash exists.
+- Preserved active-page abort and genuine non-aborted network-failure negative tests. The full recorder/provenance group passed 5/5; the new navigation test passed 3/3 with `--repeat-each=3`.
+- Frontend build PASS. Scoped ESLint PASS, 0 errors and 2 existing raw-fetch warnings at lines 302/321. `git diff --check` and exact-head hosted CI remain pending.
+- Gate: `gate_known_root_cause` on the test and three T18 journals; `narrow_override`, `gate_misroute=false`, `override_used=true`, handoff prompt read. Allowed paths remain only the E2E spec and three journals. No product runtime/API/DB/auth, staging/production config or execution, other Compose, merge, or deployment.
+- Initial direct-`goto` held-response prototypes failed to produce a deterministic committed cancellation and were discarded; the page-authored timer-navigation implementation now passes. These exploratory failures are recorded in EVIDENCE.
+- Temporary Playwright config lives only in frontend `.scratch`; remove the exact owned file before finishing. Next: run `git diff --check`, commit/push the scoped change, update PR evidence/body with the actual commit and local results, then check exact-head CI. Stop if remote head diverged or required checks fail.
+
 ## Current checkpoint — PR #4034 P2 fixed; exact-head checks pass — 2026-11-12T20:59:22+05:00
 
 - Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
