@@ -35,8 +35,11 @@ class DisplayWebSocketManager:
         )
         # RQ-24.a.1: формат имени пациента борда (DisplayBoard.
         # show_patient_names: full/initials/none), кэш на board_id —
-        # без чтения конфига на каждое сообщение. Меняется только
-        # после рестарта (документировано в PR).
+        # без чтения конфига на каждое сообщение.
+        # DISPLAYPRIVACY-BE-001 (audit PR #3961): кэш ИНВАЛИДИРУЕТСЯ при
+        # успешном админ-обновлении show_patient_names (локально +
+        # control-сообщение другим воркерам) — раньше устаревший 'full'
+        # раскрывал имена до рестарта.
         self._name_format_cache: dict[str, str] = {}
         # Redis pubsub-обработчики по board_id (connect/disconnect):
         # восстановлено — черновик PR #3214 заменил эту строку кэшем
@@ -69,6 +72,10 @@ class DisplayWebSocketManager:
                 f"Всего соединений к табло {board_id}: {len(self.connections[board_id])}"
             )
             await self._ensure_redis_subscription(board_id)
+            # DISPLAYPRIVACY-BE-001 (audit PR #3961): подписка control-канала
+            # инвалидации кэша формата имён — до первого резолва политики
+            # (кэш-запись без подписки пропустила бы control-сообщение).
+            await self._ensure_nameformat_ctl_subscription()
 
             # Отправляем текущее состояние табло
             await self._send_current_state(websocket, board_id)
@@ -106,6 +113,11 @@ class DisplayWebSocketManager:
 
         Никогда не бросает исключение наружу.
         """
+        # DISPLAYPRIVACY-BE-001 (audit PR #3961): гарантируем подписку
+        # control-канала до доставки (единственная choke-point всех
+        # broadcast-путей — кэш-записи без подписки не должны терять
+        # control-сообщения инвалидации).
+        await self._ensure_nameformat_ctl_subscription()
         try:
             sent = await self._broadcast_to_board_local(board_id, message)
             if not isinstance(sent, int):
@@ -237,6 +249,49 @@ class DisplayWebSocketManager:
             "voice_text": f"Пациент номер {queue_entry.number}, пройдите в {cabinet or 'кабинет врача'}",
         }
 
+    def _resolve_untargeted_board_ids(self) -> list[str]:
+        """DISPLAYRELAY-BE-001 (audit PR #3961): ``board_ids=None`` означает
+        «все активные табло системы», а не «локальные сокеты ЭТОГО воркера».
+        Целевой набор резолвится из реестра DisplayBoard (строки БД —
+        достижимы с других воркеров через per-board Redis publish) и
+        объединяется с локально подключёнными комнатами (dedup). При сбое
+        реестра — честный деградационный фолбэк только на локальные комнаты
+        (best effort, без крэша).
+
+        Follow-up #4035 (P2-остаток ревью): «активные» — именно
+        ``DisplayBoard.active``. Выведенная из эксплуатации (``active=False``)
+        табло не входит в нетаргетированный набор ни из реестра, ни из
+        локально подключённых комнат, и её политика формата имён не влияет
+        на strictest-format агрегацию. Явные цели (``board_ids=[...]``) этот
+        фильтр не трогает — права на явный выбор не обходятся молча.
+        """
+        local = [n for n in self.connections.keys() if n]
+        try:
+            db = SessionLocal()
+            try:
+                rows = (
+                    db.query(DisplayBoard.name)
+                    .filter(DisplayBoard.active == True)
+                    .all()
+                )
+                names = [r[0] for r in rows]
+                active_names = set(names)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(
+                "DISPLAYRELAY-BE-001: реестр табло недоступен "
+                f"({e}); нетаргетированная трансляция — только локальные комнаты"
+            )
+            return local
+        merged: list[str] = []
+        seen: set[str] = set()
+        for name in [*names, *(n for n in local if n in active_names)]:
+            if name and name not in seen:
+                seen.add(name)
+                merged.append(name)
+        return merged
+
     async def broadcast_patient_call_data(
         self,
         call_message: dict,
@@ -252,8 +307,11 @@ class DisplayWebSocketManager:
         try:
             # DISPLAYTARGET-BE-001: [] означает «явный пустой набор целей»
             # (ничего не отправлять); None — «все активные табло».
+            # DISPLAYRELAY-BE-001 (audit PR #3961): «все» резолвится из
+            # реестра DisplayBoard ∪ локальные комнаты, не только локальные
+            # сокеты этого воркера.
             if board_ids is None:
-                board_ids = list(self.connections.keys())
+                board_ids = self._resolve_untargeted_board_ids()
 
             # Отправляем на указанные табло
             for board_id in board_ids:
@@ -291,8 +349,9 @@ class DisplayWebSocketManager:
             # существует в сигнатуре — CI RED HEAD был TypeError).
             # DISPLAYTARGET-BE-001: [] — явный пустой набор целей;
             # None — все активные табло.
+            # DISPLAYRELAY-BE-001 (audit PR #3961): «все» — реестр ∪ локальные.
             if board_ids is None:
-                board_ids = list(self.connections.keys())
+                board_ids = self._resolve_untargeted_board_ids()
             call_message = self.build_patient_call_message(
                 queue_entry, doctor_name, cabinet, board_ids=board_ids
             )
@@ -484,8 +543,9 @@ class DisplayWebSocketManager:
 
             # DISPLAYTARGET-BE-001: [] — явный пустой набор целей;
             # None — все активные табло.
+            # DISPLAYRELAY-BE-001 (audit PR #3961): «все» — реестр ∪ локальные.
             if board_ids is None:
-                board_ids = list(self.connections.keys())
+                board_ids = self._resolve_untargeted_board_ids()
 
             for board_id in board_ids:
                 statuses[board_id] = await self.broadcast_to_board(
@@ -682,6 +742,126 @@ class DisplayWebSocketManager:
             return "initials"
         return "full"
 
+    # DISPLAYPRIVACY-BE-001 (audit PR #3961): control-канал инвалидации
+    # кэша формата имён. Кэш per-процессен; админ-PUT и следующий
+    # call/announcement POST могут попасть на разные uvicorn-воркеры,
+    # поэтому локального сброса недостаточно — публикация control-сообщения
+    # заставляет остальные воркеры сбросить устаревшую запись.
+    NAMEFORMAT_CTL_CHANNEL = "nameformat_ctl"
+
+    def invalidate_name_format_cache(self, board_name: str | None = None) -> None:
+        """Сбросить кэш формата имён: локально — синхронно и немедленно,
+        на других воркерах — best-effort control-сообщением (без ACK;
+        сбой публикации только логируется). Вызывается из успешного
+        админ-обновления ``DisplayBoard.show_patient_names``
+        (``board_name=None`` — консервативная очистка всего кэша).
+        """
+        try:
+            cache = getattr(self, "_name_format_cache", None)
+            if isinstance(cache, dict):
+                if board_name is None:
+                    cache.clear()
+                else:
+                    cache.pop(board_name, None)
+        except Exception as e:
+            logger.warning(
+                "DISPLAYPRIVACY-BE-001: локальная инвалидация кэша формата "
+                f"имён не удалась: {e}"
+            )
+        dispatch_async(self._publish_nameformat_invalidation(board_name))
+
+    async def _publish_nameformat_invalidation(self, board_name: str | None) -> None:
+        """Best-effort публикация control-сообщения инвалидации.
+
+        ``publish_ephemeral``: одноразовый клиент без общего listener/lock —
+        безопасно вызывается из sync-контекста админ-PUT через
+        ``dispatch_async`` (в тредпуле нет running loop).
+        """
+        try:
+            await asyncio.wait_for(
+                self._pubsub.publish_ephemeral(
+                    self.NAMEFORMAT_CTL_CHANNEL,
+                    {
+                        "type": "nameformat_invalidate",
+                        "board_name": board_name,
+                        "source_ts": datetime.now(UTC).isoformat(),
+                    },
+                ),
+                timeout=3.0,
+            )
+        except Exception as e:
+            logger.warning(
+                "DISPLAYPRIVACY-BE-001: control-publish инвалидации формата "
+                f"имён не удался (best-effort): {e}"
+            )
+
+    async def _ensure_nameformat_ctl_subscription(self) -> None:
+        """Подписать этот воркер на control-канал инвалидации (идемпотентно).
+
+        Вызывается до первого резолва политики на каждом пути
+        (connect / broadcast_to_board): воркер с кэш-записями обязан быть
+        подписан, иначе control-сообщение будет пропущено и устаревший
+        ``full`` доживёт до рестарта.
+
+        Follow-up #4035 (P1-остаток ревью): неудавшаяся подписка НЕ кэширует
+        успех и явно отменяет регистрацию обработчика в мосте (мост мог
+        добавить обработчик до проверки готовности Redis и не откатить её
+        сам). Иначе повтор с тем же обработчиком видит ``was_added=False``,
+        пропускает реальный Redis SUBSCRIBE и возвращает ``True`` — воркер
+        навсегда кэширует ``_nameformat_ctl_ok=True`` без реальной подписки
+        и после даунгрейда ``full→none`` продолжает показывать полные имена.
+        """
+        if getattr(self, "_nameformat_ctl_ok", False):
+            return
+        handler = getattr(self, "_nameformat_ctl_handler", None)
+        if handler is None:
+            handler = self._handle_nameformat_ctl
+            self._nameformat_ctl_handler = handler
+        try:
+            ok = bool(
+                await self._pubsub.subscribe(self.NAMEFORMAT_CTL_CHANNEL, handler)
+            )
+        except Exception as e:
+            logger.error(
+                "DISPLAYPRIVACY-BE-001: подписка control-канала формата "
+                f"имён не удалась: {e}"
+            )
+            ok = False
+        if not ok:
+            # Откат bridge-level регистрации (если мост не сделал это сам):
+            # без него повторная попытка того же обработчика — ложный успех.
+            try:
+                await self._pubsub.unsubscribe(self.NAMEFORMAT_CTL_CHANNEL, handler)
+            except Exception:
+                pass
+        self._nameformat_ctl_ok = ok
+
+    async def _handle_nameformat_ctl(self, payload: dict) -> None:
+        """Обработчик control-сообщений инвалидации кэша формата имён."""
+        try:
+            if (
+                not isinstance(payload, dict)
+                or payload.get("type") != "nameformat_invalidate"
+            ):
+                return
+            cache = getattr(self, "_name_format_cache", None)
+            if not isinstance(cache, dict):
+                return
+            name = payload.get("board_name")
+            if name is None:
+                cache.clear()
+            else:
+                cache.pop(name, None)
+            logger.info(
+                "DISPLAYPRIVACY-BE-001: кэш формата имён инвалидирован по "
+                f"control-сообщению (board={name or '*'})"
+            )
+        except Exception as e:
+            logger.error(
+                "DISPLAYPRIVACY-BE-001: обработка control-сообщения формата "
+                f"имён не удалась: {e}"
+            )
+
     def _format_patient_name(
         self, full_name: str, format_type: str = "initials"
     ) -> str:
@@ -696,7 +876,11 @@ class DisplayWebSocketManager:
                 parts = full_name.split()
                 if len(parts) >= 2:
                     return f"{parts[0]} {parts[1][0]}."
-                return full_name
+                if parts:
+                    # DISPLAYNAME-BE-001 (audit PR #3961): однотоковое имя
+                    # не раскрывается дословно — маска первой буквой.
+                    return f"{parts[0][:1]}."
+                return "Пациент"
             elif format_type == "none":
                 return "Пациент"
             else:

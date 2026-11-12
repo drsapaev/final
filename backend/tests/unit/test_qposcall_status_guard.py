@@ -220,20 +220,27 @@ async def test_anti_duplicate_cooldown_suppresses_immediate_resend(
     db_session, monkeypatch, fake_push
 ):
     """A second manual resend for the same ticket within the cooldown window
-    is honestly reported as suppressed — the patient is not spammed."""
+    is honestly reported as suppressed — the patient is not spammed.
+
+    Пост-merge ревью PR #4013: кулдаун действует ТОЛЬКО на намерение
+    «ручной повтор» (manual_resend=True) — канонический вызов подавлен
+    быть не может (покрыто test_qposcall_resend_cooldown_contract.py).
+    """
     day = datetime.now(UTC).date()
     queue = _make_queue(db_session, day)
     patient, _tg = _make_patient_with_user(db_session, "call_patient_4")
     entry = _make_entry(db_session, queue, 4, status="called", patient=patient)
-    user = _make_user(db_session, "call_admin_4")
 
-    request = SendCallNotificationRequest(entry_id=entry.id)
     service = get_queue_position_service(db_session)
-    first = await service.notify_patient_called(entry, cabinet_number="12")
+    first = await service.notify_patient_called(
+        entry, cabinet_number="12", manual_resend=True
+    )
     assert first["sent"] is True
     fake_push.assert_awaited_once()
 
-    second = await service.notify_patient_called(entry, cabinet_number="12")
+    second = await service.notify_patient_called(
+        entry, cabinet_number="12", manual_resend=True
+    )
     fake_push.assert_awaited_once()  # still exactly ONE delivery attempt
     assert second["sent"] is False
     assert second.get("reason") == "duplicate_suppressed"

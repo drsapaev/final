@@ -9523,7 +9523,7 @@ const ru = {
     esi_idyot_sohranenie: 'Идёт сохранение',
     esi_podpisana_s_popravkami: '📝 Подписана (с поправками)',
     esi_podpisana: '✅ Подписана',
-    esi_podpisana_formatabsolutetime: 'Подписана {formatAbsoluteTime(lastSaved)}',
+    esi_podpisana_formatabsolutetime: 'Подписана {lastSaved}',
     esi_dokument_podpisan_i_zaschisc: 'Документ подписан и защищён от изменений',
     esi_est_izmeneniya: '● Есть изменения',
     esi_avtosohranenie_cherez_math_r: 'Автосохранение через {Math.round(autosaveConfig.debounceMs / 1000)} сек',
@@ -9715,6 +9715,8 @@ const ru = {
     dtp_moy_opyt_count_shablonov: 'Мой опыт ({count} шаблонов)',
     dtp_moy_opyt: 'Мой опыт',
     dtp_net_sohranyonnyh_shablonov: 'Нет сохранённых шаблонов',
+    dtp_oshibka_zagruzki_shablonov: 'Не удалось загрузить шаблоны',
+    dtp_povtorit: 'Повторить',
     dtp_redaktirovat_shablon: 'Редактировать шаблон',
     dtp_moy_opyt_2: 'Мой опыт',
     // DermatologySection.jsx (ds_)

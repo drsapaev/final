@@ -9615,15 +9615,33 @@ export type paths = {
         };
         /**
          * Состояние очереди для табло
-         * @description Return the legacy board stats snapshot.
+         * @description Return the legacy board stats snapshot plus board-scoped settings.
          *
          *     The board state endpoint is intentionally public: it only exposes
          *     aggregate counters (``last_ticket``/``waiting``/``serving``/``done``)
-         *     and the day's open/start-number flags. It must NOT leak live queue
+         *     and non-PHI presentation settings. It must NOT leak live queue
          *     entries, current calls, or announcements — those are owned by the
          *     display board WebSocket initial_state/update stream, which is
          *     separately authenticated. Keeping this REST endpoint public lets the
          *     stats-only contract be verified without auth headers.
+         *
+         *     DISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is
+         *     board-scoped — an optional ``board`` name selects THAT board's row
+         *     (a missing board is an honest 404) instead of always ``main_board``;
+         *     the privacy setting of the selected board must not be replaced by
+         *     the main board's.
+         *
+         *     DISPLAYOPTIONS-FE-001 (audit PR #3961): the response additionally
+         *     exposes the selected board's non-PHI presentation fields
+         *     (``queue_display_count``/``show_announcements``/``voice_announcements``
+         *     /``sound_enabled``) so the live TV screen can apply what the admin
+         *     saved.
+         *
+         *     DISPLAYDEPT-FE-001 (audit PR #3961): ``department`` is now optional —
+         *     a public board route without a configured department (multi-
+         *     department kiosk) suppresses the legacy counters honestly
+         *     (``stats_available: false``) instead of inferring them from literal
+         *     ``undefined`` URL text.
          */
         get: operations["board_state_api_v1_board_state_get"];
         put?: never;
@@ -61414,9 +61432,10 @@ export interface operations {
     board_state_api_v1_board_state_get: {
         parameters: {
             query: {
-                department: string;
+                department?: string | null;
                 /** @description YYYY-MM-DD */
                 date: string;
+                board?: string | null;
             };
             header?: never;
             path?: never;

@@ -6641,7 +6641,7 @@ const uzCyrl = {
     visit_emr_status_signed: 'Подписана',
     visit_emr_status_amended: 'Изменена после подписания',
     tooth_save_requires_visit: 'Сохранение зубной карты требует открытый визит. Откройте пациента из очереди.',
-    tooth_inspection_only: 'Запись приёма доступна только для просмотра — зуб открыт в режиме осмотра, редактирование и сохранение недоступны.',
+    tooth_inspection_only: 'Қабул ёзуви фақат кўриш учун мавжуд — тиш кўриб чиқиш режимида очилди, таҳрирлаш ва сақлаш мумкин эмас.',
   },
   payment: {
     timeout: 'Время ожидания истекло',
@@ -9400,7 +9400,7 @@ const uzCyrl = {
     esi_idyot_sohranenie: 'Идёт сохранение',
     esi_podpisana_s_popravkami: '📝 Подписана (с поправками)',
     esi_podpisana: '✅ Подписана',
-    esi_podpisana_formatabsolutetime: 'Подписана {formatAbsoluteTime(lastSaved)}',
+    esi_podpisana_formatabsolutetime: 'Подписана {lastSaved}',
     esi_dokument_podpisan_i_zaschisc: 'Документ подписан и защищён от изменений',
     esi_est_izmeneniya: '● Есть изменения',
     esi_avtosohranenie_cherez_math_r: 'Автосохранение через {Math.round(autosaveConfig.debounceMs / 1000)} сек',
@@ -9592,6 +9592,8 @@ const uzCyrl = {
     dtp_moy_opyt_count_shablonov: 'Мой опыт ({count} шаблонов)',
     dtp_moy_opyt: 'Мой опыт',
     dtp_net_sohranyonnyh_shablonov: 'Нет сохранённых шаблонов',
+    dtp_oshibka_zagruzki_shablonov: 'Не удалось загрузить шаблоны',
+    dtp_povtorit: 'Повторить',
     dtp_redaktirovat_shablon: 'Редактировать шаблон',
     dtp_moy_opyt_2: 'Мой опыт',
     // DermatologySection.jsx (ds_)
