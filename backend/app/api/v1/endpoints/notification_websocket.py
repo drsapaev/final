@@ -30,6 +30,7 @@ async def websocket_notifications(
     db = SessionLocal()
     manager = get_notification_ws_manager()
     authenticated_user = None
+    registered_user_id = None
 
     try:
         token = extract_ws_token(websocket)
@@ -40,7 +41,10 @@ async def websocket_notifications(
             )
             return
 
-        await manager.connect(websocket, authenticated_user.id)
+        # Set before connecting so a partially registered socket is also
+        # cleaned up if manager.connect() raises after its registration step.
+        registered_user_id = authenticated_user.id
+        await manager.connect(websocket, registered_user_id)
 
         platform_service = get_notification_platform_service(db)
         unread_counts = platform_service.get_unread_counts(current_user=authenticated_user)
@@ -173,6 +177,31 @@ async def websocket_notifications(
                     cursor_value = int(cursor_value) if cursor_value is not None else None
                 except (TypeError, ValueError):
                     cursor_value = None
+
+                # Match the canonical REST inbox/sync page size (1..200).
+                # Never let untrusted WebSocket frames request unbounded
+                # joined queries, and keep the connection usable on errors.
+                raw_limit = payload.get("limit", 50)
+                if raw_limit is None:
+                    raw_limit = 50
+                try:
+                    if isinstance(raw_limit, bool) or not isinstance(
+                        raw_limit, (int, str)
+                    ):
+                        raise ValueError("invalid limit type")
+                    sync_limit = int(raw_limit)
+                    if not 1 <= sync_limit <= 200:
+                        raise ValueError("limit outside allowed range")
+                except (ValueError, TypeError, OverflowError):
+                    await websocket.send_json(
+                        {
+                            "type": "notification_error",
+                            "field": "limit",
+                            "message": "Параметр limit должен быть целым числом от 1 до 200",
+                        }
+                    )
+                    continue
+
                 sync_payload = platform_service.get_inbox(
                     current_user=authenticated_user,
                     role=payload.get("role"),
@@ -182,7 +211,7 @@ async def websocket_notifications(
                     department_key=payload.get("department_key"),
                     search=payload.get("search"),
                     cursor=cursor_value,
-                    limit=int(payload.get("limit") or 50),
+                    limit=sync_limit,
                 )
                 await websocket.send_json(
                     {
@@ -193,8 +222,7 @@ async def websocket_notifications(
                 continue
 
     except WebSocketDisconnect:
-        if authenticated_user:
-            manager.disconnect(websocket, authenticated_user.id)
+        pass
     except Exception as exc:
         logger.error("WebSocket notification error: %s", exc)
         try:
@@ -202,4 +230,11 @@ async def websocket_notifications(
         except Exception:
             pass
     finally:
-        db.close()
+        # Normal disconnects, unexpected exceptions and cancellation must all
+        # release the manager's socket/home-loop and Redis subscription state.
+        # Close the DB even if the manager's disconnect path raises.
+        try:
+            if registered_user_id is not None:
+                manager.disconnect(websocket, registered_user_id)
+        finally:
+            db.close()

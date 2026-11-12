@@ -149,18 +149,32 @@ describe('RETRO-3963-01: every authoritative selection invalidates or owns the n
     // the live-selection guard reads the committed selection via the ref
     expect(fn).toContain('const liveSelectionIsOtherPatient = (): boolean =>');
     expect(fn).toContain('selectedPatientRef.current');
-    expect((fn.match(/liveSelectionIsOtherPatient\(\)/g) ?? []).length).toBe(3);
-    // entry guard fires BEFORE the fetch
-    const entryGuard = fn.indexOf('if (liveSelectionIsOtherPatient()) return;');
+    // RETRO-3969-02: the failure path owns the same guard — four call sites
+    // (entry / post-fetch / post-json + the catch before its toast).
+    expect((fn.match(/liveSelectionIsOtherPatient\(\)/g) ?? []).length).toBe(4);
+    // RETRO-3969-01: the guard was widened to the visit dimension — the
+    // patient check is now combined with liveSelectionContradictsVisit()
+    // at every site; the patient-identity semantics are unchanged.
+    const entryGuard = fn.indexOf(
+      'if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;',
+    );
     const fetchIdx = fn.indexOf('await fetch(');
     expect(entryGuard).toBeGreaterThan(-1);
     expect(fetchIdx).toBeGreaterThan(entryGuard);
-    // epoch guards stay (newer intent took a ticket while fetching)
+    // epoch guards stay (newer intent took a ticket while fetching) — three
+    // now: post-fetch, post-json, and the RETRO-3969-02 catch
     expect(fn).toContain('const epoch = navigationEpochRef.current');
-    expect((fn.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(2);
-    // both post-await guards precede the identity merge
+    expect((fn.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(3);
+    // both post-await guards precede the identity merge — the RETRO-3969-02
+    // catch adds its own combined guard AFTER the merge (failure path), so
+    // the ordering invariant is computed over the pre-catch (success-path)
+    // scope only
     const jsonIdx = fn.indexOf('await patientResponse.json()');
-    const lastLiveGuard = fn.lastIndexOf('if (liveSelectionIsOtherPatient()) return;');
+    const catchStart = fn.indexOf('} catch (error: unknown) {');
+    const preCatchScope = catchStart > -1 ? fn.slice(0, catchStart) : fn;
+    const lastLiveGuard = preCatchScope.lastIndexOf(
+      'if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;',
+    );
     const selectIdx = fn.indexOf('setSelectedPatient((prev');
     expect(lastLiveGuard).toBeGreaterThan(jsonIdx);
     expect(selectIdx).toBeGreaterThan(lastLiveGuard);

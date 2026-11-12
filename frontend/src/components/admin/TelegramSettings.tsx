@@ -25,9 +25,10 @@ import {
 } from '../ui/macos';
 
 import { api } from '../../api/client';
+import { buildApiUrl } from '../../api/runtime';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 
 interface TelegramBotInfo {
   username?: string;
@@ -145,7 +146,7 @@ const TelegramSettings = () => {
 
   const setWebhook = async () => {
     try {
-      const webhookUrl = `${window.location.origin}/api/v1/telegram/webhook`;
+      const webhookUrl = buildApiUrl('/telegram/webhook');
 
       const { data: result } = await api.post('/admin/telegram/set-webhook', { webhook_url: webhookUrl });
       setMessage({ type: 'success', text: result.message });
@@ -289,7 +290,7 @@ const TelegramSettings = () => {
                   onChange={(e) => handleSettingChange('bot_token', e.target.value)}
                   placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
                   className="admin-flex-1-bordertoprightradius-ba27c5-borderbottomrightradius-8aa152" />
-                
+
                 <Button
                   type="button"
                   variant="outline"
@@ -297,7 +298,7 @@ const TelegramSettings = () => {
                   aria-label={showToken ? 'Hide Telegram bot token' : 'Show Telegram bot token'}
                   onClick={() => setShowToken(!showToken)}
                   className="admin-bordertopleftradius-e03ef8-borderbottomleftradius-355679">
-                  
+
                   {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
@@ -330,7 +331,7 @@ const TelegramSettings = () => {
                 onChange={(e) => handleSettingChange('admin_chat_ids', e.target.value.split(',').map((id) => id.trim()).filter((id) => id))}
                 placeholder="123456789, 987654321"
                 className="admin-w-100pct-minh-60" />
-              
+
               <p className="admin-sm-secondary-mt-4-m-0">
                 {t('admin2.ts_admin_chat_ids_hint')}
               </p>
@@ -363,7 +364,7 @@ const TelegramSettings = () => {
                   checked={settings.notifications_enabled}
                   onChange={(e) => handleSettingChange('notifications_enabled', e)}
                   className="admin-mr-12" />
-                
+
                 <span className="admin-sm-med-primary">{t('admin2.ts_notifications_enabled')}</span>
               </label>
 
@@ -372,7 +373,7 @@ const TelegramSettings = () => {
                   checked={settings.appointment_reminders}
                   onChange={(e) => handleSettingChange('appointment_reminders', e)}
                   className="admin-mr-12" />
-                
+
                 <span className="admin-sm-med-primary">{t('admin2.ts_appointment_reminders')}</span>
               </label>
 
@@ -381,7 +382,7 @@ const TelegramSettings = () => {
                   checked={settings.lab_results_notifications}
                   onChange={(e) => handleSettingChange('lab_results_notifications', e)}
                   className="admin-mr-12" />
-                
+
                 <span className="admin-sm-med-primary">{t('admin2.ts_lab_results_notifications')}</span>
               </label>
 
@@ -390,7 +391,7 @@ const TelegramSettings = () => {
                   checked={settings.payment_notifications}
                   onChange={(e) => handleSettingChange('payment_notifications', e)}
                   className="admin-mr-12" />
-                
+
                 <span className="admin-sm-med-primary">{t('admin2.ts_payment_notifications')}</span>
               </label>
             </div>
@@ -407,7 +408,7 @@ const TelegramSettings = () => {
                 className="w-full"
                 aria-label={t('admin2.ts_default_language')}
               ></Select>
-              
+
             </div>
 
             {/* Информация о webhook */}
@@ -452,7 +453,7 @@ const TelegramSettings = () => {
               onChange={(e) => setTestChatId(e.target.value)}
               placeholder="123456789"
               className="w-full" />
-            
+
             <p className="admin-sm-secondary-mt-4-m-0">
               {t('admin2.ts_test_chat_id_hint')}
             </p>
@@ -467,7 +468,7 @@ const TelegramSettings = () => {
               onChange={(e) => setTestMessage(e.target.value)}
               placeholder={t('admin2.ts_test_message_ph')}
               className="admin-w-100pct-minh-80" />
-            
+
           </div>
         </div>
 
@@ -475,7 +476,7 @@ const TelegramSettings = () => {
           <Button
             onClick={sendTestMessage}
             disabled={!settings.bot_token || !testChatId || !testMessage}>
-            
+
             <Send className="w-4 h-4 mr-2" />
             {t('admin2.ts_send_test_button')}
           </Button>

@@ -265,14 +265,16 @@ async function installSession(page: Page) {
     window.sessionStorage.setItem('refresh_token', token);
     window.sessionStorage.setItem('auth_profile', JSON.stringify(profile));
     window.sessionStorage.setItem('user', JSON.stringify(profile));
-    // Захват window.open: preview/PDF открывают blob-вкладки; нельзя дать
-    // настоящему popup-менеджеру Playwright мешать тесту (паттерн
+    // Захват window.open: RETRO-3970-01 — приложение резервирует контекст
+    // синхронным window.open('') в жесте и потом НАВИГИРУЕТ его на blob-URL.
+    // Стаб возвращает управляемый контекст с location/opener/close (паттерн
     // lab-preview-pdf.spec.ts).
     const opened: string[] = [];
     (window as unknown as { __openedWindows: string[] }).__openedWindows = opened;
-    window.open = ((url?: string | URL) => {
-      opened.push(String(url));
-      return {} as Window;
+    window.open = ((_url?: string | URL) => {
+      opened.push(_url == null || String(_url) === '' ? '' : String(_url));
+      const stub = { opener: 'initiator' as unknown, close() {}, location: { href: '' } };
+      return stub as unknown as Window;
     }) as typeof window.open;
   }, { token: FAKE_TOKEN, profile: LAB_PROFILE });
 }
@@ -426,7 +428,7 @@ async function installApiMocks(page: Page) {
   });
 
   // Печать: прямой канал печати недоступен (нет принтера) — workbench
-  // переходит на PDF-fallback (downloadPdf -> window.open -> mark-printed).
+  // переходит на PDF-fallback (downloadPdf -> явный «Открыть PDF» -> mark-printed).
   // Этот канал проходит через НАСТОЯЩИЙ PDF-маршрут (тот же движок, что
   // чинил PR8 hotfix) и помечает бланк PRINTED.
   await page.route('**/api/v1/print/lab-results', (route) => {
@@ -621,6 +623,10 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     // LABPRINT-FE-001: тело запроса — только report_instance_id.
     expect(printLabResultsBodies[0]).toEqual({ report_instance_id: CREATED_INSTANCE_ID });
     await expect.poll(() => pdfGetCount).toBe(1);
+    // RETRO-3970-01: подготовленный PDF вкладку сам не открывает — нужен
+    // явный второй клик «Открыть PDF для печати» (новая user activation),
+    // и только тогда появляется LABPRINT-FE-002-подтверждение.
+    await page.getByRole('button', { name: 'Открыть PDF для печати' }).click();
     // До подтверждения статус не меняется: mark-printed не вызывался.
     expect(markPrintedPostCount).toBe(0);
     await page.getByRole('button', { name: 'Отметить как напечатанное' }).click();
