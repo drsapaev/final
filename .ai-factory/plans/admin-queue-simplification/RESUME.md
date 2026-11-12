@@ -1,3 +1,15 @@
+## Resume — PR #4034 CI passed; WSL cleanup still pending — 2026-11-12T14:09:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.
+
+PR #4034 HEAD `b293dda8ff2449e26d220f513abec3d8814212d7` is based on current `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`. Unified CI #43186419010, PR Review Quality Gate #43188770157 and Lifecycle Recommendation #43188770142 passed on that head. Applicable frontend tests/build/lint and PR Required Gate passed; backend/integration/Docker/staging readiness and other path-aware jobs were skipped. Local tracked-spec provenance suite passed 9/9 after rebase.
+
+The source P2 fix is commit `a6149855d810b5bcba2955371e11c08ed7fa7279`. The local uncommitted changes are only additive records in the three T18 journals. Commit/push these records, refresh PR body to the resulting HEAD, and inspect new exact-head checks. User owns merge; do not merge.
+
+Tier-2 remains PARTIAL, no deferral. Last synthetic WSL Session stopped before browser checks on `NATIVE_UNAVAILABLE` / `WSAETIMEDOUT`. Boot continuity and complete exact-project inventory are unverified; three named volumes and busy staging ports were last observed. Do not run WSL/Compose cleanup, another staging project, or global cleanup until WSL responds and owner/expiry are rechecked. `served_revision_verified` remains false.
+
+Next exact action: `git diff --check`, commit the journal updates, push the branch with a lease against current remote HEAD, update PR #4034 description, then inspect checks. Preserve the staging blocker and keep live RQ-18 marked NOT_RUN.
+
 ## Resume — PR #4034 rebased; WSL staging cleanup pending — 2026-11-12T13:49:31+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.

@@ -1,3 +1,15 @@
+## T18 — PR #4034 exact-head CI and review gates — 2026-11-12T14:09:00+05:00
+
+- Commit under test: RQ-18 E2E source fix `a6149855d810b5bcba2955371e11c08ed7fa7279`; exact PR HEAD tested by hosted CI `b293dda8ff2449e26d220f513abec3d8814212d7`; base `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`.
+- Environment: GitHub Actions on hosted Linux runners plus local Windows Chromium validation; no WSL/browser live staging proof in this entry.
+- Local regression evidence remains from the tracked spec after rebase: focused Chromium provenance suite 9/9; targeted TypeScript compile PASS; scoped ESLint PASS with 0 errors and two existing warnings. See preceding entry for exact commands and the corrected config details.
+- Hosted CI: Unified CI #43186419010 SUCCESS on exact HEAD `b293dda`; Frontend E2E, frontend build, unit tests, lint, CI Scope and PR Required Gate PASS. Security scan, Gitleaks, GitGuardian and Agent Workflow Guards PASS. Backend, integration, Docker build, staging/production readiness, frontend/backend parity, k6, DAST and path-irrelevant jobs were SKIPPED, not passed.
+- PR metadata gates: Review Quality Gate #43188770157 PASS and Lifecycle Recommendation #43188770142 PASS after updating the description with each required field label and using the parser-supported separator for `not applicable` explanations. Two earlier body-format attempts failed validation; the corrected body now passes.
+- Exact project remains unresolved after Session attempt 3: WSL calls timed out, three exact-project volume names were visible, ports 18831/18832/55533 were busy, while boot continuity and container/network/image inventory were NOT_VERIFIED. Cleanup was not attempted after the continuity check failed. No new staging cycle or global prune is permitted until WSL recovers and exact owner/expiry/inventory are confirmed.
+- Result: source-level P2 regression and exact-head applicable CI PASS. Tier-2 remains PARTIAL with no deferral; live RQ-18/Admin 2FA/permanent QR, `served_revision_verified=true`, complete T18 and the full staging runbook remain NOT_RUN.
+- PR #4034: OPEN / Ready for review, mergeable at last metadata check, not merged. Tested HEAD `b293dda8ff2449e26d220f513abec3d8814212d7`; local journal-only update is pending commit/push.
+- Merge/deploy: none.
+
 ## T18 — RQ-18 provenance fix after main sync — 2026-11-12T13:49:31+05:00
 
 - Commit under test: E2E source fix `a6149855d810b5bcba2955371e11c08ed7fa7279`; pre-checkpoint branch HEAD `a1f8bfeca538497917ba648a580e97ab9fe137f6`; base `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`. The tracked E2E file is byte-identical to source commit `05439ffb848337410b9e2b63e5cd27c9f13fbd8f` that had passed the same focused suite before rebase.

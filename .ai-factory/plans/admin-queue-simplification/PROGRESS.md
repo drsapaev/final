@@ -1,3 +1,14 @@
+## Current checkpoint — PR #4034 exact-head checks pass; WSL cleanup pending — 2026-11-12T14:09:00+05:00
+
+- Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
+- Branch `codex/aqs-t18-rq18-failure-20261112` is based on `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`. The source fix is `a6149855d810b5bcba2955371e11c08ed7fa7279`; exact CI-tested PR HEAD is `b293dda8ff2449e26d220f513abec3d8814212d7`.
+- PR #4034 is OPEN / Ready for review, not merged. Unified CI #43186419010 completed SUCCESS on `b293dda`; Frontend E2E, build, unit tests, lint, CI Scope and PR Required Gate PASS. PR Review Quality Gate #43188770157 and Lifecycle Recommendation #43188770142 PASS after PR-body field formatting was corrected. Backend, integration, Docker, readiness, production, parity, load and DAST jobs were SKIPPED, not passed.
+- After rebase, the tracked RQ-18 provenance tests passed 9/9 over three Chromium repetitions; targeted TypeScript compile passed; scoped ESLint had 0 errors and 2 existing raw-fetch warnings. The first test rerun command used a missing config and executed no tests; a corrected task config targeted the tracked spec, not the stale scratch copy.
+- Current PR body now includes all required named fields and accurately marks live staging as incomplete. The latest Quality Gate and Lifecycle runs passed.
+- WSL staging blocker is unchanged: attempt 3 stopped before browser checks on `NATIVE_UNAVAILABLE (wsl)` / `WSAETIMEDOUT`; boot continuity and complete exact-project inventory remain unverified. Do not run WSL/Compose cleanup or start another project until WSL responds and ownership/expiry are checked.
+- `served_revision_verified` remains false; current live RQ-18, Admin 2FA, permanent QR, full T18, and full `STAGING_VALIDATION.md` are NOT_RUN/PARTIAL. No deferral is accepted.
+- Next exact action: commit and push this journal-only record, update the PR body to the resulting exact HEAD, and inspect checks. Keep the RQ-18 source unchanged; no merge/deploy.
+
 ## Current checkpoint — rebased to current main; focused regression passes — 2026-11-12T13:49:31+05:00
 
 - Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
