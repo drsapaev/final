@@ -777,14 +777,34 @@ function createServedAssetRecorder() {
   const capturedAssetHashes = new Map<string, string>();
   const captureFailures = new Map<string, string>();
   const pendingCaptures = new Set<Promise<void>>();
-  const pageCaptureStates = new Map<Page, {
-    activeRequests: Map<Request, { key: string; path: string }>;
+  type AssetReference = { key: string; path: string };
+  type PageCaptureState = {
+    activeRequests: Map<Request, AssetReference>;
+    cdpActiveRequestIds: Set<string>;
+    browserFinishedByKey: Map<string, number>;
+    cdpFinishedByKey: Map<string, number>;
     responseBodies: Map<Request, { status: number; body: Promise<BrowserBodyRead> }>;
     pending: Set<Promise<void>>;
-  }>();
+    usesCdp: boolean;
+  };
+  const pageCaptureStates = new Map<Page, PageCaptureState>();
+
+  const incrementCount = (counts: Map<string, number>, key: string) => {
+    counts.set(key, (counts.get(key) || 0) + 1);
+  };
+
+  const recordHash = (asset: AssetReference, bytes: Buffer) => {
+    const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+    const previous = capturedAssetHashes.get(asset.key);
+    if (previous && previous !== sha256) {
+      captureFailures.set(asset.key, 'multiple-browser-response-bodies');
+      return;
+    }
+    capturedAssetHashes.set(asset.key, sha256);
+  };
 
   const recordPage = async (assetPage: Page) => {
-    const assetKeyFor = (rawUrl: string, resourceType: string) => {
+    const assetKeyFor = (rawUrl: string, resourceType: string): AssetReference | null => {
       let url: URL;
       try {
         url = new URL(rawUrl);
@@ -797,27 +817,101 @@ function createServedAssetRecorder() {
       return { key: url.origin + url.pathname, path: url.pathname };
     };
 
-    // Keep the browser's HTTP cache disabled for this Chromium provenance run:
-    // CDP cannot return bodies that Chromium has already evicted from cache.
-    // This changes no request URL, headers, or response and leaves API traffic
-    // un-routed, while ensuring asset bytes are fetched from the staging origin.
-    const browser = assetPage.context().browser();
-    if (browser?.browserType().name() === 'chromium') {
-      const cacheControl = await assetPage.context().newCDPSession(assetPage);
-      await cacheControl.send('Network.enable');
-      await cacheControl.send('Network.setCacheDisabled', { cacheDisabled: true });
-      assetPage.once('close', () => {
-        void cacheControl.detach().catch(() => undefined);
-      });
-    }
+    const cdpAssetKeyFor = (rawUrl: string): AssetReference | null => {
+      let pathname: string;
+      try {
+        pathname = new URL(rawUrl).pathname;
+      } catch {
+        return null;
+      }
+      if (pathname === '/sw.js' || /\.m?js$/i.test(pathname)) return assetKeyFor(rawUrl, 'script');
+      if (/\.css$/i.test(pathname)) return assetKeyFor(rawUrl, 'stylesheet');
+      return null;
+    };
 
-    const state = {
+    const browser = assetPage.context().browser();
+    const cdpSession = browser?.browserType().name() === 'chromium'
+      ? await assetPage.context().newCDPSession(assetPage)
+      : null;
+    const state: PageCaptureState = {
       activeRequests: new Map<Request, { key: string; path: string }>(),
+      cdpActiveRequestIds: new Set<string>(),
+      browserFinishedByKey: new Map<string, number>(),
+      cdpFinishedByKey: new Map<string, number>(),
       responseBodies: new Map<Request, { status: number; body: Promise<BrowserBodyRead> }>(),
       pending: new Set<Promise<void>>(),
+      usesCdp: cdpSession !== null,
     };
     pageCaptureStates.set(assetPage, state);
     servedAssetDrainByPage.set(assetPage, () => waitForPage(assetPage));
+
+    const addPendingCapture = (capture: Promise<void>) => {
+      state.pending.add(capture);
+      pendingCaptures.add(capture);
+      void capture.then(() => {
+        state.pending.delete(capture);
+        pendingCaptures.delete(capture);
+      });
+    };
+
+    if (cdpSession) {
+      const cdpAssets = new Map<string, { asset: AssetReference; status?: number }>();
+      cdpSession.on('Network.requestWillBeSent', (event) => {
+        const asset = cdpAssetKeyFor(event.request.url);
+        if (!asset) return;
+        cdpAssets.set(event.requestId, { asset });
+        state.cdpActiveRequestIds.add(event.requestId);
+      });
+      cdpSession.on('Network.responseReceived', (event) => {
+        const asset = assetKeyFor(event.response.url, event.type.toLowerCase());
+        if (!asset) return;
+        cdpAssets.set(event.requestId, { asset, status: event.response.status });
+        state.cdpActiveRequestIds.add(event.requestId);
+      });
+      cdpSession.on('Network.loadingFinished', (event) => {
+        const cdpAsset = cdpAssets.get(event.requestId);
+        if (!cdpAsset) return;
+        cdpAssets.delete(event.requestId);
+        state.cdpActiveRequestIds.delete(event.requestId);
+        incrementCount(state.cdpFinishedByKey, cdpAsset.asset.key);
+
+        const capture = (async () => {
+          if (cdpAsset.status !== 200) {
+            captureFailures.set(cdpAsset.asset.key, 'http-' + String(cdpAsset.status ?? 'unknown'));
+            return;
+          }
+          try {
+            const body = await cdpSession.send('Network.getResponseBody', { requestId: event.requestId });
+            const bytes = body.base64Encoded
+              ? Buffer.from(body.body, 'base64')
+              : Buffer.from(body.body, 'utf8');
+            recordHash(cdpAsset.asset, bytes);
+          } catch (error) {
+            captureFailures.set(
+              cdpAsset.asset.key,
+              'browser-response-body-unavailable-' + bodyReadFailureCode(error),
+            );
+          }
+        })();
+        addPendingCapture(capture);
+      });
+      cdpSession.on('Network.loadingFailed', (event) => {
+        const cdpAsset = cdpAssets.get(event.requestId);
+        if (!cdpAsset) return;
+        cdpAssets.delete(event.requestId);
+        state.cdpActiveRequestIds.delete(event.requestId);
+        const verifiedNavigationAbort = event.errorText === 'net::ERR_ABORTED'
+          && capturedAssetHashes.has(cdpAsset.asset.key);
+        if (!verifiedNavigationAbort) {
+          captureFailures.set(cdpAsset.asset.key, 'request-failed');
+        }
+      });
+      await cdpSession.send('Network.enable');
+      await cdpSession.send('Network.setCacheDisabled', { cacheDisabled: true });
+      assetPage.once('close', () => {
+        void cdpSession.detach().catch(() => undefined);
+      });
+    }
 
     assetPage.on('request', (browserRequest) => {
       const asset = assetKeyFor(browserRequest.url(), browserRequest.resourceType());
@@ -825,6 +919,7 @@ function createServedAssetRecorder() {
     });
 
     assetPage.on('response', (browserResponse) => {
+      if (cdpSession) return;
       const browserRequest = browserResponse.request();
       if (!state.activeRequests.has(browserRequest)) return;
 
@@ -847,6 +942,8 @@ function createServedAssetRecorder() {
       const asset = state.activeRequests.get(browserRequest);
       if (!asset) return;
       state.activeRequests.delete(browserRequest);
+      incrementCount(state.browserFinishedByKey, asset.key);
+      if (cdpSession) return;
       const responseBody = state.responseBodies.get(browserRequest);
       state.responseBodies.delete(browserRequest);
 
@@ -866,20 +963,9 @@ function createServedAssetRecorder() {
           return;
         }
 
-        const sha256 = crypto.createHash('sha256').update(result.bytes).digest('hex');
-        const previous = capturedAssetHashes.get(asset.key);
-        if (previous && previous !== sha256) {
-          captureFailures.set(asset.key, 'multiple-browser-response-bodies');
-          return;
-        }
-        capturedAssetHashes.set(asset.key, sha256);
+        recordHash(asset, result.bytes);
       })();
-      state.pending.add(capture);
-      pendingCaptures.add(capture);
-      void capture.then(() => {
-        state.pending.delete(capture);
-        pendingCaptures.delete(capture);
-      });
+      addPendingCapture(capture);
     });
 
     assetPage.on('requestfailed', (browserRequest) => {
@@ -901,10 +987,11 @@ function createServedAssetRecorder() {
     const state = pageCaptureStates.get(assetPage);
     if (!state) return;
     const deadline = Date.now() + 30_000;
-    while (state.activeRequests.size > 0 || state.pending.size > 0) {
+    while (state.activeRequests.size > 0 || state.cdpActiveRequestIds.size > 0 || state.pending.size > 0) {
       if (Date.now() >= deadline) {
         throw new Error('Timed out waiting for browser-served asset bodies to settle '
-          + '(active=' + state.activeRequests.size + ', bodyReads=' + state.pending.size + ').');
+          + '(active=' + state.activeRequests.size + ', cdp=' + state.cdpActiveRequestIds.size
+          + ', bodyReads=' + state.pending.size + ').');
       }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
@@ -914,6 +1001,21 @@ function createServedAssetRecorder() {
     await Promise.all(Array.from(pageCaptureStates.keys(), waitForPage));
     while (pendingCaptures.size > 0) await Promise.all(Array.from(pendingCaptures));
     const origin = new URL(expectedOrigin).origin;
+    const finishedCounts = new Map<string, { browser: number; cdp: number }>();
+    for (const state of pageCaptureStates.values()) {
+      if (!state.usesCdp) continue;
+      for (const key of new Set([...state.browserFinishedByKey.keys(), ...state.cdpFinishedByKey.keys()])) {
+        const counts = finishedCounts.get(key) || { browser: 0, cdp: 0 };
+        counts.browser += state.browserFinishedByKey.get(key) || 0;
+        counts.cdp += state.cdpFinishedByKey.get(key) || 0;
+        finishedCounts.set(key, counts);
+      }
+    }
+    for (const [key, counts] of finishedCounts) {
+      if (key.startsWith(origin + '/') && counts.browser !== counts.cdp) {
+        captureFailures.set(key, 'browser-cdp-finished-count-mismatch');
+      }
+    }
     const failures = Array.from(captureFailures.entries())
       .filter(([key]) => key.startsWith(origin + '/'))
       .map(([key, reason]) => {
