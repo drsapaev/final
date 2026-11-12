@@ -1,3 +1,17 @@
+## Resume — PR #4034 synchronized with latest main; new exact-head checks pending — 2026-11-13T01:47:45+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged; T18/Tier-2 is PARTIAL, no deferral accepted, and user owns merge/deployment.
+
+PR #4034 remote HEAD was `22c4a95dfed46cecc8af648147a3c57a350c744c` on base `73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d`, while `origin/main` advanced to `58e79581c8f2e2039afaa18c3b0b5273a7a45585`. The worktree merged latest main locally as `9a94cf8a15c7d34b4f86ebbf17fae18819ec1ed2` without conflicts. The merge has not been pushed; journal checkpoint additions are being prepared before the single push.
+
+The prior exact-head Unified CI and configured frontend checks passed. Re-run checks on the synchronized branch after pushing. Update the PR body to the exact pushed HEAD and only then report current check state. Do not merge.
+
+The owned synthetic RQ-18 Session got through Admin 2FA, T18.10, hidden profile/service/resource setup, explicit publication and permanent address. One anonymous `start-session` POST returned HTTP 400. The detailed refusal and effective booking window were not retained; a before-window cause is only an inference. Booking completion, resource ownership, QR reopen, archive/reactivation and asset hash report are NOT_RUN; `served_revision_verified=false`. Keep Tier-2 PARTIAL.
+
+Canonical Session teardown and post-session Preflight passed; owned Compose resources are absent and ports are closed. Local policy blocked removal of task-owned ignored scratch files; do not try alternate deletion methods. The safe run summary is `.scratch/t18-rq18-live-20261112/LIVE-RESULT.md`.
+
+Next exact action: review the additive three-journal diff, run `git diff --check`, commit/push the synced PR branch, refresh exact-head PR metadata, then wait for CI. After the user merges, proceed with remaining T18 acceptance, diagnosing HTTP 400 and confirming browser-served asset provenance before claiming completion.
+
 ## Resume — PR #4034 staging result captured; Tier-2 remains partial — 2026-11-13T01:16:00+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.

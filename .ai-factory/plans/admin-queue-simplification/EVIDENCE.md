@@ -1,3 +1,18 @@
+## T18 — PR #4034 main sync and current RQ-18 checkpoint — 2026-11-13T01:47:45+05:00
+
+- Commit under test: live RQ-18 diagnostic change `dd3cf32d5c293a45689fef4fd7c66306d0f47189`; staging artifact source SHA `73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d`. PR remote HEAD at the sync check was `22c4a95dfed46cecc8af648147a3c57a350c744c`.
+- Environment: owned synthetic Compose project `clinic-aqs-t18-rq18-final2-20261113`; no production data or services.
+- Chosen mode: `gate_known_root_cause` for a T18 journal checkpoint refresh. Reason: `PROGRESS.md` held a stale exact-head/base/CI checkpoint after the PR branch fell behind main. Gate command ran from `ai/langgraph` with known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and three journal scopes. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read.
+- Canonical anchors: current root `AGENTS.md`, `docs/devbrain/PROJECT_MEMORY.md`, `docs/devbrain/DEVBRAIN_STATUS.md`, and the plan's T18 checkpoint. Reference-only source: `frontend/e2e/rq18-permanent-qr-live.spec.ts`; no source edit in this journal update.
+- Allowed/first-touch paths: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md`. Denied: product runtime/API/database/auth source, gate/router, production/deployment, other Compose projects, merge.
+- Branch synchronization: fetched `origin/main` at `58e79581c8f2e2039afaa18c3b0b5273a7a45585`; `git merge-tree --write-tree HEAD origin/main` returned clean tree `d166769489f4b5e826caff09c83134204d259638`; actual merge commit is `9a94cf8a15c7d34b4f86ebbf17fae18819ec1ed2`. No content conflict. This sync brings four audit documents and current Telegram settings changes from main.
+- Pre-push validation target: review exact three-file journal diff, verify append-only history, `git diff --check`, then inspect hosted checks on the pushed PR head. Stop if changes exceed the three authorized journal paths or the new base introduces an unresolved contract conflict.
+- Previous exact PR HEAD checks: Unified CI `43299936362` SUCCESS, including configured Frontend unit/lint/build/E2E; PR Quality Gate and Lifecycle Recommendation passed after the PR body was corrected. These checks do not cover the new merge commit.
+- Staging results: canonical Preflight, Start, runtime readiness, Admin password+TOTP, T18.10 specialists navigation/context, hidden profile/service creation, QueueResource activation, explicit publication, permanent-address provisioning, Session teardown, and post-session Preflight PASS. The anonymous `start-session` request occurred exactly once and returned HTTP 400; response detail and persisted booking-window setting were not retained. A before-window refusal is inference only.
+- NOT_RUN: anonymous booking completion, resource ownership assertion, QR reopen, archive/reactivation, browser asset-hash report. The browser-served frontend revision is unverified (`served_revision_verified=false`). Tier-2/T18 remains PARTIAL; no deferral accepted.
+- Cleanup: owned containers/volumes/networks were 0 and staging ports were closed. Local policy blocked deletion of task-owned ignored files; no alternative deletion method was used. Safe aggregate report: `.scratch/t18-rq18-live-20261112/LIVE-RESULT.md`.
+- PR #4034 remains OPEN / Ready for review. User owns merge; no merge or deployment was performed.
+
 ## T18 — PR #4034 final hosted checks — 2026-11-12T22:20:28+05:00
 
 - Commit under test: pushed PR HEAD `5999c54edad3c9bb1a6eb6af7ea79bb5711bd251`, based on current main `73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d`; the local browser test ran on parent merge HEAD `9e40bb0e6e1d4680ce4bdf717865d1c5bca4aa90` before the final journal-only commit.

@@ -1,3 +1,14 @@
+## Current checkpoint — PR #4034 synced locally to origin/main; exact-head checks pending — 2026-11-13T01:47:45+05:00
+
+- Umbrella plan: T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns PR merge and deployment.
+- PR #4034 is OPEN / Ready for review on remote HEAD `22c4a95dfed46cecc8af648147a3c57a350c744c`, but was behind `main`. This worktree fetched `origin/main` `58e79581c8f2e2039afaa18c3b0b5273a7a45585` and locally merged it as `9a94cf8a15c7d34b4f86ebbf17fae18819ec1ed2`. The remote PR branch has not yet been updated with this merge.
+- The sync was clean (`git merge-tree --write-tree` produced a tree without conflicts). Imported main changes are four audit documents and the Telegram settings source/test; no changes were made to the RQ-18 test by the sync.
+- Exact-head Unified CI on the previous PR HEAD `22c4a95` passed, as did Frontend unit/lint/build/configured E2E, PR Review Quality Gate, Lifecycle, Security and Gitleaks. Checks for the locally synchronized tree are pending push.
+- RQ-18 synthetic Session passed Admin 2FA, T18.10, profile/service/resource setup, explicit publication and permanent-address provisioning; the anonymous `start-session` request returned HTTP 400 once. Exact refusal detail and persisted clinic window were not captured; before-window remains an inference. Booking completion and later QR/archive/provenance steps remain NOT_RUN; `served_revision_verified=false`.
+- Session teardown and post-session Preflight passed; the owned Compose project has zero containers/volumes/networks and its ports are closed. Local policy still blocks removal of task-owned ignored files; no alternate deletion path was used.
+- Gate for the three-journal synchronization returned `narrow_override`, `gate_misroute=false`, `override_used=true`; execution prompt was read. First-touch was limited to `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`.
+- Next exact action: validate these additive journal edits and `git diff --check`, commit/push the synchronized PR branch, update the PR body to the exact new HEAD and wait for its checks. After user merges #4034, continue the remaining T18 acceptance; do not claim full T18 or Tier-2 completion.
+
 ## Current checkpoint — PR #4034 exact-head CI pending; live RQ-18 stopped by HTTP 400 — 2026-11-13T01:16:00+05:00
 
 - T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
