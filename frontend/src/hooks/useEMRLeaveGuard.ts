@@ -58,6 +58,8 @@ export interface UseEMRLeaveGuardOptions {
     reloadFromServer: () => Promise<unknown>;
     /** Read-only observers / access-denied mounts register nothing. */
     enabled?: boolean;
+    /** Synchronously stop queued/unmount autosave before explicit Discard. */
+    onDiscard?: () => void;
 }
 
 export function useEMRLeaveGuard({
@@ -67,6 +69,7 @@ export function useEMRLeaveGuard({
     saveEMR,
     reloadFromServer,
     enabled = true,
+    onDiscard,
 }: UseEMRLeaveGuardOptions): void {
     const guard = useLabDirtyGuard();
 
@@ -78,6 +81,8 @@ export function useEMRLeaveGuard({
     saveEMRRef.current = saveEMR;
     const reloadRef = useRef(reloadFromServer);
     reloadRef.current = reloadFromServer;
+    const onDiscardRef = useRef(onDiscard);
+    onDiscardRef.current = onDiscard;
 
     const hasVisit = visitId !== null && visitId !== undefined && visitId !== '';
     const sourceId = `emr-visit-${visitId}`;
@@ -112,6 +117,9 @@ export function useEMRLeaveGuard({
             // (EMRCONFLICT-FE-001 «discard my edits» path). The transition
             // runs after this; the draft cannot «resurrect» from the reload.
             discard: () => {
+                // The unmount cleanup of useEMRAutosave fires before a
+                // pending reload GET can settle. Stop its POST synchronously.
+                onDiscardRef.current?.();
                 void reloadRef.current?.();
             },
         });
