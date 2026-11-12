@@ -356,8 +356,14 @@ export const exportECGParameters = (parameters: Record<string, unknown>) => {
       qtc: parameters.qtcInterval
     },
     axis: {
-      p: parameters.pAxis || parameters.axis,
-      qrs: parameters.qrsAxis || parameters.axis,
+      // RETRO-3972-01 (post-merge review 4000): the P-wave axis is its own
+      // measurement — an absent (undefined/null) or legally measured-0 P
+      // axis must never be silently relabeled as the QRS axis. `??` (not
+      // `||`): 0° is a measured axis, not an absence.
+      p: parameters.pAxis ?? null,
+      // `axis` IS the QRS axis (ECGPARSER-FE-003 contract); the explicit
+      // qrsAxis key stays accepted for callers that pass it, also 0-safe.
+      qrs: parameters.qrsAxis ?? parameters.axis ?? null,
       t: parameters.tAxis
     },
     interpretation: parameters.interpretation,

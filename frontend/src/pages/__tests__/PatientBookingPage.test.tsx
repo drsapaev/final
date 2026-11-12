@@ -414,6 +414,9 @@ describe('PatientBookingPage', () => {
     expect(mockedCreateRequest).not.toHaveBeenCalled();
     const acknowledgement = screen.getByLabelText(/Я проверил/);
     fireEvent.click(acknowledgement);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Отправить заявку|Проверяем и отправляем/ })).toBeEnabled();
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
 
     await screen.findByRole('heading', { name: /Заявка отправлена регистратору/ });

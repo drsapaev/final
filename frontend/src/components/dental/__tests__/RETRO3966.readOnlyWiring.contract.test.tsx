@@ -31,6 +31,7 @@ const visitScreen = readSource('components/dental/DentalVisitScreen.tsx');
 const chart = readSource('components/dental/TeethChart.tsx');
 const section = readSource('components/emr-v2/sections/specialty/DentistrySection.tsx');
 const modal = readSource('components/dental/ToothModal.tsx');
+const dialogsLayer = readSource('pages/dentist/views/DentistDialogsLayer.tsx');
 
 describe('RETRO-3966-01: locked records open an inspection-only ToothModal', () => {
   it('DentalVisitScreen passes readOnly={fieldsDisabled} to ToothModal', () => {
@@ -87,5 +88,37 @@ describe('RETRO-3966-01: locked records open an inspection-only ToothModal', () 
     expect(modal).toContain("t('dental2.tooth_inspection_only')");
     // editable controls are wrapped in a disabled fieldset
     expect(modal).toContain('disabled={readOnly}');
+  });
+});
+
+describe('RETRO-3986-01: the dormant third ToothModal consumer carries the contract', () => {
+  it('DentistDialogsLayer requires the lock state and wires readOnly to BOTH ToothModal and TeethChart', () => {
+    // The prop is REQUIRED on the props type — a future re-wiring cannot
+    // mount this layer without making the record-lock state explicit.
+    expect(dialogsLayer).toContain('toothModalReadOnly: boolean');
+
+    // The ToothModal invocation carries the readOnly contract…
+    const modalUsage = dialogsLayer.slice(
+      dialogsLayer.indexOf('{toothModalOpen && selectedTooth &&'),
+    );
+    expect(modalUsage).toContain('<ToothModal');
+    expect(modalUsage).toContain('readOnly={toothModalReadOnly}');
+
+    // …and the chart in the same layer is not hardcoded writable.
+    const chartUsage = dialogsLayer.slice(
+      dialogsLayer.indexOf('<TeethChart'),
+      dialogsLayer.indexOf('{showTreatmentPlanner &&'),
+    );
+    expect(chartUsage).toContain('readOnly={toothModalReadOnly}');
+    expect(chartUsage).not.toContain('readOnly={false}');
+  });
+
+  it('DentistPanelUnified derives the lock from the visit EMR status and passes it down', () => {
+    const panel = readSource('pages/DentistPanelUnified.tsx');
+    expect(panel).toContain('selectedVisitRecordLocked');
+    expect(panel).toContain('toothModalReadOnly={selectedVisitRecordLocked}');
+    // the lock derives from the visit protocol record's EMR status with the
+    // DENTVISIT-FE-001 semantics (`signed` is the read-only state)
+    expect(panel).toContain("toLowerCase() === 'signed'");
   });
 });
