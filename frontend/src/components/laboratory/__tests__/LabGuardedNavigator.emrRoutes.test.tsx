@@ -73,6 +73,7 @@ function DermPage() {
     <div>
       dermatology panel page
       <button type="button" onClick={() => navigate('/profile')}>leave</button>
+      <button type="button" onClick={() => navigate('/lab')}>to-lab</button>
     </div>
   );
 }
@@ -107,6 +108,7 @@ function renderEmrRouteApp({
           <Routes>
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/doctor/dermatology" element={<DermPage />} />
+            <Route path="/lab" element={<div>laboratory page</div>} />
           </Routes>
         </LabDirtyGuardProvider>
       </BrowserRouter>
@@ -235,6 +237,52 @@ describe('Route-level leave guard on EMR doctor routes (RETRO-3971-04 residual)'
     fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
     await settleRouter();
     expect(screen.getByTestId('location')).toHaveTextContent('/doctor/dermatology');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('a dirty doctor to lab navigation awaits the guard save decision', async () => {
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+    renderEmrRouteApp({ registration });
+    fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
+    await settleRouter('/doctor/dermatology');
+
+    let acknowledgeSave: () => void = () => { throw new Error('save was not started'); };
+    const serverAck = new Promise<void>((resolve) => { acknowledgeSave = resolve; });
+    const save = vi.fn(() => serverAck);
+    await act(async () => {
+      registration.current?.({
+        id: 'emr-visit-42',
+        isDirty: () => true,
+        save,
+        discard: vi.fn(),
+      });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'to-lab' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(screen.getByTestId('location')).toHaveTextContent('/doctor/dermatology');
+    expect(screen.getByText('dermatology panel page')).toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+
+    // Save is in-flight: the editor may not unmount before an ACK.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить и перейти' }));
+    await settleRouter();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('location')).toHaveTextContent('/doctor/dermatology');
+
+    await act(async () => { acknowledgeSave(); });
+    await settleRouter('/lab');
+    expect(screen.getByText('laboratory page')).toBeInTheDocument();
+  });
+
+  it('a clean doctor to lab navigation remains immediate and dialog-free', async () => {
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+    renderEmrRouteApp({ registration });
+    fireEvent.click(screen.getByRole('button', { name: 'to-derm' }));
+    await settleRouter('/doctor/dermatology');
+    fireEvent.click(screen.getByRole('button', { name: 'to-lab' }));
+    await settleRouter('/lab');
+    expect(screen.getByText('laboratory page')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
