@@ -155,12 +155,15 @@ def _patch_validation_db(monkeypatch: pytest.MonkeyPatch, engine) -> None:
     )
 
 
-def _seed_queue_entry(engine, *, specialist_id: int, patient_id: int, status: str):
-    """Seed an active DailyQueue for (specialist_id, _DATE) + one entry.
+@pytest.fixture()
+def seed_queue(test_db):
+    """Seed queue rows and FULLY remove them at teardown.
 
-    ``test_db`` is session-scoped, so the seed is get-or-create: the queue
-    row is reused across tests and the entry number is the next free slot
-    (per-queue number uniqueness).
+    ``test_db`` is SESSION-scoped: rows committed directly to the engine
+    persist for the whole run and pollute later queue-count tests (queue
+    lag metrics, QR-join censuses, migration backups). This fixture seeds
+    get-or-create queues + entries and deletes exactly the rows it
+    created when the test finishes.
     """
     from datetime import date as date_type
 
@@ -168,36 +171,60 @@ def _seed_queue_entry(engine, *, specialist_id: int, patient_id: int, status: st
 
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
-    factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    created_queue_ids: list[int] = []
+    created_entry_ids: list[int] = []
+    factory = sessionmaker(autocommit=False, autoflush=False, bind=test_db)
+
+    def _seed(*, specialist_id: int, patient_id: int, status: str) -> int:
+        session = factory()
+        try:
+            queue_day = date_type.fromisoformat(_DATE)
+            queue = (
+                session.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == queue_day,
+                    DailyQueue.specialist_id == specialist_id,
+                )
+                .first()
+            )
+            if queue is None:
+                queue = DailyQueue(day=queue_day, specialist_id=specialist_id)
+                session.add(queue)
+                session.flush()
+                created_queue_ids.append(queue.id)
+            next_number = (
+                session.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.queue_id == queue.id)
+                .count()
+                + 1
+            )
+            entry = OnlineQueueEntry(
+                queue_id=queue.id,
+                number=next_number,
+                patient_id=patient_id,
+                status=status,
+            )
+            session.add(entry)
+            session.commit()
+            created_entry_ids.append(entry.id)
+            return queue.id
+        finally:
+            session.close()
+
+    yield _seed
+
     session = factory()
     try:
-        queue_day = date_type.fromisoformat(_DATE)
-        queue = (
-            session.query(DailyQueue)
-            .filter(
-                DailyQueue.day == queue_day, DailyQueue.specialist_id == specialist_id
-            )
-            .first()
-        )
-        if queue is None:
-            queue = DailyQueue(day=queue_day, specialist_id=specialist_id)
-            session.add(queue)
-            session.flush()
-        next_number = (
-            session.query(OnlineQueueEntry)
-            .filter(OnlineQueueEntry.queue_id == queue.id)
-            .count()
-            + 1
-        )
-        entry = OnlineQueueEntry(
-            queue_id=queue.id,
-            number=next_number,
-            patient_id=patient_id,
-            status=status,
-        )
-        session.add(entry)
+        if created_entry_ids:
+            session.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.id.in_(created_entry_ids)
+            ).delete(synchronize_session=False)
+        if created_queue_ids:
+            # Only the queues THIS fixture created — never shared rows.
+            session.query(DailyQueue).filter(
+                DailyQueue.id.in_(created_queue_ids)
+            ).delete(synchronize_session=False)
         session.commit()
-        return queue.id
     finally:
         session.close()
 
@@ -321,7 +348,11 @@ def test_authenticated_legacy_endpoint_wrong_room_never_joined(
 
 
 def test_call_patient_seeded_waiting_entry_broadcasts(
-    client: TestClient, isolated_plane, test_db, monkeypatch: pytest.MonkeyPatch
+    client: TestClient,
+    isolated_plane,
+    test_db,
+    seed_queue,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """LEGACYWSCALL-BE-001 positive path: a REAL waiting entry broadcasts.
 
@@ -331,7 +362,7 @@ def test_call_patient_seeded_waiting_entry_broadcasts(
     """
     _stub_auth(monkeypatch, _doctor_user(), _doctor_row(doctor_id=7))
     _patch_validation_db(monkeypatch, test_db)
-    _seed_queue_entry(test_db, specialist_id=7, patient_id=501, status="waiting")
+    seed_queue(specialist_id=7, patient_id=501, status="waiting")
 
     token = _mint_jwt(sub="100")
     room = f"specialist_7::{_DATE}"
@@ -358,7 +389,11 @@ def test_call_patient_seeded_waiting_entry_broadcasts(
 
 
 def test_call_patient_rejects_unseeded_synthetic_patient(
-    client: TestClient, isolated_plane, test_db, monkeypatch: pytest.MonkeyPatch
+    client: TestClient,
+    isolated_plane,
+    test_db,
+    seed_queue,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """LEGACYWSCALL-BE-001: an unseeded/non-numeric id must NOT broadcast.
 
@@ -396,12 +431,16 @@ def test_call_patient_rejects_unseeded_synthetic_patient(
 
 
 def test_call_patient_rejects_numeric_patient_without_waiting_entry(
-    client: TestClient, isolated_plane, test_db, monkeypatch: pytest.MonkeyPatch
+    client: TestClient,
+    isolated_plane,
+    test_db,
+    seed_queue,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     _stub_auth(monkeypatch, _doctor_user(), _doctor_row(doctor_id=7))
     _patch_validation_db(monkeypatch, test_db)
     # A seeded but already-served entry is NOT callable.
-    _seed_queue_entry(test_db, specialist_id=7, patient_id=502, status="served")
+    seed_queue(specialist_id=7, patient_id=502, status="served")
 
     token = _mint_jwt(sub="100")
     room = f"specialist_7::{_DATE}"
@@ -417,7 +456,11 @@ def test_call_patient_rejects_numeric_patient_without_waiting_entry(
 
 
 def test_call_patient_rejects_entry_outside_room_scope(
-    client: TestClient, isolated_plane, test_db, monkeypatch: pytest.MonkeyPatch
+    client: TestClient,
+    isolated_plane,
+    test_db,
+    seed_queue,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """The entry lives in specialist_7's queue; an Admin joined to
     specialist_8 (RBAC-unrestricted) still cannot broadcast it."""
@@ -427,7 +470,7 @@ def test_call_patient_rejects_entry_outside_room_scope(
         None,
     )
     _patch_validation_db(monkeypatch, test_db)
-    _seed_queue_entry(test_db, specialist_id=7, patient_id=503, status="waiting")
+    seed_queue(specialist_id=7, patient_id=503, status="waiting")
 
     token = _mint_jwt(sub="102")
     room = f"specialist_8::{_DATE}"
