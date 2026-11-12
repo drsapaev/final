@@ -129,7 +129,7 @@ export function useEMRAutosave({
         try {
             onAutosaveStart?.();
 
-            const result = await saveEMR({ isDraft: true }) as { accessDenied?: boolean; conflict?: unknown; finalized?: boolean } | undefined;
+            const result = await saveEMR({ isDraft: true }) as { accessDenied?: boolean; conflict?: unknown; finalized?: boolean; signed?: boolean } | undefined;
 
             if (result?.accessDenied) {
                 errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
@@ -158,15 +158,43 @@ export function useEMRAutosave({
                 return;
             }
 
-            // RETRO-3971-03 (post-merge review of the 3969–3996 window):
-            // saveEMR resolves { finalized: true } when the document was
-            // signed/amended on the server — deterministic amendment routing,
-            // never a successful save (and never "another user changed the
-            // document"). The same honesty policy as a conflict: no
-            // timestamp stamp, no error-counter reset — retrying cannot fix
-            // a finalized state; the doctor must use the amend flow.
+            // RETRO-4007-02 (post-merge re-review of 4007): a FINALIZED_STATE
+            // 409 is a DETERMINISTIC stop, not a transient error — the server
+            // will answer the same 409 on every retry. The old branch only
+            // notified and returned, but useEMR transitions saving → error
+            // with isDirty=true, which re-renders a NEW canSave closure and
+            // re-arms the debounce: known-doomed POSTs fired window after
+            // window. The same pause the access-denied family uses — the
+            // error counter at its maximum (isPausedDueToErrors) — stops the
+            // loop; the doctor's explicit recovery (resetErrors) re-arms it.
             if (result?.finalized) {
-                onAutosaveError?.({ type: 'finalized', ...(result as Record<string, unknown>) });
+                errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
+                pendingSaveRef.current = false;
+                clearTimers();
+                logger.warn('[Autosave] Paused because the EMR was finalized (signed) on the server. Use the amendment flow.');
+                onAutosaveError?.({
+                    type: 'finalized',
+                    ...(result as Record<string, unknown>),
+                    retryCount: errorCountRef.current,
+                });
+                return;
+            }
+
+            // RETRO-4007-02: the legacy signed HTTP 400 (`{ signed: true }`)
+            // is the same deterministic refusal — previously it fell through
+            // to the success bookkeeping below, stamping the last-successful
+            // timestamp for a save the server had just rejected. Deterministic
+            // stop (same pause + same explicit recovery), never a false stamp.
+            if (result?.signed) {
+                errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
+                pendingSaveRef.current = false;
+                clearTimers();
+                logger.warn('[Autosave] Paused because the EMR is signed (legacy 400 refusal). Use the amendment flow.');
+                onAutosaveError?.({
+                    type: 'signed',
+                    error: result,
+                    retryCount: errorCountRef.current,
+                });
                 return;
             }
 
