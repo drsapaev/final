@@ -144,8 +144,9 @@ async def ws_queue_authenticated(
             )
             return
 
-        # Проверяем права доступа к отделению
-        if not _has_department_access(authenticated_user, department):
+        # Проверяем права доступа к отделению (WS-POSTMERGE-03: ownership
+        # через SSOT doctors.user_id; сессия уже в скоупе — передаём её).
+        if not _has_department_access(authenticated_user, department, db):
             await websocket.close(
                 code=status.WS_1003_UNSUPPORTED_DATA,
                 reason="Access denied to department",
@@ -352,10 +353,91 @@ _STAFF_DOCTOR_ROLES = frozenset(
     }
 )
 
+_SPECIALIST_ROOM_PREFIX = "specialist_"
 
-def _has_department_access(user: User, department: str) -> bool:
+
+def _resolve_doctor_for_user(db: Session, user: User):
+    """WS-POSTMERGE-03: identity SSOT for queue-room ownership.
+
+    A doctor principal's queue rooms are the ``specialist_{doctors.id}``
+    rooms broadcast by ``queue_update_departments`` — the doctor row is
+    resolved through the UNIQUE ``doctors.user_id`` bridge (1 doctor = 1
+    User). No ``active`` filter, mirroring the routing SSOT
+    (``queue_resource_routing.routing_specialist_ids``): a deactivated
+    synthetic still names the surface for already-connected subscribers,
+    and employment status is enforced at the JWT/active-user layer.
+    """
+    from app.crud.clinic import get_doctor_by_user_id
+
+    return get_doctor_by_user_id(db, int(user.id))
+
+
+def _doctor_owns_queue_room(db: Session, user: User, department: str) -> bool:
+    """WS-POSTMERGE-03 (P1): the department argument must bind to the principal.
+
+    The role-family check alone admitted ANY doctor into ANY client-named
+    room (cross-specialty queue event disclosure). Ownership is resolved
+    from the same SSOT the broadcasters use:
+
+    - ``specialist_<id>`` rooms: the id must be the principal's own
+      ``doctors.id``. Shared/bridged queues need no sibling access — the
+      routing fan-out (``queue_update_departments``) already broadcasts to
+      every routing sibling's own room.
+    - Department-name rooms: the principal's own ``Department.key`` or the
+      canonical specialty family of their ``Doctor.specialty``
+      (``specialty_variants``) must match the requested name
+      case-insensitively. Forged/foreign department strings are denied.
+    - A doctor-family role WITHOUT a doctor row owns nothing (fail
+      closed).
+    """
+    doctor = _resolve_doctor_for_user(db, user)
+    if doctor is None:
+        return False
+
+    room_department = (department or "").strip()
+    if not room_department:
+        return False
+
+    if room_department.startswith(_SPECIALIST_ROOM_PREFIX):
+        specialist_suffix = room_department[len(_SPECIALIST_ROOM_PREFIX) :]
+        if not specialist_suffix.isdigit():
+            return False
+        return int(specialist_suffix) == int(doctor.id)
+
+    # Department-name room: own department key first, then the specialty
+    # family vocabulary of the doctor row itself.
+    department_obj = getattr(doctor, "department", None)
+    department_key = str(getattr(department_obj, "key", "") or "").strip()
+    if department_key and department_key.casefold() == room_department.casefold():
+        return True
+
+    specialty = str(getattr(doctor, "specialty", "") or "").strip()
+    if specialty:
+        from app.core.specialties import specialty_variants
+
+        for variant in specialty_variants(specialty):
+            if variant.strip().casefold() == room_department.casefold():
+                return True
+
+    return False
+
+
+def _has_department_access(
+    user: User, department: str, db: Session | None = None
+) -> bool:
     """
     Проверяет, имеет ли пользователь доступ к отделению
+
+    WS-POSTMERGE-03 (P1): for the staff doctor family the ``department``
+    argument is now enforced against the principal's own doctor identity
+    (own ``specialist_{id}`` rooms, own department key / specialty family
+    for department-name rooms) instead of being ignored. ``Admin`` /
+    ``Registrar`` keep full cross-department access; non-staff roles stay
+    rejected.
+
+    ``db`` may be omitted by callers without a session in scope (the
+    canonical ``/ws/queue`` endpoint); a short-lived session is opened
+    internally in that case.
     """
     # Админы имеют доступ ко всем отделениям
     if user.role == "Admin":
@@ -365,10 +447,16 @@ def _has_department_access(user: User, department: str) -> bool:
     if user.role == "Registrar":
         return True
 
-    # Врачи имеют доступ только к своему отделению
+    # Врачи имеют доступ только к своему отделению — теперь это не только
+    # комментарий, а проверка владения комнатой через SSOT doctors.user_id.
     if str(user.role).casefold() in _STAFF_DOCTOR_ROLES:
-        # Здесь можно добавить более сложную логику проверки отделения
-        return True
+        if db is not None:
+            return _doctor_owns_queue_room(db, user, department)
+        session = SessionLocal()
+        try:
+            return _doctor_owns_queue_room(session, user, department)
+        finally:
+            session.close()
 
     return False
 

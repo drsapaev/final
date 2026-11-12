@@ -408,6 +408,114 @@ async def test_staff_role_can_subscribe(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 # ---------------------------------------------------------------------------
+# WS-POSTMERGE-03 — doctor ownership binds the client-named room
+# ---------------------------------------------------------------------------
+
+
+def _stub_doctor_resolver(
+    monkeypatch: pytest.MonkeyPatch, doctor
+) -> None:
+    monkeypatch.setattr(
+        ws_auth_module, "_resolve_doctor_for_user", lambda db, user: doctor
+    )
+
+
+@pytest.mark.asyncio
+async def test_doctor_joins_only_own_specialist_room(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Doctor principal owns rooms through its own doctors.id (SSOT)."""
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("ENV", "dev")
+    monkeypatch.setenv("CORS_DISABLE", "1")
+    _stub_blacklist(monkeypatch, lambda db, jti, user_id=None: False)
+    _stub_user_resolver(
+        monkeypatch, SimpleNamespace(id=17, role="Doctor", username="syn-doctor")
+    )
+    _stub_doctor_resolver(
+        monkeypatch, SimpleNamespace(id=7, specialty="cardio", department=None)
+    )
+    manager = _stub_manager(monkeypatch)
+    token = _mint_jwt(sub="syn-doctor", jti="syn-doctor-jti")
+    ws = _FakeWebSocket(
+        headers={"origin": "http://localhost:5173", "authorization": f"Bearer {token}"}
+    )
+
+    await asyncio.wait_for(
+        queue_ws.ws_queue(ws, "specialist_7", "2026-11-11"), timeout=2
+    )
+
+    manager.connect.assert_awaited_once_with(ws, _ROOM)
+    assert ws.sent and ws.sent[0]["type"] == "queue.connected"
+
+
+@pytest.mark.asyncio
+async def test_doctor_denied_foreign_specialist_room(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P1 fail-first: no doctor may join another physician's room."""
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("ENV", "dev")
+    monkeypatch.setenv("CORS_DISABLE", "1")
+    _stub_blacklist(monkeypatch, lambda db, jti, user_id=None: False)
+    _stub_user_resolver(
+        monkeypatch, SimpleNamespace(id=17, role="Doctor", username="syn-doctor")
+    )
+    _stub_doctor_resolver(
+        monkeypatch, SimpleNamespace(id=73, specialty="derma", department=None)
+    )
+    manager = _stub_manager(monkeypatch)
+    token = _mint_jwt(sub="syn-doctor", jti="syn-doctor-jti")
+    ws = _FakeWebSocket(
+        headers={"origin": "http://localhost:5173", "authorization": f"Bearer {token}"}
+    )
+
+    await asyncio.wait_for(
+        queue_ws.ws_queue(ws, "specialist_8", "2026-11-11"), timeout=2
+    )
+
+    manager.connect.assert_not_awaited()
+    assert ws.closed and ws.closed[0]["code"] == 1008
+    assert ws.sent and "queue room" in ws.sent[0]["reason"]
+    assert ws.receive_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_doctor_denied_foreign_department_name_room(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Department-name rooms require the principal's own key/specialty."""
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("ENV", "dev")
+    monkeypatch.setenv("CORS_DISABLE", "1")
+    _stub_blacklist(monkeypatch, lambda db, jti, user_id=None: False)
+    _stub_user_resolver(
+        monkeypatch, SimpleNamespace(id=17, role="Doctor", username="syn-doctor")
+    )
+    _stub_doctor_resolver(
+        monkeypatch,
+        SimpleNamespace(
+            id=73,
+            specialty="derma",
+            department=SimpleNamespace(key="dermatology"),
+        ),
+    )
+    manager = _stub_manager(monkeypatch)
+    token = _mint_jwt(sub="syn-doctor", jti="syn-doctor-jti")
+    ws = _FakeWebSocket(
+        headers={"origin": "http://localhost:5173", "authorization": f"Bearer {token}"}
+    )
+
+    await asyncio.wait_for(
+        queue_ws.ws_queue(ws, "cardiology", "2026-11-11"), timeout=2
+    )
+
+    manager.connect.assert_not_awaited()
+    assert ws.closed and ws.closed[0]["code"] == 1008
+    assert ws.sent and "queue room" in ws.sent[0]["reason"]
+
+
+# ---------------------------------------------------------------------------
 # QUEUEWSRELAY-BE-001 — dead-room Redis unsubscribe on send-failure eviction
 # ---------------------------------------------------------------------------
 
