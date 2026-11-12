@@ -165,14 +165,18 @@ describe('RETRO-3921-01: a lost print-job ACK never opens a second print route',
         for (let i = 0; i < 8; i += 1) await Promise.resolve();
       });
 
-      // Definite refusal → the fallback path may open (operator-driven).
+      // Definite refusal → the operator-driven fallback PREPARES the PDF…
       await waitFor(() => {
         expect(mockedApi.downloadPdf).toHaveBeenCalledTimes(1);
       });
-      // But the report is NOT marked printed by merely opening the PDF
-      // (LABPRINT-FE-002 stays intact).
+      // …but RETRO-3970-01: the failed print attempt never AUTO-opens a tab
+      // (a noopener window.open returns null even on success — the old
+      // truthiness gate was a lie). The explicit follow-up click appears.
+      expect(windowOpenSpy).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Открыть PDF для печати' })).toBeInTheDocument();
+      // …and the report is NOT marked printed by merely preparing/opening
+      // the PDF (LABPRINT-FE-002 stays intact).
       expect(mockedApi.markPrinted).not.toHaveBeenCalled();
-      expect(windowOpenSpy).toHaveBeenCalled();
     } finally {
       windowOpenSpy.mockRestore();
     }

@@ -150,8 +150,12 @@ describe('RETRO-3963-01: every authoritative selection invalidates or owns the n
     expect(fn).toContain('const liveSelectionIsOtherPatient = (): boolean =>');
     expect(fn).toContain('selectedPatientRef.current');
     expect((fn.match(/liveSelectionIsOtherPatient\(\)/g) ?? []).length).toBe(3);
-    // entry guard fires BEFORE the fetch
-    const entryGuard = fn.indexOf('if (liveSelectionIsOtherPatient()) return;');
+    // RETRO-3969-01: the guard was widened to the visit dimension — the
+    // patient check is now combined with liveSelectionContradictsVisit()
+    // at every site; the patient-identity semantics are unchanged.
+    const entryGuard = fn.indexOf(
+      'if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;',
+    );
     const fetchIdx = fn.indexOf('await fetch(');
     expect(entryGuard).toBeGreaterThan(-1);
     expect(fetchIdx).toBeGreaterThan(entryGuard);
@@ -160,7 +164,9 @@ describe('RETRO-3963-01: every authoritative selection invalidates or owns the n
     expect((fn.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(2);
     // both post-await guards precede the identity merge
     const jsonIdx = fn.indexOf('await patientResponse.json()');
-    const lastLiveGuard = fn.lastIndexOf('if (liveSelectionIsOtherPatient()) return;');
+    const lastLiveGuard = fn.lastIndexOf(
+      'if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;',
+    );
     const selectIdx = fn.indexOf('setSelectedPatient((prev');
     expect(lastLiveGuard).toBeGreaterThan(jsonIdx);
     expect(selectIdx).toBeGreaterThan(lastLiveGuard);

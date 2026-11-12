@@ -75,8 +75,14 @@ const DisplayBoardSettings = () => {
   const [selectedBoard, setSelectedBoard] = useState<DisplayBoard | null>(null);
   const [themes, setThemes] = useState<DisplayTheme[]>([]);
   const [stats, setStats] = useState<Record<string, unknown>>({});
-  const [banners] = useState<DisplayBanner[]>([]);
+  // DISPLAYBANNER-FE-001 (audit PR #3961): баннеры реальны — загружаются
+  // с бэкенда (#4016 CRUD), форма Add действительно создаёт баннер
+  // (POST), а мёртвые кнопки Edit/Delete без обработчиков убраны.
+  const [banners, setBanners] = useState<DisplayBanner[]>([]);
   const [showBannerForm, setShowBannerForm] = useState(false); // P2 fix: restored value (used at L545 onClick)
+  const [bannerTitle, setBannerTitle] = useState('');
+  const [bannerDescription, setBannerDescription] = useState('');
+  const [bannerDuration, setBannerDuration] = useState('10');
   const [testResults, setTestResults] = useState<Record<string, { testing?: boolean; success?: boolean; message?: string; error?: string; [k: string]: unknown }>>({});
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -127,11 +133,70 @@ const DisplayBoardSettings = () => {
         setStats(statsData);
       }
 
+      // DISPLAYBANNER-FE-001: баннеры первого табло загружаются с
+      // реального бэкенд-CRUD (audit #3961) — список больше не мёртвый [].
+      if (boardsRes.status >= 200 && boardsRes.status < 300) {
+        const boardsData = boardsRes.data as DisplayBoard[];
+        if (boardsData.length > 0) {
+          try {
+            const bannersRes = await api.get(
+              `/admin/display/boards/${boardsData[0].id}/banners`
+            );
+            const payload = bannersRes.data as { banners?: DisplayBanner[] };
+            setBanners(Array.isArray(payload?.banners) ? payload.banners : []);
+          } catch (bannerError) {
+            logger.warn('Не удалось загрузить баннеры табло:', bannerError);
+            setBanners([]);
+          }
+        }
+      }
+
     } catch (error) {
       logger.error('Ошибка загрузки данных табло:', error);
-      setMessage({ type: 'error', text: t('admin2.db_error_load_boards') });
+      setMessage({ type: 'error', text: t('admin2.db_banner_error') });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // DISPLAYBANNER-FE-001: реальное создание баннера через POST
+  // /admin/display/boards/{id}/banners (audit #3961).
+  const handleCreateBanner = async () => {
+    if (!selectedBoard) return;
+    const title = bannerTitle.trim();
+    if (!title) {
+      setMessage({ type: 'error', text: t('admin2.db_error_load_boards') });
+      return;
+    }
+    try {
+      setSaving(true);
+      const response = await api.post(
+        `/admin/display/boards/${selectedBoard.id}/banners`,
+        {
+          title,
+          description: bannerDescription.trim() || undefined,
+          display_duration: Number(bannerDuration) > 0 ? Number(bannerDuration) : 10,
+        }
+      );
+      const payload = response.data as { banner_id?: number | string };
+      setBanners((prev) => [
+        {
+          id: payload?.banner_id ?? Date.now(),
+          title,
+          description: bannerDescription.trim() || undefined,
+        },
+        ...prev,
+      ]);
+      setShowBannerForm(false);
+      setBannerTitle('');
+      setBannerDescription('');
+      setBannerDuration('10');
+      setMessage({ type: 'success', text: t('admin2.db_banner_created') });
+    } catch (createError) {
+      logger.error('Ошибка создания баннера:', createError);
+      setMessage({ type: 'error', text: t('admin2.db_banner_error') });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -564,7 +629,55 @@ const DisplayBoardSettings = () => {
           </div>
 
           <div className="space-y-3">
-            {banners.length === 0 ?
+            {/* DISPLAYBANNER-FE-001 (audit PR #3961): форма Add реально
+                создаёт баннер; мёртвые Edit/Delete без обработчиков
+                убраны — бэкенд пока не предоставляет PATCH/DELETE
+                баннеров (честный UI вместо фальшивых кнопок). */}
+            {showBannerForm &&
+          <div className="p-3 border border-gray-200 rounded-lg dark:border-gray-700 space-y-2" data-testid="banner-form">
+              <Input
+                type="text"
+                value={bannerTitle}
+                onChange={(e) => setBannerTitle(e.target.value)}
+                placeholder={t('admin2.db_banner_title')}
+                aria-label="Banner title" />
+
+              <Input
+                type="text"
+                value={bannerDescription}
+                onChange={(e) => setBannerDescription(e.target.value)}
+                placeholder={t('admin2.db_banner_description')}
+                aria-label="Banner description" />
+
+              <Input
+                type="number"
+                min={1}
+                value={bannerDuration}
+                onChange={(e) => setBannerDuration(e.target.value)}
+                placeholder="10"
+                aria-label="Banner duration" />
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="small"
+                  disabled={saving || !bannerTitle.trim()}
+                  onClick={handleCreateBanner}
+                  data-testid="banner-save">
+                  {saving ? '...' : t('admin2.db_save')}
+                </Button>
+                <Button
+                  type="button"
+                  size="small"
+                  variant="outline"
+                  onClick={() => setShowBannerForm(false)}
+                  data-testid="banner-cancel">
+                  {t('admin2.db_cancel')}
+                </Button>
+              </div>
+            </div>
+            }
+            {banners.length === 0 && !showBannerForm ?
             <div className="text-center py-8 text-gray-500">
                 <Image size={32} className="mx-auto mb-2 opacity-50" />
                 <p>{t('admin2.db_banners_empty')}</p>
@@ -584,24 +697,6 @@ const DisplayBoardSettings = () => {
                       <div className="font-medium">{banner.title}</div>
                       <div className="text-sm text-gray-500">{banner.description}</div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="small"
-                      variant="outline"
-                      title={`Edit banner ${banner.title}`}
-                      aria-label={`Edit banner ${banner.title}`}>
-                      <Edit aria-hidden="true" size={14} />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="small"
-                      variant="outline"
-                      title={`Delete banner ${banner.title}`}
-                      aria-label={`Delete banner ${banner.title}`}>
-                      <Trash2 aria-hidden="true" size={14} />
-                    </Button>
                   </div>
                 </div>
             )

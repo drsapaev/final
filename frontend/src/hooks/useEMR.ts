@@ -110,6 +110,31 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     const isMountedRef = useRef(true);
     const writeAccessDeniedRef = useRef(false);
     const [writeAccessDenied, setWriteAccessDenied] = useState(false);
+    // RETRO-4007-01 (post-merge re-review of 4007): the server finalized the
+    // record (a structured FINALIZED_STATE 409 or a legacy signed HTTP 400)
+    // while the LOCAL editor still held the in_progress draft. The local
+    // isSigned/isAmended flags stay false in this window, so the amendment
+    // affordance (which only the signed/amended toolbar branch renders) was
+    // unreachable exactly when the UI told the doctor to use it. The marker
+    // mirrors the writeAccessDenied pattern (ref for the callbacks + state
+    // for the consumer) and is cleared by a reload, an amendment, a visit
+    // switch or a specialty change — never by further local edits (the
+    // unsaved draft is retained, not auto-discarded).
+    const serverFinalizedRef = useRef(false);
+    const [serverFinalized, setServerFinalized] = useState(false);
+    // Идентичность стабильна ([] — ref-гарды): флип state не пересоздаёт
+    // коллбеки, иначе эффекты визита/specialty перезапускались бы на каждом
+    // маркере и очищали его (бесконечный флип).
+    const clearServerFinalized = useCallback(() => {
+        if (serverFinalizedRef.current) {
+            serverFinalizedRef.current = false;
+            setServerFinalized(false);
+        }
+    }, []);
+    const markServerFinalized = useCallback(() => {
+        serverFinalizedRef.current = true;
+        setServerFinalized(true);
+    }, []);
     // EMRSIGN-FE-001 (audit 3886 round 17): save/sign/amend callbacks below
     // used to serialize the `state.data` captured in their closure at the
     // render they were created in. When a save-and-sign started at snapshot A
@@ -144,16 +169,18 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             visitEpochRef.current += 1;
             writeAccessDeniedRef.current = false;
             setWriteAccessDenied(false);
+            clearServerFinalized();
             // Hard reset: no data, no dirty flag, no history, no conflict of
             // the previous visit may survive into the new visit's editor.
             dispatch(emrActions.contextReset());
         }
-    }, [visitId]);
+    }, [visitId, clearServerFinalized]);
 
     useEffect(() => {
         writeAccessDeniedRef.current = false;
         setWriteAccessDenied(false);
-    }, [specialty]);
+        clearServerFinalized();
+    }, [specialty, clearServerFinalized]);
 
     // EMRCACHE-FE-001: principal-scoped cache key (cleared on principal swap)
     syncCachePrincipal();
@@ -237,6 +264,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     });
                     writeAccessDeniedRef.current = false;
                     setWriteAccessDenied(false);
+                    clearServerFinalized();
                     const emptyEmr = {
                         data: buildInitialEMRData(specialty),
                         version: 1,
@@ -260,6 +288,9 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 };
                 writeAccessDeniedRef.current = false;
                 setWriteAccessDenied(false);
+                // RETRO-4007-01: a canonical server load (the explicit refresh
+                // path) supersedes any stale-local server-finalized window.
+                clearServerFinalized();
                 if (canUseCache) {
                     emrCache.set(cacheKey, { data: normalizedEmr, promise: null });
                 }
@@ -325,7 +356,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 });
             }
         }
-    }, [cacheKey, handleAccessDenied, specialty, visitId]);
+    }, [cacheKey, handleAccessDenied, specialty, visitId, clearServerFinalized]);
 
     // =========================================================================
     // SAVE EMR
@@ -400,8 +431,32 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     your_version: unknown;
                     last_edited_by: string;
                     last_edited_at: string;
+                    error?: string;
+                    message?: string;
                     [key: string]: unknown;
                 };
+                // RETRO-3971-03 (post-merge review of the 3969–3996 window):
+                // a structured FINALIZED_STATE 409 is amendment routing, not
+                // a version conflict — the backend deliberately returns it
+                // when the record was signed/amended on the server (it was
+                // never “another user changed the document”). Dispatching
+                // conflictDetected here rendered the false conflict dialog
+                // with literal vundefined/vundefined versions (no version
+                // fields on this payload) and gated the amendment affordance
+                // behind the LOCAL isSigned flag, false in this scenario.
+                // Route honestly: the same saveError surfacing the 400-branch
+                // uses for signed documents, plus a `finalized: true` marker
+                // the autosave hook classifies as deterministic (never
+                // stamped as a successful save).
+                if (conflictData?.error === 'FINALIZED_STATE') {
+                    if (stillCurrentVisit()) {
+                        // RETRO-4007-01: expose the marker so the amendment
+                        // affordance opens for THIS stale-local window.
+                        markServerFinalized();
+                        dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    }
+                    return { finalized: true, ...conflictData };
+                }
                 if (stillCurrentVisit()) {
                     dispatch(emrActions.conflictDetected(conflictData));
                 }
@@ -413,6 +468,9 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 const detail = apiError.response.data?.detail;
                 if (typeof detail === 'string' && detail.includes('signed')) {
                     if (stillCurrentVisit()) {
+                        // RETRO-4007-01: the legacy signed-400 refusal marks
+                        // the same server-finalized window (amend routing).
+                        markServerFinalized();
                         dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
                     }
                     return { signed: true };
@@ -427,7 +485,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             dispatch(emrActions.saveError(apiError.message || 'Ошибка сохранения'));
             throw error;
         }
-    }, [handleAccessDenied, specialty, visitId]);
+    }, [handleAccessDenied, specialty, visitId, markServerFinalized]);
 
     // =========================================================================
     // SIGN EMR
@@ -499,8 +557,22 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     your_version: unknown;
                     last_edited_by: string;
                     last_edited_at: string;
+                    error?: string;
+                    message?: string;
                     [key: string]: unknown;
                 };
+                // RETRO-3971-03: same honest routing on the sign path — a
+                // FINALIZED_STATE 409 is amendment routing, never a version
+                // conflict (see the save-path branch above for the rationale).
+                if (conflictData?.error === 'FINALIZED_STATE') {
+                    if (stillCurrentVisit()) {
+                        // RETRO-4007-01: the sign path marks the same
+                        // server-finalized window.
+                        markServerFinalized();
+                        dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    }
+                    return { finalized: true, ...conflictData };
+                }
                 if (stillCurrentVisit()) {
                     dispatch(emrActions.conflictDetected(conflictData));
                 }
@@ -515,7 +587,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             dispatch(emrActions.saveError(apiError.message || 'Ошибка подписания'));
             throw error;
         }
-    }, [handleAccessDenied, specialty, visitId]);
+    }, [handleAccessDenied, specialty, visitId, markServerFinalized]);
 
     // =========================================================================
     // AMEND EMR
@@ -560,6 +632,9 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 });
             }
             if (stillCurrentVisit()) {
+                // RETRO-4007-01: the reasoned amendment landed — the amended
+                // server record supersedes the stale-local window.
+                clearServerFinalized();
                 dispatch(emrActions.saveSuccess(response.data));
             }
             return response.data;
@@ -592,7 +667,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             dispatch(emrActions.saveError(apiError.message || 'Ошибка внесения поправки'));
             throw error;
         }
-    }, [handleAccessDenied, specialty, visitId]);
+    }, [handleAccessDenied, specialty, visitId, clearServerFinalized]);
 
     // =========================================================================
     // CONFLICT RESOLUTION
@@ -669,6 +744,11 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         conflict: state.conflict,
         error: state.error,
         accessDenied: writeAccessDenied,
+        // RETRO-4007-01: the record was finalized (signed/amended) on the
+        // server while the local editor still held the stale in_progress
+        // draft — the amendment affordance must open for this window
+        // (cleared by a reload/amendment/visit switch/specialty change).
+        serverFinalized,
 
         // Computed
         isLoading: state.status === 'loading',

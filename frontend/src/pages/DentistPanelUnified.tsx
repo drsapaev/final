@@ -212,12 +212,32 @@ const DentistPanelUnified = () => {
   // invalidation until that compatibility path is retired separately.
   const {
     loadDentistVisitProtocolByVisitId,
+    savedVisitProtocols,
   } = useDentistVisitProtocols({
     tI18n,
     selectedPatient,
     setSelectedPatient,
     setShowVisitProtocol,
   });
+
+  // RETRO-3986-01 (post-merge review 4000): the dialogs-layer ToothModal
+  // performs a REAL /v2/emr POST (ToothModal.handleSave), so the signed
+  // record must open it inspection-only — the same read-only semantics as
+  // DentalVisitScreen's fieldsDisabled (DENTVISIT-FE-001: `signed` is the
+  // read-only state, `amended` stays editable). The panel's visit-protocol
+  // lifecycle already carries the EMR status per visit (`emr_status`), so
+  // the lock is derived from that record instead of offering a permanently
+  // writable modal. Server-side EMRSignedError remains the backstop.
+  const selectedVisitRecordLocked =
+    String(
+      (savedVisitProtocols as Record<string, unknown>[]).find(
+        (record) =>
+          String(record?.visit_id ?? '') ===
+          String((selectedPatient as { visit_id?: unknown } | null)?.visit_id ?? ''),
+      )?.emr_status ?? '',
+    )
+      .trim()
+      .toLowerCase() === 'signed';
   useEffect(() => {
     appointmentsTableDataRef.current = appointmentsTableData;
   }, [appointmentsTableData]);
@@ -541,6 +561,7 @@ const DentistPanelUnified = () => {
         setScheduleNextModal={setScheduleNextModal}
         setSessionWarning={setSessionWarning}
         handleProtocolTemplateSelect={handleProtocolTemplateSelect}
+        toothModalReadOnly={selectedVisitRecordLocked}
       />
     </div>);
 

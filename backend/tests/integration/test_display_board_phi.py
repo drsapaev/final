@@ -47,6 +47,10 @@ class TestResolveNameFormat:
         mgr._name_format_cache["main_board"] = "full"
         assert mgr._resolve_name_format(["main_board"]) == "full"
 
-    def test_no_board_defaults_to_initials(self):
+    def test_unknown_board_fails_closed_to_none(self):
+        # DISPLAYPRIVACY-BE-002 (audit PR #3961): an unknown board must fail
+        # CLOSED — mask the name ('none'), never degrade to 'initials'.
+        # This test previously pinned the audited fail-open behavior.
         mgr = DisplayWebSocketManager()
-        assert mgr._resolve_name_format(["nonexistent"]) == "initials"
+        assert mgr._resolve_name_format(["nonexistent"]) == "none"
+        assert "nonexistent" not in mgr._name_format_cache

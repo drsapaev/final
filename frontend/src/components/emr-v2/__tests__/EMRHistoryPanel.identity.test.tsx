@@ -72,7 +72,11 @@ describe('EMRHIST-FE-001: canonical DTO keys created_at/created_by', () => {
         <EMRHistoryPanel visitId={5} isOpen />
       </ThemeProvider>,
     );
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith('/v2/emr/5/history'));
+    // The request alone proves nothing about the render: awaiting only
+    // `getMock` raced the async state update and intermittently asserted
+    // against the still-loading panel («Загрузка...») — a pre-existing
+    // flake surfaced by CI on PR #3986. Wait for the RENDERED revision.
+    await waitFor(() => expect(screen.getByText(/2026/)).toBeInTheDocument());
 
     // Pre-fix: formatDate(revision.edited_at) rendered «—» and no author.
     const dateText = screen.getByText(/2026/).textContent ?? '';

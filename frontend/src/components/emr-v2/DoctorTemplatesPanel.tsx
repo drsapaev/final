@@ -59,7 +59,9 @@ export function DoctorTemplatesPanel({
     const {
         templates,
         loading,
+        error,
         hasTemplates,
+        refetch,
         pinTemplate,
         unpinTemplate,
         updateTemplate,
@@ -190,6 +192,19 @@ export function DoctorTemplatesPanel({
                     {loading ? (
                         <div className="doctor-templates-loading">
                             Загрузка...
+                        </div>
+                    ) : error ? (
+                        <div className="doctor-templates-empty" role="alert">
+                            <History size={32} opacity={0.3} />
+                            <p>{t18('misc.dtp_oshibka_zagruzki_shablonov')}</p>
+                            <small className="doctor-templates-error-detail">{String(error)}</small>
+                            <button
+                                type="button"
+                                className="doctor-templates-retry"
+                                onClick={() => refetch()}
+                            >
+                                {t18('misc.dtp_povtorit')}
+                            </button>
                         </div>
                     ) : !hasTemplates ? (
                         <div className="doctor-templates-empty">

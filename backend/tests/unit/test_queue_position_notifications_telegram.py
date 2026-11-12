@@ -41,8 +41,11 @@ async def test_patient_called_notification_routes_safe_telegram_event(
         push_mock,
     )
 
+    # QPOSCALL-BE-001 (audit PR #3961): the call notification is a
+    # called-ticket-only message — the routing test uses the legitimate
+    # post-transition status instead of the old waiting default.
     result = await QueuePositionNotificationService(db_session).notify_patient_called(
-        entry=_queue_entry(patient_id=test_patient.id),
+        entry=_queue_entry(patient_id=test_patient.id, status="called"),
         cabinet_number="205",
     )
 
