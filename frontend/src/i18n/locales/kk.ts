@@ -10211,6 +10211,8 @@ const kk = {
     dss_kosmetologicheskie_protsedur: 'Косметологические процедуры',
     dss_analizy_krovi: 'Анализы крови',
     dss_oshibka_zagruzki_uslug: 'Ошибка загрузки услуг',
+    dss_uslugi_ne_naydeny: 'Қызметтер табылмады',
+    dss_dobavte_uslugi_admin_paneli: '«{specialty}» мамандығы үшін қызметтерді әкімшілік панелінде қосыңыз',
     dss_tsena_uslugi_service_name: 'Цена услуги {service.name}',
     dss_uslug: 'Услуг',
     dss_minut: 'Минут',

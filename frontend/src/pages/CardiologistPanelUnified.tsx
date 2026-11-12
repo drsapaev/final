@@ -682,45 +682,47 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       return;
     }
 
+
+    // RETRO-3963-01 (review 3968 + independent re-review): URL deep-link
+    // hydration must never override a newer human selection. Two guards:
+    // (1) the navigation epoch — a newer intent took a ticket while this
+    // fetch was in flight; and (2) the live committed selection — if the
+    // doctor already selected a DIFFERENT patient, the deep link is stale
+    // and must bail WITHOUT merging its identity over the new selection
+    // (the merge previously could produce a hybrid record: patient P2's
+    // appointment context carrying patient P1's patient_id). Capturing
+    // the epoch alone was insufficient: the hydration effect re-fires on
+    // every selection change, so it could share the ticket of the very
+    // navigation that triggered it.
+    const epoch = navigationEpochRef.current;
+    const liveSelectionIsOtherPatient = (): boolean => {
+      const live = selectedPatientRef.current;
+      const livePatientId = live?.patient?.id || live?.patient_id || null;
+      return livePatientId !== null && String(livePatientId) !== String(patientIdFromUrl);
+    };
+    // RETRO-3969-01 (post-merge review of the 3969–3996 window): the
+    // VISIT dimension of the same steal scenario. This effect re-fires
+    // on every selection change, so a committed same-patient /
+    // different-visit selection (the doctor row-clicked P1 at V_row
+    // while the URL still carries ?patientId=P1&visitId=V1) reached the
+    // merge, which stamped the stale URL visit over the doctor's chosen
+    // one and hijacked the tab. The dermatology panel guards this exact
+    // class (selectionContradictsUrl: patient AND visit) and this
+    // panel's own URL-appointment sync bails on a visit mismatch — the
+    // patient-identity hydration must not be the one surface without
+    // it. A visitless live selection (search pick) is NOT a conflict:
+    // the deep link still supplies the visit for it.
+    const liveSelectionContradictsVisit = (): boolean => {
+      const live = selectedPatientRef.current;
+      const liveVisitId = live?.visit_id ?? null;
+      const urlVisitId = visitIdFromUrl ?? null;
+      return urlVisitId !== null && liveVisitId !== null && String(liveVisitId) !== String(urlVisitId);
+    };
+
     try {
       const token = tokenManager.getAccessToken();
       if (!token) return;
 
-      // RETRO-3963-01 (review 3968 + independent re-review): URL deep-link
-      // hydration must never override a newer human selection. Two guards:
-      // (1) the navigation epoch — a newer intent took a ticket while this
-      // fetch was in flight; and (2) the live committed selection — if the
-      // doctor already selected a DIFFERENT patient, the deep link is stale
-      // and must bail WITHOUT merging its identity over the new selection
-      // (the merge previously could produce a hybrid record: patient P2's
-      // appointment context carrying patient P1's patient_id). Capturing
-      // the epoch alone was insufficient: the hydration effect re-fires on
-      // every selection change, so it could share the ticket of the very
-      // navigation that triggered it.
-      const epoch = navigationEpochRef.current;
-      const liveSelectionIsOtherPatient = (): boolean => {
-        const live = selectedPatientRef.current;
-        const livePatientId = live?.patient?.id || live?.patient_id || null;
-        return livePatientId !== null && String(livePatientId) !== String(patientIdFromUrl);
-      };
-      // RETRO-3969-01 (post-merge review of the 3969–3996 window): the
-      // VISIT dimension of the same steal scenario. This effect re-fires
-      // on every selection change, so a committed same-patient /
-      // different-visit selection (the doctor row-clicked P1 at V_row
-      // while the URL still carries ?patientId=P1&visitId=V1) reached the
-      // merge, which stamped the stale URL visit over the doctor's chosen
-      // one and hijacked the tab. The dermatology panel guards this exact
-      // class (selectionContradictsUrl: patient AND visit) and this
-      // panel's own URL-appointment sync bails on a visit mismatch — the
-      // patient-identity hydration must not be the one surface without
-      // it. A visitless live selection (search pick) is NOT a conflict:
-      // the deep link still supplies the visit for it.
-      const liveSelectionContradictsVisit = (): boolean => {
-        const live = selectedPatientRef.current;
-        const liveVisitId = live?.visit_id ?? null;
-        const urlVisitId = visitIdFromUrl ?? null;
-        return urlVisitId !== null && liveVisitId !== null && String(liveVisitId) !== String(urlVisitId);
-      };
       if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;
 
       const patientResponse = await fetch(`${API_V1_BASE}/patients/${patientIdFromUrl}`, {
@@ -752,6 +754,13 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       setActiveTab('patients');
       notify.info(tI18n('cardio.cardio_panel_patient_loaded_info', { name: patientName }));
     } catch (error: unknown) {
+      // RETRO-3969-02 (P3 hygiene, ledger comment 3 inventory): the failure
+      // path owns the same epoch/live-selection guard as every async
+      // boundary above — a hydration fetch that failed AFTER the operator
+      // moved on must not toast a stale failure (sibling of the fixed
+      // loadEMR catch).
+      if (epoch !== navigationEpochRef.current) return;
+      if (liveSelectionIsOtherPatient() || liveSelectionContradictsVisit()) return;
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_load_failed')));
     }
   }, [patientIdFromUrl, visitIdFromUrl, selectedPatient, setSelectedPatient, setActiveTab]);
