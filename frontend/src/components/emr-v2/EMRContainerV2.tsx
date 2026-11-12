@@ -240,6 +240,9 @@ interface EMRHookResult {
     isSigned: boolean;
     isAmended: boolean;
     accessDenied: boolean;
+    // RETRO-4007-01: the record was finalized on the server while the
+    // local editor held the stale in_progress draft.
+    serverFinalized: boolean;
     version: number | null;
     rowVersion: number;
     canUndo: boolean;
@@ -287,6 +290,7 @@ export function EMRContainerV2({
         isSigned,
         isAmended,
         accessDenied,
+        serverFinalized,
         version,
         rowVersion,
         canUndo,
@@ -319,7 +323,13 @@ export function EMRContainerV2({
     // «Внести поправку» button on every signed EMR, making the backend's
     // reasoned amendment path dead UI. Amendment stays blocked only for
     // read-only observers and while a completion transaction is running.
-    const amendAllowed = (isSigned || isAmended) && !isReadOnly && !isPreparingCompletion && !completionBusy;
+    // RETRO-4007-01 (post-merge re-review of 4007): serverFinalized joins the
+    // reachability set — a FINALIZED_STATE 409 / legacy signed 400 arrives
+    // while the LOCAL isSigned/isAmended flags are still false, and the
+    // container must render the amendment branch for exactly that window
+    // (the stale-local draft is preserved; the reasoned amendment is the
+    // sanctioned pathway onto the server's signed record).
+    const amendAllowed = (isSigned || isAmended || serverFinalized) && !isReadOnly && !isPreparingCompletion && !completionBusy;
     const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
     const canSignReadOnly = isReadOnly
         && Boolean(emr?.id)
@@ -1279,7 +1289,7 @@ export function EMRContainerV2({
                                 </button>
                             )}
                         </>
-                    ) : !isSigned && !isAmended ? (
+                    ) : !isSigned && !isAmended && !serverFinalized ? (
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
