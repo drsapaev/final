@@ -257,14 +257,25 @@ class DisplayWebSocketManager:
         объединяется с локально подключёнными комнатами (dedup). При сбое
         реестра — честный деградационный фолбэк только на локальные комнаты
         (best effort, без крэша).
+
+        Follow-up #4035 (P2-остаток ревью): «активные» — именно
+        ``DisplayBoard.active``. Выведенная из эксплуатации (``active=False``)
+        табло не входит в нетаргетированный набор ни из реестра, ни из
+        локально подключённых комнат, и её политика формата имён не влияет
+        на strictest-format агрегацию. Явные цели (``board_ids=[...]``) этот
+        фильтр не трогает — права на явный выбор не обходятся молча.
         """
-        local = list(self.connections.keys())
-        names: list[str] = []
+        local = [n for n in self.connections.keys() if n]
         try:
             db = SessionLocal()
             try:
-                rows = db.query(DisplayBoard.name).all()
+                rows = (
+                    db.query(DisplayBoard.name)
+                    .filter(DisplayBoard.active == True)
+                    .all()
+                )
                 names = [r[0] for r in rows]
+                active_names = set(names)
             finally:
                 db.close()
         except Exception as e:
@@ -272,9 +283,10 @@ class DisplayWebSocketManager:
                 "DISPLAYRELAY-BE-001: реестр табло недоступен "
                 f"({e}); нетаргетированная трансляция — только локальные комнаты"
             )
+            return local
         merged: list[str] = []
         seen: set[str] = set()
-        for name in [*names, *local]:
+        for name in [*names, *(n for n in local if n in active_names)]:
             if name and name not in seen:
                 seen.add(name)
                 merged.append(name)
@@ -790,6 +802,14 @@ class DisplayWebSocketManager:
         (connect / broadcast_to_board): воркер с кэш-записями обязан быть
         подписан, иначе control-сообщение будет пропущено и устаревший
         ``full`` доживёт до рестарта.
+
+        Follow-up #4035 (P1-остаток ревью): неудавшаяся подписка НЕ кэширует
+        успех и явно отменяет регистрацию обработчика в мосте (мост мог
+        добавить обработчик до проверки готовности Redis и не откатить её
+        сам). Иначе повтор с тем же обработчиком видит ``was_added=False``,
+        пропускает реальный Redis SUBSCRIBE и возвращает ``True`` — воркер
+        навсегда кэширует ``_nameformat_ctl_ok=True`` без реальной подписки
+        и после даунгрейда ``full→none`` продолжает показывать полные имена.
         """
         if getattr(self, "_nameformat_ctl_ok", False):
             return
@@ -798,7 +818,7 @@ class DisplayWebSocketManager:
             handler = self._handle_nameformat_ctl
             self._nameformat_ctl_handler = handler
         try:
-            self._nameformat_ctl_ok = bool(
+            ok = bool(
                 await self._pubsub.subscribe(self.NAMEFORMAT_CTL_CHANNEL, handler)
             )
         except Exception as e:
@@ -806,7 +826,15 @@ class DisplayWebSocketManager:
                 "DISPLAYPRIVACY-BE-001: подписка control-канала формата "
                 f"имён не удалась: {e}"
             )
-            self._nameformat_ctl_ok = False
+            ok = False
+        if not ok:
+            # Откат bridge-level регистрации (если мост не сделал это сам):
+            # без него повторная попытка того же обработчика — ложный успех.
+            try:
+                await self._pubsub.unsubscribe(self.NAMEFORMAT_CTL_CHANNEL, handler)
+            except Exception:
+                pass
+        self._nameformat_ctl_ok = ok
 
     async def _handle_nameformat_ctl(self, payload: dict) -> None:
         """Обработчик control-сообщений инвалидации кэша формата имён."""
