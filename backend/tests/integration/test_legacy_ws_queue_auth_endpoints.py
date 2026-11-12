@@ -1,8 +1,8 @@
-"""WS-POSTMERGE-04: legacy /ws-auth queue endpoints — real join, canonical room, RBAC.
+"""WS-POSTMERGE-04/05: legacy /ws-auth queue endpoints — real join, canonical room, RBAC, pool hygiene, call validation.
 
 The legacy mounted routes ``/api/v1/ws-auth/ws/queue/auth`` and
 ``/api/v1/ws-auth/ws/queue/optional-auth`` (``websocket_auth.py``) had four
-source-confirmed defects:
+source-confirmed defects (WS-POSTMERGE-04):
 
 1. ``ws_manager.connect(websocket, room)`` was called WITHOUT ``await`` —
    the accepted socket never entered the manager room and could not
@@ -20,11 +20,28 @@ source-confirmed defects:
    ``await`` without RBAC would subscribe Patients/foreign specialists to
    caller-selected rooms.
 
+Round 39 added three more candidates against the repaired transport
+(audit IDs LEGACYWSPOOL-BE-001 / LEGACYWSCALL-BE-001 / WSHELPER-FE-001):
+
+5. **LEGACYWSPOOL-BE-001 (P1 conditional)** — the handshake ``SessionLocal()``
+   was held for the whole WS lifetime, pinning one PostgreSQL pool
+   connection per connected staff client (pool defaults 8+2).
+6. **LEGACYWSCALL-BE-001 (P2)** — ``call_patient`` forwarded ARBITRARY
+   patient ids to the broadcast; the queue SSOT is now consulted (numeric
+   id, ISO date, queue scope of the room, ``waiting`` entry) with a
+   short-lived session before relaying.
+7. **WSHELPER-FE-001 (P2, latent, backend half)** — the endpoints required
+   the ``?token=`` query and used a bare ``accept()``; a browser offering
+   the ``bearer.<jwt>`` subprotocol could never complete the handshake.
+   Tokens now resolve through the canonical ``extract_ws_token`` and the
+   offered subprotocol is echoed.
+
 The tests authenticate with REAL JWTs through the real endpoint flow; the
 JWT subject resolution, the doctor-ownership SSOT and the token blacklist
 are stubbed with synthetic principals (same pattern as
 ``test_queue_ws_plane_contract.py``), and the WSManager singleton is
-isolated with a fake pubsub bridge. No patient data is involved.
+isolated with a fake pubsub bridge. Queue-entry validation runs real
+queries against the per-test sqlite engine. No patient data is involved.
 """
 
 from __future__ import annotations
@@ -118,6 +135,172 @@ def _doctor_row(doctor_id: int = 7) -> SimpleNamespace:
     return SimpleNamespace(id=doctor_id, specialty="cardio", department=None)
 
 
+# ---------------------------------------------------------------------------
+# LEGACYWSPOOL-BE-001 / LEGACYWSCALL-BE-001 helpers: real SSOT sessions
+# ---------------------------------------------------------------------------
+
+
+def _patch_validation_db(monkeypatch: pytest.MonkeyPatch, engine) -> None:
+    """Bind ws_auth.SessionLocal to the per-test engine.
+
+    The queue-entry validation runs REAL queries (queue SSOT), so the
+    module's session factory is bound to the per-test sqlite engine.
+    """
+    from sqlalchemy.orm import sessionmaker
+
+    monkeypatch.setattr(
+        ws_auth,
+        "SessionLocal",
+        sessionmaker(autocommit=False, autoflush=False, bind=engine),
+    )
+
+
+@pytest.fixture()
+def seed_queue(test_db):
+    """Seed queue rows and FULLY remove them at teardown.
+
+    ``test_db`` is SESSION-scoped: rows committed directly to the engine
+    persist for the whole run and pollute later queue-count tests (queue
+    lag metrics, QR-join censuses, migration backups). This fixture seeds
+    get-or-create queues + entries and deletes exactly the rows it
+    created when the test finishes.
+    """
+    from datetime import date as date_type
+
+    from sqlalchemy.orm import sessionmaker
+
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+
+    created_queue_ids: list[int] = []
+    created_entry_ids: list[int] = []
+    factory = sessionmaker(autocommit=False, autoflush=False, bind=test_db)
+
+    def _seed(*, specialist_id: int, patient_id: int, status: str) -> int:
+        session = factory()
+        try:
+            queue_day = date_type.fromisoformat(_DATE)
+            queue = (
+                session.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == queue_day,
+                    DailyQueue.specialist_id == specialist_id,
+                )
+                .first()
+            )
+            if queue is None:
+                queue = DailyQueue(day=queue_day, specialist_id=specialist_id)
+                session.add(queue)
+                session.flush()
+                created_queue_ids.append(queue.id)
+            next_number = (
+                session.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.queue_id == queue.id)
+                .count()
+                + 1
+            )
+            entry = OnlineQueueEntry(
+                queue_id=queue.id,
+                number=next_number,
+                patient_id=patient_id,
+                status=status,
+            )
+            session.add(entry)
+            session.commit()
+            created_entry_ids.append(entry.id)
+            return queue.id
+        finally:
+            session.close()
+
+    yield _seed
+
+    session = factory()
+    try:
+        if created_entry_ids:
+            session.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.id.in_(created_entry_ids)
+            ).delete(synchronize_session=False)
+        if created_queue_ids:
+            # Only the queues THIS fixture created — never shared rows.
+            session.query(DailyQueue).filter(
+                DailyQueue.id.in_(created_queue_ids)
+            ).delete(synchronize_session=False)
+        session.commit()
+    finally:
+        session.close()
+
+
+def test_legacy_session_released_before_receive_loop(
+    client: TestClient, isolated_plane, monkeypatch: pytest.MonkeyPatch
+):
+    """LEGACYWSPOOL-BE-001 (P1 conditional): no pool connection is held for
+    the WS lifetime — the handshake session is closed BEFORE the receive
+    loop starts (asserted while the socket is still connected)."""
+    from unittest.mock import MagicMock
+
+    fake_session = MagicMock()
+    captured: list[object] = []
+
+    def _factory():
+        captured.append(fake_session)
+        return fake_session
+
+    _stub_auth(monkeypatch, _doctor_user(), _doctor_row(doctor_id=7))
+    monkeypatch.setattr(ws_auth, "SessionLocal", _factory)
+
+    token = _mint_jwt(sub="100")
+    room = f"specialist_7::{_DATE}"
+
+    with client.websocket_connect(
+        f"/api/v1/ws-auth/ws/queue/auth?department=specialist_7&date={_DATE}&token={token}"
+    ) as ws:
+        assert _wait_for_room(room)
+        assert fake_session.close.called, (
+            "the handshake SessionLocal() connection is still checked out "
+            "while the socket is connected — pool starvation risk"
+        )
+
+    # One session per handshake, no per-message re-open on the stub path.
+    assert len(captured) == 1
+
+
+def test_authenticated_endpoint_accepts_subprotocol_token(
+    client: TestClient, isolated_plane, monkeypatch: pytest.MonkeyPatch
+):
+    """WSHELPER-FE-001 backend half: bearer subprotocol + echoing accept.
+
+    The endpoint previously required the ?token= query parameter and used a
+    bare accept() — a browser offering Sec-WebSocket-Protocol could never
+    complete the handshake.
+    """
+    _stub_auth(monkeypatch, _doctor_user(), _doctor_row(doctor_id=7))
+    token = _mint_jwt(sub="100")
+    room = f"specialist_7::{_DATE}"
+
+    with client.websocket_connect(
+        f"/api/v1/ws-auth/ws/queue/auth?department=specialist_7&date={_DATE}",
+        subprotocols=[f"bearer.{token}"],
+    ) as ws:
+        assert _wait_for_room(room)
+        accepted = getattr(ws, "accepted_subprotocol", None)
+        assert accepted == f"bearer.{token}"
+
+
+def test_optional_auth_accepts_subprotocol_token(
+    client: TestClient, isolated_plane, monkeypatch: pytest.MonkeyPatch
+):
+    _stub_auth(monkeypatch, _doctor_user(user_id=101), _doctor_row(doctor_id=73))
+    token = _mint_jwt(sub="101")
+    room = f"specialist_73::{_DATE}"
+
+    with client.websocket_connect(
+        f"/api/v1/ws-auth/ws/queue/optional-auth?department=specialist_73&date={_DATE}",
+        subprotocols=[f"bearer.{token}"],
+    ) as ws:
+        assert _wait_for_room(room)
+        accepted = getattr(ws, "accepted_subprotocol", None)
+        assert accepted == f"bearer.{token}"
+
+
 def _wait_for_room(room: str, timeout: float = 2.0) -> bool:
     """Poll for server-side room registration (runs on the app loop)."""
     deadline = time.monotonic() + timeout
@@ -164,11 +347,62 @@ def test_authenticated_legacy_endpoint_wrong_room_never_joined(
         assert f"specialist_7:{_DATE}" not in ws_manager.rooms
 
 
-def test_call_patient_real_dispatcher_delivers_no_typeerror(
-    client: TestClient, isolated_plane, monkeypatch: pytest.MonkeyPatch
+def test_call_patient_seeded_waiting_entry_broadcasts(
+    client: TestClient,
+    isolated_plane,
+    test_db,
+    seed_queue,
+    monkeypatch: pytest.MonkeyPatch,
 ):
-    """call_patient through the real dispatcher: no TypeError, canonical room."""
+    """LEGACYWSCALL-BE-001 positive path: a REAL waiting entry broadcasts.
+
+    The queue scope is resolved through the SSOT (DailyQueue of the room's
+    specialist for the room's date) and the entry must exist with status
+    ``waiting`` inside that scope.
+    """
     _stub_auth(monkeypatch, _doctor_user(), _doctor_row(doctor_id=7))
+    _patch_validation_db(monkeypatch, test_db)
+    seed_queue(specialist_id=7, patient_id=501, status="waiting")
+
+    token = _mint_jwt(sub="100")
+    room = f"specialist_7::{_DATE}"
+
+    with (
+        client.websocket_connect(
+            f"/api/v1/ws-auth/ws/queue/auth?department=specialist_7&date={_DATE}&token={token}"
+        ) as ws_a,
+        client.websocket_connect(
+            f"/api/v1/ws-auth/ws/queue/auth?department=specialist_7&date={_DATE}&token={token}"
+        ) as ws_b,
+    ):
+        assert _wait_for_room(room)
+        ws_a.send_json({"type": "call_patient", "patient_id": "501"})
+
+        # Both room members must receive the patient_called event; the old
+        # code died with TypeError (await on a sync broadcast) instead.
+        msg_a = ws_a.receive_json()
+        msg_b = ws_b.receive_json()
+        for msg in (msg_a, msg_b):
+            assert msg.get("type") == "patient_called"
+            assert msg.get("patient_id") == "501"
+            assert msg.get("caller") == "synthetic-doctor"
+
+
+def test_call_patient_rejects_unseeded_synthetic_patient(
+    client: TestClient,
+    isolated_plane,
+    test_db,
+    seed_queue,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """LEGACYWSCALL-BE-001: an unseeded/non-numeric id must NOT broadcast.
+
+    The WS-POSTMERGE-04 suite asserted delivery for the unseeded synthetic
+    id 'p-1' — that asserted the flaw. The frame now gets an error reply
+    and room members receive nothing.
+    """
+    _stub_auth(monkeypatch, _doctor_user(), _doctor_row(doctor_id=7))
+    _patch_validation_db(monkeypatch, test_db)
     token = _mint_jwt(sub="100")
     room = f"specialist_7::{_DATE}"
 
@@ -183,14 +417,72 @@ def test_call_patient_real_dispatcher_delivers_no_typeerror(
         assert _wait_for_room(room)
         ws_a.send_json({"type": "call_patient", "patient_id": "p-1"})
 
-        # Both room members must receive the patient_called event; the old
-        # code died with TypeError (await on a sync broadcast) instead.
-        msg_a = ws_a.receive_json()
-        msg_b = ws_b.receive_json()
-        for msg in (msg_a, msg_b):
-            assert msg.get("type") == "patient_called"
-            assert msg.get("patient_id") == "p-1"
-            assert msg.get("caller") == "synthetic-doctor"
+        reply = ws_a.receive_json()
+        assert reply.get("type") == "error"
+        assert "numeric" in (reply.get("message") or "")
+
+        time.sleep(0.2)
+        # The other member received nothing (the queue SSOT never saw the
+        # patient): drain-check via a short socket receive would block, so
+        # assert no queued send happened by checking the room is intact and
+        # the sender's next synthetic frame still flows.
+        ws_a.send_json({"type": "ping"})
+        assert ws_a.receive_json().get("type") == "pong"
+
+
+def test_call_patient_rejects_numeric_patient_without_waiting_entry(
+    client: TestClient,
+    isolated_plane,
+    test_db,
+    seed_queue,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _stub_auth(monkeypatch, _doctor_user(), _doctor_row(doctor_id=7))
+    _patch_validation_db(monkeypatch, test_db)
+    # A seeded but already-served entry is NOT callable.
+    seed_queue(specialist_id=7, patient_id=502, status="served")
+
+    token = _mint_jwt(sub="100")
+    room = f"specialist_7::{_DATE}"
+
+    with client.websocket_connect(
+        f"/api/v1/ws-auth/ws/queue/auth?department=specialist_7&date={_DATE}&token={token}"
+    ) as ws:
+        assert _wait_for_room(room)
+        ws.send_json({"type": "call_patient", "patient_id": "502"})
+        reply = ws.receive_json()
+        assert reply.get("type") == "error"
+        assert "waiting queue entry" in (reply.get("message") or "")
+
+
+def test_call_patient_rejects_entry_outside_room_scope(
+    client: TestClient,
+    isolated_plane,
+    test_db,
+    seed_queue,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The entry lives in specialist_7's queue; an Admin joined to
+    specialist_8 (RBAC-unrestricted) still cannot broadcast it."""
+    _stub_auth(
+        monkeypatch,
+        SimpleNamespace(id=102, username="syn-registrar", role="Registrar"),
+        None,
+    )
+    _patch_validation_db(monkeypatch, test_db)
+    seed_queue(specialist_id=7, patient_id=503, status="waiting")
+
+    token = _mint_jwt(sub="102")
+    room = f"specialist_8::{_DATE}"
+
+    with client.websocket_connect(
+        f"/api/v1/ws-auth/ws/queue/auth?department=specialist_8&date={_DATE}&token={token}"
+    ) as ws:
+        assert _wait_for_room(room)
+        ws.send_json({"type": "call_patient", "patient_id": "503"})
+        reply = ws.receive_json()
+        assert reply.get("type") == "error"
+        assert "waiting queue entry" in (reply.get("message") or "")
 
 
 def test_authenticated_legacy_endpoint_disconnect_cleans_room(

@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 import jwt
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from jwt import PyJWTError as JWTError
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -114,13 +115,28 @@ async def authenticate_websocket_token(token: str | None, db: Session) -> User |
 
 @router.websocket("/ws/queue/auth")
 async def ws_queue_authenticated(
-    websocket: WebSocket, department: str, date: str, token: str
+    websocket: WebSocket, department: str, date: str, token: str | None = None
 ):
     """
     Аутентифицированное WebSocket соединение для очереди
     Требует обязательный JWT токен
     ✅ SECURITY: Authentication and rate limiting enforced
     """
+    # WSHELPER-FE-001: the token is resolved through the canonical
+    # ``extract_ws_token`` (Sec-WebSocket-Protocol ``bearer.<jwt>`` preferred,
+    # Authorization header next, ``?token=`` query kept as a deprecated
+    # fallback) and the handshake echoes an offered subprotocol — the bare
+    # ``accept()`` + query-only contract made the browser handshake of any
+    # subprotocol-offering client impossible.
+    from app.api.v1.endpoints.ws_token import (
+        accept_echoing_subprotocol,
+        extract_ws_token,
+    )
+
+    secure_token = extract_ws_token(websocket)
+    if secure_token and not token:
+        token = secure_token
+
     db = SessionLocal()
     ip_address = websocket.client.host if websocket.client else "unknown"
 
@@ -157,7 +173,18 @@ async def ws_queue_authenticated(
         # ✅ SECURITY: Record connection after successful auth
         websocket_rate_limiter.record_connection(ip_address)
 
-        await websocket.accept()
+        # LEGACYWSPOOL-BE-001 (P1 conditional): release the checked-out pool
+        # connection BEFORE the unlimited receive loop. The session was held
+        # for the whole WS lifetime; with the transport actually working
+        # (WS-POSTMERGE-04) every connected staff client pinned one of the
+        # PostgreSQL pool's 8+2 connections until disconnect. Per-message DB
+        # work opens short-lived sessions instead.
+        db.close()
+        db = None
+
+        # WSHELPER-FE-001: echo the offered subprotocol so browser
+        # handshakes complete.
+        await accept_echoing_subprotocol(websocket)
 
         # WS-POSTMERGE-04: canonical room identity ("{department}::{date}",
         # double colon) — the legacy single-colon form subscribed to a dead
@@ -214,8 +241,10 @@ async def ws_queue_authenticated(
                         continue
 
                     # Обрабатываем сообщения от аутентифицированного клиента
+                    # (LEGACYWSPOOL-BE-001: без удерживаемой сессии —
+                    # обработчики открывают короткие сессии сами)
                     await _handle_authenticated_message(
-                        websocket, message, authenticated_user, department, date, db
+                        websocket, message, authenticated_user, department, date, None
                     )
 
                 except TimeoutError:
@@ -265,7 +294,10 @@ async def ws_queue_authenticated(
         websocket_rate_limiter.remove_connection(ip_address)
         if "room" in locals():
             ws_manager.disconnect(websocket, room)
-        db.close()
+        # LEGACYWSPOOL-BE-001: the session is already released before the
+        # receive loop; the guard covers early-exit paths only.
+        if db is not None:
+            db.close()
 
 
 @router.websocket("/ws/queue/optional-auth")
@@ -278,6 +310,18 @@ async def ws_queue_optional_auth(
     ✅ SECURITY: This endpoint is deprecated. Use /ws/queue/auth instead.
     Authentication is now REQUIRED for all WebSocket connections.
     """
+    # WSHELPER-FE-001: canonical token resolution (subprotocol preferred,
+    # query kept as deprecated fallback) so subprotocol-offering browser
+    # clients can authenticate without leaking the JWT in the URL.
+    from app.api.v1.endpoints.ws_token import (
+        accept_echoing_subprotocol,
+        extract_ws_token,
+    )
+
+    secure_token = extract_ws_token(websocket)
+    if secure_token and not token:
+        token = secure_token
+
     # ✅ SECURITY: Require authentication - reject anonymous connections
     if not token:
         await websocket.close(
@@ -310,7 +354,14 @@ async def ws_queue_optional_auth(
             )
             return
 
-        await websocket.accept()
+        # LEGACYWSPOOL-BE-001 (P1 conditional): release the pool connection
+        # before the unlimited receive loop (see /ws/queue/auth).
+        db.close()
+        db = None
+
+        # WSHELPER-FE-001: echo the offered subprotocol so browser
+        # handshakes complete.
+        await accept_echoing_subprotocol(websocket)
 
         # WS-POSTMERGE-04: canonical room identity + awaited connect (see
         # the authenticated endpoint for the full rationale).
@@ -326,9 +377,11 @@ async def ws_queue_optional_auth(
                 data = await websocket.receive_text()
                 message = json.loads(data)
 
-                # Обрабатываем сообщения (только для аутентифицированных пользователей)
+                # Обрабатываем сообщения (только для аутентифицированных
+                # пользователей). LEGACYWSPOOL-BE-001: без удерживаемой
+                # сессии — обработчики открывают короткие сессии сами.
                 await _handle_authenticated_message(
-                    websocket, message, authenticated_user, department, date, db
+                    websocket, message, authenticated_user, department, date, None
                 )
 
         except WebSocketDisconnect:
@@ -349,7 +402,10 @@ async def ws_queue_optional_auth(
     finally:
         if "room" in locals():
             ws_manager.disconnect(websocket, room)
-        db.close()
+        # LEGACYWSPOOL-BE-001: the session is already released before the
+        # receive loop; the guard covers early-exit paths only.
+        if db is not None:
+            db.close()
 
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
@@ -516,7 +572,25 @@ async def _handle_authenticated_message(
             str(user.role).casefold() in _STAFF_DOCTOR_ROLES
         ):
             patient_id = message.get("patient_id")
-            await _broadcast_patient_call(department, date, patient_id, user.username)
+            # LEGACYWSCALL-BE-001 (P2): the frame used to forward ARBITRARY
+            # patient identifiers to the broadcast. Validate against the
+            # queue SSOT (entry exists, is callable, lives in the room's
+            # queue scope) with a SHORT-LIVED session before relaying.
+            session = SessionLocal()
+            try:
+                allowed, rejection_reason = _validate_patient_call(
+                    session, department, date, patient_id
+                )
+            finally:
+                session.close()
+            if allowed:
+                await _broadcast_patient_call(
+                    department, date, patient_id, user.username
+                )
+            else:
+                await websocket.send_text(
+                    json.dumps({"type": "error", "message": rejection_reason})
+                )
         else:
             await websocket.send_text(
                 json.dumps(
@@ -583,6 +657,87 @@ async def _handle_message_with_auth_level(
             await _handle_authenticated_message(
                 websocket, message, user, department, date, db
             )
+
+
+def _validate_patient_call(
+    db: Session, department: str, date: str, patient_id: object
+) -> tuple[bool, str]:
+    """LEGACYWSCALL-BE-001 (P2): bind a call_patient frame to the queue SSOT.
+
+    The legacy relay used to forward ANY client-supplied ``patient_id`` to
+    the ``patient_called`` broadcast. A frame is relayed only when:
+
+    - ``patient_id`` is a positive numeric identifier (entries reference
+      ``patients.id``; strings are accepted as decimal digits for legacy
+      clients);
+    - ``date`` is a valid ISO ``YYYY-MM-DD``;
+    - the room resolves to a queue scope: ``specialist_<id>`` rooms address
+      the active ``DailyQueue`` of that ``doctors.id``; department-name
+      rooms address active queues whose specialist's ``Department.key``
+      matches case-insensitively;
+    - a ``waiting`` entry for that patient exists inside the scope
+      (``called``/``served``/… entries are not callable; non-existent
+      patients are rejected instead of being broadcast).
+
+    Returns ``(True, "")`` when the frame may be relayed, ``(False,
+    reason)`` otherwise (the caller answers with an error frame).
+    """
+    from datetime import date as date_type
+
+    from app.models.clinic import Doctor
+    from app.models.department import Department
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+
+    if isinstance(patient_id, bool) or patient_id is None:
+        return False, "patient_id is required and must be a numeric identifier"
+    if isinstance(patient_id, int):
+        patient_pk = patient_id
+    elif isinstance(patient_id, str) and patient_id.strip().isdigit():
+        patient_pk = int(patient_id.strip())
+    else:
+        return False, "patient_id must be a numeric identifier"
+    if patient_pk <= 0:
+        return False, "patient_id must be a positive identifier"
+
+    try:
+        queue_day = date_type.fromisoformat((date or "").strip())
+    except ValueError:
+        return False, "date must be an ISO YYYY-MM-DD value"
+
+    room_department = (department or "").strip()
+    if not room_department:
+        return False, "room does not address a queue scope"
+
+    scope = (
+        db.query(OnlineQueueEntry.id)
+        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+        .filter(
+            DailyQueue.day == queue_day,
+            OnlineQueueEntry.patient_id == patient_pk,
+            OnlineQueueEntry.status == "waiting",
+        )
+    )
+
+    if room_department.startswith(_SPECIALIST_ROOM_PREFIX):
+        specialist_suffix = room_department[len(_SPECIALIST_ROOM_PREFIX) :]
+        if not specialist_suffix.isdigit():
+            return False, "room does not address a queue scope"
+        scope = scope.filter(
+            DailyQueue.specialist_id == int(specialist_suffix),
+            DailyQueue.active == True,  # noqa: E712  # SQL boolean filter
+        )
+    else:
+        scope = scope.filter(
+            Doctor.id == DailyQueue.specialist_id,
+            Department.id == Doctor.department_id,
+            func.lower(Department.key) == room_department.lower(),
+        )
+
+    if scope.first() is None:
+        return False, (
+            "no waiting queue entry for this patient in this room's queue scope"
+        )
+    return True, ""
 
 
 async def _broadcast_patient_call(
