@@ -1,3 +1,13 @@
+## Resume — RQ-18 duplicate asset failure fix — 2026-11-12T08:59:53+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`, based on merged PR #4026 commit `9091141b87170fcc4430e7ca57ac4ecd9a3d2081`.
+
+The current follow-up addresses a P2: a previously captured browser asset hash could hide a genuine later `requestfailed` on the same URL. The recorder now ignores only Chromium `net::ERR_ABORTED` after a matching response body is captured; genuine failures are retained and reported. The new local CSS regression covers the verified abort code and a real failed request after a prior successful capture.
+
+Focused Chromium Playwright provenance tests passed 2/2; scoped ESLint reported 0 errors and 2 existing raw-fetch warnings. The full local type-check and build fail before changed-source validation because shared `C:\final\frontend\node_modules` lacks `nitro` and has unrelated existing mock-typing errors; no dependencies were installed. One initial slow-navigation cancellation harness timed out and was replaced with a deterministic route-abort control. See newest `EVIDENCE.md` entry for exact commands and scope.
+
+No PR is open yet. Finish `git diff --check`, commit and push, create a focused PR, then verify its exact-head CI and review. Do not merge; the user owns merge. Do not start staging: last canonical Preflight found C: free 9.24 GiB, below the 10 GiB reserve. T18/Tier-2 remains PARTIAL with no deferral.
+
 ## Resume — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged. T18/Tier-2 remains PARTIAL, without a deferral; user owns merge/deployment.

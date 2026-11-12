@@ -819,9 +819,6 @@ function createServedAssetRecorder() {
             return;
           }
           capturedAssetHashes.set(asset.key, sha256);
-          if (captureFailures.get(asset.key) === 'request-failed') {
-            captureFailures.delete(asset.key);
-          }
         } catch {
           captureFailures.set(asset.key, 'browser-response-body-unavailable');
         }
@@ -838,11 +835,13 @@ function createServedAssetRecorder() {
       const asset = state.activeRequests.get(browserRequest);
       if (!asset) return;
       state.activeRequests.delete(browserRequest);
-      // A navigation may cancel a duplicate request after an earlier complete
-      // response already proved the bytes for this same origin and path.
-      if (!capturedAssetHashes.has(asset.key)) {
-        captureFailures.set(asset.key, 'request-failed');
-      }
+      // Only ignore Chromium's navigation-abort marker when another completed
+      // browser response already proved these exact asset bytes. A successful
+      // capture from one page must never hide a genuine failure on another.
+      const errorText = browserRequest.failure()?.errorText;
+      const verifiedNavigationAbort = errorText === 'net::ERR_ABORTED'
+        && capturedAssetHashes.has(asset.key);
+      if (!verifiedNavigationAbort) captureFailures.set(asset.key, 'request-failed');
     });
   };
 
@@ -864,7 +863,6 @@ function createServedAssetRecorder() {
     const origin = new URL(expectedOrigin).origin;
     const failures = Array.from(captureFailures.entries())
       .filter(([key]) => key.startsWith(origin + '/'))
-      .filter(([key, reason]) => reason !== 'request-failed' || !capturedAssetHashes.has(key))
       .map(([key, reason]) => {
         const path = key.slice(origin.length);
         return path + ':' + reason;
@@ -975,6 +973,85 @@ test('RQ-18 provenance hashes the browser response body before navigation cancel
   } finally {
     await independentRequest?.dispose();
     await context?.close();
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    });
+  }
+});
+
+test('RQ-18 provenance reports genuine duplicate asset failures but ignores a verified Chromium abort', async ({ browser, browserName }) => {
+  test.skip(browserName !== 'chromium', 'RQ-18 staging provenance runs on Chromium and classifies its navigation-abort code.');
+  test.setTimeout(30_000);
+  const cssPath = `/assets/rq18-duplicate-failure-${suffixKey}.css`;
+  const cssBody = ':root { --rq18-asset-probe: 1; }';
+  const server = createServer((incoming, outgoing) => {
+    if (incoming.url === '/with-css') {
+      outgoing.statusCode = 200;
+      outgoing.setHeader('content-type', 'text/html; charset=utf-8');
+      outgoing.end(`<!doctype html><html><head><link rel="stylesheet" href="${cssPath}"></head><body></body></html>`);
+      return;
+    }
+    if (incoming.url === cssPath) {
+      outgoing.statusCode = 200;
+      outgoing.setHeader('content-type', 'text/css; charset=utf-8');
+      outgoing.setHeader('cache-control', 'no-store');
+      outgoing.end(cssBody);
+      return;
+    }
+    outgoing.statusCode = 404;
+    outgoing.end();
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error('Could not start local duplicate-asset regression server.');
+  }
+
+  const origin = `http://127.0.0.1:${address.port}`;
+  const cssUrl = new URL(cssPath, origin).toString();
+  const servedAssets = createServedAssetRecorder();
+  const contexts: BrowserContext[] = [];
+  try {
+    const firstContext = await browser.newContext({ serviceWorkers: 'block' });
+    contexts.push(firstContext);
+    const firstPage = await firstContext.newPage();
+    servedAssets.recordPage(firstPage);
+    await firstPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'load' });
+    await servedAssets.waitForPage(firstPage);
+    const firstCapture = await servedAssets.reportForOrigin(origin);
+    expect(firstCapture.some((record) => record.path === cssPath
+      && record.sha256 === crypto.createHash('sha256').update(cssBody).digest('hex'))).toBe(true);
+
+    const navigationContext = await browser.newContext({ serviceWorkers: 'block' });
+    contexts.push(navigationContext);
+    const navigationPage = await navigationContext.newPage();
+    servedAssets.recordPage(navigationPage);
+    await navigationPage.route(cssUrl, (route) => route.abort('aborted'));
+    const navigationAbort = navigationPage.waitForEvent('requestfailed', (browserRequest) => browserRequest.url() === cssUrl);
+    await navigationPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'domcontentloaded' });
+    const cancelledRequest = await navigationAbort;
+    expect(cancelledRequest.failure()?.errorText).toBe('net::ERR_ABORTED');
+    await servedAssets.waitForPage(navigationPage);
+    await expect(servedAssets.reportForOrigin(origin)).resolves.toContainEqual(expect.objectContaining({ path: cssPath }));
+
+    const failedContext = await browser.newContext({ serviceWorkers: 'block' });
+    contexts.push(failedContext);
+    const failedPage = await failedContext.newPage();
+    servedAssets.recordPage(failedPage);
+    await failedPage.route(cssUrl, (route) => route.abort('failed'));
+    const failedRequestPromise = failedPage.waitForEvent('requestfailed', (browserRequest) => browserRequest.url() === cssUrl);
+    await failedPage.goto(new URL('/with-css', origin).toString(), { waitUntil: 'domcontentloaded' });
+    const failedRequest = await failedRequestPromise;
+    expect(failedRequest.failure()?.errorText).toBeTruthy();
+    expect(failedRequest.failure()?.errorText).not.toBe('net::ERR_ABORTED');
+    await servedAssets.waitForPage(failedPage);
+    await expect(servedAssets.reportForOrigin(origin)).rejects.toThrow(`${cssPath}:request-failed`);
+  } finally {
+    await Promise.all(contexts.map((context) => context.close().catch(() => undefined)));
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     });

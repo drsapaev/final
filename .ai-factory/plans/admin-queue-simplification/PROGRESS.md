@@ -1,3 +1,15 @@
+## Current checkpoint — PR #4026 post-merge RQ-18 asset failure regression — 2026-11-12T08:59:53+05:00
+
+- Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`: T00–T17 are merged; T18/Tier-2 remains PARTIAL. User owns merge/deployment.
+- PR #4026 was merged at `9091141b87170fcc4430e7ca57ac4ecd9a3d2081`. Follow-up branch `codex/aqs-t18-rq18-failure-20261112` is based on that fresh `origin/main`; the current change is a narrow browser-test/provenance-evidence correction. No new PR has been opened yet.
+- Follow-up fixes the false-green path where a prior hash hid a later real JS/CSS request failure. Only Chromium `net::ERR_ABORTED` is ignored, and only after a complete matching asset body was captured. Genuine failures remain reportable even if another page supplied a hash.
+- Local focused validation: Chromium Playwright provenance tests 2/2 PASS; scoped ESLint 0 errors with 2 existing `raw fetch` warnings. The initial physical navigation-abort harness attempt timed out; the final regression deterministically checks Chromium's abort code and a genuine route failure.
+- Local full type-check and build are blocked by shared `C:\final\frontend\node_modules`: TypeScript reports missing `nitro` and unrelated existing test-mock typing errors; Vite build stops loading config because `nitro` is absent. No packages were installed. Exact-head GitHub CI is pending until the follow-up PR exists.
+- Canonical gate: `gate_known_root_cause` on the E2E file and three journals returned `narrow_override` (`gate_misroute=false`, `override_used=true`, `handoff_required=true`); generated execution prompt was read and followed.
+- No staging/Compose was started. Last canonical Preflight found C: free 9.24 GiB against the 10 GiB staging reserve. Full live RQ-18, served artifact provenance, remaining T18 scenarios, and `STAGING_VALIDATION.md` remain incomplete; no deferral is claimed.
+- Changed scope: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and these T18 journals only. No product runtime/API/DB/auth, production, staging, or deployment changes.
+- Next exact action: finish `git diff --check`, commit and push this follow-up, open a focused PR, then inspect exact-head CI/review. Do not merge; user owns merge. Keep Tier-2 PARTIAL.
+
 ## Current checkpoint — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
 
 - Umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80: T00–T17 are MERGED; T18/Tier-2 is still PARTIAL. User owns merge/deployment.
