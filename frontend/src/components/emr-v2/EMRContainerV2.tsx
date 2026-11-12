@@ -348,7 +348,7 @@ export function EMRContainerV2({
     const doctorId = currentUser?.id;
 
     // Autosave setup
-    const { lastAutosave, config: autosaveConfig } = useEMRAutosave({
+    const { lastAutosave, config: autosaveConfig, suppressOnDiscard } = useEMRAutosave({
         isDirty,
         isSaving,
         isSigned,
@@ -374,6 +374,9 @@ export function EMRContainerV2({
         isSaving,
         saveEMR,
         reloadFromServer,
+        // Route-level Discard must suppress the #4009 unmount autosave
+        // synchronously, before the asynchronous baseline reload starts.
+        onDiscard: suppressOnDiscard,
         enabled: !isReadOnly && !accessDenied,
     });
 
