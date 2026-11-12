@@ -53,18 +53,32 @@ function PreviewTab({ draftVersion }: PreviewTabProps) {
   async function handleServerPdfPreview() {
     const versionId = draftVersion?.id;
     if (!versionId || pdfPending) return;
+    // RETRO-3970-01 (CARDHIST-FE-001 precedent): reserve the browsing
+    // context SYNCHRONOUSLY in the click gesture — the old code awaited
+    // the PDF first and then called a noopener window.open, whose null
+    // return (even on SUCCESS per MDN) was never checked: the operator
+    // got neither feedback nor an open tab when the browser rejected the
+    // delayed, gesture-less open.
+    const reserved = window.open('', '_blank');
+    if (!reserved) {
+      setPdfError('Всплывающее окно заблокировано браузером. Разрешите pop-up для этого сайта и повторите предпросмотр.');
+      return;
+    }
     setPdfPending(true);
     setPdfError(null);
     try {
       const blob = await labReportingApi.previewTemplateVersionPdf(versionId);
       if (!blob || !(blob instanceof Blob)) {
+        reserved.close();
         setPdfError('PDF сформирован некорректно. Обратитесь к администратору.');
         return;
       }
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      reserved.opener = null;
+      reserved.location.href = url;
     } catch {
+      reserved.close();
       setPdfError('Не удалось сформировать PDF-предпросмотр. Сохраните черновик и попробуйте снова.');
     } finally {
       setPdfPending(false);
