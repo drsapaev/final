@@ -1075,7 +1075,13 @@ export function useGuardedLabNavigate() {
     // Route identity — точный маршрут LabPanel: '/lab/results' не
     // зарегистрирован (wildcard → /not-found размонтирует панель).
     const leavesLabRoute = !isLabRoutePath(targetPathname);
-    if (!leavesLabRoute) {
+    // The destination /lab is not automatically an internal LabPanel
+    // navigation. A dirty doctor EMR editor is mounted on a DIFFERENT
+    // guarded route; entering /lab must await its Save/Stay/Discard decision.
+    const leavesDoctorEditorForLab = !leavesLabRoute
+      && isGuardedRoutePath(window.location.pathname)
+      && !isLabRoutePath(window.location.pathname);
+    if (!leavesLabRoute && !leavesDoctorEditorForLab) {
       // PR 3351 (review round 5, P1): переход УЖЕ с lab-маршрута на тот же
       // lab-маршрут (LabPanel смонтирован) — это внутренняя перезапись URL,
       // и она НЕ может пушить запись поверх sentinel'а. Штатные shell-
