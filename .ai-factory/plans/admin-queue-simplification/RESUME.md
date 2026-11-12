@@ -1,3 +1,15 @@
+## Resume — PR #4034 rebased; WSL staging cleanup pending — 2026-11-12T13:49:31+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`.
+
+The source fix is commit `a6149855d810b5bcba2955371e11c08ed7fa7279` on current `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`; current pre-checkpoint HEAD is `a1f8bfeca538497917ba648a580e97ab9fe137f6`. Focused Chromium provenance tests passed 9/9 after rebase; targeted TypeScript passed; ESLint had 0 errors and 2 existing warnings. See the newest EVIDENCE entry.
+
+PR #4034 remains OPEN / Ready for review. The remote branch is still at `8a8d40f3a98050be2af498280a336fb3f575b52b`; after committing this checkpoint, push the rebased branch with `--force-with-lease` against that exact SHA. Then update PR metadata and inspect checks on the new exact HEAD. Do not merge; user owns merge.
+
+Tier-2 remains PARTIAL, with no deferral. The latest staging Session stopped before browser checks because WSL requests timed out; project boot continuity and full inventory are unverified. Do not invoke WSL/Compose cleanup or launch another staging run until WSL responds and the exact project ownership/expiry can be checked. Preserve the private synthetic env only for later exact-project cleanup; never reveal or commit it.
+
+Next exact action: verify the journal diff, run `git diff --check`, commit the three journal updates, push with the explicit lease, refresh PR #4034 body, and inspect exact-head CI. Keep served artifact provenance and live RQ-18 marked NOT_RUN until a successful Session proves them.
+
 ## Resume — PR #4034 abort-provenance fix; WSL cleanup pending — 2026-11-12T13:44:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. Source commit `05439ffb848337410b9e2b63e5cd27c9f13fbd8f` is based on `origin/main` `9c910962c69305bf584c6a957b85ea9c10a69017`.

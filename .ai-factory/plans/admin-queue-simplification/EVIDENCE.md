@@ -1,3 +1,16 @@
+## T18 — RQ-18 provenance fix after main sync — 2026-11-12T13:49:31+05:00
+
+- Commit under test: E2E source fix `a6149855d810b5bcba2955371e11c08ed7fa7279`; pre-checkpoint branch HEAD `a1f8bfeca538497917ba648a580e97ab9fe137f6`; base `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`. The tracked E2E file is byte-identical to source commit `05439ffb848337410b9e2b63e5cd27c9f13fbd8f` that had passed the same focused suite before rebase.
+- Environment: Windows host, Chromium Playwright, worktree-local dependencies/config and local synthetic HTTP assets; no WSL, database or production use for these checks.
+- Validation after rebase: the first command used a missing default `frontend/playwright.config.mjs` and exited before collection. A stale task-local scratch copy had a different SHA and was not run. A corrected temporary config targeted the tracked `frontend/e2e/rq18-permanent-qr-live.spec.ts` directly.
+- Validation command: `playwright test --config ../.scratch/rq18-playwright-163/rebased-config.mjs --grep 'RQ-18 provenance' --repeat-each=3 --reporter=line` — PASS, 9 passed, 0 failed.
+- Targeted TypeScript compile for `e2e/rq18-permanent-qr-live.spec.ts` — PASS, exit 0. Scoped ESLint — PASS, exit 0, with two existing `no-restricted-syntax` raw-fetch warnings at lines 291 and 310. `git diff --check origin/main...HEAD` — PASS.
+- No application build was run; this follow-up changes only test code and journals. Exact-head hosted CI has not completed yet for the rebased branch.
+- Staging remains incomplete. Attempt 3 stopped before browser checks at WSL service timeout `NATIVE_UNAVAILABLE (wsl)` / `WSAETIMEDOUT`. Last observations: three exact-project volume names visible, ports 18831/18832/55533 busy, container/network/image inventory and boot continuity not verified. No cleanup was run after the continuity check failed. Wait for WSL recovery, then verify exact project owner/expiry and inventory before cleanup; do not start another project or run global prune.
+- Result: local source regression validation PASS; Tier-2 remains PARTIAL, no deferral. `served_revision_verified=false`; Admin 2FA and live RQ-18 remain NOT_RUN.
+- PR #4034: previously pushed head `8a8d40f3a98050be2af498280a336fb3f575b52b`; rebased local work is not pushed. Next action is a lease-protected branch update followed by PR body refresh and exact-head CI review.
+- Merge/deploy: none.
+
 ## T18 — PR #4034 abort-classification regression and staging attempts — 2026-11-12T13:44:00+05:00
 
 - Commit under test: `05439ffb848337410b9e2b63e5cd27c9f13fbd8f`; base `9c910962c69305bf584c6a957b85ea9c10a69017`. The application frontend artifact source SHA is `08325168a98d3950c6de8a4a6a503de65c462c93`; frontend source between that artifact commit and current `origin/main` is unchanged.

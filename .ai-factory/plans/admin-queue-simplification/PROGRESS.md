@@ -1,3 +1,16 @@
+## Current checkpoint — rebased to current main; focused regression passes — 2026-11-12T13:49:31+05:00
+
+- Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
+- Branch `codex/aqs-t18-rq18-failure-20261112` is rebased on fresh `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`; source-fix commit is `a6149855d810b5bcba2955371e11c08ed7fa7279`; current pre-checkpoint HEAD is `a1f8bfeca538497917ba648a580e97ab9fe137f6`.
+- PR #4034 is OPEN / Ready for review. Remote currently remains at `8a8d40f3a98050be2af498280a336fb3f575b52b`; the rebased local branch has not yet been pushed. Use explicit `--force-with-lease` against that exact remote SHA, then update the PR body and inspect checks on the resulting exact HEAD.
+- The RQ-18 recorder P2 remains fixed. The tracked E2E file is identical to the locally tested pre-rebase source; rebasing introduced no changes to it.
+- Post-rebase validation: focused Chromium Playwright provenance tests PASS, 9/9 across three repetitions; targeted TypeScript compile PASS; scoped ESLint PASS with 0 errors and 2 existing raw-fetch warnings at lines 291/310; `git diff --check origin/main...HEAD` PASS.
+- The first post-rebase Playwright invocation pointed to a nonexistent default config and ran no tests. The old task-local scratch copy was found to differ from tracked source and was not used. A task-local config was then set to the absolute tracked `frontend/e2e` path; the 9/9 result above is from that tracked file.
+- Staging attempt 3 stopped before browser checks on `NATIVE_UNAVAILABLE (wsl)` / `WSAETIMEDOUT`. Exact project inventory/boot continuity could not be verified after that. Do not issue WSL/Compose cleanup or start another staging cycle until WSL is responsive and ownership/expiry are rechecked.
+- `served_revision_verified` remains false. Admin 2FA, permanent QR live workflow, current browser-served artifact hash and complete `STAGING_VALIDATION.md` are NOT_RUN/PARTIAL. No deferral is accepted.
+- Tracked scope is the E2E spec and the three T18 journals only. No application runtime/API/DB/auth, production, deployment or merge changes.
+- Next exact action: finish this checkpoint, commit the three journal files, push with the explicit lease against remote `8a8d40f3...`, refresh PR #4034 evidence, then inspect exact-head CI.
+
 ## Current checkpoint — PR #4034 abort-provenance P2 fixed; staging blocked — 2026-11-12T13:44:00+05:00
 
 - Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
