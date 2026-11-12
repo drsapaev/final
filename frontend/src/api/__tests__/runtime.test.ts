@@ -46,6 +46,19 @@ describe('api runtime resolution', () => {
     expect(getApiBaseUrl()).toBe('https://clinic.example.com/api/v1');
   });
 
+  it('uses the current origin for the explicit same-origin artifact mode, including custom local ports', () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'same-origin');
+    vi.stubGlobal('window', { location: { origin: 'http://127.0.0.1:19080' } });
+
+    expect(getApiOrigin()).toBe('http://127.0.0.1:19080');
+    expect(getApiBaseUrl()).toBe('http://127.0.0.1:19080/api/v1');
+    expect(buildApiUrl('/patients')).toBe('http://127.0.0.1:19080/api/v1/patients');
+    expect(getWsBaseUrl()).toBe('ws://127.0.0.1:19080');
+    expect(buildWsUrl('/api/v1/ws/notifications/connect')).toBe(
+      'ws://127.0.0.1:19080/api/v1/ws/notifications/connect',
+    );
+  });
+
   it('falls back to the canonical backend origin for localhost browser origins', () => {
     vi.stubEnv('VITE_API_BASE_URL', 'https://staging.example.com');
     vi.stubGlobal('window', { location: { origin: 'http://localhost:3000' } });

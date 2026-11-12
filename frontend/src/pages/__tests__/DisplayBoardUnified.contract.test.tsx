@@ -71,8 +71,11 @@ describe('DisplayBoardUnified contract', () => {
     );
 
     await waitFor(() => {
+      // DISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is
+      // requested for the CURRENT board (board=...) alongside the legacy
+      // department/date axis.
       expect(apiMock.api.get).toHaveBeenCalledWith('/board/state', {
-        params: { department: 'Reg', date: '2026-05-23' },
+        params: { department: 'Reg', date: '2026-05-23', board: 'main_board' },
       });
     });
     expect(screen.getByText('17')).toBeInTheDocument();
@@ -133,8 +136,11 @@ describe('DisplayBoardUnified row distinctness (RQ-24.a.2)', () => {
     );
     // Flush the initial stats fetch inside act context (no act warning).
     await waitFor(() => {
+      // DISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is
+      // requested for the CURRENT board (board=...) alongside the legacy
+      // department/date axis.
       expect(apiMock.api.get).toHaveBeenCalledWith('/board/state', {
-        params: { department: 'Reg', date: '2026-05-23' },
+        params: { department: 'Reg', date: '2026-05-23', board: 'main_board' },
       });
     });
     return { view, push: (msg: unknown) => act(() => { wsMessageHandler!(msg); }) };
@@ -242,8 +248,11 @@ describe('DisplayBoardUnified queue-scoped merge (QR-FE-008)', () => {
       />
     );
     await waitFor(() => {
+      // DISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is
+      // requested for the CURRENT board (board=...) alongside the legacy
+      // department/date axis.
       expect(apiMock.api.get).toHaveBeenCalledWith('/board/state', {
-        params: { department: 'Reg', date: '2026-05-23' },
+        params: { department: 'Reg', date: '2026-05-23', board: 'main_board' },
       });
     });
     return { view, push: (msg: unknown) => act(() => { wsMessageHandler!(msg); }) };
@@ -408,8 +417,11 @@ describe('DisplayBoardUnified stale-WS banner (QR-FE-009)', () => {
       />
     );
     await waitFor(() => {
+      // DISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is
+      // requested for the CURRENT board (board=...) alongside the legacy
+      // department/date axis.
       expect(apiMock.api.get).toHaveBeenCalledWith('/board/state', {
-        params: { department: 'Reg', date: '2026-05-23' },
+        params: { department: 'Reg', date: '2026-05-23', board: 'main_board' },
       });
     });
     return {

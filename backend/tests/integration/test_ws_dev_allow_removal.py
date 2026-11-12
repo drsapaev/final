@@ -107,6 +107,8 @@ def test_ws_queue_accepts_valid_token_without_ws_dev_allow(client, db_session, m
     (heartbeat, etc.) — that's fine, we only verify auth didn't block it.
     """
     from app.core.security import get_password_hash
+    from app.models.clinic import Doctor
+    from app.models.department import Department
     from app.models.user import User
 
     monkeypatch.delenv("WS_DEV_ALLOW", raising=False)
@@ -123,6 +125,22 @@ def test_ws_queue_accepts_valid_token_without_ws_dev_allow(client, db_session, m
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
+
+    # WS-POSTMERGE-03: a doctor-family role owns rooms through its Doctor
+    # row. The department 'cardiology' room is joined through the row's
+    # Department key, so seed the ownership SSOT for this principal.
+    department = Department(key="cardiology", name_ru=f"SYNTH-cardiology-{suffix}", active=True)
+    db_session.add(department)
+    db_session.commit()
+    db_session.refresh(department)
+    doctor = Doctor(
+        user_id=user.id,
+        specialty="cardio",
+        department_id=department.id,
+        active=True,
+    )
+    db_session.add(doctor)
+    db_session.commit()
 
     token = _make_jwt(sub=user.username)
     # In TESTING mode, _auth_ok returns True regardless. The point of this

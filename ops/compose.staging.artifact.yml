@@ -1,0 +1,8 @@
+# Loaded by the canonical WSL launcher only for artifact-runtime.
+# Keep named build contexts out of the default Compose file so ordinary
+# runtime builds remain usable with older Docker Compose installations.
+services:
+  frontend:
+    build:
+      additional_contexts:
+        staging_artifact: ${STAGING_FRONTEND_ARTIFACT_CONTEXT:?Set STAGING_FRONTEND_ARTIFACT_CONTEXT to a verified artifact directory under this worktree's .scratch}

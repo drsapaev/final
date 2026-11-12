@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.db.session import get_db
 from app.models.clinic import Doctor
 from app.models.user import User
@@ -50,7 +51,10 @@ def _ensure_doctor_can_notify_entry(
     entry: Any,
     current_user: User,
 ) -> None:
-    if _role_name(current_user).strip().lower() not in QUEUE_POSITION_DOCTOR_NOTIFY_ROLES:
+    if (
+        _role_name(current_user).strip().lower()
+        not in QUEUE_POSITION_DOCTOR_NOTIFY_ROLES
+    ):
         return
 
     doctor = (
@@ -68,8 +72,10 @@ def _ensure_doctor_can_notify_entry(
 
 # ========================= СХЕМЫ =========================
 
+
 class QueuePositionResponse(BaseModel):
     """Ответ с информацией о позиции в очереди"""
+
     entry_id: int
     queue_number: int
     status: str
@@ -81,6 +87,7 @@ class QueuePositionResponse(BaseModel):
 
 class NotificationResult(BaseModel):
     """Результат отправки уведомления"""
+
     success: bool
     sent: bool
     message_id: str | None = None
@@ -90,6 +97,7 @@ class NotificationResult(BaseModel):
 
 class BatchNotificationResult(BaseModel):
     """Результат массовой отправки уведомлений"""
+
     success: bool
     total_notified: int
     details: list[dict[str, Any]] = Field(default_factory=list)
@@ -97,16 +105,19 @@ class BatchNotificationResult(BaseModel):
 
 class SendPositionNotificationRequest(BaseModel):
     """Запрос на отправку уведомления о позиции"""
+
     entry_id: int = Field(..., description="ID записи в очереди")
 
 
 class SendCallNotificationRequest(BaseModel):
     """Запрос на отправку уведомления о вызове"""
+
     entry_id: int = Field(..., description="ID записи в очереди")
     cabinet_number: str | None = Field(None, description="Номер кабинета")
 
 
 # ========================= ЭНДПОИНТЫ =========================
+
 
 @router.get("/{entry_id}", response_model=QueuePositionResponse)
 async def get_queue_position(
@@ -127,14 +138,34 @@ async def get_queue_position(
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    # Ownership check: non-staff users can only see their own entries
-    if current_user.role not in ("Admin", "Registrar", "Doctor", "SuperAdmin"):
+    # Ownership check: non-staff users can only see their own entries.
+    # QPOSAUTH-BE-002 (audit PR #3961 round 29): an entry with no patient
+    # linkage (QR walk-in / legacy row) used to skip the check entirely —
+    # absence of a patient_id is not proof of ownership, so non-staff reads
+    # of unlinked entries fail closed.
+    # RETRO-3996-02 (post-merge review 3969–#3996, group 2): the staff
+    # vocabulary must admit the WHOLE doctor family (cardio/derma/dentist
+    # and the legacy spellings), not only the exact "Doctor" spelling —
+    # per the D-3 RBAC unification SSOT (app/core/roles.py,
+    # DOCTOR_FAMILY_GATE_ROLES / is_doctor_role_spelling).
+    if current_user.role not in (
+        "Admin",
+        "Registrar",
+        "SuperAdmin",
+    ) and not is_doctor_role_spelling(current_user.role):
+        patient_id = getattr(entry, "patient_id", None)
+        if not patient_id:
+            raise HTTPException(
+                status_code=403, detail="Нет доступа к этой записи очереди"
+            )
         # Verify the entry belongs to the current user via patient linkage
-        if hasattr(entry, "patient_id") and entry.patient_id:
-            from app.models.patient import Patient
-            patient = db.query(Patient).filter(Patient.id == entry.patient_id).first()
-            if not patient or patient.user_id != current_user.id:
-                raise HTTPException(status_code=403, detail="Нет доступа к этой записи очереди")
+        from app.models.patient import Patient
+
+        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        if not patient or patient.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403, detail="Нет доступа к этой записи очереди"
+            )
 
     service = get_queue_position_service(db)
     position_info = service.get_queue_position_info(entry)
@@ -164,13 +195,28 @@ async def get_queue_position_by_number(
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    # Ownership check for non-staff
-    if current_user.role not in ("Admin", "Registrar", "Doctor", "SuperAdmin"):
-        if hasattr(entry, "patient_id") and entry.patient_id:
-            from app.models.patient import Patient
-            patient = db.query(Patient).filter(Patient.id == entry.patient_id).first()
-            if not patient or patient.user_id != current_user.id:
-                raise HTTPException(status_code=403, detail="Нет доступа к этой записи очереди")
+    # Ownership check for non-staff. QPOSAUTH-BE-002 (audit PR #3961 round
+    # 29): unlinked (patient_id=NULL) rows fail closed for non-staff callers
+    # here too — number+specialist scanning must not fetch walk-in entries.
+    # RETRO-3996-02: same doctor-family staff vocabulary as the by-id read
+    # above (D-3 SSOT), never the exact-"Doctor"-only spelling.
+    if current_user.role not in (
+        "Admin",
+        "Registrar",
+        "SuperAdmin",
+    ) and not is_doctor_role_spelling(current_user.role):
+        patient_id = getattr(entry, "patient_id", None)
+        if not patient_id:
+            raise HTTPException(
+                status_code=403, detail="Нет доступа к этой записи очереди"
+            )
+        from app.models.patient import Patient
+
+        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        if not patient or patient.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403, detail="Нет доступа к этой записи очереди"
+            )
 
     service = get_queue_position_service(db)
     position_info = service.get_queue_position_info(entry)
@@ -183,7 +229,7 @@ async def send_position_notification(
     request: SendPositionNotificationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
     """
     Отправить уведомление о позиции в очереди
@@ -193,7 +239,9 @@ async def send_position_notification(
     Доступно: Admin, Registrar, Doctor
     """
     try:
-        entry = QueuePositionApiService(db).get_position_entry(entry_id=request.entry_id)
+        entry = QueuePositionApiService(db).get_position_entry(
+            entry_id=request.entry_id
+        )
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     _ensure_doctor_can_notify_entry(db, entry=entry, current_user=current_user)
@@ -202,8 +250,7 @@ async def send_position_notification(
     people_ahead = service._count_people_ahead(entry)
 
     result = await service.notify_position_update(
-        entry=entry,
-        people_ahead=people_ahead
+        entry=entry, people_ahead=people_ahead
     )
 
     return NotificationResult(**result)
@@ -214,7 +261,7 @@ async def send_call_notification(
     request: SendCallNotificationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
     """
     Отправить уведомление о вызове пациента
@@ -224,14 +271,35 @@ async def send_call_notification(
     Доступно: Admin, Registrar, Doctor
     """
     try:
-        entry = QueuePositionApiService(db).get_position_entry(entry_id=request.entry_id)
+        entry = QueuePositionApiService(db).get_position_entry(
+            entry_id=request.entry_id
+        )
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     _ensure_doctor_can_notify_entry(db, entry=entry, current_user=current_user)
 
+    # QPOSCALL-BE-001 (audit PR #3961): ручное уведомление о вызове — это
+    # проверяемый ПОВТОР для уже вызванных билетов. Ждущий/терминальный
+    # билет не получает ложное высокоприоритетное «Вас вызывают!» —
+    # endpoint отвечает 409 и доставка не выполняется; переход статуса
+    # waiting→called остаётся в каноническом queue-сервисе.
+    if entry.status != "called":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Билет №{entry.number} не в статусе «вызван» "
+                f"(текущий статус: {entry.status}). Ручная отправка вызова "
+                "доступна только для уже вызванных пациентов."
+            ),
+        )
+
+    # QPOSCALL-BE-001 + пост-merge ревью PR #4013: антидубль-окно
+    # действует ТОЛЬКО для намерения «ручной повтор» — endpoint явно
+    # помечает вызов как manual_resend. Канонические вызовы (QR/nurse/
+    # GraphQL) остаются без флага и кулдауном не подавляются; неудачная
+    # ручная попытка кулдаун не начинает — повтор фактически повторяется.
     result = await get_queue_position_service(db).notify_patient_called(
-        entry=entry,
-        cabinet_number=request.cabinet_number
+        entry=entry, cabinet_number=request.cabinet_number, manual_resend=True
     )
 
     return NotificationResult(**result)
@@ -240,9 +308,11 @@ async def send_call_notification(
 @router.post("/notify/queue-update/{queue_id}", response_model=BatchNotificationResult)
 async def send_queue_update_notifications(
     queue_id: int,
-    changed_after_number: int = Query(0, description="Номер, после которого изменились позиции"),
+    changed_after_number: int = Query(
+        0, description="Номер, после которого изменились позиции"
+    ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
     Массовое уведомление об изменении очереди
@@ -259,8 +329,7 @@ async def send_queue_update_notifications(
 
     service = get_queue_position_service(db)
     result = await service.notify_queue_changes_batch(
-        queue_id=queue_id,
-        changed_after_number=changed_after_number
+        queue_id=queue_id, changed_after_number=changed_after_number
     )
 
     return BatchNotificationResult(**result)
@@ -270,7 +339,7 @@ async def send_queue_update_notifications(
 async def send_diagnostics_return_notification(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor"))
+    current_user: User = Depends(require_roles("Admin", "Doctor")),
 ):
     """
     Отправить уведомление о возврате после диагностики
@@ -280,7 +349,9 @@ async def send_diagnostics_return_notification(
     Доступно: Admin, Doctor
     """
     try:
-        entry = QueuePositionApiService(db).get_diagnostics_entry_or_error(entry_id=entry_id)
+        entry = QueuePositionApiService(db).get_diagnostics_entry_or_error(
+            entry_id=entry_id
+        )
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     _ensure_doctor_can_notify_entry(db, entry=entry, current_user=current_user)
@@ -294,10 +365,7 @@ async def send_diagnostics_return_notification(
             getattr(specialist_user, "full_name", None)
             or getattr(specialist_user, "username", None)
         ):
-            specialist_name = (
-                specialist_user.full_name
-                or specialist_user.username
-            )
+            specialist_name = specialist_user.full_name or specialist_user.username
         else:
             fallback_name = " ".join(
                 part
@@ -317,8 +385,7 @@ async def send_diagnostics_return_notification(
     )
 
     result = await get_queue_position_service(db).notify_diagnostics_return_needed(
-        entry=entry,
-        specialist_name=specialist_name
+        entry=entry, specialist_name=specialist_name
     )
 
     return NotificationResult(**result)
@@ -328,7 +395,7 @@ async def send_diagnostics_return_notification(
 async def send_waiting_reminder(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
     Отправить напоминание о нахождении в очереди
@@ -338,7 +405,9 @@ async def send_waiting_reminder(
     Доступно: Admin, Registrar
     """
     try:
-        entry = QueuePositionApiService(db).get_waiting_entry_or_error(entry_id=entry_id)
+        entry = QueuePositionApiService(db).get_waiting_entry_or_error(
+            entry_id=entry_id
+        )
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -349,19 +418,31 @@ async def send_waiting_reminder(
 
 # ========================= СТАТИСТИКА =========================
 
+
 @router.get("/stats/queue/{queue_id}", response_model=dict[str, Any])
 async def get_queue_positions_stats(
     queue_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # QPOSAUTH-BE-001 (audit PR #3961 round 29): was get_current_user — any
+    # authenticated user could iterate numeric queue IDs and enumerate every
+    # entry (IDs, numbers, statuses, priorities, timestamps, cabinet,
+    # specialist name) of any queue. Staff-only mirrors the module's own
+    # policy for the notify endpoints; SuperAdmin passes via is_superuser.
+    current_user: User = Depends(
+        require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)
+    ),
 ):
     """
     Получить статистику позиций в очереди
 
     Возвращает список всех записей с их позициями.
+
+    Доступно: Admin, Registrar, Doctor (и SuperAdmin).
     """
     try:
-        queue, entries = QueuePositionApiService(db).get_queue_entries_stats(queue_id=queue_id)
+        queue, entries = QueuePositionApiService(db).get_queue_entries_stats(
+            queue_id=queue_id
+        )
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -377,5 +458,5 @@ async def get_queue_positions_stats(
         "queue_id": queue_id,
         "queue_day": str(queue.day),
         "total_entries": len(entries),
-        "entries": result
+        "entries": result,
     }

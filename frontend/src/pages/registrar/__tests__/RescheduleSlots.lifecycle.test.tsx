@@ -30,6 +30,7 @@ vi.mock('../../../utils/logger', () => ({
 
 import { rescheduleTomorrow, rescheduleVisit } from '../../../api/visits';
 import notify from '../../../services/notify';
+import { getLocalDateString } from '../../../utils/dateUtils';
 import RescheduleSlots from '../views/RescheduleSlots';
 
 const tI18n = (key: string, options?: Record<string, unknown>) =>
@@ -209,7 +210,15 @@ describe('RescheduleSlots — REG-FE-065 close only after server confirmation', 
     // Grouped row: pick the target visit explicitly (REG-FE-041 guard).
     fireEvent.change(screen.getByLabelText('registrar.reschedule_select_visit_label'), { target: { value: '101' } });
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
-    fireEvent.change(dateInput, { target: { value: '2026-11-10' } });
+    // The confirm handler rejects past dates against the REGISTRAR SSOT
+    // (getLocalDateString — Asia/Tashkent). A hardcoded "today" broke the
+    // test every day between 19:00 UTC (Tashkent midnight) and the next
+    // day: the hardcoded date became yesterday and
+    // `registrar.cannot_postpone_past` short-circuited the flow before
+    // onClose could fire — surfaced by CI on PR #3986 (run
+    // 42880576300) after 19:00 UTC and reproduced locally in isolation.
+    // Compute "today" from the SAME SSOT the component validates against.
+    fireEvent.change(dateInput, { target: { value: getLocalDateString() } });
 
     const confirmButton = screen.getByRole('button', { name: /registrarPanel\.select_date/ });
     await act(async () => {

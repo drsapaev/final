@@ -24,6 +24,7 @@ import { useNavigate } from 'react-router-dom';
 const holder = vi.hoisted(() => ({
   navigate: null as ((to: string) => void) | null,
   confirmResolve: null as ((ok: boolean) => void) | null,
+  emrDirty: false,
   hotkeyConfig: null as {
     clearSelection: () => void;
     refreshData: () => void;
@@ -81,6 +82,7 @@ vi.mock('../../components/emr-v2/EMRContainerV2', () => ({
     // refreshes the queue's can_complete contract.
     useEffect(() => {
       props.onDirtyChange?.(true);
+      holder.emrDirty = true;
       props.onPersisted?.();
     }, []);
     return (
@@ -228,6 +230,7 @@ beforeEach(() => {
   mockedGet.mockReset();
   holder.navigate = null;
   holder.confirmResolve = null;
+  holder.emrDirty = false;
   holder.hotkeyConfig = null;
   releaseCompletion = null;
   vi.mocked(queueService.startVisit).mockReset();
@@ -359,6 +362,7 @@ describe('derma deferred Escape discard confirmation (DERMAHOTKEY-FE-001 follow-
     expect(holder.hotkeyConfig).not.toBeNull();
 
     // Escape opens the discard confirmation for visit A; it stays pending.
+    await waitFor(() => expect(holder.emrDirty).toBe(true));
     holder.hotkeyConfig?.clearSelection();
     await waitFor(() => expect(holder.confirmResolve).not.toBeNull());
 
@@ -388,6 +392,7 @@ describe('derma deferred Escape discard confirmation (DERMAHOTKEY-FE-001 follow-
     fireEvent.click(await screen.findByTestId('livequeue-start-501', {}, { timeout: 2500 }));
     await screen.findByTestId('emr-editor', {}, { timeout: 2500 });
     expect(holder.hotkeyConfig).not.toBeNull();
+    await waitFor(() => expect(holder.emrDirty).toBe(true));
     holder.hotkeyConfig?.clearSelection();
     await waitFor(() => expect(holder.confirmResolve).not.toBeNull());
     holder.confirmResolve?.(true);

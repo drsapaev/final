@@ -51,7 +51,9 @@ describe('EMRContainerV2 lifecycle guards (audit 3886 round 17)', () => {
     });
 
     it('EMRAMEND-FE-002: the ordinary save/sign branch excludes amended records', () => {
-        expect(source).toContain(') : !isSigned && !isAmended ? (');
+        // RETRO-4007-01 (post-merge re-review of 4007): the branch now also
+        // excludes the server-finalized window (amendment routing).
+        expect(source).toContain(') : !isSigned && !isAmended && !serverFinalized ? (');
     });
 
     it('EMRRELOAD-FE-001: toolbar refresh guards dirty edits behind a confirmation and bypasses the cache', () => {
