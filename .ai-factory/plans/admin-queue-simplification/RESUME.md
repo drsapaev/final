@@ -1,4 +1,17 @@
-## Resume — PR #4034 live RQ-18 passed; exact-head CI pending — 2026-11-13T03:49:04+05:00
+## Resume — PR #4034 synced with latest main; push and exact-head CI pending — 2026-11-13T03:57:16+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge/deployment.
+
+PR #4026 is merged; its duplicate browser-asset failure P2 is addressed in #4034. Remote #4034 is still at `893308f571375fd8a5365aa73a24702839d5448a` on base `58e79581c8f2e2039afaa18c3b0b5273a7a45585`. Local HEAD `194041b713378b82c4bf5c90f5728198acef66ad` contains a clean merge of latest `origin/main` `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e` plus commit `fbb9f3c14`; push remains pending. The PR diff is still only the RQ-18 E2E spec and three T18 journals.
+
+Local scoped ESLint, E2E TypeScript, Chromium provenance 5/5, frontend build, and synthetic RQ-18 session passed before the latest `main` sync. The synthetic Session used artifact SHA `0621df8e97213ec52f1051c70548c595c8d11204`; it passed Admin password/TOTP, synthetic window, T18.10 navigation/context, hidden profile/service/resource setup, explicit publication, permanent QR, anonymous booking, resource ownership, reopen, inactive-resource/current-queue facts, archive/restore, and fail-closed behavior. Teardown passed and resources/ports are absent. These staging results do not validate the newer runtime base `bcf15cb`.
+
+The Session captured 68 JS/CSS browser bodies and hashes, but did not compare them with the artifact manifest; it did not capture the service worker; `served_revision_verified=false`. Keep Tier-2 PARTIAL and do not claim full provenance.
+
+The current journal-update gate completed successfully with `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; its execution prompt was read. One earlier invocation with a malformed root path was rejected before execution and made no edits.
+
+Next: run scope/diff checks, push the synchronized branch fast-forward, update PR #4034 with exact new base/HEAD and evidence limitations, and inspect exact-head CI. Do not merge or deploy. After user merge, continue the remaining T18 acceptance only.
+## Previous resume checkpoint — PR #4034 live RQ-18 passed; exact-head CI pending — 2026-11-13T03:49:04+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112. T00–T17 are merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge and deployment.
 
