@@ -1,3 +1,13 @@
+## T18 — PR #4034 duplicate-asset regression after main rebase — 2026-11-12T20:02:41+05:00
+
+- Commit under test: RQ-18 recorder fix commit e11d1d65f15ac754a2886cbaeaf44acc4648f0d4, rebased onto current origin/main 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d. PR remote still points to a27a0c2a7; push and hosted checks remain pending.
+- Environment: Windows host, local Chromium Playwright, synthetic local HTTP server; current-main synthetic WSL staging is not used by these tests.
+- Allowed tracked paths: frontend/e2e/rq18-permanent-qr-live.spec.ts and the three T18 journals. No product application runtime/API/database/auth code changed.
+- Validation on the rebased tracked source: Playwright RQ-18 provenance group with --repeat-each=3 — PASS, 12/12; scoped ESLint — exit 0, 0 errors and 2 existing raw-fetch warnings; git diff --check origin/main...HEAD — PASS.
+- The regression first captures a CSS hash on one page, then makes duplicate requests from another page fail. Both ordinary network failure and an abort without committed-navigation proof cause reportForOrigin to reject the asset.
+- Staging status: the latest current-main artifact Session stopped at compose-up and teardown passed; no browser scenarios ran on this source. The earlier cdp6 browser-to-manifest PASS used artifact source c586346f. served_revision_verified remains false; overall T18/Tier-2 remains PARTIAL.
+- PR: #4034 OPEN / Ready for review. Local rebased HEAD e11d1d65f15ac754a2886cbaeaf44acc4648f0d4; remote HEAD a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8. Merge commit: none; user owns merge/deploy.
+
 ## T18 — PR #4034 duplicate browser asset failure regression — 2026-11-12T19:59:46+05:00
 
 - Commit under test: branch HEAD a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8 plus the local E2E recorder and journal changes; current origin/main is 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d. These changes are not yet committed or pushed.

@@ -1,3 +1,13 @@
+## Current checkpoint — PR #4034 rebased; duplicate-asset regression passes — 2026-11-12T20:02:41+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. Its duplicate-asset failure P2 is addressed by follow-up code in PR #4034.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final; branch codex/aqs-t18-rq18-failure-20261112; local HEAD e11d1d65f15ac754a2886cbaeaf44acc4648f0d4 is rebased onto origin/main 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d. Tracked worktree is clean except this checkpoint update. The source commit is local; remote PR #4034 still points to a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8.
+- The recorder rejects an asset if any duplicate request fails, even after another page captured the same URL hash. Only a canceled main-frame ERR_ABORTED proven by CDP to be superseded by a committed navigation is ignored.
+- Rebased local validation: provenance suite PASS 12/12 with three repetitions; scoped ESLint exit 0, 0 errors and 2 existing warnings; diff check against origin/main PASS. Hosted exact-head CI is pending.
+- Latest current-main synthetic Session failed at compose-up; teardown passed, and browser checks did not run. Earlier cdp6 live evidence used artifact source c586346f, not current main. served_revision_verified=false; full T18 remains PARTIAL.
+- Next exact action: commit this checkpoint, push the rebased branch with an explicit lease against the verified remote HEAD, update PR #4034 metadata/evidence, and inspect all checks on the pushed SHA. Do not merge or deploy.
+
 ## Current checkpoint — PR #4034 duplicate browser asset failures locally fixed; sync pending — 2026-11-12T19:59:46+05:00
 
 - Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.

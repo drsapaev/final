@@ -1,3 +1,15 @@
+## Resume — PR #4034 rebased duplicate-asset fix — 2026-11-12T20:02:41+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.
+
+PR #4026 is merged. Its review P2 is covered by the local PR #4034 change: a prior hash cannot mask a later failed asset request. Only a Chromium abort proven by CDP to belong to a superseded main-frame loader followed by a committed navigation is considered expected.
+
+The source commit is e11d1d65f15ac754a2886cbaeaf44acc4648f0d4 on current origin/main 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d. After rebase, the tracked RQ-18 provenance group passed 12/12 across three repetitions, scoped ESLint passed with 0 errors and 2 existing warnings, and git diff --check passed.
+
+Remote PR #4034 still points to a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8. Commit the current checkpoint, push the rebased branch using an explicit lease against that exact remote SHA, update PR evidence, and inspect exact-head CI. Do not merge or deploy; the user owns those actions.
+
+Current-main synthetic staging did not reach browser checks: its Session failed at compose-up and teardown passed. An earlier cdp6 Session tested an older artifact source c586346f; it is not current-main evidence. served_revision_verified remains false and full T18/Tier-2 remains PARTIAL.
+
 ## Resume — PR #4034 duplicate browser asset failure regression — 2026-11-12T19:59:46+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.
