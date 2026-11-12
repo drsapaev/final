@@ -955,6 +955,7 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
         asset: AssetReference;
         frameId?: string;
         loaderId: string;
+        status?: number;
       }>();
       cdpSession.on('Page.frameNavigated', (event) => {
         const frame = event.frame;
@@ -974,6 +975,7 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
           asset,
           frameId: event.frameId,
           loaderId: event.loaderId,
+          status: event.redirectResponse?.status,
         });
         state.cdpActiveRequestIds.add(event.requestId);
         state.cdpActiveRequestPaths.set(event.requestId, asset.path);
@@ -985,6 +987,7 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
           asset,
           frameId: event.frameId,
           loaderId: event.loaderId,
+          status: event.response.status,
         });
         state.cdpActiveRequestIds.add(event.requestId);
         state.cdpActiveRequestPaths.set(event.requestId, asset.path);
@@ -996,6 +999,36 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
         state.cdpActiveRequestIds.delete(event.requestId);
         state.cdpActiveRequestPaths.delete(event.requestId);
         incrementCount(state.cdpFinishedByKey, cdpAsset.asset.key);
+
+        if (cdpAsset.status !== 200) {
+          captureFailures.set(cdpAsset.asset.key, 'http-' + (cdpAsset.status ?? 'unknown'));
+          return;
+        }
+
+        // Chromium can discard Playwright Response bodies for resources loaded
+        // later in a busy page. Read the completed response through CDP before
+        // its Network request id is evicted, without pausing the response
+        // pipeline or relying on a second HTTP request.
+        state.bodyReadStats.bodyReadStarted += 1;
+        const capture = (async () => {
+          try {
+            const responseBody = await cdpSession.send('Network.getResponseBody', {
+              requestId: event.requestId,
+            });
+            const bytes = responseBody.base64Encoded
+              ? Buffer.from(responseBody.body, 'base64')
+              : Buffer.from(responseBody.body, 'utf8');
+            state.bodyReadStats.bodyReadCompleted += 1;
+            recordHash(cdpAsset.asset, bytes);
+          } catch (error: unknown) {
+            state.bodyReadStats.bodyReadFailed += 1;
+            captureFailures.set(
+              cdpAsset.asset.key,
+              'browser-cdp-response-body-unavailable-' + bodyReadFailureCode(error),
+            );
+          }
+        })();
+        addPendingCapture(capture);
       });
       cdpSession.on('Network.loadingFailed', (event) => {
         const cdpAsset = cdpAssets.get(event.requestId);
@@ -1032,13 +1065,11 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
 
     assetPage.on('response', (browserResponse) => {
       const browserRequest = browserResponse.request();
-      if (!state.activeRequests.has(browserRequest)) return;
+      if (state.usesCdp || !state.activeRequests.has(browserRequest)) return;
 
-      // Start reading from Playwright's browser Response as soon as it arrives.
-      // This keeps the actual body available before navigation can cancel or
-      // evict it, without pausing Chromium's response pipeline through CDP Fetch.
-      // Convert rejection immediately so failed requests do not create an
-      // unhandled promise or expose browser error text.
+      // Non-Chromium browsers have no CDP Network.getResponseBody path. Read
+      // Playwright's actual browser response immediately and convert rejection
+      // into a safe reason before it can become unhandled.
       state.bodyReadStats.bodyReadStarted += 1;
       const body = browserResponse.body().then<BrowserBodyRead, BrowserBodyRead>(
         (bytes) => {
@@ -1063,6 +1094,7 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
       incrementCount(state.browserFinishedByKey, asset.key);
       const responseBody = state.responseBodies.get(browserRequest);
       state.responseBodies.delete(browserRequest);
+      if (state.usesCdp) return;
 
       const capture = (async () => {
         if (!responseBody) {
