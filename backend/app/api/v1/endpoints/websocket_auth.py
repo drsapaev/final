@@ -158,11 +158,17 @@ async def ws_queue_authenticated(
 
         await websocket.accept()
 
-        room = f"{department}:{date}"
-        ws_manager.connect(websocket, room)
+        # WS-POSTMERGE-04: canonical room identity ("{department}::{date}",
+        # double colon) — the legacy single-colon form subscribed to a dead
+        # room no broadcaster ever targets. connect() is async and must be
+        # awaited: the un-awaited call left the accepted socket OUT of the
+        # manager room (coroutine-never-awaited), so it could never receive
+        # queue broadcasts.
+        room = f"{department.strip()}::{date.strip()}"
+        await ws_manager.connect(websocket, room)
 
         logger.info(
-            f"Аутентифицированное WebSocket подключение: пользователь {authenticated_user.username}, отделение {department}, дата {date}"
+            f"Аутентифицированное WebSocket подключение: пользователь {authenticated_user.username}, отделение {department}, дата {date}, комната {room}"
         )
 
         # ✅ SECURITY: Heartbeat configuration
@@ -291,13 +297,27 @@ async def ws_queue_optional_auth(
             )
             return
 
+        # WS-POSTMERGE-04: the latent RBAC trap — any authenticated JWT
+        # (including Patient) used to be accepted here. The same canonical
+        # department policy as /ws/queue/auth now runs BEFORE accept, so a
+        # repaired transport can never become a Patient/foreign-specialist
+        # subscription vector.
+        if not _has_department_access(authenticated_user, department, db):
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Access denied to department",
+            )
+            return
+
         await websocket.accept()
 
-        room = f"{department}:{date}"
-        ws_manager.connect(websocket, room)
+        # WS-POSTMERGE-04: canonical room identity + awaited connect (see
+        # the authenticated endpoint for the full rationale).
+        room = f"{department.strip()}::{date.strip()}"
+        await ws_manager.connect(websocket, room)
 
         logger.info(
-            f"Аутентифицированное WebSocket подключение: пользователь {authenticated_user.username}, отделение {department}"
+            f"Аутентифицированное WebSocket подключение (deprecated optional-auth): пользователь {authenticated_user.username}, отделение {department}, комната {room}"
         )
 
         try:
@@ -487,14 +507,13 @@ async def _handle_authenticated_message(
         )
     elif message_type == "call_patient":
         # Только врачи и регистраторы могут вызывать пациентов
-        if user.role in [
-            "Doctor",
-            "Registrar",
-            "Admin",
-            "Cardiologist",
-            "Dermatologist",
-            "Dentist",
-        ]:
+        # WS-POSTMERGE-04: the staff doctor family is matched
+        # case-insensitively (same contract as _has_department_access
+        # after WS-POSTMERGE-02) — canonical specialty roles (cardio,
+        # derma, dentist, …) were silently rejected by the literal list.
+        if user.role in ("Admin", "Registrar") or (
+            str(user.role).casefold() in _STAFF_DOCTOR_ROLES
+        ):
             patient_id = message.get("patient_id")
             await _broadcast_patient_call(department, date, patient_id, user.username)
         else:
@@ -571,7 +590,13 @@ async def _broadcast_patient_call(
     """
     Рассылка вызова пациента всем подключенным клиентам
     """
-    room = f"{department}:{date}"
+    # WS-POSTMERGE-04: canonical room identity (double colon) and a dict
+    # payload — the legacy form broadcast a json.dumps STRING into a
+    # single-colon dead room. WSManager.broadcast is a SYNCHRONOUS
+    # self-scheduling dispatcher (QUEUEWSDISPATCH-BE-001): awaiting it
+    # raised ``TypeError: object NoneType can't be used in 'await'``
+    # on every authorized call_patient.
+    room = f"{department.strip()}::{date.strip()}"
     message = {
         "type": "patient_called",
         "patient_id": patient_id,
@@ -582,7 +607,7 @@ async def _broadcast_patient_call(
 
     # Используем существующий ws_manager для рассылки
     if hasattr(ws_manager, "broadcast"):
-        await ws_manager.broadcast(room, json.dumps(message))
+        ws_manager.broadcast(room, message)
 
 
 async def _handle_queue_update(message: dict, department: str, date: str, db: Session):
