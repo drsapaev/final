@@ -1,3 +1,12 @@
+## T18 — PR #4034 final main sync and targeted regression — 2026-11-12T20:05:59+05:00
+
+- Commit under test: branch HEAD a2633a8f18788710e2bd3be0e0361cb97ae4058e, based on current origin/main 6b8b14c6f6a5319a174b8222ffb5bff25d4d715b. The tracked RQ-18 spec blob is unchanged from the previously tested rebased source.
+- Environment: Windows host, local Chromium Playwright, synthetic local HTTP server. No live clinic, patient data, production services, or staging credentials used.
+- Validation after the latest rebase: focused duplicate-failure regression — PASS, 1/1; scoped ESLint — exit 0, 0 errors and 2 existing raw-fetch warnings; git diff --check origin/main...HEAD — PASS. The complete provenance group passed 12/12 with three repetitions immediately before this rebase; current and prior tracked spec blob IDs match.
+- Exact-head hosted CI for this final rebase is pending until the new branch head is pushed. Existing green checks on prior PR HEADs do not count as exact-head passes.
+- Staging limitation is unchanged: the current-main synthetic artifact Session failed at compose-up and teardown passed, without browser checks. Earlier cdp6 live evidence used artifact source c586346f. served_revision_verified remains false; full T18/Tier-2 remains PARTIAL.
+- PR #4034 remote HEAD is bfe771c088d2c84d982ffc7629bd4b84be0656d4 before this checkpoint push. No merge or deployment.
+
 ## T18 — PR #4034 duplicate-asset regression after main rebase — 2026-11-12T20:02:41+05:00
 
 - Commit under test: RQ-18 recorder fix commit e11d1d65f15ac754a2886cbaeaf44acc4648f0d4, rebased onto current origin/main 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d. PR remote still points to a27a0c2a7; push and hosted checks remain pending.

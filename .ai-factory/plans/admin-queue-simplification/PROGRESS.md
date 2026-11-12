@@ -1,3 +1,12 @@
+## Current checkpoint — PR #4034 synced to current main; exact-head CI pending — 2026-11-12T20:05:59+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4026 is merged. Its duplicate-asset error P2 is addressed in follow-up PR #4034.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final; branch codex/aqs-t18-rq18-failure-20261112; local HEAD a2633a8f18788710e2bd3be0e0361cb97ae4058e, based on origin/main 6b8b14c6f6a5319a174b8222ffb5bff25d4d715b. The RQ-18 source blob matches the previously full-tested blob. Current worktree contains only the three journal files as uncommitted changes.
+- Rebased validation: duplicate-failure regression PASS 1/1; complete provenance group PASS 12/12 with three repetitions on the same source blob; ESLint exit 0, 0 errors and 2 existing warnings; diff check PASS.
+- Latest current-main synthetic Session failed at compose-up and teardown passed, so current-source live browser checks are NOT_RUN. Earlier cdp6 browser-to-manifest success used artifact source c586346f. served_revision_verified=false; full T18 remains PARTIAL.
+- Next exact action: commit this checkpoint; verify remote PR #4034 still has old head bfe771c088d2c84d982ffc7629bd4b84be0656d4, push using an explicit lease, update PR description and inspect exact-head checks. Do not merge/deploy.
+
 ## Current checkpoint — PR #4034 rebased; duplicate-asset regression passes — 2026-11-12T20:02:41+05:00
 
 - Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.

@@ -1,3 +1,13 @@
+## Resume — PR #4034 final current-main sync — 2026-11-12T20:05:59+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.
+
+The RQ-18 duplicate-asset failure fix is in the branch. Current source HEAD is a2633a8f18788710e2bd3be0e0361cb97ae4058e based on origin/main 6b8b14c6f6a5319a174b8222ffb5bff25d4d715b. Its E2E spec blob matches the source that passed the full 12/12 Chromium provenance group with three repetitions; the focused P2 test passed 1/1 after the latest rebase. Scoped ESLint has 0 errors and 2 existing warnings; diff check passed.
+
+Remote PR #4034 still needs to be updated from bfe771c088d2c84d982ffc7629bd4b84be0656d4. Commit this checkpoint, confirm that remote SHA is unchanged, push with explicit lease, refresh PR evidence, and inspect CI on the pushed exact HEAD. User owns merge/deploy.
+
+The last current-main staging Session failed at compose-up, teardown passed, and browser checks did not run. Prior live cdp6 evidence is from an older artifact source c586346f. served_revision_verified remains false; full T18/Tier-2 remains PARTIAL.
+
 ## Resume — PR #4034 rebased duplicate-asset fix — 2026-11-12T20:02:41+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112.
