@@ -1,3 +1,16 @@
+## Current checkpoint — PR #4034 abort-provenance P2 fixed; staging blocked — 2026-11-12T13:44:00+05:00
+
+- Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`; branch `codex/aqs-t18-rq18-failure-20261112`; base `origin/main` `9c910962c69305bf584c6a957b85ea9c10a69017`; source commit `05439ffb848337410b9e2b63e5cd27c9f13fbd8f`.
+- PR #4034 is OPEN / Ready for review. Last GitHub snapshot: remote HEAD `6770b85741d3dbc73e8fdff890abb5dc560e3e56`, base SHA `08325168a98d3950c6de8a4a6a503de65c462c93`, `mergeable=false` because behind. Local source fix is based on fresh `origin/main`; push and exact-head CI are pending.
+- P2 fixed in the RQ-18 recorder: an `ERR_ABORTED` is ignored only when CDP marks it canceled, the request belongs to the main frame, its loader was superseded by a committed main-frame navigation, and a matching browser asset hash existed. All other request failures remain failures; non-CDP browsers fail closed.
+- Local validation on the source commit: targeted TypeScript compile PASS; scoped ESLint exit 0 with two existing raw-fetch warnings at lines 291/310; `git diff --check` PASS; focused Chromium Playwright provenance group PASS, 9/9 over three repetitions. The first slow-CSS navigation harness timed out and was replaced by a deterministic loader-classification test plus real duplicate-abort/failure cases.
+- Synthetic staging did not complete. Three canonical Preflight/Start pairs passed; Session attempt 1 failed on missing Playwright baseURL (teardown PASS), attempt 2 failed because the harness omitted `QA_ADMIN_PASSWORD` (its exact project was subsequently fully removed), and attempt 3 stopped before browser execution with `NATIVE_UNAVAILABLE (wsl)` / `WSAETIMEDOUT`.
+- Current cleanup blocker: WSL boot ID and container/network/image inventory could not be read after the timeout. Three volumes labeled for `clinic-aqs4034-rq18-cdp-20261112` remained visible and ports 18831/18832/55533 responded as busy. No cleanup was attempted after continuity became unverified. Do not launch another Compose cycle or run global cleanup until WSL responds and exact-project ownership/expiry are rechecked. Private env remains in this worktree's ignored `.scratch/` for exact cleanup; it contains synthetic credentials and is not committed.
+- `served_revision_verified` remains false. The older 63/63 browser asset-to-manifest result is historical and does not validate this source commit. Full live RQ-18 and `STAGING_VALIDATION.md` remain NOT_RUN/PARTIAL.
+- Actual tracked scope: the RQ-18 E2E spec and the three T18 journals. No product runtime/API/DB/auth, production, or deployment changes. No merge.
+- Next exact action: push the rebased branch with an explicit lease against the last verified remote HEAD, refresh PR #4034 metadata and inspect exact-head CI; then, only after WSL recovery, verify and clean this one synthetic project before another staging attempt.
+
 ## Current checkpoint — PR #4034 source checks pass — 2026-11-12T09:27:43+05:00
 
 - Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL. User owns merge/deployment.

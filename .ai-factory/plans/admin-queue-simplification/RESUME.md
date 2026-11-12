@@ -1,3 +1,15 @@
+## Resume — PR #4034 abort-provenance fix; WSL cleanup pending — 2026-11-12T13:44:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. Source commit `05439ffb848337410b9e2b63e5cd27c9f13fbd8f` is based on `origin/main` `9c910962c69305bf584c6a957b85ea9c10a69017`.
+
+The P2 is fixed: a prior hash no longer hides a genuine asset failure. Only a canceled `ERR_ABORTED` for the main frame can be deferred, and it is ignored only after a committed navigation supersedes that request's loader and a matching hash existed. Local TypeScript, scoped lint, diff check, and focused Chromium tests passed; see the newest `EVIDENCE.md` entry for exact results.
+
+PR #4034 remains open / Ready for review. Last verified remote head is `6770b85741d3dbc73e8fdff890abb5dc560e3e56` on the PR branch, with remote base SHA `08325168a98d3950c6de8a4a6a503de65c462c93`; the local branch is rebased on newer `origin/main`. Push the rebased branch only with `--force-with-lease` against that exact remote SHA, then refresh the PR body and wait for exact-head checks. Do not merge; user owns merge.
+
+Staging is PARTIAL, with no deferral. Attempts 1 and 2 exposed harness omissions, which were corrected in task-local scratch; attempt 3 stopped before browser tests when WSL requests timed out. The exact synthetic project's volumes/ports may remain, and complete ownership/boot state is unverified. Do not run more WSL/Compose operations or delete resources until WSL is responsive and exact project ownership/expiry are rechecked. The task-owned private env remains in `.scratch/` to support later exact cleanup; never print or commit it.
+
+Next smallest step: verify the local docs/source diff and `git diff --check`, commit the three journal additions, push source + journals with the explicit lease, and inspect exact-head CI. Keep cleanup and full RQ-18 staging pending WSL recovery; keep T18/Tier-2 PARTIAL.
+
 ## Resume — PR #4034 source checks passed — 2026-11-12T09:27:43+05:00
 
 PR #4034 is OPEN / Draft. The exact-head checks documented here ran on tested commit `a744496951854ac1af6013cf1d643746c8fbc3c3`, which contains source commit `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8` and is based on `9091141b87170fcc4430e7ca57ac4ecd9a3d2081`. Unified CI #43152783047 and review/lifecycle/security gates passed. One initial PR Review Quality Gate failure was caused by three missing PR-body validation labels; corrected body passed rerun #43153005794.

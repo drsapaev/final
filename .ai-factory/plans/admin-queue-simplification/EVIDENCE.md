@@ -1,3 +1,27 @@
+## T18 — PR #4034 abort-classification regression and staging attempts — 2026-11-12T13:44:00+05:00
+
+- Commit under test: `05439ffb848337410b9e2b63e5cd27c9f13fbd8f`; base `9c910962c69305bf584c6a957b85ea9c10a69017`. The application frontend artifact source SHA is `08325168a98d3950c6de8a4a6a503de65c462c93`; frontend source between that artifact commit and current `origin/main` is unchanged.
+- Environment: Windows host, local Chromium Playwright runner, synthetic WSL Compose project `clinic-aqs4034-rq18-cdp-20261112`; no production endpoints/data.
+- Execution mode: `narrow_override` after the known-root-cause gate retry. Gate output recorded earlier: `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read. Current scope is the RQ-18 E2E recorder and these T18 journals.
+- Allowed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md`; task-local ignored `.scratch/` harness/artifacts. Denied: product runtime/API/DB/auth, other Compose projects, production, deploy and merge.
+- Original failure: an already captured hash for a URL could cause a later failed request for that same asset to be omitted from provenance failures.
+- Actual changed paths: RQ-18 E2E spec plus these three journals. No product runtime changes.
+- Validation commands/results:
+  - Targeted `tsc --ignoreConfig --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --esModuleInterop --skipLibCheck --types node --lib ES2022,DOM e2e/rq18-permanent-qr-live.spec.ts` — PASS, exit 0.
+  - Scoped ESLint on the spec — PASS, exit 0; two existing `no-restricted-syntax` warnings at lines 291 and 310.
+  - `git diff --check` — PASS.
+  - Local Chromium `playwright test --config=playwright.config.mjs --grep 'RQ-18 provenance' --repeat-each=3 --reporter=line` — PASS, 9/9, 0 failed. This covered actual second-page abort after a prior matching hash, a genuine non-aborted failed request after a prior hash, body hashing, and the loader/frame classification controls. The initial long-lived CSS navigation harness timed out; it was removed before the passing run.
+  - Frontend artifact check — PASS, 261/261 manifest entries matched, 0 unlisted files; artifact SHA matches the selected source. This is artifact preparation evidence only, not a live browser-served result.
+- Staging attempt 1: Preflight PASS (C: 14 GiB free; WSL backing disk 26 GiB); Start PASS / runtime readiness PASS; Session FAIL at `admin-login-navigation` because the temporary Playwright runner had no `STAGING_PUBLIC_BASE_URL`, making `/login` invalid. Session teardown reported PASS; exact project resources/ports were then clear.
+- Staging attempt 2: Preflight PASS with low-WSL-memory warning (520 MiB available); Start PASS (WSL memory later 2.8 GiB). Session FAIL at `admin-login-fields`: harness had not mapped private `ADMIN_USERNAME`/`ADMIN_PASSWORD` to expected `QA_ADMIN_USERNAME`/`QA_ADMIN_PASSWORD`; diagnostic was `QA_ADMIN_PASSWORD is required`. Session reported Docker unavailable during cleanup. Boot ID remained the expected `8888cff3-54f9-4c0b-9cc2-c5c5cb6a87e7`; ownership/expiry were verified for the exact project, then `scripts/staging_down.ps1` removed its containers, volumes, network and local images. Follow-up: 0 project resources, all three ports free.
+- Staging attempt 3: Preflight PASS (C: 13 GiB free; WSL backing disk 26 GiB; 3166 MiB WSL available), Start PASS / runtime readiness PASS (3199 MiB WSL available). Session stopped before the browser test with `NATIVE_UNAVAILABLE (wsl): command missing or timed out; no mutation continued`. Follow-up WSL service requests timed out (`WSAETIMEDOUT`); distro listing said Running, but boot ID and complete resource inventory could not be read. Three exact-project volume names were visible; containers/network/images were NOT_VERIFIED; ports 18831/18832/55533 were BUSY. No cleanup was attempted after continuity became unverified.
+- Browser Admin 2FA, permanent QR workflow, current browser-to-artifact hash comparison, and `served_revision_verified=true`: NOT_RUN on this current attempt. Earlier historical evidence of 63/63 matching assets belongs to a prior successful Session/source and must not be reused as a current PASS.
+- Result: source-level P2 regression fixed and local focused checks PASS; Tier-2 remains PARTIAL. No deferral is accepted. Exact-head GitHub CI after the rebase/source commit is pending.
+- Scope check: only the E2E source and three T18 journals are tracked. Synthetic staging was isolated; no production change. Current exact-project teardown is pending WSL recovery.
+- Remaining limitation / stop condition: `WSAETIMEDOUT` prevents verifying WSL boot continuity and complete teardown. Stop WSL/Compose cleanup and new staging cycles until the distro responds and ownership/expiry can be rechecked.
+- PR: [#4034](https://github.com/drsapaev/final/pull/4034), current local code is not yet pushed; remote still showed the previous HEAD at the last check.
+- Merge commit: none.
+
 ## T18 — PR #4034 source-head CI completed — 2026-11-12T09:27:43+05:00
 
 - Commit under test: `a744496951854ac1af6013cf1d643746c8fbc3c3`; RQ-18 source change is commit `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8`, unchanged in this evidence-only follow-up. Base: `9091141b87170fcc4430e7ca57ac4ecd9a3d2081`.
