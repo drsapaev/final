@@ -364,7 +364,7 @@ describe('derma deferred Escape discard confirmation (DERMAHOTKEY-FE-001 follow-
     // Escape opens the discard confirmation for visit A; it stays pending.
     await waitFor(() => expect(holder.emrDirty).toBe(true));
     holder.hotkeyConfig?.clearSelection();
-    await waitFor(() => expect(holder.confirmResolve).not.toBeNull());
+    await waitFor(() => { expect(holder.confirmResolve).not.toBeNull(); });
 
     // While the confirmation is pending, the clinician manually selects
     // visit B from the patients tab (no URL identity to re-apply it).
@@ -394,7 +394,7 @@ describe('derma deferred Escape discard confirmation (DERMAHOTKEY-FE-001 follow-
     expect(holder.hotkeyConfig).not.toBeNull();
     await waitFor(() => expect(holder.emrDirty).toBe(true));
     holder.hotkeyConfig?.clearSelection();
-    await waitFor(() => expect(holder.confirmResolve).not.toBeNull());
+    await waitFor(() => { expect(holder.confirmResolve).not.toBeNull(); });
     holder.confirmResolve?.(true);
 
     await waitFor(() => {

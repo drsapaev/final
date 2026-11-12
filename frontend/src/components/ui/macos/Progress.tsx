@@ -236,7 +236,7 @@ export const CircularProgress = React.forwardRef<HTMLDivElement, CircularProgres
       aria-label={`Progress: ${displayValue}%`}
       {...props}>
 
-      <svg
+      <svg aria-hidden="true" focusable="false"
         width={dimensions.width}
         height={dimensions.height}
         viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
