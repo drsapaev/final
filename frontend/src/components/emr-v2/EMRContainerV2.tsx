@@ -374,7 +374,7 @@ export function EMRContainerV2({
         isSaving,
         saveEMR,
         reloadFromServer,
-        // Route-level Discard must suppress the #4009 unmount autosave
+        // Route-level Discard must suppress the PR 4009 unmount autosave
         // synchronously, before the asynchronous baseline reload starts.
         onDiscard: suppressOnDiscard,
         enabled: !isReadOnly && !accessDenied,
