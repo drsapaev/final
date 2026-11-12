@@ -1,3 +1,16 @@
+## T18 — PR #4034 final hosted checks — 2026-11-12T22:20:28+05:00
+
+- Commit under test: pushed PR HEAD `5999c54edad3c9bb1a6eb6af7ea79bb5711bd251`, based on current main `73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d`; the local browser test ran on parent merge HEAD `9e40bb0e6e1d4680ce4bdf717865d1c5bca4aa90` before the final journal-only commit.
+- Environment: GitHub Actions plus the recorded local Windows Chromium synthetic-server run. No application staging, patient data, or Compose project was used for this narrow validation.
+- Scope: only the test spec and T18 journals changed; no product runtime/API/DB/auth, staging/production, merge, or deployment changes.
+- Local validation on unchanged frontend test source: recorder/provenance Chromium group PASS 15/15 over three repetitions; new browser navigation-abort case PASS 3/3; active-page abort and genuine non-aborted failure controls passed. Frontend build and scoped ESLint passed; pre-commit hooks and final diff check passed.
+- Hosted validation on exact PR HEAD: Unified CI `43265310509` SUCCESS; Frontend E2E (including lab, business/security/concurrency, and load/chaos suites), Frontend unit, lint/type-check, build, CI Scope, and PR Required Gate PASS. Backend, docs, metadata, Telegram, code quality, context-boundary, Docker, parity, integration, k6, readiness, and DAST were SKIPPED by scope.
+- PR body check: first Quality Gate `43265547788` failed on missing exact field labels/reason syntax. After correcting the body, local `check_pr_review_template.py` passed and rerun `43266167607` passed. Lifecycle Recommendation, Security Scan, Gitleaks, and Agent Workflow Guards passed.
+- Result: PASS for the targeted recorder test change. The false-green from an active-page abort is covered by a negative test; real navigation cancellation is exercised by the new case; genuine network failure remains rejected.
+- Remaining limitation: this does not complete live RQ-18/Admin 2FA/permanent QR, `served_revision_verified=true`, or full T18/Tier-2; those remain PARTIAL/NOT_RUN. No deferral accepted.
+- PR: #4034 remains OPEN / Ready for review / mergeable; user owns merge.
+- Merge commit: pending user action.
+
 ## T18 — PR #4034 final local navigation-abort regression — 2026-11-12T22:01:21+05:00
 
 - Commit under test: exact local merge HEAD `9e40bb0e6e1d4680ce4bdf717865d1c5bca4aa90`; feature test commit `9614937b6`; current base commit `73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d`; remote PR push pending.
@@ -14,9 +27,10 @@
   - Pre-commit hooks: PASS, including whitespace, conflict, private-key and Gitleaks checks.
   - `git diff --check`: PASS before commit; final check after merge/push pending.
 - Harness setup note: an initial temporary config outside `frontend` could not resolve `@playwright/test`, so no tests executed in that invocation. The config was corrected to avoid package resolution and the final repeated run passed. Earlier `page.goto()` held-response prototypes also failed to produce genuine cancellation; they were replaced by the page-authored timer navigation above.
+- Hosted exact-head check: PR Review Quality Gate `43265547788` first failed because the updated PR description omitted exact required field labels and used an unsupported em dash as the reason delimiter. The body was corrected; local `check_pr_review_template.py` passed and rerun `43266167607` passed. Lifecycle Recommendation `43266167925`, Security Scan `43265310389`, Gitleaks `43265310167`, Agent Workflow Guards `43265310331`, and CI Scope passed. Unified CI `43265310509` had Frontend lint/build and CI Scope PASS; Frontend E2E and Frontend unit jobs remained in progress at this checkpoint. Pending jobs are not PASS.
 - Result: PASS for real Chromium navigation cancellation and recorder acceptance behavior. No full live RQ-18 workflow was run.
 - Remaining limitation: `served_revision_verified` remains unproven; Admin 2FA/permanent QR and complete T18/Tier-2 remain NOT_RUN/PARTIAL. No deferral accepted.
-- PR: #4034; local branch update has not yet been pushed; user owns merge.
+- PR: #4034; branch pushed at exact HEAD `5999c54edad3c9bb1a6eb6af7ea79bb5711bd251`; user owns merge.
 - Merge commit: pending user action.
 
 ## T18 — PR #4034 real Chromium navigation-abort regression — 2026-11-12T21:55:12+05:00
