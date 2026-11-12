@@ -1,3 +1,24 @@
+## T18 — PR #4034 final local navigation-abort regression — 2026-11-12T22:01:21+05:00
+
+- Commit under test: exact local merge HEAD `9e40bb0e6e1d4680ce4bdf717865d1c5bca4aa90`; feature test commit `9614937b6`; current base commit `73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d`; remote PR push pending.
+- Environment: Windows local Chromium and an in-process synthetic HTTP server; no application API, database, patient data, production, or Compose staging was used.
+- Execution mode: mandatory `gate_known_root_cause` for the E2E recorder and three T18 journals. Gate returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt read.
+- Allowed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts`, `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Actual tracked diff contains only these four paths. Denied: product runtime/API/DB/auth, staging/production config or execution, other Compose, merge, deployment.
+- Original gap: no real browser request canceled by a committed navigation was exercised, though source predicates and the active-page/genuine-error negative tests existed.
+- Implementation: in a second tracked context, a parser-blocking duplicate JS request remains in flight while an inline page timer performs same-tab main-frame navigation. The test requires Playwright `requestfailed` = `net::ERR_ABORTED`, destination commit/content, an actual server connection close before response completion, and successful `reportForOrigin()`. That report accepts only when CDP confirms the request frame/loader and a later committed navigation superseding that loader, plus an earlier matching browser-response hash.
+- Validation:
+  - `npm.cmd exec -- playwright test --config ../.scratch/rq18-navigation.playwright.config.ts --project=chromium --grep "RQ-18 provenance" --repeat-each=3`: PASS 15/15 on exact local merge HEAD.
+  - The new navigation-cancellation case passed 3/3 in the repeated group; active-page abort and non-aborted failure controls passed in each repetition.
+  - `npm.cmd run build`: PASS on feature test commit `9614937b6`; the following main merge changed only `backend/tests/unit/test_lab_seed_cache_identity.py`, not frontend inputs.
+  - Scoped ESLint: PASS, 0 errors, 2 existing raw-fetch warnings at lines 302 and 321.
+  - Pre-commit hooks: PASS, including whitespace, conflict, private-key and Gitleaks checks.
+  - `git diff --check`: PASS before commit; final check after merge/push pending.
+- Harness setup note: an initial temporary config outside `frontend` could not resolve `@playwright/test`, so no tests executed in that invocation. The config was corrected to avoid package resolution and the final repeated run passed. Earlier `page.goto()` held-response prototypes also failed to produce genuine cancellation; they were replaced by the page-authored timer navigation above.
+- Result: PASS for real Chromium navigation cancellation and recorder acceptance behavior. No full live RQ-18 workflow was run.
+- Remaining limitation: `served_revision_verified` remains unproven; Admin 2FA/permanent QR and complete T18/Tier-2 remain NOT_RUN/PARTIAL. No deferral accepted.
+- PR: #4034; local branch update has not yet been pushed; user owns merge.
+- Merge commit: pending user action.
+
 ## T18 — PR #4034 real Chromium navigation-abort regression — 2026-11-12T21:55:12+05:00
 
 - Commit under test: uncommitted test diff based on PR HEAD `18d227f184c537d10023d409e962408d5f7583ad`; branch `codex/aqs-t18-rq18-failure-20261112`; base `origin/main` `d3ea3fdc82339b97ed484e7a2a2d649887763a27`. New commit pending.
