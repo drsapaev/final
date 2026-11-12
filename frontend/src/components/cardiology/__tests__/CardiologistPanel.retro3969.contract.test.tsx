@@ -77,26 +77,55 @@ describe('RETRO-3969-01: the URL hydration never reverts a committed same-patien
     expect(fetchIdx).toBeGreaterThan(combinedIdx);
   });
 
-  it('every post-await guard site includes the visit dimension (entry + post-fetch + post-json)', () => {
+  it('every post-await guard site includes the visit dimension (entry + post-fetch + post-json + the RETRO-3969-02 catch)', () => {
     expect(
       (hydration.match(/liveSelectionIsOtherPatient\(\) \|\| liveSelectionContradictsVisit\(\)/g) ?? []).length,
-    ).toBe(3);
+    ).toBe(4);
   });
 
   it('the visit stamping merge is only reachable after the last combined guard', () => {
     const mergeIdx = hydration.indexOf('visit_id: visitIdFromUrl ||');
-    const lastGuard = hydration.lastIndexOf('liveSelectionContradictsVisit()) return;');
+    // The RETRO-3969-02 catch adds a fourth combined guard AFTER the merge;
+    // the ordering invariant is about the pre-catch (success-path) sites.
+    const catchStart = hydration.indexOf('} catch (error: unknown) {');
+    const tryScope = hydration.slice(0, catchStart);
+    const lastGuard = tryScope.lastIndexOf('liveSelectionContradictsVisit()) return;');
     expect(mergeIdx).toBeGreaterThan(-1);
     expect(lastGuard).toBeGreaterThan(-1);
     expect(mergeIdx).toBeGreaterThan(lastGuard);
+    // The catch's own combined guard sits after the merge (failure path).
+    const catchGuard = hydration
+      .slice(catchStart)
+      .indexOf('liveSelectionIsOtherPatient() || liveSelectionContradictsVisit())');
+    expect(catchGuard).toBeGreaterThan(-1);
   });
 
   it('the patient-identity dimension of RETRO-3963-01 is preserved unchanged (regression control)', () => {
     expect(hydration).toContain('const liveSelectionIsOtherPatient = (): boolean =>');
-    // still exactly the three guard sites — now combined with the visit check
-    expect((hydration.match(/liveSelectionIsOtherPatient\(\)/g) ?? []).length).toBe(3);
-    // the epoch guards of the hydration are untouched
-    expect((hydration.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(2);
+    // exactly four guard sites: entry / post-fetch / post-json + the RETRO-3969-02 catch
+    expect((hydration.match(/liveSelectionIsOtherPatient\(\)/g) ?? []).length).toBe(4);
+    // exactly three epoch guards: post-fetch / post-json + the RETRO-3969-02 catch
+    expect((hydration.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(3);
+  });
+
+  it('RETRO-3969-02: the hydration catch gates its toast behind the same epoch/live-selection guards', () => {
+    const catchStart = hydration.indexOf('} catch (error: unknown) {');
+    expect(catchStart).toBeGreaterThan(-1);
+    const catchBlock = hydration.slice(catchStart);
+    const notifyCall = catchBlock.indexOf('notify.error(');
+    expect(notifyCall).toBeGreaterThan(-1);
+    // A hydration fetch that failed AFTER the operator moved on must bail
+    // silently: epoch recheck first, then both live-selection dimensions —
+    // the same one-guard delta the loadEMR catch already owns.
+    const epochGuard = catchBlock.indexOf('epoch !== navigationEpochRef.current');
+    const patientGuard = catchBlock.indexOf('liveSelectionIsOtherPatient()');
+    const visitGuard = catchBlock.indexOf('liveSelectionContradictsVisit()');
+    expect(epochGuard).toBeGreaterThan(-1);
+    expect(patientGuard).toBeGreaterThan(-1);
+    expect(visitGuard).toBeGreaterThan(-1);
+    expect(epochGuard).toBeLessThan(notifyCall);
+    expect(patientGuard).toBeLessThan(notifyCall);
+    expect(visitGuard).toBeLessThan(notifyCall);
   });
 
   it('the same-patient/same-visit nothing-to-do entry bail survives (regression control)', () => {
