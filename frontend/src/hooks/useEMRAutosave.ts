@@ -64,6 +64,9 @@ export function useEMRAutosave({
     const maxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastSaveTimeRef = useRef<number | null>(null);
     const pendingSaveRef = useRef(false);
+    // Explicit user Discard must not resurrect old draft text via the
+    // #4009 last-chance unmount flush (or a timer fired while leaving).
+    const discardedRef = useRef(false);
 
     // audit/phase-1, BS-17: keep latest `doAutosave` in a ref so the
     // maxWait / debounce timers always invoke the CURRENT closure.
@@ -79,6 +82,8 @@ export function useEMRAutosave({
      * Check if save is allowed
      */
     const canSave = useCallback(() => {
+        // An explicit Discard is a synchronous prohibition, not an async GET.
+        if (discardedRef.current) return false;
         // Guard conditions - do NOT save if:
         if (!isDirty) return false;           // No changes to save
         if (isSaving) return false;           // Already saving
@@ -247,7 +252,7 @@ export function useEMRAutosave({
     // dispatches (RETRO-3930-01), so a post-unmount resolution cannot
     // touch the unmounted editor's state.
     useEffect(() => () => {
-        doAutosaveRef.current?.();
+        if (!discardedRef.current) doAutosaveRef.current?.();
     }, []);
 
     /**
@@ -263,6 +268,15 @@ export function useEMRAutosave({
             maxWaitTimerRef.current = null;
         }
     }, []);
+
+    // Intentional Discard is distinct from a forced/uncontrolled unmount:
+    // cancel pending timeouts and prevent both future timer saves and the
+    // destructor's best-effort POST for this discarded draft.
+    const suppressOnDiscard = useCallback(() => {
+        discardedRef.current = true;
+        pendingSaveRef.current = false;
+        clearTimers();
+    }, [clearTimers]);
 
     /**
      * Schedule autosave with debounce
@@ -361,6 +375,10 @@ export function useEMRAutosave({
 
         // Clear pending autosave
         cancel: clearTimers,
+
+        // Synchronously suppress every later autosave for an explicit
+        // user Discard; normal unmounts continue using the #4009 flush.
+        suppressOnDiscard,
 
         // Config info (for UI)
         config: {
