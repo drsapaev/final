@@ -121,11 +121,25 @@ class RedisPubSubBridge:
         ``True`` только после успешного Redis SUBSCRIBE (или когда канал уже
         был подписан); ``False`` при сбое подписки/недоступном Redis.
         Вызывающий код решает, кэшировать ли обработчик.
+
+        Follow-up #4035 (P1-остаток ревью): неудавшаяся подписка НЕ оставляет
+        «фантомную» регистрацию обработчика. Раньше обработчик добавлялся ДО
+        проверки готовности Redis и оставался в наборе при ``False``; повтор
+        с тем же обработчиком видел ``was_added=False``, пропускал реальный
+        Redis SUBSCRIBE и возвращал ``True`` — кэш успешной подписки без
+        реальной подписки (воркер терял control-инвалидацию формата имён
+        после даунгрейда приватности). Откат выполняется только когда
+        регистрация добавлена ЭТИМ вызовом (``was_added``) — конкурентный
+        владелец того же обработчика не затрагивается.
         """
         handlers = self._handlers[logical_channel]
         was_added = handler not in handlers
         handlers.add(handler)
         if not await self._ensure_ready():
+            if was_added:
+                handlers.discard(handler)
+                if not handlers:
+                    self._handlers.pop(logical_channel, None)
             return False
 
         assert self._pubsub is not None
