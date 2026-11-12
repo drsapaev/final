@@ -1,4 +1,17 @@
-## T18 — PR #4034 latest-main sync checkpoint — 2026-11-13T03:57:16+05:00
+## T18 — PR #4034 exact code-head CI — 2026-11-13T04:19:42+05:00
+
+- Commit under test: code-bearing exact PR head `31c265d6624a58604f1c038ce8de70a299832c65`; source/test change commit `fbb9f3c14`; base `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`.
+- Environment: GitHub Actions for exact SHA `31c265d6`; PR #4034 OPEN / Ready for review / mergeable. The local journal update prepared after the run is docs-only.
+- Actual changed paths for this CI record: the same four PR paths; no product runtime/API/database/auth change.
+- Validation: Unified CI run `43325180330` SUCCESS. Frontend build, Frontend E2E, Frontend lint/type-check, Frontend unit tests, CI Scope, PR Required Gate, and Notifications were SUCCESS. PR Review Quality Gate `43325614311`, Lifecycle Recommendation `43325614289`, Security `43325180340`, Gitleaks `43325180297`, Agent Workflow Guards `43325181770` also SUCCESS. DAST, Context Boundary, docs generation, backend tests, metadata, Code Quality, Telegram, Docker, frontend-backend parity, Security subjob, Integration, staging/production readiness and k6 were SKIPPED by scope; not counted as PASS.
+- Local targeted validation before the latest main sync used unchanged E2E blob `01b1fb3c1fce59219091749c90ee353da4589cf4`: frontend build PASS, scoped ESLint PASS (0 errors, 2 existing raw-fetch warnings), E2E TypeScript PASS, focused Chromium RQ-18 provenance 5/5 PASS. Configured CI E2E does not claim to run the live RQ-18 spec.
+- Synthetic Session: PASS on owned project `clinic-aqs-t18-rq18-final-20261113`, artifact source SHA `0621df8e97213ec52f1051c70548c595c8d11204` (pre-latest-base). Admin password/TOTP, synthetic queue-window read/write, T18.10, hidden profile/service/resource setup, explicit publication, permanent address, anonymous booking/resource ownership, QR reopen, inactive-resource/current-day facts, QueueProfile archive/restore, fail-closed anonymous behavior, canonical teardown, and post-session Preflight all PASS. The result is not proof against newly synchronized runtime base `bcf15cb`.
+- Provenance: 68 browser-served JS/CSS response bodies and SHA-256 hashes captured; hashes were not compared with artifact manifest; service worker not captured; `served_revision_verified=false`.
+- Cleanup: containers/volumes/networks/images removed, ports closed. Local policy blocked recursive deletion of the task-owned ignored `.scratch/t18-rq18-booking-diagnosis-20261113` (268 files, about 13.6 MB); no alternate deletion method was attempted. The ignored validation body `.scratch/pr4034-body.md` also remains.
+- Result: code-bearing PR head CI PASS within the checks above; T18/Tier-2 PARTIAL, no deferral accepted. User owns merge/deployment.
+- PR: #4034.
+- Merge commit: pending user action.
+## Previous checkpoint — PR #4034 latest-main sync checkpoint — 2026-11-13T03:57:16+05:00
 
 - Commit under test: local synchronized HEAD `194041b713378b82c4bf5c90f5728198acef66ad`; source/test commit `fbb9f3c14`; latest base `origin/main` `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`. Remote PR #4034 remains at `893308f571375fd8a5365aa73a24702839d5448a` until push.
 - Environment: isolated worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`; synthetic Compose evidence is from owned project `clinic-aqs-t18-rq18-final-20261113`.

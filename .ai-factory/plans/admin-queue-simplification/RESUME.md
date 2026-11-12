@@ -1,4 +1,13 @@
-## Resume — PR #4034 synced with latest main; push and exact-head CI pending — 2026-11-13T03:57:16+05:00
+## Resume — PR #4034 code-head CI passed; evidence-only commit pending — 2026-11-13T04:19:42+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged; T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge/deployment.
+
+PR #4034 is OPEN / Ready for review / mergeable at `31c265d6624a58604f1c038ce8de70a299832c65`, based on `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`. The #4026 duplicate browser-asset failure P2 is fixed in the RQ-18 recorder test. Unified CI `43325180330` passed on the code-bearing head `31c265d6`; its build, E2E, lint/type-check, unit, CI Scope, Required Gate, and Notifications jobs passed. PR Review Quality Gate, Lifecycle, Security, Gitleaks and Agent Workflow Guards passed. Scope-skipped backend/integration/Docker/parity/readiness/load/DAST jobs are not passes.
+
+The final synthetic RQ-18 Session passed on app artifact SHA `0621df8e97213ec52f1051c70548c595c8d11204`, before the branch was synchronized to runtime base `bcf15cb`. It passed Admin password/TOTP, setup, explicit publication, permanent QR, anonymous booking/resource ownership, QR reopen, inactive-resource/current-queue facts, archive/restore, fail-closed behavior, teardown, and post-session Preflight. The session captured 68 browser JS/CSS hashes but did not compare them with the artifact manifest; it did not capture the service worker; `served_revision_verified=false`. Keep T18/Tier-2 PARTIAL.
+
+Next: commit/push the documentation-only CI evidence checkpoint and refresh PR body so the passing code-bearing head and the docs-only follow-up head are distinguished. Verify new PR body gates, then hand the open PR back to the user for merge. Do not merge or deploy. After merge, resume remaining T18 acceptance.
+## Previous resume checkpoint — PR #4034 synced with latest main; push and exact-head CI pending — 2026-11-13T03:57:16+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge/deployment.
 
