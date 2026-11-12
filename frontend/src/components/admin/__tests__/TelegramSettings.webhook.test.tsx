@@ -43,17 +43,35 @@ describe('Telegram settings webhook URL', () => {
   });
 
   it.each([
-    ['a separate API origin', 'https://api.example.test'],
-    ['an explicitly configured same origin', window.location.origin],
-  ])('registers the webhook on %s', async (_description, apiOrigin) => {
-    vi.stubEnv('VITE_API_BASE_URL', apiOrigin);
+    [
+      'a separate API origin',
+      'https://api.example.test',
+      'https://api.example.test/api/v1/telegram/webhook',
+    ],
+    [
+      'an explicitly configured same origin',
+      window.location.origin,
+      `${window.location.origin}/api/v1/telegram/webhook`,
+    ],
+    [
+      'the same-origin sentinel',
+      'same-origin',
+      `${window.location.origin}/api/v1/telegram/webhook`,
+    ],
+    [
+      'an unset API base URL',
+      undefined,
+      'http://localhost:18000/api/v1/telegram/webhook',
+    ],
+  ] as const)('registers the webhook on %s', async (_description, apiBaseUrl, expectedWebhookUrl) => {
+    vi.stubEnv('VITE_API_BASE_URL', apiBaseUrl);
 
     render(<ThemeProvider><TelegramSettings /></ThemeProvider>);
     fireEvent.click(await screen.findByRole('button', { name: 'admin2.ts_set_webhook_button' }));
 
     await waitFor(() => expect(apiMocks.post).toHaveBeenCalledWith(
       '/admin/telegram/set-webhook',
-      { webhook_url: `${apiOrigin}/api/v1/telegram/webhook` },
+      { webhook_url: expectedWebhookUrl },
     ));
   });
 });
