@@ -1724,7 +1724,10 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   const booking = await openPublicAddress(browser, appOrigin, publicCode, servedAssets);
   try {
     if (booking.status !== 200 || booking.startCount.value !== 1) {
-      throw new Error('Available permanent QR did not open exactly one anonymous short session.');
+      throw new Error(
+        'Available permanent QR did not open exactly one anonymous short session '
+        + '(HTTP status ' + booking.status + '; start-session POST count ' + booking.startCount.value + ').',
+      );
     }
     markRq18Phase('anonymous-session-open');
     bookingTargetDate = booking.targetDate || '';
