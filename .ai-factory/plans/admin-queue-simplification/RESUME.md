@@ -1,3 +1,12 @@
+## Resume — PR #4034 exact-head gates passed; journal checkpoint reconciliation — 2026-11-13T04:47:24+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112. T00–T17 remain merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge/deployment.
+
+PR #4034 is OPEN / Ready for review / mergeable at remote head 1cd4d9b8ce49901e44d66dcb987fb1fbdcb1e26a, based on bcf15cbf2e53f6aad5d94830c7a824e8d81e561e. The #4026 duplicate-asset failure finding is fixed in its RQ-18 test recorder. Unified CI on the code-bearing head and on this documentation-only remote head passed. For current head 1cd4d9b8, frontend unit, lint/type-check, build, E2E, CI Scope, PR Required Gate, and Notifications passed; scoped jobs marked skipped are not passes. PR Review Quality Gate and Lifecycle Recommendation passed after the PR description update. No review submission or inline thread was present at the last check.
+
+The latest synthetic RQ-18 Session passed on artifact source 0621df8e, before the current base bcf15cb. It passed its recorded synthetic setup and booking scenarios, canonical teardown, and post-session Preflight. The session captured 68 JS/CSS bodies but did not compare them with the artifact manifest and did not capture the service worker; served_revision_verified=false. Do not mark T18/Tier-2 complete.
+
+This checkpoint reconciles stale push/CI-pending text in the prior journals with the observed remote state. The journal-only update is being added to the same PR #4034 branch. After pushing it, verify the new head’s checks and update PR metadata if needed; do not create a separate PR or merge. Then leave merge to the user. After merge, resume the missing exact-base frontend provenance and remaining T18 acceptance.
 ## Resume — PR #4034 code-head CI passed; evidence-only commit pending — 2026-11-13T04:19:42+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged; T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge/deployment.

@@ -7312,3 +7312,21 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: frontend browser hashes were not matched to the artifact manifest and service worker was not captured. Full T18 and Tier-2 remain PARTIAL; no deferral.
 - PR: #4034; remote HEAD was 893308f571375fd8a5365aa73a24702839d5448a before this continuation. New commit/push and exact-head CI are pending.
 - Merge commit: NOT_MERGED.
+
+## PR #4034 — reconcile exact-head CI and T18 checkpoint — 2026-11-13T04:47:24+05:00
+
+- Commit under test: remote PR head 1cd4d9b8ce49901e44d66dcb987fb1fbdcb1e26a, base bcf15cbf2e53f6aad5d94830c7a824e8d81e561e; code-bearing fix head 31c265d6 is unchanged by the documentation-only follow-up.
+- Environment: GitHub Actions and the isolated Windows worktree for PR #4034.
+- Execution mode: gate_known_root_cause; known root cause was stale checkpoint wording in PROGRESS.md and RESUME.md after the doc-only push and successful exact-head checks.
+- Gate command: run_agent_gate.ps1 "T18 reconcile exact CI checkpoint and resume state after current-head validation" --known-root-cause .ai-factory/plans/admin-queue-simplification/PROGRESS.md --scope .ai-factory/plans/admin-queue-simplification/PROGRESS.md --scope .ai-factory/plans/admin-queue-simplification/EVIDENCE.md --scope .ai-factory/plans/admin-queue-simplification/RESUME.md.
+- Gate result: exit 0; narrow_override; gate_misroute=false; override_used=true; handoff_required=true. The generated execution prompt was read and limits edits to the three journals below.
+- Allowed paths: .ai-factory/plans/admin-queue-simplification/PROGRESS.md, EVIDENCE.md, and RESUME.md.
+- Denied paths: product runtime/API/database/auth, gate/router, staging configuration, production, unrelated worktrees, merge, and deployment.
+- Actual changed paths in this follow-up: the three named T18 journals only. No application source was changed.
+- Original failure: the latest checkpoint still said the documentation commit, push, PR body update, and exact-head CI were pending. GitHub confirmed that the current remote head had been pushed, Unified CI had passed, and PR body quality/lifecycle gates had passed.
+- Validation command: git diff --check after the journal edit; hosted evidence below applies to remote head 1cd4d9b8, before this journal-only reconciliation.
+- Result on remote head 1cd4d9b8: Unified CI run 43328178548 SUCCESS. Frontend unit, lint/type-check, build, E2E, CI Scope, PR Required Gate, and Notifications passed. Backend, integration, Docker, parity, readiness, k6, DAST, and other path-skipped jobs were not counted as passes. PR Review Quality Gate 43330542474, Lifecycle Recommendation 43330542362, Gitleaks 43328178560, Security 43328178559, and Agent Workflow Guards 43328178579 passed.
+- Result for the journal-only reconciliation: local diff check is required before commit; exact-head hosted validation remains pending until this update is pushed.
+- Remaining limitation: previous synthetic Session artifact source 0621df8e predates base bcf15cb; browser JS/CSS hashes were not compared with the manifest, service worker was not captured, and served_revision_verified=false. Full T18 and STAGING_VALIDATION.md remain PARTIAL; no deferral accepted.
+- PR: #4034, open and unmerged at the time of this record. No reviews or inline threads were present at the last GitHub check.
+- Merge commit: NOT_MERGED.

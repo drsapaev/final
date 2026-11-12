@@ -1,4 +1,33 @@
-## Current checkpoint — PR #4034 exact code-head CI passed; evidence commit pending — 2026-11-13T04:19:42+05:00
+## Current checkpoint — PR #4034 CI and PR gates pass; T18 remains partial — 2026-11-13T04:47:24+05:00
+
+Plan version: 1.0
+Current task: T18 final synthetic acceptance and PR #4034
+Current status: IN_PROGRESS; PR #4034 is open and awaiting independent review / user-owned merge
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final
+Branch: codex/aqs-t18-rq18-failure-20261112
+Base commit: bcf15cbf2e53f6aad5d94830c7a824e8d81e561e
+Current commit: 1cd4d9b8ce49901e44d66dcb987fb1fbdcb1e26a (remote PR head at checkpoint; this journal reconciliation is a docs-only follow-up)
+Last updated: 2026-11-13T04:47:24+05:00
+
+- T00–T17 remain MERGED. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. Its duplicate-asset request-failure finding is fixed by #4034 in frontend/e2e/rq18-permanent-qr-live.spec.ts. PR #4034 is OPEN, Ready for review, mergeable, based on bcf15cbf; current remote head at this checkpoint is 1cd4d9b8.
+- The code-bearing head 31c265d6 passed Unified CI. The documentation-only remote head 1cd4d9b8 also passed Unified CI run 43328178548: frontend unit, lint/type-check, build, E2E, CI Scope, PR Required Gate, and Notifications passed. Jobs skipped by workflow scope are recorded as skipped, not passed.
+- After the PR description was refreshed, PR Review Quality Gate 43330542474 and Lifecycle Recommendation 43330542362 passed. Gitleaks, Security, and Agent Workflow Guards also passed on the documentation-only head. The PR description now identifies both the code-bearing and evidence-only heads and states the Tier-2 limits.
+- This journal reconciliation is limited to PROGRESS.md, EVIDENCE.md, and RESUME.md. It records results already observed on the prior remote head. Push this update to the same PR branch, then verify checks on the resulting head; do not create another PR.
+- The synthetic Session passed on artifact source 0621df8e, which predates current base bcf15cb. Its owned Compose project was torn down and post-session Preflight passed. It does not prove runtime behavior from the current base.
+- Browser provenance is still incomplete: 68 JS/CSS response bodies were captured, but not compared with the artifact manifest; the service worker was not captured; served_revision_verified=false. Full T18 and STAGING_VALIDATION.md remain PARTIAL.
+- No review submissions or inline threads were present at the last GitHub check. No merge or deployment occurred.
+- Owned Compose resources and ports were confirmed absent. Local policy blocked recursive deletion of the task-owned .scratch/t18-rq18-booking-diagnosis-20261113 folder and .scratch/pr4034-body.md; no alternate deletion method was used.
+
+## Current checkpoint
+
+- Completed: #4026 finding fixed in #4034; exact code-head and current documentation-head CI passed; PR body gates passed; owned staging teardown verified.
+- Changed but not yet verified: this additive three-journal reconciliation; exact-head hosted checks for its resulting commit must be checked after push.
+- Remaining: independent review and user-owned merge of #4034; after that, continue T18 served-revision provenance and remaining full staging acceptance.
+- Blocker: #4034 is still unmerged; T18 acceptance is partial and its served frontend artifact predates the current base.
+- Next exact action: commit and push this journal-only update to the existing #4034 branch; confirm exact-head CI and PR gates; leave merge to the user.
+- Checks to rerun after the next change: git diff --check, PR Required Gate, exact-head Unified CI, PR Review Quality Gate, and Lifecycle Recommendation.
+## Previous checkpoint — PR #4034 exact code-head CI passed; evidence commit pending — 2026-11-13T04:19:42+05:00
 
 - T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
 - PR #4026 is merged; its duplicate-asset request-failure P2 is covered by #4034. Current PR #4034 is OPEN / Ready for review / mergeable at head `31c265d6624a58604f1c038ce8de70a299832c65`, base `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`. The current source/test commit is `fbb9f3c14`; this task is preparing a documentation-only evidence checkpoint after CI.
