@@ -48,6 +48,16 @@ const sectionTemplateCache = new Map<string, SectionTemplateCacheEntry>();
 // newest token; a stale-generation response adopts the newer shared truth
 // (or chains onto its pending read) instead of painting its own payload.
 const sectionTemplateCacheTokens = new Map<string, number>();
+// RETRO-4014-01 (ledger PR 4000, comment 19): per-key failure tombstone —
+// the generation of the LATEST failed fresh read. A newer failure deletes
+// the shared entry, so a stale completion later sees NO newer entry and
+// used to fall through to its own payload as { ok: true } — the doctor saw
+// old clinical phrase text as a successful current response after a
+// successful mutation and a failed fresh read. The tombstone is the shared
+// 'latest outcome is failure' record: a stale completion refuses to adopt
+// its own payload while a newer generation's failure is the last known
+// event. Pending-read chaining and newer-data adoption keep precedence.
+const sectionTemplateCacheFailures = new Map<string, { token: number; error: string }>();
 
 const acquireCacheToken = (cacheKey: string): number => {
     const next = (sectionTemplateCacheTokens.get(cacheKey) ?? 0) + 1;
@@ -73,6 +83,7 @@ const syncSectionTemplateCacheOwner = (): void => {
     if (owner !== sectionTemplateCacheOwner) {
         sectionTemplateCache.clear();
         sectionTemplateCacheTokens.clear();
+        sectionTemplateCacheFailures.clear();
         sectionTemplateCacheOwner = owner;
     }
 };
@@ -320,6 +331,9 @@ export function useDoctorSectionTemplates({
                         promise: null,
                         token: myCacheToken,
                     });
+                    // RETRO-4014-01: a newer SUCCESS supersedes any older
+                    // failure tombstone for this key.
+                    sectionTemplateCacheFailures.delete(cacheKey);
                 } else if (canUseCache) {
                     const newerEntry = sectionTemplateCache.get(cacheKey);
                     if (newerEntry?.promise && newerEntry.token !== myCacheToken) {
@@ -332,12 +346,36 @@ export function useDoctorSectionTemplates({
                         // instance switched context) while the install token
                         // is still ours — a self reference would create a
                         // promise cycle.
-                        return newerEntry.promise;
+                        // RETRO-4014-01: routed through the joiner contract —
+                        // the bare return resolved this request's promise but
+                        // never repainted THE STALE INSTANCE'S own state, so
+                        // it stayed on an empty list while the cache moved on.
+                        return joinInFlightRequest(epoch, newerEntry.promise, cacheKey);
                     }
                     if (newerEntry?.data && newerEntry.token !== myCacheToken) {
                         // A newer same-key read already committed successful
                         // data: prefer it over this stale payload.
                         committedData = newerEntry.data;
+                    }
+                    // RETRO-4014-01: no newer entry at all, but a NEWER
+                    // generation's failure is the last shared event (its
+                    // catch deleted the entry and left the tombstone). The
+                    // stale payload must not fall through as a successful
+                    // current response — surface the newer failure to this
+                    // instance and every joiner honestly.
+                    if (!newerEntry) {
+                        const newerFailure = sectionTemplateCacheFailures.get(cacheKey);
+                        if (newerFailure && newerFailure.token > myCacheToken) {
+                            if (
+                                isMountedRef.current &&
+                                epoch === requestEpochRef.current &&
+                                liveCacheKeyRef.current === cacheKey
+                            ) {
+                                setError(newerFailure.error);
+                                setTemplates([]);
+                            }
+                            return { ok: false, error: newerFailure.error };
+                        }
                     }
                 }
 
@@ -365,12 +403,23 @@ export function useDoctorSectionTemplates({
                     }
                     if (canUseCache && sectionTemplateCacheOwner === ownerAtRequest) {
                         sectionTemplateCache.delete(cacheKey);
+                        // RETRO-4014-01: the delete removed the shared truth;
+                        // record this generation's failure so a stale
+                        // completion can never present its own payload as a
+                        // successful current response afterwards.
+                        sectionTemplateCacheFailures.set(cacheKey, {
+                            token: myCacheToken,
+                            error: message,
+                        });
                     }
                     return { ok: false, error: message };
                 }
                 const newerEntry = canUseCache ? sectionTemplateCache.get(cacheKey) : undefined;
                 if (newerEntry?.promise && newerEntry.token !== myCacheToken) {
-                    return newerEntry.promise;
+                    // RETRO-4014-01: same joiner-contract convergence as the
+                    // success path — the stale failure's instance must follow
+                    // the newer pending read instead of staying frozen.
+                    return joinInFlightRequest(epoch, newerEntry.promise, cacheKey);
                 }
                 if (newerEntry?.data && newerEntry.token !== myCacheToken) {
                     if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {

@@ -358,7 +358,7 @@ export function EMRContainerV2({
     const doctorId = currentUser?.id;
 
     // Autosave setup
-    const { lastAutosave, config: autosaveConfig } = useEMRAutosave({
+    const { lastAutosave, config: autosaveConfig, suppressOnDiscard } = useEMRAutosave({
         isDirty,
         isSaving,
         isSigned,
@@ -384,6 +384,10 @@ export function EMRContainerV2({
         isSaving,
         saveEMR,
         reloadFromServer,
+        // RETRO-3971-04 P1: route-level Discard синхронно подавляет
+        // PR-4009 unmount autosave ДО асинхронного reload — отброшенный
+        // врачом черновик не может уйти на сервер из деструктора.
+        onDiscard: suppressOnDiscard,
         enabled: !isReadOnly && !accessDenied,
     });
 

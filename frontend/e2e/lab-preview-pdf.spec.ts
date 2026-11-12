@@ -121,13 +121,19 @@ async function installSession(page: Page) {
     window.sessionStorage.setItem('refresh_token', token);
     window.sessionStorage.setItem('auth_profile', JSON.stringify(profile));
     window.sessionStorage.setItem('user', JSON.stringify(profile));
-    // Захват window.open: preview открывает blob-вкладку; нельзя дать
-    // настоящему popup-менеджеру Playwright мешать тесту.
+    // Захват window.open: RETRO-3970-01 — приложение резервирует контекст
+    // синхронным window.open('') в жесте и потом НАВИГИРУЕТ его на blob-URL.
+    // Стаб возвращает управляемый контекст (не настоящий popup), но
+    // воспроизводит контракт резервации в реальном Chromium.
     const opened: string[] = [];
+    const reservedLocations: Array<{ href: string }> = [];
     (window as unknown as { __openedWindows: string[] }).__openedWindows = opened;
-    window.open = ((url?: string | URL) => {
-      opened.push(String(url));
-      return {} as Window;
+    (window as unknown as { __reservedLocations: Array<{ href: string }> }).__reservedLocations = reservedLocations;
+    window.open = ((_url?: string | URL) => {
+      opened.push(_url == null || String(_url) === '' ? '' : String(_url));
+      const stub = { opener: 'initiator' as unknown, close() {}, location: { href: '' } };
+      reservedLocations.push(stub.location);
+      return stub as unknown as Window;
     }) as typeof window.open;
   }, { token: FAKE_TOKEN, profile: LAB_PROFILE });
 }
@@ -211,11 +217,20 @@ test.describe('Lab server-rendered PDF preview (PR8)', () => {
 
     await previewButton.click();
 
-    // Blob-вкладка открыта (window.open захвачен пробой).
+    // RETRO-3970-01: ровно одна СИНХРОННАЯ резервация в жесте — вызов
+    // window.open('') без feature-строки; навигация заполняет location.href
+    // зарезервированного контекста blob-URL после валидного ответа.
     await expect
-      .poll(() => page.evaluate(() =>
-        (window as unknown as { __openedWindows?: string[] }).__openedWindows?.length || 0))
-      .toBeGreaterThanOrEqual(1);
+      .poll(() => page.evaluate(() => {
+        const w = (window as unknown as { __openedWindows?: string[] }).__openedWindows;
+        const locs = (window as unknown as { __reservedLocations?: Array<{ href: string }> }).__reservedLocations;
+        return { calls: w?.length || 0, first: w?.[0], href: locs?.[0]?.href };
+      }))
+      .toEqual({
+        calls: 1,
+        first: '',
+        href: expect.stringMatching(/^blob:/),
+      });
 
     // Выделенный preview-маршрут вызван ровно один раз.
     const previewCalls = labApiCalls.filter(
