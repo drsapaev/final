@@ -268,4 +268,79 @@ describe('NotificationWebSocketContext', () => {
     expect(notification.title).toBe('Повторная диагностика');
     expect(source).toBe('ws');
   });
+
+  it.each([
+    ['lab_results', 'Результат анализа', 'info'],
+    ['new_appointment', 'Новая запись', 'info'],
+    ['message_received', 'Новое сообщение', 'info'],
+    ['security_alert', 'Системная безопасность', 'warning'],
+  ] as const)(
+    'accepts canonical notification transport carrying %s event without an event-type allowlist',
+    async (eventType, title, toastLevel) => {
+      renderProvider('/doctor/cardiology');
+
+      await act(async () => {
+        vi.runAllTimers();
+      });
+
+      const socket = MockWebSocket.instances[0];
+      const deliveryId = `synthetic-${eventType}-1`;
+
+      await act(async () => {
+        socket.triggerMessage({
+          type: 'notification',
+          event_type: eventType,
+          delivery_id: deliveryId,
+          notification: {
+            delivery_id: deliveryId,
+            event_type: eventType,
+            title,
+            message: 'Синтетическое уведомление',
+            role: 'doctor',
+          },
+        });
+      });
+
+      expect(notificationCenterMockTyped.appendNotification).toHaveBeenCalledTimes(1);
+      const [notification, source] =
+        notificationCenterMockTyped.appendNotification.mock.calls[0] as [
+          { type: string; title: string; message: string; delivery_id: string },
+          string,
+        ];
+      expect(source).toBe('ws');
+      expect(notification).toMatchObject({
+        type: eventType,
+        title,
+        message: 'Синтетическое уведомление',
+        delivery_id: deliveryId,
+      });
+      expect(cacheMock.clearNotificationQueryCache).toHaveBeenCalledTimes(1);
+      expect(notifyMock[toastLevel]).toHaveBeenCalledWith(
+        `${title}: Синтетическое уведомление`,
+      );
+    },
+  );
+
+  it.each([
+    { type: 'connection_established', unread_count: 2 },
+    { type: 'notification_read_ack', delivery_id: 'synthetic-1', unread_count: 1 },
+    { type: 'notification_sync_response', items: [], unread_count: 0 },
+    { type: 'ping' },
+    { type: 'unknown', notification: { event_type: 'lab_results', title: 'Not a canonical transport' } },
+  ])('does not append a delivery for a non-notification transport %#', async (payload) => {
+    renderProvider('/doctor/cardiology');
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    await act(async () => {
+      MockWebSocket.instances[0].triggerMessage(payload);
+    });
+
+    expect(notificationCenterMockTyped.appendNotification).not.toHaveBeenCalled();
+    expect(notifyMock.info).not.toHaveBeenCalled();
+    expect(notifyMock.warning).not.toHaveBeenCalled();
+  });
+
 });

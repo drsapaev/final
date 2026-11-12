@@ -30,6 +30,7 @@ async def websocket_notifications(
     db = SessionLocal()
     manager = get_notification_ws_manager()
     authenticated_user = None
+    registered_user_id = None
 
     try:
         token = extract_ws_token(websocket)
@@ -40,7 +41,10 @@ async def websocket_notifications(
             )
             return
 
-        await manager.connect(websocket, authenticated_user.id)
+        # Set before connecting so a partially registered socket is also
+        # cleaned up if manager.connect() raises after its registration step.
+        registered_user_id = authenticated_user.id
+        await manager.connect(websocket, registered_user_id)
 
         platform_service = get_notification_platform_service(db)
         unread_counts = platform_service.get_unread_counts(current_user=authenticated_user)
@@ -218,8 +222,7 @@ async def websocket_notifications(
                 continue
 
     except WebSocketDisconnect:
-        if authenticated_user:
-            manager.disconnect(websocket, authenticated_user.id)
+        pass
     except Exception as exc:
         logger.error("WebSocket notification error: %s", exc)
         try:
@@ -227,4 +230,11 @@ async def websocket_notifications(
         except Exception:
             pass
     finally:
-        db.close()
+        # Normal disconnects, unexpected exceptions and cancellation must all
+        # release the manager's socket/home-loop and Redis subscription state.
+        # Close the DB even if the manager's disconnect path raises.
+        try:
+            if registered_user_id is not None:
+                manager.disconnect(websocket, registered_user_id)
+        finally:
+            db.close()

@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
+from weakref import WeakValueDictionary
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
@@ -40,6 +41,9 @@ class WSManager:
                 redis_url=(os.getenv("WS_REDIS_URL") or os.getenv("REDIS_URL")),
             )
             cls._instance._redis_handlers = {}
+            # Per-room critical sections survive while operations await; unused
+            # locks are released once no task is holding or awaiting them.
+            cls._instance._subscription_locks = WeakValueDictionary()
             log.info("WSManager: создан новый экземпляр")
         return cls._instance
 
@@ -80,6 +84,14 @@ class WSManager:
                     set_ws.discard(ws)
                     if not set_ws:
                         self.rooms.pop(r, None)
+                        # QUEUEWSRELAY-BE-001: the last socket of a room died
+                        # mid-send — mirror disconnect() and drop the Redis
+                        # handler too. Previously the room was popped while
+                        # _redis_handlers[room] stayed registered forever, so
+                        # remote events kept invoking a dead-room handler
+                        # (dead-room subscription leak). Scheduling via
+                        # _dispatch keeps the send loop non-blocking.
+                        self._dispatch(self._remove_room_subscription(r))
                         log.info("WSManager: removed dead websocket from room %s", r)
 
     def broadcast(self, room: str, data) -> None:
@@ -104,22 +116,67 @@ class WSManager:
     def _room_channel(self, room: str) -> str:
         return f"room:{room}"
 
+    def _room_subscription_lock(self, room: str) -> asyncio.Lock:
+        lock = self._subscription_locks.get(room)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._subscription_locks[room] = lock
+        return lock
+
     async def _ensure_room_subscription(self, room: str) -> None:
-        if room in self._redis_handlers:
-            return
+        # QUEUEWS-POST4008-SUBSCRIBE-01: a handler is cached only after the bridge
+        # confirms Redis SUBSCRIBE. Serializing first connects also prevents a
+        # second socket from treating an in-flight subscription as established.
+        async with self._room_subscription_lock(room):
+            if room in self._redis_handlers or not self.rooms.get(room):
+                return
 
-        async def _handler(payload, _room: str = room) -> None:
-            remote_data = payload.get("data", payload)
-            await self._broadcast_room(_room, remote_data, publish=False)
+            async def _handler(payload, _room: str = room) -> None:
+                remote_data = payload.get("data", payload)
+                await self._broadcast_room(_room, remote_data, publish=False)
 
-        self._redis_handlers[room] = _handler
-        await self._pubsub.subscribe(self._room_channel(room), _handler)
+            channel = self._room_channel(room)
+            try:
+                subscribed = await self._pubsub.subscribe(channel, _handler)
+            except Exception as exc:
+                log.warning(
+                    "WSManager: Redis subscribe failed for room %s: %s",
+                    room,
+                    type(exc).__name__,
+                )
+                subscribed = False
+
+            if subscribed is True:
+                self._redis_handlers[room] = _handler
+                return
+
+            # RedisPubSubBridge.subscribe can return False after adding its
+            # handler if _ensure_ready failed. Explicitly undo that state,
+            # otherwise a subsequent connect may get a false True result.
+            try:
+                await self._pubsub.unsubscribe(channel, _handler)
+            except Exception as exc:
+                log.warning(
+                    "WSManager: Redis failed-subscribe cleanup for room %s: %s",
+                    room,
+                    type(exc).__name__,
+                )
+            log.warning(
+                "WSManager: Redis room %s not subscribed; will retry on next connect",
+                room,
+            )
 
     async def _remove_room_subscription(self, room: str) -> None:
-        handler = self._redis_handlers.pop(room, None)
-        if handler is None:
-            return
-        await self._pubsub.unsubscribe(self._room_channel(room), handler)
+        # A queued unsubscribe can run after a new socket joins the same
+        # room; do not remove its live handler. Holding this lock also
+        # prevents an old in-flight unsubscribe from erasing a new subscribe.
+        async with self._room_subscription_lock(room):
+            if self.rooms.get(room):
+                return
+            handler = self._redis_handlers.pop(room, None)
+            if handler is None:
+                return
+            await self._pubsub.unsubscribe(self._room_channel(room), handler)
 
     async def _broadcast_room(self, room: str, data, publish: bool) -> None:
         for ws in list(self.rooms.get(room, set())):
@@ -212,8 +269,6 @@ def broadcast_queue_update(
             data={"action": "call_next", "entry_id": 123}
         )
     """
-    import asyncio
-
     room = f"{department.strip()}::{date.strip()}"
     message = {
         "type": event_type,
@@ -221,20 +276,31 @@ def broadcast_queue_update(
         "data": data or {},
     }
 
+    # QUEUEWSDISPATCH-BE-001: ws_manager.broadcast is a SYNCHRONOUS,
+    # self-scheduling function — its own _dispatch() layer handles both the
+    # running-loop and no-loop cases. The previous
+    # ``loop.create_task(ws_manager.broadcast(room, message))`` first ran the
+    # sync call (which scheduled the broadcast), then handed the returned
+    # ``None`` to asyncio.create_task — a guaranteed
+    # "TypeError: a coroutine was expected" on every queue mutation,
+    # surfacing as false broadcast errors in endpoint logs while the inner
+    # broadcast actually ran. Schedule through the manager's single
+    # scheduling layer instead and never wrap a sync result in create_task.
     try:
-        loop = asyncio.get_event_loop()
-        loop.create_task(ws_manager.broadcast(room, message))
-        log.info(
-            "broadcast_queue_update: queued broadcast to room %s, event=%s",
-            room,
-            event_type,
-        )
+        asyncio.get_running_loop()
     except RuntimeError:
         # No event loop running (e.g., in sync test context) — log and skip.
         log.warning(
             "broadcast_queue_update: no event loop, skipping broadcast to %s",
             room,
         )
+        return
+    ws_manager.broadcast(room, message)
+    log.info(
+        "broadcast_queue_update: queued broadcast to room %s, event=%s",
+        room,
+        event_type,
+    )
 
 
 def _origin_allowed(origin: str | None) -> bool:
@@ -252,7 +318,24 @@ def _origin_allowed(origin: str | None) -> bool:
     return origin in allowed
 
 
-def _auth_ok(headers, token_qs: str | None) -> bool:
+class _TestingBypassPrincipal:
+    """Dev/test-only marker principal for the TESTING=1 queue-WS bypass.
+
+    QUEUEWSAUTH-BE-001: the bypass must never silence auth in production,
+    and it carries no real identity — the room authorization gate treats it
+    as "no identity to authorize" and lets the pytest harness through only
+    while ENV is not production.
+    """
+
+    id = None
+    role = "__ws_testing_bypass__"
+    username = "__ws_testing__"
+
+
+_WS_TESTING_PRINCIPAL = _TestingBypassPrincipal()
+
+
+def _resolve_ws_auth(headers, token_qs: str | None):
     """QUEUE-AUDIT-28 P0-1: validate JWT, not just check token exists.
 
     Раньше принимал любой `Bearer foo` или `?token=anything` — anonymous
@@ -265,11 +348,30 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
     PR-5: WS_DEV_ALLOW bypass REMOVED — it was a security risk because CI
     used it and the flag could leak to production. Tests now use TESTING=1
     (set by pytest conftest) instead.
+
+    QUEUEWSAUTH-BE-001: the TESTING=1 bypass is now refused whenever
+    ENV=production — the misconfigured combination "ENV=production,
+    TESTING=1" no longer turns the mounted /ws/queue into an anonymous
+    queue stream. Test harnesses keep the bypass in dev/test environments
+    only.
+
+    QUEUEWSAUTH-BE-002: the validated subject is resolved to a stable user
+    BEFORE revocation is applied, so username-sub JWTs now go through the
+    same exact-jti + all-user-sentinel blacklist checks as numeric-sub
+    tokens. Previously the blacklist ran only under ``if jti and
+    user_id`` with ``user_id`` derived from a numeric subject, so a
+    revoked or bulk-invalidated username-sub token kept passing the
+    standalone queue stream.
+
+    Returns the resolved user (or the dev/test bypass principal), or None
+    when the caller must be rejected.
     """
+    env = os.getenv("ENV", "dev").lower()
     # PR-5: WS_DEV_ALLOW bypass removed. Only TESTING=1 (pytest) skips auth
-    # so unit tests that don't seed users can still connect.
-    if os.getenv("TESTING", "0") == "1":
-        return True
+    # so unit tests that don't seed users can still connect — and never in
+    # production (QUEUEWSAUTH-BE-001).
+    if os.getenv("TESTING", "0") == "1" and env not in ("prod", "production"):
+        return _WS_TESTING_PRINCIPAL
     # Extract token from header (preferred) or query param (legacy)
     auth = headers.get("authorization") or headers.get("Authorization")
     token = None
@@ -284,40 +386,55 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
         )
         token = token_qs.strip()
     if not token:
-        return False
+        return None
     # Validate JWT
     try:
         import jwt as _jwt
 
         from app.core.config import settings as _settings
         payload = _jwt.decode(token, _settings.SECRET_KEY, algorithms=[_settings.ALGORITHM])
-        # Check blacklist + resolve the user (QD-1.1 Codex round-3 P2): the
-        # standalone queue stream applies the same sentinel rejection as
-        # every other auth surface — the shared resolver returns None for
-        # internal-only roles, missing users and malformed subjects.
         from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
         from app.db.session import SessionLocal as _SessionLocal
 
         jti = payload.get("jti")
-        sub = payload.get("sub")
-        user_id = None
-        if isinstance(sub, str) and sub.isdigit():
-            user_id = int(sub)
-        elif isinstance(sub, int):
-            user_id = sub
         _db = _SessionLocal()
         try:
-            if jti and user_id:
-                from app.services.token_blacklist_service import TokenBlacklistService
-                if TokenBlacklistService.is_token_blacklisted(_db, jti, user_id=user_id):
-                    return False
-            if _resolve_websocket_user(payload, _db) is None:
-                return False
+            # QUEUEWSAUTH-BE-002: resolve the validated subject to a stable
+            # user FIRST, then apply revocation for that user — one policy
+            # for numeric and username subjects alike. The shared resolver
+            # returns None for internal-only roles, missing users and
+            # malformed subjects (QD-1.1 Codex round-3 P2).
+            user = _resolve_websocket_user(payload, _db)
+            if user is None:
+                return None
+            if jti:
+                from app.services.token_blacklist_service import (
+                    TokenBlacklistService,
+                )
+
+                if TokenBlacklistService.is_token_blacklisted(
+                    _db, jti, user_id=user.id
+                ):
+                    log.warning(
+                        "WS auth rejected: blacklisted token (jti=%s) "
+                        "for user_id=%s",
+                        jti,
+                        user.id,
+                    )
+                    return None
         finally:
             _db.close()
-        return True
+        return user
     except Exception:
-        return False
+        return None
+
+
+def _auth_ok(headers, token_qs: str | None) -> bool:
+    """Boolean view of :func:`_resolve_ws_auth`.
+
+    Kept as a named helper because existing tests assert the boolean
+    contract directly (test_queue_resource_sentinel.py)."""
+    return _resolve_ws_auth(headers, token_qs) is not None
 
 
 # -----------------------------------------------------------------------------
@@ -348,11 +465,17 @@ async def ws_queue(
     is_production = env in ("prod", "production")
 
     # PR-5: WS_DEV_ALLOW bypass REMOVED — was a security risk. Tests use
-    # TESTING=1 (handled in _auth_ok) instead.
+    # TESTING=1 (handled in _resolve_ws_auth) instead — and the bypass is
+    # refused in production (QUEUEWSAUTH-BE-001).
+
+    # ✅ SECURITY: single JWT resolution for both checks below. The legacy
+    # flow called _auth_ok twice (production gate, then unconditional gate);
+    # both share one resolution now.
+    user = _resolve_ws_auth(websocket.headers, token)
 
     # ✅ SECURITY: In production, require authentication
     if is_production:
-        if not _auth_ok(websocket.headers, token):
+        if user is None:
             await websocket.accept()
             await websocket.send_json({"type": "error", "reason": "Authentication required in production"})
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
@@ -365,15 +488,50 @@ async def ws_queue(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # Auth (required in production, optional in dev)
-    if not _auth_ok(websocket.headers, token):
+    # Auth (required in every environment; the dev/test bypass principal
+    # from TESTING=1 counts as authenticated here)
+    if user is None:
         await websocket.accept()
         await websocket.send_json({"type": "error", "reason": "auth required"})
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
+    # ✅ SECURITY: QUEUEWSSCOPE-BE-001 — a valid JWT alone does not grant an
+    # arbitrary caller-provided room. Apply the canonical authenticated-
+    # queue policy (_has_department_access) BEFORE the subscription: a
+    # Patient-role token is closed with 1008 without ever joining the room
+    # or receiving a single queue event. The dev/test bypass principal has
+    # no identity to authorize and is skipped (pytest harness only).
+    if user is not _WS_TESTING_PRINCIPAL:
+        from app.api.v1.endpoints.websocket_auth import _has_department_access
+
+        if not _has_department_access(user, department):
+            log.warning(
+                "WS auth rejected: user %s (role=%s) may not subscribe to "
+                "queue room department=%r",
+                getattr(user, "username", None),
+                getattr(user, "role", None),
+                department,
+            )
+            await websocket.accept()
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "reason": "not allowed to subscribe to this queue room",
+                }
+            )
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
     # ✅ Только после всех проверок — accept
-    await websocket.accept()
+    # QUEUEWSHANDSHAKE-BE-001: browsers that offer Sec-WebSocket-Protocol
+    # (the active useQueueWebSocket hook offers bearer.<jwt>) MUST receive
+    # one of the offered subprotocols in the handshake response, otherwise
+    # the browser aborts the connection. Reuse the canonical echoing accept
+    # instead of a bare accept().
+    from app.api.v1.endpoints.ws_token import accept_echoing_subprotocol
+
+    await accept_echoing_subprotocol(websocket)
 
     room = f"{department.strip()}::{date.strip()}"
     await ws_manager.connect(websocket, room)

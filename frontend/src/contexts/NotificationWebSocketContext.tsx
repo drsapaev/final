@@ -195,6 +195,10 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
   useEffect(() => {
     handleMessageRef.current = (data: WsPayload) => {
       const normalized = normalizePayload(data);
+      // Transport and domain event are independent: the backend sends a
+      // top-level "notification" envelope with the concrete event type
+      // (lab_results, message_received, etc.) in its nested delivery.
+      const transportType = typeof data.type === 'string' ? data.type.toLowerCase() : '';
 
       const invalidateNotificationCache = () => {
         clearNotificationQueryCache();
@@ -238,6 +242,7 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
       }
 
       if (
+        transportType === 'notification' ||
         normalized.type === 'notification' ||
         normalized.type === 'queue_update' ||
         normalized.type === 'diagnostics_return_needed' ||

@@ -139,6 +139,7 @@ def _serialize_theme(theme: DisplayTheme) -> dict[str, Any]:
         "updated_at": _iso(theme.updated_at),
     }
 
+
 # ===================== УПРАВЛЕНИЕ ТАБЛО =====================
 
 
@@ -206,6 +207,22 @@ def update_display_board(
             board_id,
             extra={"fields": sorted(payload.keys())},
         )
+        # DISPLAYPRIVACY-BE-001 (audit PR #3961): успешное обновление
+        # show_patient_names обязано инвалидировать per-worker кэш формата
+        # имён — иначе устаревший 'full' продолжает раскрывать имена на
+        # живом табло до рестарта. Локальный сброс синхронный; другие
+        # воркеры получают best-effort control-сообщение (nameformat_ctl).
+        if "show_patient_names" in payload:
+            try:
+                from app.services.display_websocket import get_display_manager
+
+                get_display_manager().invalidate_name_format_cache(updated_board.name)
+            except Exception as hook_exc:
+                logger.warning(
+                    "DISPLAYPRIVACY-BE-001: name-format cache invalidation "
+                    "hook failed (board update stays committed): %s",
+                    hook_exc,
+                )
         return {
             "success": True,
             "message": "Настройки табло обновлены",
@@ -230,10 +247,132 @@ def get_display_banners(
 ):
     """Получить баннеры табло"""
     try:
-        # Пока возвращаем заглушку
-        return []
+        # DISPLAYBANNER-BE-001 (audit PR #3961): реальное чтение вместо
+        # заглушки. Список [] под response_model=dict[str, Any] не проходит
+        # FastAPI-валидацию (риск 500 на пустой коллекции); несуществующее
+        # табло — честная 404.
+        board = db.query(DisplayBoard).filter(DisplayBoard.id == board_id).first()
+        if not board:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Табло {board_id} не найдено",
+            )
+        query = db.query(DisplayBanner).filter(DisplayBanner.board_id == board_id)
+        if active_only:
+            query = query.filter(DisplayBanner.active.is_(True))
+        rows = query.order_by(
+            DisplayBanner.display_order.asc(), DisplayBanner.id.asc()
+        ).all()
+        banners = [_serialize_banner(row) for row in rows]
+        return {"banners": banners, "total": len(banners)}
+    except HTTPException:
+        raise
     except Exception as e:
         raise _admin_display_http_error(e) from e
+
+
+def _serialize_banner(row: DisplayBanner) -> dict[str, Any]:
+    """DISPLAYBANNER-BE-001: единая сериализация строки баннера."""
+    return {
+        "id": row.id,
+        "board_id": row.board_id,
+        "title": row.title,
+        "description": row.description,
+        "image_url": row.image_url,
+        "link_url": row.link_url,
+        "display_order": row.display_order,
+        "display_duration": row.display_duration,
+        "start_date": row.start_date.isoformat() if row.start_date else None,
+        "end_date": row.end_date.isoformat() if row.end_date else None,
+        "language": row.language,
+        "active": row.active,
+    }
+
+
+def _create_display_banner_internal(
+    board_id: int,
+    banner_data: DisplayBannerRequest,
+    db: Session,
+) -> DisplayBanner:
+    """DISPLAYBANNER-BE-001 (audit PR #3961): реальная персистентность
+    вместо фиктивного ``banner_id: 1``. Тело — полиморфный словарь
+    (ValidatedDictBase); типизированные поля баннера читаются из
+    payload с честной валидацией: title обязателен, длины соответствуют
+    модели DisplayBanner."""
+    payload = banner_data.model_dump()
+
+    title = payload.get("title")
+    if not isinstance(title, str) or not title.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Поле 'title' обязательно для баннера",
+        )
+    title = title.strip()[:200]
+
+    description = payload.get("description")
+    if description is not None and not isinstance(description, str):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Поле 'description' должно быть строкой",
+        )
+
+    def _opt_str(key: str, cap: int) -> str | None:
+        value = payload.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, str) or len(value) > cap:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Поле '{key}' должно быть строкой до {cap} символов",
+            )
+        return value
+
+    def _opt_int(key: str, default: int, low: int, high: int) -> int:
+        value = payload.get(key)
+        if value is None:
+            return default
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Поле '{key}' должно быть целым числом",
+            )
+        if value < low or value > high:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Поле '{key}' вне диапазона {low}..{high}",
+            )
+        return value
+
+    language = payload.get("language") or "ru"
+    if not isinstance(language, str) or len(language) > 5:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Поле 'language' должно быть строкой до 5 символов",
+        )
+    active = payload.get("active")
+    if active is None:
+        active = True
+    if not isinstance(active, bool):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Поле 'active' должно быть булевым",
+        )
+
+    banner = DisplayBanner(
+        board_id=board_id,
+        title=title,
+        description=description,
+        image_url=_opt_str("image_url", 500),
+        link_url=_opt_str("link_url", 500),
+        display_order=_opt_int("display_order", 0, 0, 100000),
+        display_duration=_opt_int("display_duration", 10, 1, 86400),
+        language=language,
+        active=active,
+    )
+    db.add(banner)
+    db.commit()
+    db.refresh(banner)
+    return banner
 
 
 @router.post("/display/boards/{board_id}/banners", response_model=dict[str, Any])
@@ -245,8 +384,21 @@ def create_display_banner(
 ):
     """Создать баннер для табло"""
     try:
-        # Здесь будет реальная логика создания баннера
-        return {"success": True, "message": "Баннер создан", "banner_id": 1}
+        board = db.query(DisplayBoard).filter(DisplayBoard.id == board_id).first()
+        if not board:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Табло {board_id} не найдено",
+            )
+        banner = _create_display_banner_internal(board_id, banner_data, db)
+        return {
+            "success": True,
+            "message": "Баннер создан",
+            "banner_id": banner.id,
+            "banner": _serialize_banner(banner),
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise _admin_display_http_error(e) from e
 

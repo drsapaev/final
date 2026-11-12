@@ -859,11 +859,24 @@ export default function LabReportWorkbench({
     const previewStillCurrent = () =>
       previewAttemptRef.current === previewAttempt &&
       operationContextsMatch(previewOperation, operationContextRef.current);
+    // RETRO-3970-01 (CARDHIST-FE-001 precedent): reserve the browsing
+    // context SYNCHRONOUSLY inside the click gesture — before any await.
+    // No `noopener` feature string: a null reservation is an HONEST
+    // blocked signal, a context is a guaranteed-to-be-fulfilled open.
+    // (A noopener window.open returns null even on success — the old
+    // post-await call both lost the gesture and lied about the result.)
+    const reserved = window.open('', '_blank');
+    if (!reserved) {
+      setPrintFeedback({ severity: 'error', text: t('workbench.preview_popup_blocked') });
+      return;
+    }
     setBusyAction('preview');
     setPrintFeedback({ severity: 'info', text: t('workbench.preview_building') });
     try {
       const blob = await labReportingApi.previewInstancePdf(expectedInstanceId);
       if (!blob || !(blob instanceof Blob)) {
+        // RETRO-3970-01: never leave the reserved blank tab behind.
+        reserved.close();
         if (previewStillCurrent()) {
           setPrintFeedback({ severity: 'error', text: t('workbench.print_pdf_invalid') });
         }
@@ -873,19 +886,22 @@ export default function LabReportWorkbench({
       // read was pending — drop the stale blob BEFORE any object URL is
       // created; no window.open, no feedback overwrite on the new screen.
       if (!previewStillCurrent()) {
+        reserved.close();
         logger.warn('[LabReportWorkbench] Stale PDF preview ignored for a changed report context');
         return;
       }
       const url = URL.createObjectURL(blob);
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // RETRO-3970-01: the reserved tab is navigated here — a noopener
+      // window.open returns null even on a SUCCESSFUL open (MDN), so the
+      // old truthiness check reported every successful preview as
+      // «blocked». The reservation returned a context, so this success is
+      // a REAL success.
       // WF-05 parity: НЕ помечаем PRINTED и не дёргаем onRefresh* —
       // preview не имеет серверных побочных эффектов.
-      setPrintFeedback(
-        popup
-          ? { severity: 'success', text: t('workbench.preview_opened') }
-          : { severity: 'error', text: t('workbench.print_pdf_blocked') }
-      );
+      reserved.opener = null;
+      reserved.location.href = url;
+      setPrintFeedback({ severity: 'success', text: t('workbench.preview_opened') });
       if (printFeedbackTimerRef.current) {
         clearTimeout(printFeedbackTimerRef.current);
         printFeedbackTimerRef.current = null;
@@ -897,6 +913,10 @@ export default function LabReportWorkbench({
         }
       }, 5000);
     } catch (previewError) {
+      // RETRO-3970-01: the failed read must not leave the reserved blank
+      // tab behind — closing it is safe even when the attempt went stale
+      // (the tab belongs to the old attempt either way).
+      reserved.close();
       if (!previewStillCurrent()) {
         // LABR-FE-002: a stale preview's failure belongs to the old context.
         logger.warn('[LabReportWorkbench] Stale PDF preview failure ignored for a changed report context');
@@ -1067,28 +1087,20 @@ export default function LabReportWorkbench({
         clearOwnedPrintFeedback();
         return;
       }
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
+      // RETRO-3970-01: the direct-print attempt NEVER auto-opens a tab —
+      // it PREPARES the PDF and hands the decision to the operator via the
+      // explicit follow-up click («Открыть PDF для печати»). That click is
+      // a fresh user activation whose synchronous reservation either
+      // succeeds (a context to navigate) or honestly reports «blocked» —
+      // the old noopener window.open returned null even on success, so the
+      // LABPRINT-FE-002 confirmation was unreachable on real browsers.
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      if (popup) {
-        // LABPRINT-FE-002 (audit 3886, round 14): открытая PDF-вкладка —
-        // это НЕ физическая печать. Раньше UI немедленно вызывал
-        // markPrinted, и бланк получал статус PRINTED без подтверждённого
-        // печатного задания (оператор мог отменить печать или только
-        // просмотреть). Теперь статус меняет ТОЛЬКО явное подтверждение
-        // оператора (кнопка в inline Alert); до этого отчёт остаётся
-        // FINALIZED.
-        setPdfConfirmPendingInstanceId(expectedInstanceId);
-        setPrintFeedback({
-          severity: 'info',
-          text: t('workbench.print_pdf_opened_confirm')
-        });
-      } else {
-        if (!isOperationCurrent(operation)) return;
-        setPrintFeedback({
-          severity: 'warning',
-          text: t('workbench.print_pdf_blocked')
-        });
-      }
+      setPdfFallbackPrepared({ instanceId: expectedInstanceId, url });
+      setPrintFeedback({
+        severity: 'info',
+        text: t('workbench.print_pdf_prepared')
+      });
+      return;
     } catch (error) {
       if (!isOperationCurrent(operation)) {
         clearOwnedPrintFeedback();
@@ -1113,9 +1125,40 @@ export default function LabReportWorkbench({
   // PDF-превью — это не печатное задание. Сбрасывается при смене
   // активного отчёта (WF-12 parity).
   const [pdfConfirmPendingInstanceId, setPdfConfirmPendingInstanceId] = useState<string | number | null>(null);
+  // RETRO-3970-01: the PDF fallback prepared after a failed direct print —
+  // it holds the object URL until the operator clicks «Открыть PDF для
+  // печати» (a fresh user gesture). Reset with the same epoch contract as
+  // pdfConfirmPendingInstanceId (WF-12 parity); the URL is revoked so a
+  // dropped preparation never leaks a stale report document.
+  const [pdfFallbackPrepared, setPdfFallbackPrepared] = useState<{ instanceId: string | number; url: string } | null>(null);
   useEffect(() => {
     setPdfConfirmPendingInstanceId(null);
+    setPdfFallbackPrepared((prepared) => {
+      if (prepared) {
+        URL.revokeObjectURL(prepared.url);
+      }
+      return null;
+    });
   }, [activeInstance?.id]);
+
+  function openPreparedPdf() {
+    if (!pdfFallbackPrepared) return;
+    if (pdfFallbackPrepared.instanceId !== (activeInstance?.id as string | number)) return;
+    // Synchronous reservation inside THIS click gesture — no noopener
+    // feature string, so null is a real blocked signal (CARDHIST-FE-001).
+    const reserved = window.open('', '_blank');
+    if (!reserved) {
+      setPrintFeedback({ severity: 'warning', text: t('workbench.print_pdf_blocked') });
+      return;
+    }
+    reserved.opener = null;
+    reserved.location.href = pdfFallbackPrepared.url;
+    setPdfFallbackPrepared(null);
+    // LABPRINT-FE-002: the opened PDF tab is NOT a physical print — only
+    // the operator's explicit confirmation flips the status.
+    setPdfConfirmPendingInstanceId(pdfFallbackPrepared.instanceId);
+    setPrintFeedback({ severity: 'info', text: t('workbench.print_pdf_opened_confirm') });
+  }
 
   async function confirmPdfPrinted() {
     const targetInstanceId = pdfConfirmPendingInstanceId;
@@ -1540,6 +1583,17 @@ export default function LabReportWorkbench({
               {printFeedback && (
                 <div>
                   <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
+                  {pdfConfirmPendingInstanceId == null
+                    && pdfFallbackPrepared != null
+                    && pdfFallbackPrepared.instanceId === (activeInstance?.id as string | number) && (
+                    <Button
+                      variant="primary"
+                      size="default"
+                      onClick={openPreparedPdf}
+                    >
+                      {t('workbench.print_pdf_open_action')}
+                    </Button>
+                  )}
                   {pdfConfirmPendingInstanceId != null && (
                     <Button
                       variant="primary"
