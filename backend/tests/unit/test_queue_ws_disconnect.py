@@ -26,7 +26,11 @@ class _DisconnectingWebSocket:
         self.sent: list[dict] = []
         self.accepted = False
 
-    async def accept(self) -> None:
+    # QUEUEWSHANDSHAKE-BE-001: the success path now uses the canonical
+    # echoing accept, which always passes the (possibly None) subprotocol
+    # kwarg — mirror the Starlette WebSocket signature like the other
+    # unit-test stubs do.
+    async def accept(self, subprotocol: str | None = None) -> None:
         self.accepted = True
 
     async def send_json(self, message: dict) -> None:

@@ -65,9 +65,16 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
   //     closing — too late to prevent the leak.
   // The ref-based approach guarantees a single live interval at any time.
   let pingIntervalRef: ReturnType<typeof setInterval> | null = null;
+  // DISPLAYWS-FE-004 (audit PR #3961): публичное ТВ-табло обязано
+  // восстанавливаться после длительного сбоя сети/бэкенда. Лимит в 5
+  // попыток оставлял киоск отключённым до remount/перезагрузки страницы.
+  // Теперь попытки бесконечны, но с ОГРАНИЧЕННЫМ экспоненциальным backoff
+  // (capped 30s) и джиттером — нет ни перманентного обрыва, ни тугого
+  // бесконечного цикла. Ручное закрытие (code 1000/close()) по-прежнему
+  // останавливает реконнект.
   let reconnectAttempts = 0;
-  const maxReconnectAttempts = 5;
-  const reconnectDelay = 3000;
+  const reconnectBaseDelayMs = 3000;
+  const maxReconnectDelayMs = 30000;
 
   function clearPingInterval() {
     if (pingIntervalRef !== null) {
@@ -129,14 +136,21 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
         clearPingInterval();
         onDisconnect && onDisconnect();
 
-        // Автоматическое переподключение
-        if (reconnectAttempts < maxReconnectAttempts && event.code !== 1000) {
+        // DISPLAYWS-FE-004 (audit PR #3961): автоматическое
+        // переподключение с ограниченным экспоненциальным backoff и
+        // джиттером — без перманентного обрыва после 5 попыток.
+        if (event.code !== 1000) {
           reconnectAttempts++;
-          logger.log(`🔄 Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts} через ${reconnectDelay}ms`);
+          const backoff = Math.min(
+            reconnectBaseDelayMs * Math.pow(2, reconnectAttempts - 1),
+            maxReconnectDelayMs
+          );
+          const jitter = Math.floor(Math.random() * 500);
+          logger.log(`🔄 Попытка переподключения ${reconnectAttempts} через ${backoff + jitter}ms`);
 
           reconnectTimeout = setTimeout(() => {
             connect();
-          }, reconnectDelay);
+          }, backoff + jitter);
         }
       };
 

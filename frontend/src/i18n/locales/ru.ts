@@ -5485,6 +5485,12 @@ const ru = {
     db_open_board_desc: 'Просмотр в новой вкладке',
     db_add: 'Добавить',
     db_banners_empty: 'Баннеры не добавлены',
+    db_banner_title: 'Заголовок баннера',
+    db_banner_description: 'Описание баннера',
+    db_banner_duration: 'Длительность показа (сек)',
+    db_banner_created: 'Баннер создан',
+    db_banner_error: 'Ошибка создания баннера',
+    db_cancel: 'Отмена',
     db_announcements_empty: 'Объявления не добавлены',
     db_info_title: 'Информация о табло',
     db_info_queue: '• Табло отображает текущую очередь по специалистам и кабинетам',
@@ -6751,6 +6757,7 @@ const ru = {
     visit_emr_status_signed: 'Подписана',
     visit_emr_status_amended: 'Изменена после подписания',
     tooth_save_requires_visit: 'Сохранение зубной карты требует открытый визит. Откройте пациента из очереди.',
+    tooth_inspection_only: 'Запись приёма доступна только для просмотра — зуб открыт в режиме осмотра, редактирование и сохранение недоступны.',
   },
 
   // ─── Payment ─────────────────────────────────────────────────────────────
@@ -9516,7 +9523,7 @@ const ru = {
     esi_idyot_sohranenie: 'Идёт сохранение',
     esi_podpisana_s_popravkami: '📝 Подписана (с поправками)',
     esi_podpisana: '✅ Подписана',
-    esi_podpisana_formatabsolutetime: 'Подписана {formatAbsoluteTime(lastSaved)}',
+    esi_podpisana_formatabsolutetime: 'Подписана {lastSaved}',
     esi_dokument_podpisan_i_zaschisc: 'Документ подписан и защищён от изменений',
     esi_est_izmeneniya: '● Есть изменения',
     esi_avtosohranenie_cherez_math_r: 'Автосохранение через {Math.round(autosaveConfig.debounceMs / 1000)} сек',
@@ -9708,6 +9715,8 @@ const ru = {
     dtp_moy_opyt_count_shablonov: 'Мой опыт ({count} шаблонов)',
     dtp_moy_opyt: 'Мой опыт',
     dtp_net_sohranyonnyh_shablonov: 'Нет сохранённых шаблонов',
+    dtp_oshibka_zagruzki_shablonov: 'Не удалось загрузить шаблоны',
+    dtp_povtorit: 'Повторить',
     dtp_redaktirovat_shablon: 'Редактировать шаблон',
     dtp_moy_opyt_2: 'Мой опыт',
     // DermatologySection.jsx (ds_)

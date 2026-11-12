@@ -276,6 +276,121 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         assert second.json().get("idempotent_replay") is False
         assert len(_pending_visits(db_session, patient_id=patient.id)) == 2
 
+    def test_changed_confirmation_channel_is_not_a_replay(
+        self,
+        client,
+        db_session,
+        cardio_auth_headers,
+        test_doctor,
+        test_service,
+        monkeypatch,
+    ):
+        """RETRO-3960-01 (post-merge review #3968): изменённый канал
+        подтверждения — другой intent, а не replay.
+
+        Первый запрос записывает визит с каналом ``phone``; немедленный
+        повтор тех же условий с ``telegram`` НЕ может быть replay'ем: иначе
+        ответ объявляет ``confirmation.channel=telegram``, который не
+        сохранён и по которому приглашение не отправлялось. Изменённый
+        канал создаёт НОВЫЙ визит, у которого сохранённый канал и канал в
+        ответе совпадают и приглашение реально отправлено в этот канал."""
+        patient = _make_patient(db_session)
+        _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
+        calls = self._spy_invitation(monkeypatch)
+        visit_date = _clinic_today(db_session) + timedelta(days=1)
+
+        first = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=_schedule_payload(
+                patient, test_service, visit_date=visit_date, confirmation_channel="phone"
+            ),
+            headers=cardio_auth_headers,
+        )
+        second = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=_schedule_payload(
+                patient, test_service, visit_date=visit_date, confirmation_channel="telegram"
+            ),
+            headers=cardio_auth_headers,
+        )
+        assert first.status_code == 200, first.text
+        assert second.status_code == 200, second.text
+
+        # Изменённый канал — не replay: создаётся второй визит.
+        first_data = first.json()
+        second_data = second.json()
+        assert second_data.get("idempotent_replay") is False
+        assert second_data["visit_id"] != first_data["visit_id"]
+        assert len(_pending_visits(db_session, patient_id=patient.id)) == 2
+
+        # Ответ честен: заявленный канал == сохранённому каналу второго
+        # визита, и приглашение реально ушло в этот канал.
+        second_visit = (
+            db_session.query(Visit)
+            .filter(Visit.id == second_data["visit_id"])
+            .one()
+        )
+        assert second_visit.confirmation_channel == "telegram"
+        assert second_data["confirmation"]["channel"] == "telegram"
+        assert ("telegram" in [channel for _, channel in calls]), (
+            "приглашение не отправлено в изменённый канал"
+        )
+        assert len(calls) == 2, "второй intent должен отправить своё приглашение"
+
+        # Контроль: идентичный повтор ИСХОДНОГО запроса по-прежнему replay
+        # исходного phone-визита (дедуп по полному intent'у не сломан).
+        third = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=_schedule_payload(
+                patient, test_service, visit_date=visit_date, confirmation_channel="phone"
+            ),
+            headers=cardio_auth_headers,
+        )
+        assert third.status_code == 200
+        third_data = third.json()
+        assert third_data.get("idempotent_replay") is True
+        assert third_data["visit_id"] == first_data["visit_id"]
+        assert third_data["confirmation"]["channel"] == "phone"
+        assert len(calls) == 2, "replay повторно отправил приглашение"
+
+    def test_replayed_replay_reports_persisted_channel_not_requested(
+        self,
+        client,
+        db_session,
+        cardio_auth_headers,
+        test_doctor,
+        test_service,
+    ):
+        """RETRO-3960-01 (контракт): канал replay-ответа всегда совпадает с
+        каналом сохранённого визита (same-channel replay инвариант)."""
+        patient = _make_patient(db_session)
+        _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
+        visit_date = _clinic_today(db_session) + timedelta(days=1)
+        payload = _schedule_payload(
+            patient, test_service, visit_date=visit_date, confirmation_channel="pwa"
+        )
+
+        first = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=payload,
+            headers=cardio_auth_headers,
+        )
+        second = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json=payload,
+            headers=cardio_auth_headers,
+        )
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert second.json().get("idempotent_replay") is True
+        second_visit = (
+            db_session.query(Visit)
+            .filter(Visit.id == second.json()["visit_id"])
+            .one()
+        )
+        assert second_visit.confirmation_channel == "pwa"
+        assert second.json()["confirmation"]["channel"] == second_visit.confirmation_channel
+
 
 @pytest.mark.integration
 @pytest.mark.confirmation
