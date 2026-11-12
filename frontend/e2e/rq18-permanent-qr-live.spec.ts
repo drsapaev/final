@@ -239,6 +239,70 @@ async function loginAdminWithRequiredTwoFactor(page: Page) {
   throw new Error('Admin login did not require the configured 2FA flow.');
 }
 
+async function configureSyntheticQueueAdmissionWindow(page: Page) {
+  const origin = new URL(page.url());
+  if (process.env.RQ18_SYNTHETIC_STAGING !== '1'
+      || origin.protocol !== 'http:'
+      || !['localhost', '127.0.0.1'].includes(origin.hostname)) {
+    throw new Error('RQ18 synthetic settings write requires explicit opt-in and a loopback staging origin.');
+  }
+  markRq18Phase('synthetic-queue-window');
+  const token = await page.evaluate(() => sessionStorage.getItem('auth_token'));
+  if (!token) throw new Error('Synthetic Admin session token was not available after 2FA login.');
+  const settingsUrl = new URL('/api/v1/admin/queue/settings', page.url()).toString();
+  const headers = { Authorization: `Bearer ${token}` };
+  const readResponse = await page.request.get(settingsUrl, { headers });
+  if (!readResponse.ok()) {
+    throw new Error('Synthetic Admin could not read queue settings before target queue creation.');
+  }
+
+  const current = await readResponse.json() as Record<string, unknown>;
+  const isNumberMap = (value: unknown): value is Record<string, number> =>
+    typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && Object.values(value).every((entry) => typeof entry === 'number' && Number.isFinite(entry));
+  if (current.timezone !== 'Asia/Tashkent'
+      || !isNumberMap(current.start_numbers)
+      || !isNumberMap(current.max_per_day)) {
+    throw new Error('Synthetic queue settings did not match the expected typed clinic defaults.');
+  }
+
+  const updateResponse = await page.request.put(settingsUrl, {
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    data: {
+      timezone: current.timezone,
+      queue_start_hour: 0,
+      auto_close_time: '23:59',
+      start_numbers: current.start_numbers,
+      max_per_day: current.max_per_day,
+    },
+  });
+  if (!updateResponse.ok()) {
+    throw new Error('Synthetic Admin could not save the clinic-local queue admission window.');
+  }
+
+  const payload = await updateResponse.json() as {
+    settings?: { timezone?: unknown; queue_start_hour?: unknown; auto_close_time?: unknown };
+  };
+  const result = {
+    readStatus: readResponse.status(),
+    updateStatus: updateResponse.status(),
+    timezone: payload.settings?.timezone,
+    queueStartHour: payload.settings?.queue_start_hour,
+    autoCloseTime: payload.settings?.auto_close_time,
+  };
+
+  if (result.readStatus !== 200
+      || result.updateStatus !== 200
+      || result.timezone !== 'Asia/Tashkent'
+      || result.queueStartHour !== 0
+      || result.autoCloseTime !== '23:59') {
+    throw new Error('Synthetic Admin could not persist the clinic-local admission window before target queue creation.');
+  }
+  process.stdout.write('RQ18_SYNTHETIC_QUEUE_WINDOW=PASS\n');
+}
+
 function isGetResponseForPath(response: Response, suffixPath: string) {
   return response.request().method() === 'GET'
     && new URL(response.url()).pathname.endsWith(suffixPath);
@@ -1619,6 +1683,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   page.on('pageerror', () => { pageErrors += 1; });
   markRq18Phase('admin-login');
   await loginAdminWithRequiredTwoFactor(page);
+  await configureSyntheticQueueAdmissionWindow(page);
   await verifyT18SpecialistsNavigation(page);
   markRq18Phase('admin-setup-page');
   await gotoWithServedAssetDrain(page, '/admin/setup-directions');
@@ -1822,10 +1887,21 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
 
   facts = await readAdminDirections(page, profileKey);
   direction = directionByKey(facts, profileKey);
-  if (direction.public_availability || !direction.permanent_address_exists) {
-    throw new Error('Inactive resource remained selectable for new clinic-day bookings or lost its permanent address.');
+  const clinicDayResourceQueueCount = direction.current_day_queues.filter((queue) =>
+    queue.queue_tag === queueTag
+      && queue.owner_type === 'resource'
+      && queue.owner_id === resourceId).length;
+  const clinicDayResourceHasQueue = clinicDayResourceQueueCount > 0;
+  if (direction.public_availability !== clinicDayResourceHasQueue
+      || !direction.permanent_address_exists) {
+    throw new Error(
+      'Inactive-resource clinic-day facts mismatch: public='
+      + direction.public_availability
+      + '; clinic-day-resource-queues=' + clinicDayResourceQueueCount
+      + '; address=' + direction.permanent_address_exists + '.',
+    );
   }
-  markRq18Phase('inactive-resource-clinic-day-booking-closed');
+  markRq18Phase('inactive-resource-current-day-availability-matches-snapshot');
 
   await setSyntheticProfileArchived(page, true);
   markRq18Phase('archive-published-profile');

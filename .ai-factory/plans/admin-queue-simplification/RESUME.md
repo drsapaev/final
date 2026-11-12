@@ -1,4 +1,16 @@
-## Resume — PR #4034 synchronized head validated — 2026-11-13T02:10:08+05:00
+## Resume — PR #4034 live RQ-18 passed; exact-head CI pending — 2026-11-13T03:49:04+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112. T00–T17 are merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge and deployment.
+
+PR #4026 is merged; its P2 is fixed in #4034. The branch locally includes origin/main 0621df8e97213ec52f1051c70548c595c8d11204 via merge commit 1f41cfae373c51f24f61082c45a31a68521258d0. The current uncommitted E2E blob is 01b1fb3c1fce59219091749c90ee353da4589cf4. Only frontend/e2e/rq18-permanent-qr-live.spec.ts and the three T18 journals are in scope.
+
+The RQ-18 scenario passed in the owned synthetic project clinic-aqs-t18-rq18-final-20261113: ordinary Admin password/TOTP enrollment, synthetic admission window, T18.10 navigation/context, hidden profile/resource setup, explicit publication, permanent QR, anonymous booking, resource ownership, reopen, inactive-resource/current-queue facts, archive/restore, and anonymous fail-closed behavior. The inactive-resource assertion now matches the existing T13 contract. Canonical teardown passed and project resources/ports are absent.
+
+The test captured 68 JS/CSS browser bodies and hashes. Artifact validation for source 0621df8e and 261 manifest files passed, but browser hashes were not compared; service worker was not captured; launcher served_revision_verified remains false. Preserve this limitation and keep Tier-2 PARTIAL.
+
+Latest exact-scope gate at 2026-11-13T03:32:50+05:00 returned exit 0, narrow_override, gate_misroute=false, override_used=true, handoff_required=true; execution prompt was read. Local ESLint, E2E TypeScript, provenance 5/5, build, and diff check passed. New exact-head CI is pending until commit/push.
+
+Next: commit/push the synchronized branch, update PR #4034 body with exact gate/source/session results and AI-authored by ChatGPT: yes, then verify exact-head CI. Do not merge or deploy; after user merge continue remaining T18 acceptance.## Resume — PR #4034 synchronized head validated — 2026-11-13T02:10:08+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged. T18/Tier-2 remains PARTIAL, no deferral accepted; user owns merge and deployment.
 
