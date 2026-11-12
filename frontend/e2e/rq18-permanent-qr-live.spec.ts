@@ -840,12 +840,10 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
     mainFrameLoaderId: string | null;
     supersededMainLoaderIds: Set<string>;
     pendingNavigationAborts: PendingNavigationAbort[];
-    fetchStats: {
-      paused: number;
+    bodyReadStats: {
       bodyReadStarted: number;
       bodyReadCompleted: number;
-      continueCompleted: number;
-      continueFailed: number;
+      bodyReadFailed: number;
     };
     usesCdp: boolean;
   };
@@ -867,11 +865,9 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
       'active=' + state.activeRequests.size,
       'cdp=' + state.cdpActiveRequestIds.size,
       'pendingCaptures=' + state.pending.size,
-      'fetchPaused=' + state.fetchStats.paused,
-      'bodyReadStarted=' + state.fetchStats.bodyReadStarted,
-      'bodyReadCompleted=' + state.fetchStats.bodyReadCompleted,
-      'fetchContinued=' + state.fetchStats.continueCompleted,
-      'fetchContinueFailed=' + state.fetchStats.continueFailed,
+      'bodyReadStarted=' + state.bodyReadStats.bodyReadStarted,
+      'bodyReadCompleted=' + state.bodyReadStats.bodyReadCompleted,
+      'bodyReadFailed=' + state.bodyReadStats.bodyReadFailed,
       'pendingPathHashes=' + (pendingPathHashes.join(',') || 'none'),
     ].join(' ');
   };
@@ -933,12 +929,10 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
       mainFrameLoaderId: null,
       supersededMainLoaderIds: new Set<string>(),
       pendingNavigationAborts: [],
-      fetchStats: {
-        paused: 0,
+      bodyReadStats: {
         bodyReadStarted: 0,
         bodyReadCompleted: 0,
-        continueCompleted: 0,
-        continueFailed: 0,
+        bodyReadFailed: 0,
       },
       usesCdp: cdpSession !== null,
     };
@@ -1020,52 +1014,12 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
           captureFailures.set(cdpAsset.asset.key, 'request-failed');
         }
       });
-      cdpSession.on('Fetch.requestPaused', (event) => {
-        state.fetchStats.paused += 1;
-        const asset = assetKeyFor(event.request.url, event.resourceType.toLowerCase());
-        if (!asset) {
-          const continuation = cdpSession.send('Fetch.continueResponse', { requestId: event.requestId })
-            .then(() => { state.fetchStats.continueCompleted += 1; })
-            .catch(() => { state.fetchStats.continueFailed += 1; });
-          addPendingCapture(continuation);
-          return;
-        }
-        const capture = (async () => {
-          try {
-            if (event.responseStatusCode !== 200) {
-              captureFailures.set(asset.key, 'http-' + String(event.responseStatusCode ?? 'unknown'));
-              return;
-            }
-            state.fetchStats.bodyReadStarted += 1;
-            const response = await cdpSession.send('Fetch.getResponseBody', { requestId: event.requestId });
-            state.fetchStats.bodyReadCompleted += 1;
-            const bytes = response.base64Encoded ? Buffer.from(response.body, 'base64') : Buffer.from(response.body, 'utf8');
-            recordHash(asset, bytes);
-          } catch (error) {
-            captureFailures.set(asset.key, 'browser-response-body-unavailable-' + bodyReadFailureCode(error));
-          } finally {
-            try {
-              await cdpSession.send('Fetch.continueResponse', { requestId: event.requestId });
-              state.fetchStats.continueCompleted += 1;
-            } catch {
-              state.fetchStats.continueFailed += 1;
-              captureFailures.set(asset.key, 'browser-response-continuation-failed');
-            }
-          }
-        })();
-        addPendingCapture(capture);
-      });
       await cdpSession.send('Page.enable');
       const frameTree = await cdpSession.send('Page.getFrameTree');
       state.mainFrameId = frameTree.frameTree.frame.id;
       state.mainFrameLoaderId = frameTree.frameTree.frame.loaderId;
       await cdpSession.send('Network.enable');
       await cdpSession.send('Network.setCacheDisabled', { cacheDisabled: true });
-      await cdpSession.send('Fetch.enable', { patterns: [
-        { urlPattern: '*://*/assets/*', resourceType: 'Script', requestStage: 'Response' },
-        { urlPattern: '*://*/assets/*', resourceType: 'Stylesheet', requestStage: 'Response' },
-        { urlPattern: '*://*/sw.js', resourceType: 'Script', requestStage: 'Response' },
-      ] });
       assetPage.once('close', () => {
         void cdpSession.detach().catch(() => undefined);
       });
@@ -1077,18 +1031,24 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
     });
 
     assetPage.on('response', (browserResponse) => {
-      if (state.usesCdp) return;
       const browserRequest = browserResponse.request();
       if (!state.activeRequests.has(browserRequest)) return;
 
-      // Start reading while the browser response is still available. The body
-      // promise resolves only after the response bytes have arrived; retaining
-      // it here avoids a late CDP body lookup after requestfinished/navigation.
-      // Convert rejection to a safe result immediately so failed requests do
-      // not create unhandled promises or expose browser error text.
+      // Start reading from Playwright's browser Response as soon as it arrives.
+      // This keeps the actual body available before navigation can cancel or
+      // evict it, without pausing Chromium's response pipeline through CDP Fetch.
+      // Convert rejection immediately so failed requests do not create an
+      // unhandled promise or expose browser error text.
+      state.bodyReadStats.bodyReadStarted += 1;
       const body = browserResponse.body().then<BrowserBodyRead, BrowserBodyRead>(
-        (bytes) => ({ ok: true, bytes }),
-        (error: unknown) => ({ ok: false, reason: bodyReadFailureCode(error) }),
+        (bytes) => {
+          state.bodyReadStats.bodyReadCompleted += 1;
+          return { ok: true, bytes };
+        },
+        (error: unknown) => {
+          state.bodyReadStats.bodyReadFailed += 1;
+          return { ok: false, reason: bodyReadFailureCode(error) };
+        },
       );
       state.responseBodies.set(browserRequest, {
         status: browserResponse.status(),
@@ -1101,7 +1061,6 @@ function createServedAssetRecorder(options: { drainTimeoutMs?: number } = {}) {
       if (!asset) return;
       state.activeRequests.delete(browserRequest);
       incrementCount(state.browserFinishedByKey, asset.key);
-      if (state.usesCdp) return;
       const responseBody = state.responseBodies.get(browserRequest);
       state.responseBodies.delete(browserRequest);
 
@@ -1605,8 +1564,8 @@ test('RQ-18 provenance timeout reports safe capture counters', async ({ browser,
     const expectedPathHash = crypto.createHash('sha256').update(cssPath).digest('hex').slice(0, 16);
     await expect(servedAssets.waitForPage(page)).rejects.toThrow(
       new RegExp('Timed out waiting for browser-served asset bodies to settle '
-        + '\\(active=1 cdp=\\d+ pendingCaptures=\\d+ fetchPaused=\\d+ bodyReadStarted=\\d+'
-        + ' bodyReadCompleted=\\d+ fetchContinued=\\d+ fetchContinueFailed=\\d+'
+        + '\\(active=1 cdp=\\d+ pendingCaptures=\\d+ bodyReadStarted=\\d+'
+        + ' bodyReadCompleted=\\d+ bodyReadFailed=\\d+'
         + ' pendingPathHashes=' + expectedPathHash + '\\)\\.'),
     );
   } finally {
