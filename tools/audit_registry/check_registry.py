@@ -93,7 +93,9 @@ def crosscheck_issue(entries: list[dict], pat: str | None) -> None:
         body = json.load(urllib.request.urlopen(req)).get("body") or ""
     except Exception as e:  # noqa: BLE001
         fail(f"could not fetch issue #{issue_id}: {e}")
-    issue_ids = set(ID_RE.findall(body))
+    # Checklist semantics: only checkbox items count (prose may mention aliases/exclusions).
+    issue_ids = set(re.findall(r"^- \[( |x)\] `([A-Z0-9][A-Z0-9_-]*-(?:BE|FE)-\d{3})`", body, re.M) and
+                    {m[1] for m in re.findall(r"^- \[( |x)\] `([A-Z0-9][A-Z0-9_-]*-(?:BE|FE)-\d{3})`", body, re.M)})
     reg_ids = {e["id"] for e in entries}
     missing_in_registry = sorted(issue_ids - reg_ids)
     missing_in_issue = sorted(reg_ids - issue_ids)
