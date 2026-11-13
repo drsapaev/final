@@ -8,8 +8,9 @@ Covers (remediation registry, issue #4063):
   same class breaking revocation in production (Sentry 3E, #3122).
 - AUTH-BE-002: POST /authentication/password-reset was an email-existence
   oracle (400 + "Пользователь с таким email не найден" vs 200 + expires_at).
-- AUTH-BE-005: CSRF cookie ``Secure`` flag was keyed to an ad-hoc
-  ``os.getenv("ENV", "dev")`` instead of the app settings.
+
+AUTH-BE-005 (CSRF Secure flag) was refuted during remediation — see the
+note at the bottom of this file and the registry justification.
 
 The SQLite test DB returns naive datetimes, which is exactly why the
 production break (aware column) stayed invisible locally: these tests inject
@@ -126,25 +127,11 @@ class TestAuthBE002PasswordResetUniformResponse:
         assert not (known_body.get("data") or {}).get("expires_at")
 
 
-class TestAuthBE005CsrfSecureFlag:
-    def _set_cookie_headers(self, client):
-        return client.get("/api/v1/auth/csrf-token").headers.get_list("set-cookie")
-
-    def test_csrf_cookie_secure_when_settings_env_is_prod(self, client, monkeypatch):
-        from app.core.config import settings
-
-        monkeypatch.setattr(settings, "ENV", "prod")
-        cookies = "; ".join(self._set_cookie_headers(client)).lower()
-        assert "csrf_token=" in cookies
-        assert (
-            "secure" in cookies
-        ), "csrf cookie must carry Secure when settings.ENV declares production"
-
-    def test_csrf_cookie_stays_insecure_in_dev(self, client, monkeypatch):
-        """Regression guard: dev keeps Secure off (plain-HTTP local run)."""
-        from app.core.config import settings
-
-        monkeypatch.setattr(settings, "ENV", "dev")
-        cookies = "; ".join(self._set_cookie_headers(client)).lower()
-        assert "csrf_token=" in cookies
-        assert "secure" not in cookies
+# AUTH-BE-005 (CSRF Secure flag keyed to os.getenv) was REFUTED during
+# remediation: the pinned SameSite contract (PR #3407,
+# tests/integration/test_csrf_cookie_samesite.py) deliberately keys the flag
+# to the runtime ENV variable, and core/config.py load_dotenv() syncs
+# backend/.env into the process environment before any request, so
+# os.getenv("ENV") always reflects the settings-loaded value. Its original
+# fail-first probes were removed when CI's own pinned contract disproved the
+# finding; see registry justification for the full evidence chain.
