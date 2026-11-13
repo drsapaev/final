@@ -15,6 +15,8 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useEMR } from '../../hooks/useEMR';
 import { useEMRAutosave } from '../../hooks/useEMRAutosave';
+import { useEMRLeaveGuard } from '../../hooks/useEMRLeaveGuard';
+import { isRejectedEMRWrite } from './emrWriteResult';
 import { useBeforeUnload } from '../../hooks/useNavigationGuard';
 import { useEMRKeyboard } from '../../hooks/useEMRKeyboard';
 import { useVisitLifecycle } from '../../hooks/useVisitLifecycle';
@@ -135,17 +137,6 @@ interface EMRDataShape {
  */
 type PersistAndSignResult = 'cancelled' | 'save_failed' | 'sign_failed' | 'sign_attempted';
 
-function isRejectedEMRWrite(value: unknown): boolean {
-    if (!value || typeof value !== 'object') return true;
-    const result = value as Record<string, unknown>;
-    return result.accessDenied === true ||
-        result.conflict === true ||
-        result.signed === true ||
-        result.success === false ||
-        result.status === 'error' ||
-        (result.error !== undefined && result.error !== null);
-}
-
 function getSavedRowVersion(value: unknown): number | null {
     if (isRejectedEMRWrite(value)) return null;
     const result = value as Record<string, unknown>;
@@ -249,6 +240,9 @@ interface EMRHookResult {
     isSigned: boolean;
     isAmended: boolean;
     accessDenied: boolean;
+    // RETRO-4007-01: the record was finalized on the server while the
+    // local editor held the stale in_progress draft.
+    serverFinalized: boolean;
     version: number | null;
     rowVersion: number;
     canUndo: boolean;
@@ -296,6 +290,7 @@ export function EMRContainerV2({
         isSigned,
         isAmended,
         accessDenied,
+        serverFinalized,
         version,
         rowVersion,
         canUndo,
@@ -328,7 +323,13 @@ export function EMRContainerV2({
     // «Внести поправку» button on every signed EMR, making the backend's
     // reasoned amendment path dead UI. Amendment stays blocked only for
     // read-only observers and while a completion transaction is running.
-    const amendAllowed = (isSigned || isAmended) && !isReadOnly && !isPreparingCompletion && !completionBusy;
+    // RETRO-4007-01 (post-merge re-review of 4007): serverFinalized joins the
+    // reachability set — a FINALIZED_STATE 409 / legacy signed 400 arrives
+    // while the LOCAL isSigned/isAmended flags are still false, and the
+    // container must render the amendment branch for exactly that window
+    // (the stale-local draft is preserved; the reasoned amendment is the
+    // sanctioned pathway onto the server's signed record).
+    const amendAllowed = (isSigned || isAmended || serverFinalized) && !isReadOnly && !isPreparingCompletion && !completionBusy;
     const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
     const canSignReadOnly = isReadOnly
         && Boolean(emr?.id)
@@ -357,7 +358,7 @@ export function EMRContainerV2({
     const doctorId = currentUser?.id;
 
     // Autosave setup
-    const { lastAutosave, config: autosaveConfig } = useEMRAutosave({
+    const { lastAutosave, config: autosaveConfig, suppressOnDiscard } = useEMRAutosave({
         isDirty,
         isSaving,
         isSigned,
@@ -366,6 +367,28 @@ export function EMRContainerV2({
         debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
         enabled: !editingDisabled && !accessDenied,
+    });
+
+    // RETRO-3971-04 residual (post-merge re-review of 4009): the unmount
+    // flush above is a best-effort safety net — a clinical draft must not
+    // depend on a fire-and-forget destructor. The container (the visit
+    // owner) registers its dirty draft in the SHARED App-level leave
+    // guard: SPA navigation / browser Back / logout pass through the
+    // explicit Stay / Retry / Discard dialog, and «Save and leave» is an
+    // AWAITED draft save that only proceeds on the server's acknowledged
+    // write of the current visit. Read-only observers and access-denied
+    // mounts register nothing — they own no draft.
+    useEMRLeaveGuard({
+        visitId,
+        isDirty,
+        isSaving,
+        saveEMR,
+        reloadFromServer,
+        // RETRO-3971-04 P1: route-level Discard синхронно подавляет
+        // PR-4009 unmount autosave ДО асинхронного reload — отброшенный
+        // врачом черновик не может уйти на сервер из деструктора.
+        onDiscard: suppressOnDiscard,
+        enabled: !isReadOnly && !accessDenied,
     });
 
     // Navigation guard
@@ -1270,7 +1293,7 @@ export function EMRContainerV2({
                                 </button>
                             )}
                         </>
-                    ) : !isSigned && !isAmended ? (
+                    ) : !isSigned && !isAmended && !serverFinalized ? (
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"

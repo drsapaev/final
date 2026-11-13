@@ -105,10 +105,11 @@ describe('CARDVISIT-FE-001: latest navigation intent wins the visit selection', 
     // invalidate outstanding tickets (+= 1) — search pick, queue start-visit,
     // completion deselect, explicit cancel and unmount. The synchronous
     // URL-appointment sync deliberately does NOT bump (a background status
-    // refresh must never cancel an in-flight human click). 13 post-await
-    // rechecks cover every async boundary including loadEMR's catch block.
+    // refresh must never cancel an in-flight human click). 14 post-await
+    // rechecks cover every async boundary including loadEMR's catch block
+    // and the RETRO-3969-02 hydration catch.
     expect((panel.match(/\+\+navigationEpochRef\.current/g) ?? []).length).toBe(4);
-    expect((panel.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(13);
+    expect((panel.match(/epoch !== navigationEpochRef\.current/g) ?? []).length).toBe(14);
     expect((panel.match(/navigationEpochRef\.current \+= 1/g) ?? []).length).toBe(5);
   });
 

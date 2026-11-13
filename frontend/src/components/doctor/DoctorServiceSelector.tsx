@@ -552,18 +552,20 @@ const DoctorServiceSelector = ({
           margin: '0 auto 16px auto',
           color: 'var(--mac-text-tertiary)'
         }} />
+          {/* RETRO-3970-02 (P3 hygiene): the empty fallback is localized
+              like the sibling error state (misc.dss_oshibka_zagruzki_uslug). */}
           <h3 style={{
           fontSize: 'var(--mac-font-size-lg)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
           marginBottom: 'var(--mac-spacing-2)'
         }}>
-            Услуги не найдены
+            {t('misc.dss_uslugi_ne_naydeny')}
           </h3>
           <p style={{
           color: 'var(--mac-text-secondary)'
         }}>
-            Добавьте услуги для специальности «{specialty}» в админ панели
+            {t('misc.dss_dobavte_uslugi_admin_paneli', { specialty })}
           </p>
         </Card>
       }
