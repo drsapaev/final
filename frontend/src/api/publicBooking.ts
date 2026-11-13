@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios';
 import { api } from './client';
 import type {
+  AppointmentDto,
   PublicBookingAvailabilityDto,
   PublicBookingOptionsDto,
   PublicBookingRequestCreateDto,
@@ -16,6 +17,11 @@ export type PublicBookingOptions = PublicBookingOptionsDto;
 export type PublicBookingAvailability = PublicBookingAvailabilityDto;
 export type PublicBookingRequestBody = PublicBookingRequestCreateDto;
 export type PublicBookingRequestResult = PublicBookingRequestPatientOutDto;
+export type PatientConfirmedPublicBookingResult = Pick<AppointmentDto, 'id' | 'appointment_date'> & {
+  appointment_time: string;
+  status: 'scheduled';
+  timezone: 'Asia/Tashkent';
+};
 
 export interface PublicBookingRequestResubmitBody {
   expected_version: number;
@@ -31,6 +37,7 @@ export interface PublicBookingSelection {
   date: string;
   time: string;
   settingsVersion: number;
+  mode?: PublicBookingOptions['mode'];
   createdAt: number;
   resubmit?: PublicBookingResubmitSelection;
 }
@@ -64,6 +71,7 @@ export function getPublicBookingResubmitHandoffLocale(state: unknown): PublicBoo
 const optionsPath = '/public-site/booking-options';
 const availabilityPath = '/public-site/availability';
 const patientRequestsPath = '/patients/booking-requests';
+const patientAppointmentsPath = '/patients/public-booking/appointments';
 
 export type PatientPublicBookingRequest = PublicBookingRequestOutDto;
 export type PatientPublicBookingRequestStatus = PublicBookingRequestStatusDto;
@@ -133,6 +141,9 @@ function isSelection(value: unknown): value is PublicBookingSelection {
     && isTime(candidate.time)
     && Number.isSafeInteger(candidate.settingsVersion)
     && (candidate.settingsVersion ?? -1) >= 0
+    && (candidate.mode === undefined
+      || candidate.mode === 'registrar_request'
+      || candidate.mode === 'confirmed_appointment')
     && Number.isSafeInteger(candidate.createdAt)
     && (candidate.createdAt ?? 0) > 0
     && (candidate.resubmit === undefined || isResubmitSelection(candidate.resubmit, candidate));
@@ -185,6 +196,18 @@ export async function createPatientPublicBookingRequest(
 ): Promise<PublicBookingRequestResult> {
   const response = await api.post<PublicBookingRequestResult>(
     patientRequestsPath,
+    body,
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  );
+  return response.data;
+}
+
+export async function createPatientConfirmedPublicBookingAppointment(
+  body: PublicBookingRequestBody,
+  idempotencyKey: string,
+): Promise<PatientConfirmedPublicBookingResult> {
+  const response = await api.post<PatientConfirmedPublicBookingResult>(
+    patientAppointmentsPath,
     body,
     { headers: { 'Idempotency-Key': idempotencyKey } },
   );

@@ -258,6 +258,10 @@ const kk = {
     print_confirm_mark_printed: 'Басылды деп белгілеу',
     print_marked: 'Есеп басылды деп белгіленді',
     print_pdf_blocked: 'PDF сформирован, но новая вкладка заблокирована. Разрешите pop-up для этого сайта и нажмите «Печать» снова, чтобы обновить статус отчёта.',
+    print_pdf_open_action: 'Печатке арналған PDF ашу',
+    print_pdf_prepared: 'Тікелей басып шығару сәтсіз болды — бланк PDF дайын. Құжатты ашу үшін «Печатке арналған PDF ашу» түймесін басыңыз және физикалық басып шығарудан кейін белгіні растаңыз.',
+    print_pdf_prepared_expired: 'Дайындалған PDF сілтемесі ескірді. Басып шығаруды қайта орындаңыз — құжат қайта дайындалады.',
+    preview_popup_blocked: 'Браузер қалқымалы терезені бөгеді. Бұл сайт үшін pop-up рұқсат етіңіз және алдын ала қарауды қайталаңыз.',
     preview_building: 'Формирую серверный предпросмотр PDF...',
     preview_opened: 'Предпросмотр PDF открыт в новой вкладке (водяной знак «Черновик»).',
     preview_failed: 'Не удалось сформировать предпросмотр PDF. Сохраните черновик и попробуйте снова.',
@@ -865,6 +869,12 @@ const kk = {
     cardio_parser_normal_params: 'Параметры в пределах нормы.',
     cardio_parser_sinus_rhythm: 'Синусовый',
     cardio_parser_scp_not_implemented: 'Парсинг SCP-ECG формата не реализован. Загрузите файл в формате XML/HL7 aECG или обратитесь к администратору для интеграции SCP-библиотеки.',
+    // ECGPARSER-FE-001/002 (audit 3886 round 25): honest parser states —
+    // unrecognized XML is not a parsed ECG; absent measurements are
+    // explicitly "not measured", never a silent "normal".
+    cardio_parser_xml_not_ecg: 'XML не содержит распознаваемых измерений ЭКГ (HL7 aECG) — файл не будет сохранён как запись ЭКГ',
+    cardio_parser_hr_not_measured: 'ЧСС не измерена',
+    cardio_parser_axis_not_measured: 'Положение ЭОС не измерено',
 
     // ─── EchoForm (cardio.cardio_echo_*) ───
     cardio_echo_section_left_ventricle: 'Левый желудочек',
@@ -1142,6 +1152,7 @@ const kk = {
     cardio_echo_hydration_error: 'Сақталған ЭхоКГ көрсеткіштерін жүктеу мүмкин болмады. Сақталған деректерді қайта жазып жібермес үшін сақтау блокталды — «Қайтадан жүктеу» түймесін басыңыз.',
     cardio_echo_retry: 'Қайтадан жүктеу',
     cardio_echo_saved_stale_edit: 'Бұрынға редакция сақталды: сақтау кезінде жасалған өңдеулер әлі сақталмаған. Мәндерді тексеріп, «Сақтау» түймесін қайта басыңыз.',
+    cardio_echo_draft_preserved: 'Сақталған көрсеткіштер жүктелді; жүктеу сәтсіз аяқталғанда енгізілген түзетулер формада сақталды және әлі жазылмады — оларды тексеріп, «Сақтау» түймесін басыңыз.',
     cardio_panel_close: 'Закрыть',
     cardio_panel_save: 'Сохранить',
     cardio_panel_session_warning_aria: 'Предупреждение об истечении сессии',
@@ -5353,6 +5364,12 @@ const kk = {
     db_open_board_desc: 'Просмотр в новой вкладке',
     db_add: 'Добавить',
     db_banners_empty: 'Баннеры не добавлены',
+    db_banner_title: 'Баннер тақырыбы',
+    db_banner_description: 'Баннер сипаттамасы',
+    db_banner_duration: 'Көрсету ұзақтығы (сек)',
+    db_banner_created: 'Баннер жасалды',
+    db_banner_error: 'Баннер жасау қатесі',
+    db_cancel: 'Болдырмау',
     db_announcements_empty: 'Объявления не добавлены',
     db_info_title: 'Информация о табло',
     db_info_queue: '• Табло отображает текущую очередь по специалистам и кабинетам',
@@ -6617,6 +6634,7 @@ const kk = {
     visit_emr_status_signed: 'Подписана',
     visit_emr_status_amended: 'Изменена после подписания',
     tooth_save_requires_visit: 'Сохранение зубной карты требует открытый визит. Откройте пациента из очереди.',
+    tooth_inspection_only: 'Қабылдау жазбасы тек көру үшін қолжетімді — тіс қарау режимінде ашылды, өңдеу және сақтау қолжетімсіз.',
   },
   payment: {
     timeout: 'Время ожидания истекло',
@@ -8778,6 +8796,7 @@ const kk = {
     ps_save: 'Сохранить рецепт',
     ps_print: 'Печать рецепта',
     emr_ai_no_complaints: 'Для AI-подсказок сначала заполните поле «Жалобы»',
+    ai_popover_kb_hint: '↑↓ және Enter тізім фокусында жұмыс істейді • Esc жабу',
     emr_ghost_unavailable: 'Ghost Mode недоступен в подписанной карте.',
     emr_sign_title: 'Подписание ЭМК',
     emr_sign_message: 'Подписать ЭМК?',
@@ -8903,6 +8922,7 @@ const kk = {
     aia_fallback_provider_notice: 'Ответ получен через резервный AI-провайдер {provider}. Используйте его только как черновик и проверьте настройки внешнего AI перед клиническим применением.',
     aia_analyzing_via: 'Анализ через {provider} AI...',
     aia_click_refresh: 'Нажмите Обновить для запуска AI анализа',
+    aia_no_context_notice: 'Клиникалық контекстсіз AI-талдау қолжетімсіз: көмекшіні диагноз, шағымдар мен нәтижелермен қолдану үшін пациент картасын ашыңыз.',
     aia_retry_attempt: 'Попытка {count}. Попробуйте сменить AI провайдер или повторить запрос.',
 
     // ─── ComponentTest.jsx (ct_) ───────────────────────────────────────────
@@ -9373,7 +9393,7 @@ const kk = {
     esi_idyot_sohranenie: 'Идёт сохранение',
     esi_podpisana_s_popravkami: '📝 Подписана (с поправками)',
     esi_podpisana: '✅ Подписана',
-    esi_podpisana_formatabsolutetime: 'Подписана {formatAbsoluteTime(lastSaved)}',
+    esi_podpisana_formatabsolutetime: 'Подписана {lastSaved}',
     esi_dokument_podpisan_i_zaschisc: 'Документ подписан и защищён от изменений',
     esi_est_izmeneniya: '● Есть изменения',
     esi_avtosohranenie_cherez_math_r: 'Автосохранение через {Math.round(autosaveConfig.debounceMs / 1000)} сек',
@@ -9565,6 +9585,8 @@ const kk = {
     dtp_moy_opyt_count_shablonov: 'Мой опыт ({count} шаблонов)',
     dtp_moy_opyt: 'Мой опыт',
     dtp_net_sohranyonnyh_shablonov: 'Нет сохранённых шаблонов',
+    dtp_oshibka_zagruzki_shablonov: 'Не удалось загрузить шаблоны',
+    dtp_povtorit: 'Повторить',
     dtp_redaktirovat_shablon: 'Редактировать шаблон',
     dtp_moy_opyt_2: 'Мой опыт',
     // DermatologySection.jsx (ds_)
@@ -9769,6 +9791,8 @@ const kk = {
     poa_vse: 'Все',
     poa_zagruzka: 'Загрузка...',
     poa_izmeneniy_tsen_ne_naydeno: 'Изменений цен не найдено',
+    poa_vsego_zaprosov: 'Кезектегі өтініштер саны',
+    poa_tsena_v_vizite: 'Визиттегі қызмет бағасы',
     // PatientPanel.jsx (pp_)
     pp_ne_udalos_zagruzit_label_obn: 'Не удалось загрузить {label}. Обновите страницу.',
     pp_zapisi: 'записи',
@@ -10188,6 +10212,8 @@ const kk = {
     dss_kosmetologicheskie_protsedur: 'Косметологические процедуры',
     dss_analizy_krovi: 'Анализы крови',
     dss_oshibka_zagruzki_uslug: 'Ошибка загрузки услуг',
+    dss_uslugi_ne_naydeny: 'Қызметтер табылмады',
+    dss_dobavte_uslugi_admin_paneli: '«{specialty}» мамандығы үшін қызметтерді әкімшілік панелінде қосыңыз',
     dss_tsena_uslugi_service_name: 'Цена услуги {service.name}',
     dss_uslug: 'Услуг',
     dss_minut: 'Минут',

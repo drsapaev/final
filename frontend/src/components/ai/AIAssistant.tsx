@@ -220,15 +220,18 @@ const AIAssistant = ({
   // an older run's finally must not clear the flag a newer run raised.
   const analysisRunRef = useRef(0);
 
-  // X-1 (UX audit): If specialty is provided, auto-configure analysisType and data
-  // so the AI tab works without the parent having to pass analysisType explicitly.
+  // X-1 (UX audit) + CARDAI-FE-001 (audit 3886): a specialty-only mount
+  // derives the default analysis type, but NO clinical data exists in
+  // such a mount — `analyzeData` stays fail-closed on `!data` and the
+  // analysis UI is suppressed (see `hasAnalysisData`) instead of offering
+  // provider controls and a disabled refresh as a false affordance.
+  // Wiring an empty synthetic payload in place of real patient context
+  // would mint meaningless suggestions (per the finding's repair note),
+  // so the honest state is an explicit no-context notice.
   const effectiveAnalysisType = analysisType || (specialty ? 'icd10' : undefined);
-  const effectiveData = data || (specialty ? {
-    complaint: '',
-    specialty: specialty,
-    patient_age: null,
-    patient_gender: null,
-  } : undefined);
+  // CARDAI-FE-001: analysis actions exist only when the parent supplied
+  // authorized clinical data.
+  const hasAnalysisData = data != null;
 
   const analyzeData = async (manualRetry = false) => {
     if (!data) return;
@@ -264,7 +267,9 @@ const AIAssistant = ({
               throw new Error(mcpResult.error || 'MCP analysis failed');
             }
           } else {
-            response = await apiClient.post('/api/v1/ai/complaint-to-plan', {
+            // CARDAI-FE-002 (audit 3886): the shared client's baseURL already
+            // ends with /api/v1 — pass only the versioned-relative path.
+            response = await apiClient.post('/ai/complaint-to-plan', {
               ...data,
               provider,
               use_mcp: false
@@ -293,7 +298,8 @@ const AIAssistant = ({
               throw new Error(mcpResult.error || 'MCP ICD10 suggestion failed');
             }
           } else {
-            response = await apiClient.post('/api/v1/ai/icd-suggest', { ...data, provider });
+            // CARDAI-FE-002: versioned-relative path (baseURL owns /api/v1).
+            response = await apiClient.post('/ai/icd-suggest', { ...data, provider });
           }
           break;
 
@@ -312,12 +318,14 @@ const AIAssistant = ({
               throw new Error(mcpResult.error || 'MCP lab interpretation failed');
             }
           } else {
-            response = await apiClient.post('/api/v1/ai/lab-interpret', { ...data, provider });
+            // CARDAI-FE-002: versioned-relative path (baseURL owns /api/v1).
+            response = await apiClient.post('/ai/lab-interpret', { ...data, provider });
           }
           break;
 
         case 'ecg':
-          response = await apiClient.post('/api/v1/ai/ecg-interpret', { ...data, provider });
+          // CARDAI-FE-002: versioned-relative path (baseURL owns /api/v1).
+          response = await apiClient.post('/ai/ecg-interpret', { ...data, provider });
           break;
 
         case 'skin':
@@ -338,7 +346,8 @@ const AIAssistant = ({
             formData.append('image', data.image as Blob);
             if (data.metadata) formData.append('metadata', JSON.stringify(data.metadata));
             formData.append('provider', provider);
-            response = await apiClient.post('/api/v1/ai/skin-analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            // CARDAI-FE-002: versioned-relative path (baseURL owns /api/v1).
+            response = await apiClient.post('/ai/skin-analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
           }
           break;
 
@@ -727,6 +736,11 @@ const AIAssistant = ({
             {useMCP && <Badge variant="success">MCP</Badge>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* CARDAI-FE-001 (audit 3886): provider controls and the refresh
+             * action exist only when clinical data was supplied — a
+             * specialty-only mount must not present startable-looking
+             * controls that can never start. */}
+            {hasAnalysisData && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {providerOptions.map((prov) =>
               <Button key={prov} size="small" variant={provider === prov ? 'primary' : 'outline'} onClick={() => setProvider(prov)} disabled={loading}>
@@ -734,10 +748,13 @@ const AIAssistant = ({
                 </Button>
               )}
             </div>
-            <Button size="small" variant="outline" onClick={() => analyzeData(true)} disabled={loading || !data}>
+            )}
+            {hasAnalysisData && (
+            <Button size="small" variant="outline" onClick={() => analyzeData(true)} disabled={loading}>
               <RefreshCw style={{ width: 14, height: 14, marginRight: 6 }} />
               {t('misc.aia_refresh')}
             </Button>
+            )}
             <Button
               type="button"
               size="small"
@@ -785,7 +802,12 @@ const AIAssistant = ({
         }
 
         {!result && !loading && !error &&
-        <Alert severity="info">{t('misc.aia_click_refresh')}</Alert>
+        (hasAnalysisData
+          ? <Alert severity="info">{t('misc.aia_click_refresh')}</Alert>
+          : /* CARDAI-FE-001: explicit no-context state — explain WHY analysis
+             * is unavailable instead of prompting a click that can never
+             * start. */
+            <Alert severity="info">{t('misc.aia_no_context_notice')}</Alert>)
         }
 
         {error && retryCount > 0 &&

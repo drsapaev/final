@@ -528,6 +528,136 @@
         ]
       }
     },
+    "/api/v1/patients/public-booking/appointments": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Create an appointment from the confirmed public booking mode",
+        "description": "Reserve an available slot as a normal Appointment for the own card.\n\nThis route is valid only while the clinic's current mode is\n`confirmed_appointment`; it never falls back to a non-reserving request.",
+        "operationId": "patient_create_confirmed_public_booking_appointment",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Required for safe retries of the same appointment submission.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Required for safe retries of the same appointment submission."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientConfirmedPublicBookingOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestPatientProfileErrorOut"
+                    }
+                  ],
+                  "title": "Response 404 Patient Create Confirmed Public Booking Appointment"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "The patient has reached the public booking creation limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patients/booking-requests": {
       "post": {
         "tags": [
@@ -20306,7 +20436,7 @@
           "registrar-wizard"
         ],
         "summary": "Получить все изменения цен для одобрения",
-        "description": "Получить список изменений цен для одобрения регистратурой",
+        "description": "Получить список изменений цен для одобрения регистратурой\n\nREGPRICE-BE-004 (audit #3892, group 16): the queue is paginated over a\ndeterministic ``(created_at DESC, id DESC)`` order and the FULL filtered\ntotal is exposed via the ``X-Total-Count`` header — a bare 100-row\nnewest-first window silently hid older pending requests with no way to\nreach them from the registrar UI.",
         "operationId": "get_pending_price_overrides_api_v1_registrar_price_overrides_get",
         "security": [
           {
@@ -20342,6 +20472,17 @@
               "minimum": 1,
               "default": 50,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -20379,7 +20520,7 @@
           "registrar-wizard"
         ],
         "summary": "Одобрить или отклонить изменение цены",
-        "description": "Одобрить или отклонить изменение цены врачом",
+        "description": "Одобрить или отклонить изменение цены врачом\n\nREGPRICE-BE-001/002/003/005 (audit #3892, group 16): the registrar route\nnow delegates to the canonical PriceOverrideApprovalService — the SAME\nimplementation the dental PUT route uses — so both independently exposed\nroutes converge on one outcome: locked decision (409 for the loser of a\nconcurrent race), chargeable ``VisitService.price`` update PLUS the\n``Visit.doctor_price_override`` JSON mirror in one commit, stale-intent\nvalidation and a mandatory non-blank rejection reason.",
         "operationId": "approve_price_override_api_v1_registrar_price_override_approve_post",
         "requestBody": {
           "content": {
@@ -22111,7 +22252,7 @@
           "doctor-integration"
         ],
         "summary": "Add Service To Visit",
-        "description": "Добавить услугу к визиту",
+        "description": "Добавить услугу к визиту.\n\nDOCVISIT-BE-002: ``quantity``/``custom_price`` валидируются ДО записи —\nнекорректные строки не попадают в биллинг. DOCVISIT-BE-003: мутация\nкоординируется с платёжным легером (каноничный Visit-lock + отказ при\nprocessing-инвойсах и оплаченном остатке). DOCVISIT-BE-001: ответ\nстроится ТОЛЬКО из персистентного состояния — ``price`` и есть\nфактическая цена (кастомная или каталожная), фантомного ``custom_price``\nполя не существует.",
         "operationId": "add_service_to_visit_api_v1_doctor_visits__visit_id__add_service_put",
         "security": [
           {
@@ -22196,7 +22337,7 @@
           "doctor-integration"
         ],
         "summary": "Remove Service From Visit",
-        "description": "Удалить услугу из визита",
+        "description": "Удалить услугу из визита.\n\nDOCVISIT-BE-003: удаление строки услуги оплаченного визита меняет базу\nстоимости под неизменным чеком — отказ (409), как и для добавления.",
         "operationId": "remove_service_from_visit_api_v1_doctor_visits__visit_id__services__visit_service_id__delete",
         "security": [
           {
@@ -27919,17 +28060,24 @@
           "board"
         ],
         "summary": "Состояние очереди для табло",
-        "description": "Return the legacy board stats snapshot.\n\nThe board state endpoint is intentionally public: it only exposes\naggregate counters (``last_ticket``/``waiting``/``serving``/``done``)\nand the day's open/start-number flags. It must NOT leak live queue\nentries, current calls, or announcements — those are owned by the\ndisplay board WebSocket initial_state/update stream, which is\nseparately authenticated. Keeping this REST endpoint public lets the\nstats-only contract be verified without auth headers.",
+        "description": "Return the legacy board stats snapshot plus board-scoped settings.\n\nThe board state endpoint is intentionally public: it only exposes\naggregate counters (``last_ticket``/``waiting``/``serving``/``done``)\nand non-PHI presentation settings. It must NOT leak live queue\nentries, current calls, or announcements — those are owned by the\ndisplay board WebSocket initial_state/update stream, which is\nseparately authenticated. Keeping this REST endpoint public lets the\nstats-only contract be verified without auth headers.\n\nDISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is\nboard-scoped — an optional ``board`` name selects THAT board's row\n(a missing board is an honest 404) instead of always ``main_board``;\nthe privacy setting of the selected board must not be replaced by\nthe main board's.\n\nDISPLAYOPTIONS-FE-001 (audit PR #3961): the response additionally\nexposes the selected board's non-PHI presentation fields\n(``queue_display_count``/``show_announcements``/``voice_announcements``\n/``sound_enabled``) so the live TV screen can apply what the admin\nsaved.\n\nDISPLAYDEPT-FE-001 (audit PR #3961): ``department`` is now optional —\na public board route without a configured department (multi-\ndepartment kiosk) suppresses the legacy counters honestly\n(``stats_available: false``) instead of inferring them from literal\n``undefined`` URL text.",
         "operationId": "board_state_api_v1_board_state_get",
         "parameters": [
           {
             "name": "department",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Department"
             }
           },
@@ -27943,6 +28091,23 @@
               "title": "Date"
             },
             "description": "YYYY-MM-DD"
+          },
+          {
+            "name": "board",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Board"
+            }
           }
         ],
         "responses": {
@@ -52761,6 +52926,17 @@
               "default": 50,
               "title": "Limit"
             }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -68410,7 +68586,7 @@
           "queue-position"
         ],
         "summary": "Get Queue Positions Stats",
-        "description": "Получить статистику позиций в очереди\n\nВозвращает список всех записей с их позициями.",
+        "description": "Получить статистику позиций в очереди\n\nВозвращает список всех записей с их позициями.\n\nДоступно: Admin, Registrar, Doctor (и SuperAdmin).",
         "operationId": "get_queue_positions_stats_api_v1_queue_position_stats_queue__queue_id__get",
         "security": [
           {
@@ -100233,6 +100409,44 @@
         ],
         "title": "PatientBenefitCreate"
       },
+      "PatientConfirmedPublicBookingOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointment Date"
+          },
+          "appointment_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Appointment Time"
+          },
+          "status": {
+            "type": "string",
+            "const": "scheduled",
+            "title": "Status"
+          },
+          "timezone": {
+            "type": "string",
+            "const": "Asia/Tashkent",
+            "title": "Timezone",
+            "default": "Asia/Tashkent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "appointment_date",
+          "appointment_time",
+          "status"
+        ],
+        "title": "PatientConfirmedPublicBookingOut",
+        "description": "Minimal result for an immediately-created public booking appointment."
+      },
       "PatientCreate": {
         "properties": {
           "full_name": {
@@ -103739,6 +103953,30 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "New Price"
           },
+          "visit_price_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Price Before"
+          },
+          "visit_price_difference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Price Difference"
+          },
           "reason": {
             "type": "string",
             "title": "Reason"
@@ -106028,6 +106266,7 @@
               "booking_request_idempotency_conflict",
               "booking_request_duplicate",
               "booking_request_rate_limited",
+              "booking_active_appointment_limit",
               "booking_request_unavailable"
             ],
             "title": "Code"
@@ -112468,6 +112707,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Confirmation"
+          },
+          "idempotent_replay": {
+            "type": "boolean",
+            "title": "Idempotent Replay",
+            "description": "True, когда идентичный intent уже был зафиксирован в окне дедупликации и ответ перестроен из СОХРАНЁННОГО визита (второй визит/токен не создавались).",
+            "default": false
           }
         },
         "type": "object",

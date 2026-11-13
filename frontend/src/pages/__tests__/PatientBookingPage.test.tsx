@@ -9,6 +9,7 @@ vi.mock('../../api/publicBooking', async () => {
     ...actual,
     getPublicBookingOptions: vi.fn(),
     getPublicBookingAvailability: vi.fn(),
+    createPatientConfirmedPublicBookingAppointment: vi.fn(),
     createPatientPublicBookingRequest: vi.fn(),
     resubmitPatientPublicBookingRequest: vi.fn(),
   };
@@ -20,6 +21,7 @@ vi.mock('../../stores/auth', () => ({
 
 import {
   clearPendingPublicBookingSelection,
+  createPatientConfirmedPublicBookingAppointment,
   createPatientPublicBookingRequest,
   resubmitPatientPublicBookingRequest,
   getPendingPublicBookingLocale,
@@ -33,6 +35,7 @@ import PatientBookingPage from '../PatientBookingPage';
 
 const mockedOptions = vi.mocked(getPublicBookingOptions);
 const mockedAvailability = vi.mocked(getPublicBookingAvailability);
+const mockedCreateAppointment = vi.mocked(createPatientConfirmedPublicBookingAppointment);
 const mockedCreateRequest = vi.mocked(createPatientPublicBookingRequest);
 const mockedResubmitRequest = vi.mocked(resubmitPatientPublicBookingRequest);
 const mockedAuthState = vi.mocked(getState);
@@ -107,6 +110,13 @@ describe('PatientBookingPage', () => {
       slots: ['09:00:00'],
     }) as never);
     mockedCreateRequest.mockResolvedValue({ id: 'request-id' } as never);
+    mockedCreateAppointment.mockResolvedValue({
+      id: 42,
+      appointment_date: todayInTashkent(),
+      appointment_time: '09:00:00',
+      status: 'scheduled',
+      timezone: 'Asia/Tashkent',
+    } as never);
     mockedResubmitRequest.mockResolvedValue({ id: 'request-id', status: 'pending' } as never);
   });
 
@@ -140,6 +150,94 @@ describe('PatientBookingPage', () => {
     expect(screen.getByText(/не резервирует время/i)).toBeInTheDocument();
   });
 
+  it('creates and confirms an appointment when the current policy selects that mode', async () => {
+    mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'confirmed_appointment' } as never);
+    renderPage();
+    await chooseSlot();
+
+    expect(screen.getByText(/после заключительной проверки свободного времени/i)).toBeInTheDocument();
+    expect(screen.queryByText(/не резервирует время/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить запись' }));
+
+    expect(await screen.findByRole('heading', { name: 'Запись подтверждена.' })).toBeInTheDocument();
+    expect(mockedCreateAppointment).toHaveBeenCalledTimes(1);
+    expect(mockedCreateAppointment.mock.calls[0][0]).toEqual({
+      service_slug: 'cardiology',
+      doctor_slug: 'doctor-one',
+      appointment_date: todayInTashkent(),
+      appointment_time: '09:00',
+      expected_settings_version: 1,
+    });
+    expect(mockedCreateAppointment.mock.calls[0][1]).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+    expect(screen.getByText(/вы записаны на выбранное время/i)).toBeInTheDocument();
+    expect(screen.getByText(/Врач Один/)).toBeInTheDocument();
+  });
+
+  it('explains the five future appointment limit returned by the server', async () => {
+    mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'confirmed_appointment' } as never);
+    mockedCreateAppointment.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 409,
+        data: { detail: { code: 'booking_active_appointment_limit' } },
+      },
+    });
+    renderPage();
+    await chooseSlot();
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить запись' }));
+
+    expect(await screen.findByText(/5 активных записей на будущие даты/i)).toBeInTheDocument();
+    expect(mockedCreateAppointment).toHaveBeenCalledTimes(1);
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+
+  it('requires explicit acknowledgement before switching from request to confirmed appointment mode', async () => {
+    renderPage();
+    await chooseSlot();
+    mockedOptions.mockResolvedValue({
+      ...OPTIONS,
+      mode: 'confirmed_appointment',
+      settings_version: 2,
+    } as never);
+    mockedAvailability.mockImplementation(async ({ date }) => ({
+      date,
+      timezone: 'Asia/Tashkent',
+      settings_version: 2,
+      slots: ['09:00:00'],
+    }) as never);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+
+    expect(await screen.findByLabelText(/Я проверил/)).toBeInTheDocument();
+    expect(mockedCreateAppointment).not.toHaveBeenCalled();
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText(/Я проверил/));
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить запись' }));
+
+    await screen.findByRole('heading', { name: 'Запись подтверждена.' });
+    expect(mockedCreateAppointment).toHaveBeenCalledTimes(1);
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+
+  it('retries an ambiguous confirmed booking with the exact same payload and key', async () => {
+    mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'confirmed_appointment' } as never);
+    mockedCreateAppointment.mockRejectedValueOnce({ isAxiosError: true, request: {} });
+    renderPage();
+    await chooseSlot();
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить запись' }));
+
+    expect(await screen.findByText(/не удалось подтвердить результат/i)).toBeInTheDocument();
+    const firstAttempt = mockedCreateAppointment.mock.calls[0];
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить ту же отправку' }));
+
+    await screen.findByRole('heading', { name: 'Запись подтверждена.' });
+    expect(mockedCreateAppointment).toHaveBeenCalledTimes(2);
+    expect(mockedCreateAppointment.mock.calls[1]).toEqual(firstAttempt);
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+
   it('resubmits a changed time against the existing request instead of creating another one', async () => {
     const requestId = '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab';
     mockedResubmitRequest.mockRejectedValueOnce({ isAxiosError: true, request: {} });
@@ -159,7 +257,7 @@ describe('PatientBookingPage', () => {
     expect(screen.getByLabelText('Врач')).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Отправить новое время' }));
 
-    const retry = await screen.findByRole('button', { name: 'Повторно проверить ту же заявку' });
+    const retry = await screen.findByRole('button', { name: 'Повторить ту же отправку' });
     const firstAttempt = mockedResubmitRequest.mock.calls[0];
     fireEvent.click(retry);
     await screen.findByRole('heading', { name: /Новое время отправлено регистратору/ });
@@ -316,6 +414,9 @@ describe('PatientBookingPage', () => {
     expect(mockedCreateRequest).not.toHaveBeenCalled();
     const acknowledgement = screen.getByLabelText(/Я проверил/);
     fireEvent.click(acknowledgement);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Отправить заявку|Проверяем и отправляем/ })).toBeEnabled();
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
 
     await screen.findByRole('heading', { name: /Заявка отправлена регистратору/ });
@@ -329,7 +430,7 @@ describe('PatientBookingPage', () => {
     await chooseSlot();
     fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
 
-    const retry = await screen.findByRole('button', { name: 'Повторно проверить ту же заявку' });
+    const retry = await screen.findByRole('button', { name: 'Повторить ту же отправку' });
     expect(screen.getByLabelText('Услуга')).toBeDisabled();
     const firstAttempt = mockedCreateRequest.mock.calls[0];
     fireEvent.click(retry);
@@ -350,11 +451,29 @@ describe('PatientBookingPage', () => {
     expect(getPendingPublicBookingLocale()).toBe('uz-Latn');
   });
 
-  it('fails closed when the selected mode requires a different booking API', async () => {
-    mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'confirmed_appointment' } as never);
+  it('fails closed when the server reports an unsupported booking mode', async () => {
+    mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'future_mode' as never } as never);
     renderPage();
     expect(await screen.findByText(/Этот способ записи пока не подключён/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Услуга')).not.toBeInTheDocument();
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+    expect(mockedCreateAppointment).not.toHaveBeenCalled();
+  });
+
+  it('does not convert a resubmission into a new confirmed appointment', async () => {
+    mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'confirmed_appointment' } as never);
+    renderPage('/ru/booking', {
+      publicBookingResubmit: {
+        requestId: '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab',
+        expectedVersion: 4,
+        serviceSlug: 'cardiology',
+        doctorSlug: 'doctor-one',
+      },
+    });
+
+    expect(await screen.findByText(/этот вариант нельзя использовать для изменения прежней заявки/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Услуга')).not.toBeInTheDocument();
+    expect(mockedCreateAppointment).not.toHaveBeenCalled();
     expect(mockedCreateRequest).not.toHaveBeenCalled();
   });
 

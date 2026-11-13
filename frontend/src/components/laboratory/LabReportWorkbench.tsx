@@ -167,7 +167,22 @@ export default function LabReportWorkbench({
   // LABR-FE-002 (audit 3886): preview attempt epoch — a late preview
   // response must never open/report into a context that replaced it.
   const previewAttemptRef = useRef(0);
+  // RETRO-3970-01 review follow-up: an in-flight preview must not outlive
+  // its unmount — the reservation is mirrored so the unmount cleanup can
+  // close it, and the mounted mirror owns previewStillCurrent().
+  const previewReservedRef = useRef<Window | null>(null);
+  const previewMountedRef = useRef(true);
   const printFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // RETRO-3970-01 review follow-up: on unmount the in-flight preview loses
+  // its ownership (mounted mirror + attempt invalidation) and its reserved
+  // blank tab is closed — a late blob response must never navigate a
+  // departed report's document into a popup nobody is watching.
+  useEffect(() => () => {
+    previewMountedRef.current = false;
+    previewAttemptRef.current += 1;
+    previewReservedRef.current?.close();
+    previewReservedRef.current = null;
+  }, []);
   const captureOperationContext = useCallback(
     () => getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT,
     [getOperationContext],
@@ -857,13 +872,30 @@ export default function LabReportWorkbench({
     const previewOperation = getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT;
     const previewAttempt = ++previewAttemptRef.current;
     const previewStillCurrent = () =>
+      previewMountedRef.current &&
       previewAttemptRef.current === previewAttempt &&
       operationContextsMatch(previewOperation, operationContextRef.current);
+    // RETRO-3970-01 (CARDHIST-FE-001 precedent): reserve the browsing
+    // context SYNCHRONOUSLY inside the click gesture — before any await.
+    // No `noopener` feature string: a null reservation is an HONEST
+    // blocked signal, a context is a guaranteed-to-be-fulfilled open.
+    // (A noopener window.open returns null even on success — the old
+    // post-await call both lost the gesture and lied about the result.)
+    const reserved = window.open('', '_blank');
+    if (!reserved) {
+      setPrintFeedback({ severity: 'error', text: t('workbench.preview_popup_blocked') });
+      return;
+    }
+    previewReservedRef.current = reserved;
     setBusyAction('preview');
     setPrintFeedback({ severity: 'info', text: t('workbench.preview_building') });
     try {
       const blob = await labReportingApi.previewInstancePdf(expectedInstanceId);
-      if (!blob || !(blob instanceof Blob)) {
+      if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+        // RETRO-3970-01: never leave the reserved blank tab behind. The
+        // review follow-up adds the size guard — a zero-byte payload would
+        // otherwise open as a dead document.
+        reserved.close();
         if (previewStillCurrent()) {
           setPrintFeedback({ severity: 'error', text: t('workbench.print_pdf_invalid') });
         }
@@ -873,19 +905,22 @@ export default function LabReportWorkbench({
       // read was pending — drop the stale blob BEFORE any object URL is
       // created; no window.open, no feedback overwrite on the new screen.
       if (!previewStillCurrent()) {
+        reserved.close();
         logger.warn('[LabReportWorkbench] Stale PDF preview ignored for a changed report context');
         return;
       }
       const url = URL.createObjectURL(blob);
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // RETRO-3970-01: the reserved tab is navigated here — a noopener
+      // window.open returns null even on a SUCCESSFUL open (MDN), so the
+      // old truthiness check reported every successful preview as
+      // «blocked». The reservation returned a context, so this success is
+      // a REAL success.
       // WF-05 parity: НЕ помечаем PRINTED и не дёргаем onRefresh* —
       // preview не имеет серверных побочных эффектов.
-      setPrintFeedback(
-        popup
-          ? { severity: 'success', text: t('workbench.preview_opened') }
-          : { severity: 'error', text: t('workbench.print_pdf_blocked') }
-      );
+      reserved.opener = null;
+      reserved.location.href = url;
+      setPrintFeedback({ severity: 'success', text: t('workbench.preview_opened') });
       if (printFeedbackTimerRef.current) {
         clearTimeout(printFeedbackTimerRef.current);
         printFeedbackTimerRef.current = null;
@@ -897,6 +932,10 @@ export default function LabReportWorkbench({
         }
       }, 5000);
     } catch (previewError) {
+      // RETRO-3970-01: the failed read must not leave the reserved blank
+      // tab behind — closing it is safe even when the attempt went stale
+      // (the tab belongs to the old attempt either way).
+      reserved.close();
       if (!previewStillCurrent()) {
         // LABR-FE-002: a stale preview's failure belongs to the old context.
         logger.warn('[LabReportWorkbench] Stale PDF preview failure ignored for a changed report context');
@@ -1053,8 +1092,9 @@ export default function LabReportWorkbench({
         clearOwnedPrintFeedback();
         return;
       }
-      if (!blob || !(blob instanceof Blob)) {
-        // L-M-9 fix: если blob пустой или не Blob — не открываем window.open('undefined')
+      if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+        // L-M-9 fix: если blob пустой или не Blob — не открываем window.open('undefined').
+        // RETRO-3970-01 review follow-up: size === 0 is the same invalid class.
         setPrintFeedback({
           severity: 'error',
           text: t('workbench.print_pdf_invalid')
@@ -1067,28 +1107,37 @@ export default function LabReportWorkbench({
         clearOwnedPrintFeedback();
         return;
       }
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      if (popup) {
-        // LABPRINT-FE-002 (audit 3886, round 14): открытая PDF-вкладка —
-        // это НЕ физическая печать. Раньше UI немедленно вызывал
-        // markPrinted, и бланк получал статус PRINTED без подтверждённого
-        // печатного задания (оператор мог отменить печать или только
-        // просмотреть). Теперь статус меняет ТОЛЬКО явное подтверждение
-        // оператора (кнопка в inline Alert); до этого отчёт остаётся
-        // FINALIZED.
-        setPdfConfirmPendingInstanceId(expectedInstanceId);
-        setPrintFeedback({
-          severity: 'info',
-          text: t('workbench.print_pdf_opened_confirm')
-        });
-      } else {
-        if (!isOperationCurrent(operation)) return;
-        setPrintFeedback({
-          severity: 'warning',
-          text: t('workbench.print_pdf_blocked')
-        });
-      }
+      // RETRO-3970-01: the direct-print attempt NEVER auto-opens a tab —
+      // it PREPARES the PDF and hands the decision to the operator via the
+      // explicit follow-up click («Открыть PDF для печати»). That click is
+      // a fresh user activation whose synchronous reservation either
+      // succeeds (a context to navigate) or honestly reports «blocked» —
+      // the old noopener window.open returned null even on success, so the
+      // LABPRINT-FE-002 confirmation was unreachable on real browsers.
+      const preparedUrl = url;
+      pdfPreparedUrlRef.current = preparedUrl;
+      setTimeout(() => {
+        URL.revokeObjectURL(preparedUrl);
+        // RETRO-3970-01 review follow-up: the 60s object-URL budget also
+        // expires the PREPARATION — an expired link must never back the
+        // explicit open (a dead document) nor the printed-confirmation that
+        // follows it. Only the still-pending preparation expires; one that
+        // was already opened (or dropped) is untouched.
+        if (pdfPreparedUrlRef.current === preparedUrl) {
+          pdfPreparedUrlRef.current = null;
+          setPdfFallbackPrepared(null);
+          setPrintFeedback({
+            severity: 'warning',
+            text: t('workbench.print_pdf_prepared_expired')
+          });
+        }
+      }, 60_000);
+      setPdfFallbackPrepared({ instanceId: expectedInstanceId, url });
+      setPrintFeedback({
+        severity: 'info',
+        text: t('workbench.print_pdf_prepared')
+      });
+      return;
     } catch (error) {
       if (!isOperationCurrent(operation)) {
         clearOwnedPrintFeedback();
@@ -1113,9 +1162,46 @@ export default function LabReportWorkbench({
   // PDF-превью — это не печатное задание. Сбрасывается при смене
   // активного отчёта (WF-12 parity).
   const [pdfConfirmPendingInstanceId, setPdfConfirmPendingInstanceId] = useState<string | number | null>(null);
+  // RETRO-3970-01: the PDF fallback prepared after a failed direct print —
+  // it holds the object URL until the operator clicks «Открыть PDF для
+  // печати» (a fresh user gesture). Reset with the same epoch contract as
+  // pdfConfirmPendingInstanceId (WF-12 parity); the URL is revoked so a
+  // dropped preparation never leaks a stale report document.
+  const [pdfFallbackPrepared, setPdfFallbackPrepared] = useState<{ instanceId: string | number; url: string } | null>(null);
+  // Ref mirror of the still-pending prepared URL — the expiry timer and the
+  // open action compare against it so a dead link can never be consumed.
+  const pdfPreparedUrlRef = useRef<string | null>(null);
   useEffect(() => {
     setPdfConfirmPendingInstanceId(null);
+    pdfPreparedUrlRef.current = null;
+    setPdfFallbackPrepared((prepared) => {
+      if (prepared) {
+        URL.revokeObjectURL(prepared.url);
+      }
+      return null;
+    });
   }, [activeInstance?.id]);
+
+  function openPreparedPdf() {
+    if (!pdfFallbackPrepared) return;
+    if (pdfFallbackPrepared.instanceId !== (activeInstance?.id as string | number)) return;
+    if (pdfPreparedUrlRef.current !== pdfFallbackPrepared.url) return;
+    // Synchronous reservation inside THIS click gesture — no noopener
+    // feature string, so null is a real blocked signal (CARDHIST-FE-001).
+    const reserved = window.open('', '_blank');
+    if (!reserved) {
+      setPrintFeedback({ severity: 'warning', text: t('workbench.print_pdf_blocked') });
+      return;
+    }
+    reserved.opener = null;
+    reserved.location.href = pdfFallbackPrepared.url;
+    pdfPreparedUrlRef.current = null;
+    setPdfFallbackPrepared(null);
+    // LABPRINT-FE-002: the opened PDF tab is NOT a physical print — only
+    // the operator's explicit confirmation flips the status.
+    setPdfConfirmPendingInstanceId(pdfFallbackPrepared.instanceId);
+    setPrintFeedback({ severity: 'info', text: t('workbench.print_pdf_opened_confirm') });
+  }
 
   async function confirmPdfPrinted() {
     const targetInstanceId = pdfConfirmPendingInstanceId;
@@ -1540,6 +1626,17 @@ export default function LabReportWorkbench({
               {printFeedback && (
                 <div>
                   <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
+                  {pdfConfirmPendingInstanceId == null
+                    && pdfFallbackPrepared != null
+                    && pdfFallbackPrepared.instanceId === (activeInstance?.id as string | number) && (
+                    <Button
+                      variant="primary"
+                      size="default"
+                      onClick={openPreparedPdf}
+                    >
+                      {t('workbench.print_pdf_open_action')}
+                    </Button>
+                  )}
                   {pdfConfirmPendingInstanceId != null && (
                     <Button
                       variant="primary"

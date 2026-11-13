@@ -102,7 +102,8 @@ interface MockWebSocketInstance {
   onmessage: ((e: MockWsEvent) => void) | null;
   onclose: ((e: MockWsEvent) => void) | null;
   onerror: ((e?: unknown) => void) | null;
-  close: ReturnType<typeof vi.fn>;
+  close: () => void;
+  send: ReturnType<typeof vi.fn>;
   triggerOpen: () => void;
   triggerMessage: (payload: unknown) => void;
 }
@@ -120,7 +121,8 @@ class MockWebSocket {
   onmessage: ((e: MockWsEvent) => void) | null;
   onclose: ((e: MockWsEvent) => void) | null;
   onerror: ((e?: unknown) => void) | null;
-  close: ReturnType<typeof vi.fn>;
+  close: () => void;
+  send: ReturnType<typeof vi.fn>;
 
   constructor(url: string) {
     this.url = url;
@@ -129,6 +131,7 @@ class MockWebSocket {
     this.onmessage = null;
     this.onclose = null;
     this.onerror = null;
+    this.send = vi.fn();
     this.close = vi.fn(() => {
       this.readyState = MockWebSocket.CLOSED;
       this.onclose?.({ code: 1000, reason: 'Unmount' });
@@ -268,4 +271,190 @@ describe('NotificationWebSocketContext', () => {
     expect(notification.title).toBe('Повторная диагностика');
     expect(source).toBe('ws');
   });
+
+  it.each([
+    ['lab_results', 'Результат анализа', 'info'],
+    ['new_appointment', 'Новая запись', 'info'],
+    ['message_received', 'Новое сообщение', 'info'],
+    ['security_alert', 'Системная безопасность', 'warning'],
+  ] as const)(
+    'accepts canonical notification transport carrying %s event without an event-type allowlist',
+    async (eventType, title, toastLevel) => {
+      renderProvider('/doctor/cardiology');
+
+      await act(async () => {
+        vi.runAllTimers();
+      });
+
+      const socket = MockWebSocket.instances[0];
+      const deliveryId = `synthetic-${eventType}-1`;
+
+      await act(async () => {
+        socket.triggerMessage({
+          type: 'notification',
+          event_type: eventType,
+          delivery_id: deliveryId,
+          notification: {
+            delivery_id: deliveryId,
+            event_type: eventType,
+            title,
+            message: 'Синтетическое уведомление',
+            role: 'doctor',
+          },
+        });
+      });
+
+      expect(notificationCenterMockTyped.appendNotification).toHaveBeenCalledTimes(1);
+      const [notification, source] =
+        notificationCenterMockTyped.appendNotification.mock.calls[0] as [
+          { type: string; title: string; message: string; delivery_id: string },
+          string,
+        ];
+      expect(source).toBe('ws');
+      expect(notification).toMatchObject({
+        type: eventType,
+        title,
+        message: 'Синтетическое уведомление',
+        delivery_id: deliveryId,
+      });
+      expect(cacheMock.clearNotificationQueryCache).toHaveBeenCalledTimes(1);
+      expect(notifyMock[toastLevel]).toHaveBeenCalledWith(
+        `${title}: Синтетическое уведомление`,
+      );
+    },
+  );
+
+  it.each([
+    { type: 'connection_established', unread_count: 2 },
+    { type: 'notification_read_ack', delivery_id: 'synthetic-1', unread_count: 1 },
+    { type: 'notification_sync_response', items: [], unread_count: 0 },
+    { type: 'ping' },
+    { type: 'unknown', notification: { event_type: 'lab_results', title: 'Not a canonical transport' } },
+  ])('does not append a delivery for a non-notification transport %#', async (payload) => {
+    renderProvider('/doctor/cardiology');
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    await act(async () => {
+      MockWebSocket.instances[0].triggerMessage(payload);
+    });
+
+    expect(notificationCenterMockTyped.appendNotification).not.toHaveBeenCalled();
+    expect(notifyMock.info).not.toHaveBeenCalled();
+    expect(notifyMock.warning).not.toHaveBeenCalled();
+  });
+
+  it('requests bounded inbox replay only after handshake, once per connection', async () => {
+    renderProvider('/doctor/cardiology');
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    const socket = MockWebSocket.instances[0];
+    await act(async () => {
+      socket.triggerOpen();
+    });
+    expect(socket.send).not.toHaveBeenCalled();
+
+    await act(async () => {
+      socket.triggerMessage({
+        type: 'connection_established',
+        user_id: 41,
+        unread_count: 3,
+      });
+      socket.triggerMessage({
+        type: 'connection_established',
+        user_id: 41,
+        unread_count: 3,
+      });
+    });
+
+    expect(socket.send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(socket.send.mock.calls[0][0] as string)).toEqual({
+      type: 'notification_sync',
+      limit: 50,
+    });
+    expect(notificationCenterMockTyped.updateUnreadSnapshot).toHaveBeenCalled();
+    expect(notifyMock.info).not.toHaveBeenCalled();
+    expect(notificationCenterMockTyped.appendNotification).not.toHaveBeenCalled();
+  });
+
+  it('reconciles replayed persisted delivery without a second toast', async () => {
+    renderProvider('/doctor/cardiology');
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    const socket = MockWebSocket.instances[0];
+    await act(async () => {
+      socket.triggerOpen();
+      socket.triggerMessage({ type: 'connection_established', unread_count: 2 });
+      socket.triggerMessage({
+        type: 'notification_sync_response',
+        unread_count: 2,
+        items: [{
+          delivery_id: 'synthetic-offline-1',
+          sequence_id: 77,
+          event_type: 'lab_results',
+          title: 'Synthetic result',
+          message: 'Persisted offline',
+        }],
+      });
+    });
+
+    expect(socket.send).toHaveBeenCalledTimes(1);
+    expect(notificationCenterMockTyped.replaceNotifications).toHaveBeenCalledTimes(1);
+    const [items, meta] =
+      notificationCenterMockTyped.replaceNotifications.mock.calls[0] as [
+        Array<{ delivery_id: string; event_type: string }>,
+        { source: string; unreadSnapshot: { total: number }; lastSyncAt: string },
+      ];
+    expect(items).toEqual([expect.objectContaining({
+      delivery_id: 'synthetic-offline-1',
+      event_type: 'lab_results',
+    })]);
+    expect(meta.source).toBe('ws');
+    expect(meta.unreadSnapshot.total).toBe(2);
+    expect(meta.lastSyncAt).toEqual(expect.any(String));
+    expect(notificationCenterMockTyped.appendNotification).not.toHaveBeenCalled();
+    expect(notifyMock.info).not.toHaveBeenCalled();
+    expect(notifyMock.warning).not.toHaveBeenCalled();
+  });
+
+  it('replays again on a fresh reconnect but never responds to stale socket messages', async () => {
+    renderProvider('/doctor/cardiology');
+    await act(async () => {
+      vi.runAllTimers();
+    });
+    const first = MockWebSocket.instances[0];
+
+    await act(async () => {
+      first.triggerOpen();
+      first.triggerMessage({ type: 'connection_established', unread_count: 1 });
+    });
+    expect(first.send).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      first.close();
+      vi.advanceTimersByTime(3000);
+    });
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const second = MockWebSocket.instances[1];
+
+    await act(async () => {
+      second.triggerOpen();
+      first.triggerMessage({ type: 'connection_established', unread_count: 7 });
+      second.triggerMessage({ type: 'connection_established', unread_count: 2 });
+    });
+    expect(first.send).toHaveBeenCalledTimes(1);
+    expect(second.send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(second.send.mock.calls[0][0] as string)).toEqual({
+      type: 'notification_sync',
+      limit: 50,
+    });
+  });
+
+
 });

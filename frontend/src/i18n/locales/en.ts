@@ -258,6 +258,10 @@ const en = {
     print_confirm_mark_printed: 'Mark as printed',
     print_marked: 'Report marked as printed',
     print_pdf_blocked: 'PDF сформирован, но новая вкладка заблокирована. Разрешите pop-up для этого сайта и нажмите «Печать» снова, чтобы обновить статус отчёта.',
+    print_pdf_open_action: 'Open PDF for printing',
+    print_pdf_prepared: 'Direct printing failed — the report PDF is prepared. Click "Open PDF for printing" to open the document, and confirm the mark after the physical print.',
+    print_pdf_prepared_expired: 'The prepared PDF link has expired. Retry the print — the document will be prepared again.',
+    preview_popup_blocked: 'The browser blocked the pop-up window. Allow pop-ups for this site and retry the preview.',
     preview_building: 'Формирую серверный предпросмотр PDF...',
     preview_opened: 'Предпросмотр PDF открыт в новой вкладке (водяной знак «Черновик»).',
     preview_failed: 'Не удалось сформировать предпросмотр PDF. Сохраните черновик и попробуйте снова.',
@@ -865,6 +869,12 @@ const en = {
     cardio_parser_normal_params: 'Параметры в пределах нормы.',
     cardio_parser_sinus_rhythm: 'Синусовый',
     cardio_parser_scp_not_implemented: 'Парсинг SCP-ECG формата не реализован. Загрузите файл в формате XML/HL7 aECG или обратитесь к администратору для интеграции SCP-библиотеки.',
+    // ECGPARSER-FE-001/002 (audit 3886 round 25): honest parser states —
+    // unrecognized XML is not a parsed ECG; absent measurements are
+    // explicitly "not measured", never a silent "normal".
+    cardio_parser_xml_not_ecg: 'XML не содержит распознаваемых измерений ЭКГ (HL7 aECG) — файл не будет сохранён как запись ЭКГ',
+    cardio_parser_hr_not_measured: 'ЧСС не измерена',
+    cardio_parser_axis_not_measured: 'Положение ЭОС не измерено',
 
     // ─── EchoForm (cardio.cardio_echo_*) ───
     cardio_echo_section_left_ventricle: 'Левый желудочек',
@@ -1142,6 +1152,7 @@ const en = {
     cardio_echo_hydration_error: 'Failed to load the saved echo measurements. Saving is blocked to protect the stored data — press "Retry load".',
     cardio_echo_retry: 'Retry load',
     cardio_echo_saved_stale_edit: 'An earlier revision was saved: edits made while saving are not saved yet. Review the values and press "Save" again.',
+    cardio_echo_draft_preserved: 'Stored measurements were loaded; the edits you typed while loading had failed are kept in the form and are not saved yet — review them and press "Save".',
     cardio_panel_close: 'Закрыть',
     cardio_panel_save: 'Сохранить',
     cardio_panel_session_warning_aria: 'Предупреждение об истечении сессии',
@@ -5353,6 +5364,12 @@ const en = {
     db_open_board_desc: 'Просмотр в новой вкладке',
     db_add: 'Добавить',
     db_banners_empty: 'Баннеры не добавлены',
+    db_banner_title: 'Banner title',
+    db_banner_description: 'Banner description',
+    db_banner_duration: 'Display duration (sec)',
+    db_banner_created: 'Banner created',
+    db_banner_error: 'Failed to create banner',
+    db_cancel: 'Cancel',
     db_announcements_empty: 'Объявления не добавлены',
     db_info_title: 'Информация о табло',
     db_info_queue: '• Табло отображает текущую очередь по специалистам и кабинетам',
@@ -6617,6 +6634,7 @@ const en = {
     visit_emr_status_signed: 'Подписана',
     visit_emr_status_amended: 'Изменена после подписания',
     tooth_save_requires_visit: 'Сохранение зубной карты требует открытый визит. Откройте пациента из очереди.',
+    tooth_inspection_only: 'Visit record is view-only — the tooth is open in inspection mode; editing and saving are unavailable.',
   },
   payment: {
     timeout: 'Время ожидания истекло',
@@ -8782,6 +8800,7 @@ const en = {
     ps_save: 'Сохранить рецепт',
     ps_print: 'Печать рецепта',
     emr_ai_no_complaints: 'Для AI-подсказок сначала заполните поле «Жалобы»',
+    ai_popover_kb_hint: '↑↓ and Enter act when the list is focused • Esc closes',
     emr_ghost_unavailable: 'Ghost Mode недоступен в подписанной карте.',
     emr_sign_title: 'Sign electronic medical record',
     emr_sign_message: 'Sign this EMR?',
@@ -8907,6 +8926,7 @@ const en = {
     aia_fallback_provider_notice: 'Ответ получен через резервный AI-провайдер {provider}. Используйте его только как черновик и проверьте настройки внешнего AI перед клиническим применением.',
     aia_analyzing_via: 'Анализ через {provider} AI...',
     aia_click_refresh: 'Нажмите Обновить для запуска AI анализа',
+    aia_no_context_notice: 'AI analysis is unavailable without clinical context: open a patient record to use the assistant with its diagnosis, complaints and results.',
     aia_retry_attempt: 'Попытка {count}. Попробуйте сменить AI провайдер или повторить запрос.',
 
     // ─── ComponentTest.jsx (ct_) ───────────────────────────────────────────
@@ -9377,7 +9397,7 @@ const en = {
     esi_idyot_sohranenie: 'Идёт сохранение',
     esi_podpisana_s_popravkami: '📝 Подписана (с поправками)',
     esi_podpisana: '✅ Подписана',
-    esi_podpisana_formatabsolutetime: 'Подписана {formatAbsoluteTime(lastSaved)}',
+    esi_podpisana_formatabsolutetime: 'Подписана {lastSaved}',
     esi_dokument_podpisan_i_zaschisc: 'Документ подписан и защищён от изменений',
     esi_est_izmeneniya: '● Есть изменения',
     esi_avtosohranenie_cherez_math_r: 'Автосохранение через {Math.round(autosaveConfig.debounceMs / 1000)} сек',
@@ -9569,6 +9589,8 @@ const en = {
     dtp_moy_opyt_count_shablonov: 'Мой опыт ({count} шаблонов)',
     dtp_moy_opyt: 'Мой опыт',
     dtp_net_sohranyonnyh_shablonov: 'Нет сохранённых шаблонов',
+    dtp_oshibka_zagruzki_shablonov: 'Не удалось загрузить шаблоны',
+    dtp_povtorit: 'Повторить',
     dtp_redaktirovat_shablon: 'Редактировать шаблон',
     dtp_moy_opyt_2: 'Мой опыт',
     // DermatologySection.jsx (ds_)
@@ -9773,6 +9795,8 @@ const en = {
     poa_vse: 'Все',
     poa_zagruzka: 'Загрузка...',
     poa_izmeneniy_tsen_ne_naydeno: 'Изменений цен не найдено',
+    poa_vsego_zaprosov: 'Total requests in queue',
+    poa_tsena_v_vizite: 'Visit service price',
     // PatientPanel.jsx (pp_)
     pp_ne_udalos_zagruzit_label_obn: 'Не удалось загрузить {label}. Обновите страницу.',
     pp_zapisi: 'записи',
@@ -10192,6 +10216,8 @@ const en = {
     dss_kosmetologicheskie_protsedur: 'Косметологические процедуры',
     dss_analizy_krovi: 'Анализы крови',
     dss_oshibka_zagruzki_uslug: 'Ошибка загрузки услуг',
+    dss_uslugi_ne_naydeny: 'No services found',
+    dss_dobavte_uslugi_admin_paneli: 'Add services for the "{specialty}" specialty in the admin panel',
     dss_tsena_uslugi_service_name: 'Цена услуги {service.name}',
     dss_uslug: 'Услуг',
     dss_minut: 'Минут',

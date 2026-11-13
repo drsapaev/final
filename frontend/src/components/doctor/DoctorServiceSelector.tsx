@@ -22,7 +22,6 @@ import {
   Input } from '../ui/macos';
 
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -50,6 +49,11 @@ export interface DoctorServiceSelectorProps {
   onServicesChange?: (services: DoctorServiceItem[]) => void;
   /** Whether the user can edit service prices inline. */
   canEditPrices?: boolean;
+  /** CARDSVC-FE-002 (audit 3886): explicitly disable selection
+   * affordances — a read-only catalog renders rows as plain information
+   * (no role="button", no focus, no pointer affordance) instead of
+   * activatable cards whose clicks are silently discarded. */
+  readOnly?: boolean;
   /** Extra CSS class. */
   className?: string;
   [key: string]: unknown;
@@ -64,9 +68,17 @@ const DoctorServiceSelector = ({
   selectedServices = [] as DoctorServiceItem[],
   onServicesChange,
   canEditPrices = true,
+  readOnly = false,
   className = ''
 }: DoctorServiceSelectorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
+
+  // CARDSVC-FE-002 (audit 3886): selection is a real action only when a
+  // parent listens for it (and did not explicitly request a read-only
+  // catalog). Without an owner, rows must be non-interactive catalog
+  // information — clicks/keyboard activation that compute a new selection
+  // and silently discard it are a false affordance.
+  const selectionEnabled = !readOnly && typeof onServicesChange === 'function';
 
   const [serviceSearch, setServiceSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -100,18 +112,18 @@ const DoctorServiceSelector = ({
       setLoading(true);
       setError('');
 
-      const token = tokenManager.getAccessToken();
-      const response = await fetch(`/doctor/${specialty}/services`, {
-        headers: { 'Authorization': `Bearer ${token || ''}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setServices(data.services_by_category);
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail);
-      }
+      // CARDSVC-FE-001 (audit 3886): request the catalog through the
+      // configured shared API client (API-origin baseURL + auth request
+      // interceptor), never a browser-relative `fetch('/doctor/...')`
+      // that targets the FRONTEND origin on separately hosted
+      // deployments (VITE_API_BASE_URL) and can 404 / receive SPA
+      // fallback HTML. The canonical route is /api/v1/doctor/{specialty}/services,
+      // owned by the client's baseURL.
+      const response = await api.get(`/doctor/${specialty}/services`);
+      const payload = (response?.data ?? {}) as {
+        services_by_category?: Record<string, { category?: { name_ru?: string }; services?: Record<string, unknown>[] }>;
+      };
+      setServices(payload.services_by_category ?? {});
     } catch (err) {
       logger.error('Ошибка загрузки услуг врача:', err);
       setError(t('misc.dss_oshibka_zagruzki_uslug'));
@@ -430,39 +442,21 @@ const DoctorServiceSelector = ({
                 {categoryData.services.map((service: Record<string, any>) => {
                   const isSelected = isServiceSelected(service.id);
 
-                  return (
-                    <div
-                      key={service.id}
-                      role="button"
-                      tabIndex={0}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 'var(--mac-spacing-3)',
-                        borderRadius: 'var(--mac-radius-lg)',
-                        border: `1px solid ${isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)'}`,
-                        backgroundColor: isSelected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-secondary)',
-                        cursor: 'pointer',
-                        transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                      }}
-                      onClick={() => handleServiceToggle(service)}
-                      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => handleServiceToggle(service))}
-                      onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.backgroundColor = 'var(--mac-bg-hover)';
-                          e.currentTarget.style.transform = 'translateX(4px)';
-                          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-                        }
-                      }}
-                      onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
-                          e.currentTarget.style.transform = 'translateX(0)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }
-                      }}>
-                      
+                  // CARDSVC-FE-002: base row style is shared; the pointer
+                  // affordance exists only in selection mode.
+                  const serviceRowStyle: React.CSSProperties = {
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: 'var(--mac-spacing-3)',
+                    borderRadius: 'var(--mac-radius-lg)',
+                    border: `1px solid ${isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)'}`,
+                    backgroundColor: isSelected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-secondary)',
+                    transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                    ...(selectionEnabled ? { cursor: 'pointer' as const } : {})
+                  };
+
+                  const serviceRowContent = (<>
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         {isSelected ?
                         <CheckCircle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-accent)' }} /> :
@@ -507,6 +501,42 @@ const DoctorServiceSelector = ({
                           {service.duration_minutes} мин
                         </div>
                       </div>
+                    </>);
+
+                  // CARDSVC-FE-002: two statically-analyzable branches — a
+                  // read-only catalog row is a plain div (no role, no focus,
+                  // no handlers); a selection-mode row is a real button-role
+                  // control with full keyboard support.
+                  if (!selectionEnabled) {
+                    return (
+                      <div key={service.id} style={serviceRowStyle}>
+                        {serviceRowContent}
+                      </div>);
+                  }
+
+                  return (
+                    <div
+                      key={service.id}
+                      role="button"
+                      tabIndex={0}
+                      style={serviceRowStyle}
+                      onClick={() => handleServiceToggle(service)}
+                      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => handleServiceToggle(service))}
+                      onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.backgroundColor = 'var(--mac-bg-hover)';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+                        }
+                      }}
+                      onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }
+                      }}>
+                      {serviceRowContent}
                     </div>);
 
                 })}
@@ -522,18 +552,20 @@ const DoctorServiceSelector = ({
           margin: '0 auto 16px auto',
           color: 'var(--mac-text-tertiary)'
         }} />
+          {/* RETRO-3970-02 (P3 hygiene): the empty fallback is localized
+              like the sibling error state (misc.dss_oshibka_zagruzki_uslug). */}
           <h3 style={{
           fontSize: 'var(--mac-font-size-lg)',
           fontWeight: 'var(--mac-font-weight-medium)',
           color: 'var(--mac-text-primary)',
           marginBottom: 'var(--mac-spacing-2)'
         }}>
-            Услуги не найдены
+            {t('misc.dss_uslugi_ne_naydeny')}
           </h3>
           <p style={{
           color: 'var(--mac-text-secondary)'
         }}>
-            Добавьте услуги для специальности «{specialty}» в админ панели
+            {t('misc.dss_dobavte_uslugi_admin_paneli', { specialty })}
           </p>
         </Card>
       }

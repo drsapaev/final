@@ -221,6 +221,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patients/public-booking/appointments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an appointment from the confirmed public booking mode
+         * @description Reserve an available slot as a normal Appointment for the own card.
+         *
+         *     This route is valid only while the clinic's current mode is
+         *     `confirmed_appointment`; it never falls back to a non-reserving request.
+         */
+        post: operations["patient_create_confirmed_public_booking_appointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/patients/booking-requests": {
         parameters: {
             query?: never;
@@ -6668,6 +6691,12 @@ export type paths = {
         /**
          * Получить все изменения цен для одобрения
          * @description Получить список изменений цен для одобрения регистратурой
+         *
+         *     REGPRICE-BE-004 (audit #3892, group 16): the queue is paginated over a
+         *     deterministic ``(created_at DESC, id DESC)`` order and the FULL filtered
+         *     total is exposed via the ``X-Total-Count`` header — a bare 100-row
+         *     newest-first window silently hid older pending requests with no way to
+         *     reach them from the registrar UI.
          */
         get: operations["get_pending_price_overrides_api_v1_registrar_price_overrides_get"];
         put?: never;
@@ -6690,6 +6719,14 @@ export type paths = {
         /**
          * Одобрить или отклонить изменение цены
          * @description Одобрить или отклонить изменение цены врачом
+         *
+         *     REGPRICE-BE-001/002/003/005 (audit #3892, group 16): the registrar route
+         *     now delegates to the canonical PriceOverrideApprovalService — the SAME
+         *     implementation the dental PUT route uses — so both independently exposed
+         *     routes converge on one outcome: locked decision (409 for the loser of a
+         *     concurrent race), chargeable ``VisitService.price`` update PLUS the
+         *     ``Visit.doctor_price_override`` JSON mirror in one commit, stale-intent
+         *     validation and a mandatory non-blank rejection reason.
          */
         post: operations["approve_price_override_api_v1_registrar_price_override_approve_post"];
         delete?: never;
@@ -7280,7 +7317,15 @@ export type paths = {
         get?: never;
         /**
          * Add Service To Visit
-         * @description Добавить услугу к визиту
+         * @description Добавить услугу к визиту.
+         *
+         *     DOCVISIT-BE-002: ``quantity``/``custom_price`` валидируются ДО записи —
+         *     некорректные строки не попадают в биллинг. DOCVISIT-BE-003: мутация
+         *     координируется с платёжным легером (каноничный Visit-lock + отказ при
+         *     processing-инвойсах и оплаченном остатке). DOCVISIT-BE-001: ответ
+         *     строится ТОЛЬКО из персистентного состояния — ``price`` и есть
+         *     фактическая цена (кастомная или каталожная), фантомного ``custom_price``
+         *     поля не существует.
          */
         put: operations["add_service_to_visit_api_v1_doctor_visits__visit_id__add_service_put"];
         post?: never;
@@ -7302,7 +7347,10 @@ export type paths = {
         post?: never;
         /**
          * Remove Service From Visit
-         * @description Удалить услугу из визита
+         * @description Удалить услугу из визита.
+         *
+         *     DOCVISIT-BE-003: удаление строки услуги оплаченного визита меняет базу
+         *     стоимости под неизменным чеком — отказ (409), как и для добавления.
          */
         delete: operations["remove_service_from_visit_api_v1_doctor_visits__visit_id__services__visit_service_id__delete"];
         options?: never;
@@ -9567,15 +9615,33 @@ export type paths = {
         };
         /**
          * Состояние очереди для табло
-         * @description Return the legacy board stats snapshot.
+         * @description Return the legacy board stats snapshot plus board-scoped settings.
          *
          *     The board state endpoint is intentionally public: it only exposes
          *     aggregate counters (``last_ticket``/``waiting``/``serving``/``done``)
-         *     and the day's open/start-number flags. It must NOT leak live queue
+         *     and non-PHI presentation settings. It must NOT leak live queue
          *     entries, current calls, or announcements — those are owned by the
          *     display board WebSocket initial_state/update stream, which is
          *     separately authenticated. Keeping this REST endpoint public lets the
          *     stats-only contract be verified without auth headers.
+         *
+         *     DISPLAYCONFIG-FE-001 (audit PR #3961): the settings snapshot is
+         *     board-scoped — an optional ``board`` name selects THAT board's row
+         *     (a missing board is an honest 404) instead of always ``main_board``;
+         *     the privacy setting of the selected board must not be replaced by
+         *     the main board's.
+         *
+         *     DISPLAYOPTIONS-FE-001 (audit PR #3961): the response additionally
+         *     exposes the selected board's non-PHI presentation fields
+         *     (``queue_display_count``/``show_announcements``/``voice_announcements``
+         *     /``sound_enabled``) so the live TV screen can apply what the admin
+         *     saved.
+         *
+         *     DISPLAYDEPT-FE-001 (audit PR #3961): ``department`` is now optional —
+         *     a public board route without a configured department (multi-
+         *     department kiosk) suppresses the legacy counters honestly
+         *     (``stats_available: false``) instead of inferring them from literal
+         *     ``undefined`` URL text.
          */
         get: operations["board_state_api_v1_board_state_get"];
         put?: never;
@@ -22635,6 +22701,8 @@ export type paths = {
          * @description Получить статистику позиций в очереди
          *
          *     Возвращает список всех записей с их позициями.
+         *
+         *     Доступно: Admin, Registrar, Doctor (и SuperAdmin).
          */
         get: operations["get_queue_positions_stats_api_v1_queue_position_stats_queue__queue_id__get"];
         put?: never;
@@ -34606,6 +34674,35 @@ export type components = {
             /** Document Expiry Date */
             document_expiry_date?: string | null;
         };
+        /**
+         * PatientConfirmedPublicBookingOut
+         * @description Minimal result for an immediately-created public booking appointment.
+         */
+        PatientConfirmedPublicBookingOut: {
+            /** Id */
+            id: number;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /**
+             * Appointment Time
+             * Format: time
+             */
+            appointment_time: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "scheduled";
+            /**
+             * Timezone
+             * @default Asia/Tashkent
+             * @constant
+             */
+            timezone: "Asia/Tashkent";
+        };
         /** PatientCreate */
         PatientCreate: {
             /**
@@ -35857,6 +35954,10 @@ export type components = {
             original_price: string;
             /** New Price */
             new_price: string;
+            /** Visit Price Before */
+            visit_price_before?: string | null;
+            /** Visit Price Difference */
+            visit_price_difference?: string | null;
             /** Reason */
             reason: string;
             /** Details */
@@ -36774,7 +36875,7 @@ export type components = {
              * Code
              * @enum {string}
              */
-            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict" | "booking_request_duplicate" | "booking_request_rate_limited" | "booking_request_unavailable";
+            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict" | "booking_request_duplicate" | "booking_request_rate_limited" | "booking_active_appointment_limit" | "booking_request_unavailable";
         };
         /** PublicBookingRequestErrorOut */
         PublicBookingRequestErrorOut: {
@@ -39272,6 +39373,12 @@ export type components = {
             confirmation: {
                 [key: string]: unknown;
             };
+            /**
+             * Idempotent Replay
+             * @description True, когда идентичный intent уже был зафиксирован в окне дедупликации и ответ перестроен из СОХРАНЁННОГО визита (второй визит/токен не создавались).
+             * @default false
+             */
+            idempotent_replay: boolean;
         };
         /** ScheduleNextVisitService */
         ScheduleNextVisitService: {
@@ -44559,6 +44666,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+        };
+    };
+    patient_create_confirmed_public_booking_appointment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for safe retries of the same appointment submission. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientConfirmedPublicBookingOut"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"] | components["schemas"]["PublicBookingRequestPatientProfileErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The patient has reached the public booking creation limit. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
                 };
             };
         };
@@ -56545,6 +56742,7 @@ export interface operations {
             query?: {
                 status_filter?: string | null;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -61234,9 +61432,10 @@ export interface operations {
     board_state_api_v1_board_state_get: {
         parameters: {
             query: {
-                department: string;
+                department?: string | null;
                 /** @description YYYY-MM-DD */
                 date: string;
+                board?: string | null;
             };
             header?: never;
             path?: never;
@@ -76210,6 +76409,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;

@@ -16,20 +16,33 @@
  * confirmation must not reset B — on the pre-fix source
  * `setSelectedPatient(null)` runs unconditionally in the `.then`.
  */
-import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { useEffect } from 'react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { useCallback, useEffect, useRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useNavigate } from 'react-router-dom';
+import type { ReactElement } from 'react';
+import {
+  LabDirtyGuardProvider,
+  useLabDirtyGuard,
+} from '../../components/laboratory/LabDirtyGuardContext';
 
 const holder = vi.hoisted(() => ({
   navigate: null as ((to: string) => void) | null,
   confirmResolve: null as ((ok: boolean) => void) | null,
-  hotkeyConfig: null as {
-    clearSelection: () => void;
-    refreshData: () => void;
-    handleTabChange: (tab: string) => void;
-  } | null,
+  emrDirty: false,
+  saveForVisit: vi.fn(async (_visitId?: unknown, _options?: Record<string, unknown>) => ({ status: 'in_progress', row_version: 3 })),
+  discardForVisit: vi.fn(),
+  events: [] as string[],
 }));
+
+function DirtyGuardProbe() {
+  const guard = useLabDirtyGuard();
+  return (
+    <output data-testid="dirty-guard-probe">
+      {`${guard.hasDirtySources()}|${guard.hasPendingOperations}`}
+    </output>
+  );
+}
 
 function NavigateProbe() {
   const navigate = useNavigate();
@@ -73,15 +86,43 @@ vi.mock('../../components/emr-v2/EMRContainerV2', () => ({
   EMRContainerV2: (props: {
     visitId?: unknown;
     patientId?: unknown;
-    onDirtyChange?: (dirty: boolean) => void;
     onPersisted?: () => void;
   }) => {
-    // Report a permanently dirty draft so the Escape path requires the
-    // explicit discard confirmation; announce persistence so the panel
-    // refreshes the queue's can_complete contract.
+    const visitId = props.visitId;
+    const onPersistedRef = useRef(props.onPersisted);
+    onPersistedRef.current = props.onPersisted;
+    const saveEMR = useCallback(
+      (options?: Record<string, unknown>) => holder.saveForVisit(visitId, options),
+      [visitId],
+    );
+    const reloadFromServer = useCallback(async () => undefined, []);
+    const { suppressOnDiscard } = useEMRAutosave({
+      isDirty: true,
+      isSaving: false,
+      isSigned: false,
+      status: 'in_progress',
+      saveEMR,
+      debounceMs: 60_000,
+      maxWaitMs: 120_000,
+      enabled: true,
+    });
+    useEMRLeaveGuard({
+      visitId: visitId as string | number,
+      isDirty: true,
+      isSaving: false,
+      saveEMR,
+      reloadFromServer,
+      onDiscard: () => {
+        suppressOnDiscard();
+        holder.events.push(`discard:${String(visitId)}`);
+        holder.discardForVisit(visitId);
+      },
+    });
+    // Keep a dirty draft registered for Escape, and refresh the queue's
+    // can_complete contract after persistence.
     useEffect(() => {
-      props.onDirtyChange?.(true);
-      props.onPersisted?.();
+      holder.emrDirty = true;
+      onPersistedRef.current?.();
     }, []);
     return (
       <div
@@ -152,9 +193,6 @@ vi.mock('../../components/common/ConfirmDialog', () => ({
 vi.mock('../../hooks/useSessionTimeoutWarning', () => ({
   useSessionTimeoutWarning: () => undefined,
 }));
-vi.mock('../../hooks/useDermaHotkeys', () => ({
-  useDermaHotkeys: (config: typeof holder.hotkeyConfig) => { holder.hotkeyConfig = config; },
-}));
 vi.mock('../../hooks/useVisitLifecycle', () => ({ useVisitLifecycle: vi.fn() }));
 vi.mock('../../useDermatologyPatientHistory', () => ({
   useDermatologyPatientHistory: () => ({
@@ -176,6 +214,8 @@ vi.mock('../../useDermatologyPatientHistory', () => ({
 }));
 
 import { api } from '../../api/client';
+import { useEMRAutosave } from '../../hooks/useEMRAutosave';
+import { useEMRLeaveGuard } from '../../hooks/useEMRLeaveGuard';
 import { queueService } from '../../services/queue';
 import notifyService from '../../services/notify';
 import { renderWithProviders } from '../../test/renderWithProviders';
@@ -228,10 +268,15 @@ beforeEach(() => {
   mockedGet.mockReset();
   holder.navigate = null;
   holder.confirmResolve = null;
-  holder.hotkeyConfig = null;
+  holder.emrDirty = false;
+  holder.events = [];
   releaseCompletion = null;
   vi.mocked(queueService.startVisit).mockReset();
   vi.mocked(queueService.startVisit).mockResolvedValue(START_VISIT_ACK_A as never);
+  holder.saveForVisit.mockImplementation(async (visitId?: unknown) => {
+    holder.events.push(`save:${String(visitId)}`);
+    return { status: 'in_progress', row_version: 3 };
+  });
   mockedGet.mockImplementation(async (url: unknown) => {
     const path = String(url);
     if (path === '/registrar/queues/today') {
@@ -260,6 +305,13 @@ beforeEach(() => {
   });
 });
 
+function renderWithDirtyGuard(ui: ReactElement, options: Parameters<typeof renderWithProviders>[1]) {
+  return renderWithProviders(
+    <LabDirtyGuardProvider>{ui}</LabDirtyGuardProvider>,
+    options,
+  );
+}
+
 describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow-up)', () => {
   it('suppresses the success toast and all consequences for a stale completion (pre-fix: toast fires before the guard)', async () => {
     mockedCompleteVisit.mockImplementation(() => new Promise((resolve) => {
@@ -267,7 +319,7 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
     }));
     mockedCallNext.mockResolvedValue({ success: true } as never);
 
-    renderWithProviders(
+    renderWithDirtyGuard(
       <>
         <DermatologistPanelUnified />
         <NavigateProbe />
@@ -282,7 +334,6 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
     // The visit opens (patient 1 / visit 98) with a completable queue row.
     const editor = await screen.findByTestId('emr-editor', {}, { timeout: 2500 });
     expect(editor.getAttribute('data-patient')).toBe('1');
-
     // The completion POST is issued and hangs.
     const completeButton = await waitFor(() => {
       const button = screen.getByRole('button', { name: /Qabulni yaklash|Завершить прием/i });
@@ -317,7 +368,7 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
     mockedCompleteVisit.mockResolvedValue({ success: true } as never);
     mockedCallNext.mockResolvedValue({ success: true } as never);
 
-    renderWithProviders(<DermatologistPanelUnified />, {
+    renderWithDirtyGuard(<DermatologistPanelUnified />, {
       routerProps: { initialEntries: ['/doctor/dermatology'] },
     });
 
@@ -343,9 +394,10 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
 
 describe('derma deferred Escape discard confirmation (DERMAHOTKEY-FE-001 follow-up)', () => {
   it('does not clear a newly selected visit from a stale discard confirmation (pre-fix: unconditional reset)', async () => {
-    renderWithProviders(
+    renderWithDirtyGuard(
       <>
         <DermatologistPanelUnified />
+        <DirtyGuardProbe />
         <NavigateProbe />
       </>,
       { routerProps: { initialEntries: ['/doctor/dermatology'] } },
@@ -356,44 +408,62 @@ describe('derma deferred Escape discard confirmation (DERMAHOTKEY-FE-001 follow-
     // Visit A opens; the mocked EMR reports a dirty draft.
     const editor = await screen.findByTestId('emr-editor', {}, { timeout: 2500 });
     expect(editor.getAttribute('data-patient')).toBe('1');
-    expect(holder.hotkeyConfig).not.toBeNull();
-
+    await waitFor(() => expect(screen.getByTestId('dirty-guard-probe')).toHaveTextContent('true|false'));
     // Escape opens the discard confirmation for visit A; it stays pending.
-    holder.hotkeyConfig?.clearSelection();
-    await waitFor(() => expect(holder.confirmResolve).not.toBeNull());
+    await waitFor(() => expect(holder.emrDirty).toBe(true));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    const discardDialog = await screen.findByRole('dialog');
 
     // While the confirmation is pending, the clinician manually selects
     // visit B from the patients tab (no URL identity to re-apply it).
-    holder.navigate?.('/doctor/dermatology?tab=patients');
+    act(() => holder.navigate?.('/doctor/dermatology?tab=patients'));
     fireEvent.click(await screen.findByTestId('patients-select-b'));
-    holder.navigate?.('/doctor/dermatology?tab=visit');
+    act(() => holder.navigate?.('/doctor/dermatology?tab=visit'));
     await waitFor(() => {
       expect(screen.getByTestId('emr-editor').getAttribute('data-patient')).toBe('2');
     }, { timeout: 2500 });
 
-    // The clinician accepts the OLD confirmation — it must not clear B.
-    holder.confirmResolve?.(true);
+    // The clinician accepts the OLD shared-guard decision — it must not clear
+    // or discard B's draft after A's source has been replaced.
+    fireEvent.click(within(discardDialog).getByRole('button', { name: 'Выйти без сохранения' }));
     await new Promise((resolve) => { setTimeout(resolve, 120); });
 
     const current = screen.getByTestId('emr-editor');
     expect(current.getAttribute('data-patient')).toBe('2');
     expect(current.getAttribute('data-visit')).toBe('55');
+    expect(holder.discardForVisit).not.toHaveBeenCalledWith(55);
   });
 
-  it('positive control: accepting the confirmation for the still-current visit clears the selection', async () => {
-    renderWithProviders(<DermatologistPanelUnified />, {
-      routerProps: { initialEntries: ['/doctor/dermatology'] },
-    });
+  it('Escape discard suppresses unmount autosave before clearing the still-current visit', async () => {
+    renderWithDirtyGuard(
+      <>
+        <DermatologistPanelUnified />
+        <DirtyGuardProbe />
+      </>,
+      {
+        routerProps: { initialEntries: ['/doctor/dermatology'] },
+      },
+    );
 
     fireEvent.click(await screen.findByTestId('livequeue-start-501', {}, { timeout: 2500 }));
-    await screen.findByTestId('emr-editor', {}, { timeout: 2500 });
-    expect(holder.hotkeyConfig).not.toBeNull();
-    holder.hotkeyConfig?.clearSelection();
-    await waitFor(() => expect(holder.confirmResolve).not.toBeNull());
-    holder.confirmResolve?.(true);
+    const editor = await screen.findByTestId('emr-editor', {}, { timeout: 2500 });
+    expect(editor.getAttribute('data-patient')).toBe('1');
+    await waitFor(() => expect(screen.getByTestId('dirty-guard-probe')).toHaveTextContent('true|false'));
+    await waitFor(() => expect(holder.emrDirty).toBe(true));
+    // The synthetic dirty editor can flush once while the queue identity
+    // settles. Measure only writes caused by the explicit Escape discard.
+    holder.saveForVisit.mockClear();
+    holder.events = [];
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    const discardDialog = await screen.findByRole('dialog');
+    expect(screen.getByTestId('emr-editor')).toBeInTheDocument();
+    fireEvent.click(within(discardDialog).getByRole('button', { name: 'Выйти без сохранения' }));
 
     await waitFor(() => {
       expect(screen.queryByTestId('emr-editor')).toBeNull();
     }, { timeout: 2500 });
+    expect(holder.discardForVisit).toHaveBeenCalledWith(98);
+    expect(holder.events).toEqual(['discard:98']);
+    expect(holder.saveForVisit).not.toHaveBeenCalled();
   });
 });

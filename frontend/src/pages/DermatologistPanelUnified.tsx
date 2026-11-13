@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
+import { useLabDirtyGuard } from '../components/laboratory/LabDirtyGuardContext';
 import { DERMATOLOGY_PANEL_TABS, getDermatologyTabAliases } from './dermatologyTabAliases';
 // S-M-2 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
 import { Button, Card, Badge, AppEmpty } from '../components/ui/macos';
@@ -324,6 +325,7 @@ const DermatologistPanelUnified = () => {
   // STRAT#33: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   const t = tI18n as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { guardTransition, hasPendingOperations } = useLabDirtyGuard();
   // QW-6 (UX audit): session timeout warning
   const [sessionWarning, setSessionWarning] = useState<{ active: boolean } | null>(null);
 
@@ -359,44 +361,31 @@ const DermatologistPanelUnified = () => {
   }, []);
 
   // Deferred #2: keyboard shortcuts for tab switching, refresh, clear selection.
-  // DERMAHOTKEY-FE-001 (audit 3892): the EMR container reports its dirty
-  // state through onDirtyChange so the Escape exit can guard against
-  // silently discarding an unsaved clinical draft.
-  const emrDirtyRef = useRef(false);
-  const handleEmrDirtyChange = useCallback((dirty: boolean) => {
-    emrDirtyRef.current = dirty;
-  }, []);
-
   useDermaHotkeys({
     handleTabChange: (tab: string) => {},
     refreshData: () => loadDermatologyAppointments(true),
     clearSelection: () => {
-      if (emrDirtyRef.current) {
-        // DERMAHOTKEY-FE-001: an unsaved EMR draft is on screen — require an
-        // explicit discard confirmation instead of silently dropping it.
-        // Self-review (audit 3892 wave 2): snapshot the visit the dialog
-        // was opened for — a deferred confirmation must not clear a NEWER
-        // selection that replaced it while the dialog was pending.
-        const dialogVisitContext = currentVisitContextRef.current;
-        void confirm({
-          title: t('derma.derma_panel_discard_draft_title'),
-          message: t('derma.derma_panel_discard_draft_message'),
-          confirmLabel: t('derma.derma_panel_discard_draft_confirm'),
-          cancelLabel: t('derma.cancel'),
-          intent: 'danger',
-        }).then((ok) => {
-          if (!ok) return;
-          if (!isSameDermatologyVisit(dialogVisitContext, currentVisitContextRef.current)) {
-            return;
-          }
-          emrDirtyRef.current = false;
-          setSelectedPatient(null);
-          setCurrentAppointment(null);
-        });
+      if (hasPendingOperations) {
+        notify.info(t('workbench.saving'));
         return;
       }
-      setSelectedPatient(null);
-      setCurrentAppointment(null);
+
+      // Escape is an in-panel state transition: use the shared dirty-source
+      // registry without the route-history sentinel. Scope Discard to the
+      // captured visit so a new EMR mounted while the dialog is open cannot
+      // inherit the older visit's discard decision.
+      const dialogVisitContext = currentVisitContextRef.current;
+      const visitId = dialogVisitContext.visitId;
+      const sourceIds = visitId === null || visitId === undefined || visitId === ''
+        ? []
+        : ['emr-visit-' + visitId];
+      guardTransition(() => {
+        if (!isSameDermatologyVisit(dialogVisitContext, currentVisitContextRef.current)) {
+          return;
+        }
+        setSelectedPatient(null);
+        setCurrentAppointment(null);
+      }, { sourceIds, intentPolicy: 'leave' });
     },
   });
   const location = useLocation();
@@ -1702,11 +1691,11 @@ const DermatologistPanelUnified = () => {
                     {t('derma.derma_panel_emr_title')}
                   </h4>
                   <EMRContainerV2
+                  key={(currentAppointment?.visit_id ?? 'no-visit') as string | number}
                   visitId={(currentAppointment?.visit_id ?? undefined) as string | number}
                   patientId={(currentAppointment?.patient_id ?? undefined) as string | number | null | undefined}
                   specialty="dermatology"
-                  onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)}
-                  onDirtyChange={handleEmrDirtyChange} />
+                  onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)} />
 
                 </div>
 

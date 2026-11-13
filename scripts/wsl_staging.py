@@ -8,6 +8,7 @@ the pipe releases the keeper even when the Windows parent is interrupted.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -19,7 +20,7 @@ import sys
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import parse_qsl, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -210,6 +211,9 @@ def context_values(path: Path) -> dict[str, str]:
         "CLINIC_LIFECYCLE",
         "CLINIC_OWNER",
         "CLINIC_EXPIRES_AT",
+        "STAGING_FRONTEND_BUILD_TARGET",
+        "STAGING_FRONTEND_ARTIFACT_CONTEXT",
+        "VERCEL_GIT_COMMIT_SHA",
         *(v[0] for v in PORT_KEYS.values()),
         *PUBLIC_ORIGIN_KEYS,
     }
@@ -239,7 +243,183 @@ def context_values(path: Path) -> dict[str, str]:
         raise GuardError(
             "PROJECT_REQUIRED: set an explicit unique COMPOSE_PROJECT_NAME"
         )
+    frontend_target = (
+        values.get("STAGING_FRONTEND_BUILD_TARGET", "runtime").strip() or "runtime"
+    )
+    if frontend_target not in {"runtime", "artifact-runtime"}:
+        raise GuardError(
+            "FRONTEND_BUILD_TARGET_INVALID: unsupported staging frontend target"
+        )
     return values
+
+
+def _is_link_or_reparse_point(path: Path) -> bool:
+    """Reject symlinks and Windows junctions/reparse points in build contexts."""
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction) and is_junction():
+        return True
+    # pathlib.Path.is_junction is not available on every supported Python.
+    # Windows exposes junctions and other reparse points in st_file_attributes.
+    try:
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except FileNotFoundError:
+        return False
+    return bool(attributes & 0x400)  # FILE_ATTRIBUTE_REPARSE_POINT
+
+
+def validate_frontend_artifact_context(
+    root: Path, context_value: str, expected_source_sha: str
+) -> Path:
+    """Verify an exact frontend artifact rooted in this worktree's .scratch."""
+    if (
+        not context_value
+        or "\\" in context_value
+        or any(ord(char) < 32 or ord(char) == 127 for char in context_value)
+    ):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: use a relative artifact directory in this worktree"
+        )
+    relative = PurePosixPath(context_value)
+    if (
+        relative.is_absolute()
+        or PureWindowsPath(context_value).is_absolute()
+        or PureWindowsPath(context_value).drive
+    ):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: use a relative artifact directory in this worktree"
+        )
+    if not re.fullmatch(r"[0-9a-f]{40}", expected_source_sha):
+        raise GuardError(
+            "ARTIFACT_SOURCE_INVALID: provide the exact 40-character source commit"
+        )
+
+    worktree = root.resolve()
+    ops_path = worktree / "ops"
+    scratch_path = worktree / ".scratch"
+    if _is_link_or_reparse_point(ops_path) or _is_link_or_reparse_point(scratch_path):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: ops and .scratch must be real worktree directories"
+        )
+    try:
+        if ops_path.resolve(strict=True) != ops_path:
+            raise GuardError(
+                "ARTIFACT_CONTEXT_INVALID: ops must be a real worktree directory"
+            )
+        scratch = scratch_path.resolve(strict=True)
+        candidate = Path(os.path.abspath(ops_path / Path(*relative.parts)))
+    except (OSError, RuntimeError):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: artifact directory is missing or unresolved"
+        ) from None
+    if (
+        not scratch.is_dir()
+        or scratch == worktree
+        or not scratch.is_relative_to(worktree)
+        or scratch != scratch_path
+        or candidate == scratch_path
+        or not candidate.is_relative_to(scratch_path)
+    ):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_OUTSIDE_SCRATCH: artifact must be below this worktree's .scratch"
+        )
+
+    relative_to_scratch = candidate.relative_to(scratch_path)
+    current = scratch_path
+    for part in relative_to_scratch.parts:
+        current = current / part
+        if _is_link_or_reparse_point(current):
+            raise GuardError(
+                "ARTIFACT_SYMLINK: artifact paths must not contain symlinks"
+            )
+
+    try:
+        context = candidate.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: artifact directory is missing or unresolved"
+        ) from None
+    if context != candidate:
+        raise GuardError("ARTIFACT_SYMLINK: artifact paths must not contain symlinks")
+    if not context.is_dir():
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: artifact directory is missing or unresolved"
+        )
+
+    files: dict[str, Path] = {}
+    try:
+        for item in context.rglob("*"):
+            if _is_link_or_reparse_point(item):
+                raise GuardError(
+                    "ARTIFACT_SYMLINK: artifact contents must not contain symlinks"
+                )
+            if item.is_file():
+                files["./" + item.relative_to(context).as_posix()] = item
+            elif not item.is_dir():
+                raise GuardError(
+                    "ARTIFACT_FILESET_INVALID: artifact contains a non-file entry"
+                )
+
+        manifest = context / "SHA256SUMS"
+        source_file = context / "source.sha"
+        if (
+            not manifest.is_file()
+            or _is_link_or_reparse_point(manifest)
+            or not source_file.is_file()
+            or _is_link_or_reparse_point(source_file)
+        ):
+            raise GuardError(
+                "ARTIFACT_MANIFEST_INVALID: source and checksum manifest are required"
+            )
+        if source_file.read_text(encoding="ascii").strip() != expected_source_sha:
+            raise GuardError(
+                "ARTIFACT_SOURCE_MISMATCH: artifact source differs from the requested commit"
+            )
+
+        expected: dict[str, str] = {}
+        for line in manifest.read_text(encoding="ascii").splitlines():
+            match = re.fullmatch(r"([0-9a-f]{64})  (\./[^\s\\]+)", line)
+            if not match:
+                raise GuardError(
+                    "ARTIFACT_MANIFEST_INVALID: checksum manifest contains an unsupported path"
+                )
+            digest, name = match.groups()
+            components = name[2:].split("/")
+            if (
+                name == "./SHA256SUMS"
+                or any(part in {"", ".", ".."} for part in components)
+                or name in expected
+            ):
+                raise GuardError(
+                    "ARTIFACT_MANIFEST_INVALID: checksum manifest paths must be unique and relative"
+                )
+            expected[name] = digest
+        actual = set(files) - {"./SHA256SUMS"}
+        if (
+            actual != set(expected)
+            or "./source.sha" not in expected
+            or "./index.html" not in expected
+        ):
+            raise GuardError(
+                "ARTIFACT_FILESET_MISMATCH: files must exactly match the checksum manifest"
+            )
+        for name, digest in expected.items():
+            hasher = hashlib.sha256()
+            with files[name].open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    hasher.update(chunk)
+            if hasher.hexdigest() != digest:
+                raise GuardError(
+                    "ARTIFACT_CHECKSUM_MISMATCH: artifact file does not match its manifest"
+                )
+    except GuardError:
+        raise
+    except (OSError, UnicodeError, ValueError):
+        raise GuardError(
+            "ARTIFACT_MANIFEST_INVALID: artifact files could not be verified"
+        ) from None
+    return context
 
 
 def validate_public_origins(values: dict[str, str], frontend_port: int) -> None:
@@ -305,11 +485,11 @@ def validate_public_origins(values: dict[str, str], frontend_port: int) -> None:
         or ws_host.path
         or ws_host.query
         or ws_host.fragment
-        or any(
-            char in values["STAGING_PUBLIC_WS_HOST"] for char in "\r\n\t/?#"
-        )
+        or any(char in values["STAGING_PUBLIC_WS_HOST"] for char in "\r\n\t/?#")
     ):
-        raise GuardError("PUBLIC_ORIGIN_INVALID: WebSocket host must be loopback host:port")
+        raise GuardError(
+            "PUBLIC_ORIGIN_INVALID: WebSocket host must be loopback host:port"
+        )
     if parsed_ws_host != public_host or ws_host_port != frontend_port:
         raise GuardError(
             "PUBLIC_ORIGIN_CONTEXT_MISMATCH: WebSocket host must match the frontend host and port"
@@ -388,12 +568,21 @@ def validate_ownership(
     containers: list[dict],
     project: str,
     root: str,
-    compose: str,
+    compose: str | list[str],
     ports: dict[str, int],
     *,
     enforce_port_bindings: bool = True,
+    alternative_compose_files: list[list[str]] | None = None,
 ) -> list[dict]:
     owned = []
+    expected_compose_files = compose if isinstance(compose, list) else [compose]
+    allowed_compose_file_sets = [
+        expected_compose_files,
+        *(alternative_compose_files or []),
+    ]
+    allowed_compose_file_labels = [
+        ",".join(files) for files in allowed_compose_file_sets
+    ]
 
     def validate_bindings(mapping: dict | None, service: str) -> None:
         expected_key = f"{PORT_KEYS[service][2]}/tcp"
@@ -403,15 +592,11 @@ def validate_ownership(
             )
         bindings = mapping[expected_key]
         if not isinstance(bindings, list) or len(bindings) != 1:
-            raise GuardError(
-                "PORT_CONTEXT_MISMATCH: expected one published binding"
-            )
+            raise GuardError("PORT_CONTEXT_MISMATCH: expected one published binding")
         try:
             host_port = int(bindings[0]["HostPort"])
         except (KeyError, TypeError, ValueError):
-            raise GuardError(
-                "PORT_CONTEXT_MISMATCH: invalid published port"
-            ) from None
+            raise GuardError("PORT_CONTEXT_MISMATCH: invalid published port") from None
         if host_port != ports[service]:
             raise GuardError(
                 "PORT_CONTEXT_MISMATCH: existing project uses different ports"
@@ -423,10 +608,14 @@ def validate_ownership(
 
     for container in containers:
         if container.get("project") == project:
-            if (
-                container.get("root") != root + "/ops"
-                or container.get("files") != compose
-            ):
+            actual_compose_files = container.get("files")
+            if isinstance(actual_compose_files, str):
+                compose_files_match = (
+                    actual_compose_files in allowed_compose_file_labels
+                )
+            else:
+                compose_files_match = actual_compose_files in allowed_compose_file_sets
+            if container.get("root") != root + "/ops" or not compose_files_match:
                 raise GuardError(
                     "PROJECT_OWNERSHIP: project belongs to another worktree or Compose file"
                 )
@@ -570,8 +759,18 @@ class WslStaging:
         self.env_file = local_file(self.root, env_file)
         self.values = context_values(self.env_file)
         self.project = self.values["COMPOSE_PROJECT_NAME"]
+        self.frontend_build_target = (
+            self.values.get("STAGING_FRONTEND_BUILD_TARGET", "runtime").strip()
+            or "runtime"
+        )
+        self.frontend_artifact_context_value = self.values.get(
+            "STAGING_FRONTEND_ARTIFACT_CONTEXT", ""
+        )
+        self.frontend_artifact_context: Path | None = None
         self.distribution = distribution
         self.compose = self.root / "ops/compose.staging.yml"
+        self.compose_artifact = self.root / "ops/compose.staging.artifact.yml"
+        self.stop_recovery = False
         self.ownership_verified = False
         self.cleanup_policy = None
         self.lifecycle_owner = None
@@ -589,13 +788,29 @@ class WslStaging:
             operation=operation,
         )
 
-    def docker(self, *args: str, timeout: int = 30, operation: str = "docker") -> str:
+    def docker(
+        self,
+        *args: str,
+        timeout: int = 30,
+        operation: str = "docker",
+        extra_env: dict[str, str] | None = None,
+    ) -> str:
         # Clear ambient WSL env/Compose overrides and forbid a remote Docker context.
+        env_args = []
+        for key, value in (extra_env or {}).items():
+            if not re.fullmatch(r"[A-Z_][A-Z0-9_]*", key) or any(
+                ord(char) < 32 or ord(char) == 127 for char in value
+            ):
+                raise GuardError(
+                    "COMPOSE_ENV_INVALID: refusing an invalid Compose override"
+                )
+            env_args.append(f"{key}={value}")
         return self.wsl(
             "env",
             "-i",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "COMPOSE_PARALLEL_LIMIT=1",
+            *env_args,
             "docker",
             "--host",
             "unix:///var/run/docker.sock",
@@ -606,7 +821,7 @@ class WslStaging:
 
     def compose_command(self, *args: str, timeout: int = 30) -> str:
         # Compose relative paths are anchored at ops/, where the canonical YAML lives.
-        return self.docker(
+        compose_args = [
             "compose",
             "--project-directory",
             self.linux_root + "/ops",
@@ -616,10 +831,29 @@ class WslStaging:
             self.linux_env,
             "-f",
             self.linux_compose,
+        ]
+        extra_env = None
+        if self.frontend_build_target == "artifact-runtime":
+            compose_args.extend(["-f", self.linux_compose_artifact])
+            if self.stop_recovery:
+                # Teardown does not build. Keep it possible after an operator
+                # removes the ignored artifact directory, while preserving the
+                # exact Compose file labels used to validate project ownership.
+                extra_env = {"STAGING_FRONTEND_ARTIFACT_CONTEXT": "../frontend/docker"}
+        docker_options = {"timeout": timeout, "operation": "compose-" + args[0]}
+        if extra_env is not None:
+            docker_options["extra_env"] = extra_env
+        return self.docker(
+            *compose_args,
             *args,
-            timeout=timeout,
-            operation="compose-" + args[0],
+            **docker_options,
         )
+
+    def expected_compose_files(self) -> list[str]:
+        files = [self.linux_compose]
+        if self.frontend_build_target == "artifact-runtime":
+            files.append(self.linux_compose_artifact)
+        return files
 
     @contextmanager
     def keeper(self):
@@ -715,7 +949,7 @@ class WslStaging:
             self.containers(),
             self.project,
             self.linux_root,
-            self.linux_compose,
+            self.expected_compose_files(),
             self.ports,
             enforce_port_bindings=False,
         )
@@ -800,7 +1034,9 @@ class WslStaging:
         try:
             outcome = self.teardown_project(allow_keep=True)
             self.assert_session(keeper, boot)
-        except Exception as cleanup_error:  # noqa: BLE001 - preserve the primary failure and redact unknown errors
+        except (
+            Exception
+        ) as cleanup_error:  # noqa: BLE001 - preserve the primary failure and redact unknown errors
             self.summary["teardown"] = "FAIL"
             safe_cleanup_error = (
                 str(cleanup_error)
@@ -829,7 +1065,9 @@ class WslStaging:
         # The checkout and the sparse distro VHD can live on different volumes.
         # Non-Windows direct calls exist only for the mocked tooling tests.
         backing = (
-            windows_distro_base_path(self.distribution) if IS_WINDOWS else str(self.root)
+            windows_distro_base_path(self.distribution)
+            if IS_WINDOWS
+            else str(self.root)
         )
         self.summary["wsl_backing_path"] = backing
         self.storage_recovery = recovery
@@ -867,7 +1105,9 @@ class WslStaging:
         """Reject read-only/full virtual storage before Compose or the child."""
         reserve = BUILD_RESERVE_GIB if build_possible else RUN_RESERVE_GIB
         try:
-            root = json.loads(self.docker("info", "--format", "{{json .DockerRootDir}}"))
+            root = json.loads(
+                self.docker("info", "--format", "{{json .DockerRootDir}}")
+            )
         except (ValueError, TypeError):
             raise GuardError(
                 "WSL_STORAGE_UNKNOWN: local Docker storage path cannot be verified"
@@ -877,7 +1117,9 @@ class WslStaging:
             or not root.startswith("/")
             or any(char in root for char in ("\0", "\r", "\n"))
         ):
-            raise GuardError("WSL_STORAGE_UNKNOWN: local Docker storage path is invalid")
+            raise GuardError(
+                "WSL_STORAGE_UNKNOWN: local Docker storage path is invalid"
+            )
         self.summary["wsl_storage"] = {}
         prefix = (
             "env",
@@ -889,8 +1131,14 @@ class WslStaging:
             try:
                 mounts = json.loads(
                     self.wsl(
-                        *prefix, "findmnt", "--json", "--target", path,
-                        "--output", "TARGET,OPTIONS", operation="wsl-storage-mount",
+                        *prefix,
+                        "findmnt",
+                        "--json",
+                        "--target",
+                        path,
+                        "--output",
+                        "TARGET,OPTIONS",
+                        operation="wsl-storage-mount",
                     )
                 )["filesystems"]
                 if len(mounts) != 1:
@@ -906,7 +1154,12 @@ class WslStaging:
                 if "rw" not in options:
                     raise ValueError
                 available = self.wsl(
-                    *prefix, "df", "--block-size=1", "--output=avail", "--", path,
+                    *prefix,
+                    "df",
+                    "--block-size=1",
+                    "--output=avail",
+                    "--",
+                    path,
                     operation="wsl-storage-space",
                 ).splitlines()
                 if (
@@ -931,6 +1184,7 @@ class WslStaging:
 
     def preflight(self, *, stop_recovery: bool = False) -> list[dict]:
         self.ownership_verified = False
+        self.stop_recovery = stop_recovery
         main = Path(
             native(
                 [
@@ -970,6 +1224,9 @@ class WslStaging:
         self.linux_root = self.wsl("wslpath", "-a", "-u", str(self.root))
         self.linux_env = self.wsl("wslpath", "-a", "-u", str(self.env_file))
         self.linux_compose = self.wsl("wslpath", "-a", "-u", str(self.compose))
+        self.linux_compose_artifact = self.wsl(
+            "wslpath", "-a", "-u", str(self.compose_artifact)
+        )
         self.summary["boot_id"] = self.boot_id()
         self.summary["docker"] = self.docker(
             "version", "--format", "{{.Server.Version}}"
@@ -993,9 +1250,14 @@ class WslStaging:
             self.containers(),
             self.project,
             self.linux_root,
-            self.linux_compose,
+            self.expected_compose_files(),
             self.ports,
             enforce_port_bindings=not stop_recovery,
+            alternative_compose_files=(
+                [[self.linux_compose]]
+                if stop_recovery and self.frontend_build_target == "artifact-runtime"
+                else None
+            ),
         )
         if not stop_recovery:
             owned_ports = {
@@ -1038,7 +1300,7 @@ class WslStaging:
             self.containers(),
             self.project,
             self.linux_root,
-            self.linux_compose,
+            self.expected_compose_files(),
             self.ports,
         )
         by_service = {c["service"]: c for c in owned}
@@ -1168,6 +1430,13 @@ class WslStaging:
         # Session commands are opaque and may build. NoBuild is the caller's
         # explicit promise to run without image builds, not an argv heuristic.
         build_possible = args.action in {"start", "session"} and not args.no_build
+        if self.frontend_build_target == "artifact-runtime" and args.action != "stop":
+            self.frontend_artifact_context = validate_frontend_artifact_context(
+                self.root,
+                self.frontend_artifact_context_value,
+                self.values.get("VERCEL_GIT_COMMIT_SHA", ""),
+            )
+            self.summary["frontend_artifact_validation"] = "PASS"
         self.host_storage(build_possible=build_possible, recovery=args.action == "stop")
         with self.keeper() as keeper:
             self.preflight(stop_recovery=args.action == "stop")

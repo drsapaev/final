@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.clinic import Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.service import Service
+from app.models.telegram_config import TelegramUser
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 
@@ -19,6 +20,27 @@ class DentalApiRepository:
 
     def list_registrars(self) -> list[User]:
         return self.db.query(User).filter(User.role == "Registrar").all()
+
+    def get_telegram_chat_ids_by_user_ids(
+        self, user_ids: list[int]
+    ) -> dict[int, int]:
+        """DENTPRICE-BE-001 (audit #3892, group 17): the REAL user↔chat
+        association lives in ``telegram_users`` (``user_id`` ↔ ``chat_id``);
+        the ``User`` model has no telegram column. Returns only active,
+        unblocked links with notifications enabled."""
+        if not user_ids:
+            return {}
+        rows = (
+            self.db.query(TelegramUser)
+            .filter(
+                TelegramUser.user_id.in_(user_ids),
+                TelegramUser.active.is_(True),
+                TelegramUser.blocked.is_(False),
+                TelegramUser.notifications_enabled.is_(True),
+            )
+            .all()
+        )
+        return {row.user_id: row.chat_id for row in rows if row.user_id is not None}
 
     def get_visit(self, visit_id: int) -> Visit | None:
         return self.db.query(Visit).filter(Visit.id == visit_id).first()
@@ -65,13 +87,41 @@ class DentalApiRepository:
             .first()
         )
 
-    def list_pending_price_overrides(self, *, limit: int) -> list[DoctorPriceOverride]:
+    def has_pending_override(self, *, visit_id: int, service_id: int) -> bool:
+        """REGPRICE-BE-003 (audit 3892, group 16): creation-side probe —
+        another pending override for the same visit/service must block a
+        second intent (reverse-order approval hazard)."""
+        return (
+            self.db.query(DoctorPriceOverride)
+            .filter(
+                DoctorPriceOverride.visit_id == visit_id,
+                DoctorPriceOverride.service_id == service_id,
+                DoctorPriceOverride.status == "pending",
+            )
+            .first()
+            is not None
+        )
+
+    def list_pending_price_overrides(
+        self, *, limit: int, offset: int = 0
+    ) -> list[DoctorPriceOverride]:
+        # REGPRICE-BE-004 (audit #3892, group 16): deterministic
+        # (created_at DESC, id DESC) order so offset pagination is stable
+        # across pages even for same-second timestamps.
         return (
             self.db.query(DoctorPriceOverride)
             .filter(DoctorPriceOverride.status == "pending")
-            .order_by(DoctorPriceOverride.created_at.desc())
+            .order_by(DoctorPriceOverride.created_at.desc(), DoctorPriceOverride.id.desc())
+            .offset(offset)
             .limit(limit)
             .all()
+        )
+
+    def count_pending_price_overrides(self) -> int:
+        return (
+            self.db.query(DoctorPriceOverride)
+            .filter(DoctorPriceOverride.status == "pending")
+            .count()
         )
 
     def commit(self) -> None:

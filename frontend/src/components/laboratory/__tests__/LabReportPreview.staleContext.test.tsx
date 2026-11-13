@@ -10,7 +10,7 @@
  * Red-first: on the pre-fix source the stale A blob opens a window and
  * stamps A's success feedback into B's workbench.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
@@ -62,6 +62,30 @@ const CONTEXT_B = { epoch: 2, selectionKey: 'B', patientId: 555 };
 
 const mockedApi = labReportingApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
+// RETRO-3970-01: честная резервация контекста — window.open('', '_blank')
+// БЕЗ feature-строки: успех возвращает Window (truthy), реальный блок —
+// null. Моделирует браузерный контракт patientFilePreview.ts (CARDHIST-FE-001).
+const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function makeReservedWindow(): Window {
+  return {
+    close: vi.fn(),
+    opener: 'initiator' as unknown,
+    location: { href: '' },
+  } as unknown as Window;
+}
+
+
 function workbenchProps(activeInstance: typeof INSTANCE_A, getOperationContext: () => unknown) {
   return ({
     selectedAppointment: null,
@@ -93,7 +117,54 @@ beforeEach(() => {
     configurable: true,
     value: vi.fn(),
   });
-  vi.spyOn(window, 'open').mockReturnValue({} as unknown as Window);
+  vi.spyOn(window, 'open').mockImplementation(() => makeReservedWindow());
+});
+
+describe('RETRO-3970-01 review — an in-flight preview does not outlive its unmount', () => {
+  it('unmount closes the reserved tab and a late response never navigates it', async () => {
+    const gateBlob = deferred<Blob>();
+    mockedApi.previewInstancePdf.mockImplementation(() => gateBlob.promise);
+
+    const { unmount } = render(
+      <ThemeProvider>
+        <LabReportWorkbench
+          selectedAppointment={null}
+          templates={[]}
+          templateResolution={null}
+          templateResolutionLoading={false}
+          reportHistory={[]}
+          recentReports={[]}
+          activeInstance={INSTANCE_A}
+          onInstanceChange={vi.fn()}
+          onOpenInstance={vi.fn()}
+          onRefreshHistory={vi.fn()}
+          onRefreshRecentReports={vi.fn()}
+          onQueueChanged={vi.fn()}
+          notify={vi.fn()}
+          getOperationContext={() => CONTEXT_A}
+        />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Предпросмотр PDF/ }));
+    await waitFor(() => expect(mockedApi.previewInstancePdf).toHaveBeenCalled());
+
+    // The operator LEAVES the workbench while the preview read is pending.
+    unmount();
+    await act(async () => {
+      gateBlob.resolve(new Blob(['%PDF-late'], { type: 'application/pdf' }));
+      await flush();
+    });
+
+    // The departed report's PDF must never reach the reserved popup: the
+    // reservation is closed and the object URL is never created.
+    const reserved = (window.open as unknown as ReturnType<typeof vi.fn>).mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      location: { href: string };
+    };
+    expect(reserved.close).toHaveBeenCalled();
+    expect(reserved.location.href).toBe('');
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
 });
 
 describe('LABR-FE-002 — a late preview is owned by its initiating context', () => {
@@ -132,9 +203,18 @@ describe('LABR-FE-002 — a late preview is owned by its initiating context', ()
     releasePreview('blob');
     await new Promise((resolve) => { setTimeout(resolve, 120); });
 
-    // No window for the stale PDF, no object URL created, no success
-    // feedback stamped into B's workbench, no print side effects.
-    expect(window.open).not.toHaveBeenCalled();
+    // The reservation WAS made synchronously in the gesture, but the stale
+    // settle must CLOSE the reserved tab and never navigate it: no object
+    // URL created, no success feedback stamped into B's workbench, no print
+    // side effects.
+    expect(window.open).toHaveBeenCalledTimes(1);
+    expect((window.open as unknown as ReturnType<typeof vi.fn>).mock.calls[0]).toEqual(['', '_blank']);
+    const reserved = (window.open as unknown as ReturnType<typeof vi.fn>).mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      location: { href: string };
+    };
+    expect(reserved.close).toHaveBeenCalledTimes(1);
+    expect(reserved.location.href).toBe('');
     expect(URL.createObjectURL).not.toHaveBeenCalled();
     expect(mockedApi.markPrinted).not.toHaveBeenCalled();
   });
@@ -173,9 +253,16 @@ describe('LABR-FE-002 — a late preview is owned by its initiating context', ()
     releasePreview('reject');
     await new Promise((resolve) => { setTimeout(resolve, 120); });
 
-    // The stale failure must not surface as B's error toast.
+    // The stale failure must not surface as B's error toast, and the
+    // reserved blank tab must be closed, not left behind (RETRO-3970-01).
     expect(notify).not.toHaveBeenCalled();
     expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+    const reserved = (window.open as unknown as ReturnType<typeof vi.fn>).mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      location: { href: string };
+    };
+    expect(reserved.close).toHaveBeenCalledTimes(1);
+    expect(reserved.location.href).toBe('');
   });
 
   it('control: the current context\'s preview still opens the popup exactly once', async () => {
@@ -192,8 +279,18 @@ describe('LABR-FE-002 — a late preview is owned by its initiating context', ()
     fireEvent.click(screen.getByRole('button', { name: /Предпросмотр PDF/ }));
 
     await waitFor(() => {
-      expect(window.open).toHaveBeenCalledWith('blob:lab-preview', '_blank', 'noopener,noreferrer');
+      expect((window.open as unknown as ReturnType<typeof vi.fn>).mock.calls[0]).toEqual(['', '_blank']);
     }, { timeout: 2500 });
+    // RETRO-3970-01: the current context's preview NAVIGATES the reserved
+    // tab to the blob URL (opener severed first) and never reports blocked.
+    const reserved = (window.open as unknown as ReturnType<typeof vi.fn>).mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      opener: unknown;
+      location: { href: string };
+    };
+    expect(reserved.location.href).toBe('blob:lab-preview');
+    expect(reserved.opener).toBeNull();
+    expect(reserved.close).not.toHaveBeenCalled();
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     expect(mockedApi.markPrinted).not.toHaveBeenCalled();
   });

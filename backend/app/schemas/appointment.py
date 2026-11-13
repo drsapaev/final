@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any
+from datetime import date, datetime, time
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -58,6 +58,16 @@ class PatientPortalAppointmentCreate(AppointmentCreate):
     """
 
     department_id: int | None = None
+
+
+class PatientConfirmedPublicBookingOut(ORMModel):
+    """Minimal result for an immediately-created public booking appointment."""
+
+    id: int
+    appointment_date: date
+    appointment_time: time
+    status: Literal["scheduled"]
+    timezone: Literal["Asia/Tashkent"] = "Asia/Tashkent"
 
 
 class AppointmentUpdate(ORMModel):

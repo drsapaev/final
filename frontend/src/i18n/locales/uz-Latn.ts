@@ -258,6 +258,10 @@ const uzLatn = {
     print_confirm_mark_printed: 'Chop etilgan deb belgilash',
     print_marked: 'Hisobot chop etilgan deb belgilandi',
     print_pdf_blocked: 'PDF shakllantirildi, lekin yangi varaq bloklandi. Bu sayt uchun pop-up\'larga ruxsat bering va hisobot holatini yangilash uchun «Chop etish»ni qayta bosing.',
+    print_pdf_open_action: 'Chop etish uchun PDF ochish',
+    print_pdf_prepared: 'To\'g\'ridan-to\'g\'ri chop etish amalga oshmadi — blank PDF tayyor. Hujjatni ochish uchun «Chop etish uchun PDF ochish» tugmasini bosing va jismoniy chop etilgandan keyin belgini tasdiqlang.',
+    print_pdf_prepared_expired: 'Tayyorlangan PDF havola eskirdi. Chop etishni qayta bajaring — hujjat qayta tayyorlanadi.',
+    preview_popup_blocked: 'Brauzer qalqib chiquvchi oynani blokladi. Ushbu sayt uchun pop-up\'larga ruxsat bering va oldindan ko\'rishni qayta urinib ko\'ring.',
     preview_building: 'Server PDF ko‘rib chiqish shakillantirilmoqda...',
     preview_opened: 'PDF ko‘rib chiqish yangi varaqda ochildi («Qoralama» suv belgisi bilan).',
     preview_failed: 'PDF ko‘rib chiqishni shakllantirib bo‘lmadi. Qoralamani saqlang va qayta urinib ko‘ring.',
@@ -864,6 +868,12 @@ const uzLatn = {
     cardio_parser_normal_params: 'Parametrlar normal chegarada.',
     cardio_parser_sinus_rhythm: 'Sinus',
     cardio_parser_scp_not_implemented: "SCP-ECG formatini tahlil qilish amalga oshirilmagan. Faylni XML/HL7 aECG formatida yuklang yoki SCP kutubxonasini integratsiya qilish uchun administratorga murojaat qiling.",
+    // ECGPARSER-FE-001/002 (audit 3886 round 25): honest parser states —
+    // unrecognized XML is not a parsed ECG; absent measurements are
+    // explicitly "not measured", never a silent "normal".
+    cardio_parser_xml_not_ecg: "XML faylda aniqlanadigan EKG o'lchovlari (HL7 aECG) topilmadi — fayl EKG yozuvi sifatida saqlanmaydi",
+    cardio_parser_hr_not_measured: "YSS o'lchanmagan",
+    cardio_parser_axis_not_measured: "EEO holati o'lchanmagan",
 
     // ─── EchoForm (cardio.cardio_echo_*) ───
     cardio_echo_section_left_ventricle: "Chap qorincha",
@@ -1141,6 +1151,7 @@ const uzLatn = {
     cardio_echo_hydration_error: "Saqlangan ehokardiografiya ko'rsatkichlarini yuklab bo'lmadi. Saqlangan ma'lumotlarni o'chirib yubormaslik uchun saqlash bloklandi — «Qaytadan yuklash» tugmasini bosing.",
     cardio_echo_retry: 'Qaytadan yuklash',
     cardio_echo_saved_stale_edit: 'Oldingi tahrir saqlandi: saqlash davomida kiritilgan tahrirlar hali saqlanmagan. Qiymatlarni tekshirib, «Saqlash» tugmasini yana bosing.',
+    cardio_echo_draft_preserved: 'Saqlangan ko‘rsatkichlar yuklandi; yuklash muvaffaqiyatsiz tugaganida kiritilgan tahrirlar shaklda saqlandi va hali yozilmagan — ularni tekshirib, «Saqlash» tugmasini bosing.',
     cardio_panel_close: "Yopish",
     cardio_panel_save: "Saqlash",
     cardio_panel_session_warning_aria: "Sessiya muddati tugashi haqida ogohlantirish",
@@ -5353,6 +5364,12 @@ const uzLatn = {
     db_open_board_desc: 'Yangi varaqda koʻrish',
     db_add: 'Qoʻshish',
     db_banners_empty: 'Bannerlar qoʻshilmagan',
+    db_banner_title: 'Banner sarlavhasi',
+    db_banner_description: 'Banner tavsifi',
+    db_banner_duration: 'Ko‘rsatish davomiyligi (sek)',
+    db_banner_created: 'Banner yaratildi',
+    db_banner_error: 'Banner yaratishda xatolik',
+    db_cancel: 'Bekor qilish',
     db_announcements_empty: 'Eʼlonlar qoʻshilmagan',
     db_info_title: 'Tablo haqida maʼlumot',
     db_info_queue: '• Tablo mutaxassislar va kabinetlar boʻyicha joriy navbatni koʻrsatadi',
@@ -6617,6 +6634,7 @@ const uzLatn = {
     visit_emr_status_signed: 'Подписана',
     visit_emr_status_amended: 'Изменена после подписания',
     tooth_save_requires_visit: 'Сохранение зубной карты требует открытый визит. Откройте пациента из очереди.',
+    tooth_inspection_only: "Qabul yozuvi faqat ko'rish uchun mavjud — tish ko'rib chiqish rejimida ochildi, tahrirlash va saqlash mumkin emas.",
   },
   payment: {
     timeout: 'Время ожидания истекло',
@@ -8778,6 +8796,7 @@ const uzLatn = {
     ps_save: 'Retseptni saqlash',
     ps_print: 'Retseptni chop etish',
     emr_ai_no_complaints: 'AI-tavsiyalar uchun avval «Shikoyatlar» maydonini toʻldiring',
+    ai_popover_kb_hint: '↑↓ va Enter roʻyxat fokusida ishlaydi • Esc yopish',
     emr_ghost_unavailable: 'Ghost Mode imzolangan kartada mavjud emas.',
     emr_sign_title: 'EMK imzolash',
     emr_sign_message: 'EMK imzolansinmi?',
@@ -8903,6 +8922,7 @@ const uzLatn = {
     aia_fallback_provider_notice: '{provider} zaxira AI-provayderi orqali javob olindi. Buni faqat qoralama sifatida ishlating va klinik qoʻllashdan oldin tashqi AI sozlamalarini tekshiring.',
     aia_analyzing_via: '{provider} AI orqali tahlil...',
     aia_click_refresh: 'AI tahlilini boshlash uchun Yangilashni bosing',
+    aia_no_context_notice: "Klinik kontekstsiz AI tahlil mavjud emas: yordamchidan tashxis, shikoyatlar va natijalar bilan foydalanish uchun bemor kartasini oching.",
     aia_retry_attempt: '{count}-urinish. AI provayderini almashtiring yoki soʻrovni qaytaring.',
 
     // ─── ComponentTest.jsx (ct_) ───────────────────────────────────────────
@@ -9373,7 +9393,7 @@ const uzLatn = {
     esi_idyot_sohranenie: 'Идёт сохранение',
     esi_podpisana_s_popravkami: '📝 Подписана (с поправками)',
     esi_podpisana: '✅ Подписана',
-    esi_podpisana_formatabsolutetime: 'Подписана {formatAbsoluteTime(lastSaved)}',
+    esi_podpisana_formatabsolutetime: 'Подписана {lastSaved}',
     esi_dokument_podpisan_i_zaschisc: 'Документ подписан и защищён от изменений',
     esi_est_izmeneniya: '● Есть изменения',
     esi_avtosohranenie_cherez_math_r: 'Автосохранение через {Math.round(autosaveConfig.debounceMs / 1000)} сек',
@@ -9565,6 +9585,8 @@ const uzLatn = {
     dtp_moy_opyt_count_shablonov: 'Мой опыт ({count} шаблонов)',
     dtp_moy_opyt: 'Мой опыт',
     dtp_net_sohranyonnyh_shablonov: 'Нет сохранённых шаблонов',
+    dtp_oshibka_zagruzki_shablonov: 'Не удалось загрузить шаблоны',
+    dtp_povtorit: 'Повторить',
     dtp_redaktirovat_shablon: 'Редактировать шаблон',
     dtp_moy_opyt_2: 'Мой опыт',
     // DermatologySection.jsx (ds_)
@@ -9769,6 +9791,8 @@ const uzLatn = {
     poa_vse: 'Все',
     poa_zagruzka: 'Загрузка...',
     poa_izmeneniy_tsen_ne_naydeno: 'Изменений цен не найдено',
+    poa_vsego_zaprosov: 'Navbatdagi jami so\'rovlar',
+    poa_tsena_v_vizite: 'Vizitdagi xizmat narxi',
     // PatientPanel.jsx (pp_)
     pp_ne_udalos_zagruzit_label_obn: 'Не удалось загрузить {label}. Обновите страницу.',
     pp_zapisi: 'записи',
@@ -10188,6 +10212,8 @@ const uzLatn = {
     dss_kosmetologicheskie_protsedur: 'Косметологические процедуры',
     dss_analizy_krovi: 'Анализы крови',
     dss_oshibka_zagruzki_uslug: 'Ошибка загрузки услуг',
+    dss_uslugi_ne_naydeny: 'Xizmatlar topilmadi',
+    dss_dobavte_uslugi_admin_paneli: '«{specialty}» mutaxassisligi uchun xizmatlarni admin panelida qo\'shing',
     dss_tsena_uslugi_service_name: 'Цена услуги {service.name}',
     dss_uslug: 'Услуг',
     dss_minut: 'Минут',
