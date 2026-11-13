@@ -329,9 +329,8 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                 version = conn.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-                # Head pin follows the latest migration (0092 —
-                # DERMAPRICE-BE-002 price override visit_price_before).
-                assert version == "0092_price_override_visit_price", version
+                # Head pin follows the latest migration (0093 — display board devices).
+                assert version == "0093_display_board_devices", version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(

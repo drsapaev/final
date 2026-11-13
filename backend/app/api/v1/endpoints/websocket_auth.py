@@ -532,9 +532,9 @@ def _doctor_owns_queue_room(db: Session, user: User, department: str) -> bool:
       routing fan-out (``queue_update_departments``) already broadcasts to
       every routing sibling's own room.
     - Department-name rooms: the principal's own ``Department.key`` or the
-      canonical specialty family of their ``Doctor.specialty``
-      (``specialty_variants``) must match the requested name
-      case-insensitively. Forged/foreign department strings are denied.
+      queue-room specialty family of their ``Doctor.specialty`` must match
+      the requested name case-insensitively. Forged/foreign department
+      strings are denied.
     - A doctor-family role WITHOUT a doctor row owns nothing (fail
       closed).
     """
@@ -567,9 +567,9 @@ def _doctor_owns_queue_room(db: Session, user: User, department: str) -> bool:
 
     specialty = str(getattr(doctor, "specialty", "") or "").strip()
     if specialty:
-        from app.core.specialties import specialty_variants
+        from app.core.specialties import queue_room_specialty_variants
 
-        for variant in specialty_variants(specialty):
+        for variant in queue_room_specialty_variants(specialty):
             if variant.strip().casefold() == room_department.casefold():
                 return True
 
