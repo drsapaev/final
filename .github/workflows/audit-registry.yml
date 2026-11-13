@@ -1,0 +1,53 @@
+name: audit-registry
+
+# Registry consistency runs on every PR/push touching the registry.
+# The final-closure check is manual (workflow_dispatch): intermediate fix PRs
+# must pass CI while findings remain open; the closure check gates ONLY the
+# final audit closure (make it a Required status check when closing the audit,
+# after owner sign-off per issue #4063).
+
+on:
+  pull_request:
+    paths:
+      - "docs/audit-registry/**"
+      - "tools/audit_registry/**"
+  push:
+    branches: [main]
+    paths:
+      - "docs/audit-registry/**"
+      - "tools/audit_registry/**"
+  workflow_dispatch:
+    inputs:
+      final_closure:
+        description: "Run the final audit-closure check (fails while open findings remain)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  registry-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate registry schema and evidence rules
+        run: python tools/audit_registry/check_registry.py --issue-token "${{ secrets.GITHUB_TOKEN }}"
+      - name: Cross-check against issue #4063 checklist (1:1, no lost/renamed findings)
+        run: python tools/audit_registry/check_registry.py --issue-check --issue-token "${{ secrets.GITHUB_TOKEN }}"
+
+  audit-final-closure:
+    if: github.event_name == 'workflow_dispatch' && inputs.final_closure == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Final audit closure check (fails while UNVERIFIED/CONFIRMED_OPEN/FIX_IN_PROGRESS/FIX_PROPOSED_DRAFT > 0)
+        run: python tools/audit_registry/check_registry.py --issue-check --final-closure --issue-token "${{ secrets.GITHUB_TOKEN }}"
