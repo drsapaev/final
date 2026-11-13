@@ -56,7 +56,17 @@ export function openDisplayBoardWS(
   onDisconnect: () => void,
   tokenProvider?: () => Promise<string | null>,
 ): () => void {
-  if (!wsEnabled()) return () => {};
+  if (!wsEnabled()) {
+    let closed = false;
+    if (tokenProvider) {
+      void tokenProvider().catch(() => {
+        if (!closed) onDisconnect();
+      });
+    }
+    return () => {
+      closed = true;
+    };
+  }
   let ws: WebSocket | null = null;
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   // audit/phase-4, BS-14: hoist `pingIntervalRef` to outer scope so `close()`
@@ -177,9 +187,17 @@ export function openDisplayBoardWS(
 
     tokenProvider().then((token) => {
       if (!closed) connectWithToken(token);
-    }).catch(() => {
+    }).catch((error: unknown) => {
       if (closed) return;
       onDisconnect && onDisconnect();
+      if (
+        typeof error === 'object'
+        && error !== null
+        && 'code' in error
+        && error.code === 'DISPLAY_DEVICE_PROVISIONING_REQUIRED'
+      ) {
+        return;
+      }
       // A failed exchange can be transient (for example during a network
       // outage). Retry through the same bounded backoff without exposing the
       // credential or request error in logs.

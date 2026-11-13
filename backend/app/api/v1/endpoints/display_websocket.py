@@ -6,6 +6,7 @@ WebSocket endpoints для табло очереди
 import asyncio
 import json
 import logging
+import os
 from datetime import UTC, datetime
 from typing import Any
 
@@ -15,6 +16,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Query,
     Request,
     Response,
     WebSocket,
@@ -51,9 +53,13 @@ from app.schemas.display_device import (
     DisplayBoardDeviceTokenResponse,
 )
 from app.services.display_device_credentials import (
+    DISPLAY_DEVICE_SESSION_TTL_SECONDS,
     DISPLAY_DEVICE_TOKEN_TTL_SECONDS,
     DISPLAY_DEVICE_TOKEN_TYPE,
     authenticate_display_device_token,
+    display_device_session_cookie_name,
+    display_device_session_cookie_prefix,
+    exchange_display_device_session,
     exchange_display_device_secret,
 )
 
@@ -182,13 +188,38 @@ def exchange_display_device_token(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    """Exchange a one-time provisioned device credential for a scoped JWT."""
+    """Exchange a provisioned secret or HttpOnly device session for a scoped JWT."""
     response.headers["Cache-Control"] = "no-store"
-    issued = exchange_display_device_secret(
-        db,
-        device_id=body.device_id,
-        secret=body.secret,
-    )
+    session_device_id: int | None = None
+    if body.secret is not None and body.device_id is not None:
+        issued = exchange_display_device_secret(
+            db,
+            device_id=body.device_id,
+            secret=body.secret,
+            board_name=body.board_name,
+        )
+        session_device_id = body.device_id
+    else:
+        issued = None
+        cookie_prefix = display_device_session_cookie_prefix(body.board_name)
+        for cookie_name, cookie_value in request.cookies.items():
+            if not cookie_name.startswith(cookie_prefix):
+                continue
+            raw_device_id = cookie_name[len(cookie_prefix):]
+            if not raw_device_id.isascii() or not raw_device_id.isdecimal():
+                continue
+            candidate_device_id = int(raw_device_id)
+            candidate = exchange_display_device_session(
+                db,
+                device_id=candidate_device_id,
+                board_name=body.board_name,
+                session_token=cookie_value,
+            )
+            if candidate is not None:
+                issued = candidate
+                session_device_id = candidate_device_id
+                break
+
     if issued is None:
         # Keep unknown, revoked, inactive-board and wrong-secret responses
         # indistinguishable so the endpoint does not disclose device state.
@@ -196,12 +227,85 @@ def exchange_display_device_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid display device credentials",
         )
-    token, expires_in, board_name = issued
+    token, expires_in, board_name, session_token = issued
+    if session_device_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid display device credentials",
+        )
+    _set_display_device_session_cookie(
+        request,
+        response,
+        device_id=session_device_id,
+        board_name=board_name,
+        session_token=session_token,
+    )
     return DisplayBoardDeviceTokenResponse(
         access_token=token,
         expires_in=expires_in or DISPLAY_DEVICE_TOKEN_TTL_SECONDS,
         board_name=board_name,
     )
+
+
+def _display_device_cookie_policy(request: Request) -> tuple[str, bool]:
+    same_site = (
+        os.getenv("DISPLAY_DEVICE_COOKIE_SAMESITE")
+        or os.getenv("CSRF_COOKIE_SAMESITE")
+        or "lax"
+    ).strip().lower()
+    if same_site not in {"strict", "lax", "none"}:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="DISPLAY_DEVICE_COOKIE_SAMESITE must be strict, lax, or none",
+        )
+    is_production = os.getenv("ENV", "dev").strip().lower() in {
+        "prod",
+        "production",
+    }
+    secure = is_production or same_site == "none" or request.url.scheme == "https"
+    return same_site, secure
+
+
+def _set_display_device_session_cookie(
+    request: Request,
+    response: Response,
+    *,
+    device_id: int,
+    board_name: str,
+    session_token: str,
+) -> None:
+    same_site, secure = _display_device_cookie_policy(request)
+    response.set_cookie(
+        key=display_device_session_cookie_name(device_id, board_name),
+        value=session_token,
+        max_age=DISPLAY_DEVICE_SESSION_TTL_SECONDS,
+        path="/api/v1/display/devices/token",
+        secure=secure,
+        httponly=True,
+        samesite=same_site,
+    )
+
+
+@router.delete("/devices/token", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
+def forget_display_device_session(
+    request: Request,
+    response: Response,
+    board_name: str = Query(min_length=1, max_length=120),
+) -> None:
+    """Clear this browser's HttpOnly device sessions for one public board."""
+    response.headers["Cache-Control"] = "no-store"
+    same_site, secure = _display_device_cookie_policy(request)
+    cookie_prefix = display_device_session_cookie_prefix(board_name)
+    for cookie_name in request.cookies:
+        if cookie_name.startswith(cookie_prefix):
+            response.delete_cookie(
+                key=cookie_name,
+                path="/api/v1/display/devices/token",
+                secure=secure,
+                httponly=True,
+                samesite=same_site,
+            )
 
 
 # Canonical WebSocket authentication (JWT decode + TokenBlacklist jti/

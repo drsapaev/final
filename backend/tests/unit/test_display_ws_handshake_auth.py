@@ -511,8 +511,11 @@ def test_device_board_socket_closes_after_device_revocation(handshake_env, monke
             device_name="Synthetic TV",
             created_by=admin.id,
         )
-        token, _ttl, _board_name = exchange_display_device_secret(
-            session, device_id=device.id, secret=secret
+        token, _ttl, _board_name, _session = exchange_display_device_secret(
+            session,
+            device_id=device.id,
+            secret=secret,
+            board_name=board.name,
         )
         device_id = device.id
         board_name = board.name

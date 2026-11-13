@@ -20,10 +20,10 @@ import {
 import { api } from '../api/client';
 import { openDisplayBoardWS } from '../api/ws';
 import {
+  exchangeDisplayDeviceSession,
   exchangeDisplayDeviceCredential,
-  forgetDisplayDeviceCredential,
-  readDisplayDeviceCredential,
-  saveDisplayDeviceCredential,
+  forgetDisplayDeviceSession,
+  DisplayDeviceProvisioningRequiredError,
 } from '../api/displayDeviceAuth';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -315,7 +315,7 @@ export default function DisplayBoardUnified({
   const isBoardView = window.location.pathname.startsWith('/queue-board') || window.location.pathname.startsWith('/display-board');
   const [displayDeviceState, setDisplayDeviceState] = useState<'ready' | 'connecting' | 'unconfigured'>(() => {
     if (!isBoardView || tokenManager.getAccessToken()) return 'ready';
-    return readDisplayDeviceCredential(currentBoardId) ? 'ready' : 'unconfigured';
+    return 'connecting';
   });
   const [setupDeviceId, setSetupDeviceId] = useState('');
   const [setupDeviceSecret, setSetupDeviceSecret] = useState('');
@@ -436,35 +436,24 @@ export default function DisplayBoardUnified({
       }
 
       const staffToken = tokenManager.getAccessToken();
-      const deviceCredential = !staffToken && isBoardView
-        ? readDisplayDeviceCredential(currentBoardId)
-        : null;
-      if (isBoardView && !staffToken && !deviceCredential) {
-        setDisplayDeviceState('unconfigured');
-        setConnected(false);
-        return;
-      }
-
-      if (deviceCredential && !staffToken) setDisplayDeviceState('connecting');
-      const tokenProvider = deviceCredential
+      const needsDeviceSession = !staffToken && isBoardView;
+      if (needsDeviceSession) setDisplayDeviceState('connecting');
+      const tokenProvider = needsDeviceSession
         ? async () => {
             // Staff access always takes precedence, including on reconnect
             // after a staff session is established in this browser.
             const currentStaffToken = tokenManager.getAccessToken();
             if (currentStaffToken) return currentStaffToken;
-            const currentCredential = readDisplayDeviceCredential(currentBoardId);
-            if (!currentCredential) throw new Error('Display device needs provisioning');
             try {
-              const deviceToken = await exchangeDisplayDeviceCredential(
-                currentCredential,
-                currentBoardId,
-              );
+              const deviceToken = await exchangeDisplayDeviceSession(currentBoardId);
               setDisplayDeviceState('ready');
               setSetupError('');
               return deviceToken;
             } catch (error) {
-              setDisplayDeviceState('unconfigured');
-              setSetupError('Не удалось подтвердить устройство. Проверьте данные или обратитесь к администратору.');
+              if (error instanceof DisplayDeviceProvisioningRequiredError) {
+                setDisplayDeviceState('unconfigured');
+                setSetupError('Табло не настроено или доступ отозван. Введите выданный администратором код.');
+              }
               throw error;
             }
           }
@@ -498,12 +487,10 @@ export default function DisplayBoardUnified({
 
     setSetupSubmitting(true);
     setSetupError('');
-    const credential = { deviceId, secret };
     try {
-      // Validate before storing. The short-lived JWT is kept in memory by
-      // the socket helper; only the per-board device credential is persisted.
-      await exchangeDisplayDeviceCredential(credential, currentBoardId);
-      saveDisplayDeviceCredential(currentBoardId, credential);
+      // The server replaces the one-time code with an HttpOnly, board-scoped
+      // session cookie; the reusable secret is never persisted by the page.
+      await exchangeDisplayDeviceCredential(deviceId, secret, currentBoardId);
       setSetupDeviceSecret('');
       setDisplayDeviceState('connecting');
       connectWebSocketRef.current();
@@ -802,24 +789,35 @@ export default function DisplayBoardUnified({
   // Инициализация
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('forget-device') === '1') {
-      forgetDisplayDeviceCredential(currentBoardId);
-      params.delete('forget-device');
-      const query = params.toString();
-      window.history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
-      );
-      if (!tokenManager.getAccessToken()) {
+    const forgetDeviceRequested = params.get('forget-device') === '1';
+    const hasStaffToken = Boolean(tokenManager.getAccessToken());
+    if (forgetDeviceRequested) {
+      if (!hasStaffToken) {
         setDisplayDeviceState('unconfigured');
         setSetupDeviceId('');
         setSetupDeviceSecret('');
+        setSetupSubmitting(true);
       }
+      void forgetDisplayDeviceSession(currentBoardId).then(() => {
+        params.delete('forget-device');
+        const query = params.toString();
+        window.history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
+        );
+        setSetupError('');
+      }).catch(() => {
+        if (!hasStaffToken) {
+          setSetupError('Не удалось удалить данные табло. Проверьте соединение и повторите попытку.');
+        }
+      }).finally(() => {
+        if (!hasStaffToken) setSetupSubmitting(false);
+      });
     }
     loadBoardStateRef.current();
     loadWindowsRef.current();
-    connectWebSocketRef.current();
+    if (!forgetDeviceRequested || hasStaffToken) connectWebSocketRef.current();
 
     const clock = setInterval(() => setNowStr(timeNow()), 1000);
 

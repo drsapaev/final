@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const wsMock = vi.hoisted(() => ({ openDisplayBoardWS: vi.fn() }));
-const apiMock = vi.hoisted(() => ({ api: { get: vi.fn(), post: vi.fn() } }));
+const apiMock = vi.hoisted(() => ({ api: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }));
 const tokenManagerMock = vi.hoisted(() => ({ getAccessToken: vi.fn((): string | null => null) }));
 
 vi.mock('../../api/client', () => apiMock);
@@ -15,7 +15,6 @@ vi.mock('../../utils/logger', () => ({
 vi.mock('../../utils/tokenManager', () => ({ tokenManager: tokenManagerMock }));
 
 import DisplayBoardUnified from '../DisplayBoardUnified';
-import { readDisplayDeviceCredential, saveDisplayDeviceCredential } from '../../api/displayDeviceAuth';
 
 const DEVICE_SECRET = 'synthetic-device-secret-value-0123456789abcdef';
 
@@ -30,65 +29,102 @@ describe('DisplayBoardUnified public device provisioning', () => {
     openPublicBoard();
     tokenManagerMock.getAccessToken.mockReturnValue(null);
     apiMock.api.get.mockResolvedValue({ data: { department: 'Reg', date_str: 'synthetic' } });
-    apiMock.api.post.mockResolvedValue({
-      data: {
-        access_token: 'synthetic-device-jwt',
-        token_type: 'bearer',
-        expires_in: 3600,
-        board_name: 'main_board',
-      },
+    apiMock.api.post.mockRejectedValue({ response: { status: 401 } });
+    apiMock.api.delete.mockResolvedValue({ status: 204 });
+    wsMock.openDisplayBoardWS.mockImplementation((...args: unknown[]) => {
+      const tokenProvider = args[4];
+      if (typeof tokenProvider === 'function') {
+        void (tokenProvider as () => Promise<string | null>)().catch(() => undefined);
+      }
+      return vi.fn();
     });
-    wsMock.openDisplayBoardWS.mockReturnValue(vi.fn());
   });
 
   it('shows a provisioning form instead of opening an unauthenticated board socket', async () => {
     render(<DisplayBoardUnified department="Reg" dateStr="synthetic" boardId="main_board" />);
 
     expect(await screen.findByTestId('display-device-provisioning')).toBeInTheDocument();
-    expect(screen.getByText(/Табло не настроено/)).toBeInTheDocument();
-    expect(wsMock.openDisplayBoardWS).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Табло не настроено' })).toBeInTheDocument();
+    expect(wsMock.openDisplayBoardWS).toHaveBeenCalledTimes(1);
+    const [, , , , tokenProvider] = wsMock.openDisplayBoardWS.mock.calls[0];
+    expect(typeof tokenProvider).toBe('function');
+    await expect(tokenProvider()).rejects.toMatchObject({
+      code: 'DISPLAY_DEVICE_PROVISIONING_REQUIRED',
+    });
   });
 
-  it('validates and stores the one-time credential, then uses a refreshable token provider', async () => {
+  it('exchanges the one-time code for an HttpOnly session without persisting the secret', async () => {
     const user = userEvent.setup();
     render(<DisplayBoardUnified department="Reg" dateStr="synthetic" boardId="main_board" />);
+    await screen.findByTestId('display-device-provisioning');
+    apiMock.api.post.mockResolvedValueOnce({
+      data: {
+        access_token: 'synthetic-device-jwt',
+        token_type: 'bearer',
+        expires_in: 3600,
+        board_name: 'main_board',
+      },
+    }).mockResolvedValueOnce({
+      data: {
+        access_token: 'synthetic-session-jwt',
+        token_type: 'bearer',
+        expires_in: 3600,
+        board_name: 'main_board',
+      },
+    });
 
     await user.type(screen.getByLabelText('ID устройства'), '17');
     await user.type(screen.getByLabelText('Код устройства'), DEVICE_SECRET);
     await user.click(screen.getByRole('button', { name: 'Подключить табло' }));
 
-    await waitFor(() => expect(wsMock.openDisplayBoardWS).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(wsMock.openDisplayBoardWS).toHaveBeenCalledTimes(2));
     expect(apiMock.api.post).toHaveBeenCalledWith('/display/devices/token', {
+      board_name: 'main_board',
+    }, { withCredentials: true });
+    expect(apiMock.api.post).toHaveBeenCalledWith('/display/devices/token', {
+      board_name: 'main_board',
       device_id: 17,
       secret: DEVICE_SECRET,
-    });
-    expect(readDisplayDeviceCredential('main_board')).toEqual({
-      deviceId: 17,
-      secret: DEVICE_SECRET,
-    });
+    }, { withCredentials: true });
+    const storedValues = Array.from({ length: window.localStorage.length }, (_, index) => {
+      const key = window.localStorage.key(index);
+      return key ? window.localStorage.getItem(key) : null;
+    }).join('\n');
+    expect(storedValues).not.toContain(DEVICE_SECRET);
 
     const [, , , , tokenProvider] = wsMock.openDisplayBoardWS.mock.calls[0];
     expect(typeof tokenProvider).toBe('function');
-    tokenManagerMock.getAccessToken.mockReturnValue('synthetic-staff-jwt');
-    await expect(tokenProvider()).resolves.toBe('synthetic-staff-jwt');
-    expect(apiMock.api.post).toHaveBeenCalledTimes(1);
+    apiMock.api.post.mockResolvedValueOnce({
+      data: {
+        access_token: 'synthetic-refreshed-device-jwt',
+        token_type: 'bearer',
+        expires_in: 3600,
+        board_name: 'main_board',
+      },
+    });
+    await expect(tokenProvider()).resolves.toBe('synthetic-refreshed-device-jwt');
+    expect(apiMock.api.post).toHaveBeenLastCalledWith('/display/devices/token', {
+      board_name: 'main_board',
+    }, { withCredentials: true });
   });
 
-  it('forgets only the selected board credential from the URL control', async () => {
-    saveDisplayDeviceCredential('main_board', { deviceId: 17, secret: DEVICE_SECRET });
-    saveDisplayDeviceCredential('other_board', { deviceId: 22, secret: DEVICE_SECRET });
+  it('forgets only the selected board session from the URL control', async () => {
     openPublicBoard('?board=main_board&forget-device=1');
 
     render(<DisplayBoardUnified department="Reg" dateStr="synthetic" boardId="main_board" />);
 
     expect(await screen.findByTestId('display-device-provisioning')).toBeInTheDocument();
-    expect(readDisplayDeviceCredential('main_board')).toBeNull();
-    expect(readDisplayDeviceCredential('other_board')).not.toBeNull();
+    expect(apiMock.api.delete).toHaveBeenCalledWith('/display/devices/token', {
+      params: { board_name: 'main_board' },
+      withCredentials: true,
+    });
     expect(window.location.search).toBe('?board=main_board');
   });
 
   it('keeps a wrong-board credential out of storage and shows setup again', async () => {
     const user = userEvent.setup();
+    render(<DisplayBoardUnified department="Reg" dateStr="synthetic" boardId="main_board" />);
+    await screen.findByTestId('display-device-provisioning');
     apiMock.api.post.mockResolvedValueOnce({
       data: {
         access_token: 'synthetic-device-jwt',
@@ -97,7 +133,6 @@ describe('DisplayBoardUnified public device provisioning', () => {
         board_name: 'another_board',
       },
     });
-    render(<DisplayBoardUnified department="Reg" dateStr="synthetic" boardId="main_board" />);
 
     await user.type(screen.getByLabelText('ID устройства'), '17');
     await user.type(screen.getByLabelText('Код устройства'), DEVICE_SECRET);
@@ -106,7 +141,6 @@ describe('DisplayBoardUnified public device provisioning', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Не удалось подтвердить устройство.',
     );
-    expect(readDisplayDeviceCredential('main_board')).toBeNull();
-    expect(wsMock.openDisplayBoardWS).not.toHaveBeenCalled();
+    expect(wsMock.openDisplayBoardWS).toHaveBeenCalledTimes(1);
   });
 });

@@ -106,8 +106,8 @@ class DisplayBoardDevice(Base):
         index=True,
     )
     device_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    # The one-time credential itself is never persisted; only an Argon2/bcrypt
-    # verifier produced by app.core.security is stored here.
+    # The one-time credential is never persisted; its Argon2/bcrypt verifier is
+    # replaced with an unrelated verifier after the first successful exchange.
     secret_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(
         String(16), default="active", server_default="active", nullable=False

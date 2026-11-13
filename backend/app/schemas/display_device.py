@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class DisplayBoardDeviceCreateRequest(BaseModel):
@@ -18,8 +18,23 @@ class DisplayBoardDeviceCreateRequest(BaseModel):
 
 
 class DisplayBoardDeviceTokenRequest(BaseModel):
-    device_id: int = Field(gt=0)
-    secret: str = Field(min_length=32, max_length=128)
+    board_name: str = Field(min_length=1, max_length=120)
+    device_id: int | None = Field(default=None, gt=0)
+    secret: str | None = Field(default=None, min_length=32, max_length=128)
+
+    @field_validator("board_name")
+    @classmethod
+    def board_name_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Board name must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def device_id_and_secret_must_be_paired(self):
+        if (self.device_id is None) != (self.secret is None):
+            raise ValueError("Device ID and secret must be provided together")
+        return self
 
 
 class DisplayBoardDeviceTokenResponse(BaseModel):

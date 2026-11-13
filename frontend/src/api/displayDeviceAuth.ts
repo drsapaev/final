@@ -1,10 +1,5 @@
 import { api } from './client';
 
-export interface DisplayDeviceCredential {
-  deviceId: number;
-  secret: string;
-}
-
 interface DisplayDeviceTokenResponse {
   access_token: string;
   token_type: string;
@@ -12,68 +7,64 @@ interface DisplayDeviceTokenResponse {
   board_name: string;
 }
 
-const STORAGE_PREFIX = 'clinic_display_device_v1:';
+export class DisplayDeviceProvisioningRequiredError extends Error {
+  readonly code = 'DISPLAY_DEVICE_PROVISIONING_REQUIRED';
 
-function storageKey(boardId: string): string {
-  return `${STORAGE_PREFIX}${encodeURIComponent(boardId)}`;
-}
-
-export function readDisplayDeviceCredential(boardId: string): DisplayDeviceCredential | null {
-  try {
-    const raw = window.localStorage.getItem(storageKey(boardId));
-    if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<DisplayDeviceCredential>;
-    if (
-      !Number.isSafeInteger(value.deviceId)
-      || typeof value.secret !== 'string'
-      || value.secret.length < 32
-      || value.secret.length > 128
-    ) {
-      window.localStorage.removeItem(storageKey(boardId));
-      return null;
-    }
-    return { deviceId: value.deviceId as number, secret: value.secret };
-  } catch {
-    return null;
+  constructor() {
+    super('Display device provisioning is required');
+    this.name = 'DisplayDeviceProvisioningRequiredError';
   }
 }
 
-export function saveDisplayDeviceCredential(
-  boardId: string,
-  credential: DisplayDeviceCredential,
-): void {
-  window.localStorage.setItem(storageKey(boardId), JSON.stringify(credential));
-}
-
-export function forgetDisplayDeviceCredential(boardId: string): void {
-  try {
-    window.localStorage.removeItem(storageKey(boardId));
-  } catch {
-    // The public setup view can still be shown when browser storage is blocked.
-  }
-}
-
-export async function exchangeDisplayDeviceCredential(
-  credential: DisplayDeviceCredential,
-  expectedBoardName: string,
+async function exchange(
+  boardName: string,
+  credential?: { deviceId: number; secret: string },
 ): Promise<string> {
   try {
     const response = await api.post<DisplayDeviceTokenResponse>(
       '/display/devices/token',
-      { device_id: credential.deviceId, secret: credential.secret },
+      credential
+        ? { board_name: boardName, device_id: credential.deviceId, secret: credential.secret }
+        : { board_name: boardName },
+      { withCredentials: true },
     );
     const token = response.data?.access_token;
     if (
       typeof token !== 'string'
       || !token
-      || response.data?.board_name !== expectedBoardName
+      || response.data?.board_name !== boardName
     ) {
-      throw new Error('Missing display token');
+      throw new Error('Display token did not match the selected board');
     }
     return token;
-  } catch {
+  } catch (error) {
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    if (status === 401) throw new DisplayDeviceProvisioningRequiredError();
     // Do not propagate Axios request config, which can contain the one-time
     // device secret, into UI errors or logging.
     throw new Error('Display device authorization failed');
+  }
+}
+
+export function exchangeDisplayDeviceCredential(
+  deviceId: number,
+  secret: string,
+  expectedBoardName: string,
+): Promise<string> {
+  return exchange(expectedBoardName, { deviceId, secret });
+}
+
+export function exchangeDisplayDeviceSession(boardName: string): Promise<string> {
+  return exchange(boardName);
+}
+
+export async function forgetDisplayDeviceSession(boardName: string): Promise<void> {
+  try {
+    await api.delete('/display/devices/token', {
+      params: { board_name: boardName },
+      withCredentials: true,
+    });
+  } catch {
+    throw new Error('Display device session could not be cleared');
   }
 }
