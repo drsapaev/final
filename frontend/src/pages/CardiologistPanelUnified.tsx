@@ -94,7 +94,7 @@ type SelectedPatient = {
 type DoctorPanelState = {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  handleTabChange: (tab: string) => void;
+  handleTabChange: (tab: string, beforeTransition?: () => void) => void;
   patientIdFromUrl: number | null;
   visitIdFromUrl: number | null;
   selectedPatient: SelectedPatient | null;
@@ -2128,12 +2128,14 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                 emr={emr}
                 loading={loading}
                 onCancel={() => {
-                  // RETRO-3963-01: explicit close invalidates every in-flight
-                  // navigation ticket — a late appointment/EMR resolution
-                  // must not resurrect a closed visit screen.
-                  navigationEpochRef.current += 1;
-                  setSelectedPatient(null);
-                  setActiveTab('queue');
+                  // RETRO-3971-04 residual: let the shared EMR leave guard
+                  // resolve Save/Discard/Stay before invalidating async work
+                  // or clearing the visit. handleTabChange commits the URL
+                  // and tab in the same confirmed transition.
+                  goToTab('queue', () => {
+                    navigationEpochRef.current += 1;
+                    setSelectedPatient(null);
+                  });
                 }}
                 onComplete={handleCompleteVisitFromEMR}
                 onCompletionBlocked={handleEMRCompletionBlocked}

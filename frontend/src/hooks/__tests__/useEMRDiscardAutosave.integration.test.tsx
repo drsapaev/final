@@ -8,6 +8,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import i18n from '@/i18n';
 import {
   LabDirtyGuardProvider,
+  useLabDirtyGuard,
   useGuardedLabNavigate,
 } from '../../components/laboratory/LabDirtyGuardContext';
 import { useEMRAutosave } from '../useEMRAutosave';
@@ -61,10 +62,19 @@ function DraftEditor({ control }: { control: Harness }) {
 function DoctorRoute({ control }: { control: Harness }) {
   const [isMounted, setMounted] = React.useState(true);
   const navigate = useGuardedLabNavigate();
+  const { guardTransition, hasPendingOperations } = useLabDirtyGuard();
+  const clearCurrentVisit = () => {
+    if (hasPendingOperations) return;
+    guardTransition(() => setMounted(false), {
+      sourceIds: ['emr-visit-42'],
+      intentPolicy: 'leave',
+    });
+  };
   return (
     <>
       {isMounted && <DraftEditor control={control} />}
       <button type="button" onClick={() => navigate('/profile')}>leave doctor</button>
+      <button type="button" onClick={clearCurrentVisit}>clear current visit</button>
       <button type="button" onClick={() => setMounted(false)}>force unmount</button>
     </>
   );
@@ -123,6 +133,23 @@ describe('EMR Discard × unmount autosave integrity (RETRO-3971-04)', () => {
     await flush();
 
     expect(screen.getByTestId('path')).toHaveTextContent('/profile');
+    expect(screen.queryByTestId('editor')).not.toBeInTheDocument();
+    expect(control.reload).toHaveBeenCalledTimes(1);
+    expect(control.saveEMR).not.toHaveBeenCalled();
+  });
+
+  it('a guarded in-panel discard suppresses unmount autosave before clearing the current visit', async () => {
+    const control = makeHarness();
+    render(<HarnessApp control={control} />);
+    await flush();
+
+    fireEvent.click(screen.getByRole('button', { name: 'clear current visit' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(screen.getByTestId('editor')).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Выйти без сохранения' }));
+    await flush();
+
     expect(screen.queryByTestId('editor')).not.toBeInTheDocument();
     expect(control.reload).toHaveBeenCalledTimes(1);
     expect(control.saveEMR).not.toHaveBeenCalled();

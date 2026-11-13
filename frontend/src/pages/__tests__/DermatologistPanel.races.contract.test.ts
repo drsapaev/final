@@ -149,15 +149,20 @@ describe('DERMAHOTKEY-FE-001 — dirty-guarded panel exits (source contract)', (
     expect(hotkeys).toMatch(/aria-modal="true"/);
   });
 
-  it('the panel tracks the EMR dirty state and confirms before discarding it', () => {
-    expect(source).toContain('emrDirtyRef');
-    expect(source).toContain('derma_panel_discard_draft_title');
+  it('Escape delegates the current visit to the shared dirty-source guard', () => {
+    expect(source).not.toContain('emrDirtyRef');
+    expect(source).not.toContain('handleEmrDirtyChange');
+    expect(source).toContain('hasPendingOperations');
+    expect(source).toContain('guardTransition(() =>');
+    expect(source).toContain('{ sourceIds, intentPolicy: \'leave\' }');
+    expect(source).toContain('dialogVisitContext');
+    expect(source).toContain('isSameDermatologyVisit(dialogVisitContext, currentVisitContextRef.current)');
     const visitBranch = source.slice(
       source.indexOf('{activeTab === \'visit\' && currentAppointment'),
       source.indexOf('{' + 'activeTab === \'visit\' && !currentAppointment'),
     );
     const emrMount = visitBranch.slice(visitBranch.indexOf('<EMRContainerV2'));
-    expect(emrMount).toContain('onDirtyChange');
+    expect(emrMount).not.toContain('onDirtyChange');
   });
 
   it('EMRContainerV2 exposes its dirty flag through an optional callback prop', () => {
