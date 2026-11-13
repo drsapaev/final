@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import func
+
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401
     _get_configured_bot_token,
 )
+from app.models.telegram_config import TelegramMessage, TelegramUser
 
 
 @router.get("/telegram/templates", response_model=dict[str, Any])
@@ -168,22 +171,62 @@ def send_test_message(
 
 @router.get("/telegram/stats", response_model=dict[str, Any])
 def get_telegram_stats(
-    days_back: int = 7,
+    days_back: int = Query(default=7, ge=1, le=365),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin", "admin"])),
 ):
     """Получить статистику Telegram"""
     try:
-        # Пока возвращаем заглушку, в будущем будет реальная статистика
+        now = datetime.now(UTC)
+        period_start = now - timedelta(days=days_back)
+        query_period_start = period_start.replace(tzinfo=None)
+        query_period_end = now.replace(tzinfo=None)
+
+        telegram_users = db.query(TelegramUser)
+        message_history = db.query(TelegramMessage).filter(
+            TelegramMessage.created_at >= query_period_start,
+            TelegramMessage.created_at <= query_period_end,
+        )
+
+        messages_sent = message_history.filter(
+            TelegramMessage.status.in_(["sent", "delivered"])
+        ).count()
+        messages_delivered = message_history.filter(
+            TelegramMessage.status == "delivered"
+        ).count()
+        messages_failed = message_history.filter(
+            TelegramMessage.status == "failed"
+        ).count()
+
+        by_message_type_rows = (
+            db.query(
+                TelegramMessage.message_type,
+                func.count(TelegramMessage.id),
+            )
+            .filter(
+                TelegramMessage.created_at >= query_period_start,
+                TelegramMessage.created_at <= query_period_end,
+            )
+            .group_by(TelegramMessage.message_type)
+            .all()
+        )
+
         return {
-            "total_users": 0,
-            "active_users": 0,
-            "messages_sent": 0,
-            "messages_delivered": 0,
-            "messages_failed": 0,
-            "by_message_type": {},
-            "period_start": datetime.now(UTC) - timedelta(days=days_back),
-            "period_end": datetime.now(UTC),
+            "total_users": telegram_users.count(),
+            "active_users": telegram_users.filter(
+                TelegramUser.active.is_(True),
+                TelegramUser.blocked.is_(False),
+                TelegramUser.last_activity >= now - timedelta(days=days_back),
+            ).count(),
+            "messages_sent": messages_sent,
+            "messages_delivered": messages_delivered,
+            "messages_failed": messages_failed,
+            "by_message_type": {
+                message_type or "unknown": int(count)
+                for message_type, count in by_message_type_rows
+            },
+            "period_start": period_start,
+            "period_end": now,
         }
     except Exception as e:
         raise_admin_telegram_error(
@@ -198,16 +241,54 @@ def get_telegram_stats(
 
 @router.get("/telegram/users", response_model=dict[str, Any])
 def get_telegram_users(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
     active_only: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin", "admin"])),
 ):
     """Получить список пользователей Telegram"""
     try:
-        # Пока возвращаем заглушку
-        return []
+        users_query = db.query(TelegramUser)
+        if active_only:
+            users_query = users_query.filter(
+                TelegramUser.active.is_(True), TelegramUser.blocked.is_(False)
+            )
+
+        total = users_query.count()
+        users = (
+            users_query.order_by(TelegramUser.last_activity.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+        def initials(first_name: str | None, last_name: str | None) -> str | None:
+            letters = [
+                value.strip()[0].upper()
+                for value in (first_name, last_name)
+                if value and value.strip()
+            ]
+            return ".".join(letters) + "." if letters else None
+
+        return {
+            "users": [
+                {
+                    "name_initials": initials(user.first_name, user.last_name),
+                    "chat_id_suffix": str(user.chat_id)[-4:],
+                    "language_code": user.language_code,
+                    "notifications_enabled": user.notifications_enabled,
+                    "active": user.active,
+                    "blocked": user.blocked,
+                    "last_activity": user.last_activity,
+                    "created_at": user.created_at,
+                }
+                for user in users
+            ],
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        }
     except Exception as e:
         raise_admin_telegram_error(
             "users",
@@ -224,33 +305,10 @@ def send_broadcast_message(
     message: str,
     target_groups: list[str],  # ["patients", "doctors", "admins"]
     language: str = "ru",
-    db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
-    """Отправить широковещательное сообщение"""
-    try:
-        # Получаем токен бота
-        bot_token = _get_configured_bot_token(db)
-        if not bot_token:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Токен бота не настроен"
-            )
-
-        # Здесь будет логика отправки широковещательных сообщений
-        # Пока возвращаем заглушку
-
-        return {
-            "success": True,
-            "message": "Широковещательное сообщение поставлено в очередь",
-            "target_groups": target_groups,
-            "estimated_recipients": 0,  # Будет подсчитано из БД
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise_admin_telegram_error(
-            "broadcast",
-            "Ошибка отправки сообщения",
-            e,
-        )
+    """Report that broadcast delivery is unavailable instead of claiming success."""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Telegram broadcast delivery is not configured; no messages were sent.",
+    )
