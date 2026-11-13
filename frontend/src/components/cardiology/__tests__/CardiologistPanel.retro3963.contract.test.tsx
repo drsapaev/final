@@ -207,10 +207,13 @@ describe('RETRO-3963-01: every authoritative selection invalidates or owns the n
       panel.indexOf('onCancel={() => {'),
       panel.indexOf('onComplete={handleCompleteVisitFromEMR}'),
     );
-    expect(cancel).toContain('navigationEpochRef.current += 1');
-    expect(cancel.indexOf('navigationEpochRef.current += 1')).toBeLessThan(
-      cancel.indexOf('setSelectedPatient(null)'),
-    );
+    const transition = cancel.indexOf('goToTab(\'queue\', () => {');
+    const bump = cancel.indexOf('navigationEpochRef.current += 1');
+    const clear = cancel.indexOf('setSelectedPatient(null)');
+    expect(transition).toBeGreaterThan(-1);
+    expect(bump).toBeGreaterThan(transition);
+    expect(clear).toBeGreaterThan(bump);
+    expect(cancel).not.toContain('setActiveTab(\'queue\')');
   });
 
   it('unmount invalidates every in-flight navigation ticket', () => {
