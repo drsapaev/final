@@ -1037,6 +1037,7 @@ export default function DisplayBoardUnified({
             <input
               className="display-device-provisioning__input"
               id="display-device-id"
+              aria-label="ID устройства"
               inputMode="numeric"
               autoComplete="off"
               value={setupDeviceId}
@@ -1047,6 +1048,7 @@ export default function DisplayBoardUnified({
             <input
               className="display-device-provisioning__input"
               id="display-device-secret"
+              aria-label="Код устройства"
               type="password"
               autoComplete="new-password"
               value={setupDeviceSecret}

@@ -27860,6 +27860,84 @@
         ]
       }
     },
+    "/api/v1/display/devices/token": {
+      "post": {
+        "tags": [
+          "display-websocket"
+        ],
+        "summary": "Exchange Display Device Token",
+        "description": "Exchange a provisioned secret or HttpOnly device session for a scoped JWT.",
+        "operationId": "exchange_display_device_token_api_v1_display_devices_token_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisplayBoardDeviceTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayBoardDeviceTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "display-websocket"
+        ],
+        "summary": "Forget Display Device Session",
+        "description": "Clear this browser's HttpOnly device sessions for one public board.",
+        "operationId": "forget_display_device_session_api_v1_display_devices_token_delete",
+        "parameters": [
+          {
+            "name": "board_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Board Name"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/display/call-patient": {
       "post": {
         "tags": [
@@ -33513,6 +33591,212 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/display/boards/{board_id}/devices": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Display Board Devices",
+        "description": "List device metadata without returning any stored credential material.",
+        "operationId": "list_display_board_devices_api_v1_admin_display_boards__board_id__devices_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DisplayBoardDeviceResponse"
+                  },
+                  "title": "Response List Display Board Devices Api V1 Admin Display Boards  Board Id  Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Display Board Device Endpoint",
+        "description": "Create a board device; return its random credential only in this response.",
+        "operationId": "create_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisplayBoardDeviceCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayBoardDeviceCreatedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/display/boards/{board_id}/devices/{device_id}/rotate": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Rotate Display Board Device Endpoint",
+        "description": "Replace a device credential and invalidate every previously issued JWT.",
+        "operationId": "rotate_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices__device_id__rotate_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayBoardDeviceCreatedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/display/devices/{device_id}": {
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Revoke Display Board Device Endpoint",
+        "description": "Revoke one display device and terminate its already-issued JWT grants.",
+        "operationId": "revoke_display_board_device_endpoint_api_v1_admin_display_devices__device_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -83575,6 +83859,186 @@
         "type": "object",
         "title": "DisplayBannerRequest",
         "description": "Request body for POST /display/boards/{board_id}/banners."
+      },
+      "DisplayBoardDeviceCreateRequest": {
+        "properties": {
+          "device_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Device Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_name"
+        ],
+        "title": "DisplayBoardDeviceCreateRequest"
+      },
+      "DisplayBoardDeviceCreatedResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "board_id": {
+            "type": "integer",
+            "title": "Board Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "device_name",
+          "status",
+          "secret"
+        ],
+        "title": "DisplayBoardDeviceCreatedResponse"
+      },
+      "DisplayBoardDeviceResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "board_id": {
+            "type": "integer",
+            "title": "Board Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "last_connected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Connected At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "rotated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "device_name",
+          "status"
+        ],
+        "title": "DisplayBoardDeviceResponse"
+      },
+      "DisplayBoardDeviceTokenRequest": {
+        "properties": {
+          "board_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Board Name"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "board_name"
+        ],
+        "title": "DisplayBoardDeviceTokenRequest"
+      },
+      "DisplayBoardDeviceTokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "board_name": {
+            "type": "string",
+            "title": "Board Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in",
+          "board_name"
+        ],
+        "title": "DisplayBoardDeviceTokenResponse"
       },
       "DisplayBoardUpdate": {
         "properties": {
