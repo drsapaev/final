@@ -7330,3 +7330,20 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: previous synthetic Session artifact source 0621df8e predates base bcf15cb; browser JS/CSS hashes were not compared with the manifest, service worker was not captured, and served_revision_verified=false. Full T18 and STAGING_VALIDATION.md remain PARTIAL; no deferral accepted.
 - PR: #4034, open and unmerged at the time of this record. No reviews or inline threads were present at the last GitHub check.
 - Merge commit: NOT_MERGED.
+
+## PR #4034 — reconcile stale T18 checkpoint with remote head 55cfd9e3 — 2026-11-13T05:21:07+05:00
+
+- Commit under test: `55cfd9e36175a71a0e2e9b6fa27616262b19b56a`; base `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`. This entry records the observed state before the journal-only follow-up is committed.
+- Environment: GitHub PR metadata and isolated Windows worktree for PR #4034.
+- Execution mode: `gate_known_root_cause`; known cause was stale top checkpoint text after later documentation commits and exact-head checks.
+- Gate command: `run_agent_gate.ps1 "T18 reconcile resume and evidence after exact-head CI on PR 4034" --known-root-cause .ai-factory/plans/admin-queue-simplification/PROGRESS.md --scope .ai-factory/plans/admin-queue-simplification/PROGRESS.md --scope .ai-factory/plans/admin-queue-simplification/EVIDENCE.md --scope .ai-factory/plans/admin-queue-simplification/RESUME.md` from `ai/langgraph`.
+- Gate result: exit 0; `narrow_override`; `gate_misroute=false`; `override_used=true`; `handoff_required=true`. The generated execution prompt was read and limited the edits to the three journals.
+- Allowed paths: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`.
+- Denied paths: runtime/API/database/auth, gate/router, staging configuration, production, unrelated worktrees, merge, and deployment.
+- Actual changed paths in this follow-up: the three named T18 journals only.
+- Original discrepancy: journal heads and pending actions still named `1cd4d9b8`, while direct `git ls-remote` and `gh pr view 4034` confirmed remote PR head `55cfd9e3`; PR remained OPEN, Ready for review, and mergeable on base `bcf15cbf`.
+- Validation on observed remote head `55cfd9e3`: Unified CI SUCCESS (run `43332774485`). Frontend unit, lint/type-check, build, configured E2E, CI Scope, PR Required Gate, and Notifications passed. PR Review Quality Gate `43335452936`, Lifecycle Recommendation `43335452888`, Security `43332774349`, Gitleaks `43332774446`, and Agent Workflow Guards `43332774383` passed. Other path-scoped jobs were skipped and are not recorded as passes.
+- Local validation for this journal edit: `git diff --check` PASS after final review; exact-head hosted checks on the journal-only follow-up are pending until push.
+- Remaining limitation: earlier synthetic Session artifact source `0621df8e` predates base `bcf15cbf`; browser JS/CSS hashes were not compared with the manifest, service worker was not captured, and `served_revision_verified=false`. Full T18 and `STAGING_VALIDATION.md` remain PARTIAL; no deferral accepted.
+- PR: #4034; OPEN / Ready for review / mergeable at `55cfd9e3` before this docs-only follow-up. No merge or deployment.
+- Merge commit: NOT_MERGED.

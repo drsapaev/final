@@ -1,4 +1,32 @@
-## Current checkpoint — PR #4034 CI and PR gates pass; T18 remains partial — 2026-11-13T04:47:24+05:00
+## Current checkpoint — PR #4034 exact remote head confirmed; T18 remains partial — 2026-11-13T05:21:07+05:00
+
+Plan version: 1.0
+Current task: T18 final synthetic acceptance and PR #4034
+Current status: IN_PROGRESS; PR #4034 is open and awaiting independent review / user-owned merge
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final
+Branch: codex/aqs-t18-rq18-failure-20261112
+Base commit: bcf15cbf2e53f6aad5d94830c7a824e8d81e561e
+Current commit: 55cfd9e36175a71a0e2e9b6fa27616262b19b56a (confirmed local and remote before this journal-only follow-up)
+Last updated: 2026-11-13T05:21:07+05:00
+
+- T00–T17 remain MERGED. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. PR #4034 is OPEN, Ready for review, mergeable, based on current `origin/main` `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`. `git ls-remote` and `gh pr view` confirmed exact remote head `55cfd9e36175a71a0e2e9b6fa27616262b19b56a`; review decision was empty.
+- The RQ-18 duplicate asset failure fix is in code-bearing commit `31c265d6`. The later commits are documentation-only. Unified CI on current head `55cfd9e3` passed: frontend unit, lint/type-check, build, configured E2E, CI Scope, PR Required Gate, and Notifications. PR Review Quality Gate and Lifecycle Recommendation passed after the latest PR-body update; Security, Gitleaks, and Agent Workflow Guards also passed. Jobs skipped by workflow scope remain SKIPPED, not PASS.
+- The open review finding from PR #4026 is addressed in #4034: a failed duplicate JS/CSS request is not suppressed by a previously captured hash; only an abort proven to be navigation-related is excluded. Exact full RQ-18 live execution was not part of CI.
+- The previous synthetic RQ-18 Session passed on artifact source `0621df8e`, which predates current base `bcf15cbf`. Its owned Compose project was torn down and post-session Preflight passed. Browser provenance remains incomplete: 68 JS/CSS response bodies were captured but not compared with the artifact manifest, the service worker was not captured, and `served_revision_verified=false`.
+- Full T18 and `STAGING_VALIDATION.md` remain PARTIAL. Do not infer full-system or production readiness from this PR's CI or the earlier targeted staging run.
+- Before this follow-up, PROGRESS/RESUME still described head `1cd4d9b8` and said push/CI were pending. This additive correction is limited to the three T18 journals; earlier checkpoints remain below as history.
+
+## Checkpoint details
+
+- Completed: #4026 finding fixed in #4034; current remote head and PR state confirmed; exact-head CI and PR gates passed; owned staging teardown verified.
+- Local validation: `git diff --check` PASS. Commit/push and exact-head hosted checks for the resulting docs commit remain pending.
+- Remaining: finish this same-PR documentation checkpoint; verify the new head checks; leave review/merge to the user. After merge, continue exact-base served-frontend provenance and remaining T18 acceptance.
+- Blocker: PR #4034 is unmerged; T18 remains partial because served frontend provenance and the full staging checklist are incomplete.
+- Next exact action: inspect the three journal edits, run `git diff --check`, commit with normal hooks, push the current branch, verify exact-head CI and PR gates, and refresh PR metadata only if it no longer matches the new head. Do not merge or deploy.
+- Checks to run after this change: `git diff --check`, exact-head Unified CI, PR Review Quality Gate, Lifecycle Recommendation, Security, Gitleaks, and Agent Workflow Guards.
+
+## Previous checkpoint — PR #4034 remote head 1cd4d9b8; exact-head checks passed — 2026-11-13T04:47:24+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance and PR #4034

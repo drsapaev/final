@@ -1,3 +1,13 @@
+## Resume — PR #4034 exact remote head confirmed; journal follow-up in progress — 2026-11-13T05:21:07+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge and deployment.
+
+PR #4034 is OPEN, Ready for review, mergeable, at exact remote head `55cfd9e36175a71a0e2e9b6fa27616262b19b56a`, based on `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`. The #4026 duplicate asset request-failure issue is fixed in code-bearing commit `31c265d6`. Unified CI passed on current head; PR Review Quality Gate and Lifecycle Recommendation passed after the PR-body update; Security, Gitleaks, and Agent Workflow Guards passed. Scoped skipped jobs are not passes. No review decision was present at the last direct PR check.
+
+The earlier synthetic RQ-18 Session passed using artifact source `0621df8e`, predating current base `bcf15cbf`. It did not prove current-base served frontend provenance: browser response hashes were not compared to the manifest, the service worker was not captured, and `served_revision_verified=false`. Full T18 and `STAGING_VALIDATION.md` remain PARTIAL. Owned Compose resources were previously torn down and verified absent.
+
+The top PROGRESS/RESUME checkpoint was stale at `1cd4d9b8`; this follow-up reconciles it while preserving historical entries. Next: validate the three journal changes, commit with normal hooks, push to the existing #4034 branch, verify exact-head checks and update PR metadata only if needed. Leave merge and deployment to the user. After merge, continue exact-base frontend provenance and remaining T18 acceptance.
+
 ## Resume — PR #4034 exact-head gates passed; journal checkpoint reconciliation — 2026-11-13T04:47:24+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112. T00–T17 remain merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge/deployment.
@@ -2398,3 +2408,4 @@ Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.code
 On runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`, current-source SQLite unit tests `test_queue_token_parent_recheck.py` and `test_qr_available_specialists.py` passed 11/11 (2 warnings). Three PostgreSQL cases for disabled-parent direct tokens and resource-owned legacy-token positive/negative behavior remain NOT_RUN: a private tmpfs-only PostgreSQL container was reachable, but the attempt logged `alembic_version` missing and produced no target-test result before it was stopped. The exact Alembic failure remains undiagnosed. The exact owned containers were removed and port 15561 is closed. User removed the private staging env and four remaining scratch files.
 
 Tier-2 remains PARTIAL; no deferral is claimed. The remaining evidence gaps are scenario 2 resource-only onboarding, scenario 3 broad incomplete-configuration actions, scenario 5 current-source PostgreSQL/live behavior, scenario 10 all legacy URLs/profile key/409 guard, full `STAGING_VALIDATION.md`, and byte-level frontend provenance. Do not repeat scenarios 1 or 6–9. Next: after user merge of #3861, refresh `origin/main` in a fresh worktree and combine the remaining scenario 2/5/10 checks into one isolated synthetic validation cycle. Do not merge or deploy.
+## Resume — PR #4034 exact-head gates passed; journal checkpoint reconciliation — 2026-11-13T04:47:24+05:00
