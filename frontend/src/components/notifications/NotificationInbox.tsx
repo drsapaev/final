@@ -231,6 +231,7 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
           ? { userId: senderId }
           : {};
         window.dispatchEvent(new CustomEvent('openChat', { detail }));
+        onClose();
         return;
       }
 
