@@ -18972,7 +18972,7 @@ export type paths = {
         put?: never;
         /**
          * Test Notifications
-         * @description Тестирование всех типов уведомлений
+         * @description Report diagnostic endpoint status without sending to external recipients.
          */
         post: operations["test_notifications_api_v1_notifications_test_notifications_post"];
         delete?: never;
@@ -26287,7 +26287,7 @@ export type components = {
         BulkNotificationRequest: {
             /**
              * Recipient Type
-             * @description Тип получателей
+             * @description Тип получателей; поддерживается только patient
              */
             recipient_type: string;
             /**
@@ -39822,7 +39822,7 @@ export type components = {
         SendNotificationRequest: {
             /**
              * Recipient Type
-             * @description Тип получателя: patient, doctor, admin
+             * @description Тип получателя; этот endpoint поддерживает только patient
              */
             recipient_type: string;
             /**
@@ -39869,7 +39869,7 @@ export type components = {
             priority: string;
             /**
              * Scheduled At
-             * @description Время отправки (для отложенных)
+             * @description Время отложенной отправки; сейчас непустое значение отклоняется с 422, так как нет durable scheduler
              */
             scheduled_at?: string | null;
         };
