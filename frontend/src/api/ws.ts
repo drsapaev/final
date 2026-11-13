@@ -49,7 +49,13 @@ export function openQueueWS(department: string, dateStr: string, onMessage: (dat
  * Открыть WebSocket для табло очереди (новая система)
  * Подключается к /api/v1/display/ws/board/{board_id}
  */
-export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) => void, onConnect: () => void, onDisconnect: () => void): () => void {
+export function openDisplayBoardWS(
+  boardId: string,
+  onMessage: (data: unknown) => void,
+  onConnect: () => void,
+  onDisconnect: () => void,
+  tokenProvider?: () => Promise<string | null>,
+): () => void {
   if (!wsEnabled()) return () => {};
   let ws: WebSocket | null = null;
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -75,6 +81,7 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
   let reconnectAttempts = 0;
   const reconnectBaseDelayMs = 3000;
   const maxReconnectDelayMs = 30000;
+  let closed = false;
 
   function clearPingInterval() {
     if (pingIntervalRef !== null) {
@@ -83,12 +90,26 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
     }
   }
 
-  function connect() {
+  function scheduleReconnect() {
+    if (closed || reconnectTimeout) return;
+    reconnectAttempts++;
+    const backoff = Math.min(
+      reconnectBaseDelayMs * Math.pow(2, reconnectAttempts - 1),
+      maxReconnectDelayMs,
+    );
+    const jitter = Math.floor(Math.random() * 500);
+    logger.log(`🔄 Попытка переподключения ${reconnectAttempts} через ${backoff + jitter}ms`);
+    reconnectTimeout = setTimeout(() => {
+      reconnectTimeout = null;
+      connect();
+    }, backoff + jitter);
+  }
+
+  function connectWithToken(token: string | null) {
     try {
       // PR-36 / P0-3: JWT now sent via Sec-WebSocket-Protocol subprotocol
       // (bearer.<token>) instead of URL query. Avoids leaking the token
       // into nginx access logs, browser history, and Referer headers.
-      const token = tokenManager.getAccessToken();
       const url = buildWsUrl(`/api/v1/display/ws/board/${encodeURIComponent(boardId)}`);
       const subprotocols = token ? [`bearer.${token}`] : [];
 
@@ -139,19 +160,7 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
         // DISPLAYWS-FE-004 (audit PR #3961): автоматическое
         // переподключение с ограниченным экспоненциальным backoff и
         // джиттером — без перманентного обрыва после 5 попыток.
-        if (event.code !== 1000) {
-          reconnectAttempts++;
-          const backoff = Math.min(
-            reconnectBaseDelayMs * Math.pow(2, reconnectAttempts - 1),
-            maxReconnectDelayMs
-          );
-          const jitter = Math.floor(Math.random() * 500);
-          logger.log(`🔄 Попытка переподключения ${reconnectAttempts} через ${backoff + jitter}ms`);
-
-          reconnectTimeout = setTimeout(() => {
-            connect();
-          }, backoff + jitter);
-        }
+        if (event.code !== 1000) scheduleReconnect();
       };
 
     } catch (error) {
@@ -159,10 +168,30 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
     }
   }
 
+  function connect() {
+    if (closed) return;
+    if (!tokenProvider) {
+      connectWithToken(tokenManager.getAccessToken());
+      return;
+    }
+
+    tokenProvider().then((token) => {
+      if (!closed) connectWithToken(token);
+    }).catch(() => {
+      if (closed) return;
+      onDisconnect && onDisconnect();
+      // A failed exchange can be transient (for example during a network
+      // outage). Retry through the same bounded backoff without exposing the
+      // credential or request error in logs.
+      scheduleReconnect();
+    });
+  }
+
   // Начальное подключение
   connect();
 
   return function close() {
+    closed = true;
     try {
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);

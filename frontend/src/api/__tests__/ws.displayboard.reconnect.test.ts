@@ -120,6 +120,23 @@ describe('openDisplayBoardWS reconnect policy (DISPLAYWS-FE-004)', () => {
     expect(FakeWebSocket.instances.length).toBe(4);
   });
 
+  it('requests a fresh board-scoped token before every connection', async () => {
+    const tokenProvider = vi.fn()
+      .mockResolvedValueOnce('device-token-one')
+      .mockResolvedValueOnce('device-token-two');
+    openDisplayBoardWS('main_board', () => {}, () => {}, () => {}, tokenProvider);
+    await Promise.resolve();
+
+    expect(FakeWebSocket.instances[0].protocols).toEqual(['bearer.device-token-one']);
+    FakeWebSocket.instances[0].simulateOpen();
+    FakeWebSocket.instances[0].simulateAbnormalClose(1008);
+    vi.advanceTimersByTime(3500);
+    await Promise.resolve();
+
+    expect(tokenProvider).toHaveBeenCalledTimes(2);
+    expect(FakeWebSocket.instances[1].protocols).toEqual(['bearer.device-token-two']);
+  });
+
   it('does not reconnect after a manual close (code 1000)', () => {
     const close = openDisplayBoardWS('main_board', () => {}, () => {}, () => {});
     const socket = FakeWebSocket.instances[0];

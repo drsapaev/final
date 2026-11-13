@@ -3,15 +3,20 @@ WebSocket endpoints для табло очереди
 Основа: passport.md стр. 2571-3324
 """
 
+import asyncio
 import json
 import logging
 from datetime import UTC, datetime
 from typing import Any
 
+import jwt
+
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
+    Response,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -19,11 +24,17 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
+from app.api.v1.endpoints.websocket_auth import (
+    _has_department_access,
+    _resolve_doctor_for_user,
+    authenticate_websocket_token,
+    resolve_websocket_token_user,
+)
 from app.api.v1.endpoints.ws_token import extract_ws_token
-from app.core.roles import DOCTOR_ROLES, Roles, normalize_role_value
+from app.core.config import settings
+from app.core.rate_limiter import limiter
+from app.core.roles import DOCTOR_ROLE_SPELLINGS, Roles, normalize_role_value
 from app.crud import display_config as crud_display
-from app.db.session import SessionLocal
 from app.models.user import User
 from app.repositories.display_websocket_api_repository import (
     resolve_display_board_targets,
@@ -34,10 +45,22 @@ from app.services.display_websocket_api_service import (
     DisplayWebSocketApiDomainError,
     DisplayWebSocketApiService,
 )
+from app.db.session import SessionLocal
+from app.schemas.display_device import (
+    DisplayBoardDeviceTokenRequest,
+    DisplayBoardDeviceTokenResponse,
+)
+from app.services.display_device_credentials import (
+    DISPLAY_DEVICE_TOKEN_TTL_SECONDS,
+    DISPLAY_DEVICE_TOKEN_TYPE,
+    authenticate_display_device_token,
+    exchange_display_device_secret,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+DISPLAY_WS_AUTH_RECHECK_SECONDS = 15
 
 # ===================== WEBSOCKET АУТЕНТИФИКАЦИЯ =====================
 
@@ -45,15 +68,17 @@ router = APIRouter()
 # trust "a token resolved to some user" as an entitlement. The policy below
 # mirrors the mounted display HTTP surface (require_roles Admin/Doctor/
 # Registrar) extended with the canonical doctor-specialty spellings; Patient
-# and every other role is rejected. Board-scoped kiosk credentials remain a
-# separate product decision (DISPLAYBOOT-FE-001) and are NOT invented here.
+# and every other role is rejected. The separate board-scoped device
+# principal is checked through its credential-version and board-binding
+# policy below.
 _DISPLAY_WS_ALLOWED_ROLES: frozenset[str] = frozenset(
     value.strip().lower()
     for value in (
         Roles.ADMIN.value,
+        Roles.SUPER_ADMIN.value,
         Roles.REGISTRAR.value,
         Roles.DOCTOR.value,
-        *(role.value for role in DOCTOR_ROLES),
+        *DOCTOR_ROLE_SPELLINGS,
     )
 )
 
@@ -66,6 +91,117 @@ def _is_display_staff(user: User | None) -> bool:
         return True
     role = normalize_role_value(getattr(user, "role", None))
     return role in _DISPLAY_WS_ALLOWED_ROLES
+
+
+def _is_authorized_display_staff(
+    user: User | None, db: Session, *, department: str | None = None
+) -> bool:
+    """Apply live doctor eligibility and the canonical queue-room grant."""
+    if user is None or not _is_display_staff(user):
+        return False
+    if bool(getattr(user, "is_superuser", False)):
+        return True
+    if department is not None:
+        return _has_department_access(user, department, db)
+    role = normalize_role_value(getattr(user, "role", None))
+    if role in DOCTOR_ROLE_SPELLINGS and _resolve_doctor_for_user(db, user) is None:
+        return False
+    return True
+
+
+def _resolve_display_socket_principal(
+    token: str | None,
+    db: Session,
+    *,
+    board_name: str | None = None,
+    department: str | None = None,
+    allow_device: bool = False,
+    touch_device: bool = False,
+) -> User | object | None:
+    """Resolve either an existing staff JWT or a bound display-device JWT."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+
+    if payload.get("typ") == DISPLAY_DEVICE_TOKEN_TYPE:
+        if not allow_device or board_name is None:
+            return None
+        return authenticate_display_device_token(
+            db,
+            token,
+            board_name=board_name,
+            touch_connection=touch_device,
+        )
+
+    user = resolve_websocket_token_user(token, db)
+    return (
+        user
+        if _is_authorized_display_staff(user, db, department=department)
+        else None
+    )
+
+
+def _token_is_display_device(token: str | None) -> bool:
+    if not token:
+        return False
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except jwt.PyJWTError:
+        return False
+    return payload.get("typ") == DISPLAY_DEVICE_TOKEN_TYPE
+
+
+def _reauthorize_display_socket(
+    token: str | None,
+    *,
+    board_name: str,
+    allow_device: bool,
+    department: str | None = None,
+) -> User | object | None:
+    db = SessionLocal()
+    try:
+        return _resolve_display_socket_principal(
+            token,
+            db,
+            board_name=board_name,
+            department=department,
+            allow_device=allow_device,
+        )
+    finally:
+        db.close()
+
+
+@router.post("/devices/token", response_model=DisplayBoardDeviceTokenResponse)
+@limiter.limit("5/minute")
+def exchange_display_device_token(
+    request: Request,
+    body: DisplayBoardDeviceTokenRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Exchange a one-time provisioned device credential for a scoped JWT."""
+    response.headers["Cache-Control"] = "no-store"
+    issued = exchange_display_device_secret(
+        db,
+        device_id=body.device_id,
+        secret=body.secret,
+    )
+    if issued is None:
+        # Keep unknown, revoked, inactive-board and wrong-secret responses
+        # indistinguishable so the endpoint does not disclose device state.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid display device credentials",
+        )
+    token, expires_in, board_name = issued
+    return DisplayBoardDeviceTokenResponse(
+        access_token=token,
+        expires_in=expires_in or DISPLAY_DEVICE_TOKEN_TTL_SECONDS,
+        board_name=board_name,
+    )
 
 
 # Canonical WebSocket authentication (JWT decode + TokenBlacklist jti/
@@ -103,22 +239,27 @@ async def websocket_display_board(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Token required"
             )
             return
-        # DISPLAYAUTH-BE-001: canonical auth now also rejects blacklisted
-        # tokens (exact jti + all_user_tokens sentinel).
-        authenticated_user = await authenticate_websocket_token(token, db)
-        if not authenticated_user:
+        # Staff JWTs use the canonical user/JTI/sentinel validator. Device
+        # JWTs are a separate principal and must be bound to this exact,
+        # active board before the manager is allowed to subscribe it.
+        if _token_is_display_device(token):
+            principal = _resolve_display_socket_principal(
+                token,
+                db,
+                board_name=board_id,
+                allow_device=True,
+                touch_device=True,
+            )
+        else:
+            principal = await authenticate_websocket_token(token, db)
+            if not _is_authorized_display_staff(principal, db):
+                principal = None
+        if principal is None:
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
             )
             return
-        # DISPLAYWS-BE-002: knowing a board_id is not an entitlement —
-        # staff-only subscription policy.
-        if not _is_display_staff(authenticated_user):
-            await websocket.close(
-                code=status.WS_1008_POLICY_VIOLATION,
-                reason="Insufficient role for board subscription",
-            )
-            return
+        authenticated_user = principal if isinstance(principal, User) else None
 
         # DISPLAYSESSION-BE-002: authentication is complete — release the DB
         # session BEFORE suspending in the long-lived receive loop (close is
@@ -128,9 +269,36 @@ async def websocket_display_board(
         await manager.connect(websocket, board_id, authenticated_user)
 
         try:
+            loop = asyncio.get_running_loop()
+            last_auth_check = loop.time()
             while True:
-                # Ожидаем сообщения от клиента (ping/pong, команды управления)
-                data = await websocket.receive_text()
+                timeout = max(
+                    0.01,
+                    DISPLAY_WS_AUTH_RECHECK_SECONDS - (loop.time() - last_auth_check),
+                )
+                try:
+                    data = await asyncio.wait_for(
+                        websocket.receive_text(), timeout=timeout
+                    )
+                except TimeoutError:
+                    data = None
+
+                if loop.time() - last_auth_check >= DISPLAY_WS_AUTH_RECHECK_SECONDS:
+                    current_principal = _reauthorize_display_socket(
+                        token,
+                        board_name=board_id,
+                        allow_device=True,
+                    )
+                    if current_principal is None:
+                        await websocket.close(
+                            code=status.WS_1008_POLICY_VIOLATION,
+                            reason="Display authorization expired or revoked",
+                        )
+                        break
+                    last_auth_check = loop.time()
+
+                if data is None:
+                    continue
                 message = json.loads(data)
 
                 # Обрабатываем команды от табло
@@ -229,15 +397,13 @@ async def websocket_queue_department(
             )
             return
         authenticated_user = await authenticate_websocket_token(token, db)
+        if not _is_authorized_display_staff(
+            authenticated_user, db, department=department
+        ):
+            authenticated_user = None
         if not authenticated_user:
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
-            )
-            return
-        if not _is_display_staff(authenticated_user):
-            await websocket.close(
-                code=status.WS_1008_POLICY_VIOLATION,
-                reason="Insufficient role for department queue",
             )
             return
     finally:
@@ -252,9 +418,39 @@ async def websocket_queue_department(
         await _send_department_queue_state(websocket, department)
 
         try:
+            loop = asyncio.get_running_loop()
+            last_auth_check = loop.time()
             while True:
                 # Ожидаем сообщения от клиента
-                data = await websocket.receive_text()
+                timeout = max(
+                    0.01,
+                    DISPLAY_WS_AUTH_RECHECK_SECONDS - (loop.time() - last_auth_check),
+                )
+                try:
+                    data = await asyncio.wait_for(
+                        websocket.receive_text(), timeout=timeout
+                    )
+                except TimeoutError:
+                    data = None
+
+                if loop.time() - last_auth_check >= DISPLAY_WS_AUTH_RECHECK_SECONDS:
+                    current_user = _reauthorize_display_socket(
+                        token,
+                        board_name=board_id,
+                        allow_device=False,
+                        department=department,
+                    )
+                    if not isinstance(current_user, User):
+                        await websocket.close(
+                            code=status.WS_1008_POLICY_VIOLATION,
+                            reason="Display authorization expired or revoked",
+                        )
+                        break
+                    authenticated_user = current_user
+                    last_auth_check = loop.time()
+
+                if data is None:
+                    continue
                 message = json.loads(data)
 
                 # Обрабатываем команды

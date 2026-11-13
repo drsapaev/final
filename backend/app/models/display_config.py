@@ -7,7 +7,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -71,6 +81,55 @@ class DisplayBoard(Base):
     )
     videos: Mapped[list[DisplayVideo]] = relationship(
         "DisplayVideo", back_populates="board", cascade="all, delete-orphan"
+    )
+    devices: Mapped[list[DisplayBoardDevice]] = relationship(
+        "DisplayBoardDevice", back_populates="board", cascade="all, delete-orphan"
+    )
+
+
+class DisplayBoardDevice(Base):
+    """Revocable, board-scoped credential for a waiting-room display."""
+
+    __tablename__ = "display_board_devices"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'revoked')",
+            name="ck_display_board_devices_status",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    board_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("display_boards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    device_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # The one-time credential itself is never persisted; only an Argon2/bcrypt
+    # verifier produced by app.core.security is stored here.
+    secret_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default="active", server_default="active", nullable=False
+    )
+    credential_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+    last_connected_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    rotated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    board: Mapped[DisplayBoard] = relationship(
+        "DisplayBoard", back_populates="devices"
     )
 
 
