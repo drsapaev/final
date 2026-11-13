@@ -15,7 +15,7 @@ import '@testing-library/jest-dom';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportActionsBar from '../LabReportActionsBar';
@@ -38,6 +38,16 @@ const apiClientSource = fs.readFileSync(
 // RETRO-3970-01: честная резервация контекста — window.open('', '_blank')
 // БЕЗ feature-строки: успех возвращает Window (truthy), реальный блок —
 // null. Моделирует браузерный контракт patientFilePreview.ts (CARDHIST-FE-001).
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function makeReservedWindow(): Window {
   return {
     close: vi.fn(),
@@ -334,6 +344,24 @@ describe('RETRO-3970-01 — honest popup reservation for the workbench preview',
     expect(screen.getByText(/Не удалось сформировать предпросмотр/)).toBeInTheDocument();
   });
 
+  it('a zero-byte preview PDF is rejected like an invalid one — no tab navigation (review P2)', async () => {
+    const mockedApi = labReportingApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    mockedApi.previewInstancePdf.mockResolvedValue(new Blob([], { type: 'application/pdf' }));
+
+    renderPreview();
+    fireEvent.click(screen.getByRole('button', { name: /Предпросмотр PDF/ }));
+    await waitFor(() => expect(mockedApi.previewInstancePdf).toHaveBeenCalled());
+    await new Promise((resolve) => { setTimeout(resolve, 80); });
+
+    const reserved = (window.open as unknown as ReturnType<typeof vi.fn>).mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      location: { href: string };
+    };
+    expect(reserved.close).toHaveBeenCalledTimes(1);
+    expect(reserved.location.href).toBe('');
+    expect(screen.getByText(/сформирован некорректно/)).toBeInTheDocument();
+  });
+
   it('an invalid blob closes the reserved tab instead of leaving a blank one', async () => {
     const mockedApi = labReportingApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
     mockedApi.previewInstancePdf.mockResolvedValue(null as unknown as Blob);
@@ -445,6 +473,54 @@ describe('PR8: template editor PreviewTab — server PDF preview', () => {
 
     expect(mockedApi.previewTemplateVersionPdf).not.toHaveBeenCalled();
     expect(screen.getByText(/заблокировано браузером/)).toBeInTheDocument();
+  });
+
+  it('a zero-byte template preview PDF is rejected like an invalid one (review P2)', async () => {
+    const mockedApi = labReportingApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    mockedApi.previewTemplateVersionPdf.mockResolvedValue(new Blob([], { type: 'application/pdf' }));
+
+    render(
+      <ThemeProvider>
+        <PreviewTab draftVersion={{ id: 55, sections: [] }} />
+      </ThemeProvider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /PDF-предпросмотр/ }));
+    await waitFor(() => expect(mockedApi.previewTemplateVersionPdf).toHaveBeenCalled());
+    await new Promise((resolve) => { setTimeout(resolve, 80); });
+
+    const reserved = (window.open as unknown as ReturnType<typeof vi.fn>).mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      location: { href: string };
+    };
+    expect(reserved.close).toHaveBeenCalledTimes(1);
+    expect(reserved.location.href).toBe('');
+    expect(screen.getByText(/сформирован некорректно/)).toBeInTheDocument();
+  });
+
+  it('an in-flight template preview does not navigate its reserved tab after unmount (review P2)', async () => {
+    const gateBlob = deferred<Blob>();
+    const mockedApi = labReportingApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    mockedApi.previewTemplateVersionPdf.mockImplementation(() => gateBlob.promise);
+
+    const { unmount } = render(
+      <ThemeProvider>
+        <PreviewTab draftVersion={{ id: 55, sections: [] }} />
+      </ThemeProvider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /PDF-предпросмотр/ }));
+    await waitFor(() => expect(mockedApi.previewTemplateVersionPdf).toHaveBeenCalled());
+    unmount();
+    await act(async () => {
+      gateBlob.resolve(new Blob(['%PDF-late'], { type: 'application/pdf' }));
+      await new Promise((resolve) => { setTimeout(resolve, 40); });
+    });
+
+    const reserved = (window.open as unknown as ReturnType<typeof vi.fn>).mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      location: { href: string };
+    };
+    expect(reserved.close).toHaveBeenCalled();
+    expect(reserved.location.href).toBe('');
   });
 
   it('a failed template preview read closes the reserved blank tab (RETRO-3970-01)', async () => {

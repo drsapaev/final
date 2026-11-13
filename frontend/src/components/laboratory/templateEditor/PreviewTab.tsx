@@ -1,6 +1,6 @@
 
 import { Alert, Button, Card } from '../../ui/macos';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { labReportingApi } from '../../../api/labReporting';
 import { FileText } from 'lucide-react';
 
@@ -49,6 +49,16 @@ function PreviewTab({ draftVersion }: PreviewTabProps) {
   const signers = draftVersion.signer_defaults || {};
   const [pdfPending, setPdfPending] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  // RETRO-3970-01 review follow-up: an in-flight preview must not outlive
+  // its unmount — the reserved blank tab is closed and the late response
+  // never navigates it.
+  const previewReservedRef = useRef<Window | null>(null);
+  const previewMountedRef = useRef(true);
+  useEffect(() => () => {
+    previewMountedRef.current = false;
+    previewReservedRef.current?.close();
+    previewReservedRef.current = null;
+  }, []);
 
   async function handleServerPdfPreview() {
     const versionId = draftVersion?.id;
@@ -64,17 +74,28 @@ function PreviewTab({ draftVersion }: PreviewTabProps) {
       setPdfError('Всплывающее окно заблокировано браузером. Разрешите pop-up для этого сайта и повторите предпросмотр.');
       return;
     }
+    previewReservedRef.current = reserved;
     setPdfPending(true);
     setPdfError(null);
     try {
       const blob = await labReportingApi.previewTemplateVersionPdf(versionId);
-      if (!blob || !(blob instanceof Blob)) {
+      if (!previewMountedRef.current) {
+        // RETRO-3970-01 review follow-up: the editor left while the read was
+        // pending — the reserved tab is closed, never navigated.
+        reserved.close();
+        return;
+      }
+      if (!blob || !(blob instanceof Blob) || blob.size === 0) {
         reserved.close();
         setPdfError('PDF сформирован некорректно. Обратитесь к администратору.');
         return;
       }
       const url = URL.createObjectURL(blob);
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (!previewMountedRef.current) {
+        reserved.close();
+        return;
+      }
       reserved.opener = null;
       reserved.location.href = url;
     } catch {

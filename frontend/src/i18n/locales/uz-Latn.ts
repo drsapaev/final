@@ -260,6 +260,7 @@ const uzLatn = {
     print_pdf_blocked: 'PDF shakllantirildi, lekin yangi varaq bloklandi. Bu sayt uchun pop-up\'larga ruxsat bering va hisobot holatini yangilash uchun «Chop etish»ni qayta bosing.',
     print_pdf_open_action: 'Chop etish uchun PDF ochish',
     print_pdf_prepared: 'To\'g\'ridan-to\'g\'ri chop etish amalga oshmadi — blank PDF tayyor. Hujjatni ochish uchun «Chop etish uchun PDF ochish» tugmasini bosing va jismoniy chop etilgandan keyin belgini tasdiqlang.',
+    print_pdf_prepared_expired: 'Tayyorlangan PDF havola eskirdi. Chop etishni qayta bajaring — hujjat qayta tayyorlanadi.',
     preview_popup_blocked: 'Brauzer qalqib chiquvchi oynani blokladi. Ushbu sayt uchun pop-up\'larga ruxsat bering va oldindan ko\'rishni qayta urinib ko\'ring.',
     preview_building: 'Server PDF ko‘rib chiqish shakillantirilmoqda...',
     preview_opened: 'PDF ko‘rib chiqish yangi varaqda ochildi («Qoralama» suv belgisi bilan).',
