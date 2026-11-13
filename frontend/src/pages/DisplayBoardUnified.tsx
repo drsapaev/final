@@ -1029,42 +1029,34 @@ export default function DisplayBoardUnified({
     return (
       <main
         data-testid="display-device-provisioning"
-        style={{
-          minHeight: '100vh',
-          display: 'grid',
-          placeItems: 'center',
-          padding: '2rem',
-          background: '#f4f7fb',
-          color: '#14233b',
-          fontFamily: 'system-ui, sans-serif',
-        }}
+        className="display-device-provisioning"
       >
-        <section style={{ width: 'min(100%, 30rem)', padding: '2rem', background: '#fff', borderRadius: '1rem', boxShadow: '0 8px 32px rgba(20,35,59,.12)' }}>
-          <h1>Табло не настроено</h1>
+        <section className="display-device-provisioning__card">
+          <h1 className="display-device-provisioning__title">Табло не настроено</h1>
           <p>Попросите администратора выдать ID устройства и код для этого табло.</p>
           <form onSubmit={submitDeviceProvisioning}>
-            <label htmlFor="display-device-id">ID устройства</label>
+            <label className="display-device-provisioning__label" htmlFor="display-device-id">ID устройства</label>
             <input
+              className="display-device-provisioning__input"
               id="display-device-id"
               inputMode="numeric"
               autoComplete="off"
               value={setupDeviceId}
               onChange={(event) => setSetupDeviceId(event.target.value)}
               required
-              style={{ display: 'block', width: '100%', margin: '.4rem 0 1rem', padding: '.75rem' }}
             />
-            <label htmlFor="display-device-secret">Код устройства</label>
+            <label className="display-device-provisioning__label" htmlFor="display-device-secret">Код устройства</label>
             <input
+              className="display-device-provisioning__input"
               id="display-device-secret"
               type="password"
               autoComplete="new-password"
               value={setupDeviceSecret}
               onChange={(event) => setSetupDeviceSecret(event.target.value)}
               required
-              style={{ display: 'block', width: '100%', margin: '.4rem 0 1rem', padding: '.75rem' }}
             />
-            {setupError && <p role="alert">{setupError}</p>}
-            <button type="submit" disabled={setupSubmitting}>
+            {setupError && <p className="display-device-provisioning__error" role="alert">{setupError}</p>}
+            <button className="display-device-provisioning__submit" type="submit" disabled={setupSubmitting}>
               {setupSubmitting ? 'Проверка…' : 'Подключить табло'}
             </button>
           </form>
