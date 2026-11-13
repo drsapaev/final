@@ -36161,14 +36161,23 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "501": {
+            "description": "Telegram broadcast delivery is disabled.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Send Broadcast Message Api V1 Admin Telegram Broadcast Post"
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                },
+                "example": {
+                  "detail": "Telegram broadcast delivery is not configured; no messages were sent."
                 }
               }
             }
