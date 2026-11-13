@@ -3394,12 +3394,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
+   "status": "REFUTED",
    "fix_pr": null,
    "merge_sha": null,
    "root_cause": "auth.py:177 CSRF cookie Secure flag keyed to ad-hoc os.getenv('ENV','dev') instead of settings",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "justification": "REFUTED during fix-PR #4065 verification by CI's own pinned contract: the SameSite/Secure semantics are deliberately keyed to the runtime ENV variable by PR #3407 (tests/integration/test_csrf_cookie_samesite.py pins ENV=production -> Secure, unset -> no Secure). core/config.py load_dotenv(_DEFAULT_ENV_FILE) (lines 587-590) syncs backend/.env — including ENV — into the process environment at import time, before any request, so os.getenv(\"ENV\") always reflects the settings-loaded value in every real deployment contour (process env, .env file, or both). A settings-only configuration path for ENV that bypasses the process environment does not exist in this codebase; a settings-keyed implementation was attempted, failed the pinned test_production_default_keeps_lax_and_adds_secure on CI, and was reverted. Verified 2026-11-13 on main 94d140f83 + PR #4065 head."
   },
   {
    "checked": false,
