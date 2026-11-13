@@ -1,4 +1,16 @@
-## Resume — PR #4034 synchronized CI green; journal follow-up — 2026-11-13T06:17:35+05:00
+## Resume — exact-base RQ-18 live evidence — 2026-11-13T07:32:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged; T18/Tier-2 is PARTIAL with no deferral. User owns merge/deployment.
+
+PR #4026 is merged. The P2 from its review is fixed in #4034 code commit `31c265d6`: genuine request failures are retained; only CDP-confirmed navigation cancellation on a superseded main-frame loader can be ignored. At this checkpoint #4034 is open, Ready for review, and clean/mergeable at code/test head `f77c761410da28c0d40b5c8eb590d991ddb0233b`, based on `main` `355d1a94b79d5793c42d98b6ea4802fa864ceea4`. Unified CI and PR quality/lifecycle gates passed there; no independent approval or merge is recorded.
+
+Exact-base artifact workflow run `43348297781` built from `355d1a94`; source SHA, 261 manifest entries and inventory passed. Synthetic RQ-18 Session on `clinic-aqs-rq18-20261113-r3` passed the live RQ-18 lifecycle and T18.10 `specialists` route/context. Normal Admin TOTP enrollment/login passed. It captured 68 actual browser JS/CSS response bodies; all 68 match the exact artifact manifest. `sw.js` was not captured, so `served_revision_verified=false` remains correct. Canonical Session teardown removed all owned resources (5 containers, 3 volumes, 1 network; remaining zero).
+
+The full six-test Playwright run completed with `status=passed`, `failedTests=[]` after collecting six cases. Its Session wrapper then failed while writing a report because Windows PowerShell 5 does not support `utf8NoBOM`; an earlier wrapper attempt stopped on a Node color warning. Each owned project reported successful teardown. These wrapper failures are not application failures and are separately recorded in `EVIDENCE.md`.
+
+This journal update is documentation-only and is prepared against code/test head `f77c7614`; its commit/push and exact-head CI are pending. Review the three-file diff, run `git diff --check`, commit and push it to the existing #4034 branch, then verify current-head checks. Do not merge. After user merge, create a fresh worktree from current `origin/main` and continue the missing service-worker provenance and remaining T18/STAGING_VALIDATION checks.
+
+## Historical resume — PR #4034 synchronized CI green; journal follow-up — 2026-11-13T06:17:35+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112. T00–T17 remain merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge and deployment.
 

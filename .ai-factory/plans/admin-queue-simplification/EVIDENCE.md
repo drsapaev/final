@@ -7361,3 +7361,96 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: earlier synthetic Session artifact source `0621df8e` predates base `bcf15cbf`; browser JS/CSS hashes were not compared with the manifest, service worker was not captured, and `served_revision_verified=false`. Full T18 and `STAGING_VALIDATION.md` remain PARTIAL; no deferral accepted.
 - PR: #4034; OPEN / Ready for review / mergeable at `55cfd9e3` before this docs-only follow-up. No merge or deployment.
 - Merge commit: NOT_MERGED.
+
+## PR #4034 — exact-base artifact-backed RQ-18 validation — 2026-11-13T07:29:02+05:00
+
+- Commit under test: RQ-18 test code at `f77c761410da28c0d40b5c8eb590d991ddb0233b`; served frontend artifact source SHA `355d1a94b79d5793c42d98b6ea4802fa864ceea4`, equal to `origin/main` at the time of the run.
+- Environment: Windows host; `Ubuntu-24.04`; Docker 29.1.3; Compose 2.40.3; synthetic project `clinic-aqs-rq18-20261113-r3`; ports 19371/19372/55473. No production endpoint or data was used.
+- Execution mode: approved `narrow_override` for validation-only T18 work. Canonical gate result: `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt was read. First-touch scope was the three T18 journals, staging runbooks/launcher/Compose/artifact workflow, the RQ-18 E2E spec, and this worktree's ignored `.scratch/t18-rq18-main-355d1a94/` harness.
+- Allowed paths: T18 journals, existing staging runbooks/launcher/configuration as references, target RQ-18 Playwright test, and owned ignored scratch for artifact, private env and harness. Denied: application runtime/API/schema, production, deployment, merge and foreign projects.
+- Actual tracked paths for this evidence update: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. No application runtime or API code changed.
+- Original review finding: PR #4026 P2 said a failed duplicate asset request could be suppressed by a hash captured on another page. PR #4026 is merged; the correction is present in PR #4034 code commit `31c265d6`: only a Chromium `ERR_ABORTED` proven by CDP to belong to a superseded main-frame loader with a matching captured hash is treated as navigation cancellation. Genuine failures remain failures.
+- Artifact validation: workflow run [43348297781](https://github.com/drsapaev/final/actions/runs/43348297781) built from exact `main` SHA `355d1a94b79d5793c42d98b6ea4802fa864ceea4`. `source.sha` matched; all 261 manifest entries matched; no unmanifested files were present. `SHA256SUMS` digest: `4fd8d9dff4f440e61bbb691518a292ce8afc1405c6ecc3842f1fc1101c0b4ff5`.
+- Canonical command: `ops/scripts/wsl_staging.ps1 -Action Preflight` then `-Action Session -EnvFile .scratch/t18-rq18-main-355d1a94/staging.env -TimeoutSec 300` with the task-owned Playwright wrapper. No `-NoBuild` was used. Preflight PASS: artifact validation PASS, WSL available memory 3205 MiB, C: reserve 14 GiB, WSL backing disk D: reserve 26 GiB, no warnings. The Session used artifact-runtime for frontend and built the backend/worker images.
+- Browser result: one live RQ-18 lifecycle test PASS in 1m 06s. Normal synthetic Admin password login and TOTP enrollment/verification PASS; synthetic queue settings GET/PUT PASS; T18.10 `specialists` navigation/context PASS; hidden profile creation, service/resource setup, explicit publication, permanent QR, anonymous booking to the QueueResource owner, inactive-resource/current-queue behavior, profile archive/restore, and reactivation PASS.
+- Browser-served asset result: 68 same-origin JavaScript/CSS `Response.body()` hashes were captured and compared against the exact artifact manifest: 68/68 matched; 0 mismatches. The artifact's `sw.js` was not captured (`RQ18_BROWSER_SW_CAPTURED=0`), so `served_revision_verified` remains `false`; do not claim complete served-revision provenance.
+- Full recorder suite: six tests were collected and Playwright's `.last-run.json` reported `status=passed`, `failedTests=[]`. The surrounding Session was marked FAIL only because Windows PowerShell 5 rejected the wrapper's `utf8NoBOM` report-encoding option after the tests completed; that run is not counted as a Session PASS. An earlier wrapper attempt stopped on a Node color warning. Those two attempts each reported owned-project teardown PASS and are not product failures.
+- Teardown: final canonical Session PASS; 5 containers, 3 volumes and 1 network removed; remaining container/volume/network counts 0/0/0; local project images removed. No other Compose project was inspected or changed.
+- Relevant safe evidence: workflow URL above, this aggregate record, and the following per-path hashes. The private synthetic env is excluded.
+- Scope check: current PR/test worktree only; no production, live data, unrelated worktree, global Docker prune, or deployment action.
+- Remaining limitation: service-worker body is missing from capture; `served_revision_verified=false`; remaining T18 scenarios and the full `STAGING_VALIDATION.md` checks are not complete. T18/Tier-2 remains `PARTIAL`; no deferral is claimed.
+- PR: #4034, open at test head `f77c761410da28c0d40b5c8eb590d991ddb0233b`, base `355d1a94b79d5793c42d98b6ea4802fa864ceea4`; CI and PR quality/lifecycle gates passed on that head. Journal follow-up checks are pending after this documentation update. User owns review and merge.
+- Merge commit: `NOT_MERGED`.
+
+Browser asset SHA-256 values captured from the browser's actual response bodies; each entry matched the same path in the artifact manifest:
+
+```text
+/assets/activity-BSJgC_If.js 8891ce2a096dde3a3064cb922a6f8c97f6cd5f13d9134d63cfda7774c35d7dcc
+/assets/AdminDashboard-DfuZ7LPF.js 740af286cf98a776c83879ae339a0a0a56462ec24ec6df0ee95d34dda6695519
+/assets/AdminRouteSwitcher-DtSB2rfd.js 948620a05db2f3c824cc889ec8ade5a6b167bda82c93dd200ccade1fdb522ec4
+/assets/AdminServices-B1ow--wJ.js 2e1e1d4732e1bc65cfec739d79f7e7a01220458881a0527df258afb6747eb45b
+/assets/AdminSetupDirections-CCiMbc6K.js d8eda6dfaa801d56ad792d713512e37f1d25e84c082df3635b63f9dd68bc2780
+/assets/arrow-left-right-BoqrTIiG.js 0025e30a476fd75fa23a76950c62d9a89ce8dcd7929ed758e4b4c38372ea0f72
+/assets/async-state-D9nJC1OP.js 68545f8dbc5de34f7bb1152133028731fa50bdf01b8a6b3b607604b82245bdae
+/assets/Badge-DyYVc4Y4.js fb891d083353bc0278d2dd31d678071d1b0d18310eae18eabcfe76be0cb653fe
+/assets/ban-Cpf5742b.js 9c9659522eb6d58694f9a955a0ea1c4b28e50661f093701559071a5484d0808f
+/assets/calendar-days-y2E04WxG.js e0260072d2a56466baacffc5da6292194d5e309a20c47b0db90da4196aff465f
+/assets/chevron-up-Btig1xu_.js 60f5eaa5d4be95fa1477b06a5ab77a44c37eab12d8201478649b93c7463167f7
+/assets/circle-check-BTQ6FE6S.js 811b7042452b38ea8747286991a1ac2ab315bf41928722c386727d13d3e5a6dc
+/assets/ClinicSettings-Dg8YGxre.js 53456a42f20e966fe5c3034727eadcd9488ac0596a6e845e999d669c9ec03df3
+/assets/ColorSchemeSelector-BW3peBLY.js e71bc19acff6c355de23e42ec79e4ea08269350dcc9c0c19c2594d0a0b6c3f3e
+/assets/ConfirmDialog-BoivHieh.js dae1ef364e80d3a5405185d823fbaf3b77c3e9a0e36d5f6e3e186e08566002f0
+/assets/DataTable-CCOFLuoO.js de6414e18863127b81e82b2d2d6e6747c49814dc54c546d48d0b1cc694cdfe69
+/assets/dateUtils-CRY4jqc3.js d1d5090c40b14db594a4232a507f8db3ee3c6da90bbab1c492ebf746ed76eb13
+/assets/Dialog-DanL2coJ.js ff9aac5751099286bc02658ef0dae9f2b0867dc598229f9f5617ad7f2fce2870
+/assets/dollar-sign-32YYB4tj.js 8308b4fe484f88ece375590d48687ce4d251d7998dbc26afe48d53b410e1d66c
+/assets/external-link-MNkXJVRz.js 499d1f2f6d58deabbe77980fe6bf56cc1548607c60c424c8db582d7bfb4618f2
+/assets/folder-tree-DA-XzLD7.js e2863104ab565b2bdf1c769fe4f01b12b05e851a1d41567b9c3289580000d34e
+/assets/formatCurrency-BA4EJy20.js f3aee08283c543cfb633649941a971499f21a24ecf107f6f7d22d1be7d8922fc
+/assets/funnel-Dcv1G-xJ.js 7d72cbddadd08cb7252dfadc0536ff33e7fe8a2a98ffe57b328d47fdea1f7569
+/assets/globe-Di2OHfWc.js 031b17f8099d655fce11b34bf5f92aa72e99d57386d29b73c248f653b90652f9
+/assets/history-Dvx-gz5m.js f7d3c802a6f9bddf36cf3812bdbc8de6f93a1ff16e0e45f6c8b843ad5728f380
+/assets/i18n-dudx1xi9.js 820eeb0a3921d2ffaf7b93acf63b1b7d2b4bd774620936333cb2e0169687c4b7
+/assets/index-C3gpOeJv.css cffe2954fac5d65a9be86a142fce9bc426723323d17bc1a6cae4f68fcd64a90a
+/assets/index-CHvslma7.js d7b8748b13a4c748a0ec1c8d069d0c4012d54c65f880f7a8a5b4e919961602fd
+/assets/index-CNHtzVYG.js 3f07c71085bdce2b8501f85179b96e9495f488b0d8db20f627adde9be1362092
+/assets/Label-C7LZpz2E.js 10a1975e8a3efdd1aaee855f247b14f3a4a93d0cac1241035a5cf20ff4412a8f
+/assets/map-pin-C7_oQRqq.js a90cd3a8ba60eabef5032728b3dc09f38ceafdee526f8133c53e6bd2df18144f
+/assets/minus-BiZs7aCC.js fa18669dfc50d3346320450153dcd44689eb46597bc997da6ad0e7c29f3eb967
+/assets/package-CiMWFeMK.js cfbc200b90bc6e1a5de8df79ae763e182fb643a5cf479564660aa338e797afed
+/assets/pen-bQg2o3k2.js 1362f65df25466e7658281108daf37eef2c6152b115c328ae6b3e442c10169ac
+/assets/play-Dz14RCYk.js f7fae4047c6cd49d939a0683e3dc75eecea956e1ccdadc94576ddcb7eb00dccf
+/assets/printer-skJRMfvj.js 5eb58b0b83dd0497a5ca9a53fe85a52073a0bee40e7304c9e31e21e8a0256028
+/assets/qr-code-CDfjW_JH.js a424e55826281278ba5ea8198ce68f6ea6b43b3ba98c66f6e7ec6dfbf64cce4c
+/assets/queue-DuXqVfmy.js 48286106846ae852432757be74e3422ac7bb8dc14a724c27a8a7c42d114954d9
+/assets/queue-fLF3lsjj.js cf219f0b58b142ed47c85295ac8e0fea96fd23b1f6102f5eb4bdfc2bb40fed8c
+/assets/QueueCabinetManagement-48Ys5z0X.js f70beb969317f3085961bc633db996a977280cb795d154cd6dd768f0970eab52
+/assets/queueDirections-C4hpm_KP.js 4356483640cace73c594b054dce711e91425d4fbbc570f48b4ef4907244241fc
+/assets/QueueJoin-CSyTScJb.css acc2533659a607f8e73bb7a985949529a95d258abf3ae9cd62e14e45dfb01e1e
+/assets/QueueJoin-DVwA0f_S.js 1e1dc127aa75b02a3cac4daf849bbbe3b87d56c1ce12f32e463f93921a3943c6
+/assets/QueueProfilesManager-DfgTABPi.js f5c5d2fc7c9f113d74a5336fa5f6d001345b7c7323769743ba1b0c50f0c90e79
+/assets/react-vendor-cKMGke8C.js 3500e8e7bc81b5fd5be9f602d64eab53f7871d8cd3406d222ad052d773604591
+/assets/rotate-ccw-ZKQetmOX.js adc1eead12b0f6db8f56df5d42204b5b8bafde786683287f5c2adf93a45efacb
+/assets/save-DWlH4EHv.js 8e91e0d8a64e4f1842852f1d587e69045142885a7138cbccea2972129cb3c096
+/assets/scissors-CsjsApfT.js 63c373186d8c774cf4510df5bfa9b8d1ef7a7f595e5f5992db70677a75e3a89c
+/assets/SegmentedControl-Dwan6Dvv.js 14ce919f9f14c619265bd716c9b49af74207f952c5a9828dd61ab1d01e8c842c
+/assets/sentry-DSl5gQYd.js db8fbe6f3cd7ea5b421b5ff2864b14759f96fd3648ea69d4ffed3a7e1d6fdf2d
+/assets/ServiceCatalog-6lWIVy3m.js 0e4fa3a22d63126b4707ea0ff11563915d6a93c5a519c77b17cc317467d63964
+/assets/serviceCodeUtils-BKcbhs2e.js 13f67a08c0eab28c8dfff91cb61f6b3ae6c7e33022fbc51ae717307e73dc5807
+/assets/Skeleton-CKZJS8fR.js 3c8e5c3c6489460705c5f2efcc41d03628733809cc00c0886bbc5a6f6bacab41
+/assets/square-C-d8FXBx.js 47aaa8a1a92716c1c3c8f413e88f687cb16a44217645ff192f54a1b6b9fca5bd
+/assets/square-check-big-DZAa6GQb.js 0785b9e314f4473e3f9bcca71a947dcbca61654ee6ceff75eaba5bbc6c42e11f
+/assets/square-pen-DzdE_SMs.js 04ba205e33999d24d3d565d281dd56caf15bcf43b447a36b81eaaf212703bd1d
+/assets/StatCard-gMaApW57.js d5259335e68a975000ef8d5e8622887678553771c9466fe6c08fb6d42c360d73
+/assets/test-tube-CPqKailG.js 090e2676952765d08fe8a9533812effe187216542110ac86c480cacf87c95e61
+/assets/Textarea-CIhdRbum.js 7467bb118bc6d6fc59dbce33d91cbb4d2f7536968d1c5208e4f381465b56ebed
+/assets/ticketPrintSettings-UmC0_hHK.js c4477f22fa981b63c4bb6459f2ae435d5482128de038543a0df1edbda0e1301e
+/assets/trash-2-DpCOBk3v.js 400cf2f3e66323a185cd2408ab8324da9a7b5f02fba0283430c2f2635e4b15c6
+/assets/trending-down-C-Hbg06W.js ea8f6e0c54d2649be38debffe7323e8184608ffef94d44a4680d5cc7d3e35430
+/assets/trending-up-BUN91B_c.js b255f1f68aec6048fe984156d6e5e5cdbd760fdcdfdab663584472fc0d943249
+/assets/UnifiedSettings-DtbhCPpz.js 9a8c5c96b34016d4c224d2ef3fea08fd0f6fd52e82d9981ce09de4b82f338583
+/assets/upload-CRskumc0.js 6e66f4ed8f9fc4c7131e2b62d203bba5a32ece12b742ac1abfb92111a6d7afc9
+/assets/useAsyncAction-BOcFlhM4.js 9bc7d44aa3d425dd731b626c33b31213979f575ee0739f5c07bbe8a69724da25
+/assets/volume-2-BTGMF9dR.js 173969a7736c19be17fd8a7ad048579fd555c04a219fce1b5819d683e15d7927
+/assets/zap-DYk4tGhv.js 36a8739e416642802284df2c5c31965e411a7b1d14d7eaf903dd1e6a63b5ae1c
+```

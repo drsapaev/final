@@ -1,4 +1,32 @@
-## Current checkpoint — PR #4034 synchronized CI green; awaiting user review/merge — 2026-11-13T06:17:35+05:00
+## Current checkpoint — PR #4034 current-base RQ-18 evidence — 2026-11-13T07:32:00+05:00
+
+Plan version: 1.0
+Current task: T18 final acceptance and PR #4034
+Current status: IN_PROGRESS; RQ-18 live check PASS, provenance remains partial
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final
+Branch: codex/aqs-t18-rq18-failure-20261112
+Base commit: 355d1a94b79d5793c42d98b6ea4802fa864ceea4
+Code/test commit under validation: f77c761410da28c0d40b5c8eb590d991ddb0233b
+Last updated: 2026-11-13T07:32:00+05:00
+
+- T00–T17 remain MERGED. T18/Tier-2 remains PARTIAL; no deferral accepted.
+- PR #4026 is MERGED. Its P2 is corrected in #4034 code commit 31c265d6: genuine duplicate JS/CSS failures remain failures; only CDP-proven cancellation from a superseded main-frame loader with a matching captured hash is ignored.
+- PR #4034 was OPEN, Ready for review, clean/mergeable at code/test HEAD f77c7614; its exact-head Unified CI, PR Required Gate, PR Review Quality Gate and Lifecycle Recommendation passed. Independent approval and user merge remain outstanding.
+- Current-main frontend artifact workflow 43348297781 passed on 355d1a94. source.sha matched; 261/261 manifest hashes and the exact inventory passed; manifest SHA-256 is recorded in EVIDENCE.md.
+- Final synthetic Preflight/Session used artifact-runtime. Normal Admin login/TOTP, T18.10 specialists context, and the RQ-18 profile/service/resource/publication/permanent-QR/booking/archive/reactivation scenario passed. Canonical teardown removed 5 containers, 3 volumes and 1 network; remaining counts were zero.
+- Browser captured 68 JS/CSS response bodies; all 68 SHA-256 values match the exact artifact manifest. The service-worker body was not captured, therefore `served_revision_verified=false` and T18 is not complete.
+- One earlier six-test Playwright run had `status=passed`, `failedTests=[]`; its enclosing Session failed only while writing a report with an encoding unsupported by Windows PowerShell 5. Another wrapper attempt stopped on a Node color warning. Both owned projects were torn down; these are harness failures, not application failures.
+- The full STAGING_VALIDATION.md checklist and remaining T18 scenarios have not been run. Backend/integration/production readiness jobs skipped by CI are not passes.
+- This checkpoint records the code/test head before the documentation-only evidence follow-up. User owns review and merge; no merge or deployment occurred.
+
+## Current checkpoint
+- Completed: confirmed the #4026 P2 fix in #4034; exact-main artifact verified; RQ-18 live flow and T18.10 passed; 68/68 browser JS/CSS hashes match; owned staging teardown passed.
+- Changed but not verified: additive PROGRESS/EVIDENCE/RESUME journal update; commit/push and exact-head CI are still pending.
+- Remaining: service-worker body provenance; other T18 scenarios; all STAGING_VALIDATION.md checks; independent review and user merge of #4034.
+- Blocker: `served_revision_verified=false`; T18/Tier-2 remains PARTIAL. No accepted deferral.
+- Next exact action: review the journal diff, run `git diff --check`, commit and push the documentation update to the existing #4034 PR, then verify exact-head CI and PR gates. Do not merge.
+- Checks to rerun after the next change: `git diff --check`; exact-head Unified CI, PR Required Gate, PR Review Quality Gate and Lifecycle Recommendation.
+## Historical checkpoint — PR #4034 synchronized CI green; awaiting user review/merge — 2026-11-13T06:17:35+05:00
 
 Plan version: 1.0
 Current task: T18 final acceptance and PR #4034
