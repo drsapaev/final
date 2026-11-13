@@ -25,3 +25,6 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+## 2023-10-05 - Disabled buttons swallow hover events
+**Learning:** Tooltips wrapped directly around disabled `<button>` elements in React often fail to appear because the disabled state swallows pointer events like `onMouseEnter`.
+**Action:** Always wrap the disabled button in a `<span>` or `<div>` (e.g. `<span style={{ display: 'inline-block' }}>`) inside the Tooltip component to ensure the hover events fire and the tooltip displays correctly.
