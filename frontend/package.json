@@ -57,7 +57,7 @@
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
     "@sentry/react": "^8.47.0",
-    "@tanstack/react-virtual": "^3.14.26",
+    "@tanstack/react-virtual": "3.14.14",
     "@testing-library/dom": "^10.4.2",
     "@vercel/speed-insights": "^2.1.0",
     "axios": "^1.21.0",
