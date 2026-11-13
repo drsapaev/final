@@ -1711,7 +1711,8 @@ async def test_service_body_ends_transaction_before_dispatch(
     # The channel selection resolves to "pwa" (the fixture phone is a
     # +998 number). Stub the pwa dispatch itself — the assertion target
     # is the transaction state AT THE PROVIDER AWAIT, wherever it lives.
-    async def _stub_pwa_invitation(patient, data):
+    async def _stub_pwa_invitation(patient, data, *, db=None):
+        assert db is s
         observed["in_transaction"] = s.in_transaction()
         return {"success": True, "channel": "pwa"}
 

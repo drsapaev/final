@@ -1223,7 +1223,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
   // P1: центр уведомлений обходит guard; route identity вместо /lab/*-префикса;
   // pending-only операция не блокирует уход; P2: фантомная sentinel-запись.
 
-  test('notification center navigation is guarded while a lab draft is dirty (review round 3)', async ({ page }) => {
+  test('message notification opens chat without discarding a dirty lab draft (review round 3)', async ({ page }) => {
     await page.route('**/api/v1/notifications/inbox**', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -1248,31 +1248,18 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await fieldInput.fill('6.5');
     await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
 
-    // Колокольчик → центр уведомлений → клик по уведомлению message_received.
-    // Прежний прямой обход History API выполнял переход молча: LabPanel
-    // размонтировалась без решения пользователя.
+    // Колокольчик → центр уведомлений → клик по message_received открывает
+    // чат поверх формы и не размонтирует LabPanel с несохранённым черновиком.
     await page.getByRole('button', { name: 'Уведомления', exact: true }).click();
     const inbox = page.getByRole('dialog', { name: 'Центр уведомлений' });
     await expect(inbox).toBeVisible();
     await page.getByRole('button', { name: 'Открыть уведомление: Новое сообщение' }).click();
 
-    // Guard-диалог открыт (кнопка «Выйти без сохранения» уникальна для него),
-    // URL остался /lab.
-    const guardDiscard = page.getByRole('button', { name: 'Выйти без сохранения' });
-    await expect(guardDiscard).toBeVisible();
+    await expect(inbox).toBeHidden();
+    await expect(page.getByRole('dialog', { name: 'Чат' })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe('/lab');
-
-    // Отмена: черновик и контекст нетронуты.
-    await page.getByRole('button', { name: 'Отмена' }).click();
-    await expect(guardDiscard).toHaveCount(0);
     await expect(fieldInput).toHaveValue('6.5');
     expect(new URL(page.url()).pathname).toBe('/lab');
-
-    // Подтверждённый уход: discard → переход по цели уведомления.
-    await page.getByRole('button', { name: 'Открыть уведомление: Новое сообщение' }).click();
-    await expect(guardDiscard).toBeVisible();
-    await guardDiscard.click();
-    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).not.toBe('/lab');
   });
 
   test('notification lab_results deep-link asks the guard instead of unmounting the panel (review round 3)', async ({ page }) => {
