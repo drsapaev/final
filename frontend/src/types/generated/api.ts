@@ -11799,7 +11799,7 @@ export type paths = {
         put?: never;
         /**
          * Send Broadcast Message
-         * @description Отправить широковещательное сообщение
+         * @description Report that broadcast delivery is unavailable instead of claiming success.
          */
         post: operations["send_broadcast_message_api_v1_admin_telegram_broadcast_post"];
         delete?: never;
