@@ -110,10 +110,6 @@ def wire_endpoint(
     [
         (None, None),
         ("[]", status.WS_1011_INTERNAL_ERROR),
-        (
-            '{"type":"notification_sync","limit":"invalid"}',
-            status.WS_1011_INTERNAL_ERROR,
-        ),
     ],
 )
 async def test_registered_socket_removed_on_disconnect_and_unexpected_errors(

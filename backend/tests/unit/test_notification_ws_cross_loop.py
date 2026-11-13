@@ -397,3 +397,97 @@ async def test_redis_listener_starts_after_first_subscription() -> None:
     await bridge._listener_task
     assert bridge._listener_task.done()
     await bridge._redis_client.aclose()
+
+
+class _TrackingPubSub(_NoopPubSub):
+    def __init__(self) -> None:
+        self.subscribe_calls: list[str] = []
+        self.unsubscribe_calls: list[str] = []
+
+    async def subscribe(self, channel: str, handler) -> None:
+        self.subscribe_calls.append(channel)
+
+    async def unsubscribe(self, channel: str, handler) -> None:
+        self.unsubscribe_calls.append(channel)
+
+
+class _FailingWebSocket(_FakeWebSocket):
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.attempts = 0
+
+    async def send_json(self, data: dict) -> None:
+        self.attempts += 1
+        raise RuntimeError("synthetic socket is closed")
+
+
+@pytest.mark.asyncio
+async def test_failed_json_send_prunes_socket_but_preserves_other_recipients() -> None:
+    pubsub = _TrackingPubSub()
+    manager = NotificationWebSocketManager(pubsub=pubsub)
+    bad = _FailingWebSocket("closed")
+    good = _FakeWebSocket("healthy")
+
+    await manager.connect(bad, 51)
+    await manager.connect(good, 51)
+    assert len(manager.active_connections[51]) == 2
+
+    await manager.send_json({"type": "notification", "delivery_id": "synthetic-1"}, 51)
+
+    assert manager.active_connections[51] == [good]
+    assert id(bad) not in manager._connection_loops
+    assert good.sent == [{"type": "notification", "delivery_id": "synthetic-1"}]
+    assert bad.attempts == 1
+    # Redis subscription belongs to the remaining healthy connection.
+    assert pubsub.unsubscribe_calls == []
+
+    await manager.send_json({"type": "notification", "delivery_id": "synthetic-2"}, 51)
+    assert bad.attempts == 1
+    assert len(good.sent) == 2
+    manager.disconnect(good, 51)
+    await _wait_until(lambda: pubsub.unsubscribe_calls == ["user:51"])
+    assert 51 not in manager.active_connections
+
+
+@pytest.mark.asyncio
+async def test_failed_last_json_send_removes_redis_handler() -> None:
+    pubsub = _TrackingPubSub()
+    manager = NotificationWebSocketManager(pubsub=pubsub)
+    bad = _FailingWebSocket("closed-last")
+    await manager.connect(bad, 52)
+
+    await manager.send_json({"type": "notification"}, 52)
+
+    assert bad.attempts == 1
+    assert 52 not in manager.active_connections
+    assert id(bad) not in manager._connection_loops
+    assert 52 not in manager._pubsub_handlers
+    await _wait_until(lambda: pubsub.unsubscribe_calls == ["user:52"])
+
+
+@pytest.mark.asyncio
+async def test_failed_foreign_loop_json_send_prunes_on_socket_home_loop() -> None:
+    pubsub = _TrackingPubSub()
+    manager = NotificationWebSocketManager(pubsub=pubsub)
+    bad = _FailingWebSocket("foreign-fail")
+    await manager.connect(bad, 53)
+    home_loop = asyncio.get_running_loop()
+    errors: list[BaseException] = []
+
+    def background_sender() -> None:
+        try:
+            asyncio.run(manager.send_json({"type": "notification"}, 53))
+        except BaseException as exc:
+            errors.append(exc)
+
+    worker = threading.Thread(target=background_sender, daemon=True)
+    worker.start()
+    await asyncio.to_thread(worker.join, 5)
+
+    assert not worker.is_alive()
+    assert errors == []
+    await _wait_until(lambda: 53 not in manager.active_connections)
+    await _wait_until(lambda: pubsub.unsubscribe_calls == ["user:53"])
+    assert id(bad) not in manager._connection_loops
+    assert bad.attempts == 1
+    assert home_loop.is_running()
