@@ -13,7 +13,7 @@ from html import escape  # noqa: F401
 from typing import Any  # noqa: F401
 
 import httpx  # noqa: F401
-from jinja2 import Environment, select_autoescape  # noqa: F401
+from jinja2.sandbox import SandboxedEnvironment  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.core.config import settings  # noqa: F401
@@ -38,7 +38,7 @@ from app.services.telegram.bot import telegram_bot  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
-_jinja_env = Environment(autoescape=True)
+_jinja_env = SandboxedEnvironment(autoescape=True)
 
 
 class NotificationSenderMixinBase:

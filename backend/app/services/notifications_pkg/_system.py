@@ -27,43 +27,32 @@ class SystemMixin(NotificationSenderMixinBase):
         actor_role: str | None = None,
     ) -> bool:
         """Отправка системного оповещения"""
-        alert_message = f"""
-        🚨 <b>Системное оповещение</b>
-
-        Тип: {alert_type}
-        Сообщение: {message}
-        """
-
-        if details:
-            alert_message += "\nДетали:\n"
-            for key, value in details.items():
-                alert_message += f"• {key}: {value}\n"
-
-        alert_message += f"\nВремя: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
-
+        inbox_created = False
         if db:
             platform_service = self._platform_service(db)
             admins = platform_service.resolve_users_for_role("admin")
-            await platform_service.record_delivery_for_users(
-                users=admins,
-                event_type="system_alert",
-                title=f"Системное оповещение: {alert_type}",
-                message=message,
-                source_module="system",
-                recipient_type="user",
-                severity="critical" if alert_type.lower() in {"critical", "security"} else "warning",
-                priority="urgent" if alert_type.lower() in {"critical", "security"} else "high",
-                actor_id=actor_id,
-                actor_role=actor_role,
-                payload_snapshot={
-                    "alert_type": alert_type,
-                    "message": message,
-                    "details": details or {},
-                },
-                transport_type="system_alert",
-            )
+            if admins:
+                deliveries = await platform_service.record_delivery_for_users(
+                    users=admins,
+                    event_type="system_alert",
+                    title=f"Системное оповещение: {alert_type}",
+                    message=message,
+                    source_module="system",
+                    recipient_type="user",
+                    severity="critical" if alert_type.lower() in {"critical", "security"} else "warning",
+                    priority="urgent" if alert_type.lower() in {"critical", "security"} else "high",
+                    actor_id=actor_id,
+                    actor_role=actor_role,
+                    payload_snapshot={
+                        "alert_type": alert_type,
+                        "message": message,
+                        "details": details or {},
+                    },
+                    transport_type="system_alert",
+                )
+                inbox_created = bool(deliveries)
 
-        return await self.send_telegram(alert_message)
+        return inbox_created
 
 
     async def send_all_free_request_notification(
@@ -303,7 +292,6 @@ class SystemMixin(NotificationSenderMixinBase):
                 entity_type="message",
                 entity_id=str(message_id),
                 payload_snapshot=payload_snapshot,
-                deep_link=f"/messages?user={sender.id}",
             )
             logger.info(
                 "[FIX:NOTIFICATIONS] created message_received delivery",

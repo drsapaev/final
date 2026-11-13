@@ -37,6 +37,7 @@ class NotificationPlatformServiceMixinBase:
 
     INBOX_CHANNEL = "in_app_inbox"
     TRANSPORT_NOTIFICATION = "notification"
+    TRANSPORT_NOTIFICATION_UPDATE = "notification_update"
     TRANSPORT_QUEUE_UPDATE = "queue_update"
     TRANSPORT_SYSTEM_ALERT = "system_alert"
     DEFAULT_TIMEZONE = "Asia/Tashkent"

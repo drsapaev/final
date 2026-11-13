@@ -187,7 +187,7 @@ class NotificationSettings(NotificationSettingsBase):
 # Запросы для отправки уведомлений
 class SendNotificationRequest(BaseModel):
     recipient_type: str = Field(
-        ..., description="Тип получателя: patient, doctor, admin"
+        ..., description="Тип получателя; этот endpoint поддерживает только patient"
     )
     recipient_id: int | None = Field(None, description="ID получателя")
     notification_type: str = Field(..., description="Тип уведомления")
@@ -201,12 +201,18 @@ class SendNotificationRequest(BaseModel):
     related_entity_id: int | None = Field(None, description="ID связанной сущности")
     priority: str = Field("normal", description="Приоритет: low, normal, high, urgent")
     scheduled_at: datetime | None = Field(
-        None, description="Время отправки (для отложенных)"
+        None,
+        description=(
+            "Время отложенной отправки; сейчас непустое значение отклоняется с 422, "
+            "так как нет durable scheduler"
+        ),
     )
 
 
 class BulkNotificationRequest(BaseModel):
-    recipient_type: str = Field(..., description="Тип получателей")
+    recipient_type: str = Field(
+        ..., description="Тип получателей; поддерживается только patient"
+    )
     recipient_ids: list[int] = Field(..., description="ID получателей")
     notification_type: str = Field(..., description="Тип уведомления")
     channels: list[str] = Field(["email"], description="Каналы отправки")

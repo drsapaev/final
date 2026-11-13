@@ -14,7 +14,7 @@ import { useNotificationCenter } from '../../contexts/NotificationCenterContext'
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useGuardedLabNavigate } from '../laboratory/LabDirtyGuardContext';
-import React from "react";
+import React from 'react';
 import { safeJsonParse } from '../../utils/safeJsonParse';
 
 const STATUS_FILTER_OPTIONS = [
@@ -47,12 +47,15 @@ function getSeverityStyle(severity = 'info') {
   }
 }
 
-function extractMetadata(item: { payloadSnapshot?: unknown; raw?: Record<string, unknown> } | null | undefined): Record<string, unknown> {
+function extractMetadata(item: { payloadSnapshot?: unknown; raw?: unknown } | null | undefined): Record<string, unknown> {
   if (!item) {
     return {};
   }
 
-  const payloadSnapshot = item.payloadSnapshot || item.raw?.payload_snapshot || item.raw?.payloadSnapshot;
+  const raw = item.raw && typeof item.raw === 'object' && !Array.isArray(item.raw)
+    ? item.raw as Record<string, unknown>
+    : {};
+  const payloadSnapshot = item.payloadSnapshot || raw.payload_snapshot || raw.payloadSnapshot;
   let snapshotData: unknown = payloadSnapshot;
   if (typeof snapshotData === 'string') {
     try {
@@ -65,29 +68,29 @@ function extractMetadata(item: { payloadSnapshot?: unknown; raw?: Record<string,
   const snapshotRecord = (snapshotData && typeof snapshotData === 'object' ? snapshotData : {}) as Record<string, unknown>;
   const metadata: unknown =
     snapshotRecord.metadata ||
-    item.raw?.metadata ||
-    item.raw?.data ||
+    raw.metadata ||
+    raw.data ||
     {};
 
   return metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : {};
 }
 
 function resolveNotificationTarget(item: { deepLink?: string | null; type?: string; eventType?: string; payloadSnapshot?: unknown; raw?: unknown } | null | undefined, userRole: string | null | undefined) {
+  const type = String(item?.type || item?.eventType || '').trim().toLowerCase();
+  if (type === 'message_received') {
+    return null;
+  }
+
   const explicitDeepLink = String(item?.deepLink || '').trim();
   if (explicitDeepLink) {
     return explicitDeepLink;
   }
-
-  const type = String(item?.type || item?.eventType || '').trim().toLowerCase();
-  const metadata = extractMetadata(item as { payloadSnapshot?: unknown; raw?: Record<string, unknown> } | null | undefined);
 
   switch (type) {
     case 'all_free_requested':
     case 'all_free_approved':
     case 'all_free_rejected':
       return '/admin/all-free-requests';
-    case 'message_received':
-      return metadata.conversation_id ? `/messages?conversation=${String(metadata.conversation_id)}` : '/messages';
     case 'lab_results':
       return '/lab/results';
     case 'lab_critical_result':
@@ -218,6 +221,17 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
 
       if (!item.isRead && !item.isArchived) {
         await markAsRead(item.id);
+      }
+
+      const notificationType = String(item.type || item.eventType || '').trim().toLowerCase();
+      if (notificationType === 'message_received' && typeof window !== 'undefined') {
+        const metadata = extractMetadata(item);
+        const senderId = Number(metadata.sender_id);
+        const detail = Number.isSafeInteger(senderId) && senderId > 0
+          ? { userId: senderId }
+          : {};
+        window.dispatchEvent(new CustomEvent('openChat', { detail }));
+        return;
       }
 
       const target = resolveNotificationTarget(item, userRole);

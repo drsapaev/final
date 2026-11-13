@@ -43,16 +43,6 @@ class AppointmentsMixin(NotificationSenderMixinBase):
 
         sms_message = f"Напоминание: запись к {doctor_name} {appointment_date.strftime('%d.%m в %H:%M')}"
 
-        telegram_message = f"""
-        📅 <b>Напоминание о записи</b>
-
-        👤 Пациент: {patient_email}
-        📱 Телефон: {patient_phone}
-        👨‍⚕️ Врач: {doctor_name}
-        🏥 Отделение: {department}
-        📅 Дата: {appointment_date.strftime('%d.%m.%Y в %H:%M')}
-        """
-
         # Отправляем уведомления
         results = {}
 
@@ -74,10 +64,20 @@ class AppointmentsMixin(NotificationSenderMixinBase):
                     db=db,
                 )
 
-        if patient_email:
+        if patient_email and self._patient_channel_opted_in(
+            db=db,
+            patient_id=patient_id,
+            channel="email",
+            event_type="appointment_reminder",
+        ):
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
-        if patient_phone:
+        if patient_phone and self._patient_channel_opted_in(
+            db=db,
+            patient_id=patient_id,
+            channel="sms",
+            event_type="appointment_reminder",
+        ):
             results["sms"] = await self.send_sms(patient_phone, sms_message)
 
         if db and patient_id:
@@ -92,7 +92,7 @@ class AppointmentsMixin(NotificationSenderMixinBase):
                 },
             )
         else:
-            results["telegram"] = await self.send_telegram(telegram_message)
+            results["telegram"] = False
 
         return results
 
@@ -107,6 +107,7 @@ class AppointmentsMixin(NotificationSenderMixinBase):
         queue_number: int | None = None,
         db: Session | None = None,
         patient_id: int | None = None,
+        send_push_notification: bool = True,
     ) -> dict[str, bool]:
         """Отправка подтверждения визита"""
         subject = "Подтверждение визита к врачу"
@@ -134,23 +135,10 @@ class AppointmentsMixin(NotificationSenderMixinBase):
         if queue_number:
             sms_message += f", очередь №{queue_number}"
 
-        telegram_message = f"""
-        ✅ <b>Подтверждение визита</b>
-
-        👤 Пациент: {patient_email}
-        📱 Телефон: {patient_phone}
-        👨‍⚕️ Врач: {doctor_name}
-        🏥 Отделение: {department}
-        📅 Дата: {visit_date.strftime('%d.%m.%Y в %H:%M')}
-        """
-
-        if queue_number:
-            telegram_message += f"🎫 Номер в очереди: {queue_number}"
-
         # Отправляем уведомления
         results = {}
 
-        if db and patient_id:
+        if send_push_notification and db and patient_id:
             from app.models.patient import Patient
 
             patient = db.query(Patient).filter(Patient.id == patient_id).first()
@@ -169,13 +157,34 @@ class AppointmentsMixin(NotificationSenderMixinBase):
                     db=db,
                 )
 
-        if patient_email:
+        if patient_email and self._patient_channel_opted_in(
+            db=db,
+            patient_id=patient_id,
+            channel="email",
+            event_type="visit_confirmation",
+        ):
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
-        if patient_phone:
+        if patient_phone and self._patient_channel_opted_in(
+            db=db,
+            patient_id=patient_id,
+            channel="sms",
+            event_type="visit_confirmation",
+        ):
             results["sms"] = await self.send_sms(patient_phone, sms_message)
 
-        results["telegram"] = await self.send_telegram(telegram_message)
+        if db and patient_id:
+            results["telegram"] = await self.send_patient_telegram_event_notification(
+                db=db,
+                patient_id=patient_id,
+                event_type="visit_confirmation",
+                metadata={
+                    "visit_date": visit_date.strftime("%d.%m.%Y %H:%M"),
+                    "doctor_name": doctor_name,
+                },
+            )
+        else:
+            results["telegram"] = False
 
         return results
 
@@ -250,6 +259,7 @@ class AppointmentsMixin(NotificationSenderMixinBase):
                 department=appointment.department_key or specialty,
                 db=db,
                 patient_id=appointment.patient_id,
+                send_push_notification=False,
             )
 
         except Exception as e:
@@ -281,7 +291,7 @@ class AppointmentsMixin(NotificationSenderMixinBase):
 
                 patient = db.query(Patient).filter(Patient.id == patient_id).first()
                 if patient and patient.user_id:
-                    await self.send_push(
+                    push_sent = await self.send_push(
                         user_id=patient.user_id,
                         title="Обновление очереди",
                         message=f"Ваша очередь обновлена: #{current_number}",
@@ -293,9 +303,19 @@ class AppointmentsMixin(NotificationSenderMixinBase):
                         },
                         db=db,
                     )
+                    telegram_sent = await self.send_patient_telegram_event_notification(
+                        db=db,
+                        patient_id=patient_id,
+                        event_type="queue_status_changed",
+                        metadata={
+                            "queue_number": current_number,
+                            "status": "updated",
+                        },
+                    )
+                    return bool(push_sent or telegram_sent)
             else:
                 targets = platform_service.resolve_users_for_department(department)
-                await platform_service.record_delivery_for_users(
+                deliveries = await platform_service.record_delivery_for_users(
                     users=targets,
                     event_type="queue_update",
                     title="Обновление очереди",
@@ -311,8 +331,9 @@ class AppointmentsMixin(NotificationSenderMixinBase):
                     },
                     transport_type="queue_update",
                 )
+                return bool(deliveries)
 
-        return await self.send_telegram(message)
+        return False
 
 
     async def send_patient_queue_update(
@@ -341,7 +362,7 @@ class AppointmentsMixin(NotificationSenderMixinBase):
 
              # Push
              if user:
-                  await self.send_push(
+                  push_sent = await self.send_push(
                       user_id=user.id,
                       title=title,
                      message=message,
@@ -353,14 +374,13 @@ class AppointmentsMixin(NotificationSenderMixinBase):
                      db=db
                  )
 
-             # Telegram (если есть)
-             if user.telegram_id:
-                 await self.send_telegram_message(
-                     user.telegram_id,
-                     f"🔢 <b>{title}</b>\n\n{message}"
-                 )
-
-             return True
+             telegram_sent = await self.send_patient_telegram_event_notification(
+                 db=db,
+                 patient_id=patient_id,
+                 event_type="queue_status_changed",
+                 metadata={"queue_number": queue_position, "status": "updated"},
+             )
+             return bool(push_sent or telegram_sent)
         except Exception as e:
             logger.error(f"Error sending patient queue update: {e}")
             return False

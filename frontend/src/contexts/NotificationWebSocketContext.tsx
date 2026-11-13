@@ -258,6 +258,20 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
         return;
       }
 
+      if (transportType === 'notification_update') {
+        invalidateNotificationCache();
+        applyUnreadSnapshot(data);
+        const currentSocket = ws.current;
+        if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
+          try {
+            currentSocket.send(JSON.stringify({ type: 'notification_sync', limit: 50 }));
+          } catch (error) {
+            logger.warn('[NotificationWS] notification state refresh failed', error);
+          }
+        }
+        return;
+      }
+
       if (
         transportType === 'notification' ||
         normalized.type === 'notification' ||
