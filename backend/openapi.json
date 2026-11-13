@@ -56522,7 +56522,7 @@
           "notifications"
         ],
         "summary": "Test Notifications",
-        "description": "Тестирование всех типов уведомлений",
+        "description": "Report diagnostic endpoint status without sending to external recipients.",
         "operationId": "test_notifications_api_v1_notifications_test_notifications_post",
         "responses": {
           "200": {
@@ -77802,7 +77802,7 @@
           "recipient_type": {
             "type": "string",
             "title": "Recipient Type",
-            "description": "Тип получателей"
+            "description": "Тип получателей; поддерживается только patient"
           },
           "recipient_ids": {
             "items": {
@@ -113440,7 +113440,7 @@
           "recipient_type": {
             "type": "string",
             "title": "Recipient Type",
-            "description": "Тип получателя: patient, doctor, admin"
+            "description": "Тип получателя; этот endpoint поддерживает только patient"
           },
           "recipient_id": {
             "anyOf": [
@@ -113518,7 +113518,7 @@
               }
             ],
             "title": "Scheduled At",
-            "description": "Время отправки (для отложенных)"
+            "description": "Время отложенной отправки; сейчас непустое значение отклоняется с 422, так как нет durable scheduler"
           }
         },
         "type": "object",
