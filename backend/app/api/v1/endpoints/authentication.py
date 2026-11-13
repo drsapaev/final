@@ -4,6 +4,7 @@ API endpoints для системы аутентификации
 
 import json
 import logging
+from datetime import UTC, datetime
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -44,6 +45,10 @@ from app.services.authentication_api_service import (
 from app.services.authentication_service import (
     get_authentication_service,
 )
+
+# AUTH-BE-002 (#4063): SSOT for the enumeration-resistant generic message —
+# the same text /password-reset/initiate returns for every outcome.
+from app.services.password_reset_service import _EMAIL_RESET_GENERIC_MESSAGE
 from app.services.user_management_service import get_user_management_service
 
 router = APIRouter()
@@ -67,6 +72,21 @@ def raise_authentication_internal_error(action: str, exc: Exception) -> NoReturn
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Internal server error",
     ) from exc
+
+
+def _as_utc_aware(value: datetime) -> datetime:
+    """AUTH-BE-001 (#4063): normalize a possibly-naive datetime to UTC-aware.
+
+    ``UserSession.expires_at`` is ``DateTime(timezone=True)``: PostgreSQL
+    (production) returns timezone-aware values while SQLite (tests/dev)
+    returns naive ones. Comparing a naive ``utcnow()`` against an aware
+    column raises ``TypeError`` — the exact production break documented in
+    the logout-path docstring (Sentry 3E, follow-up to #3122). Normalize
+    before every session-expiry comparison.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -192,8 +212,7 @@ def _extract_access_token_meta(
     exp = payload.get("exp")
     if not exp:
         return jti, None
-    from datetime import datetime as _dt, timezone as _tz
-    return jti, _dt.fromtimestamp(exp, tz=_tz.utc)
+    return jti, datetime.fromtimestamp(exp, tz=UTC)
 
 
 @router.post("/logout", response_model=LogoutResponse)
@@ -250,15 +269,21 @@ async def request_password_reset(
             user_agent=user_agent,
         )
 
-        if not result["success"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
-            )
+        # AUTH-BE-002 (#4063): enumeration-resistant uniform response — the
+        # public contract is identical whether or not the email exists,
+        # mirroring the uniform service contract of /password-reset/initiate
+        # (password_reset_service._EMAIL_RESET_GENERIC_MESSAGE). The previous
+        # shape was an active oracle: unknown emails got 400 + "Пользователь
+        # с таким email не найден" while registered ones returned
+        # 200 + machine-readable expires_at. The service result is
+        # deliberately not inspected for the response; side effects (token
+        # creation + email) still happen only for known emails.
+        del result
 
         return AuthSuccessResponse(
             success=True,
-            message="Инструкции по сбросу пароля отправлены на email",
-            data={"expires_at": result["expires_at"].isoformat()},
+            message=_EMAIL_RESET_GENERIC_MESSAGE,
+            data=None,
         )
 
     except HTTPException:
@@ -442,8 +467,8 @@ async def get_paginated_user_sessions(
         sessions = sessions[skip : skip + per_page]
 
         # Конвертируем в ответы (поля соответствуют модели UserSession).
-        from datetime import datetime as _dt
-        now = _dt.utcnow()
+        # AUTH-BE-001: aware-normalized comparison — see _as_utc_aware.
+        now = datetime.now(UTC)
         session_responses = []
         for session in sessions:
             session_responses.append(
@@ -452,7 +477,9 @@ async def get_paginated_user_sessions(
                     user_id=session.user_id,
                     created_at=session.created_at,
                     expires_at=session.expires_at,
-                    is_active=(not session.revoked and session.expires_at > now),
+                    is_active=(
+                        not session.revoked and _as_utc_aware(session.expires_at) > now
+                    ),
                     revoked=session.revoked,
                     revoked_at=getattr(session, "revoked_at", None),
                     ip_address=session.ip,  # alias
@@ -557,8 +584,8 @@ async def get_auth_status(
         sessions = user_session.get_active_sessions(db, current_user.id)
         current_session = sessions[0] if sessions else None
 
-        from datetime import datetime as _dt
-        now = _dt.utcnow()
+        # AUTH-BE-001: aware-normalized comparison — see _as_utc_aware.
+        now = datetime.now(UTC)
         return AuthStatusResponse(
             authenticated=True,
             user=UserProfileResponse(**profile),
@@ -568,7 +595,10 @@ async def get_auth_status(
                     user_id=current_session.user_id,
                     created_at=current_session.created_at,
                     expires_at=current_session.expires_at,
-                    is_active=(not current_session.revoked and current_session.expires_at > now),
+                    is_active=(
+                        not current_session.revoked
+                        and _as_utc_aware(current_session.expires_at) > now
+                    ),
                     revoked=current_session.revoked,
                     revoked_at=getattr(current_session, "revoked_at", None),
                     ip_address=current_session.ip,
