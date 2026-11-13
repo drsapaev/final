@@ -1,3 +1,17 @@
+## Resume — PR #4034 synchronized CI green; journal follow-up — 2026-11-13T06:17:35+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-failure-20261112. T00–T17 remain merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge and deployment.
+
+PR #4034 is OPEN, Ready for review, and mergeable at synchronized HEAD d4127362dad00d78a30628bf7567a1e727d3f802, based on current origin/main 355d1a94b79d5793c42d98b6ea4802fa864ceea4. The branch is clean and its remote ref matches. PR description now reflects the current base/head and explicitly labels the previous synthetic Session as pre-sync history.
+
+The #4026 duplicate browser-asset failure P2 is fixed in the RQ-18 recorder test. Unified CI #43341009576 passed on the exact synchronized HEAD: frontend unit, build, lint, configured E2E, CI Scope, Required Gate, and Notifications passed; scoped jobs are skipped, not passes. PR Review Quality Gate and Lifecycle Recommendation passed after the description refresh. reviewDecision is empty; this session did not publish an independent APPROVE.
+
+The earlier synthetic RQ-18 Session used artifact source 0621df8e, predating base 355d1a94. It captured 68 JS/CSS response hashes but did not compare them with the artifact manifest or capture the service worker; served_revision_verified=false. Do not upgrade T18/Tier-2 from PARTIAL.
+
+The current evidence gate returned narrow_override with no gate misroute and limited journal edits to PROGRESS, EVIDENCE, and RESUME; the generated execution prompt was read. This journal follow-up passed git diff --check and manual scope review. Commit it with normal hooks, push to the existing PR branch, and verify exact-head checks.
+
+Next exact action after the journal checkpoint: hand PR #4034 to the user for review/merge. After merge, start a fresh worktree from current origin/main and continue exact-base frontend provenance plus the remaining T18/STAGING_VALIDATION checks. Do not merge or deploy.
+
 ## Resume — PR #4034 exact remote head confirmed; journal follow-up in progress — 2026-11-13T05:21:07+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge and deployment.

@@ -1,3 +1,33 @@
+## Current checkpoint — PR #4034 synchronized CI green; awaiting user review/merge — 2026-11-13T06:17:35+05:00
+
+Plan version: 1.0
+Current task: T18 final acceptance and PR #4034
+Current status: IN_PROGRESS; exact synchronized-head checks passed; PR remains open
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final
+Branch: codex/aqs-t18-rq18-failure-20261112
+Base commit: 355d1a94b79d5793c42d98b6ea4802fa864ceea4
+Current commit: d4127362dad00d78a30628bf7567a1e727d3f802 (local and remote feature ref match)
+Last updated: 2026-11-13T06:17:35+05:00
+
+- T00–T17 remain MERGED. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. PR #4034 is OPEN, Ready for review, mergeable=true, mergeStateStatus=CLEAN, based on origin/main 355d1a94. reviewDecision is empty; no independent approval is recorded.
+- The #4026 duplicate browser-asset failure finding is fixed in code-bearing commit 31c265d6: real request failures are retained; only a Chromium abort proven by CDP to belong to a superseded main-frame loader with an already captured matching hash is ignored.
+- Branch synchronization was pushed as merge commit d4127362. Local and remote branch refs match. The PR diff against current main remains scoped to the RQ-18 E2E test and the three T18 journals.
+- Unified CI run #43341009576 passed on exact synchronized HEAD d4127362: Frontend unit, build, lint, configured E2E, CI Scope, PR Required Gate, and Notifications passed. Security, Gitleaks, GitGuardian, CodeQL, scratch guards, secret scan, Analyze jobs, and Agent Workflow Guards passed. PR Review Quality Gate #43343454246 and Lifecycle Recommendation #43343454484 passed after refreshing the PR body.
+- Backend, staging/production readiness, integration, Docker, parity, load, DAST, and other path-scoped jobs were skipped; they are not recorded as PASS. The configured CI E2E does not execute the full live RQ-18 spec.
+- The prior synthetic RQ-18 Session used artifact source 0621df8e, before the current base 355d1a94. Its 68 JS/CSS response hashes were not compared to the artifact manifest, service worker assets were not captured, and served_revision_verified=false. Do not treat it as evidence for the synchronized app base.
+- Full T18 and STAGING_VALIDATION.md remain PARTIAL. No staging run, production action, merge, or deployment occurred in this continuation.
+- Execution mode for this evidence-only journal follow-up: gate_known_root_cause; canonical gate returned narrow_override, gate_misroute=false, override_used=true, handoff_required=true; the execution prompt limited first-touch to these three journals and was read. No runtime source was edited.
+
+## Checkpoint details
+
+- Completed: synchronized feature branch to current main, verified exact-head CI and PR text gates, refreshed stale PR description and these journals.
+- Journal checkpoint: additive update passed git diff --check and manual three-file scope review; commit, push, and exact-head checks remain pending.
+- Remaining: finish the journal-only follow-up in this same PR; then leave PR review/merge to the user. After user merge, resume exact-base served-frontend provenance and remaining T18 acceptance from a fresh worktree.
+- Blocker: PR #4034 has no recorded independent review decision; T18 browser provenance and the full staging checklist remain incomplete.
+- Next exact action: commit only the three validated journal files with normal hooks, push to the existing #4034 branch, and verify exact-head checks. Do not merge or deploy.
+- Checks to rerun after the next change: git diff --check; exact-head PR gates/CI for the journal follow-up. Staging is not authorized or needed for this journal change.
+
 ## Current checkpoint — PR #4034 exact remote head confirmed; T18 remains partial — 2026-11-13T05:21:07+05:00
 
 Plan version: 1.0

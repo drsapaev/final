@@ -1,3 +1,17 @@
+## T18 — PR #4034 synchronized exact-head CI — 2026-11-13T06:17:35+05:00
+
+- Commit under test: d4127362dad00d78a30628bf7567a1e727d3f802; base origin/main 355d1a94b79d5793c42d98b6ea4802fa864ceea4.
+- Environment: GitHub Actions and isolated Windows worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final.
+- Execution mode: gate_known_root_cause; canonical gate identified the stale PR checkpoint in PROGRESS.md, returned narrow_override, gate_misroute=false, override_used=true, handoff_required=true. The generated prompt limited edits to the three T18 journals and was read.
+- Allowed paths: .ai-factory/plans/admin-queue-simplification/PROGRESS.md, EVIDENCE.md, RESUME.md. Denied: runtime/API/DB/auth, gate/router, production, unrelated worktrees, merge, deployment.
+- Actual changed paths in this follow-up: the three named journals only. The existing PR diff also includes frontend/e2e/rq18-permanent-qr-live.spec.ts; no product runtime source changed.
+- Original discrepancy: journals and PR body named base bcf15cbf and head 55cfd9e3, while the branch had been synchronized to 355d1a94 and pushed as exact HEAD d4127362.
+- Validation: Unified CI #43341009576 SUCCESS on exact synchronized HEAD. Frontend unit tests, build, lint, configured E2E, CI Scope, PR Required Gate, and Notifications passed. Security, Gitleaks, GitGuardian, CodeQL, scratch guards, secret scan, Analyze jobs, and Agent Workflow Guards passed. PR Review Quality Gate #43343454246 and Lifecycle Recommendation #43343454484 passed after the body refresh. Backend, staging/production readiness, integration, Docker, parity, load, DAST, and other scoped skips remain SKIPPED, not PASS.
+- Local validation: git diff --check PASS on this journal-only diff; the three-file diff was manually reviewed. Normal commit hooks remain to run.
+- Remaining limitation: full live RQ-18 was not run against current base 355d1a94. The earlier Session used artifact source 0621df8e, did not compare captured JS/CSS hashes with the artifact manifest, did not capture service worker assets, and had served_revision_verified=false. Full T18 and STAGING_VALIDATION.md remain PARTIAL; no deferral accepted.
+- PR: #4034 OPEN / Ready for review / mergeable; review decision empty. PR description now names current base and head. User owns merge and deployment.
+- Merge commit: NOT_MERGED.
+
 ## T18 — PR #4034 exact code-head CI — 2026-11-13T04:19:42+05:00
 
 - Commit under test: code-bearing exact PR head `31c265d6624a58604f1c038ce8de70a299832c65`; source/test change commit `fbb9f3c14`; base `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`.
