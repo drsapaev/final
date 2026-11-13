@@ -105,13 +105,17 @@ export function useDoctorPanelState({
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
 
-  const handleTabChange = useCallback((tabId: string) => {
+  const handleTabChange = useCallback((
+    tabId: string,
+    beforeTransition?: () => void,
+  ) => {
     const aliasedTab = tabAliases[tabId] || tabId;
     const resolvedTab = !validTabs || validTabs.includes(aliasedTab) ? aliasedTab : defaultTab;
     // Тот же таб: ни решения, ни дублирующей записи истории (прежний код
     // пушал дубликат URL при повторном клике на активную вкладку).
     if (resolvedTab === activeTabRef.current) return;
     guardRouteLeaveRef.current(() => {
+      beforeTransition?.();
       setActiveTab(resolvedTab);
       const params = new URLSearchParams(location.search);
       params.set('tab', resolvedTab);
