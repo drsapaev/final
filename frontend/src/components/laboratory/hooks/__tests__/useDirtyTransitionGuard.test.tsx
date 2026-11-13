@@ -74,6 +74,63 @@ describe('useDirtyTransitionGuard (PR5)', () => {
     expect(firstTransition).not.toHaveBeenCalled();
   });
 
+  it('a dirty context intent cannot replace a pending route-leave intent', async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    const leaveTransition = vi.fn();
+    act(() => {
+      result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
+      result.current.guardTransition(leaveTransition, { intentPolicy: 'leave' });
+    });
+
+    const contextTransition = vi.fn();
+    let accepted = true;
+    act(() => {
+      accepted = result.current.guardTransition(contextTransition, { intentPolicy: 'context' });
+    });
+
+    expect(accepted).toBe(false);
+    expect(result.current.isDialogOpen).toBe(true);
+    expect(contextTransition).not.toHaveBeenCalled();
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Выйти без сохранения' }));
+    await flush();
+
+    expect(leaveTransition).toHaveBeenCalledTimes(1);
+    expect(contextTransition).not.toHaveBeenCalled();
+  });
+
+  it('a clean scoped context intent cannot clear a pending route-leave dialog', async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    const leaveTransition = vi.fn();
+    act(() => {
+      result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
+      result.current.guardTransition(leaveTransition, { intentPolicy: 'leave' });
+    });
+
+    const contextTransition = vi.fn();
+    let accepted = true;
+    act(() => {
+      accepted = result.current.guardTransition(contextTransition, {
+        intentPolicy: 'context',
+        sourceIds: [],
+      });
+    });
+
+    expect(accepted).toBe(false);
+    expect(result.current.isDialogOpen).toBe(true);
+    expect(contextTransition).not.toHaveBeenCalled();
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Выйти без сохранения' }));
+    await flush();
+
+    expect(leaveTransition).toHaveBeenCalledTimes(1);
+    expect(contextTransition).not.toHaveBeenCalled();
+  });
+
   it('cancel keeps the user in place: no save, no transition', () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => useDirtyTransitionGuard());
