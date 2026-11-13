@@ -300,7 +300,28 @@ def get_telegram_users(
 # ===================== ШИРОКОВЕЩАТЕЛЬНЫЕ СООБЩЕНИЯ =====================
 
 
-@router.post("/telegram/broadcast", response_model=dict[str, Any])
+@router.post(
+    "/telegram/broadcast",
+    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+    response_model=None,
+    responses={
+        status.HTTP_501_NOT_IMPLEMENTED: {
+            "description": "Telegram broadcast delivery is disabled.",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"detail": {"type": "string"}},
+                        "required": ["detail"],
+                    },
+                    "example": {
+                        "detail": "Telegram broadcast delivery is not configured; no messages were sent."
+                    },
+                }
+            },
+        }
+    },
+)
 def send_broadcast_message(
     message: str,
     target_groups: list[str],  # ["patients", "doctors", "admins"]
