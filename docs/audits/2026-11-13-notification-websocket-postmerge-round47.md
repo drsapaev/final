@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-13 (Asia/Tashkent). **Repository:** `drsapaev/final`. **Source anchor:** [main @ `eaab3b9365c0a1056b90f1afdc74c5e18924cfc2`](https://github.com/drsapaev/final/commit/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2). **Predecessors:** [merged #4049](https://github.com/drsapaev/final/pull/4049) (groups 40–44) and [merged #4052](https://github.com/drsapaev/final/pull/4052) (groups 45–46). Historical tally before this report: **227** source-reviewed candidates. Audit only: no claim that these are 227 unresolved production issues.
 
-**Execution boundary:** `direct_execute`, narrowly scoped documentation-only review with source and prior-report nonduplication checks. This report proposes four **new** source-backed candidates, but makes no runtime changes. `ai/langgraph/scripts/run_agent_gate.ps1` was **not run** and remains mandatory for subsequent auth/DB/realtime or frontend-backend contract repair. No project tests, Postgres, Redis, browser QA, staging or production run for this report.
+**Execution boundary:** `direct_execute`, narrowly scoped documentation-only review with source and prior-report nonduplication checks. This report originally recorded four source-backed candidates; a cross-PR reconciliation in group 48 discovered one overlapping finding in parallel PR #4054. No runtime changes. `ai/langgraph/scripts/run_agent_gate.ps1` was **not run** and remains mandatory for subsequent auth/DB/realtime or frontend-backend contract repair. No project tests, Postgres, Redis, browser QA, staging or production run for this report.
 
 ## Group 47 ledger
 
@@ -12,6 +12,8 @@
 | `NOTIFYMARKSCOPE-FE-001` | P2 conditional | optimistic mark-all-as-read | Local update ignores department filter and includes null-role items |
 | `NOTIFYSYNCBADGE-FE-001` | P2 conditional | replay/counter contract | WS `notification_sync_response` clears authoritative role counters to `{}` |
 | `NOTIFYREADBUTTON-FE-001` | P2 | inbox action | The "Прочитать" button also navigates via the Open handler |
+
+> **Cross-report reconciliation (13 November):** NOTIFYPAGEFLAG-BE-001 is the same root cause as NOTIFYCURSORLAST-BE-001 in [parallel PR #4054, group 50](https://github.com/drsapaev/final/pull/4054). Keep its code evidence for provenance, but **do not add it again** to the combined distinct-defect count.
 
 ### NOTIFYPAGEFLAG-BE-001 — P2 conditional: incorrect cursor `has_more` on the last full page
 
@@ -47,8 +49,61 @@
 
 ## Scope, gates, and follow-up
 
-- **Historical ledger:** group 47 adds four unique source-observed IDs to the 227 from #3961 + #4049 + #4052, yielding **231 historical observations**, not 231 currently-open or clinically verified defects.
+- **Historical ledger, before cross-PR reconciliation:** 227 earlier entries + four group-47 identifiers = 231 local report entries; **one of those four overlaps #4054**. These local totals are not additive to the parallel review and must not be represented as globally unique.
 - **Nonduplication:** explicitly checked groups 40–46 for the listed adjacent issues (`NOTIFYSEQ-BE-001`, `NOTIFYHISTORYPAGE-FE-001`, `NOTIFYACK-FE-001`, `NOTIFYROLLBACK-FE-001`, `NOTIFYOPENBLOCK-FE-001`). Group 46 already documented `NOTIFYSEENSTATUS-BE-001`; **not repeated here**.
 - **Permitted first-touch:** only `docs/audits/2026-11-13-notification-websocket-postmerge-round47.md`. **Reference-only:** backend notification repository/services/endpoints, frontend notification provider, inbox and header, `AGENTS.md`, previous audit PRs. **Denied:** `backend/`, `frontend/`, `ai/`, `ops/`, `.github/`, tests, migrations, secrets, all patient data, staging/production operations, runtime PR merge/deploy.
 - **Validation performed:** static source inspection at the pinned main commit, prior-audit finding comparison, source-anchored test-case design. **Not performed:** project pytest/Vitest/Playwright, live WebSocket/Redis/Postgres, actual fail-first project tests, production/staging validation, `run_agent_gate.ps1`, local `git diff --check`. GitHub CI for this documentation commit must be checked separately.
 - **Gate and stop condition for implementation:** any repair touching auth/DB/notification contract/realtime must start from refreshed main with the mandatory `ai/langgraph/scripts/run_agent_gate.ps1` and synthetic failing tests, respect ownership, and stop if a product contract is unresolved. **Rollback:** revert this one Markdown addition.
+
+---
+
+## Continued source Code Review — group 48: WS cursor parsing, Redis listener robustness and connection lifecycle
+
+**Review date:** 2026-11-13, Asia/Tashkent. **Main reference:** [eaab3b9365c0a1](https://github.com/drsapaev/final/commit/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2). Reviewed current files: personal WS endpoint blob 5ff188ba187552c9db25ae7853379e6e9c7dd127, notification React provider 2f76184eb4843544a6332b3e67f07b4f24fbc0a8, shared Redis bridge dd97dfb0d4f82ea0ccb6dc5747b48fd1d01c8d94 and personal manager b27ce06c96e853fb967a237f5cefc483180d841f. Previous groups 40–47 and parallel #4054 groups 47–52 checked for duplication. **All four below are source-observed candidates; none is a confirmed production incident.**
+
+| Finding | Priority | Mechanism |
+| --- | --- | --- |
+| NOTIFYWSCURSOR-BE-001 | P2 conditional | Invalid cursor silently resets WS sync to the first page |
+| NOTIFYREDISHOL-BE-001 | P2 conditional | One blocked notification socket stalls unrelated Redis channels on the same worker |
+| NOTIFYREDISENVELOPE-BE-001 | P2 conditional | JSON array/scalar envelope crashes the Redis listener |
+| NOTIFYROUTECHURN-FE-001 | P2 conditional | Protected-to-protected SPA navigation closes and recreates a healthy personal WebSocket |
+
+### NOTIFYWSCURSOR-BE-001 — invalid WS cursor silently treated as first page
+
+**Exact source:** [notification_websocket.py lines 168–181](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/api/v1/endpoints/notification_websocket.py#L168-L181) coerces the supplied sync cursor with Python int and **catches TypeError/ValueError by assigning None**, then [passes that value to get_inbox](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/api/v1/endpoints/notification_websocket.py#L201-L218). Thus an authenticated command with a malformed cursor such as "not-an-int" returns a fresh first page without validation error; Boolean true also converts to 1. The corresponding [REST sync API accepts a typed integer cursor](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/api/v1/endpoints/notifications.py#L573-L654), with FastAPI validation for invalid strings.
+
+**Scope and distinction:** This is a client-protocol corruption issue during pagination, not a recipient authorization bypass. Different from group-41 NOTIFYFRAME-BE-001 (non-object top-level frames / sync limit), group-42 NOTIFYSEQ-BE-001 (sequence collision) and the cursor end-of-pages report duplicated with #4054.
+
+**Synthetic RED test, NOT executed:** authenticate a synthetic user; send a sync command with malformed string cursor and then Boolean cursor; expect a bounded error identifying the cursor and *no* unintended first-page query, while the socket remains usable. Follow with a valid integer cursor to prove recovery. Establish valid lower bound and whether null is allowed before implementation.
+
+### NOTIFYREDISHOL-BE-001 — one slow user blocks the entire notification Redis subscriber loop
+
+**Exact source:** [RedisPubSubBridge._listen_loop lines 208–246](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/services/ws_redis_pubsub.py#L208-L246) processes Redis messages in one async-for loop and **awaits each handler inline** before reading the next event. The [personal manager's per-user receiver](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/services/notification_websocket.py#L69-L87) awaits _send_json_local, which [awaits WebSocket.send_json without deadline](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/services/notification_websocket.py#L150-L167). A backpressured recipient A can therefore stall dispatch to **different recipient B** on the same worker's notification bridge, notwithstanding separate user channel names.
+
+**Scope and distinction:** The impact is conditional on a blocked send, not proven under real load. Group-41 NOTIFYFANOUT-BE-001 concerns sequential *same-user* fanout and publisher ordering; this concerns the shared Redis listener for *different users*. Persistence is outbox-owned and is not claimed lost.
+
+**Synthetic RED test, NOT executed:** fake Redis receives events for synthetic users A and B. Hold A's send unresolved; assert B's event is dispatched within a bounded time independently, without releasing A first. Verify same-recipient message ordering, safe timeout/cancellation, no unbounded detached task accumulation, and last-socket cleanup.
+
+### NOTIFYREDISENVELOPE-BE-001 — valid non-object Redis JSON kills the listener
+
+**Exact source:** [RedisPubSubBridge._listen_loop lines 221–245](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/services/ws_redis_pubsub.py#L221-L245) catches invalid json.loads syntax, then immediately calls envelope.get("source") and envelope.get("payload") **without checking that the parsed value is a dictionary**. A valid JSON array, null, number or string from a noncanonical producer raises an AttributeError and falls into the [outer crash/recovery block](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/services/ws_redis_pubsub.py#L244-L270), rather than dropping one bad frame.
+
+**Scope and distinction:** Owned bridge publishers [create dictionary envelopes](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/backend/app/services/ws_redis_pubsub.py#L53-L67); malformed input depends on a faulty/trusted external publisher or transport corruption, **not established attacker access**. The older NOTIFYFRAME-BE-001 concerns WebSocket *client* payloads in another owner.
+
+**Synthetic RED test, NOT executed:** fake pubsub first yields a matching-channel JSON array, then a valid canonical envelope. Assert the malformed event is ignored, the listener stays alive (no recovery/reset), and the valid event reaches its handler. Repeat null and string; verify no notification payload enters error logs.
+
+### NOTIFYROUTECHURN-FE-001 — protected page transitions unnecessarily disconnect notification WebSocket
+
+**Exact source:** [NotificationWebSocketProvider route effect lines 396–437](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/frontend/src/contexts/NotificationWebSocketContext.tsx#L396-L437) depends on location.pathname, even though its policy is based on whether a route is public. Cleanup calls disconnectRef.current and closeSocketSafely on every pathname change, including a move **between two protected staff pages with unchanged user/token**. [closeSocketSafely actively closes an OPEN socket](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/frontend/src/contexts/NotificationWebSocketContext.tsx#L145-L163); the next effect [schedules a new connection](https://github.com/drsapaev/final/blob/eaab3b9365c0a1056b90f1afdc74c5e18924cfc2/frontend/src/contexts/NotificationWebSocketContext.tsx#L304-L328). This repeats authentication, unread-count DB reads and a fresh 50-item replay after ordinary navigation.
+
+**Impact / distinction:** Extra websocket handshakes and a transient disconnect window, conditional on typical multi-page navigation; no real dropped notifications were measured. Distinct from group-40 permanent-denial retry and group-41 cross-principal isolation. Before changing, verify whether per-route rotation is deliberate and preserve logout/public-route/identity changes.
+
+**Synthetic RED test, NOT executed:** with MemoryRouter and fake WebSocket, establish a socket on a synthetic protected doctor page, navigate to a different protected doctor page, assert no close, no second socket, no duplicate replay. Move to login and assert clean close; change account/token and assert mandatory security replacement. Include CONNECTING and stale onclose races.
+
+### Group 48 reconciliation and execution boundary
+
+- **New independent group-48 findings:** the four IDs above. **Prior overlap:** #4059 group-47 NOTIFYPAGEFLAG-BE-001 is the same as parallel [#4054 group-50 NOTIFYCURSORLAST-BE-001](https://github.com/drsapaev/final/pull/4054); track as one root cause, not two.
+- **Cumulative cross-report reconciliation:** previously merged #3961 199 + #4049 20 + #4052 8 = **227** source observations. Parallel open #4054 documents 24 candidates. This PR contains 8 local group-47/48 entries, one overlapping #4054, so contributes 7 additional distinct candidates. **258 provisional distinct source-reviewed observations** across the combined tracked reports (227+24+7); *not* 258 open/live defects. The prior standalone total 231 was before cross-PR deduplication and should not be added to 251.
+- **Mode and first-touch:** direct_execute for documentation-only continuation; **allowed change:** only this Markdown audit file on existing Draft PR #4059. **Reference-only:** frontend/backend runtime, AGENTS.md, prior audit reports, test code. **Denied:** runtime source, tests, migrations, AI, CI, credentials, patient data, Redis/Postgres, deploy and production actions. Full runtime patches require a separate gated execution.
+- **Mandatory source gate:** ai/langgraph/scripts/run_agent_gate.ps1 was **not run** for this docs-only edit. Before any auth/realtime/DB/contract implementation, use the mandatory PowerShell launcher in ai/langgraph with known root-cause and reviewed scopes plus executable failing synthetic tests. No bypass or implied approval.
+- **Evidence:** static GitHub source/blob inspection, comparison to groups 40–47 and #4054, Vercel React review skill consultation. **Not run:** project pytest, Vitest, Playwright, live Redis/Postgres/WS, staging, production, run_agent_gate.ps1 or local git diff --check. The negative tests here are *proposals only*. **Stop condition:** do not merge on pending/red exact-head checks or ambiguous source contract. **Rollback:** revert the group-48 audit addition or this sole Markdown file.
