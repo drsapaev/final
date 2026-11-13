@@ -10,7 +10,6 @@ dispatched either by awaiting (async) or via run_in_threadpool (sync).
 from __future__ import annotations
 
 import logging
-import os
 import secrets
 from typing import Any
 
@@ -175,12 +174,15 @@ async def get_csrf_token(response: Response) -> CSRFTokenResponse:
     """
     # PR-30: secure flag must follow production status. Previously secure=False
     # always — cookie was sent over plain HTTP, allowing MITM interception.
-    # AUTH-BE-005 (#4063): keyed to the app settings (settings.ENV, already
-    # imported at module level) instead of the ad-hoc os.getenv("ENV") lookup.
-    # A deployment configured through the settings mechanism but without the
-    # literal ENV process env shipped the CSRF cookie without Secure — the
-    # exact regression the PR-30 fix was supposed to prevent.
-    is_prod = (settings.ENV or "").strip().lower() in ("prod", "production")
+    # AUTH-BE-005 (#4063): REFUTED during remediation — the pinned SameSite
+    # contract (PR #3407, tests/integration/test_csrf_cookie_samesite.py)
+    # deliberately keys this flag to the runtime ENV variable, and
+    # core/config.py load_dotenv() syncs backend/.env (including ENV) into
+    # the process environment before any request, so os.getenv("ENV") always
+    # reflects the settings-loaded value in every real deployment contour.
+    import os
+
+    is_prod = os.getenv("ENV", "dev").lower() in ("prod", "production")
 
     # PR #3407 (2a64f6d02 review follow-up): SameSite policy for the CSRF
     # cookie. The documented split-origin deployment (ops/vps, VITE_API_BASE_URL)
