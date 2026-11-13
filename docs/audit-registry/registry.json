@@ -3367,12 +3367,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
+   "status": "REFUTED",
    "fix_pr": null,
    "merge_sha": null,
    "root_cause": "/password-reset/confirm, /email-verification/confirm, /refresh lack @limiter.limit while sibling router and login carry it",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "justification": "Slowapi decorators are indeed absent, but the production SecurityMiddleware (backend/app/main.py:327-335, mounted unconditionally outside TESTING+dev) throttles every named path: /authentication/password-reset -> password_reset bucket 3/3600 (security_middleware.py:115), /password-reset/confirm -> password_reset_token 30/300 (:111-112), /authentication/refresh and /email-verification/confirm -> shared api bucket 5000/3600 default in prod (:51-52). Tokens are high-entropy (refresh JWT, 24h verification token), so per-endpoint caps are not brute-force surfaces; the finding examined only the slowapi layer and missed the middleware layer. Verified 2026-11-13 on main 94d140f83."
   },
   {
    "checked": false,
@@ -3383,7 +3384,7 @@
    "status": "CONFIRMED_OPEN",
    "fix_pr": null,
    "merge_sha": null,
-   "root_cause": "/status two_factor_verified=profile['two_factor_enabled'] — session-level 2FA state not tracked",
+   "root_cause": "/status two_factor_verified=profile['two_factor_enabled'] — session-level 2FA state not tracked; fix requires a product decision: track session-level 2FA-verified state (schema change) or re-name/re-scope the field — left for owner",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13"
   },
@@ -3448,7 +3449,7 @@
    "status": "CONFIRMED_OPEN",
    "fix_pr": null,
    "merge_sha": null,
-   "root_cause": "no @limiter.limit on /verify-setup /verify /recovery/verify /verify-code; verify_two_factor counts no attempts, no lockout (soft failure) — unlimited 6-digit guesses with password-only bootstrap",
+   "root_cause": "no @limiter.limit on /verify-setup /verify /recovery/verify /verify-code; verify_two_factor counts no attempts, no lockout (soft failure) — unlimited 6-digit guesses with password-only bootstrap; middleware bounds noted: /2fa/verify, /2fa/verify-setup and /2fa/verify-code share the 2fa_verify bucket 10/300 via '/2fa/verify' substring match, /2fa/recovery/verify falls to the api bucket 5000/3600 — the confirmed core is the absent service-side attempt cap/lockout in verify_two_factor",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13"
   },
@@ -3539,7 +3540,7 @@
    "status": "CONFIRMED_OPEN",
    "fix_pr": null,
    "merge_sha": null,
-   "root_cause": "/verify-code lacks the endpoint limiter /send-code has; per-code cap measurable via echoed attempts_left",
+   "root_cause": "/verify-code lacks the endpoint limiter /send-code has; per-code cap measurable via echoed attempts_left; bounded by the per-code MAX_ATTEMPTS cap service-side (429 MAX_ATTEMPTS_EXCEEDED) and the api bucket — the missing endpoint limiter remains a consistency gap, low severity",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13"
   },
