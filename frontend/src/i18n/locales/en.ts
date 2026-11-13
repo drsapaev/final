@@ -260,6 +260,7 @@ const en = {
     print_pdf_blocked: 'PDF сформирован, но новая вкладка заблокирована. Разрешите pop-up для этого сайта и нажмите «Печать» снова, чтобы обновить статус отчёта.',
     print_pdf_open_action: 'Open PDF for printing',
     print_pdf_prepared: 'Direct printing failed — the report PDF is prepared. Click "Open PDF for printing" to open the document, and confirm the mark after the physical print.',
+    print_pdf_prepared_expired: 'The prepared PDF link has expired. Retry the print — the document will be prepared again.',
     preview_popup_blocked: 'The browser blocked the pop-up window. Allow pop-ups for this site and retry the preview.',
     preview_building: 'Формирую серверный предпросмотр PDF...',
     preview_opened: 'Предпросмотр PDF открыт в новой вкладке (водяной знак «Черновик»).',

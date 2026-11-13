@@ -10,7 +10,7 @@
  * Red-first: on the pre-fix source the stale A blob opens a window and
  * stamps A's success feedback into B's workbench.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
@@ -65,6 +65,18 @@ const mockedApi = labReportingApi as unknown as Record<string, ReturnType<typeof
 // RETRO-3970-01: честная резервация контекста — window.open('', '_blank')
 // БЕЗ feature-строки: успех возвращает Window (truthy), реальный блок —
 // null. Моделирует браузерный контракт patientFilePreview.ts (CARDHIST-FE-001).
+const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function makeReservedWindow(): Window {
   return {
     close: vi.fn(),
@@ -106,6 +118,53 @@ beforeEach(() => {
     value: vi.fn(),
   });
   vi.spyOn(window, 'open').mockImplementation(() => makeReservedWindow());
+});
+
+describe('RETRO-3970-01 review — an in-flight preview does not outlive its unmount', () => {
+  it('unmount closes the reserved tab and a late response never navigates it', async () => {
+    const gateBlob = deferred<Blob>();
+    mockedApi.previewInstancePdf.mockImplementation(() => gateBlob.promise);
+
+    const { unmount } = render(
+      <ThemeProvider>
+        <LabReportWorkbench
+          selectedAppointment={null}
+          templates={[]}
+          templateResolution={null}
+          templateResolutionLoading={false}
+          reportHistory={[]}
+          recentReports={[]}
+          activeInstance={INSTANCE_A}
+          onInstanceChange={vi.fn()}
+          onOpenInstance={vi.fn()}
+          onRefreshHistory={vi.fn()}
+          onRefreshRecentReports={vi.fn()}
+          onQueueChanged={vi.fn()}
+          notify={vi.fn()}
+          getOperationContext={() => CONTEXT_A}
+        />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Предпросмотр PDF/ }));
+    await waitFor(() => expect(mockedApi.previewInstancePdf).toHaveBeenCalled());
+
+    // The operator LEAVES the workbench while the preview read is pending.
+    unmount();
+    await act(async () => {
+      gateBlob.resolve(new Blob(['%PDF-late'], { type: 'application/pdf' }));
+      await flush();
+    });
+
+    // The departed report's PDF must never reach the reserved popup: the
+    // reservation is closed and the object URL is never created.
+    const reserved = (window.open as unknown as ReturnType<typeof vi.fn>).mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      location: { href: string };
+    };
+    expect(reserved.close).toHaveBeenCalled();
+    expect(reserved.location.href).toBe('');
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
 });
 
 describe('LABR-FE-002 — a late preview is owned by its initiating context', () => {

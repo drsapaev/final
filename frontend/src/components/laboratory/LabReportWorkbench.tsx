@@ -167,7 +167,22 @@ export default function LabReportWorkbench({
   // LABR-FE-002 (audit 3886): preview attempt epoch — a late preview
   // response must never open/report into a context that replaced it.
   const previewAttemptRef = useRef(0);
+  // RETRO-3970-01 review follow-up: an in-flight preview must not outlive
+  // its unmount — the reservation is mirrored so the unmount cleanup can
+  // close it, and the mounted mirror owns previewStillCurrent().
+  const previewReservedRef = useRef<Window | null>(null);
+  const previewMountedRef = useRef(true);
   const printFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // RETRO-3970-01 review follow-up: on unmount the in-flight preview loses
+  // its ownership (mounted mirror + attempt invalidation) and its reserved
+  // blank tab is closed — a late blob response must never navigate a
+  // departed report's document into a popup nobody is watching.
+  useEffect(() => () => {
+    previewMountedRef.current = false;
+    previewAttemptRef.current += 1;
+    previewReservedRef.current?.close();
+    previewReservedRef.current = null;
+  }, []);
   const captureOperationContext = useCallback(
     () => getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT,
     [getOperationContext],
@@ -857,6 +872,7 @@ export default function LabReportWorkbench({
     const previewOperation = getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT;
     const previewAttempt = ++previewAttemptRef.current;
     const previewStillCurrent = () =>
+      previewMountedRef.current &&
       previewAttemptRef.current === previewAttempt &&
       operationContextsMatch(previewOperation, operationContextRef.current);
     // RETRO-3970-01 (CARDHIST-FE-001 precedent): reserve the browsing
@@ -870,12 +886,15 @@ export default function LabReportWorkbench({
       setPrintFeedback({ severity: 'error', text: t('workbench.preview_popup_blocked') });
       return;
     }
+    previewReservedRef.current = reserved;
     setBusyAction('preview');
     setPrintFeedback({ severity: 'info', text: t('workbench.preview_building') });
     try {
       const blob = await labReportingApi.previewInstancePdf(expectedInstanceId);
-      if (!blob || !(blob instanceof Blob)) {
-        // RETRO-3970-01: never leave the reserved blank tab behind.
+      if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+        // RETRO-3970-01: never leave the reserved blank tab behind. The
+        // review follow-up adds the size guard — a zero-byte payload would
+        // otherwise open as a dead document.
         reserved.close();
         if (previewStillCurrent()) {
           setPrintFeedback({ severity: 'error', text: t('workbench.print_pdf_invalid') });
@@ -1073,8 +1092,9 @@ export default function LabReportWorkbench({
         clearOwnedPrintFeedback();
         return;
       }
-      if (!blob || !(blob instanceof Blob)) {
-        // L-M-9 fix: если blob пустой или не Blob — не открываем window.open('undefined')
+      if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+        // L-M-9 fix: если blob пустой или не Blob — не открываем window.open('undefined').
+        // RETRO-3970-01 review follow-up: size === 0 is the same invalid class.
         setPrintFeedback({
           severity: 'error',
           text: t('workbench.print_pdf_invalid')
@@ -1094,7 +1114,24 @@ export default function LabReportWorkbench({
       // succeeds (a context to navigate) or honestly reports «blocked» —
       // the old noopener window.open returned null even on success, so the
       // LABPRINT-FE-002 confirmation was unreachable on real browsers.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      const preparedUrl = url;
+      pdfPreparedUrlRef.current = preparedUrl;
+      setTimeout(() => {
+        URL.revokeObjectURL(preparedUrl);
+        // RETRO-3970-01 review follow-up: the 60s object-URL budget also
+        // expires the PREPARATION — an expired link must never back the
+        // explicit open (a dead document) nor the printed-confirmation that
+        // follows it. Only the still-pending preparation expires; one that
+        // was already opened (or dropped) is untouched.
+        if (pdfPreparedUrlRef.current === preparedUrl) {
+          pdfPreparedUrlRef.current = null;
+          setPdfFallbackPrepared(null);
+          setPrintFeedback({
+            severity: 'warning',
+            text: t('workbench.print_pdf_prepared_expired')
+          });
+        }
+      }, 60_000);
       setPdfFallbackPrepared({ instanceId: expectedInstanceId, url });
       setPrintFeedback({
         severity: 'info',
@@ -1131,8 +1168,12 @@ export default function LabReportWorkbench({
   // pdfConfirmPendingInstanceId (WF-12 parity); the URL is revoked so a
   // dropped preparation never leaks a stale report document.
   const [pdfFallbackPrepared, setPdfFallbackPrepared] = useState<{ instanceId: string | number; url: string } | null>(null);
+  // Ref mirror of the still-pending prepared URL — the expiry timer and the
+  // open action compare against it so a dead link can never be consumed.
+  const pdfPreparedUrlRef = useRef<string | null>(null);
   useEffect(() => {
     setPdfConfirmPendingInstanceId(null);
+    pdfPreparedUrlRef.current = null;
     setPdfFallbackPrepared((prepared) => {
       if (prepared) {
         URL.revokeObjectURL(prepared.url);
@@ -1144,6 +1185,7 @@ export default function LabReportWorkbench({
   function openPreparedPdf() {
     if (!pdfFallbackPrepared) return;
     if (pdfFallbackPrepared.instanceId !== (activeInstance?.id as string | number)) return;
+    if (pdfPreparedUrlRef.current !== pdfFallbackPrepared.url) return;
     // Synchronous reservation inside THIS click gesture — no noopener
     // feature string, so null is a real blocked signal (CARDHIST-FE-001).
     const reserved = window.open('', '_blank');
@@ -1153,6 +1195,7 @@ export default function LabReportWorkbench({
     }
     reserved.opener = null;
     reserved.location.href = pdfFallbackPrepared.url;
+    pdfPreparedUrlRef.current = null;
     setPdfFallbackPrepared(null);
     // LABPRINT-FE-002: the opened PDF tab is NOT a physical print — only
     // the operator's explicit confirmation flips the status.
