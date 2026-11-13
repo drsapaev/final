@@ -17,8 +17,11 @@ from app.crud.user_management import (
 from app.crud.user_management import (
     user_profile as crud_user_profile,
 )
+from app.models.clinic import Doctor
+from app.models.telegram_config import TelegramUser
 from app.models.user import User
 from app.models.user_profile import UserPreferences
+from app.models.visit import Visit
 from app.schemas.notification import (
     BulkNotificationRequest,
     NotificationInboxResponse,
@@ -45,6 +48,51 @@ from app.services.notifications import notification_sender_service
 router = APIRouter()
 logger = logging.getLogger(__name__)
 _TIME_PATTERN = re.compile(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")
+
+
+def _is_admin_or_superuser(user: User) -> bool:
+    return bool(getattr(user, "is_superuser", False)) or (
+        str(getattr(user, "role", "")).strip().lower() == "admin"
+    )
+
+
+def _active_doctor_for_user(db: Session, user: User) -> Doctor | None:
+    return (
+        db.query(Doctor)
+        .filter(Doctor.user_id == user.id, Doctor.active.is_(True))
+        .first()
+    )
+
+
+def _assert_doctor_owns_visit(
+    *, db: Session, current_user: User, visit: Visit
+) -> None:
+    if _is_admin_or_superuser(current_user):
+        return
+
+    doctor = _active_doctor_for_user(db, current_user)
+    if doctor is None or visit.doctor_id != doctor.id:
+        # Avoid confirming whether an unassigned visit belongs to another patient.
+        raise HTTPException(status_code=404, detail=t("visit.not_found"))
+
+
+def _assert_doctor_can_notify_patient_visit(
+    *,
+    db: Session,
+    current_user: User,
+    patient_id: int,
+    related_entity_type: str | None,
+    related_entity_id: int | None,
+) -> None:
+    if _is_admin_or_superuser(current_user):
+        return
+    if related_entity_type != "visit" or related_entity_id is None:
+        raise HTTPException(status_code=404, detail=t("visit.not_found"))
+
+    visit = db.query(Visit).filter(Visit.id == related_entity_id).first()
+    if visit is None or visit.patient_id != patient_id:
+        raise HTTPException(status_code=404, detail=t("visit.not_found"))
+    _assert_doctor_owns_visit(db=db, current_user=current_user, visit=visit)
 
 
 def _combine_date_and_time(date_value, time_value: str | None) -> datetime:
@@ -283,6 +331,29 @@ async def send_appointment_reminder(
     if not patient:
         raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
+    if not _is_admin_or_superuser(current_user):
+        doctor = _active_doctor_for_user(db, current_user)
+        if doctor is None:
+            raise HTTPException(status_code=404, detail=t("visit.not_found"))
+        assigned_visit = (
+            db.query(Visit)
+            .filter(
+                Visit.patient_id == patient_id,
+                Visit.doctor_id == doctor.id,
+                Visit.visit_date == appointment_date.date(),
+                Visit.status != "canceled",
+            )
+            .order_by(Visit.id.desc())
+            .first()
+        )
+        if assigned_visit is None:
+            raise HTTPException(status_code=404, detail=t("visit.not_found"))
+        appointment_date = _combine_date_and_time(
+            assigned_visit.visit_date, assigned_visit.visit_time
+        )
+        doctor_name = current_user.full_name or current_user.username
+        department = assigned_visit.department or doctor.specialty
+
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
         notification_sender_service.send_appointment_reminder,
@@ -315,6 +386,7 @@ async def send_visit_confirmation(
     visit = visit_crud.get(db, id=visit_id)
     if not visit:
         raise HTTPException(status_code=404, detail=t("visit.not_found"))
+    _assert_doctor_owns_visit(db=db, current_user=current_user, visit=visit)
 
     # Получаем данные пациента
     patient = patient_crud.get(db, id=visit.patient_id)
@@ -355,6 +427,7 @@ async def send_payment_notification(
     visit = visit_crud.get(db, id=visit_id)
     if not visit:
         raise HTTPException(status_code=404, detail=t("visit.not_found"))
+    _assert_doctor_owns_visit(db=db, current_user=current_user, visit=visit)
 
     # Получаем данные пациента
     patient = patient_crud.get(db, id=visit.patient_id)
@@ -440,57 +513,13 @@ async def send_system_alert(
 
 @router.post("/test-notifications", response_model=dict[str, Any])
 async def test_notifications(
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_roles(["admin"])),
 ):
-    """Тестирование всех типов уведомлений"""
-    test_email = "test@example.com"
-    test_phone = "+998901234567"
-    test_date = datetime.now(UTC)
-
-    # Тестируем все типы уведомлений
-    background_tasks.add_task(
-        notification_sender_service.send_appointment_reminder,
-        test_email,
-        test_phone,
-        test_date,
-        "Тестовый врач",
-        "Тестовое отделение",
-    )
-
-    background_tasks.add_task(
-        notification_sender_service.send_visit_confirmation,
-        test_email,
-        test_phone,
-        test_date,
-        "Тестовый врач",
-        "Тестовое отделение",
-        123,
-    )
-
-    background_tasks.add_task(
-        notification_sender_service.send_payment_notification,
-        test_email,
-        test_phone,
-        100.0,
-        "UZS",
-        test_date,
-        "Тестовый врач",
-    )
-
-    background_tasks.add_task(
-        notification_sender_service.send_queue_update, "Тестовое отделение", 123, "15 минут"
-    )
-
-    background_tasks.add_task(
-        notification_sender_service.send_system_alert,
-        "TEST",
-        "Тестовое системное оповещение",
-        {"test_key": "test_value"},
-    )
-
+    """Report diagnostic endpoint status without sending to external recipients."""
     return {
-        "message": "Тестовые уведомления отправлены",
+        "message": "Диагностика не отправляет уведомления внешним получателям",
+        "queued": 0,
+        "external_delivery": False,
         "sent_at": datetime.now(UTC).isoformat(),
     }
 
@@ -510,12 +539,9 @@ async def get_notification_status(
             "port": notification_sender_service.smtp_port,
         },
         "telegram": {
-            "configured": bool(
-                notification_sender_service.telegram_bot_token
-                and notification_sender_service.telegram_chat_id
-            ),
+            "configured": bool(notification_sender_service.telegram_bot_token),
             "bot_token": "***" if notification_sender_service.telegram_bot_token else None,
-            "chat_id": notification_sender_service.telegram_chat_id,
+            "delivery_mode": "linked_chat_only",
         },
         "sms": {
             "configured": bool(
@@ -888,18 +914,58 @@ async def send_notification(
     db: Session = Depends(get_db),
 ):
     """Отправка уведомления с использованием шаблона"""
+    if request.scheduled_at is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Отложенная отправка пока не поддерживается; сообщение не поставлено в очередь",
+        )
+    if request.recipient_type != "patient":
+        raise HTTPException(
+            status_code=422,
+            detail="Для этого endpoint поддерживаются только получатели типа patient",
+        )
+    if request.recipient_id is None:
+        raise HTTPException(status_code=422, detail="recipient_id обязателен")
+    if str(request.priority).strip().lower() not in {"low", "normal", "high", "urgent"}:
+        raise HTTPException(status_code=422, detail="Неподдерживаемый приоритет уведомления")
 
-    for channel in request.channels:
+    channels = list(dict.fromkeys(str(channel).strip().lower() for channel in request.channels))
+    supported_channels = {"email", "sms", "telegram"}
+    if not channels or any(channel not in supported_channels for channel in channels):
+        raise HTTPException(status_code=422, detail="Неподдерживаемый канал уведомления")
+
+    _assert_doctor_can_notify_patient_visit(
+        db=db,
+        current_user=current_user,
+        patient_id=request.recipient_id,
+        related_entity_type=request.related_entity_type,
+        related_entity_id=request.related_entity_id,
+    )
+    patient = patient_crud.get(db, id=request.recipient_id)
+    if patient is None:
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
+
+    telegram_link = (
+        db.query(TelegramUser)
+        .filter(
+            TelegramUser.patient_id == patient.id,
+            TelegramUser.active.is_(True),
+            TelegramUser.blocked.is_(False),
+            TelegramUser.notifications_enabled.is_(True),
+        )
+        .order_by(TelegramUser.id.desc())
+        .first()
+    )
+    queued_channels = []
+    for channel in channels:
         # Получаем контакт получателя
         contact = None
-        if request.recipient_id:
-            if request.recipient_type == "patient":
-                patient = patient_crud.get(db, id=request.recipient_id)
-                if patient:
-                    if channel == "email":
-                        contact = patient.email
-                    elif channel == "sms":
-                        contact = patient.phone
+        if channel == "email":
+            contact = patient.email
+        elif channel == "sms":
+            contact = patient.phone
+        elif channel == "telegram" and telegram_link:
+            contact = str(telegram_link.chat_id)
 
         if not contact:
             continue
@@ -916,9 +982,15 @@ async def send_notification(
             recipient_id=request.recipient_id,
             related_entity_type=request.related_entity_type,
             related_entity_id=request.related_entity_id,
+            priority=request.priority,
         )
+        queued_channels.append(channel)
 
-    return {"message": "Уведомления отправлены в фоновом режиме"}
+    return {
+        "message": "Попытки отправки поставлены в очередь",
+        "queued": len(queued_channels),
+        "channels": queued_channels,
+    }
 
 
 @router.post("/send-bulk", response_model=dict[str, Any])
@@ -929,35 +1001,59 @@ async def send_bulk_notification(
     db: Session = Depends(get_db),
 ):
     """Массовая отправка уведомлений"""
+    if request.recipient_type != "patient":
+        raise HTTPException(
+            status_code=422,
+            detail="Для этого endpoint поддерживаются только получатели типа patient",
+        )
+    if str(request.priority).strip().lower() not in {"low", "normal", "high", "urgent"}:
+        raise HTTPException(status_code=422, detail="Неподдерживаемый приоритет уведомления")
+    channels = list(dict.fromkeys(str(channel).strip().lower() for channel in request.channels))
+    supported_channels = {"email", "sms", "telegram"}
+    if not channels or any(channel not in supported_channels for channel in channels):
+        raise HTTPException(status_code=422, detail="Неподдерживаемый канал уведомления")
+
     recipients = []
 
     # Формируем список получателей
-    for recipient_id in request.recipient_ids:
-        if request.recipient_type == "patient":
-            patient = patient_crud.get(db, id=recipient_id)
-            if patient:
-                recipients.append(
-                    {
-                        "id": recipient_id,
-                        "type": "patient",
-                        "email": patient.email,
-                        "phone": patient.phone,
-                        "name": patient.full_name
-                        or f"{patient.first_name} {patient.last_name}",
-                    }
+    for recipient_id in dict.fromkeys(request.recipient_ids):
+        patient = patient_crud.get(db, id=recipient_id)
+        if patient:
+            telegram_link = (
+                db.query(TelegramUser)
+                .filter(
+                    TelegramUser.patient_id == patient.id,
+                    TelegramUser.active.is_(True),
+                    TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
                 )
+                .order_by(TelegramUser.id.desc())
+                .first()
+            )
+            recipients.append(
+                {
+                    "id": patient.id,
+                    "type": "patient",
+                    "email": patient.email,
+                    "phone": patient.phone,
+                    "telegram": str(telegram_link.chat_id) if telegram_link else None,
+                    "name": patient.full_name
+                    or f"{patient.first_name} {patient.last_name}",
+                }
+            )
 
     # Отправляем в фоновом режиме
     background_tasks.add_task(
         notification_sender_service.send_bulk_notification,
         db=db,
         notification_type=request.notification_type,
-        channels=request.channels,
+        channels=channels,
         recipients=recipients,
         template_data=request.template_data,
+        priority=request.priority,
     )
     return {
         "message": "Массовая отправка запущена",
         "recipients_count": len(recipients),
-        "channels": request.channels,
+        "channels": channels,
     }

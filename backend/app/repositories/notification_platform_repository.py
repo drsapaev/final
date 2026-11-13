@@ -11,6 +11,11 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.notification import NotificationDelivery, NotificationEvent
 
 
+def _not_expired_event_filter():
+    now = datetime.now(UTC).replace(tzinfo=None)
+    return or_(NotificationEvent.expires_at.is_(None), NotificationEvent.expires_at > now)
+
+
 class NotificationPlatformRepository:
     """Persistence boundary for notification events and deliveries."""
 
@@ -96,7 +101,11 @@ class NotificationPlatformRepository:
         query = (
             self.db.query(NotificationDelivery)
             .options(joinedload(NotificationDelivery.event))
-            .filter(NotificationDelivery.recipient_id == recipient_id)
+            .join(NotificationDelivery.event)
+            .filter(
+                NotificationDelivery.recipient_id == recipient_id,
+                _not_expired_event_filter(),
+            )
         )
 
         if role:
@@ -116,9 +125,6 @@ class NotificationPlatformRepository:
             query = query.filter(NotificationDelivery.archived_at.is_not(None))
         else:
             query = query.filter(NotificationDelivery.archived_at.is_(None))
-
-        if event_type or severity or search:
-            query = query.join(NotificationDelivery.event)
 
         if event_type:
             query = query.filter(
@@ -168,7 +174,10 @@ class NotificationPlatformRepository:
             self.db.query(func.count(NotificationDelivery.id))
             .select_from(NotificationDelivery)
             .join(NotificationDelivery.event)
-            .filter(NotificationDelivery.recipient_id == recipient_id)
+            .filter(
+                NotificationDelivery.recipient_id == recipient_id,
+                _not_expired_event_filter(),
+            )
         )
 
         if role:
@@ -222,10 +231,12 @@ class NotificationPlatformRepository:
         query = (
             self.db.query(func.count(NotificationDelivery.id))
             .select_from(NotificationDelivery)
+            .join(NotificationDelivery.event)
             .filter(
                 NotificationDelivery.recipient_id == recipient_id,
                 NotificationDelivery.read_at.is_(None),
                 NotificationDelivery.archived_at.is_(None),
+                _not_expired_event_filter(),
             )
         )
 
@@ -245,10 +256,12 @@ class NotificationPlatformRepository:
                 NotificationDelivery.role,
                 func.count(NotificationDelivery.id).label("count"),
             )
+            .join(NotificationDelivery.event)
             .filter(
                 NotificationDelivery.recipient_id == recipient_id,
                 NotificationDelivery.read_at.is_(None),
                 NotificationDelivery.archived_at.is_(None),
+                _not_expired_event_filter(),
             )
             .group_by(NotificationDelivery.role)
             .all()
@@ -262,10 +275,12 @@ class NotificationPlatformRepository:
                 NotificationDelivery.channel,
                 func.count(NotificationDelivery.id).label("count"),
             )
+            .join(NotificationDelivery.event)
             .filter(
                 NotificationDelivery.recipient_id == recipient_id,
                 NotificationDelivery.read_at.is_(None),
                 NotificationDelivery.archived_at.is_(None),
+                _not_expired_event_filter(),
             )
             .group_by(NotificationDelivery.channel)
             .all()
@@ -284,6 +299,7 @@ class NotificationPlatformRepository:
                 NotificationDelivery.recipient_id == recipient_id,
                 NotificationDelivery.read_at.is_(None),
                 NotificationDelivery.archived_at.is_(None),
+                _not_expired_event_filter(),
             )
             .group_by(NotificationEvent.severity)
             .all()
@@ -297,8 +313,11 @@ class NotificationPlatformRepository:
         limit: int = 10,
         since: datetime | None = None,
     ) -> list[NotificationDelivery]:
-        query = self.db.query(NotificationDelivery).options(
-            joinedload(NotificationDelivery.event)
+        query = (
+            self.db.query(NotificationDelivery)
+            .options(joinedload(NotificationDelivery.event))
+            .join(NotificationDelivery.event)
+            .filter(_not_expired_event_filter())
         )
         if since is not None:
             query = query.filter(NotificationDelivery.created_at >= since)
