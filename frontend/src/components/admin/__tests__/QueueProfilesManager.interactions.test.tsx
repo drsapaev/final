@@ -1,11 +1,18 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import i18n from '@/i18n';
 import QueueProfilesManager from '../QueueProfilesManager';
+
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+const mockScrollIntoView = () => {
+  const mock = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: mock });
+  return mock;
+};
 
 const { apiMock, syntheticProfiles } = vi.hoisted(() => {
   const syntheticProfiles = [
@@ -121,6 +128,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.clearAllMocks();
+  if (originalScrollIntoView) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+  else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
   window.sessionStorage.removeItem('admin.queueProfiles.pendingCsvPublication.v1');
   await i18n.changeLanguage('ru');
 });
@@ -361,6 +370,7 @@ describe('QueueProfilesManager interactions', () => {
     },
   ])('shows the structured delete refusal $reason and preserves the profile', async (detail) => {
     const user = userEvent.setup();
+    const scrollIntoView = mockScrollIntoView();
     apiMock.get.mockResolvedValueOnce({
       data: {
         profiles: [{
@@ -389,13 +399,58 @@ describe('QueueProfilesManager interactions', () => {
     await user.click(within(confirmation).getByRole('button', { name: 'Удалить' }));
 
     expect(await screen.findByText(detail.message)).toBeInTheDocument();
+    expect(within(row).getByRole('alert')).toHaveTextContent(detail.message);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
     expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
     expect(apiMock.delete).toHaveBeenCalledExactlyOnceWith('/queues/profiles/specialists');
     expect(apiMock.put).not.toHaveBeenCalled();
     expect(screen.getByText('Синтетический профиль для проверки удаления')).toBeInTheDocument();
     expect(within(row).getByTitle('Архивировать профиль')).toBeEnabled();
     expect(apiMock.get.mock.calls.filter(([url]) => url.startsWith('/queues/profiles'))).toHaveLength(1);
+    await user.click(within(row).getByRole('button', { name: 'Скрыть сообщение об ошибке' }));
+    expect(within(row).queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('announces a delete refusal even if the profile is filtered out while the request is pending', async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = mockScrollIntoView();
+    let rejectDelete!: (reason: unknown) => void;
+    apiMock.delete.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectDelete = reject; }));
+    await renderManager();
+
+    const row = screen.getByText('Синтетическая активная очередь').closest('tr')!;
+    await user.click(within(row).getByTitle('Удалить'));
+    const confirmation = screen.getByRole('dialog', { name: 'Удаление вкладки очереди' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Удалить' }));
+    await waitFor(() => expect(apiMock.delete).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole('button', { name: 'Все' }));
+    await user.click(screen.getByRole('option', { name: 'Профили в архиве' }));
+    rejectDelete({ response: { status: 409, data: { detail: { reason: 'profile_has_significant_links' } } } });
+
+    const deleteAlert = await screen.findByRole('alert');
+    expect(deleteAlert).toHaveTextContent('Синтетическая активная очередь');
+    expect(deleteAlert).toHaveTextContent('Профиль используется: архивируйте его');
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+
+    apiMock.post.mockRejectedValueOnce({ response: { data: { detail: 'Ошибка создания синтетического профиля' } } });
+    await openCreateDialog(user);
+    const dialog = screen.getByRole('dialog', { name: 'Новая вкладка' });
+    fireEvent.change(screen.getByLabelText('Уникальный ключ вкладки очереди'), { target: { value: 'synthetic_new' } });
+    fireEvent.change(screen.getByLabelText('Название вкладки очереди на английском'), { target: { value: 'Synthetic new direction' } });
+    fireEvent.change(screen.getByLabelText('Название вкладки очереди на русском'), { target: { value: 'Синтетическое новое направление' } });
+    await user.click(within(dialog).getByRole('button', { name: 'Создать вкладку очереди' }));
+    await screen.findByText('Ошибка создания синтетического профиля');
+    await user.keyboard('{Escape}');
+
+    const createAlert = screen.getByText('Ошибка создания синтетического профиля').closest('[role="alert"]')!;
+    expect(deleteAlert).toBeInTheDocument();
+    await user.click(within(createAlert as HTMLElement).getByRole('button', { name: 'Скрыть сообщение об ошибке' }));
+    expect(createAlert).not.toBeInTheDocument();
+    expect(deleteAlert).toBeInTheDocument();
+    await user.click(within(deleteAlert).getByRole('button', { name: 'Скрыть сообщение об ошибке' }));
+    expect(deleteAlert).not.toBeInTheDocument();
+  }, 15000);
 
   it('localizes the single-delete refusal instead of displaying the server message', async () => {
     const user = userEvent.setup();
