@@ -2599,6 +2599,16 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYPAYCLAIM-BE-001",
+   "priority": "P1 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "mounted Admin/Doctor /notifications/send-payment-notification uses caller-supplied amount/currency and only checks Visit/Patient existence, then sends official paid-confirmation wording without verifying any canonical Payment/settlement",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYPBROUTBATCHABORT-BE-001",
    "priority": "P2 conditional",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -2623,6 +2633,16 @@
    "priority": "P2",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "outbox never terminates permanent delivery failures; attempt_count unbounded, retry backoff capped at one hour but no dead-letter/manual disposition or failure-age alert; agree retention/replay policy before fixing",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYPBROUTSTALE-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "queued submitted/resubmitted notification is delivered without rechecking current PublicBookingRequest.status/version, so a stale v1 event can be emitted as actionable new booking after withdrawal or confirmation at v2; historical notification policy needs owner decision before source fix",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
@@ -3375,6 +3395,16 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYTESTREALOUT-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "mounted Admin /notifications/test-notifications invokes actual SMS/SMTP/Telegram senders with a fixed plausible phone number and configured default Telegram chat; not a sandbox/dry-run",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYTGBOTCONFIG-BE-001",
    "priority": "P2 conditional/architecture",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -3409,6 +3439,16 @@
    "priority": "P1 conditional/privacy",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "clinical send-appointment-reminder and send-lab-notification accept arbitrary caller-supplied Telegram chat IDs without patient-to-chat / source-record ownership validation",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYTGDEFAULTPII-BE-001",
+   "priority": "P1 conditional/privacy",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "legacy send_payment_notification and send_visit_confirmation embed patient contact, clinical/financial details and call send_telegram without chat_id; transport routes to configured global telegram_chat_id, not a verified patient-bound destination",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
