@@ -82,6 +82,7 @@ def test_expand_queue_tags_family_and_dedupe() -> None:
     assert "dentistry" in expanded
     assert "dental" in expanded and "stomatology" in expanded
     assert "cardiology" in expanded
+    assert "cardio" not in expanded and "cardiologist" not in expanded
     assert len(expanded) == len(set(expanded))
     assert expanded[0] == "dental"  # original order preserved first
 

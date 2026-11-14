@@ -1,8 +1,8 @@
 # DISPLAYBOOT-FE-001 — scoped design: provisioning of credentials for public TV boards
 
-**Status:** PROPOSAL, awaiting a product/security verdict of the owner. This document does not change any code and does not claim that the decision has been made.
+**Status:** APPROVED — Variant A, per owner decision. Implementation includes backend device provisioning, board-bound 60-minute JWTs, revocation, and the kiosk setup flow.
 **Source:** finding `DISPLAYBOOT-FE-001` (P1/P2), audit dossier `docs/audits/2026-11-09-queue-position-notifications-source-review.md` (round 32, draft PR #3961), re-verified against `main` @ `233b38cd5992` (2026-11-12).
-**Decision requested:** choosing the variant (A/B/C, see below) + answers to the open questions in the last section.
+**Decision record:** Variant A; 60-minute device JWTs; one-time provisioning codes; revocable, board-scoped HttpOnly session cookies; the existing public aggregate endpoint remains unchanged; backend and frontend land together.
 
 ## 1. Problem (re-verified against the current main)
 
@@ -26,19 +26,20 @@ The admin provisions a **device identity per board**; the TV exchanges it for a 
 
 Backend:
 
-1. New table `display_board_devices`: `id`, `board_id` (FK → `display_boards`), `device_name`, `secret_hash` (argon2/bcrypt, the secret itself is not stored), `status` (`active` / `revoked`), `last_connected_at`, `created_by`, `created_at`, `rotated_at`. There is no secret in the DB — only the hash.
+1. New table `display_board_devices`: `id`, `board_id` (FK → `display_boards`), `device_name`, `secret_hash` (argon2/bcrypt verifier), `status` (`active` / `revoked`), `credential_version`, `last_connected_at`, `created_by`, `created_at`, `rotated_at`. The cleartext secret is never stored; after successful provisioning its verifier is atomically replaced with a verifier for an unrelated random value.
 2. Endpoints (Admin role):
-   - `POST /display/boards/{board_id}/devices` — creates a device, returns the secret **once** (for scanning/copying into the kiosk); response is not logged.
-   - `DELETE /display/devices/{device_id}` — revocation (`status=revoked`).
-   - `POST /display/boards/{board_id}/devices/{device_id}/rotate` — rotation with a new one-time secret.
-3. Exchange `POST /display/devices/token` (device_id + secret): on success issues a short-lived JWT with `typ=display_device`, `board_id=<bound board>`, `jti` (blacklist-compatible, the same `TokenBlacklist` as for humans), TTL 30–60 min. Rate limiting on this endpoint is mandatory (protection against brute-force of the secret).
-4. Display-WS authorization: `_is_display_staff` is extended with the `display_device` principal — allowed **only** for the board bound by the claim, **only** when `DisplayBoard.active=True` and `status=active`; updates `last_connected_at`. Revocation of the device / deactivation of the board (including via the existing PUT settings contract, where #4035/#4039 already hooked the invalidations) kills the next reconnect.
+   - `POST /api/v1/admin/display/boards/{board_id}/devices` — creates a device, returns the secret **once** (for scanning/copying into the kiosk); response is not logged.
+   - `GET /api/v1/admin/display/boards/{board_id}/devices` — lists metadata only; never returns secret material.
+   - `DELETE /api/v1/admin/display/devices/{device_id}` — revocation (`status=revoked`).
+   - `POST /api/v1/admin/display/boards/{board_id}/devices/{device_id}/rotate` — rotation with a new one-time secret.
+3. Initial exchange `POST /api/v1/display/devices/token` (board_name + device_id + secret) atomically consumes the one-time code and issues a short-lived JWT with `typ=display_device`, `board_id=<bound board>`, `jti` (blacklist-compatible, the same `TokenBlacklist` as for humans), TTL 60 min. It also sets a 30-day sliding, board-scoped `HttpOnly` session cookie. Later exchanges send only `board_name` and the cookie. The cookie is `Secure` in production and uses `SameSite=Lax` by default; deployments that require cross-site cookies must set `DISPLAY_DEVICE_COOKIE_SAMESITE=none` over HTTPS. Prefer a same-site frontend/API topology: browser third-party-cookie policies may still block cross-site sessions. Rate limiting on this endpoint is mandatory (protection against brute-force of the secret).
+4. Display-WS authorization: a separate `display_device` principal is allowed **only** for the board bound by the claim, **only** when `DisplayBoard.active=True` and the device is active; it updates `last_connected_at`. Existing connections re-check the token, device version, and board/device status every 15 seconds, so revocation, rotation, or board deactivation closes the socket within 30 seconds.
 5. Name masking is unchanged: the device principal receives the same snapshot as the staff for this board — the privacy policy is governed by the board, not by the principal type.
 
 Frontend (kiosk boot-flow):
 
 - No staff token and no device credential → an honest **provisioning screen** ("The board is not configured. Ask the administrator to provision a device") — this is exactly the "explicit protected-setup/credential-required state" required by the fail-first from the finding, instead of a fake-empty board.
-- With a credential → silent exchange → WS connection; the secret is stored in `localStorage` of the kiosk profile; a URL parameter like `?forget-device=1` clears it.
+- With a one-time provisioning code → exchange → browser-held `HttpOnly` session cookie → WS connection. The code is held only in the setup form's memory and is consumed by the server. A URL parameter like `?forget-device=1` clears this board's session cookie.
 - The staff token takes precedence (a TV logged in under a staff account behaves as it does today).
 
 ### B. Interactive login under a dedicated "Display" account
@@ -80,14 +81,15 @@ Directly prohibited by the finding: rows contain tickets, doctors, offices, and 
 ## 5. Risks and limitations
 
 - A new table + 3–4 endpoints + a kiosk boot-flow — the largest implementation scope among the variants, but everything is additive, without migrations of existing tables (a new table, a new principal type — a backward-compatible extension of `_is_display_staff`).
-- The secret in the TV's `localStorage` — an XSS on the public route would gain access to the device secret; the blast radius is limited (one board, read-only, revocable); the TV does not store user PHI.
+- The `HttpOnly` session cookie is scoped to one board and the token-exchange path; same-origin script cannot read it, while same-origin script execution could still act through the browser until the device is revoked or rotated. Revocation and rotation invalidate the cookie through `credential_version`.
 - The exchange endpoint becomes the target of brute force — mandatory rate limiting + a secret of sufficient entropy (≥32 bytes base64url).
 - The audit of device connections is kept minimal (last_connected_at); a full connection log is possible as a follow-up.
 
-## 6. Open questions for the owner
+## 6. Decision details
 
-1. **TTL of the display-device token** — 30 or 60 minutes? (the recommendation is 60 with a silent refresh exchange on reconnect).
-2. **Rotation policy** — forced 90 days or only upon request?
-3. Should the device principal be allowed the aggregate `GET /board/state?board=` (today it is public anyway) — yes/no?
-4. Storage on the TV: `localStorage` of the kiosk profile (recommended) or an httpOnly cookie with a device session?
-5. Phase ordering: is backend-only (Phase 1) allowed to land first, with the kiosk FE flow as a separate PR?
+- WebSocket JWT lifetime is 60 minutes. The kiosk silently exchanges its board-scoped session cookie whenever it opens or reconnects its WebSocket; each successful exchange renews the 30-day cookie expiry.
+- Rotation is available to an administrator on request; no forced rotation interval was selected.
+- The initial provisioning code is single-use; after exchange, its verifier is replaced with one for an unrelated random value. If the initial response is lost before the browser receives the cookie, or the cookie is later lost or expires after 30 days without use, an administrator must rotate the device code and provision the kiosk again.
+- The device principal receives no added REST access. The existing public `GET /board/state` remains aggregate-only and unchanged.
+- The browser stores the session as an HttpOnly cookie whose name is scoped to the board and device and whose path is limited to the exchange endpoint. `?forget-device=1` asks the server to clear cookies for that board in this browser; it does not revoke the device for other kiosks.
+- Backend provisioning and the kiosk flow are implemented together so public boards do not ship in an unconfigured, blank-live state.

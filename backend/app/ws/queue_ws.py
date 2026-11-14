@@ -387,41 +387,16 @@ def _resolve_ws_auth(headers, token_qs: str | None):
         token = token_qs.strip()
     if not token:
         return None
-    # Validate JWT
+    # Validate through the same user/JTI/sentinel resolver used by the
+    # authenticated and legacy display sockets. This also checks revocation
+    # for username-sub and missing-JTI tokens.
     try:
-        import jwt as _jwt
-
-        from app.core.config import settings as _settings
-        payload = _jwt.decode(token, _settings.SECRET_KEY, algorithms=[_settings.ALGORITHM])
-        from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
+        from app.api.v1.endpoints.websocket_auth import resolve_websocket_token_user
         from app.db.session import SessionLocal as _SessionLocal
 
-        jti = payload.get("jti")
         _db = _SessionLocal()
         try:
-            # QUEUEWSAUTH-BE-002: resolve the validated subject to a stable
-            # user FIRST, then apply revocation for that user — one policy
-            # for numeric and username subjects alike. The shared resolver
-            # returns None for internal-only roles, missing users and
-            # malformed subjects (QD-1.1 Codex round-3 P2).
-            user = _resolve_websocket_user(payload, _db)
-            if user is None:
-                return None
-            if jti:
-                from app.services.token_blacklist_service import (
-                    TokenBlacklistService,
-                )
-
-                if TokenBlacklistService.is_token_blacklisted(
-                    _db, jti, user_id=user.id
-                ):
-                    log.warning(
-                        "WS auth rejected: blacklisted token (jti=%s) "
-                        "for user_id=%s",
-                        jti,
-                        user.id,
-                    )
-                    return None
+            user = resolve_websocket_token_user(token, _db)
         finally:
             _db.close()
         return user
@@ -459,6 +434,7 @@ async def ws_queue(
     secure_token = extract_ws_token(websocket)
     if secure_token and not token:
         token = secure_token
+    auth_token = token or secure_token
 
     # ✅ SECURITY: Check environment
     env = os.getenv("ENV", "dev").lower()
@@ -540,7 +516,24 @@ async def ws_queue(
     HEARTBEAT_INTERVAL = 30  # seconds
     CONNECTION_TIMEOUT = 120  # seconds (2 minutes of inactivity)
     # ✅ BUGFIX: Use list to allow mutation from nested scopes (nonlocal doesn't work in nested try blocks)
-    last_pong = [asyncio.get_event_loop().time()]
+    loop = asyncio.get_running_loop()
+    last_pong = [loop.time()]
+    last_auth_check = [loop.time()]
+    from app.api.v1.endpoints.websocket_auth import QUEUE_WS_AUTH_RECHECK_SECONDS
+
+    def refresh_queue_auth() -> bool:
+        nonlocal user
+        current_user = _resolve_ws_auth(websocket.headers, auth_token)
+        if current_user is None:
+            return False
+        if current_user is not _WS_TESTING_PRINCIPAL:
+            from app.api.v1.endpoints.websocket_auth import _has_department_access
+
+            if not _has_department_access(current_user, department):
+                return False
+        user = current_user
+        last_auth_check[0] = loop.time()
+        return True
 
     async def send_heartbeat():
         """Send periodic ping to detect dead connections"""
@@ -559,8 +552,22 @@ async def ws_queue(
         await websocket.send_json({"type": "queue.connected", "room": room})
         while True:
             try:
+                elapsed = loop.time() - last_auth_check[0]
                 # ✅ SECURITY: Set receive timeout
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=CONNECTION_TIMEOUT)
+                data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=min(
+                        CONNECTION_TIMEOUT,
+                        max(0.01, QUEUE_WS_AUTH_RECHECK_SECONDS - elapsed),
+                    ),
+                )
+                if loop.time() - last_auth_check[0] >= QUEUE_WS_AUTH_RECHECK_SECONDS:
+                    if not refresh_queue_auth():
+                        await websocket.close(
+                            code=status.WS_1008_POLICY_VIOLATION,
+                            reason="Queue authorization expired or revoked",
+                        )
+                        break
 
                 # Parse message
                 try:
@@ -580,9 +587,16 @@ async def ws_queue(
                 log.info("WebSocket disconnected: %s", room)
                 break
             except TimeoutError:
+                if loop.time() - last_auth_check[0] >= QUEUE_WS_AUTH_RECHECK_SECONDS:
+                    if not refresh_queue_auth():
+                        await websocket.close(
+                            code=status.WS_1008_POLICY_VIOLATION,
+                            reason="Queue authorization expired or revoked",
+                        )
+                        break
                 # Check if connection is still alive
                 # ✅ BUGFIX: Access list element to get current value
-                time_since_pong = asyncio.get_event_loop().time() - last_pong[0]
+                time_since_pong = loop.time() - last_pong[0]
                 if time_since_pong > CONNECTION_TIMEOUT:
                     log.warning(f"Connection timeout for {room}, closing...")
                     break
