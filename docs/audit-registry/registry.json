@@ -2599,6 +2599,46 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYPBROUTBATCHABORT-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "process_due_batch reads db.get before per-item try, so one post-claim fetch exception aborts entire already-leased batch until lease expiry rather than isolating/releasing remaining items",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYPBROUTFENCE-BE-001",
+   "priority": "P1 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "10m outbox lease claim has no owner token/generation; stale worker completion/deferral writes by row ID alone, can clear/ACK lease re-claimed by second worker after lease expiry",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYPBROUTRETRYMAX-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "outbox never terminates permanent delivery failures; attempt_count unbounded, retry backoff capped at one hour but no dead-letter/manual disposition or failure-age alert; agree retention/replay policy before fixing",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYPBROUTWORKERFAIL-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "cron ARQ worker swallows batch exceptions into warning and returns normally, masking batch failure from task-status-based monitoring",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYPHONETASK-BE-001",
    "priority": "P1",
    "source": "Notification platform groups 47–52 (#4054)",
