@@ -3705,11 +3705,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4068",
    "merge_sha": null,
-   "root_cause": "webauthn.py register/login finish pass client-supplied rp_id/origin (body.get defaults localhost/localhost:3000) as the EXPECTED verification values — origin-binding neutralized",
+   "root_cause": "webauthn.py read rp_id/origin from the request body (defaults localhost/http://localhost:3000) and passed them as the EXPECTED verification values to verify_registration_response/verify_authentication_response; registration options embedded the client RP too — WebAuthn's origin binding verified attacker input against attacker input (phished initData -> attacker-origin passkey for victim patient_id -> end-to-end login); fix PR #4068 opened 2026-11-14 (head 512d4d806, off main 94d140f83): RP ID/origin server-pinned from settings.FRONTEND_URL (rpId=hostname, origin=scheme://netloc, missing FRONTEND_URL fails closed); client rp_id/origin ignored in all four flows (kwargs kept for call-site compatibility, documented as deprecated); rp_name stays display-only; dead webauthn.helpers.structs import removed. RED 4 failed (captured expected_* == evil.example) -> GREEN 4 passed; webauthn unit neighbors 15 passed, mini-app 16 passed; openapi unchanged (manual request.json parsing)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "512d4d806"
   },
   {
    "checked": false,
