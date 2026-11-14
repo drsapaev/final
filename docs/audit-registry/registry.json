@@ -3395,16 +3395,6 @@
   },
   {
    "checked": false,
-   "id": "NOTIFYTESTREALOUT-BE-001",
-   "priority": "P2 conditional",
-   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
-   "evidence": "mounted Admin /notifications/test-notifications invokes actual SMS/SMTP/Telegram senders with a fixed plausible phone number and configured default Telegram chat; not a sandbox/dry-run",
-   "status": "UNVERIFIED",
-   "fix_pr": null,
-   "merge_sha": null
-  },
-  {
-   "checked": false,
    "id": "NOTIFYTGBOTCONFIG-BE-001",
    "priority": "P2 conditional/architecture",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -3439,16 +3429,6 @@
    "priority": "P1 conditional/privacy",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "clinical send-appointment-reminder and send-lab-notification accept arbitrary caller-supplied Telegram chat IDs without patient-to-chat / source-record ownership validation",
-   "status": "UNVERIFIED",
-   "fix_pr": null,
-   "merge_sha": null
-  },
-  {
-   "checked": false,
-   "id": "NOTIFYTGDEFAULTPII-BE-001",
-   "priority": "P1 conditional/privacy",
-   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
-   "evidence": "legacy send_payment_notification and send_visit_confirmation embed patient contact, clinical/financial details and call send_telegram without chat_id; transport routes to configured global telegram_chat_id, not a verified patient-bound destination",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
