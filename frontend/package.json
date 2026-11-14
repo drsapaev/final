@@ -134,6 +134,12 @@
     "js-yaml": "^4.3.1",
     "brace-expansion@1": "^1.1.18",
     "brace-expansion@2": "^2.1.4",
-    "qs": "^6.16.0"
+    "qs": "^6.16.0",
+    "@joshwooding/vite-plugin-react-docgen-typescript": {
+      "glob": "14.0.6"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.8"
+    }
   }
 }

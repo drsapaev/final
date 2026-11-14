@@ -36005,6 +36005,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
               "default": 7,
               "title": "Days Back"
             }
@@ -36056,6 +36058,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "default": 0,
               "title": "Skip"
             }
@@ -36066,6 +36069,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 100,
               "title": "Limit"
             }
@@ -36113,7 +36118,7 @@
           "admin"
         ],
         "summary": "Send Broadcast Message",
-        "description": "Отправить широковещательное сообщение",
+        "description": "Report that broadcast delivery is unavailable instead of claiming success.",
         "operationId": "send_broadcast_message_api_v1_admin_telegram_broadcast_post",
         "security": [
           {
@@ -36156,14 +36161,23 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "501": {
+            "description": "Telegram broadcast delivery is disabled.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Send Broadcast Message Api V1 Admin Telegram Broadcast Post"
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                },
+                "example": {
+                  "detail": "Telegram broadcast delivery is not configured; no messages were sent."
                 }
               }
             }
