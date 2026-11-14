@@ -215,11 +215,29 @@ def begin_passkey_authentication(
 
     from app.core.cache import cache_manager
     challenge_b64 = options.challenge.decode() if isinstance(options.challenge, bytes) else options.challenge
-    cache_manager.set(
-        f"webauthn_auth_challenge:{patient_id}",
-        challenge_b64,
-        ttl=300,
+
+    # WEBAUTHN-BE-002 (#4063): the begin endpoint is unauthenticated and
+    # takes an arbitrary patient_id — cache a challenge ONLY when that
+    # patient actually has an active credential. Unknown/gated patients get
+    # a byte-identical dummy response, but nothing is stored: the shared
+    # cache can no longer be grown by anonymous probing, and a dummy
+    # challenge can never complete a ceremony (its verify finds no cache
+    # entry and rejects).
+    has_active_credential = (
+        db.query(PasskeyCredential.id)
+        .filter(
+            PasskeyCredential.patient_id == patient_id,
+            PasskeyCredential.active == True,
+        )
+        .first()
+        is not None
     )
+    if has_active_credential:
+        cache_manager.set(
+            f"webauthn_auth_challenge:{patient_id}",
+            challenge_b64,
+            ttl=300,
+        )
 
     return {
         "challenge": challenge_b64,
