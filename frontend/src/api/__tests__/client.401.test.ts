@@ -163,6 +163,7 @@ beforeEach(() => {
   tokenState.access = 'old-access-token';
   tokenState.refresh = 'refresh-token-1';
   tokenState.cleared = 0;
+  delete api.defaults.headers.common['Authorization'];
 });
 
 afterEach(() => {
@@ -252,26 +253,70 @@ describe('reactive 401 recovery', () => {
     expect(tokenState.refresh).toBe('refresh-token-1');
   });
 
-  it('does NOT clear the session when a newer login already replaced the token', async () => {
-    api.defaults.adapter = async (config) => {
-      const url = String(config.url || '');
-      if (url.includes('/visits/')) throw make401(url);
-      throw new Error(`unexpected adapter call: ${url}`);
-    };
-    vi.spyOn(axios, 'post').mockRejectedValue(
-      make401('/api/v1/authentication/refresh', 'post')
-    );
-
-    // Mid-flight the user re-logged in: current token is no longer the one
-    // that went out with the failed request.
-    const promise = api.get('/api/v1/visits/42');
-    tokenState.access = 'fresh-login-token';
-
-    await expect(promise).rejects.toMatchObject({
-      response: { status: 401 }
+  it('does not refresh or clear a replacement session for an older in-flight request', async () => {
+    const seenConfigs: InternalAxiosRequestConfig[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
     });
+    api.defaults.adapter = async (config) => {
+      seenConfigs.push(config);
+      await gate;
+      throw make401FromRealConfig(config);
+    };
+    const refreshSpy = vi.spyOn(axios, 'post');
+
+    const promise = api.get('/api/v1/visits/42');
+    await vi.waitFor(() => expect(seenConfigs).toHaveLength(1));
+    expect(seenConfigs[0].headers?.Authorization).toBe('Bearer old-access-token');
+    tokenState.access = 'fresh-login-token';
+    tokenState.refresh = 'fresh-login-refresh-token';
+    release();
+
+    await expect(promise).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+    expect(refreshSpy).not.toHaveBeenCalled();
     expect(tokenState.cleared).toBe(0);
+    expect(tokenState.access).toBe('fresh-login-token');
+    expect(tokenState.refresh).toBe('fresh-login-refresh-token');
   });
+
+  it.each(['post', 'put', 'delete'] as const)(
+    'does not replay an in-flight %s as a replacement session after 401',
+    async (method) => {
+      const seenConfigs: InternalAxiosRequestConfig[] = [];
+      let rejectRefresh: (error: AxiosError) => void = () => {};
+      const refreshResponse = new Promise<AxiosResponse>((_resolve, reject) => {
+        rejectRefresh = reject;
+      });
+      let businessCalls = 0;
+      api.defaults.adapter = async (config) => {
+        businessCalls += 1;
+        seenConfigs.push(config);
+        if (businessCalls === 1) throw make401FromRealConfig(config);
+        return make200({ authorizedAs: config.headers?.Authorization });
+      };
+      vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+      const refreshSpy = vi.spyOn(axios, 'post').mockReturnValue(refreshResponse);
+      const url = '/api/v1/visits/42';
+      const request = method === 'delete'
+        ? api.delete(url)
+        : api[method](url, { synthetic: true });
+
+      await vi.waitFor(() => expect(refreshSpy).toHaveBeenCalledTimes(1));
+      expect(seenConfigs).toHaveLength(1);
+      expect(seenConfigs[0].headers?.Authorization).toBe('Bearer old-access-token');
+      tokenState.access = 'replacement-access-token';
+      tokenState.refresh = 'replacement-refresh-token';
+      rejectRefresh(make401('/api/v1/authentication/refresh', 'post'));
+
+      await expect(request).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+      expect(businessCalls).toBe(1);
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+      expect(tokenState.cleared).toBe(0);
+      expect(tokenState.access).toBe('replacement-access-token');
+      expect(tokenState.refresh).toBe('replacement-refresh-token');
+    }
+  );
 
   it('does not attempt refresh for anonymous 401s (no Authorization header)', async () => {
     const refreshSpy = vi.spyOn(axios, 'post');
@@ -442,34 +487,66 @@ describe('proactive refresh failure lifecycle', () => {
     expect(tokenState.cleared).toBe(1);
   });
 
-  it('does not clear a replacement session when the in-flight proactive refresh returns 401', async () => {
+  it('cancels a proactive request when refresh belongs to a replaced login session', async () => {
     const attemptedToken = makeExpiringAccessToken();
     tokenState.access = attemptedToken;
     let rejectRefresh: (error: AxiosError) => void = () => {};
     const refreshResponse = new Promise<AxiosResponse>((_resolve, reject) => {
       rejectRefresh = reject;
     });
-    const businessAuthorization: Array<string | undefined> = [];
-    api.defaults.adapter = async (config) => {
-      businessAuthorization.push(config.headers?.Authorization as string | undefined);
+    let businessCalls = 0;
+    api.defaults.adapter = async () => {
+      businessCalls += 1;
       return make200({ ok: true });
     };
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
     const refreshSpy = vi.spyOn(axios, 'post').mockReturnValue(refreshResponse);
 
-    const request = api.get('/api/v1/visits/42');
+    const request = api.post('/api/v1/visits/42', { synthetic: true });
     await vi.waitFor(() => expect(refreshSpy).toHaveBeenCalledTimes(1));
     tokenState.access = 'fresh-login-access-token';
     tokenState.refresh = 'fresh-login-refresh-token';
     rejectRefresh(make401('/api/v1/authentication/refresh', 'post'));
 
-    const response = await request;
-
-    expect(response.data).toEqual({ ok: true });
-    expect(businessAuthorization).toEqual(['Bearer fresh-login-access-token']);
+    await expect(request).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+    expect(businessCalls).toBe(0);
     expect(tokenState.cleared).toBe(0);
     expect(tokenState.access).toBe('fresh-login-access-token');
     expect(tokenState.refresh).toBe('fresh-login-refresh-token');
   });
+
+  it.each(['post', 'put', 'delete'] as const)(
+    'cancels a proactive %s before dispatch when its session is replaced during refresh',
+    async (method) => {
+      tokenState.access = makeExpiredAccessToken();
+      let rejectRefresh: (error: AxiosError) => void = () => {};
+      const refreshResponse = new Promise<AxiosResponse>((_resolve, reject) => {
+        rejectRefresh = reject;
+      });
+      let businessCalls = 0;
+      api.defaults.adapter = async () => {
+        businessCalls += 1;
+        return make200({ ok: true });
+      };
+      vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+      const refreshSpy = vi.spyOn(axios, 'post').mockReturnValue(refreshResponse);
+      const url = '/api/v1/queues/profiles/specialists';
+      const request = method === 'delete'
+        ? api.delete(url)
+        : api[method](url, { synthetic: true });
+
+      await vi.waitFor(() => expect(refreshSpy).toHaveBeenCalledTimes(1));
+      tokenState.access = 'replacement-access-token';
+      tokenState.refresh = 'replacement-refresh-token';
+      rejectRefresh(make401('/api/v1/authentication/refresh', 'post'));
+
+      await expect(request).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+      expect(businessCalls).toBe(0);
+      expect(tokenState.cleared).toBe(0);
+      expect(tokenState.access).toBe('replacement-access-token');
+      expect(tokenState.refresh).toBe('replacement-refresh-token');
+    }
+  );
 });
 
 describe('access-only session 401 lifecycle (Phase 0 follow-up)', () => {
@@ -519,7 +596,7 @@ describe('access-only session 401 lifecycle (Phase 0 follow-up)', () => {
     tokenState.access = 'fresh-login-jwt';
     release();
 
-    await expect(promise).rejects.toMatchObject({ response: { status: 401 } });
+    await expect(promise).rejects.toMatchObject({ code: 'ERR_CANCELED' });
     // Same race guard as the refresh path: liveToken !== failedToken → the
     // replacement session survives untouched.
     expect(tokenState.cleared).toBe(0);
@@ -563,27 +640,30 @@ describe('staff dead-session termination (N2-5 review round 3 P1)', () => {
     expect(api.defaults.headers.common['Authorization']).toBeUndefined();
   });
 
-  it('the login-transition race guard keeps protecting a replaced session from the listener path', async () => {
+  it('does not notify the invalidation listener for a replaced login session', async () => {
     const listener = vi.fn();
     setSessionInvalidationListener(listener);
 
-    api.defaults.adapter = async (config) => {
-      const url = String(config.url || '');
-      if (url.includes('/visits/')) throw make401(url);
-      throw new Error(`unexpected adapter call: ${url}`);
-    };
-    vi.spyOn(axios, 'post').mockRejectedValue(
-      make401('/api/v1/authentication/refresh', 'post')
-    );
-
-    // Mid-flight a fresh login replaces the staff token.
-    const promise = api.get('/api/v1/visits/42');
-    tokenState.access = 'fresh-login-token';
-
-    await expect(promise).rejects.toMatchObject({
-      response: { status: 401 }
+    const seenConfigs: InternalAxiosRequestConfig[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
     });
-    // liveToken !== failedToken → neither the listener nor clearAll ran.
+    api.defaults.adapter = async (config) => {
+      seenConfigs.push(config);
+      await gate;
+      throw make401FromRealConfig(config);
+    };
+    const refreshSpy = vi.spyOn(axios, 'post');
+
+    const promise = api.get('/api/v1/visits/42');
+    await vi.waitFor(() => expect(seenConfigs).toHaveLength(1));
+    tokenState.access = 'fresh-login-token';
+    tokenState.refresh = 'fresh-login-refresh-token';
+    release();
+
+    await expect(promise).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+    expect(refreshSpy).not.toHaveBeenCalled();
     expect(listener).not.toHaveBeenCalled();
     expect(tokenState.cleared).toBe(0);
     expect(tokenState.access).toBe('fresh-login-token');

@@ -218,7 +218,7 @@ describe('access-only patient session replacement (P1)', () => {
       make200({ access_token: 'rotated-staff-access', refresh_token: 'rotated-staff-refresh' })
     );
 
-    await requestPromise;
+    await expect(requestPromise).rejects.toMatchObject({ code: 'ERR_CANCELED' });
 
     // The rotated tokens of the replaced principal must NOT resurrect:
     // no staff access token over the patient one, no staff refresh token
@@ -280,10 +280,9 @@ describe('access-only patient session replacement (P1)', () => {
       make200({ access_token: 'rotated-staff-access', refresh_token: 'rotated-staff-refresh' })
     );
 
-    // The business request itself still surfaces the original 401 (nothing
-    // to retry with — that path is unchanged), but the cleanup must NOT
-    // take the replaced session with it.
-    await expect(requestPromise).rejects.toMatchObject({ response: { status: 401 } });
+    // The old request is canceled after the session changes; its stale staff
+    // refresh must neither replay it as the patient nor clear the patient.
+    await expect(requestPromise).rejects.toMatchObject({ code: 'ERR_CANCELED' });
 
     // Patient session survives:
     expect(tokenState.access).toBe(patientJwt);
