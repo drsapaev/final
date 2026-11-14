@@ -18,6 +18,9 @@ from app.api.v1.endpoints.telegram_webhook._helpers import get_db, logger, Reque
 
 router = APIRouter(prefix="/webauthn", tags=["webauthn"])
 
+# WEBAUTHN-BE-002 (#4063): the login plane is unauthenticated — IP-throttle it
+from app.core.rate_limiter import limiter  # noqa: E402
+
 
 def _check_webauthn_available():
     """Raise 503 if webauthn library is not installed."""
@@ -30,7 +33,7 @@ def _check_webauthn_available():
 
 
 @router.post("/register/begin", operation_id="webauthn_register_begin")
-def webauthn_register_begin(
+async def webauthn_register_begin(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -47,7 +50,7 @@ def webauthn_register_begin(
     )
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -78,7 +81,7 @@ def webauthn_register_begin(
 
 
 @router.post("/register/finish", operation_id="webauthn_register_finish")
-def webauthn_register_finish(
+async def webauthn_register_finish(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -94,7 +97,7 @@ def webauthn_register_finish(
     )
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -137,7 +140,8 @@ def webauthn_register_finish(
 
 
 @router.post("/login/begin", operation_id="webauthn_login_begin")
-def webauthn_login_begin(
+@limiter.limit("10/minute")  # WEBAUTHN-BE-002: anonymous challenge-issuer throttle
+async def webauthn_login_begin(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -150,7 +154,7 @@ def webauthn_login_begin(
     from app.services.webauthn_service import begin_passkey_authentication
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -169,7 +173,8 @@ def webauthn_login_begin(
 
 
 @router.post("/login/finish", operation_id="webauthn_login_finish")
-def webauthn_login_finish(
+@limiter.limit("5/minute")  # WEBAUTHN-BE-002: unauthenticated assertion throttle
+async def webauthn_login_finish(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -182,7 +187,7 @@ def webauthn_login_finish(
     from app.services.webauthn_service import finish_passkey_authentication
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -205,14 +210,21 @@ def webauthn_login_finish(
         )
         return result
     except ValueError as exc:
-        raise HTTPException(status_code=403, detail={"reason": str(exc)}) from exc
+        # WEBAUTHN-BE-002: every pre-verification failure (non-numeric id,
+        # unknown patient, no challenge, no active credential) shares ONE
+        # opaque 403 — the raw message was an enumeration oracle. Details go
+        # to the server log only.
+        logger.info("WebAuthn auth finish rejected: %s", exc)
+        raise HTTPException(status_code=403, detail={"reason": "auth_finish_failed"}) from exc
     except Exception as exc:
         logger.error("WebAuthn auth finish failed: %s", exc)
-        raise HTTPException(status_code=500, detail={"reason": "auth_finish_failed"}) from exc
+        # Uniform with the ValueError branch: infra failures on this
+        # anonymous plane must not be distinguishable from rejections.
+        raise HTTPException(status_code=403, detail={"reason": "auth_finish_failed"}) from exc
 
 
 @router.post("/credentials/list", operation_id="webauthn_list_credentials")
-def webauthn_list_credentials(
+async def webauthn_list_credentials(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -223,7 +235,7 @@ def webauthn_list_credentials(
     )
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -255,7 +267,7 @@ def webauthn_list_credentials(
 
 
 @router.post("/credentials/{credential_id}/deactivate", operation_id="webauthn_deactivate_credential")
-def webauthn_deactivate_credential(
+async def webauthn_deactivate_credential(
     credential_id: int,
     request: Request,
     db: Session = Depends(get_db),
@@ -267,7 +279,7 @@ def webauthn_deactivate_credential(
     )
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
