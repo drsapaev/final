@@ -287,7 +287,19 @@ def test_realtime_policy_suppresses_queue_events_during_quiet_hours(
     assert reason == "quiet_hours_queue_suppression"
 
 
-def test_realtime_policy_respects_event_push_setting_mapping(db_session):
+@pytest.mark.parametrize(
+    "event_type",
+    [
+        "queue_update",
+        "lab_results",
+        "lab_new_study",
+        "lab_result_sent_confirmation",
+        "lab_critical_finding",
+        "dental_price_override_pending",
+        "dental_price_override_result",
+    ],
+)
+def test_realtime_policy_respects_event_push_setting_mapping(db_session, event_type):
     service = NotificationPlatformService(db_session)
     user = SimpleNamespace(
         preferences=SimpleNamespace(
@@ -304,13 +316,28 @@ def test_realtime_policy_respects_event_push_setting_mapping(db_session):
 
     allowed, reason = service._should_broadcast_realtime(
         user=user,
-        event_type="queue_update",
+        event_type=event_type,
         severity="info",
         priority="normal",
     )
 
     assert allowed is False
     assert reason == "setting_disabled:push_system_updates"
+
+
+def test_critical_lab_result_remains_a_realtime_breakthrough(db_session):
+    service = NotificationPlatformService(db_session)
+    user = SimpleNamespace()
+
+    allowed, reason = service._should_broadcast_realtime(
+        user=user,
+        event_type="lab_critical_result",
+        severity="critical",
+        priority="urgent",
+    )
+
+    assert allowed is True
+    assert reason == "critical_breakthrough"
 
 
 @pytest.mark.asyncio

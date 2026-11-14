@@ -91,6 +91,12 @@ class NotificationPlatformServiceMixinBase:
         "diagnostics_return_needed": "push_system_updates",
         "queue_status_changed": "push_system_updates",
         "patient_registered": "push_system_updates",
+        "lab_results": "push_system_updates",
+        "lab_new_study": "push_system_updates",
+        "lab_result_sent_confirmation": "push_system_updates",
+        "lab_critical_finding": "push_system_updates",
+        "dental_price_override_pending": "push_system_updates",
+        "dental_price_override_result": "push_system_updates",
     }
 
     ROLE_ALIASES = {

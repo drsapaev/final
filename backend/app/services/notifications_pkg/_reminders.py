@@ -43,6 +43,18 @@ class RemindersMixin(NotificationSenderMixinBase):
             notification_data = self._prepare_notification_data(db, visit, patient)
             notification_data["is_reminder"] = True
             notification_data["hours_before"] = hours_before
+            sms_opted_in = True
+
+            # Resolve patient preferences while the read transaction is
+            # active. Provider dispatch happens after commit, so it must not
+            # trigger another query on this session immediately before await.
+            if channel == "pwa":
+                sms_opted_in = self._patient_channel_opted_in(
+                    db=db,
+                    patient_id=patient.id,
+                    channel="sms",
+                    event_type="appointment_confirmation",
+                )
 
             # Codex round 12, P2: the provider dispatch can hold this
             # connection for up to the arq job timeout (300s). End the
@@ -89,8 +101,15 @@ class RemindersMixin(NotificationSenderMixinBase):
                 )
                 return {"success": result.get("success"), "error": result.get("error")}
             elif channel == "pwa":
+                if not sms_opted_in:
+                    return {
+                        "success": False,
+                        "error": "SMS отключены настройками пациента",
+                    }
                 return await self._send_pwa_invitation(
-                    patient, notification_data, db=db
+                    patient,
+                    notification_data,
+                    sms_opted_in=sms_opted_in,
                 )
             else:
                 return await self._send_phone_invitation(

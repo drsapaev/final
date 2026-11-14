@@ -1688,9 +1688,8 @@ async def test_service_body_ends_transaction_before_dispatch(
     read-only transaction BEFORE awaiting the provider — asserted inside
     the stubbed provider call — so max_jobs slow dispatches can never pin
     every connection in an idle-in-transaction state. The session mirrors
-    the worker's configuration (expire_on_commit=False), so the pwa
-    branch's post-commit attribute reads stay in-memory instead of
-    reopening a transaction."""
+    the worker's configuration (expire_on_commit=False). Preferences are
+    resolved before commit and provider dispatch must not reopen a transaction."""
     from app.models.patient import Patient
     from app.models.visit import Visit
     from app.services.notification_service import NotificationService
@@ -1708,15 +1707,13 @@ async def test_service_body_ends_transaction_before_dispatch(
     svc = NotificationService()
     observed: dict = {}
 
-    # The channel selection resolves to "pwa" (the fixture phone is a
-    # +998 number). Stub the pwa dispatch itself — the assertion target
-    # is the transaction state AT THE PROVIDER AWAIT, wherever it lives.
-    async def _stub_pwa_invitation(patient, data, *, db=None):
-        assert db is s
+    # Keep the real PWA path and replace only the external provider.
+    async def _stub_send_sms(phone, _message):
+        assert phone.startswith("+998000")
         observed["in_transaction"] = s.in_transaction()
-        return {"success": True, "channel": "pwa"}
+        return True
 
-    svc._send_pwa_invitation = _stub_pwa_invitation  # type: ignore[method-assign]
+    svc.send_sms = _stub_send_sms  # type: ignore[method-assign]
 
     s = sessionmaker(bind=pipeline_db, expire_on_commit=False)()
     try:
