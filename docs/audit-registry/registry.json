@@ -3474,11 +3474,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4066",
    "merge_sha": null,
-   "root_cause": "two_factor_auth.py:601 two_factor_device.get(device_id) missing db session arg (base signature get(db,id)) -> TypeError -> 500 on every single-device untrust",
+   "root_cause": "two_factor_auth.py:601 two_factor_device.get(device_id) missing db session arg (base signature get(db,id)) -> TypeError -> 500 on every single-device untrust; fix PR #4066 opened 2026-11-14 (head 72d58faa6, RED 4 failed -> GREEN 4 passed, neighborhood 73 passed); wave-3b discovery: POST /2fa/devices (add) and POST /2fa/devices/{id}/trust additionally call TwoFactorService methods that do not exist (service.add_trusted_device / service.trust_device — AttributeError -> 500 on every call; device methods exist only in CRUD), and TwoFactorService.verify_code is likewise missing making /2fa/verify-code a dead endpoint — owner-decision items, not repaired in #4066",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "72d58faa6"
   },
   {
    "checked": false,
@@ -3487,11 +3488,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4066",
    "merge_sha": null,
-   "root_cause": "/2fa/verify-code carries code+phone_number+email_address as URL Query params on POST (half-applied AUTH-REAUDIT-28 remediation; logged for full 300s validity)",
+   "root_cause": "/2fa/verify-code carries code+phone_number+email_address as URL Query params on POST (half-applied AUTH-REAUDIT-28 remediation; logged for full 300s validity); fix PR #4066 opened 2026-11-14 (head 72d58faa6): VerifyCodeRequest body model is now the only contract, query transport rejected with 422; additionally documented: the sole FE caller SMSEmail2FA.tsx passes an axios config object where data is expected (method/headers/body keys are not axios parameters) so it never sends anything — FE repair is a separate wave; TwoFactorService.verify_code missing (dead endpoint) — owner decision",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "72d58faa6"
   },
   {
    "checked": false,
@@ -3500,11 +3502,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4066",
    "merge_sha": null,
-   "root_cause": "/devices/{id}/trust: trust_duration_days unbounded Query (365000 accepted), no re-verification; /devices persists client-supplied fingerprint/IP/UA",
+   "root_cause": "/devices/{id}/trust: trust_duration_days unbounded Query (365000 accepted), no re-verification; /devices persists client-supplied fingerprint/IP/UA; fix PR #4066 opened 2026-11-14 (head 72d58faa6): trust_duration_days bounded to Query(30, ge=1, le=30) — 422 before any state change; residual: the endpoint remains dead at the service layer (missing method) — full repair is an owner decision",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "72d58faa6"
   },
   {
    "checked": false,
