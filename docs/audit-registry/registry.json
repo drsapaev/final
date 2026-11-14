@@ -1981,6 +1981,26 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYDOCDBFAILMASK-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "get_doctor_full_info catches unexpected ORM/DB exception and returns synthetic Doctor ID/name rather than signaling failure; strict GET /doctor-info/doctors/{id} may return fake HTTP 200 during DB outage (different from absent-row fallback)",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCDEPARTMENTFK-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "DoctorInfoService derives department label from Doctor.specialty instead of mapped Doctor.department_id/Department.name_ru, returns department_id=None and may misrepresent actual configured doctor department",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYDOCDEPTDTO-BE-001",
    "priority": "P1 conditional",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -2025,6 +2045,16 @@
    "priority": "P2",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "GET /doctor-info/doctors without specialization/department_name always sets doctors=[] despite Doctor records, returns 200 and total_count=0",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCPHONEPROFILE-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "DoctorInfoService.get_doctor_full_info reads unmapped User.phone rather than UserProfile.phone, causing null physician phone in doctor info API even for profile-populated contact",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
@@ -2773,6 +2803,16 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYREGALERTPRIO-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "Admin POST /registrar/notifications/system-alert accepts requested priority but notify_system_alert forwards it only in metadata; typed canonical registrar producer hardcodes high/info for registrar_system_alert, losing explicit urgent priority that drives realtime breakthrough policy",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYREGAPPTTIME-BE-001",
    "priority": "P1",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -2787,6 +2827,46 @@
    "priority": "P2",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "AppointmentNotificationRequest.appointment_type accepts any str; context service maps all values except exact \"visit\" to Appointment rather than returning 422, risking wrong PK namespace and misleading 404/record selection",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGASGNDETAIL-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "rich service assignment message is built but discarded; canonical event carries generic text, count and aggregate sum but not individual assigned service lines/quantities; distinct from daily summary renderer group72",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGASGNPATIENT-BE-001",
+   "priority": "P1 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "notify_services_assigned dereferences mapped Patient.name; Patient has full_name only; ordinary Patient row raises AttributeError before canonical send if method is invoked",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGASGNPRICE-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "Service.price and VisitService.price nullable; method formats/uses None as Decimal in multiplication and :.0f causing TypeError, no price-unknown policy",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGASGNQUANTITY-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "service assignment method expects service.quantity despite services: list[Any]; catalog Service has no quantity property, unlike VisitService snapshot",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
