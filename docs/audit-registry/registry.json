@@ -14,12 +14,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4075",
    "merge_sha": null,
-   "root_cause": "/activation/activate unauthenticated+unthrottled by documented bootstrap rationale — unlimited license-key grinding window",
+   "root_cause": "/activation/activate unauthenticated+unthrottled by documented bootstrap rationale — unlimited license-key grinding window; fix PR #4075 opened 2026-11-14 (head c3b962820, independent on main b142a30dc): POST /activation/activate now carries the 5/minute IP limiter (same as sibling /verify-code); stays unauthenticated per bootstrap rationale but the grinding window is closed; verified by live slowapi limiter test (429 within an 8-request burst via live_limiter fixture — TESTING disables the limiter globally, so the test re-enables the real production limiter object)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "c3b962820"
   },
   {
    "checked": false,
@@ -27,12 +28,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4075",
    "merge_sha": null,
-   "root_cause": "/activation/status unauth discloses license key + machine_hash verbatim (core/activation.py:251-266 passes through unmasked)",
+   "root_cause": "/activation/status unauth discloses license key + machine_hash verbatim (core/activation.py:251-266 passes through unmasked); fix PR #4075 opened 2026-11-14 (head c3b962820, independent on main b142a30dc): GET /activation/status masks license key (first4…last4) and machine_hash (first8…last8) via _mask_secret; full values remain admin-visible via /activation/list (Admin-gated); /activate still returns the full machine_hash to the party that presented the key",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "c3b962820"
   },
   {
    "checked": false,
@@ -3699,12 +3701,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4075",
    "merge_sha": null,
-   "root_cause": "/password-reset/verify-phone unauth+no limiter, USER_NOT_FOUND 404 with error_code echoed (phone enumeration oracle)",
+   "root_cause": "/password-reset/verify-phone unauth+no limiter, USER_NOT_FOUND 404 with error_code echoed (phone enumeration oracle); fix PR #4075 opened 2026-11-14 (head c3b962820, independent on main b142a30dc): POST /password-reset/verify-phone: 5/minute IP limiter added; an unknown phone now returns the EXACT generic 404 CODE_NOT_FOUND body ('Код не найден или истек', no attempts_left) — indistinguishable from a missing code; USER_NOT_FOUND discriminator removed from the response (initiate already returns success:true on unknown phones, so the journey is oracle-free end to end)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "c3b962820"
   },
   {
    "checked": false,
@@ -3712,12 +3715,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4075",
    "merge_sha": null,
-   "root_cause": "GET /validate-token transports reset token as URL Query param (proxy/CDN/logs/history/Referer)",
+   "root_cause": "GET /validate-token transports reset token as URL Query param (proxy/CDN/logs/history/Referer); fix PR #4075 opened 2026-11-14 (head c3b962820, independent on main b142a30dc): GET /password-reset/validate-token accepts the token via X-Reset-Token header (outside URL/logs/Referer); query param kept working for back-compat and marked deprecated in the schema description; FE ResetPasswordPage migration to the header is the documented follow-up; surgical spec patch (29/4 lines) + matching api.ts patch (full local regen impossible in sandbox: python 3.12.16 vs CI 3.11.10 ref-name drift)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "c3b962820"
   },
   {
    "checked": false,
@@ -3725,12 +3729,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4075",
    "merge_sha": null,
-   "root_cause": "password_reset.py:98-103 only policy is len(v)<6 (below NIST 800-63B floor) for recovery-set passwords",
+   "root_cause": "password_reset.py:98-103 only policy is len(v)<6 (below NIST 800-63B floor) for recovery-set passwords; fix PR #4075 opened 2026-11-14 (head c3b962820, independent on main b142a30dc): recovery-set password floor raised to 8 characters (NIST 800-63B) in PasswordResetConfirmRequest with a live token round-trip test (7-char → 422, 8-char → 200 success); global registration policy (min_length=6 in schemas/user.py) intentionally untouched — separate candidate",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "c3b962820"
   },
   {
    "checked": false,
