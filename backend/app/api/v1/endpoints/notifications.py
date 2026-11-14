@@ -102,9 +102,7 @@ def get_or_create_notification_settings(db: Session, user_id: int):
 
 def get_or_create_user_preferences(db: Session, user_id: int):
     preferences = (
-        db.query(UserPreferences)
-        .filter(UserPreferences.user_id == user_id)
-        .first()
+        db.query(UserPreferences).filter(UserPreferences.user_id == user_id).first()
     )
     if preferences:
         return preferences
@@ -134,7 +132,9 @@ def _parse_policy_datetime(value: Any, *, field_name: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise HTTPException(status_code=422, detail=f"{field_name} must be ISO datetime string")
+        raise HTTPException(
+            status_code=422, detail=f"{field_name} must be ISO datetime string"
+        )
     normalized = value.strip()
     if not normalized:
         return None
@@ -143,17 +143,23 @@ def _parse_policy_datetime(value: Any, *, field_name: str) -> str | None:
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=f"{field_name} has invalid ISO datetime") from exc
+        raise HTTPException(
+            status_code=422, detail=f"{field_name} has invalid ISO datetime"
+        ) from exc
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed.isoformat()
 
 
-def _normalize_realtime_control(control: Any, *, field_name: str) -> bool | dict[str, Any]:
+def _normalize_realtime_control(
+    control: Any, *, field_name: str
+) -> bool | dict[str, Any]:
     if isinstance(control, bool):
         return control
     if not isinstance(control, dict):
-        raise HTTPException(status_code=422, detail=f"{field_name} must be boolean or object")
+        raise HTTPException(
+            status_code=422, detail=f"{field_name} must be boolean or object"
+        )
 
     normalized: dict[str, Any] = {}
     for key in ("enabled", "realtime_enabled", "desktop"):
@@ -164,7 +170,9 @@ def _normalize_realtime_control(control: Any, *, field_name: str) -> bool | dict
     channels = control.get("channels")
     if channels is not None:
         if not isinstance(channels, dict):
-            raise HTTPException(status_code=422, detail=f"{field_name}.channels must be an object")
+            raise HTTPException(
+                status_code=422, detail=f"{field_name}.channels must be an object"
+            )
         normalized_channels: dict[str, bool] = {}
         for channel_name in ("desktop", "push", "email", "sms"):
             channel_value = channels.get(channel_name)
@@ -214,11 +222,15 @@ def _normalize_notification_policy_payload(
             dnd: dict[str, Any] = {}
             if "enabled" in value:
                 if not isinstance(value["enabled"], bool):
-                    raise HTTPException(status_code=422, detail="dnd.enabled must be boolean")
+                    raise HTTPException(
+                        status_code=422, detail="dnd.enabled must be boolean"
+                    )
                 dnd["enabled"] = value["enabled"]
             if "always_on" in value:
                 if not isinstance(value["always_on"], bool):
-                    raise HTTPException(status_code=422, detail="dnd.always_on must be boolean")
+                    raise HTTPException(
+                        status_code=422, detail="dnd.always_on must be boolean"
+                    )
                 dnd["always_on"] = value["always_on"]
             for time_key in ("start", "end"):
                 if time_key not in value:
@@ -226,8 +238,12 @@ def _normalize_notification_policy_payload(
                 time_value = value[time_key]
                 if time_value is None:
                     continue
-                if not isinstance(time_value, str) or not _TIME_PATTERN.match(time_value):
-                    raise HTTPException(status_code=422, detail=f"dnd.{time_key} must be HH:MM")
+                if not isinstance(time_value, str) or not _TIME_PATTERN.match(
+                    time_value
+                ):
+                    raise HTTPException(
+                        status_code=422, detail=f"dnd.{time_key} must be HH:MM"
+                    )
                 dnd[time_key] = time_value
             if dnd:
                 normalized_policy["dnd"] = dnd
@@ -479,7 +495,10 @@ async def test_notifications(
     )
 
     background_tasks.add_task(
-        notification_sender_service.send_queue_update, "Тестовое отделение", 123, "15 минут"
+        notification_sender_service.send_queue_update,
+        "Тестовое отделение",
+        123,
+        "15 минут",
     )
 
     background_tasks.add_task(
@@ -514,12 +533,15 @@ async def get_notification_status(
                 notification_sender_service.telegram_bot_token
                 and notification_sender_service.telegram_chat_id
             ),
-            "bot_token": "***" if notification_sender_service.telegram_bot_token else None,
+            "bot_token": (
+                "***" if notification_sender_service.telegram_bot_token else None
+            ),
             "chat_id": notification_sender_service.telegram_chat_id,
         },
         "sms": {
             "configured": bool(
-                notification_sender_service.sms_api_key and notification_sender_service.sms_api_url
+                notification_sender_service.sms_api_key
+                and notification_sender_service.sms_api_url
             ),
             "api_url": notification_sender_service.sms_api_url,
         },
@@ -543,7 +565,14 @@ async def create_notification_template(
     db: Session = Depends(get_db),
 ):
     """Создание шаблона уведомления"""
-    return crud_notification_template.create(db, obj_in=template_data)
+    template = crud_notification_template.create(db, obj_in=template_data)
+    # NOTIFYTPLACTIVECLASH-BE-001 (#4063): активация нового шаблона снимает
+    # активность с сиблингов той же пары (type, channel).
+    if template.is_active:
+        crud_notification_template.deactivate_sibling_actives(
+            db, type=template.type, channel=template.channel, keep_id=template.id
+        )
+    return template
 
 
 @router.put("/templates/{template_id}", response_model=NotificationTemplate)
@@ -558,7 +587,16 @@ async def update_notification_template(
     if not template:
         raise HTTPException(status_code=404, detail="Шаблон не найден")
 
-    return crud_notification_template.update(db, db_obj=template, obj_in=template_data)
+    template = crud_notification_template.update(
+        db, db_obj=template, obj_in=template_data
+    )
+    # NOTIFYTPLACTIVECLASH-BE-001 (#4063): обновление/активация шаблона
+    # снимает активность с сиблингов той же пары (type, channel).
+    if template.is_active:
+        crud_notification_template.deactivate_sibling_actives(
+            db, type=template.type, channel=template.channel, keep_id=template.id
+        )
+    return template
 
 
 @router.delete("/templates/{template_id}", response_model=dict[str, Any])
@@ -690,7 +728,9 @@ async def mark_notification_seen(
     except PermissionError:
         raise HTTPException(status_code=404, detail="Уведомление не найдено")
 
-    unread_count = platform_service.get_unread_counts(current_user=current_user)["total"]
+    unread_count = platform_service.get_unread_counts(current_user=current_user)[
+        "total"
+    ]
     return NotificationMutationResponse(
         id=delivery.delivery_id,
         delivery_status=delivery.delivery_status,
@@ -714,7 +754,9 @@ async def mark_notification_read(
     except PermissionError:
         raise HTTPException(status_code=404, detail="Уведомление не найдено")
 
-    unread_count = platform_service.get_unread_counts(current_user=current_user)["total"]
+    unread_count = platform_service.get_unread_counts(current_user=current_user)[
+        "total"
+    ]
     return NotificationMutationResponse(
         id=delivery.delivery_id,
         delivery_status=delivery.delivery_status,
@@ -738,7 +780,9 @@ async def archive_notification(
     except PermissionError:
         raise HTTPException(status_code=404, detail="Уведомление не найдено")
 
-    unread_count = platform_service.get_unread_counts(current_user=current_user)["total"]
+    unread_count = platform_service.get_unread_counts(current_user=current_user)[
+        "total"
+    ]
     return NotificationMutationResponse(
         id=delivery.delivery_id,
         delivery_status=delivery.delivery_status,
@@ -769,7 +813,9 @@ async def mark_all_notifications_read(
         role=role,
         department_key=department_key,
     )
-    unread_count = platform_service.get_unread_counts(current_user=current_user)["total"]
+    unread_count = platform_service.get_unread_counts(current_user=current_user)[
+        "total"
+    ]
     return NotificationMutationResponse(
         id="mark-all-read",
         delivery_status="read",
@@ -825,7 +871,9 @@ async def update_user_notification_settings(
 
     settings = get_or_create_notification_settings(db, user_id)
 
-    return crud_user_notification_settings.update(db, db_obj=settings, obj_in=settings_data)
+    return crud_user_notification_settings.update(
+        db, db_obj=settings, obj_in=settings_data
+    )
 
 
 @router.get("/settings/{user_id}/policy", response_model=dict[str, Any])
@@ -837,14 +885,20 @@ async def get_user_notification_policy(
     """Получение runtime policy-override для anti-noise (mute/snooze/DND + controls)."""
     _assert_notification_policy_access(current_user=current_user, user_id=user_id)
     preferences = get_or_create_user_preferences(db, user_id)
-    security_settings = preferences.security_settings if isinstance(preferences.security_settings, dict) else {}
+    security_settings = (
+        preferences.security_settings
+        if isinstance(preferences.security_settings, dict)
+        else {}
+    )
     policy = security_settings.get("notification_policy")
     if not isinstance(policy, dict):
         policy = {}
     return {
         "user_id": user_id,
         "policy": policy,
-        "updated_at": preferences.updated_at.isoformat() if preferences.updated_at else None,
+        "updated_at": (
+            preferences.updated_at.isoformat() if preferences.updated_at else None
+        ),
     }
 
 
@@ -865,7 +919,11 @@ async def update_user_notification_policy(
     )
 
     preferences = get_or_create_user_preferences(db, user_id)
-    security_settings = preferences.security_settings if isinstance(preferences.security_settings, dict) else {}
+    security_settings = (
+        preferences.security_settings
+        if isinstance(preferences.security_settings, dict)
+        else {}
+    )
     security_settings["notification_policy"] = normalized_policy
     preferences.security_settings = security_settings
     db.add(preferences)
@@ -875,7 +933,9 @@ async def update_user_notification_policy(
     return {
         "user_id": user_id,
         "policy": normalized_policy,
-        "updated_at": preferences.updated_at.isoformat() if preferences.updated_at else None,
+        "updated_at": (
+            preferences.updated_at.isoformat() if preferences.updated_at else None
+        ),
     }
 
 

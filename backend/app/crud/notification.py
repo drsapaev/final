@@ -27,6 +27,10 @@ class CRUDNotificationTemplate(
     def get_by_type_and_channel(
         self, db: Session, *, type: str, channel: str
     ) -> NotificationTemplate | None:
+        # NOTIFYTPLACTIVECLASH-BE-001 (#4063): выбор активного шаблона должен
+        # быть детерминированным — побеждает последний обновлённый (updated_at
+        # desc, затем id desc), даже если legacy-данные нарушают инвариант
+        # единственного активного шаблона на пару (type, channel).
         return (
             db.query(NotificationTemplate)
             .filter(
@@ -36,8 +40,33 @@ class CRUDNotificationTemplate(
                     NotificationTemplate.is_active,
                 )
             )
+            .order_by(
+                NotificationTemplate.updated_at.desc(),
+                NotificationTemplate.id.desc(),
+            )
             .first()
         )
+
+    def deactivate_sibling_actives(
+        self, db: Session, *, type: str, channel: str, keep_id: int
+    ) -> int:
+        """NOTIFYTPLACTIVECLASH-BE-001 (#4063): инвариант единственного
+        активного шаблона на (type, channel) — активация одного деактивирует
+        остальные. Возвращает число деактивированных сиблингов."""
+        result = (
+            db.query(NotificationTemplate)
+            .filter(
+                and_(
+                    NotificationTemplate.type == type,
+                    NotificationTemplate.channel == channel,
+                    NotificationTemplate.is_active,
+                    NotificationTemplate.id != keep_id,
+                )
+            )
+            .update({"is_active": False}, synchronize_session=False)
+        )
+        db.commit()
+        return result
 
     def get_active_templates(self, db: Session) -> list[NotificationTemplate]:
         return (
@@ -258,9 +287,7 @@ def get_user_notifications(
     )
 
 
-def get_notification(
-    db: Session, notification_id: int
-) -> NotificationHistory | None:
+def get_notification(db: Session, notification_id: int) -> NotificationHistory | None:
     """Получить уведомление по ID"""
     return (
         db.query(NotificationHistory)
