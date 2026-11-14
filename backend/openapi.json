@@ -43765,79 +43765,24 @@
         "summary": "Verify Verification Code",
         "description": "Проверить код подтверждения",
         "operationId": "verify_verification_code_api_v1_2fa_verify_code_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "method",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Метод верификации: sms или email",
-              "title": "Method"
-            },
-            "description": "Метод верификации: sms или email"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest"
+              }
+            }
           },
-          {
-            "name": "code",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Код подтверждения",
-              "title": "Code"
-            },
-            "description": "Код подтверждения"
-          },
-          {
-            "name": "phone_number",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Номер телефона для SMS",
-              "title": "Phone Number"
-            },
-            "description": "Номер телефона для SMS"
-          },
-          {
-            "name": "email_address",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Email адрес",
-              "title": "Email Address"
-            },
-            "description": "Email адрес"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Verify Verification Code Api V1 2Fa Verify Code Post"
                 }
               }
@@ -43853,7 +43798,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/2fa/verification-status": {
@@ -44402,11 +44352,13 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "description": "Длительность доверия в днях",
+              "maximum": 30,
+              "minimum": 1,
+              "description": "Длительность доверия в днях (1–30)",
               "default": 30,
               "title": "Trust Duration Days"
             },
-            "description": "Длительность доверия в днях"
+            "description": "Длительность доверия в днях (1–30)"
           }
         ],
         "responses": {
@@ -47364,7 +47316,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VerifyCodeRequest"
+                "$ref": "#/components/schemas/app__api__v1__endpoints__phone_verification__VerifyCodeRequest"
               }
             }
           },
@@ -121532,30 +121484,6 @@
         ],
         "title": "ValidationError"
       },
-      "VerifyCodeRequest": {
-        "properties": {
-          "phone": {
-            "type": "string",
-            "title": "Phone"
-          },
-          "code": {
-            "type": "string",
-            "title": "Code"
-          },
-          "purpose": {
-            "type": "string",
-            "title": "Purpose",
-            "default": "verification"
-          }
-        },
-        "type": "object",
-        "required": [
-          "phone",
-          "code"
-        ],
-        "title": "VerifyCodeRequest",
-        "description": "Запрос на проверку кода верификации"
-      },
       "VisitCreate": {
         "properties": {
           "patient_id": {
@@ -124645,6 +124573,30 @@
         "title": "PasswordResetConfirmRequest",
         "description": "Запрос на подтверждение сброса пароля"
       },
+      "app__api__v1__endpoints__phone_verification__VerifyCodeRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose",
+            "default": "verification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "title": "VerifyCodeRequest",
+        "description": "Запрос на проверку кода верификации"
+      },
       "app__api__v1__endpoints__phrase_suggest__TelemetryResponse": {
         "properties": {
           "success": {
@@ -125218,6 +125170,47 @@
         ],
         "title": "TelemetryResponse",
         "description": "Response for telemetry submission"
+      },
+      "app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "email_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "code"
+        ],
+        "title": "VerifyCodeRequest",
+        "description": "TWOFACTOR-BE-004 (#4063): the 6-digit code and destination contacts\nride the request BODY, not URL Query — completing the AUTH-REAUDIT-28\nremediation (totp_code/recovery_token moved to body two endpoints over\nin two_factor_auth.py). Query transport put a replayable code and PII\ncontacts into intermediary/server logs for the full 300-second validity\nwindow."
       },
       "app__models__discount_benefits__DiscountType": {
         "type": "string",

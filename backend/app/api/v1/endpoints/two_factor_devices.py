@@ -204,7 +204,13 @@ async def get_device_statistics(
 @router.post("/devices/{device_id}/trust", response_model=dict[str, Any])
 async def trust_device(
     device_id: str,
-    trust_duration_days: int = Query(30, description="Длительность доверия в днях"),
+    # TWOFACTOR-BE-005 (#4063): bound the 2FA-exempting trust grant — the
+    # previous unbounded Query accepted e.g. 365000 days (~1000 years).
+    # 30 days matches the documented default and keeps re-verification
+    # periodic; validation fails loudly (422) before any state change.
+    trust_duration_days: int = Query(
+        30, ge=1, le=30, description="Длительность доверия в днях (1–30)"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

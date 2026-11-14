@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -106,22 +107,34 @@ async def send_verification_code(request: Request,
         raise_two_factor_sms_internal_error("send-code", "Ошибка отправки кода", e)
 
 
+class VerifyCodeRequest(BaseModel):
+    """TWOFACTOR-BE-004 (#4063): the 6-digit code and destination contacts
+    ride the request BODY, not URL Query — completing the AUTH-REAUDIT-28
+    remediation (totp_code/recovery_token moved to body two endpoints over
+    in two_factor_auth.py). Query transport put a replayable code and PII
+    contacts into intermediary/server logs for the full 300-second validity
+    window."""
+
+    method: str
+    code: str
+    phone_number: str | None = None
+    email_address: str | None = None
+
+
 @router.post("/verify-code", response_model=dict[str, Any])
 async def verify_verification_code(
-    method: str = Query(..., description="Метод верификации: sms или email"),
-    code: str = Query(..., description="Код подтверждения"),
-    phone_number: str | None = Query(None, description="Номер телефона для SMS"),
-    email_address: str | None = Query(None, description="Email адрес"),
+    request_data: VerifyCodeRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Проверить код подтверждения"""
     try:
         service = get_two_factor_service()
+        method = request_data.method
 
         # Проверяем код
         is_valid = service.verify_code(
-            db=db, user_id=current_user.id, method=method, code=code
+            db=db, user_id=current_user.id, method=method, code=request_data.code
         )
 
         if not is_valid:
