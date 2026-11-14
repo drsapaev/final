@@ -3,7 +3,7 @@ API endpoints для двухфакторной аутентификации (2F
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -598,7 +598,10 @@ async def untrust_device(
     """
     try:
         # Проверяем, что устройство принадлежит пользователю
-        device = two_factor_device.get(device_id)
+        # TWOFACTOR-BE-003 (#4063): the base CRUD signature is get(db, id) —
+        # the missing db session arg raised TypeError on every call and the
+        # blanket handler turned single-device untrust into a permanent 500.
+        device = two_factor_device.get(db, device_id)
         if not device or device.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
