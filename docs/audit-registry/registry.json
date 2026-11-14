@@ -4130,11 +4130,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4071",
    "merge_sha": null,
-   "root_cause": "GET /backup-codes + POST /backup-codes/regenerate depend only on bearer JWT — no password/TOTP (contrast /disable and /devices/revoke-all)",
+   "root_cause": "GET /two-factor/backup-codes returned every unused plaintext backup code to any bearer-token holder, and POST /backup-codes/regenerate minted ten fresh codes with NO password and NO TOTP — inconsistent with the same file's own policy (/disable demands both factors per AUTH-REAUDIT-28; /two-factor/devices/revoke-all verifies the password); a transient session compromise (token theft, unattended workstation) was convertible into a permanent, self-service re-entry kit; fix PR #4071 opened 2026-11-14 (head d4e2e0a1e, stacked on #4070/#4069/#4068): GET /backup-codes now returns one-time-disclosure-safe semantics — backup_codes=[] + total=remaining (values disclosed exactly once at enable or regenerate after re-auth); POST /backup-codes/regenerate requires BOTH factors mirroring /disable — new TwoFactorBackupCodesRegenerateRequest body {password, totp_code?, backup_code?}, 401 on password mismatch, 400 if second factor absent, 403 via the same service.verify_two_factor used at login, only then the kit is minted. RED (5 failed: plaintext re-read, 200 on no-body/wrong-password/no-second-factor/wrong-totp) -> GREEN 6 passed; 2FA regression 42 passed; response shape unchanged (no openapi regeneration). Follow-up candidates: PASSRESET/PHONEVER/ACTIVATION planes",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "d4e2e0a1e"
   },
   {
    "checked": false,
