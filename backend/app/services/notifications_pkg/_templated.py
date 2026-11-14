@@ -2,6 +2,7 @@
 
 Split from notifications.py.
 """
+
 from __future__ import annotations
 
 from app.services.notifications_pkg._base import (
@@ -45,7 +46,10 @@ class TemplatedMixin(NotificationSenderMixinBase):
             fallback="notification",
         )
         template_lookup_types = [canonical_notification_type]
-        if raw_notification_type and raw_notification_type != canonical_notification_type:
+        if (
+            raw_notification_type
+            and raw_notification_type != canonical_notification_type
+        ):
             template_lookup_types.append(raw_notification_type)
 
         # Получаем шаблон
@@ -58,19 +62,53 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 break
 
         if not template:
-            logger.warning(
-                f"Шаблон не найден: {canonical_notification_type}/{channel}"
-            )
+            logger.warning(f"Шаблон не найден: {canonical_notification_type}/{channel}")
             # Используем базовый шаблон
             subject = template_data.get("subject", "Уведомление")
             content = template_data.get("message", "Сообщение")
         else:
+            # NOTIFYTPLPLAINTEXTESC-BE-001 (#4063): SMS и email — текстовые
+            # каналы (SMS body / text/plain MIME part), рендер без HTML-
+            # экранирования; telegram (parse_mode=HTML) и push — с ним.
+            channel_escape = channel not in ("sms", "email")
             subject = (
-                self.render_template(template.subject or "", template_data)
+                self.render_template(
+                    template.subject or "", template_data, escape_html=channel_escape
+                )
                 if template.subject
                 else None
             )
-            content = self.render_template(template.template, template_data)
+            content = self.render_template(
+                template.template, template_data, escape_html=channel_escape
+            )
+            # NOTIFYTPLRENDERFAIL-BE-001 (#4063): fail-closed — ошибка рендера
+            # не превращается в отправку исходного шаблона пациенту.
+            if content is None or (template.subject and subject is None):
+                logger.error(
+                    f"Не удалось отрендерить шаблон {template.id} "
+                    f"({canonical_notification_type}/{channel}); отправка прервана"
+                )
+                history_data = NotificationHistoryCreate(
+                    recipient_type=recipient_type,
+                    recipient_id=recipient_id,
+                    recipient_contact=recipient_contact,
+                    notification_type=canonical_notification_type,
+                    channel=channel,
+                    template_id=template.id,
+                    subject=None,
+                    content="",
+                    related_entity_type=related_entity_type,
+                    related_entity_id=related_entity_id,
+                    notification_metadata=template_data,
+                )
+                history = crud_notification_history.create(db, obj_in=history_data)
+                crud_notification_history.update_status(
+                    db,
+                    notification_id=history.id,
+                    status="failed",
+                    error_message="Ошибка рендеринга шаблона",
+                )
+                return history
 
         # Создаем запись в истории
         history_data = NotificationHistoryCreate(
@@ -97,7 +135,9 @@ class TemplatedMixin(NotificationSenderMixinBase):
 
                 patient = db.query(Patient).filter(Patient.id == recipient_id).first()
                 if patient and patient.user_id:
-                    recipient_user = db.query(User).filter(User.id == patient.user_id).first()
+                    recipient_user = (
+                        db.query(User).filter(User.id == patient.user_id).first()
+                    )
             else:
                 recipient_user = db.query(User).filter(User.id == recipient_id).first()
 
@@ -147,7 +187,6 @@ class TemplatedMixin(NotificationSenderMixinBase):
 
         return history
 
-
     async def send_bulk_notification(
         self,
         db: Session,
@@ -176,7 +215,7 @@ class TemplatedMixin(NotificationSenderMixinBase):
                     # Проверяем наличие атрибута, если нет - считаем включенным по умолчанию (или глобальным)
                     if hasattr(settings, setting_key):
                         if not getattr(settings, setting_key):
-                            continue # Выключено пользователем
+                            continue  # Выключено пользователем
 
                 # Получаем контакт для канала
                 contact = None
@@ -207,7 +246,6 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 results.append(history)
 
         return results
-
 
     async def send_appointment_notification(
         self,
@@ -289,7 +327,6 @@ class TemplatedMixin(NotificationSenderMixinBase):
 
         return results
 
-
     async def send_payment_notification(
         self,
         patient_email: str,
@@ -361,7 +398,6 @@ class TemplatedMixin(NotificationSenderMixinBase):
 
         return results
 
-
     async def send_payment_notification_by_id(
         self,
         db: Session,
@@ -374,7 +410,6 @@ class TemplatedMixin(NotificationSenderMixinBase):
     ) -> list[NotificationHistory]:
         """Отправка уведомления об оплате"""
         from app.crud import patient as patient_crud
-
 
         # Получаем данные пациента
         canonical_notification_type = _normalize_notification_event_type(
@@ -389,7 +424,6 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 extra={"notification_type": canonical_notification_type},
             )
             return []
-
 
         # Данные для шаблона
         template_data = {
@@ -433,5 +467,3 @@ class TemplatedMixin(NotificationSenderMixinBase):
         return results
 
     # === Business Logic Methods (Merged from Mobile/Telegram Services) ===
-
-

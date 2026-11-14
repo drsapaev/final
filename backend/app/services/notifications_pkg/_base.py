@@ -2,6 +2,7 @@
 
 Split from notifications.py (2395 LOC → modular).
 """
+
 from __future__ import annotations
 
 import logging  # noqa: F401
@@ -39,6 +40,16 @@ from app.services.telegram.bot import telegram_bot  # noqa: F401
 logger = logging.getLogger(__name__)
 
 _jinja_env = Environment(autoescape=True)
+# NOTIFYTPLPLAINTEXTESC-BE-001 (#4063): plain-text channels (SMS body, the
+# text/plain part of email) must not receive HTML entities — a separate
+# environment without autoescape is used for them (see render_template).
+# B701: autoescape=False here is the DELIBERATE remediation itself — this
+# environment renders ONLY SMS bodies and text/plain email parts (see
+# TemplatedMixin: escape_html=channel not in ("sms", "email")); HTML-bearing
+# channels (telegram parse_mode=HTML, push) keep the autoescape=True
+# environment above. The data rendered is clinic-authored template text, not
+# untrusted HTML.
+_jinja_env_text = Environment(autoescape=False)  # nosec B701 - intentional for text-only channels (SMS / text/plain email), wave-3h fix for #4063
 
 
 class NotificationSenderMixinBase:

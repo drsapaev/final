@@ -2,6 +2,7 @@
 
 Split from notifications.py.
 """
+
 from __future__ import annotations
 
 from app.services.notifications_pkg._base import (
@@ -9,6 +10,7 @@ from app.services.notifications_pkg._base import (
     NotificationSenderMixinBase,
     Session,
     _jinja_env,
+    _jinja_env_text,
     get_fcm_service,
     get_notification_platform_service,
     logger,
@@ -39,10 +41,8 @@ class CoreMixin(NotificationSenderMixinBase):
         # Интеграция с FCM
         self.fcm_service = get_fcm_service()
 
-
     def _platform_service(self, db: Session):
         return get_notification_platform_service(db)
-
 
     @staticmethod
     def _extract_prefixed_user_id(actor_ref: str | None, prefix: str) -> int | None:
@@ -51,15 +51,13 @@ class CoreMixin(NotificationSenderMixinBase):
         if not normalized.startswith(expected_prefix):
             return None
 
-        raw_value = normalized[len(expected_prefix):].strip()
+        raw_value = normalized[len(expected_prefix) :].strip()
         if not raw_value.isdigit():
             return None
 
         return int(raw_value)
 
     @staticmethod
-
-
     def _payload_snapshot(
         title: str,
         message: str,
@@ -71,18 +69,25 @@ class CoreMixin(NotificationSenderMixinBase):
             "metadata": metadata or {},
         }
 
-
-    def render_template(self, template_text: str, data: dict[str, Any]) -> str:
+    def render_template(
+        self, template_text: str, data: dict[str, Any], *, escape_html: bool = True
+    ) -> str | None:
         """Рендеринг шаблона с данными.
 
         NOTIF-REAUDIT-28 P1-1: использует Environment с autoescape=True
         для защиты от SSTI/XSS.
+        NOTIFYTPLPLAINTEXTESC-BE-001 (#4063): текстовые каналы (SMS, text/plain
+        email) рендерятся без HTML-экранирования (escape_html=False), чтобы
+        имена вида "Иванов & Сын" не превращались в "Иванов &amp; Сын";
+        HTML-каналы (telegram parse_mode=HTML, push) сохраняют экранирование.
+        NOTIFYTPLRENDERFAIL-BE-001 (#4063): ошибка рендеринга теперь
+        fail-closed — возвращает None вместо исходного текста шаблона,
+        отправка не выполняется (см. TemplatedMixin).
         """
         try:
-            template = _jinja_env.from_string(template_text)
+            env = _jinja_env_text if not escape_html else _jinja_env
+            template = env.from_string(template_text)
             return template.render(**data)
         except Exception as e:
             logger.error(f"Ошибка рендеринга шаблона: {e}")
-            return template_text
-
-
+            return None
