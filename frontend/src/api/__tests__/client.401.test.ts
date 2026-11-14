@@ -115,6 +115,14 @@ function makeExpiringAccessToken(): string {
   return `e30.${payload}.synthetic-signature`;
 }
 
+function makeExpiredAccessToken(): string {
+  const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 60 }))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  return `e30.${payload}.synthetic-signature`;
+}
+
 /**
  * 401 carrying the REAL request config (header attached by the request
  * interceptor) — mirrors the production interceptor inputs exactly.
@@ -329,7 +337,7 @@ describe('proactive refresh failure lifecycle', () => {
   });
 
   it('ends the matching session after refresh 401 and does not send the stale write', async () => {
-    tokenState.access = makeExpiringAccessToken();
+    tokenState.access = makeExpiredAccessToken();
     const listener = vi.fn();
     setSessionInvalidationListener(listener);
     let businessCalls = 0;
@@ -382,8 +390,39 @@ describe('proactive refresh failure lifecycle', () => {
     expect(tokenState.refresh).toBe('refresh-token-1');
   });
 
+  it('keeps an unexpired access token and backs off after proactive refresh 401 until an explicit retry', async () => {
+    const nearExpiryToken = makeExpiringAccessToken();
+    tokenState.access = nearExpiryToken;
+    const businessAuthorization: Array<string | undefined> = [];
+    api.defaults.adapter = async (config) => {
+      businessAuthorization.push(config.headers?.Authorization as string | undefined);
+      return make200({ ok: true });
+    };
+    const refreshSpy = vi.spyOn(axios, 'post').mockRejectedValueOnce(
+      make401('/api/v1/authentication/refresh', 'post')
+    ).mockResolvedValueOnce(
+      make200({ access_token: 'fresh-access-token', refresh_token: 'fresh-refresh-token' })
+    );
+
+    await expect(api.get('/api/v1/lab/appointments')).resolves.toMatchObject({ data: { ok: true } });
+    await expect(api.get('/api/v1/lab/reports')).resolves.toMatchObject({ data: { ok: true } });
+
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(tokenState.access).toBe(nearExpiryToken);
+    expect(tokenState.cleared).toBe(0);
+    expect(businessAuthorization).toEqual([
+      `Bearer ${nearExpiryToken}`,
+      `Bearer ${nearExpiryToken}`
+    ]);
+
+    await expect(forceRefreshToken()).resolves.toBe('fresh-access-token');
+    expect(refreshSpy).toHaveBeenCalledTimes(2);
+    expect(tokenState.access).toBe('fresh-access-token');
+    expect(tokenState.refresh).toBe('fresh-refresh-token');
+  });
+
   it('shares a rejected proactive refresh and aborts every waiting business request', async () => {
-    tokenState.access = makeExpiringAccessToken();
+    tokenState.access = makeExpiredAccessToken();
     let businessCalls = 0;
     api.defaults.adapter = async (config) => {
       businessCalls += 1;

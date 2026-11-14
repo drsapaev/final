@@ -137,6 +137,12 @@ export function isTokenExpiringSoon(token: string | null | undefined): boolean {
   return Date.now() > (expiresAt - fiveMinutes);
 }
 
+function isAccessTokenUnexpired(token: string | null): boolean {
+  if (!token) return false;
+  const exp = numericClaim(decodeJwtClaims(token), 'exp');
+  return exp !== null && exp * 1000 > Date.now();
+}
+
 // ✅ SECURITY: Single-flight pattern for token refresh
 // Prevents race conditions when multiple requests detect token expiring
 interface TokenRefreshResult {
@@ -148,6 +154,8 @@ interface TokenRefreshResult {
 
 let refreshPromise: Promise<TokenRefreshResult> | null = null;
 let pendingRequestsQueue: Array<(value: string | null) => void> = [];
+const PROACTIVE_REFRESH_401_COOLDOWN_MS = 30_000;
+let proactiveRefreshRetryAfter = 0;
 
 /**
  * Core refresh call. Caller must hold the single-flight mutex
@@ -187,6 +195,7 @@ async function performTokenRefresh(): Promise<TokenRefreshResult> {
         pendingRequestsQueue = [];
         return result(null);
       }
+      proactiveRefreshRetryAfter = 0;
       const newToken = response.data.access_token;
       tokenManager.setAccessToken(newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
@@ -208,6 +217,9 @@ async function performTokenRefresh(): Promise<TokenRefreshResult> {
     return result(null);
   } catch (err) {
     const status = (err as AxiosError | undefined)?.response?.status;
+    if (status === 401) {
+      proactiveRefreshRetryAfter = Date.now() + PROACTIVE_REFRESH_401_COOLDOWN_MS;
+    }
     // Axios errors contain request config and payloads (including refresh
     // credentials). Keep logs limited to the response status.
     logger.warn('❌ Token refresh failed', {
@@ -263,6 +275,14 @@ async function refreshTokenIfNeeded(): Promise<string | null> {
     return token;
   }
 
+  // An access token remains usable until its own exp claim. Keep a valid
+  // near-expiry session alive for the warning/explicit-extension flow and
+  // avoid retrying a rejected refresh on every page request. Expired tokens
+  // still go through the failure path below.
+  if (proactiveRefreshRetryAfter > Date.now() && isAccessTokenUnexpired(token)) {
+    return token;
+  }
+
   // ✅ MUTEX: If refresh is already in progress, wait for it
   if (refreshPromise !== null) {
     logger.log('🔄 Refresh already in progress, waiting...');
@@ -279,6 +299,9 @@ async function refreshTokenIfNeeded(): Promise<string | null> {
     const sessionAlreadyEnded = !liveAccessToken && !liveRefreshToken;
 
     if (isAttemptedSessionStillCurrent) {
+      if (isAccessTokenUnexpired(liveAccessToken)) {
+        return liveAccessToken;
+      }
       logger.warn('🔒 Refresh token rejected — ending the matching session');
       invalidateDeadSession();
     }
@@ -309,6 +332,8 @@ async function forceRefreshTokenWithResult(): Promise<TokenRefreshResult> {
 }
 
 async function forceRefreshToken(): Promise<string | null> {
+  // An explicit operator retry should bypass the automatic 401 backoff.
+  proactiveRefreshRetryAfter = 0;
   const refreshResult = await forceRefreshTokenWithResult();
   return refreshResult.accessToken;
 }
@@ -511,6 +536,7 @@ export function setSessionInvalidationListener(listener: SessionInvalidationList
 }
 
 function invalidateDeadSession(): void {
+  proactiveRefreshRetryAfter = 0;
   const listener = sessionInvalidationListener;
   if (listener) {
     try {
