@@ -196,18 +196,25 @@ class FormattingMixin(NotificationSenderMixinBase):
 
 
     async def _send_pwa_invitation(
-        self, patient: Any, data: dict[str, Any], db: Session | None = None
+        self,
+        patient: Any,
+        data: dict[str, Any],
+        db: Session | None = None,
+        *,
+        sms_opted_in: bool | None = None,
     ) -> dict[str, Any]:
         """Отправляет приглашение через PWA (SMS с deep link)"""
         try:
             if not patient.phone:
                 return {"success": False, "error": "У пациента нет номера телефона"}
-            if not self._patient_channel_opted_in(
-                db=db,
-                patient_id=getattr(patient, "id", None),
-                channel="sms",
-                event_type="appointment_confirmation",
-            ):
+            if sms_opted_in is None:
+                sms_opted_in = self._patient_channel_opted_in(
+                    db=db,
+                    patient_id=getattr(patient, "id", None),
+                    channel="sms",
+                    event_type="appointment_confirmation",
+                )
+            if not sms_opted_in:
                 return {"success": False, "error": "SMS отключены настройками пациента"}
 
             # Canonical public base URL for user-facing deep links — the

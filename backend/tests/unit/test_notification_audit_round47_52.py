@@ -12,10 +12,16 @@ from fastapi import BackgroundTasks, HTTPException
 
 from app.api.v1.endpoints.notifications import (
     _assert_doctor_can_notify_patient_visit,
+    send_appointment_reminder as send_appointment_reminder_route,
     send_notification,
     test_notifications as _test_notifications_route,
 )
-from app.models.notification import NotificationDelivery, NotificationEvent
+from app.models.lab import LabOrder, LabResult
+from app.models.notification import (
+    NotificationDelivery,
+    NotificationEvent,
+    NotificationHistory,
+)
 from app.models.user_profile import UserNotificationSettings, UserPreferences, UserProfile
 from app.schemas.notification import SendNotificationRequest
 from app.services.notification_platform_service import NotificationPlatformService
@@ -43,6 +49,55 @@ def _attach_notification_preferences(
     return preferences, settings
 
 
+@pytest.mark.parametrize(
+    "event_type",
+    [
+        "lab_results",
+        "lab_new_study",
+        "lab_result_sent_confirmation",
+        "lab_critical_result",
+    ],
+)
+def test_lab_and_other_system_push_events_honor_system_updates_opt_out(
+    db_session, admin_user, event_type
+):
+    _attach_notification_preferences(
+        db_session,
+        user_id=admin_user.id,
+        preferences_values={"push_notifications": True},
+        settings_values={"push_system_updates": False},
+    )
+    db_session.commit()
+
+    service = NotificationSenderService()
+    assert service._channel_opted_in(
+        db=db_session,
+        user_id=admin_user.id,
+        channel="push",
+        event_type=event_type,
+    ) is False
+
+
+def test_unmapped_push_event_keeps_its_existing_default_behavior(
+    db_session, admin_user
+):
+    _attach_notification_preferences(
+        db_session,
+        user_id=admin_user.id,
+        preferences_values={"push_notifications": True},
+        settings_values={"push_system_updates": False},
+    )
+    db_session.commit()
+
+    service = NotificationSenderService()
+    assert service._channel_opted_in(
+        db=db_session,
+        user_id=admin_user.id,
+        channel="push",
+        event_type="message_received",
+    ) is True
+
+
 def test_doctor_notification_scope_requires_the_assigned_visit(
     db_session, test_visit, test_patient, test_doctor, cardio_user, test_doctor_user
 ):
@@ -64,6 +119,374 @@ def test_doctor_notification_scope_requires_the_assigned_visit(
         )
 
     assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_doctor_reminder_hides_patient_existence_without_assigned_visit(
+    db_session, test_patient, monkeypatch
+):
+    import app.api.v1.endpoints.notifications as notifications_endpoint
+
+    doctor_user = SimpleNamespace(
+        role="Doctor",
+        is_superuser=False,
+        full_name="Synthetic Doctor",
+        username="synthetic-doctor",
+    )
+    doctor = SimpleNamespace(id=2_000_000_000, specialty="cardiology")
+    monkeypatch.setattr(
+        notifications_endpoint,
+        "_active_doctor_for_user",
+        lambda _db, _user: doctor,
+    )
+    lookups = []
+
+    def patient_lookup(_db, *, id):
+        lookups.append(id)
+        return None
+
+    monkeypatch.setattr(notifications_endpoint.patient_crud, "get", patient_lookup)
+
+    responses = []
+    for patient_id in (test_patient.id, test_patient.id + 100_000_000):
+        with pytest.raises(HTTPException) as exc_info:
+            await send_appointment_reminder_route(
+                BackgroundTasks(),
+                patient_id=patient_id,
+                appointment_date=datetime(2026, 11, 14, 10, 0),
+                doctor_name="ignored",
+                department="ignored",
+                current_user=doctor_user,
+                db=db_session,
+            )
+        assert exc_info.value.status_code == 404
+        responses.append(exc_info.value.detail)
+
+    assert responses[0] == responses[1]
+    assert lookups == []
+
+
+@pytest.mark.asyncio
+async def test_lab_result_delivery_uses_inbox_and_honors_sms_opt_out(
+    db_session, admin_user, test_patient, monkeypatch
+):
+    import app.services.lab_notification_service as lab_notification_module
+    from app.services.lab_notification_service import LabNotificationService
+
+    test_patient.user_id = admin_user.id
+    _attach_notification_preferences(
+        db_session,
+        user_id=admin_user.id,
+        preferences_values={"sms_notifications": False},
+    )
+    db_session.flush()
+
+    lab_inbox = AsyncMock(return_value=True)
+    telegram_event = AsyncMock(return_value=False)
+    legacy_telegram = AsyncMock()
+    sms = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_lab_event_notification",
+        lab_inbox,
+    )
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_patient_telegram_event_notification",
+        telegram_event,
+    )
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_telegram_message",
+        legacy_telegram,
+    )
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_sms",
+        sms,
+    )
+
+    await LabNotificationService(db_session)._notify_patient_results_ready(
+        SimpleNamespace(id=77, patient_id=test_patient.id)
+    )
+
+    assert [call.kwargs["event_type"] for call in lab_inbox.await_args_list] == [
+        "lab_results",
+        "lab_result_sent_confirmation",
+    ]
+    assert all(
+        call.kwargs["recipient"] is admin_user for call in lab_inbox.await_args_list
+    )
+    telegram_event.assert_not_awaited()
+    legacy_telegram.assert_not_awaited()
+    sms.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_lab_result_sms_success_is_recorded_and_not_repeated(
+    db_session, test_patient, monkeypatch
+):
+    import app.services.lab_notification_service as lab_notification_module
+    from app.services.lab_notification_service import LabNotificationService
+
+    sms = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_sms",
+        sms,
+    )
+    service = LabNotificationService(db_session)
+    order = SimpleNamespace(id=82, patient_id=test_patient.id)
+
+    assert await service._notify_patient_results_ready(order) is True
+    assert await service._notify_patient_results_ready(order) is False
+
+    sms.assert_awaited_once()
+    history = (
+        db_session.query(NotificationHistory)
+        .filter(
+            NotificationHistory.recipient_id == test_patient.id,
+            NotificationHistory.related_entity_type == "lab_order",
+            NotificationHistory.related_entity_id == order.id,
+            NotificationHistory.notification_type == "lab_results",
+            NotificationHistory.channel == "sms",
+            NotificationHistory.status == "sent",
+        )
+        .all()
+    )
+    assert len(history) == 1
+
+
+@pytest.mark.asyncio
+async def test_lab_ready_inbox_and_sms_deliveries_are_not_repeated(
+    db_session, admin_user, test_patient, monkeypatch
+):
+    import app.services.lab_notification_service as lab_notification_module
+    from app.services.lab_notification_service import LabNotificationService
+
+    test_patient.user_id = admin_user.id
+    db_session.flush()
+    order = SimpleNamespace(id=83, patient_id=test_patient.id)
+    created_event_types = []
+
+    async def create_lab_delivery(**kwargs):
+        event_type = kwargs["event_type"]
+        created_event_types.append(event_type)
+        event = NotificationEvent(
+            event_type=event_type,
+            dedup_key=f"test:{event_type}:{order.id}",
+            source_module="lab",
+            entity_type="lab_result",
+            entity_id=str(order.id),
+            severity="info",
+            priority="high",
+            title=kwargs["title"],
+            message=kwargs["message"],
+            payload_snapshot={"metadata": kwargs["metadata"]},
+        )
+        db_session.add(
+            NotificationDelivery(
+                event=event,
+                recipient_type="user",
+                recipient_id=kwargs["recipient"].id,
+                role=kwargs["recipient"].role,
+                channel="in_app_inbox",
+                dedup_key=f"test-delivery:{event_type}:{order.id}",
+                sequence_id=len(created_event_types),
+                delivery_status="delivered",
+            )
+        )
+        db_session.flush()
+        return True
+
+    inbox = AsyncMock(side_effect=create_lab_delivery)
+    sms = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_lab_event_notification",
+        inbox,
+    )
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_sms",
+        sms,
+    )
+    service = LabNotificationService(db_session)
+
+    assert await service._notify_patient_results_ready(order) is True
+    assert await service._notify_patient_results_ready(order) is False
+
+    assert created_event_types == ["lab_results", "lab_result_sent_confirmation"]
+    sms.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_failed_lab_ready_delivery_is_not_counted_or_logged_as_success(
+    db_session, admin_user, test_patient, monkeypatch, caplog
+):
+    import app.services.lab_notification_service as lab_notification_module
+    from app.services.lab_notification_service import LabNotificationService
+
+    test_patient.user_id = admin_user.id
+    _attach_notification_preferences(
+        db_session,
+        user_id=admin_user.id,
+        preferences_values={"sms_notifications": False},
+    )
+    order = LabOrder(
+        patient_id=test_patient.id,
+        status="completed",
+    )
+    db_session.add(order)
+    db_session.flush()
+
+    inbox_delivery = AsyncMock(return_value=False)
+    sms = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_lab_event_notification",
+        inbox_delivery,
+    )
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_sms",
+        sms,
+    )
+
+    with caplog.at_level(logging.INFO):
+        result = await LabNotificationService(db_session).check_and_notify_ready_results()
+
+    assert result == {"total_checked": 1, "notifications_sent": 0, "errors": []}
+    inbox_delivery.assert_awaited_once()
+    sms.assert_not_awaited()
+    assert any(
+        "lab_results canonical delivery failed" in record.message
+        for record in caplog.records
+    )
+    assert not any(
+        "Lab result notification delivered" in record.message
+        or "Notification sent for order" in record.message
+        for record in caplog.records
+    )
+
+
+@pytest.mark.asyncio
+async def test_critical_lab_alert_does_not_log_success_when_inbox_creation_fails(
+    db_session, test_visit, test_patient, monkeypatch, caplog
+):
+    import app.services.lab_notification_service as lab_notification_module
+    from app.services.lab_notification_service import LabNotificationService
+
+    order = LabOrder(
+        patient_id=test_patient.id,
+        visit_id=test_visit.id,
+        status="completed",
+    )
+    db_session.add(order)
+    db_session.flush()
+    result = LabResult(
+        order_id=order.id,
+        test_name="glucose",
+        value="25",
+    )
+    db_session.add(result)
+    db_session.flush()
+
+    inbox_delivery = AsyncMock(return_value=False)
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_lab_event_notification",
+        inbox_delivery,
+    )
+
+    with caplog.at_level(logging.INFO):
+        await LabNotificationService(db_session)._notify_doctor_critical_value(
+            result,
+            value=25,
+            thresholds={"low": 3, "high": 20, "unit": "mmol/L"},
+        )
+
+    inbox_delivery.assert_awaited_once()
+    assert any(
+        "lab_critical_result canonical delivery failed" in record.message
+        for record in caplog.records
+    )
+    assert not any(
+        phrase in record.message
+        for record in caplog.records
+        for phrase in (
+            "Critical value alert recorded in doctor inbox",
+            "Critical value alert sent",
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_critical_lab_alert_reuses_existing_inbox_deliveries(
+    db_session, test_visit, test_patient, cardio_user, monkeypatch
+):
+    import app.services.lab_notification_service as lab_notification_module
+    from app.services.lab_notification_service import LabNotificationService
+
+    order = LabOrder(
+        patient_id=test_patient.id,
+        visit_id=test_visit.id,
+        status="completed",
+    )
+    db_session.add(order)
+    db_session.flush()
+    result = LabResult(
+        order_id=order.id,
+        test_name="glucose",
+        value="25",
+    )
+    db_session.add(result)
+    db_session.flush()
+
+    created_event_types = []
+
+    async def create_lab_delivery(**kwargs):
+        event_type = kwargs["event_type"]
+        created_event_types.append(event_type)
+        event = NotificationEvent(
+            event_type=event_type,
+            dedup_key=f"test:{event_type}:{result.id}",
+            source_module="lab",
+            entity_type="lab_result",
+            entity_id=str(result.id),
+            severity="critical" if event_type == "lab_critical_result" else "info",
+            priority="urgent" if event_type == "lab_critical_result" else "normal",
+            title=kwargs["title"],
+            message=kwargs["message"],
+            payload_snapshot={"metadata": kwargs["metadata"]},
+        )
+        db_session.add(
+            NotificationDelivery(
+                event=event,
+                recipient_type="user",
+                recipient_id=kwargs["recipient"].id,
+                role="Doctor",
+                channel="in_app_inbox",
+                dedup_key=f"test-delivery:{event_type}:{result.id}",
+                sequence_id=len(created_event_types),
+                delivery_status="delivered",
+            )
+        )
+        db_session.flush()
+        return True
+
+    monkeypatch.setattr(
+        lab_notification_module.notification_sender_service,
+        "send_lab_event_notification",
+        AsyncMock(side_effect=create_lab_delivery),
+    )
+    service = LabNotificationService(db_session)
+    thresholds = {"low": 3, "high": 20, "unit": "mmol/L"}
+
+    await service._notify_doctor_critical_value(result, 25, thresholds)
+    await service._notify_doctor_critical_value(result, 25, thresholds)
+
+    assert created_event_types == ["lab_critical_result", "lab_critical_finding"]
 
 
 @pytest.mark.asyncio

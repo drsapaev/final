@@ -326,11 +326,6 @@ async def send_appointment_reminder(
     db: Session = Depends(get_db),
 ):
     """Отправка напоминания о записи"""
-    # Получаем данные пациента
-    patient = patient_crud.get(db, id=patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail=t("patient.not_found"))
-
     if not _is_admin_or_superuser(current_user):
         doctor = _active_doctor_for_user(db, current_user)
         if doctor is None:
@@ -353,6 +348,13 @@ async def send_appointment_reminder(
         )
         doctor_name = current_user.full_name or current_user.username
         department = assigned_visit.department or doctor.specialty
+
+    # Check the doctor's visit scope before looking up the patient. Returning
+    # patient.not_found for an unassigned but existing patient would let a
+    # Doctor distinguish existing patient IDs from nonexistent ones.
+    patient = patient_crud.get(db, id=patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
