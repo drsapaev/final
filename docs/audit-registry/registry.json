@@ -2703,6 +2703,16 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYREGAPPTTYPE-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "AppointmentNotificationRequest.appointment_type accepts any str; context service maps all values except exact \"visit\" to Appointment rather than returning 422, risking wrong PK namespace and misleading 404/record selection",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYREGDAILYORM-BE-001",
    "priority": "P1",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -2803,10 +2813,40 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYREGQUEUEACTOR-BE-001",
+   "priority": "P1 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "Doctor-role POST /registrar/notifications/queue-status accepts any queue_entry_id without verifying allowed specialist/queue resource scope or same-specialty collaboration per ADR-001; distinct from other queue-update route and group71 clinical/price IDs",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGQUEUECLAIM-BE-001",
+   "priority": "P1 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "queue-status notification trusts caller status_change without comparing persisted OnlineQueueEntry.status or a canonical transition; after separate ORM fixes may announce fake completed/cancelled states",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYREGQUEUEORM-BE-001",
    "priority": "P1",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "notify_queue_status reads removed DailyQueue.department/doctor_id/doctor_name plus OnlineQueueEntry.queue_number/visit_date; queue event cannot be recorded through that path",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGSTALEAPPT-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "explicit registrar new-appointment sender allows canceled/completed Appointment and closed/canceled Visit, but unconditionally creates new_appointment event with \"Создана новая запись\" regardless of source status",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
