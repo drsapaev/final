@@ -934,6 +934,8 @@ def _build_mini_app_appointment_booking_preview_from_request(
 def _resolve_mini_app_patient_scope_from_init_data(
     db: Session,
     init_data_payload: str,
+    *,
+    max_age_seconds: int | None = None,
 ):
     bot_token = _get_configured_bot_token(db)
     if not bot_token:
@@ -949,7 +951,14 @@ def _resolve_mini_app_patient_scope_from_init_data(
         # max_age=24h (backward compat), replay_check=False (same initData
         # is sent with every request). New /auth/exchange endpoint uses
         # the secure defaults: max_age=5min, replay_check=True.
-        max_age_seconds=LEGACY_MAX_AUTH_AGE_SECONDS,
+        # WEBAUTHN-BE-003 (#4063): DESTRUCTIVE callers (e.g. passkey
+        # deactivation) pass max_age_seconds=900 so a phished 24h-old
+        # initData blob cannot reach the destructive endpoint.
+        max_age_seconds=(
+            max_age_seconds
+            if max_age_seconds is not None
+            else LEGACY_MAX_AUTH_AGE_SECONDS
+        ),
         replay_check=False,
     )
     return resolve_telegram_mini_app_session_scope(
@@ -999,6 +1008,7 @@ def _resolve_mini_app_patient_scope_from_auth(
     init_data_payload: str | None = None,
     entry_token: str | None = None,
     expected_section: str | None = None,
+    max_age_seconds: int | None = None,
 ) -> tuple[TelegramMiniAppSessionScope, str]:
     normalized_init_data = str(init_data_payload or "").strip()
     if normalized_init_data:
@@ -1006,6 +1016,7 @@ def _resolve_mini_app_patient_scope_from_auth(
             _resolve_mini_app_patient_scope_from_init_data(
                 db,
                 normalized_init_data,
+                max_age_seconds=max_age_seconds,
             ),
             "init_data",
         )
