@@ -1971,6 +1971,46 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYEMAILSMSAMOUNTNONE-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "PaymentData.amount is nullable and optional, but enhanced payment formatting :,.0f on None raises TypeError, surfaced as HTTP 500 instead of 422/approved fallback",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSAPPTFIELDS-BE-001",
+   "priority": "P1",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "enhanced appointment reminder uses nonexistent Appointment ORM doctor_name/specialty/date/time/cabinet fields, leading to HTTP 500 before any notification",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSATTACHACK-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "Email attachment processing silently discards schema-valid relative paths or file errors, yet provider Email still returns successful send",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSBATCHBOUND-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "bulk batch_size and delay_between_batches have no bounds; zero triggers 500, negative batch yields no sends, oversized batch defeats throttling",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYEMAILSMSBULKACK-BE-001",
    "priority": "P2",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -1985,6 +2025,16 @@
    "priority": "P2",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "bulk recipients are list[str] vs required list[RecipientData], body message and batch query controls also drift",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSCLIENTLIFE-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "SMS provider creates httpx.AsyncClient for every request without aclose or async context manager, risking resource exhaustion during bulk sends",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
@@ -2011,6 +2061,16 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYEMAILSMSFALLBACKHTML-BE-001",
+   "priority": "P1 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "template-render failure falls back to raw HTML f-string with unescaped patient_name/message, bypassing configured Jinja autoescape",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYEMAILSMSLABPHANTOM-BE-001",
    "priority": "P1 conditional/clinical",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -2031,10 +2091,70 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYEMAILSMSPRIOQUERY-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "SendCustomEmailRequest/SendCustomSmsRequest declare JSON body priority but handlers pass independent Query priority to transport, ignoring body high",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSRECIPIENTKEY-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "RecipientData.email/phone both optional; bulk handlers omit null keys with exclude_none and service indexes recipient['email'] or ['phone'] => valid schema input causes HTTP 500",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSSMSLOADER-BE-001",
+   "priority": "P1/P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "SMS Jinja lookup under templates/email/sms conflicts with actual templates/sms files; generic fallback silently omits appointment/lab/payment details",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSSTATSVOLATILE-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "Email/SMS statistics and reset are per-process in-memory singleton, not aggregated across workers or persisted across restart",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSTEMPLATECAT-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "GET /templates hardcodes catalogue, advertises incomplete variable lists, ignores limit/offset, and does not verify templates are renderable by configured loaders",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYEMAILSMSTESTDTO-FE-001",
    "priority": "P2",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "test-email/test-sms send required query parameters in JSON body; FastAPI returns 422 validation error",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYEMAILSMSTESTHTML-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "Admin-only test-email endpoint directly interpolates unescaped message query string into HTML mail body, permitting markup/links if pasted or submitted",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
@@ -2563,6 +2683,36 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYREGAPPTTIME-BE-001",
+   "priority": "P1",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "registrar notify_new_appointment invokes .strftime on Appointment.appointment_time (str | None); catches AttributeError, aborts canonical notification before sending",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGDAILYORM-BE-001",
+   "priority": "P1",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "daily summary query references nonexistent DailyQueue.queue_date and OnlineQueueEntry.visit_date; catch-all silently resets computed counts and every KPI to zero",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGDAILYZEROS-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "daily digest includes financial and clinical KPIs hardcoded to 0 without database aggregation, even once ORM date-column drift is fixed",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYREGDEPTCAST-BE-001",
    "priority": "P2 conditional",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -2587,6 +2737,16 @@
    "priority": "P1 conditional",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "price override notification_sent/notification_sent_at persist even when canonical_created=false, misleading durable audit",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGQUEUEORM-BE-001",
+   "priority": "P1",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "notify_queue_status reads removed DailyQueue.department/doctor_id/doctor_name plus OnlineQueueEntry.queue_number/visit_date; queue event cannot be recorded through that path",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
