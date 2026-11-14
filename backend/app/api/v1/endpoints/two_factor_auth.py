@@ -3,7 +3,7 @@ API endpoints для двухфакторной аутентификации (2F
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.rate_limiter import limiter
+from app.core.security import verify_password
 from app.crud.two_factor_auth import (
     two_factor_auth,
     two_factor_backup_code,
@@ -18,7 +19,6 @@ from app.crud.two_factor_auth import (
 )
 from app.db.session import get_db
 from app.models.user import User
-from app.core.security import verify_password
 from app.schemas.two_factor_auth import (
     TwoFactorBackupCodesResponse,
     TwoFactorDeviceListResponse,
