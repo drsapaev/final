@@ -2683,6 +2683,16 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYREGACTOROMIT-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "registrar event producers fail to pass authenticated current_user into canonical actor_user, so event actor_id/actor_role are null despite human-initiated action",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYREGAPPTTIME-BE-001",
    "priority": "P1",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -2723,6 +2733,26 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYREGDOCTOROWNER-BE-001",
+   "priority": "P1 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "Doctor-role appointment/price-change notification routes resolve referenced appointment, visit or price override by arbitrary supplied PK without checking Doctor.user_id/current_user ownership; may create staff alert for another physician's record if other source bugs do not abort",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGENTITYLINK-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "appointment and queue canonical notification calls omit entity_type/entity_id and visit_id metadata; typed canonical producer defaults to entity_type='visit' and entity_id=None, breaking structured source association after other independent delivery errors are fixed",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYREGFALSEACK-BE-001",
    "priority": "P1 conditional",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
@@ -2733,10 +2763,40 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYREGLISTPAGE-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "GET /registrar/notifications/registrars declares limit/offset but never applies them, and directory service .all() returns entire authorized staff list",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGPHONEPROFILE-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "registrar listing serializes nonexistent User.phone using getattr(...,None) rather than linked UserProfile.phone, silently emitting null despite recorded staff contact",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYREGPRICEFLAG-BE-001",
    "priority": "P1 conditional",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "price override notification_sent/notification_sent_at persist even when canonical_created=false, misleading durable audit",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGPRICEPENDING-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "price-change notification always says awaiting approval even for DoctorPriceOverride.status approved/rejected; endpoint/context do not restrict by pending state",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
@@ -2757,6 +2817,26 @@
    "priority": "P2",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
    "evidence": "registrar notifications stats route always returns literal zero counts, no DB aggregation, while UI treats as actual channel statistics",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGSUMMARYDROP-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "send_daily_summary builds multiline financial/clinical message then discards it, sending only one-line 'summary ready' with figures relegated to metadata",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYREGVISITCODE-BE-001",
+   "priority": "P1",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "registrar appointment_type=visit code indexes nonexistent VisitService.service_code (model has code); with a service row get_appointment_context raises AttributeError and route responds HTTP 500 before notification",
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
