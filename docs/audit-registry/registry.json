@@ -3793,11 +3793,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4072",
    "merge_sha": null,
-   "root_cause": "/phone-verification/send-code: custom_message verbatim to arbitrary +998 numbers under clinic sender; purpose allowlist includes password_reset outside reset flow",
+   "root_cause": "self-service send-code forwarded custom_message verbatim into the SMS body (custom_message.format(code=code) — attacker-controlled SMS content to arbitrary +998 numbers under the clinic's sender identity), accepted arbitrary recipient phones with no ownership binding, and its purpose allowlist included password_reset — minting reset codes outside the 3/minute /password-reset/initiate gate; fix PR #4072 opened 2026-11-14 (head fbdb95c55, stacked on #4071/#4070/#4069/#4068): custom_message → 400 (admin-only via /admin/send-code), authenticated send allowlist narrowed to verification|phone_change (422 otherwise — password_reset stays in the dedicated 3/min reset flow, registration has no authenticated caller), verification records now store requesting user_id (in-memory, no migration) and status/cancel/verify mask foreign records as missing (exists:false / 404 CODE_NOT_FOUND — no oracle, no cross-user cancel/verify), Admin/SuperAdmin bypass mirrors existing admin-plane gating, verify-code carries @limiter.limit('5/minute') mirroring send-code. RED 7 failed (200 on custom_message/password_reset, user_id None, full oracle payload, cross-user cancel 200+deletion, cross-user verify 200 with the correct code, no bare-429) -> GREEN 7 passed; related regression 34 passed 0 errors; openapi.json and generated api.ts byte-identical (zero spec delta — request/response models and docstrings unchanged)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "fbdb95c55"
   },
   {
    "checked": false,
@@ -3806,11 +3807,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4072",
    "merge_sha": null,
-   "root_cause": "/phone-verification/status + /cancel operate on arbitrary phone numbers with no ownership binding (state oracle + cross-user cancellation DoS)",
+   "root_cause": "/phone-verification/status and /cancel operated on fully caller-chosen phone/purpose — a cross-user verification-state oracle (purpose, expiry, attempt state) and a cancellation DoS on a victim's pending code; fix PR #4072 opened 2026-11-14 (head fbdb95c55, stacked on #4071/#4070/#4069/#4068): custom_message → 400 (admin-only via /admin/send-code), authenticated send allowlist narrowed to verification|phone_change (422 otherwise — password_reset stays in the dedicated 3/min reset flow, registration has no authenticated caller), verification records now store requesting user_id (in-memory, no migration) and status/cancel/verify mask foreign records as missing (exists:false / 404 CODE_NOT_FOUND — no oracle, no cross-user cancel/verify), Admin/SuperAdmin bypass mirrors existing admin-plane gating, verify-code carries @limiter.limit('5/minute') mirroring send-code. RED 7 failed (200 on custom_message/password_reset, user_id None, full oracle payload, cross-user cancel 200+deletion, cross-user verify 200 with the correct code, no bare-429) -> GREEN 7 passed; related regression 34 passed 0 errors; openapi.json and generated api.ts byte-identical (zero spec delta — request/response models and docstrings unchanged)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "fbdb95c55"
   },
   {
    "checked": false,
@@ -3819,11 +3821,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4072",
    "merge_sha": null,
-   "root_cause": "/verify-code lacks the endpoint limiter /send-code has; per-code cap measurable via echoed attempts_left; bounded by the per-code MAX_ATTEMPTS cap service-side (429 MAX_ATTEMPTS_EXCEEDED) and the api bucket — the missing endpoint limiter remains a consistency gap, low severity",
+   "root_cause": "/phone-verification/verify-code lacked the endpoint limiter its sibling /send-code carries; combined with per-code attempt budgets being resettable by fresh sends, brute-force could ride them; fix PR #4072 opened 2026-11-14 (head fbdb95c55, stacked on #4071/#4070/#4069/#4068): custom_message → 400 (admin-only via /admin/send-code), authenticated send allowlist narrowed to verification|phone_change (422 otherwise — password_reset stays in the dedicated 3/min reset flow, registration has no authenticated caller), verification records now store requesting user_id (in-memory, no migration) and status/cancel/verify mask foreign records as missing (exists:false / 404 CODE_NOT_FOUND — no oracle, no cross-user cancel/verify), Admin/SuperAdmin bypass mirrors existing admin-plane gating, verify-code carries @limiter.limit('5/minute') mirroring send-code. RED 7 failed (200 on custom_message/password_reset, user_id None, full oracle payload, cross-user cancel 200+deletion, cross-user verify 200 with the correct code, no bare-429) -> GREEN 7 passed; related regression 34 passed 0 errors; openapi.json and generated api.ts byte-identical (zero spec delta — request/response models and docstrings unchanged)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "fbdb95c55"
   },
   {
    "checked": false,
