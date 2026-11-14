@@ -3537,6 +3537,42 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYTPLACTIVECLASH-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "template name is unique but active (notification type, channel) is NOT; admin can create two different active templates for same event/channel and sender's .first() without ORDER BY selects unpredictably",
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4074",
+   "merge_sha": null,
+   "root_cause": "; fix PR #4074 opened 2026-11-14 (head 8315689a1, independent branch on main b142a30dc): get_by_type_and_channel now orders by updated_at desc, id desc (newest active template wins — deterministic even for legacy rows violating the invariant), and POST/PUT /notifications/templates enforce a single-active invariant per (type, channel) via new CRUD helper deactivate_sibling_actives (activation deactivates siblings in-transaction; legacy duplicates self-heal on next admin edit; no DB migration — app-level invariant)",
+   "fix_pr_head": "8315689a1"
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYTPLPLAINTEXTESC-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "global Jinja autoescape=True renders HTML entities for message variables even when delivery is SMS or MIME text/plain email; Jinja standalone input `Иванов & Сын <3` becomes `Иванов &amp; Сын &lt;3`; channel-aware render contract needed",
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4074",
+   "merge_sha": null,
+   "root_cause": "; fix PR #4074 opened 2026-11-14 (head 8315689a1, independent branch on main b142a30dc): second Jinja environment _jinja_env_text (autoescape=False); render_template(..., escape_html=...) renders SMS and email channels unescaped (SMS body / text/plain email part), while telegram keeps escaping (parse_mode=HTML) and push keeps the safe default",
+   "fix_pr_head": "8315689a1"
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYTPLRENDERFAIL-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "a malformed DB Jinja template passes Admin create/update; CoreMixin catches syntax/render failure and returns raw source, which subsequent Email/SMS/Telegram sender can send while marking accepted transport as \"sent\"",
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4074",
+   "merge_sha": null,
+   "root_cause": "; fix PR #4074 opened 2026-11-14 (head 8315689a1, independent branch on main b142a30dc): render_template returns str | None (None on Jinja failure, reason logged) and send_templated_notification is fail-closed: NO provider call, NO platform delivery record, history row created with empty content and marked failed with error 'Ошибка рендеринга шаблона' — the raw template text is never delivered; the no-template fallback path is unchanged; render_template has exactly two call sites (_templated subject/content)",
+   "fix_pr_head": "8315689a1"
+  },
+  {
+   "checked": false,
    "id": "NOTIFYUNREADPARTIAL-FE-001",
    "priority": "",
    "source": "Personal WS groups 47–56 (#4059)",
