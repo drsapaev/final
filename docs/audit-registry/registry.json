@@ -85,7 +85,7 @@
    "status": "CONFIRMED_OPEN",
    "fix_pr": null,
    "merge_sha": null,
-   "root_cause": "/status two_factor_verified=profile['two_factor_enabled'] — session-level 2FA state not tracked; fix requires a product decision: track session-level 2FA-verified state (schema change) or re-name/re-scope the field — left for owner",
+   "root_cause": "/status two_factor_verified=profile['two_factor_enabled'] — session-level 2FA state not tracked; fix requires a product decision: track session-level 2FA-verified state (schema change) or re-name/re-scope the field — left for owner; 2026-11-14 fixing-agent triage: NOT mechanically fixable — the registry itself scopes it as a product decision (track session-level 2FA-verified state via schema change vs re-name/re-scope the /status field); left for owner deliberately to avoid hardening a semantics guess into the schema",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13"
   },
@@ -3451,12 +3451,13 @@
    "priority": "P2",
    "source": "#4059 group 60 — four new bot delivery candidates",
    "evidence": "https://github.com/drsapaev/final/pull/4059#issuecomment-6860968097",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4076",
    "merge_sha": null,
-   "root_cause": "notifications.py:271-297 returns 'Напоминание отправлено'+sent_at unconditionally (background-task False result discarded); telegram_bot.py:322-334 returns success while send_lab_results_ready provider-False paths (bot.py:451-524) are swallowed",
+   "root_cause": "notifications.py:271-297 returns 'Напоминание отправлено'+sent_at unconditionally (background-task False result discarded); telegram_bot.py:322-334 returns success while send_lab_results_ready provider-False paths (bot.py:451-524) are swallowed; fix PR #4076 opened 2026-11-14 (head 8117d442b, independent on main b142a30dc): multi-surface honest ack: bot reminder/lab methods return the delivery bool; POST /telegram/bot/send-appointment-reminder turns False into 502; email-sms endpoint message matches result['success']; notifications + telegram-integration background-task acks use queued wording («поставлено в очередь отправки», queued:true); FE string-match verified absent",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "8117d442b"
   },
   {
    "checked": false,
@@ -3474,12 +3475,13 @@
    "priority": "P2",
    "source": "#4059 group 60 — four new bot delivery candidates",
    "evidence": "https://github.com/drsapaev/final/pull/4059#issuecomment-6860968097",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4076",
    "merge_sha": null,
-   "root_cause": "_formatting.py:80-91 legacy **bold** + unescaped patient/doctor/service names; bot.py sends those paths with parse_mode='Markdown' (68/382/509/522) — legacy parser renders ** literally and chokes on unescaped content",
+   "root_cause": "_formatting.py:80-91 legacy **bold** + unescaped patient/doctor/service names; bot.py sends those paths with parse_mode='Markdown' (68/382/509/522) — legacy parser renders ** literally and chokes on unescaped content; fix PR #4076 opened 2026-11-14 (head 8117d442b, independent on main b142a30dc): invitation formatting: single-star bold (no legacy **), _md_escape (backslash, _, *, [, ], `) applied to patient/doctor/services/dates/amounts; bot.py reminder/lab templates escape dynamic fields and every legacy ** heading (incl. help text) converted; parse_mode stays Markdown per scope decision",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "8117d442b"
   },
   {
    "checked": false,
@@ -3487,12 +3489,13 @@
    "priority": "P1",
    "source": "#4059 group 60 — four new bot delivery candidates",
    "evidence": "https://github.com/drsapaev/final/pull/4059#issuecomment-6860968097",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4076",
    "merge_sha": null,
-   "root_cause": "_formatting.py:119 inline keyboard url uses tel: scheme — Telegram Bot API InlineKeyboardButton.url accepts HTTP/tg:// only; whole invitation/confirmation send can be rejected",
+   "root_cause": "_formatting.py:119 inline keyboard url uses tel: scheme — Telegram Bot API InlineKeyboardButton.url accepts HTTP/tg:// only; whole invitation/confirmation send can be rejected; fix PR #4076 opened 2026-11-14 (head 8117d442b, independent on main b142a30dc): tel: InlineKeyboardButton removed (Bot API accepts HTTP(S)/tg:// only); contact line moved to the message body with getattr(settings, 'CLINIC_PHONE', '') fallback — side finding: the attribute does not exist in Settings at all, so the old line was a guaranteed runtime AttributeError, not just a rejected scheme",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "8117d442b"
   },
   {
    "checked": false,
@@ -3510,12 +3513,13 @@
    "priority": "P2",
    "source": "#4059 group 60 — four new bot delivery candidates",
    "evidence": "https://github.com/drsapaev/final/pull/4059#issuecomment-6860968097",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4076",
    "merge_sha": null,
-   "root_cause": "telegram/bot.py:412+416 produce confirm_{id}/cancel_{id} callbacks; active handle_callback (258-297) handles only confirm_visit:/cancel_visit:/queue_/appointment/my_appointments/help -> dead buttons + 'Неизвестная команда'",
+   "root_cause": "telegram/bot.py:412+416 produce confirm_{id}/cancel_{id} callbacks; active handle_callback (258-297) handles only confirm_visit:/cancel_visit:/queue_/appointment/my_appointments/help -> dead buttons + 'Неизвестная команда'; fix PR #4076 opened 2026-11-14 (head 8117d442b, independent on main b142a30dc): handle_callback routes confirm_{id}/cancel_{id} to a static _handle_appointment_decision: ownership via TelegramUser.patient_id == appointment.patient_id, refuses processed records, sets status confirmed/cancelled + commits + explicit answers; foreign/unlinked chats get a specific refusal (GREEN-only guard test asserts the foreign appointment stays pending)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "8117d442b"
   },
   {
    "checked": false,
