@@ -1773,3 +1773,55 @@ NOTIFYPOLICYJSON-BE-001 (P1 conditional) is **already tracked in merged group44*
 **Proposed synthetic regressions (NOT RUN):** For existing global Telegram and live test bugs use the original #4054 synthetic cases, avoiding contact with real recipients. For existing bulk-pref mapping, seed Patient.id != linked User.id with one real-owner opt-out and an unrelated user with opposite opt-in; mock providers and ensure the actual linked user's preference exclusively controls delivery. For mobile confirmation, linked appointment with Doctor.user name must not return {}, exactly one intended canonical patient confirmation after repair. For genuinely new NOTIFYPAYCLAIM-BE-001 retain the group80 unpaid-Visit/wrong-amount test and SSOT owner decision. All project FastAPI/DB/clinical/financial tests **NOT RUN**.
 
 **Execution boundary:** documentation-only direct_execute on existing Draft PR #4059 and issue #4063, no backend/frontend/runtime files, tests, configuration, DB writes, real notifications, patient data, merge or deployment. Mandatory ai/langgraph/scripts/run_agent_gate.ps1 **NOT RUN**; required for risk-domain source changes and before merge. Exact-head markdown-only diff and CI status must be checked after this append. Green docs checks do not establish repaired runtime behavior.
+
+---
+
+## Continued source Code Review — group 82: cross-PR remediation verification and mandatory per-step progress protocol
+
+**Review date:** 2026-11-14, Asia/Tashkent. **Pinned live main:** [94d140f837a0204212e8e6b20f35ab4d3b84546d](https://github.com/drsapaev/final/commit/94d140f837a0204212e8e6b20f35ab4d3b84546d). Existing docs-only [Draft audit #4059](https://github.com/drsapaev/final/pull/4059), [remediation issue #4063](https://github.com/drsapaev/final/issues/4063), [proposed fix Draft #4060](https://github.com/drsapaev/final/pull/4060), source/report of parallel [audit #4054](https://github.com/drsapaev/final/pull/4054). **Exact fix head checked:** [7440683fb7dc7f8439f9ec50658384b2f4e323be](https://github.com/drsapaev/final/commit/7440683fb7dc7f8439f9ec50658384b2f4e323be).
+
+### Progress ledger — pinned snapshot, do not confuse proposed with fixed
+
+| Measure | Cumulative at group 82 | Change in THIS group | Interpretation |
+| --- | ---: | ---: | --- |
+| Unique candidate finding IDs in #4063 | **400** | **+0** | Reconciled after group 81 cross-PR alias correction; includes 21 separately counted auth/security IDs |
+| Historical checklist boxes backed by earlier merged fixes | **27** | **0 new** | Previously verified on a prior main; not rerun or re-proven in this group |
+| Proposed source fixes in OPEN/DRAFT #4060 | **24** | **0 new** | The 24 #4054 IDs have an attempted source/test fix, but PR is unmerged and exact-head required checks are red |
+| Other unchecked IDs (not in #4060's 24 proposed) | **349** | **0** | Still need current-main per-ID classification/verification; many have static findings, not necessarily validated production bugs |
+| Total unchecked requiring resolution/adjudication | **373** | **0** | Equals proposed Draft 24 + other unchecked 349; do NOT double-count |
+| FIXED_VERIFIED_ON_MAIN newly demonstrated this group | **0** | **0** | No source merge or fresh merged-main regression verification |
+| Group-82 new P0/P1/P2 unique candidates | **0** | **0** | This step is a real *remediation CI/root-cause review*, not a manufactured new finding |
+| Cumulative historically fixed fraction | **27 / 400 = 6.75%** | no change | Inventory ratio, NOT exact current defect closure or current-green confidence |
+
+### Fix PR #4060 current-head verification — required checks are RED
+
+**HEAD:** 7440683fb7dc7f8439f9ec50658384b2f4e323be, five commits ahead/one behind pinned main, 34 modified runtime/test/generated files, **open Draft, unmerged**. Diff includes actual backend and frontend changes and new scoped tests. The fix-PR's text reports a successful scoped run_agent_gate.ps1 and local targeted frontend tests; this group **did not independently execute the agent gate**. The exact-head [Unified CI run #43559232040](https://github.com/drsapaev/final/actions/runs/43559232040) is **FAILURE**. Direct GitHub Actions jobs/logs confirm:
+
+- **Frontend:** Frontend e2e, unit, lint, build were **SUCCESS** in that run. An earlier lab-dirty-guard e2e blocker is no longer reproduced on this head; do not infer that every related contract is fixed.
+- **Backend tests job #132339038434: FAILURE**, summary **6367 passed, 2 failed, 67 skipped, 44 deselected, 3 xfailed** (745.48 seconds). Both failed [tests/integration/test_docvisit_pricing_integrity.py](https://github.com/drsapaev/final/blob/94d140f837a0204212e8e6b20f35ab4d3b84546d/backend/tests/integration/test_docvisit_pricing_integrity.py#L793-L849):
+  1. test_dental_notification_flag_true_on_one_confirmed_delivery — expected the approved registrar Telegram chat to be called once; observed no calls (empty list).
+  2. test_dental_notification_mixed_delivery_counts_confirmed_only — expected 2 mock sender calls; observed 0.
+- **Review Quality Gate:** [run #43560069327](https://github.com/drsapaev/final/actions/runs/43560069327), job #132341548161 **FAILURE** with an exact missing field: `## Frontend Resilience` → **Empty data proof** unanswered in PR body. New PR body text may have been edited later, but this run remains failure until an exact-body rerun succeeds.
+- **PR Required Gate:** in Unified CI FAILED because backend job failed. Security/Gitleaks, Agent Workflow Guards and several other workflow checks succeeded, but **overall merge readiness is NO**.
+
+**Root-cause contrast (draft vs still-unmodified main tests):** On exact #4060 head [backend/app/services/dental_api_service.py#L161-L243](https://github.com/drsapaev/final/blob/7440683fb7dc7f8439f9ec50658384b2f4e323be/backend/app/services/dental_api_service.py#L161-L243) the dental price-override producer sends **`send_canonical_notification_to_user(db=self.db, recipient=registrar, ...)`** and uses its returned boolean to update `notification_sent`; it **no longer invokes `send_telegram_message`**. The unchanged [positive/mixed integration test's fake sender](https://github.com/drsapaev/final/blob/94d140f837a0204212e8e6b20f35ab4d3b84546d/backend/tests/integration/test_docvisit_pricing_integrity.py#L687-L850) offers `send_telegram_message` and asserts exact Telegram chat ID/call count. Thus there is a **legacy test-to-proposed-new delivery contract mismatch**. It is **not enough** to change an assertion from "send" to "no send" or delete tests: owner must approve whether dental price-change alert is canonical staff inbox only, Telegram-only, or both with proper scoped consent. The draft producer catches exceptions and can retain `notification_sent=False`; independent synthetic positive/negative tests must prove correct delivery and acknowledgement under chosen policy, including registrar recipient and failure isolation. No source edit or test run here.
+
+**Correction to prior blocker status:** Earlier #4060 comments about chat dialog/E2E and raw Telegram helper signatures referred to older draft heads. At this head, frontend e2e is **green**, but backend dental notification tests and PR review body evidence **are failing**. Do not present outdated blocker descriptions as current status without checking exact head.
+
+### Required agent reporting handshake, user-requested
+
+**Actual comments posted:**
+- [Instruction addressed to fixing agent in THIS audit PR #4059](https://github.com/drsapaev/final/pull/4059#issuecomment-6881110112).
+- [Cross-link and full reporting reminder in fix PR #4060](https://github.com/drsapaev/final/pull/4060#issuecomment-6881110624).
+- [Exact CI failure analysis and action plan in fix PR #4060](https://github.com/drsapaev/final/pull/4060#issuecomment-6881143182).
+
+After **each** fix step, the fixing agent should independently post a **new top-level comment in audit #4059** and link it from the active fix PR and #4063. Include total unique IDs, delta/new IDs for the step, statuses and evidence for work done this step **and prior successful steps**, exact `main`/fix head SHAs, merged fix PR evidence, test command + success/failure, mandatory agent gate, release/merge blockers. Only mark #4063 checklist [x] when exact merged-main source changes and real regression evidence confirm FIXED_VERIFIED_ON_MAIN; a Docs PR or Draft fix is not enough. Communication instruction cannot itself force another agent's action; verify comment actually appears.
+
+### Synthetic next-step acceptance criteria — NOT RUN in this audit
+
+1. Fix PR #4060: choose and document precise dental notification contract, instrument fake canonical inbox sender (or an approved linked Telegram path), prove 2 positive/negative integration tests and preserve truthful `notification_sent` status; **do not skip/xfail protected tests**.
+2. Fill PR review gate's `Empty data proof` field with real evidence or justified targeted N/A; rerun exact-head PR Review Quality Gate.
+3. Re-run full required Unified CI and role/security/clinical gates on **updated exact fix head**, especially backend (2 prior failures), frontend e2e and mandatory AGENTS.md `ai/langgraph/scripts/run_agent_gate.ps1`. The earlier gate result reported by #4060 belongs to old code head if it changes.
+4. Post a new per-step agent comment in audit PR #4059 and update #4063 only after per-ID merged-main tests. **Never attempt live Bot API/provider sends or modify clinical/patient/production data for review**.
+
+**Execution:** documentation-only `direct_execute`. Only this Markdown on existing #4059, PR comments/metadata and tracker #4063 are touched. No merge, source change, tests run by this audit agent, DB, deployment, real notifications or gate invocation. Report exact-head Markdown-only compare + docs CI separately. No new issue IDs in group 82.
