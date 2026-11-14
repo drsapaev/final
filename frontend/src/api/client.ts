@@ -301,11 +301,16 @@ async function refreshTokenIfNeeded(): Promise<string | null> {
  * local expiry heuristic. Shares the same mutex as refreshTokenIfNeeded so
  * a burst of 401s triggers exactly one /authentication/refresh call.
  */
-async function forceRefreshToken(): Promise<TokenRefreshResult> {
+async function forceRefreshTokenWithResult(): Promise<TokenRefreshResult> {
   if (refreshPromise !== null) {
     logger.log('🔄 Reactive refresh already in progress, waiting...');
   }
   return getOrStartTokenRefresh();
+}
+
+async function forceRefreshToken(): Promise<string | null> {
+  const refreshResult = await forceRefreshTokenWithResult();
+  return refreshResult.accessToken;
 }
 
 // Endpoints that bootstrap or replace the session themselves — a 401/403
@@ -572,7 +577,7 @@ api.interceptors.response.use(
         logger.warn('🔒 401 received — single-flight refresh + retry', {
           url: config.url
         });
-        const refreshResult = await forceRefreshToken();
+        const refreshResult = await forceRefreshTokenWithResult();
         if (refreshResult.accessToken) {
           config.headers.set('Authorization', `Bearer ${refreshResult.accessToken}`);
           return api.request(config);

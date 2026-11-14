@@ -45,7 +45,7 @@ vi.mock('../../utils/logger', () => ({
 
 import axios from 'axios';
 import logger from '../../utils/logger';
-import { api, setSessionInvalidationListener } from '../client';
+import { api, forceRefreshToken, setSessionInvalidationListener } from '../client';
 
 // Some sibling suites stub the global URL with a non-constructor; capture the
 // real one at import time and restore it per test so the axios pipeline can
@@ -165,6 +165,16 @@ afterEach(() => {
 });
 
 describe('reactive 401 recovery', () => {
+  it('preserves the exported forceRefreshToken string result contract', async () => {
+    vi.spyOn(axios, 'post').mockResolvedValue(
+      make200({ access_token: 'new-access-token', refresh_token: 'rotated-refresh' })
+    );
+
+    await expect(forceRefreshToken()).resolves.toBe('new-access-token');
+    expect(tokenState.access).toBe('new-access-token');
+    expect(tokenState.refresh).toBe('rotated-refresh');
+  });
+
   it('refreshes once and retries the business request with the new token', async () => {
     const seenAuthHeaders: Array<string | undefined> = [];
     let businessCalls = 0;
