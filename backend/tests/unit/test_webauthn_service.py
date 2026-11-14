@@ -4,9 +4,10 @@ Unit tests for WebAuthn/Passkey Service (M4-P1-4).
 Tests the graceful fallback when webauthn library is not installed,
 and the passkey management functions (list, deactivate).
 """
+
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -17,12 +18,14 @@ class TestWebAuthnAvailability:
     def test_is_webauthn_available_returns_bool(self):
         """is_webauthn_available returns a boolean."""
         from app.services.webauthn_service import is_webauthn_available
+
         result = is_webauthn_available()
         assert isinstance(result, bool)
 
     def test_webauthn_not_available_in_cloud_env(self):
         """In cloud dev env, webauthn library is not installed."""
         from app.services.webauthn_service import is_webauthn_available
+
         # In this environment, webauthn is not installed
         assert is_webauthn_available() is False
 
@@ -53,7 +56,9 @@ class TestPasskeyManagement:
         mock_passkey.active = True
 
         query = MagicMock()
-        query.filter.return_value.order_by.return_value.all.return_value = [mock_passkey]
+        query.filter.return_value.order_by.return_value.all.return_value = [
+            mock_passkey
+        ]
         db.query.return_value = query
 
         result = list_patient_passkeys(db, patient_id=42)
@@ -61,7 +66,8 @@ class TestPasskeyManagement:
         assert result[0].name == "iPhone 15"
 
     def test_deactivate_passkey_returns_true_on_success(self):
-        """Deactivate returns True when passkey exists."""
+        """Deactivate returns True when passkey exists (and is not the last
+        active one — WEBAUTHN-BE-003 last-credential guard)."""
         from app.services.webauthn_service import deactivate_passkey
 
         db = MagicMock()
@@ -72,6 +78,9 @@ class TestPasskeyManagement:
 
         query = MagicMock()
         query.filter.return_value.first.return_value = mock_passkey
+        query.filter.return_value.count.return_value = (
+            2  # another active passkey exists
+        )
         db.query.return_value = query
 
         result = deactivate_passkey(db, patient_id=42, credential_id=1)
@@ -91,6 +100,41 @@ class TestPasskeyManagement:
         result = deactivate_passkey(db, patient_id=42, credential_id=999)
         assert result is False
 
+    def test_deactivate_passkey_returns_false_when_already_inactive(self):
+        """WEBAUTHN-BE-003: already-inactive credentials behave like missing
+        ones (endpoint answers one opaque 404, no state disclosure)."""
+        from app.services.webauthn_service import deactivate_passkey
+
+        db = MagicMock()
+        mock_passkey = MagicMock()
+        mock_passkey.active = False
+
+        query = MagicMock()
+        query.filter.return_value.first.return_value = mock_passkey
+        db.query.return_value = query
+
+        result = deactivate_passkey(db, patient_id=42, credential_id=1)
+        assert result is False
+        assert not db.commit.called
+
+    def test_deactivate_passkey_rejects_last_active_credential(self):
+        """WEBAUTHN-BE-003: deactivating the ONLY active passkey raises
+        ValueError("last_active_credential") — endpoint maps it to 409."""
+        from app.services.webauthn_service import deactivate_passkey
+
+        db = MagicMock()
+        mock_passkey = MagicMock()
+        mock_passkey.active = True
+
+        query = MagicMock()
+        query.filter.return_value.first.return_value = mock_passkey
+        query.filter.return_value.count.return_value = 1  # this IS the last one
+        db.query.return_value = query
+
+        with pytest.raises(ValueError, match="last_active_credential"):
+            deactivate_passkey(db, patient_id=42, credential_id=1)
+        assert not db.commit.called
+
 
 class TestPasskeyCredentialModel:
     """Tests for PasskeyCredential model."""
@@ -106,8 +150,16 @@ class TestPasskeyCredentialModel:
         mapper = PasskeyCredential.__mapper__
         column_keys = set(mapper.columns.keys())
         expected = {
-            "id", "patient_id", "credential_id", "public_key",
-            "sign_count", "transports", "device_type", "name",
-            "active", "created_at", "last_used_at",
+            "id",
+            "patient_id",
+            "credential_id",
+            "public_key",
+            "sign_count",
+            "transports",
+            "device_type",
+            "name",
+            "active",
+            "created_at",
+            "last_used_at",
         }
         assert expected.issubset(column_keys), f"Missing: {expected - column_keys}"
