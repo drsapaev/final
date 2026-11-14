@@ -3959,11 +3959,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4069",
    "merge_sha": null,
-   "root_cause": "/webauthn/login/begin + /login/finish unauthenticated with arbitrary patient_id, no limiter import in module",
+   "root_cause": "/webauthn/login/begin and /login/finish fully unauthenticated with arbitrary body patient_id, no rate limiter at all (webauthn.py imports none; router public at api.py:219); distinct 400/500 shapes vs success leaked existing patient ids and active-passkey possession (anonymous enumeration); login/begin cached a challenge for ANY caller-supplied id (unbounded cache growth); assertion attempts unthrottled; fix PR #4069 opened 2026-11-14 (head 900006e9d, stacked on #4068 which it includes): slowapi IP limits 10/min begin + 5/min finish (repo auth-plane pattern); begin caches challenge ONLY when an active PasskeyCredential exists (unknown/gated patients get byte-identical dummy 200, cache no longer growable); finish returns ONE opaque 403 auth_finish_failed for every pre-verify failure (raw str(exc) message removed, details to logs). PRE-EXISTING BREAKAGE repaired in the same PR: all six handlers called async request.json() from sync def handlers -> AttributeError 500 after the 503 guard (login plane dead on main); handlers now async def with await request.json(). RED 5 failed (503->coroutine 500, leaked message, no 429) -> GREEN 9 passed with stacked BE-001 suite; regression 24+16+57 passed",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "900006e9d"
   },
   {
    "checked": false,
