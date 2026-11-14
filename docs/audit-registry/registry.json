@@ -3448,11 +3448,12 @@
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
    "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "fix_pr": "https://github.com/drsapaev/final/pull/4067",
    "merge_sha": null,
-   "root_cause": "no @limiter.limit on /verify-setup /verify /recovery/verify /verify-code; verify_two_factor counts no attempts, no lockout (soft failure) — unlimited 6-digit guesses with password-only bootstrap; middleware bounds noted: /2fa/verify, /2fa/verify-setup and /2fa/verify-code share the 2fa_verify bucket 10/300 via '/2fa/verify' substring match, /2fa/recovery/verify falls to the api bucket 5000/3600 — the confirmed core is the absent service-side attempt cap/lockout in verify_two_factor",
+   "root_cause": "no @limiter.limit on /verify-setup /verify /recovery/verify /verify-code; verify_two_factor counts no attempts, no lockout (soft failure) — unlimited 6-digit guesses with password-only bootstrap; middleware bounds noted: /2fa/verify, /2fa/verify-setup and /2fa/verify-code share the 2fa_verify bucket 10/300 via '/2fa/verify' substring match, /2fa/recovery/verify falls to the api bucket 5000/3600 — the confirmed core is the absent service-side attempt cap/lockout in verify_two_factor; fix PR #4067 opened 2026-11-14 (head 127a667aa, off main 94d140f83): alembic 0093 adds two_factor_auth.failed_attempts (INT NOT NULL default 0) + locked_until (nullable ts); TwoFactorService.verify_two_factor now gates on lock before any code check, increments on failure (>=5 consecutive -> 15-minute lock, even correct code rejected with 200+success:false+lock message), resets on success, self-clears expired locks; endpoint contract unchanged (no new status codes, no remaining-attempt disclosure). RED 3 failed (6th attempt with correct code succeeded) -> GREEN 3 passed, neighborhood 64 passed; pyotp was removed from the project, test fixtures use the service's own generate_totp_code (wrong code = hour-ago window)",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "127a667aa"
   },
   {
    "checked": false,
