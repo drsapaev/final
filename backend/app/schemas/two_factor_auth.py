@@ -228,6 +228,22 @@ class TwoFactorDisableRequest(BaseModel):
     backup_code: str | None = Field(None, min_length=8, max_length=10)
 
 
+class TwoFactorBackupCodesRegenerateRequest(BaseModel):
+    """Запрос на перегенерацию backup-кодов.
+
+    SECURITY (TWOFACTOR-BE-002, #4063): требуется ОБА фактора — пароль +
+    текущий 2FA-код (TOTP или backup) — паритет с /disable
+    (AUTH-REAUDIT-28): bearer-токен сам по себе не может отчеканить новый
+    комплект кодов повторного входа.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    password: str = Field(..., min_length=1)
+    totp_code: str | None = Field(None, min_length=6, max_length=6)
+    backup_code: str | None = Field(None, min_length=8, max_length=10)
+
+
 class TwoFactorVerifySetupRequest(BaseModel):
     """Тело запроса верификации TOTP-настройки.
 
