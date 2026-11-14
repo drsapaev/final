@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -43,6 +44,18 @@ class TwoFactorAuth(Base):
     recovery_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     recovery_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     recovery_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # TWOFACTOR-BE-001 (#4063): service-side brute-force defense. The endpoint
+    # limiter is per-IP and trivially bypassed, so the verify counter and the
+    # temporary lockout live on the 2FA record itself. See
+    # TwoFactorService.verify_two_factor and alembic
+    # 0093_two_factor_attempt_lockout.
+    failed_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sa_text("0")
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Метаданные
     created_at: Mapped[datetime | None] = mapped_column(
