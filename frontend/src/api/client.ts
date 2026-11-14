@@ -9,7 +9,7 @@
 //  - me() - GET /me
 //  - login(username, password) - POST /login (x-www-form-urlencoded)
 
-import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { buildApiUrl, buildWsUrl, getApiBaseUrl, getApiOrigin } from './runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
@@ -137,19 +137,41 @@ export function isTokenExpiringSoon(token: string | null | undefined): boolean {
   return Date.now() > (expiresAt - fiveMinutes);
 }
 
+function isAccessTokenUnexpired(token: string | null): boolean {
+  if (!token) return false;
+  const exp = numericClaim(decodeJwtClaims(token), 'exp');
+  return exp !== null && exp * 1000 > Date.now();
+}
+
 // ✅ SECURITY: Single-flight pattern for token refresh
 // Prevents race conditions when multiple requests detect token expiring
-let refreshPromise: Promise<string | null> | null = null;
+interface TokenRefreshResult {
+  accessToken: string | null;
+  attemptedAccessToken: string | null;
+  attemptedRefreshToken: string | null;
+  failureStatus?: number;
+}
+
+let refreshPromise: Promise<TokenRefreshResult> | null = null;
 let pendingRequestsQueue: Array<(value: string | null) => void> = [];
+const PROACTIVE_REFRESH_401_COOLDOWN_MS = 30_000;
+let proactiveRefreshRetryAfter = 0;
 
 /**
  * Core refresh call. Caller must hold the single-flight mutex
  * (refreshPromise) — see refreshTokenIfNeeded / forceRefreshToken.
- * @returns {Promise<string|null>} New access token or null on failure
+ * @returns The refresh result without retaining the response/error body.
  */
-async function performTokenRefresh(): Promise<string | null> {
+async function performTokenRefresh(): Promise<TokenRefreshResult> {
+  const attemptedAccessToken = tokenManager.getAccessToken();
   const refreshToken = tokenManager.getRefreshToken();
-  if (!refreshToken) return null;
+  const result = (accessToken: string | null, failureStatus?: number): TokenRefreshResult => ({
+    accessToken,
+    attemptedAccessToken,
+    attemptedRefreshToken: refreshToken,
+    ...(failureStatus === undefined ? {} : { failureStatus })
+  });
+  if (!refreshToken) return result(null);
 
   try {
     logger.log('🔄 Refreshing access token...');
@@ -171,8 +193,9 @@ async function performTokenRefresh(): Promise<string | null> {
         logger.warn('🔄 Refresh token changed mid-flight — dropping rotated tokens of the replaced session');
         pendingRequestsQueue.forEach(resolve => resolve(null));
         pendingRequestsQueue = [];
-        return null;
+        return result(null);
       }
+      proactiveRefreshRetryAfter = 0;
       const newToken = response.data.access_token;
       tokenManager.setAccessToken(newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
@@ -187,18 +210,54 @@ async function performTokenRefresh(): Promise<string | null> {
       pendingRequestsQueue.forEach(resolve => resolve(newToken));
       pendingRequestsQueue = [];
 
-      return newToken;
+      return result(newToken);
     }
     pendingRequestsQueue.forEach(resolve => resolve(null));
     pendingRequestsQueue = [];
-    return null;
+    return result(null);
   } catch (err) {
-    logger.warn('❌ Token refresh failed:', err);
+    const status = (err as AxiosError | undefined)?.response?.status;
+    if (status === 401) {
+      proactiveRefreshRetryAfter = Date.now() + PROACTIVE_REFRESH_401_COOLDOWN_MS;
+    }
+    // Axios errors contain request config and payloads (including refresh
+    // credentials). Keep logs limited to the response status.
+    logger.warn('❌ Token refresh failed', {
+      status: typeof status === 'number' ? status : null
+    });
     // Notify pending requests of failure
     pendingRequestsQueue.forEach(resolve => resolve(null));
     pendingRequestsQueue = [];
-    return null;
+    return result(null, typeof status === 'number' ? status : undefined);
   }
+}
+
+function getOrStartTokenRefresh(): Promise<TokenRefreshResult> {
+  if (refreshPromise !== null) return refreshPromise;
+  refreshPromise = performTokenRefresh().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
+function createRefreshUnauthorizedError(): AxiosError {
+  const response: Partial<AxiosResponse> = {
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: {},
+    data: { detail: 'Not authenticated' },
+    config: {} as InternalAxiosRequestConfig
+  };
+  // Do not retain the failed refresh request config: its body contains the
+  // refresh token. Without a business-request config the response interceptor
+  // also cannot start a second refresh attempt for this synthetic rejection.
+  return new AxiosError(
+    'Request failed with status code 401',
+    'ERR_BAD_REQUEST',
+    undefined,
+    undefined,
+    response as AxiosResponse
+  );
 }
 
 /**
@@ -216,19 +275,48 @@ async function refreshTokenIfNeeded(): Promise<string | null> {
     return token;
   }
 
+  // An access token remains usable until its own exp claim. Keep a valid
+  // near-expiry session alive for the warning/explicit-extension flow and
+  // avoid retrying a rejected refresh on every page request. Expired tokens
+  // still go through the failure path below.
+  if (proactiveRefreshRetryAfter > Date.now() && isAccessTokenUnexpired(token)) {
+    return token;
+  }
+
   // ✅ MUTEX: If refresh is already in progress, wait for it
   if (refreshPromise !== null) {
     logger.log('🔄 Refresh already in progress, waiting...');
-    return refreshPromise;
   }
 
-  // ✅ Start single refresh operation
-  refreshPromise = performTokenRefresh().finally(() => {
-    // ✅ Reset mutex after completion
-    refreshPromise = null;
-  });
+  const result = await getOrStartTokenRefresh();
+  if (result.accessToken) return result.accessToken;
 
-  return refreshPromise;
+  if (result.failureStatus === 401) {
+    const liveAccessToken = tokenManager.getAccessToken();
+    const liveRefreshToken = tokenManager.getRefreshToken();
+    const isAttemptedSessionStillCurrent = liveAccessToken === result.attemptedAccessToken
+      && liveRefreshToken === result.attemptedRefreshToken;
+    const sessionAlreadyEnded = !liveAccessToken && !liveRefreshToken;
+
+    if (isAttemptedSessionStillCurrent) {
+      if (isAccessTokenUnexpired(liveAccessToken)) {
+        return liveAccessToken;
+      }
+      logger.warn('🔒 Refresh token rejected — ending the matching session');
+      invalidateDeadSession();
+    }
+
+    // Don't dispatch the business request with a rejected/stale credential.
+    // Concurrent waiters observe the same failure after the first one clears
+    // the session, and must also stop instead of sending anonymously.
+    if (isAttemptedSessionStillCurrent || sessionAlreadyEnded) {
+      throw createRefreshUnauthorizedError();
+    }
+  }
+
+  // A network or 5xx failure is transient; keep the current session and let
+  // this request proceed with the current access token.
+  return tokenManager.getAccessToken();
 }
 
 /**
@@ -236,15 +324,18 @@ async function refreshTokenIfNeeded(): Promise<string | null> {
  * local expiry heuristic. Shares the same mutex as refreshTokenIfNeeded so
  * a burst of 401s triggers exactly one /authentication/refresh call.
  */
-async function forceRefreshToken(): Promise<string | null> {
+async function forceRefreshTokenWithResult(): Promise<TokenRefreshResult> {
   if (refreshPromise !== null) {
     logger.log('🔄 Reactive refresh already in progress, waiting...');
-    return refreshPromise;
   }
-  refreshPromise = performTokenRefresh().finally(() => {
-    refreshPromise = null;
-  });
-  return refreshPromise;
+  return getOrStartTokenRefresh();
+}
+
+async function forceRefreshToken(): Promise<string | null> {
+  // An explicit operator retry should bypass the automatic 401 backoff.
+  proactiveRefreshRetryAfter = 0;
+  const refreshResult = await forceRefreshTokenWithResult();
+  return refreshResult.accessToken;
 }
 
 // Endpoints that bootstrap or replace the session themselves — a 401/403
@@ -274,8 +365,25 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
 ];
 
 function isAuthBootstrapEndpoint(url: string | undefined): boolean {
-  const raw = String(url || '');
-  return AUTH_BOOTSTRAP_SUFFIXES.some((suffix) => raw.endsWith(suffix));
+  const path = String(url || '').split(/[?#]/, 1)[0];
+  return AUTH_BOOTSTRAP_SUFFIXES.some((suffix) => path.endsWith(suffix));
+}
+
+function isPendingTwoFactorChallenge(url: string | undefined, data: unknown): boolean {
+  const path = String(url || '').split(/[?#]/, 1)[0];
+  if (!path.endsWith('/2fa/verify')) return false;
+
+  let body = data;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body) as unknown;
+    } catch {
+      return false;
+    }
+  }
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return false;
+  const pendingToken = (body as Record<string, unknown>).pending_2fa_token;
+  return typeof pendingToken === 'string' && pendingToken.trim().length > 0;
 }
 
 // ✅ SECURITY: Get CSRF token from cookie
@@ -354,8 +462,9 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     return Promise.reject(createLocalRateLimitError(config, globalRateLimitUntil - now, 'global'));
   }
 
-  // Try to refresh token if expiring soon (except for auth endpoints)
-  if (!config.url?.includes('/auth/')) {
+  // Don't preemptively refresh on authentication bootstrap or the pending
+  // 2FA challenge. A challenge uses its own one-time token, not this session.
+  if (!isAuthBootstrapEndpoint(requestUrl) && !isPendingTwoFactorChallenge(requestUrl, config.data)) {
     await refreshTokenIfNeeded();
   }
 
@@ -427,6 +536,7 @@ export function setSessionInvalidationListener(listener: SessionInvalidationList
 }
 
 function invalidateDeadSession(): void {
+  proactiveRefreshRetryAfter = 0;
   const listener = sessionInvalidationListener;
   if (listener) {
     try {
@@ -477,7 +587,8 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       error.config &&
-      !isAuthBootstrapEndpoint(error.config.url)
+      !isAuthBootstrapEndpoint(error.config.url) &&
+      !isPendingTwoFactorChallenge(error.config.url, error.config.data)
     ) {
       const config = error.config as InternalAxiosRequestConfig & {
         _retriedAfterRefresh?: boolean;
@@ -492,9 +603,9 @@ api.interceptors.response.use(
         logger.warn('🔒 401 received — single-flight refresh + retry', {
           url: config.url
         });
-        const newToken = await forceRefreshToken();
-        if (newToken) {
-          config.headers.set('Authorization', `Bearer ${newToken}`);
+        const refreshResult = await forceRefreshTokenWithResult();
+        if (refreshResult.accessToken) {
+          config.headers.set('Authorization', `Bearer ${refreshResult.accessToken}`);
           return api.request(config);
         }
         // Session is dead only if no newer session took its place meanwhile.
@@ -510,7 +621,12 @@ api.interceptors.response.use(
         // still present), so the replacement survives; a genuinely dead
         // session still fails the check and gets cleared.
         const liveToken = tokenManager.getAccessToken();
-        if (!liveToken || failedToken === liveToken) {
+        const liveRefreshToken = tokenManager.getRefreshToken();
+        const failedRefreshSessionIsStillCurrent = refreshResult.failureStatus === 401
+          && failedToken === refreshResult.attemptedAccessToken
+          && liveToken === refreshResult.attemptedAccessToken
+          && liveRefreshToken === refreshResult.attemptedRefreshToken;
+        if (failedRefreshSessionIsStillCurrent) {
           // N2-5 review round 3 (P1): a STAFF session whose refresh died is
           // terminated through the SAME machinery as the access-only path
           // below — invalidateDeadSession() (the auth-store listener:
