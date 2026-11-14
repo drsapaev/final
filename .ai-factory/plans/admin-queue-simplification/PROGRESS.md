@@ -1,3 +1,326 @@
+## Current checkpoint — PR #4034 current-base RQ-18 evidence — 2026-11-13T07:32:00+05:00
+
+Plan version: 1.0
+Current task: T18 final acceptance and PR #4034
+Current status: IN_PROGRESS; RQ-18 live check PASS, provenance remains partial
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final
+Branch: codex/aqs-t18-rq18-failure-20261112
+Base commit: 355d1a94b79d5793c42d98b6ea4802fa864ceea4
+Code/test commit under validation: f77c761410da28c0d40b5c8eb590d991ddb0233b
+Last updated: 2026-11-13T07:32:00+05:00
+
+- T00–T17 remain MERGED. T18/Tier-2 remains PARTIAL; no deferral accepted.
+- PR #4026 is MERGED. Its P2 is corrected in #4034 code commit 31c265d6: genuine duplicate JS/CSS failures remain failures; only CDP-proven cancellation from a superseded main-frame loader with a matching captured hash is ignored.
+- PR #4034 was OPEN, Ready for review, clean/mergeable at code/test HEAD f77c7614; its exact-head Unified CI, PR Required Gate, PR Review Quality Gate and Lifecycle Recommendation passed. Independent approval and user merge remain outstanding.
+- Current-main frontend artifact workflow 43348297781 passed on 355d1a94. source.sha matched; 261/261 manifest hashes and the exact inventory passed; manifest SHA-256 is recorded in EVIDENCE.md.
+- Final synthetic Preflight/Session used artifact-runtime. Normal Admin login/TOTP, T18.10 specialists context, and the RQ-18 profile/service/resource/publication/permanent-QR/booking/archive/reactivation scenario passed. Canonical teardown removed 5 containers, 3 volumes and 1 network; remaining counts were zero.
+- Browser captured 68 JS/CSS response bodies; all 68 SHA-256 values match the exact artifact manifest. The service-worker body was not captured, therefore `served_revision_verified=false` and T18 is not complete.
+- One earlier six-test Playwright run had `status=passed`, `failedTests=[]`; its enclosing Session failed only while writing a report with an encoding unsupported by Windows PowerShell 5. Another wrapper attempt stopped on a Node color warning. Both owned projects were torn down; these are harness failures, not application failures.
+- The full STAGING_VALIDATION.md checklist and remaining T18 scenarios have not been run. Backend/integration/production readiness jobs skipped by CI are not passes.
+- This checkpoint records the code/test head before the documentation-only evidence follow-up. User owns review and merge; no merge or deployment occurred.
+
+## Current checkpoint
+- Completed: confirmed the #4026 P2 fix in #4034; exact-main artifact verified; RQ-18 live flow and T18.10 passed; 68/68 browser JS/CSS hashes match; owned staging teardown passed.
+- Changed but not verified: additive PROGRESS/EVIDENCE/RESUME journal update; commit/push and exact-head CI are still pending.
+- Remaining: service-worker body provenance; other T18 scenarios; all STAGING_VALIDATION.md checks; independent review and user merge of #4034.
+- Blocker: `served_revision_verified=false`; T18/Tier-2 remains PARTIAL. No accepted deferral.
+- Next exact action: review the journal diff, run `git diff --check`, commit and push the documentation update to the existing #4034 PR, then verify exact-head CI and PR gates. Do not merge.
+- Checks to rerun after the next change: `git diff --check`; exact-head Unified CI, PR Required Gate, PR Review Quality Gate and Lifecycle Recommendation.
+## Historical checkpoint — PR #4034 synchronized CI green; awaiting user review/merge — 2026-11-13T06:17:35+05:00
+
+Plan version: 1.0
+Current task: T18 final acceptance and PR #4034
+Current status: IN_PROGRESS; exact synchronized-head checks passed; PR remains open
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final
+Branch: codex/aqs-t18-rq18-failure-20261112
+Base commit: 355d1a94b79d5793c42d98b6ea4802fa864ceea4
+Current commit: d4127362dad00d78a30628bf7567a1e727d3f802 (local and remote feature ref match)
+Last updated: 2026-11-13T06:17:35+05:00
+
+- T00–T17 remain MERGED. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. PR #4034 is OPEN, Ready for review, mergeable=true, mergeStateStatus=CLEAN, based on origin/main 355d1a94. reviewDecision is empty; no independent approval is recorded.
+- The #4026 duplicate browser-asset failure finding is fixed in code-bearing commit 31c265d6: real request failures are retained; only a Chromium abort proven by CDP to belong to a superseded main-frame loader with an already captured matching hash is ignored.
+- Branch synchronization was pushed as merge commit d4127362. Local and remote branch refs match. The PR diff against current main remains scoped to the RQ-18 E2E test and the three T18 journals.
+- Unified CI run #43341009576 passed on exact synchronized HEAD d4127362: Frontend unit, build, lint, configured E2E, CI Scope, PR Required Gate, and Notifications passed. Security, Gitleaks, GitGuardian, CodeQL, scratch guards, secret scan, Analyze jobs, and Agent Workflow Guards passed. PR Review Quality Gate #43343454246 and Lifecycle Recommendation #43343454484 passed after refreshing the PR body.
+- Backend, staging/production readiness, integration, Docker, parity, load, DAST, and other path-scoped jobs were skipped; they are not recorded as PASS. The configured CI E2E does not execute the full live RQ-18 spec.
+- The prior synthetic RQ-18 Session used artifact source 0621df8e, before the current base 355d1a94. Its 68 JS/CSS response hashes were not compared to the artifact manifest, service worker assets were not captured, and served_revision_verified=false. Do not treat it as evidence for the synchronized app base.
+- Full T18 and STAGING_VALIDATION.md remain PARTIAL. No staging run, production action, merge, or deployment occurred in this continuation.
+- Execution mode for this evidence-only journal follow-up: gate_known_root_cause; canonical gate returned narrow_override, gate_misroute=false, override_used=true, handoff_required=true; the execution prompt limited first-touch to these three journals and was read. No runtime source was edited.
+
+## Checkpoint details
+
+- Completed: synchronized feature branch to current main, verified exact-head CI and PR text gates, refreshed stale PR description and these journals.
+- Journal checkpoint: additive update passed git diff --check and manual three-file scope review; commit, push, and exact-head checks remain pending.
+- Remaining: finish the journal-only follow-up in this same PR; then leave PR review/merge to the user. After user merge, resume exact-base served-frontend provenance and remaining T18 acceptance from a fresh worktree.
+- Blocker: PR #4034 has no recorded independent review decision; T18 browser provenance and the full staging checklist remain incomplete.
+- Next exact action: commit only the three validated journal files with normal hooks, push to the existing #4034 branch, and verify exact-head checks. Do not merge or deploy.
+- Checks to rerun after the next change: git diff --check; exact-head PR gates/CI for the journal follow-up. Staging is not authorized or needed for this journal change.
+
+## Current checkpoint — PR #4034 exact remote head confirmed; T18 remains partial — 2026-11-13T05:21:07+05:00
+
+Plan version: 1.0
+Current task: T18 final synthetic acceptance and PR #4034
+Current status: IN_PROGRESS; PR #4034 is open and awaiting independent review / user-owned merge
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final
+Branch: codex/aqs-t18-rq18-failure-20261112
+Base commit: bcf15cbf2e53f6aad5d94830c7a824e8d81e561e
+Current commit: 55cfd9e36175a71a0e2e9b6fa27616262b19b56a (confirmed local and remote before this journal-only follow-up)
+Last updated: 2026-11-13T05:21:07+05:00
+
+- T00–T17 remain MERGED. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. PR #4034 is OPEN, Ready for review, mergeable, based on current `origin/main` `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`. `git ls-remote` and `gh pr view` confirmed exact remote head `55cfd9e36175a71a0e2e9b6fa27616262b19b56a`; review decision was empty.
+- The RQ-18 duplicate asset failure fix is in code-bearing commit `31c265d6`. The later commits are documentation-only. Unified CI on current head `55cfd9e3` passed: frontend unit, lint/type-check, build, configured E2E, CI Scope, PR Required Gate, and Notifications. PR Review Quality Gate and Lifecycle Recommendation passed after the latest PR-body update; Security, Gitleaks, and Agent Workflow Guards also passed. Jobs skipped by workflow scope remain SKIPPED, not PASS.
+- The open review finding from PR #4026 is addressed in #4034: a failed duplicate JS/CSS request is not suppressed by a previously captured hash; only an abort proven to be navigation-related is excluded. Exact full RQ-18 live execution was not part of CI.
+- The previous synthetic RQ-18 Session passed on artifact source `0621df8e`, which predates current base `bcf15cbf`. Its owned Compose project was torn down and post-session Preflight passed. Browser provenance remains incomplete: 68 JS/CSS response bodies were captured but not compared with the artifact manifest, the service worker was not captured, and `served_revision_verified=false`.
+- Full T18 and `STAGING_VALIDATION.md` remain PARTIAL. Do not infer full-system or production readiness from this PR's CI or the earlier targeted staging run.
+- Before this follow-up, PROGRESS/RESUME still described head `1cd4d9b8` and said push/CI were pending. This additive correction is limited to the three T18 journals; earlier checkpoints remain below as history.
+
+## Checkpoint details
+
+- Completed: #4026 finding fixed in #4034; current remote head and PR state confirmed; exact-head CI and PR gates passed; owned staging teardown verified.
+- Local validation: `git diff --check` PASS. Commit/push and exact-head hosted checks for the resulting docs commit remain pending.
+- Remaining: finish this same-PR documentation checkpoint; verify the new head checks; leave review/merge to the user. After merge, continue exact-base served-frontend provenance and remaining T18 acceptance.
+- Blocker: PR #4034 is unmerged; T18 remains partial because served frontend provenance and the full staging checklist are incomplete.
+- Next exact action: inspect the three journal edits, run `git diff --check`, commit with normal hooks, push the current branch, verify exact-head CI and PR gates, and refresh PR metadata only if it no longer matches the new head. Do not merge or deploy.
+- Checks to run after this change: `git diff --check`, exact-head Unified CI, PR Review Quality Gate, Lifecycle Recommendation, Security, Gitleaks, and Agent Workflow Guards.
+
+## Previous checkpoint — PR #4034 remote head 1cd4d9b8; exact-head checks passed — 2026-11-13T04:47:24+05:00
+
+Plan version: 1.0
+Current task: T18 final synthetic acceptance and PR #4034
+Current status: IN_PROGRESS; PR #4034 is open and awaiting independent review / user-owned merge
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final
+Branch: codex/aqs-t18-rq18-failure-20261112
+Base commit: bcf15cbf2e53f6aad5d94830c7a824e8d81e561e
+Current commit: 1cd4d9b8ce49901e44d66dcb987fb1fbdcb1e26a (remote PR head at checkpoint; this journal reconciliation is a docs-only follow-up)
+Last updated: 2026-11-13T04:47:24+05:00
+
+- T00–T17 remain MERGED. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. Its duplicate-asset request-failure finding is fixed by #4034 in frontend/e2e/rq18-permanent-qr-live.spec.ts. PR #4034 is OPEN, Ready for review, mergeable, based on bcf15cbf; current remote head at this checkpoint is 1cd4d9b8.
+- The code-bearing head 31c265d6 passed Unified CI. The documentation-only remote head 1cd4d9b8 also passed Unified CI run 43328178548: frontend unit, lint/type-check, build, E2E, CI Scope, PR Required Gate, and Notifications passed. Jobs skipped by workflow scope are recorded as skipped, not passed.
+- After the PR description was refreshed, PR Review Quality Gate 43330542474 and Lifecycle Recommendation 43330542362 passed. Gitleaks, Security, and Agent Workflow Guards also passed on the documentation-only head. The PR description now identifies both the code-bearing and evidence-only heads and states the Tier-2 limits.
+- This journal reconciliation is limited to PROGRESS.md, EVIDENCE.md, and RESUME.md. It records results already observed on the prior remote head. Push this update to the same PR branch, then verify checks on the resulting head; do not create another PR.
+- The synthetic Session passed on artifact source 0621df8e, which predates current base bcf15cb. Its owned Compose project was torn down and post-session Preflight passed. It does not prove runtime behavior from the current base.
+- Browser provenance is still incomplete: 68 JS/CSS response bodies were captured, but not compared with the artifact manifest; the service worker was not captured; served_revision_verified=false. Full T18 and STAGING_VALIDATION.md remain PARTIAL.
+- No review submissions or inline threads were present at the last GitHub check. No merge or deployment occurred.
+- Owned Compose resources and ports were confirmed absent. Local policy blocked recursive deletion of the task-owned .scratch/t18-rq18-booking-diagnosis-20261113 folder and .scratch/pr4034-body.md; no alternate deletion method was used.
+
+## Current checkpoint
+
+- Completed: #4026 finding fixed in #4034; exact code-head and current documentation-head CI passed; PR body gates passed; owned staging teardown verified.
+- Changed but not yet verified: this additive three-journal reconciliation; exact-head hosted checks for its resulting commit must be checked after push.
+- Remaining: independent review and user-owned merge of #4034; after that, continue T18 served-revision provenance and remaining full staging acceptance.
+- Blocker: #4034 is still unmerged; T18 acceptance is partial and its served frontend artifact predates the current base.
+- Next exact action: commit and push this journal-only update to the existing #4034 branch; confirm exact-head CI and PR gates; leave merge to the user.
+- Checks to rerun after the next change: git diff --check, PR Required Gate, exact-head Unified CI, PR Review Quality Gate, and Lifecycle Recommendation.
+## Previous checkpoint — PR #4034 exact code-head CI passed; evidence commit pending — 2026-11-13T04:19:42+05:00
+
+- T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4026 is merged; its duplicate-asset request-failure P2 is covered by #4034. Current PR #4034 is OPEN / Ready for review / mergeable at head `31c265d6624a58604f1c038ce8de70a299832c65`, base `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`. The current source/test commit is `fbb9f3c14`; this task is preparing a documentation-only evidence checkpoint after CI.
+- The PR diff is limited to `frontend/e2e/rq18-permanent-qr-live.spec.ts` and the three T18 journals. No application runtime/API/DB/auth code changed in the PR.
+- Unified CI run `43325180330` passed on code-bearing exact head `31c265d6`: Frontend build, Frontend E2E, Frontend lint/type-check, Frontend unit tests, CI Scope, PR Required Gate, Notifications all SUCCESS. DAST, Context Boundary, docs generation, backend tests, metadata, Code Quality, Telegram, Docker, parity, security subjob, Integration, staging/production readiness, and k6 were SKIPPED by scope; these are not PASS. PR Review Quality Gate `43325614311`, Lifecycle Recommendation `43325614289`, Security `43325180340`, Gitleaks `43325180297`, and Agent Workflow Guards `43325181770` passed.
+- Local focused checks passed before the latest main sync on unchanged E2E blob `01b1fb3c1fce59219091749c90ee353da4589cf4`: scoped ESLint (0 errors, 2 existing raw-fetch warnings), E2E TypeScript, focused Chromium RQ-18 provenance 5/5, and frontend build. CI does not claim to execute the live RQ-18 spec itself.
+- One synthetic RQ-18 Session passed on project `clinic-aqs-t18-rq18-final-20261113`; artifact source was `0621df8e97213ec52f1051c70548c595c8d11204`, before latest base `bcf15cb`. Admin 2FA, queue-window read/write, T18.10 navigation/context, hidden profile/service/resource setup, explicit publication, permanent address, anonymous booking/resource ownership, QR reopen, inactive-resource/current-day facts, archive/restore, and fail-closed anonymous behavior passed. Teardown and post-session Preflight passed. This does not validate runtime from the newer base.
+- Browser provenance remains incomplete: 68 JS/CSS bodies and hashes were captured but not compared with the artifact manifest; service worker was not captured; `served_revision_verified=false`. Full T18 and `STAGING_VALIDATION.md` remain PARTIAL.
+- The owned Compose resources and ports are confirmed absent. Local policy blocked recursive deletion of the task-owned `.scratch/t18-rq18-booking-diagnosis-20261113` folder (268 files, about 13.6 MB); no alternate deletion method was used. A small `.scratch/pr4034-body.md` validation file is also task-owned and ignored.
+- Next exact action: commit/push the evidence-only journal update, refresh PR #4034 body to cite the passing code-bearing head and accurately state that the resulting head only adds evidence docs, then verify any new PR body gate. Do not merge/deploy. User owns merge; continue remaining T18 acceptance after merge.
+## Previous checkpoint — PR #4034 synced with latest main; push and exact-head CI pending — 2026-11-13T03:57:16+05:00
+
+- T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4026 is merged; its duplicate-asset request-failure P2 is addressed in #4034. GitHub PR #4034 was OPEN/Ready for review at remote HEAD `893308f571375fd8a5365aa73a24702839d5448a`, base `58e79581c8f2e2039afaa18c3b0b5273a7a45585`. This worktree fetched and cleanly merged latest `origin/main` `bcf15cbf2e53f6aad5d94830c7a824e8d81e561e`; local HEAD is `194041b713378b82c4bf5c90f5728198acef66ad`, including source/test commit `fbb9f3c14`. The push is pending.
+- Current PR diff from `origin/main` is limited to `frontend/e2e/rq18-permanent-qr-live.spec.ts` and the three T18 journals. Current E2E source blob is `01b1fb3c1fce59219091749c90ee353da4589cf4`. The test aligns inactive-resource public availability with the existing T13 read-model contract. No application runtime/API/DB/auth source was changed by this PR.
+- Evidence-update gate ran from `ai/langgraph` with the three journal files as first-touch scope; the successful command returned exit 0, `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt was read. An initial invocation used an invalid repository-relative root and was rejected before execution; it made no edits.
+- Before the latest main sync, local focused checks passed on the unchanged E2E blob: scoped ESLint (0 errors, 2 existing raw-fetch warnings), E2E TypeScript, Chromium RQ-18 provenance 5/5, and frontend build (existing bundler/CSS warnings). Exact-head CI for the newly synchronized tree is pending push.
+- Canonical Preflight and Session passed in owned synthetic project `clinic-aqs-t18-rq18-final-20261113` on ports 19479/19480/55475. Admin password + normal TOTP, synthetic queue-window read/write, T18.10 navigation/context, hidden profile/service/resource setup, explicit publication, permanent address, anonymous booking/resource ownership, QR reopen, inactive-resource/current-day facts, QueueProfile archive/restore, and fail-closed anonymous behavior passed. This Session used frontend artifact source SHA `0621df8e97213ec52f1051c70548c595c8d11204`, before latest `main` advanced to `bcf15cb`; it does not prove runtime behavior from the newly synchronized base.
+- The Session captured 68 browser-served JS/CSS bodies and SHA-256 values. Preflight validated source.sha and 261 artifact manifest entries, but the captured browser hashes were not compared with the manifest; service worker was not captured; `served_revision_verified=false`. Do not claim exact served-revision provenance.
+- Canonical teardown PASS: 5 containers, 3 volumes, 1 network removed; remaining counts 0; project images removed; ports closed. Full T18/Tier-2 remains PARTIAL.
+- Next exact action: verify the four-file diff and `git diff --check`, push this synchronized branch fast-forward, refresh PR #4034 with the new base/HEAD and precise staging limits, then inspect exact-head CI/review. Do not merge or deploy. After user merge, continue only remaining T18 acceptance.
+## Previous checkpoint — PR #4034 RQ-18 synthetic live flow passed; exact-head CI pending — 2026-11-13T03:49:04+05:00
+
+- Umbrella plan T00–T17 remains merged. T18/Tier-2 remains PARTIAL, no deferral accepted; user owns merge/deployment.
+- PR #4026 is merged; its duplicate-asset request-failure P2 is addressed in PR #4034. Remote PR #4034 HEAD before this continuation was 893308f571375fd8a5365aa73a24702839d5448a. This worktree contains a clean local merge of origin/main 0621df8e97213ec52f1051c70548c595c8d11204 at 1f41cfae373c51f24f61082c45a31a68521258d0. The current E2E blob is 01b1fb3c1fce59219091749c90ee353da4589cf4; it was run in that worktree before commit.
+- Current test-only change aligns inactive-resource public availability with the existing T13 read-model contract: an inactive resource with a matching clinic-day DailyQueue remains an eligible target; archiving the QueueProfile itself still closes anonymous booking. No application runtime/API/DB/auth behavior changed.
+- Exact-scope gate timestamp 2026-11-13T03:32:50+05:00; exit 0; result narrow_override; gate_misroute=false; override_used=true; handoff_required=true; execution prompt read. The override is covered by the user's standing authorization for synthetic T18 cycles. Validation target frontend build passed after the source change.
+- Local checks after the test edit: scoped ESLint exit 0 (0 errors, 2 existing raw-fetch warnings); E2E TypeScript PASS; Chromium RQ-18 provenance tests 5/5 PASS; frontend build PASS with existing Vite/Rollup/CSS warnings; git diff --check PASS.
+- Canonical Preflight and Session passed on owned project clinic-aqs-t18-rq18-final-20261113 (ports 19479/19480/55475). Admin password + normal TOTP enrollment/verification, synthetic queue-window read/write, T18.10 specialists navigation/context, hidden profile/service/resource setup, explicit publication, permanent-address provisioning, anonymous booking and resource ownership, QR reopen, inactive-resource/current-day facts, QueueProfile archive/restore and fail-closed anonymous behavior all passed.
+- Session captured 68 browser-served JS/CSS bodies and SHA-256 values. The frontend artifact source was 0621df8e97213ec52f1051c70548c595c8d11204; Preflight verified its source.sha and 261-file checksum manifest. The captured browser hashes were not compared with that manifest, service worker was not captured, and the canonical helper reported served_revision_verified=false. Do not claim exact served-revision provenance.
+- Canonical teardown PASS: 5 containers, 3 volumes, 1 network removed; remaining counts all 0; local project images removed. Ports 19479/19480/55475 are closed. Host C: had 14 GiB free; WSL backing D: had 26 GiB free; Session reported 3262 MiB available WSL memory.
+- Earlier Session attempts stopped at task-local runner syntax, expired lease, synthetic-guard mismatch, and the initial test-contract assertion; each canonical teardown passed. These were not counted as application PASS. The final run above is the completed live result.
+- Next exact action: inspect and commit the four in-scope paths, push the synchronized branch, update PR #4034 with exact gate/session evidence and ChatGPT authorship label, then await exact-head CI/review. Do not merge. After user merge, continue the remaining T18 checklist; full T18/Tier-2 remains PARTIAL.## Current checkpoint — PR #4034 pushed and exact-head CI passed — 2026-11-13T02:10:08+05:00
+
+- Umbrella plan T00–T17 remains merged. T18/Tier-2 is PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4034 is OPEN / Ready for review. Branch `codex/aqs-t18-rq18-failure-20261112` is pushed at `5073ca58ac702349ecaf889e957cb120d70387d0`, based on `origin/main` `58e79581c8f2e2039afaa18c3b0b5273a7a45585`. The sync merge `9a94cf8a15c7d34b4f86ebbf17fae18819ec1ed2` is on the remote branch; this checkpoint update is pending commit/push.
+- Exact-head Unified CI run `43304335736` on `5073ca58` completed SUCCESS. Frontend unit, lint/type-check, build, configured E2E, CI Scope, and PR Required Gate passed. Security, Gitleaks, PR Review Quality Gate, Lifecycle Recommendation, and Agent Workflow Guards passed. Backend, docs, metadata, Telegram, code-quality, context-boundary, Docker, parity, integration, k6, readiness, and DAST jobs were skipped by scope and are not reported as passes.
+- Scope remains the RQ-18 E2E spec and three T18 journals; the main-sync merge also contains the already reviewed upstream changes. No production application behavior was changed in this checkpoint.
+- Synthetic T18 evidence remains limited: Admin 2FA, T18.10 navigation, hidden profile/service/resource setup, explicit publication, permanent-address provisioning, teardown and post-session Preflight passed. One anonymous `start-session` returned HTTP 400; its detailed reason and persisted clinic window were not captured, so a before-window explanation is only an inference. Booking completion, QR reopen, archive/reactivation and browser asset-hash reporting remain NOT_RUN; `served_revision_verified=false`.
+- Owned synthetic Compose resources are absent and ports are closed. Local policy blocked removal of task-owned ignored scratch files; no alternate deletion method was used. Safe aggregate evidence is `.scratch/t18-rq18-live-20261112/LIVE-RESULT.md`.
+- Next exact action: refresh PR #4034's body to state that exact-head CI `43304335736` passed on `5073ca58`, then leave merge to the user. After the user merges, continue T18 by safely capturing the HTTP 400 reason/effective booking window and completing only remaining acceptance steps. Do not claim T18/Tier-2 complete.
+
+## Current checkpoint — PR #4034 synced locally to origin/main; exact-head checks pending — 2026-11-13T01:47:45+05:00
+
+- Umbrella plan: T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns PR merge and deployment.
+- PR #4034 is OPEN / Ready for review on remote HEAD `22c4a95dfed46cecc8af648147a3c57a350c744c`, but was behind `main`. This worktree fetched `origin/main` `58e79581c8f2e2039afaa18c3b0b5273a7a45585` and locally merged it as `9a94cf8a15c7d34b4f86ebbf17fae18819ec1ed2`. The remote PR branch has not yet been updated with this merge.
+- The sync was clean (`git merge-tree --write-tree` produced a tree without conflicts). Imported main changes are four audit documents and the Telegram settings source/test; no changes were made to the RQ-18 test by the sync.
+- Exact-head Unified CI on the previous PR HEAD `22c4a95` passed, as did Frontend unit/lint/build/configured E2E, PR Review Quality Gate, Lifecycle, Security and Gitleaks. Checks for the locally synchronized tree are pending push.
+- RQ-18 synthetic Session passed Admin 2FA, T18.10, profile/service/resource setup, explicit publication and permanent-address provisioning; the anonymous `start-session` request returned HTTP 400 once. Exact refusal detail and persisted clinic window were not captured; before-window remains an inference. Booking completion and later QR/archive/provenance steps remain NOT_RUN; `served_revision_verified=false`.
+- Session teardown and post-session Preflight passed; the owned Compose project has zero containers/volumes/networks and its ports are closed. Local policy still blocks removal of task-owned ignored files; no alternate deletion path was used.
+- Gate for the three-journal synchronization returned `narrow_override`, `gate_misroute=false`, `override_used=true`; execution prompt was read. First-touch was limited to `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`.
+- Next exact action: validate these additive journal edits and `git diff --check`, commit/push the synchronized PR branch, update the PR body to the exact new HEAD and wait for its checks. After user merges #4034, continue the remaining T18 acceptance; do not claim full T18 or Tier-2 completion.
+
+## Current checkpoint — PR #4034 exact-head CI pending; live RQ-18 stopped by HTTP 400 — 2026-11-13T01:16:00+05:00
+
+- T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4034 is OPEN / Ready for review. Branch codex/aqs-t18-rq18-failure-20261112; code HEAD dd3cf32d5c293a45689fef4fd7c66306d0f47189; base 73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d. Unified CI is still in progress; Security, Review Quality Gate, Lifecycle, Agent Workflow Guards and Gitleaks are PASS. No review threads or submitted reviews were present at this checkpoint.
+- The test-only follow-up adds safe numeric diagnostics to the anonymous booking assertion. Local RQ-18 recorder tests passed 5/5; TypeScript and diff-check passed; ESLint had 0 errors and 2 existing warnings; normal commit hooks passed.
+- Latest isolated staging attempt used project clinic-aqs-t18-rq18-final2-20261113 and a hosted frontend artifact from source SHA 73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d. Preflight and Start passed. Admin password+TOTP, T18.10, profile/service/resource setup, explicit publication and permanent-address provisioning passed.
+- The live scenario then failed: one anonymous start-session POST returned HTTP 400. Backend defaults and local run time make a before-07:00 refusal plausible, but response detail and persisted settings were not captured; do not treat that cause as confirmed. Booking completion, archive/reactivation and asset-hash reporting were NOT_RUN. served_revision_verified=false.
+- Session automatic teardown PASS; post-session Preflight PASS; owned containers/volumes/networks are 0 and ports 19374/19375/55974 are closed. Deleting the task-owned secret env was blocked by local policy; it remains at .scratch/t18-rq18-live-20261112/final-run/staging.env. No alternate deletion method was used. Raw Playwright output is retained until cleanup.
+- Evidence detail: .scratch/t18-rq18-live-20261112/LIVE-RESULT.md. No runtime/API/database/production changes.
+- Next exact action: commit/push the three-journal evidence update, refresh the PR body and wait for exact-head CI. The user must remove the exact private env file noted above because this session was denied file deletion. After this PR cycle closes, make the RQ-18 test's synthetic booking window deterministic in a separate scoped cycle, then repeat only the still-missing RQ-18 legs. Do not mark T18/Tier-2 complete.
+## Current checkpoint — PR #4034 exact-head CI passed — 2026-11-12T22:20:28+05:00
+
+- T00–T17 are merged. Full T18/Tier-2 remains PARTIAL; `served_revision_verified` and the complete live RQ-18/Admin 2FA/permanent-QR flow are not proven. No deferral accepted. User owns merge/deployment.
+- PR #4034 remains OPEN / Ready for review. Local branch includes current `origin/main` `73b7cf0d49aba69f1cfd747afb11fcb28d7c2e4d`. Exact PR HEAD is `5999c54edad3c9bb1a6eb6af7ea79bb5711bd251`; the repeated browser test ran on merge HEAD `9e40bb0e6e1d4680ce4bdf717865d1c5bca4aa90` before the final journal-only commit.
+- Added a real Chromium scenario: the page schedules a same-tab main-frame navigation while its duplicate JS asset is genuinely in flight. The test requires Playwright `requestfailed` = `net::ERR_ABORTED`, destination-page commit, server-side response cancellation, and successful recorder report; the report can pass only with CDP evidence that the canceled request's main-frame loader was superseded and an earlier matching browser hash exists.
+- Preserved active-page abort and genuine non-aborted network-failure negative tests. The full recorder/provenance group passed 5/5; the new navigation test passed 3/3 with `--repeat-each=3`.
+- On final merge HEAD `9e40bb0e6e1d4680ce4bdf717865d1c5bca4aa90`, the complete local Chromium `RQ-18 provenance` group passed 15/15 over three repetitions, including the real navigation-abort case (3/3), active-page abort, and genuine network-failure controls. Frontend build PASS on source commit `9614937b6`; the subsequent merge only added a backend unit-test change, leaving frontend files unchanged. Scoped ESLint PASS, 0 errors and 2 existing raw-fetch warnings at lines 302/321.
+- Hosted exact-head Unified CI `43265310509` passed: Frontend E2E (including lab dirty-guard, lab full path, business/security/concurrency and load/chaos suites), Frontend unit, lint/type-check, build, CI Scope and PR Required Gate all PASS. Backend, docs, metadata, Telegram, code quality, context-boundary, Docker, parity, integration, k6, staging/production readiness and DAST were SKIPPED by scope; they are not PASS.
+- PR Review Quality Gate first failed because required body field labels/reason syntax were missing; after correction, local template validation and rerun `43266167607` passed. Lifecycle Recommendation, Security Scan, Gitleaks and Agent Workflow Guards passed. PR remains open and mergeable; no independent approval or merge by this agent.
+- `git diff --check` on the local diff and final branch diff passed. Branch is pushed; PR is mergeable. No independent approval, merge, or deploy by this agent.
+- Gate: `gate_known_root_cause` on the test and three T18 journals; `narrow_override`, `gate_misroute=false`, `override_used=true`, handoff prompt read. Allowed paths remain only the E2E spec and three journals. No product runtime/API/DB/auth, staging/production config or execution, other Compose, merge, or deployment.
+- Initial direct-`goto` held-response prototypes failed to produce a deterministic committed cancellation and were discarded; the page-authored timer-navigation implementation now passes. These exploratory failures are recorded in EVIDENCE.
+- The temporary Playwright config in the worktree `.scratch` was removed. Next: commit/push this final evidence-only journal update, refresh PR description to the final HEAD and CI result, then await review/user merge decision. Keep full Tier-2 PARTIAL; do not merge or deploy.
+
+## Current checkpoint — PR #4034 P2 fixed; exact-head checks pass — 2026-11-12T20:59:22+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4026 is merged. The duplicate browser asset failure P2 is fixed in follow-up PR #4034.
+- Worktree branch codex/aqs-t18-rq18-failure-20261112; verified current base origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27; source PR HEAD 8b4e58d3f13b091d3fe0aa19275e40801c649851. The fix ensures a failed duplicate request cannot be hidden by a prior hash; only CDP-proven superseded main-frame navigation aborts are ignored.
+- Local checks: duplicate-failure regression PASS 1/1; provenance group PASS 12/12 across three repetitions; scoped ESLint 0 errors/2 existing warnings; isolated PatientBookingPage.test.tsx PASS 18/18; diff check PASS.
+- Hosted exact-head CI attempt 1 had a failure in PatientBookingPage.test.tsx; attempt 2 passed at the same SHA. Frontend unit/E2E/lint/build, CI Scope and PR Required Gate PASS; Review Quality Gate, Lifecycle Recommendation, security, Gitleaks, GitGuardian and CodeQL PASS. Path-skipped backend/integration/Docker/parity/readiness/load/DAST jobs are not passes.
+- Current-main synthetic staging failed at compose-up and was torn down without browser checks. Earlier cdp6 live evidence uses artifact source c586346f; served_revision_verified=false; full T18 remains PARTIAL.
+- PR body now reflects current base, HEAD, CI retry, and staging limitation. PR #4034 is OPEN / Ready for review / mergeState CLEAN; no independent approval or merge. Next step: await required independent review or user merge decision; do not deploy.
+
+## Current checkpoint — PR #4034 rebased on current main; exact-head CI pending — 2026-11-12T20:25:12+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4026 is merged. Its duplicate-asset request failure P2 is fixed in follow-up PR #4034.
+- Worktree branch codex/aqs-t18-rq18-failure-20261112; local HEAD 13da1a2250dcb1a4618344ceafa313c7c3202164 is based on origin/main d3ea3fdc82339b97ed484e7a2a2d649887763a27. Remote PR HEAD remains 34b4c940b58220cceb99d1abee9ee2c7a3e33117; worktree currently has only the three journal files uncommitted.
+- After latest rebase, the targeted duplicate-failure Playwright regression passed 1/1 and diff check passed. Full provenance group 12/12 with three repetitions and scoped ESLint exit 0 with 0 errors/2 existing warnings ran on the identical source blob before the unrelated main commit. Unified CI passed on prior exact head 34b4c940, not on this rebased head.
+- Latest current-main synthetic Session failed at compose-up, teardown passed, and no browser checks ran. Earlier live cdp6 evidence used artifact source c586346f. served_revision_verified=false; overall T18 remains PARTIAL.
+- Next exact action: commit this checkpoint, confirm the remote head is still 34b4c940, push with explicit lease, update PR #4034 description, and inspect exact-head CI. Do not merge/deploy.
+
+## Current checkpoint — PR #4034 synced to current main; exact-head CI pending — 2026-11-12T20:05:59+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge/deployment.
+- PR #4026 is merged. Its duplicate-asset error P2 is addressed in follow-up PR #4034.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final; branch codex/aqs-t18-rq18-failure-20261112; local HEAD a2633a8f18788710e2bd3be0e0361cb97ae4058e, based on origin/main 6b8b14c6f6a5319a174b8222ffb5bff25d4d715b. The RQ-18 source blob matches the previously full-tested blob. Current worktree contains only the three journal files as uncommitted changes.
+- Rebased validation: duplicate-failure regression PASS 1/1; complete provenance group PASS 12/12 with three repetitions on the same source blob; ESLint exit 0, 0 errors and 2 existing warnings; diff check PASS.
+- Latest current-main synthetic Session failed at compose-up and teardown passed, so current-source live browser checks are NOT_RUN. Earlier cdp6 browser-to-manifest success used artifact source c586346f. served_revision_verified=false; full T18 remains PARTIAL.
+- Next exact action: commit this checkpoint; verify remote PR #4034 still has old head bfe771c088d2c84d982ffc7629bd4b84be0656d4, push using an explicit lease, update PR description and inspect exact-head checks. Do not merge/deploy.
+
+## Current checkpoint — PR #4034 rebased; duplicate-asset regression passes — 2026-11-12T20:02:41+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. Its duplicate-asset failure P2 is addressed by follow-up code in PR #4034.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final; branch codex/aqs-t18-rq18-failure-20261112; local HEAD e11d1d65f15ac754a2886cbaeaf44acc4648f0d4 is rebased onto origin/main 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d. Tracked worktree is clean except this checkpoint update. The source commit is local; remote PR #4034 still points to a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8.
+- The recorder rejects an asset if any duplicate request fails, even after another page captured the same URL hash. Only a canceled main-frame ERR_ABORTED proven by CDP to be superseded by a committed navigation is ignored.
+- Rebased local validation: provenance suite PASS 12/12 with three repetitions; scoped ESLint exit 0, 0 errors and 2 existing warnings; diff check against origin/main PASS. Hosted exact-head CI is pending.
+- Latest current-main synthetic Session failed at compose-up; teardown passed, and browser checks did not run. Earlier cdp6 live evidence used artifact source c586346f, not current main. served_revision_verified=false; full T18 remains PARTIAL.
+- Next exact action: commit this checkpoint, push the rebased branch with an explicit lease against the verified remote HEAD, update PR #4034 metadata/evidence, and inspect all checks on the pushed SHA. Do not merge or deploy.
+
+## Current checkpoint — PR #4034 duplicate browser asset failures locally fixed; sync pending — 2026-11-12T19:59:46+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns merge and deployment.
+- PR #4026 is merged. Its reported duplicate-asset failure P2 is being carried in follow-up PR #4034, not retroactively changed in #4026.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final; branch codex/aqs-t18-rq18-failure-20261112; remote PR HEAD a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8. Local E2E recorder and journal changes are uncommitted. Fresh origin/main is 7c3459ef63066a05ccb41aa3b4cea15c5e2f9e5d; the PR is behind.
+- The recorder no longer suppresses a later failed asset request because another page captured that URL's hash. Only an abort proven by Chromium CDP to be a canceled main-frame request superseded by a committed navigation is accepted.
+- Validation on the current local tracked source: duplicate-failure regression PASS 1/1; provenance suite PASS 12/12 with three repetitions; scoped ESLint exit 0 with 0 errors and 2 existing warnings; git diff --check PASS. Exact-head CI for the local changes is pending.
+- Latest current-main synthetic staging artifact stopped at compose-up and was torn down; it did not reach browser checks. The older cdp6 live PASS used artifact source c586346f; do not treat that as validation of current main 7c3459ef. served_revision_verified=false; overall T18 remains PARTIAL.
+- Next exact action: review and commit only the four scoped tracked files, rebase this feature branch onto origin/main 7c3459ef, rerun the focused regression/checks, push the branch, update #4034 evidence, and inspect CI on the exact pushed HEAD. Do not merge or deploy.
+
+## Current checkpoint — RQ-18 Fetch recorder and synthetic Session PASS; PR sync pending — 2026-11-12T17:34:36+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns PR merge and deployment.
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`, pre-journal HEAD `a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8`. The RQ-18 E2E spec has the current uncommitted recorder fix; these three journals are being updated in the same follow-up.
+- PR #4034 is OPEN / Ready for review. GitHub reports head `a27a0c2a7f6fea34e58f40a73702f3fed2ca77d8`, base snapshot `c409d80ebefbf171876b57cb24755d24f9080241`, `mergeable=true`, `mergeStateStatus=BEHIND`. Current `origin/main` has advanced to `6d4ccfdf6002d65741571283603e92458957bf25` (#4043), so branch synchronization and exact-head CI remain pending.
+- RQ-18 recorder now captures the actual Chromium response bytes at CDP Fetch response pause, registers the pause listener before enabling interception, preserves fail-closed duplicate network-error handling, and emits numeric-only diagnostics on timeout. Product runtime/API/DB/auth code is unchanged.
+- Local checks after the latest source edit: focused Chromium provenance tests 9/9 PASS (`--repeat-each=3`); scoped ESLint 0 errors with 2 existing raw-fetch warnings; `npm.cmd run build` PASS; `git diff --check` PASS.
+- Synthetic RQ-18 Session attempt 4 on owned project `clinic-aqs4034-rq18-cdp6-20261112`: canonical Preflight PASS (artifact validation PASS, C: 13 GiB free, WSL backing D: 26 GiB free, WSL available 3219 MiB, ports 18895/18896/55623 free). Canonical Session PASS: ordinary Admin password+TOTP flow, full RQ-18 permanent-QR booking/archive/reactivation test, 63 browser JS/CSS records all matched `SHA256SUMS` from frontend artifact source `c586346f84b43afe7fb20fa1fe1ef4304237cf3e` (artifact workflow #43205982129). Session teardown PASS; independent exact-project inventory is zero containers, volumes, networks, images and listeners on all three ports.
+- Previous failures are retained in EVIDENCE: cdp5 lost a CDP Network body; cdp6 attempts 1–3 exposed listener-order/navigation timeout issues; one automatic cleanup returned `NATIVE_UNAVAILABLE`, then exact project-scoped teardown succeeded. Do not erase those failures from the audit.
+- Canonical helper field `served_revision_verified` still reports `false`; the separate custom browser-byte-to-artifact-manifest comparison above is PASS and must be described as that custom check, not as a helper-field change. Full `STAGING_VALIDATION.md` and remaining T18 checks are incomplete.
+- Latest frontend artifact build for current main `6d4ccfdf6002d65741571283603e92458957bf25` is queued as workflow #43219021958. Next exact action: obtain its artifact, rebase this PR branch on current `origin/main`, re-run local checks, then run the RQ-18 Session once with the current-main artifact if Preflight passes. Record the result, update PR metadata/body, push with lease, and inspect exact-head checks. Do not merge or deploy.
+
+## Current checkpoint — PR #4034 WSL recovery and RQ-18 Session build failure — 2026-11-12T15:03:41+05:00
+
+- Umbrella T00–T17 remain merged. T18/Tier-2 remains PARTIAL; no deferral accepted. User owns PR merge and deployment.
+- PR #4034 is OPEN / Ready for review / mergeable at exact HEAD `e5691754cfdbdcfde1d569b883ee7c6145ad2be2`, based on `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`. Exact-head Unified CI, applicable frontend checks, Required Gate, security, Gitleaks, Review Quality Gate and Lifecycle Recommendation passed. Backend/integration/Docker/staging/production jobs were skipped, not passed.
+- RQ-18 recorder P2 fix remains verified: only a canceled main-frame `ERR_ABORTED` superseded by a committed navigation and backed by the captured matching asset hash is ignored. Focused tracked-spec Playwright passed 9/9 over three repetitions; targeted TypeScript passed; scoped ESLint had 0 errors and 2 existing raw-fetch warnings.
+- Recovered WSL and reconciled project `clinic-aqs4034-rq18-cdp-20261112`: owner/expiry/lifecycle/project/worktree/Compose labels matched its private env. Canonical `Stop` PASS and project-scoped final teardown PASS. Follow-up inventory found zero containers, volumes, networks or labeled images for all eight T18 RQ-18 project names checked; ports 18831/18832/55533 were free. Old private env files with no remaining resources were removed.
+- A fresh project `clinic-aqs4034-rq18-live-20261112` passed canonical Preflight: artifact validation PASS, C: 14 GiB free, WSL backing D: 26 GiB free, WSL available memory 3189 MiB, ports 18851/18852/55581 free. Its canonical Session failed at `compose-up` (`exit 1`, sanitized category `unclassified`); Session reported `STAGING_TEARDOWN=PASS`. Follow-up project inventory and port checks were zero/free. The browser command did not run.
+- `served_revision_verified` remains false. This attempt proves neither Admin 2FA nor the live permanent-QR lifecycle or browser-served hashes. Full `STAGING_VALIDATION.md` and remaining T18 acceptance remain incomplete.
+- Diagnostic retry checkpoint: the next Session may set `KEEP_STAGING=1` so a failed exact project is preserved for diagnosis; successful Session still tears down. Inspect and remove only that project's resources. Do not run global prune, touch other projects, or claim the compose-up failure root cause before evidence.
+- Next exact action: determine whether safe BuildKit/Docker diagnostics exist for the failed compose-up; then prepare one fresh unique project with `KEEP_STAGING=1` recorded and run canonical Preflight/Session. Keep T18 PARTIAL and do not merge/deploy.
+
+## Current checkpoint — PR #4034 exact-head checks pass; WSL cleanup pending — 2026-11-12T14:09:00+05:00
+
+- Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
+- Branch `codex/aqs-t18-rq18-failure-20261112` is based on `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`. The source fix is `a6149855d810b5bcba2955371e11c08ed7fa7279`; exact CI-tested PR HEAD is `b293dda8ff2449e26d220f513abec3d8814212d7`.
+- PR #4034 is OPEN / Ready for review, not merged. Unified CI #43186419010 completed SUCCESS on `b293dda`; Frontend E2E, build, unit tests, lint, CI Scope and PR Required Gate PASS. PR Review Quality Gate #43188770157 and Lifecycle Recommendation #43188770142 PASS after PR-body field formatting was corrected. Backend, integration, Docker, readiness, production, parity, load and DAST jobs were SKIPPED, not passed.
+- After rebase, the tracked RQ-18 provenance tests passed 9/9 over three Chromium repetitions; targeted TypeScript compile passed; scoped ESLint had 0 errors and 2 existing raw-fetch warnings. The first test rerun command used a missing config and executed no tests; a corrected task config targeted the tracked spec, not the stale scratch copy.
+- Current PR body now includes all required named fields and accurately marks live staging as incomplete. The latest Quality Gate and Lifecycle runs passed.
+- WSL staging blocker is unchanged: attempt 3 stopped before browser checks on `NATIVE_UNAVAILABLE (wsl)` / `WSAETIMEDOUT`; boot continuity and complete exact-project inventory remain unverified. Do not run WSL/Compose cleanup or start another project until WSL responds and ownership/expiry are checked.
+- `served_revision_verified` remains false; current live RQ-18, Admin 2FA, permanent QR, full T18, and full `STAGING_VALIDATION.md` are NOT_RUN/PARTIAL. No deferral is accepted.
+- Next exact action: commit and push this journal-only record, update the PR body to the resulting exact HEAD, and inspect checks. Keep the RQ-18 source unchanged; no merge/deploy.
+
+## Current checkpoint — rebased to current main; focused regression passes — 2026-11-12T13:49:31+05:00
+
+- Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
+- Branch `codex/aqs-t18-rq18-failure-20261112` is rebased on fresh `origin/main` `c409d80ebefbf171876b57cb24755d24f9080241`; source-fix commit is `a6149855d810b5bcba2955371e11c08ed7fa7279`; current pre-checkpoint HEAD is `a1f8bfeca538497917ba648a580e97ab9fe137f6`.
+- PR #4034 is OPEN / Ready for review. Remote currently remains at `8a8d40f3a98050be2af498280a336fb3f575b52b`; the rebased local branch has not yet been pushed. Use explicit `--force-with-lease` against that exact remote SHA, then update the PR body and inspect checks on the resulting exact HEAD.
+- The RQ-18 recorder P2 remains fixed. The tracked E2E file is identical to the locally tested pre-rebase source; rebasing introduced no changes to it.
+- Post-rebase validation: focused Chromium Playwright provenance tests PASS, 9/9 across three repetitions; targeted TypeScript compile PASS; scoped ESLint PASS with 0 errors and 2 existing raw-fetch warnings at lines 291/310; `git diff --check origin/main...HEAD` PASS.
+- The first post-rebase Playwright invocation pointed to a nonexistent default config and ran no tests. The old task-local scratch copy was found to differ from tracked source and was not used. A task-local config was then set to the absolute tracked `frontend/e2e` path; the 9/9 result above is from that tracked file.
+- Staging attempt 3 stopped before browser checks on `NATIVE_UNAVAILABLE (wsl)` / `WSAETIMEDOUT`. Exact project inventory/boot continuity could not be verified after that. Do not issue WSL/Compose cleanup or start another staging cycle until WSL is responsive and ownership/expiry are rechecked.
+- `served_revision_verified` remains false. Admin 2FA, permanent QR live workflow, current browser-served artifact hash and complete `STAGING_VALIDATION.md` are NOT_RUN/PARTIAL. No deferral is accepted.
+- Tracked scope is the E2E spec and the three T18 journals only. No application runtime/API/DB/auth, production, deployment or merge changes.
+- Next exact action: finish this checkpoint, commit the three journal files, push with the explicit lease against remote `8a8d40f3...`, refresh PR #4034 evidence, then inspect exact-head CI.
+
+## Current checkpoint — PR #4034 abort-provenance P2 fixed; staging blocked — 2026-11-12T13:44:00+05:00
+
+- Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL, with no deferral. User owns merge/deployment.
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`; branch `codex/aqs-t18-rq18-failure-20261112`; base `origin/main` `9c910962c69305bf584c6a957b85ea9c10a69017`; source commit `05439ffb848337410b9e2b63e5cd27c9f13fbd8f`.
+- PR #4034 is OPEN / Ready for review. Last GitHub snapshot: remote HEAD `6770b85741d3dbc73e8fdff890abb5dc560e3e56`, base SHA `08325168a98d3950c6de8a4a6a503de65c462c93`, `mergeable=false` because behind. Local source fix is based on fresh `origin/main`; push and exact-head CI are pending.
+- P2 fixed in the RQ-18 recorder: an `ERR_ABORTED` is ignored only when CDP marks it canceled, the request belongs to the main frame, its loader was superseded by a committed main-frame navigation, and a matching browser asset hash existed. All other request failures remain failures; non-CDP browsers fail closed.
+- Local validation on the source commit: targeted TypeScript compile PASS; scoped ESLint exit 0 with two existing raw-fetch warnings at lines 291/310; `git diff --check` PASS; focused Chromium Playwright provenance group PASS, 9/9 over three repetitions. The first slow-CSS navigation harness timed out and was replaced by a deterministic loader-classification test plus real duplicate-abort/failure cases.
+- Synthetic staging did not complete. Three canonical Preflight/Start pairs passed; Session attempt 1 failed on missing Playwright baseURL (teardown PASS), attempt 2 failed because the harness omitted `QA_ADMIN_PASSWORD` (its exact project was subsequently fully removed), and attempt 3 stopped before browser execution with `NATIVE_UNAVAILABLE (wsl)` / `WSAETIMEDOUT`.
+- Current cleanup blocker: WSL boot ID and container/network/image inventory could not be read after the timeout. Three volumes labeled for `clinic-aqs4034-rq18-cdp-20261112` remained visible and ports 18831/18832/55533 responded as busy. No cleanup was attempted after continuity became unverified. Do not launch another Compose cycle or run global cleanup until WSL responds and exact-project ownership/expiry are rechecked. Private env remains in this worktree's ignored `.scratch/` for exact cleanup; it contains synthetic credentials and is not committed.
+- `served_revision_verified` remains false. The older 63/63 browser asset-to-manifest result is historical and does not validate this source commit. Full live RQ-18 and `STAGING_VALIDATION.md` remain NOT_RUN/PARTIAL.
+- Actual tracked scope: the RQ-18 E2E spec and the three T18 journals. No product runtime/API/DB/auth, production, or deployment changes. No merge.
+- Next exact action: push the rebased branch with an explicit lease against the last verified remote HEAD, refresh PR #4034 metadata and inspect exact-head CI; then, only after WSL recovery, verify and clean this one synthetic project before another staging attempt.
+
+## Current checkpoint — PR #4034 source checks pass — 2026-11-12T09:27:43+05:00
+
+- Umbrella T00–T17 remain merged; T18/Tier-2 remains PARTIAL. User owns merge/deployment.
+- PR #4034 is OPEN / Draft. Source commit `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8` is included in branch HEAD `a744496951854ac1af6013cf1d643746c8fbc3c3`, based on PR #4026 merge `9091141b87170fcc4430e7ca57ac4ecd9a3d2081`.
+- Exact-head Unified CI #43152783047 completed SUCCESS: frontend unit, build, lint/type-check, configured E2E groups and PR Required Gate passed. Security, Gitleaks and Agent Workflow Guards passed. PR Review Quality Gate #43153005794 and Lifecycle Recommendation #43153005803 passed after the PR body was corrected; the first Quality Gate run failed only because three required validation labels were missing.
+- Skipped checks are not passes: backend, integration, Docker, staging/production readiness, frontend/backend parity, load/k6, DAST and path-irrelevant jobs. The RQ-18 live staging scenario was not run.
+- This checkpoint records the exact-head CI result for source-tested commit `a744496`; these journal additions do not change the E2E source. Local full type-check/build remain unavailable with shared dependencies missing `nitro`; no packages installed.
+- The latest hosted CI still does not complete full T18. Keep Tier-2 PARTIAL and no deferral. No staging/Compose was run.
+- Next: after this evidence-only update is pushed, verify the resulting PR HEAD and its checks, refresh the PR description, then mark #4034 Ready for review if applicable checks are green. User owns merge.
+
+## Current checkpoint — PR #4034 opened for RQ-18 asset failure regression — 2026-11-12T09:07:06+05:00
+
+- Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`: T00–T17 are merged; T18/Tier-2 remains PARTIAL. User owns merge/deployment.
+- PR #4026 was merged at `9091141b87170fcc4430e7ca57ac4ecd9a3d2081`. Follow-up PR #4034 is OPEN / Draft at HEAD `42ee1878afbd20a8d8d054c58a8a96f2e020f7e8`, based on that fresh `origin/main`; exact-head CI is pending.
+- Follow-up fixes the false-green path where a prior hash hid a later real JS/CSS request failure. Only Chromium `net::ERR_ABORTED` is ignored, and only after a complete matching asset body was captured. Genuine failures remain reportable even if another page supplied a hash.
+- Local focused validation: Chromium Playwright provenance tests 2/2 PASS; scoped ESLint 0 errors with 2 existing `raw fetch` warnings. The initial physical navigation-abort harness attempt timed out; the final regression deterministically checks Chromium's abort code and a genuine route failure.
+- Local full type-check and build are blocked by shared `C:\final\frontend\node_modules`: TypeScript reports missing `nitro` and unrelated existing test-mock typing errors; Vite build stops loading config because `nitro` is absent. No packages were installed. Exact-head GitHub CI is pending.
+- Canonical gate: `gate_known_root_cause` on the E2E file and three journals returned `narrow_override` (`gate_misroute=false`, `override_used=true`, `handoff_required=true`); generated execution prompt was read and followed.
+- No staging/Compose was started. Last canonical Preflight found C: free 9.24 GiB against the 10 GiB staging reserve. Full live RQ-18, served artifact provenance, remaining T18 scenarios, and `STAGING_VALIDATION.md` remain incomplete; no deferral is claimed.
+- Changed scope: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and these T18 journals only. No product runtime/API/DB/auth, production, staging, or deployment changes.
+- Next exact action: push the PR-ID journal update, refresh PR #4034 metadata to the resulting exact HEAD, then inspect all applicable checks. Do not merge; user owns merge. Keep Tier-2 PARTIAL.
+
 ## Current checkpoint — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
 
 - Umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80: T00–T17 are MERGED; T18/Tier-2 is still PARTIAL. User owns merge/deployment.
