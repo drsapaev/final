@@ -1971,6 +1971,86 @@
   },
   {
    "checked": false,
+   "id": "NOTIFYDOCACTIVEFILTER-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "/doctor-info/doctors?specialization=...&active_only=false excludes Doctor.active=False rows because the delegated service always adds Doctor.active==True SQL predicate",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCDEPTDTO-BE-001",
+   "priority": "P1 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "service specialty department dict has no id/is_active but DepartmentInfoResponse requires both; nonempty /doctor-info/departments and /appointments/{id}/doctor-info department serializer raise validation error/500",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCDEPTID-BE-001",
+   "priority": "P1",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "GET /doctor-info/departments/{department_id} passes int into DoctorInfoService.get_department_info(str specialty); specialty_variants(value).strip raises and service swallows => 404 even for existing Department ID",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCDEPTSOURCE-BE-001",
+   "priority": "P2 conditional",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "get_all_departments derives all departments from active Doctor.specialty instead of the Department registry, omitting doctorless configured departments and potentially synthesizing incomplete 'general' specialty as a department",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCDYNDEPT-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "doctor list department_name maps only six hardcoded Russian labels, not dynamically persisted Department.name_ru/name_uz/key, so valid new departments return empty doctor lists",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCLISTEMPTY-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "GET /doctor-info/doctors without specialization/department_name always sets doctors=[] despite Doctor records, returns 200 and total_count=0",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCSPECWILDCARD-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "get_doctors_by_specialization uses ILIKE(f\"%{variant}%\"), treating user %/_ as SQL wildcards and matching unrelated substring specialties despite exact canonical specialty families",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
+   "id": "NOTIFYDOCUNKNOWN-BE-001",
+   "priority": "P2",
+   "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
+   "evidence": "GET /doctor-info/doctors/{doctor_id} returns synthetic id/name 'Врач #N' with 200 for missing Doctor rather than not-found; preserve intentionally lenient fallback in notification formatter when fixing strict lookup",
+   "status": "UNVERIFIED",
+   "fix_pr": null,
+   "merge_sha": null
+  },
+  {
+   "checked": false,
    "id": "NOTIFYEMAILSMSAMOUNTNONE-BE-001",
    "priority": "P2",
    "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
