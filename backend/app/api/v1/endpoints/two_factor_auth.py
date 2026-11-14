@@ -20,7 +20,6 @@ from app.db.session import get_db
 from app.models.user import User
 from app.core.security import verify_password
 from app.schemas.two_factor_auth import (
-    TwoFactorBackupCodesRegenerateRequest,
     TwoFactorBackupCodesResponse,
     TwoFactorDeviceListResponse,
     TwoFactorDisableRequest,
@@ -533,17 +532,16 @@ async def get_backup_codes(
 
 @router.post("/backup-codes/regenerate", response_model=TwoFactorBackupCodesResponse)
 async def regenerate_backup_codes(
-    request_data: TwoFactorBackupCodesRegenerateRequest,
+    request_data: TwoFactorDisableRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Перегенерировать backup коды.
-
-    SECURITY (TWOFACTOR-BE-002, #4063): требуется ОБА фактора — пароль +
-    валидный 2FA-код (TOTP или backup) — паритет с /disable
-    (AUTH-REAUDIT-28): украденный bearer-токен не может отчеканить новый
-    комплект кодов повторного входа.
-    """
+    """Перегенерировать backup коды"""
+    # SECURITY (TWOFACTOR-BE-002, #4063): требуется ОБА фактора — пароль +
+    # валидный 2FA-код (TOTP или backup) — паритет с /disable
+    # (AUTH-REAUDIT-28): украденный bearer-токен не может отчеканить новый
+    # комплект кодов повторного входа. Docstring намеренно однострочный,
+    # чтобы поверхность openapi.json не менялась (generated-types гейт).
     try:
         service = get_two_factor_service()
 
