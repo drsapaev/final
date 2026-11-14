@@ -15,13 +15,13 @@ from html import escape  # noqa: F401
 from typing import Any  # noqa: F401
 
 import httpx  # noqa: F401
-from jinja2 import Environment, select_autoescape  # noqa: F401
+from jinja2.sandbox import SandboxedEnvironment  # noqa: F401
 
 # NOTIF-REAUDIT-28 P1-1: autoescape для защиты от SSTI/XSS.
 # Раньше Template(template_text) использовался без autoescape —
 # admin-controlled templates могли выполнять произвольный Python (SSTI),
 # а user data с HTML попадала в email body unescaped.
-_jinja_env = Environment(autoescape=True)
+_jinja_env = SandboxedEnvironment(autoescape=True)
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.core.config import settings  # noqa: F401
@@ -139,6 +139,10 @@ QUEUE_NOTIFICATION_EVENT_TYPES = {
 
 PATIENT_TELEGRAM_EVENT_PREFERENCES = {
     "appointment_reminder": "appointment_reminders",
+    "appointment_confirmation": "appointment_reminders",
+    "visit_confirmation": "appointment_reminders",
+    "schedule_change": "appointment_reminders",
+    "prescription_ready": "notifications_enabled",
     "visit_created": "appointment_reminders",
     "queue_ticket_issued": "appointment_reminders",
     "queue_status_changed": "appointment_reminders",
@@ -153,6 +157,14 @@ PATIENT_TELEGRAM_EVENT_MESSAGES = {
     "appointment_reminder": {
         "ru": "Напоминание о записи. Дата: {date}. Врач: {doctor}.",
         "uz-Latn": "Qabul eslatmasi. Sana: {date}. Shifokor: {doctor}.",
+    },
+    "appointment_confirmation": {
+        "ru": "Запись подтверждена. Дата: {date}. Врач: {doctor}.",
+        "uz-Latn": "Qabul tasdiqlandi. Sana: {date}. Shifokor: {doctor}.",
+    },
+    "visit_confirmation": {
+        "ru": "Визит подтвержден. Дата: {date}. Врач: {doctor}.",
+        "uz-Latn": "Tashrif tasdiqlandi. Sana: {date}. Shifokor: {doctor}.",
     },
     "visit_created": {
         "ru": "Запись создана. Дата: {date}. Врач: {doctor}.",

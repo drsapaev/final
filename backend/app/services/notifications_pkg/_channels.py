@@ -4,6 +4,8 @@ Split from notifications.py.
 """
 from __future__ import annotations
 
+import ssl
+
 from app.core.pii_masker import mask_pii_text
 from app.crud import user as crud_user
 from app.services.email_sms_enhanced import build_from_header
@@ -67,7 +69,7 @@ class ChannelsMixin(NotificationSenderMixinBase):
                 msg.attach(html_part)
 
             server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-            server.starttls()
+            server.starttls(context=ssl.create_default_context())
             server.login(self.smtp_username, self.smtp_password)
 
             # Отправляем письмо
@@ -93,9 +95,8 @@ class ChannelsMixin(NotificationSenderMixinBase):
             logger.warning("Telegram bot token не настроен")
             return False
 
-        chat_id = chat_id or self.telegram_chat_id
         if not chat_id:
-            logger.warning("Telegram chat ID не настроен")
+            logger.info("Telegram notification skipped: linked recipient chat required")
             return False
 
         try:
@@ -110,8 +111,23 @@ class ChannelsMixin(NotificationSenderMixinBase):
             logger.info("Telegram notification sent", extra={"has_chat_id": bool(chat_id)})
             return True
 
-        except Exception as e:
-            logger.error(f"Ошибка отправки Telegram: {e}")
+        except httpx.HTTPStatusError as exc:
+            logger.warning(
+                "Telegram delivery failed",
+                extra={"status_code": exc.response.status_code},
+            )
+            return False
+        except httpx.RequestError as exc:
+            logger.warning(
+                "Telegram request failed",
+                extra={"error_type": type(exc).__name__},
+            )
+            return False
+        except Exception as exc:
+            logger.error(
+                "Telegram delivery failed",
+                extra={"error_type": type(exc).__name__},
+            )
             return False
 
 
@@ -191,6 +207,12 @@ class ChannelsMixin(NotificationSenderMixinBase):
                 if (
                     user.device_token
                     and getattr(user, "push_notifications_enabled", False)
+                    and self._channel_opted_in(
+                        db=db,
+                        user_id=user.id,
+                        channel="push",
+                        event_type=notification_type,
+                    )
                     and self.fcm_service.active
                 ):
                     push_attempted = True
