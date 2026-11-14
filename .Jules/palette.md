@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-10-11 - Tooltips for Icon-Only Close Buttons
+**Learning:** Using native `title` attributes for icon-only buttons like "Close" creates an inconsistent UX. Relying solely on `aria-label` hides the action's purpose from sighted users who don't use screen readers. Tooltip wrappers bridge this gap.
+**Action:** Always wrap icon-only dismiss/close buttons in custom Tooltip components to ensure consistent visual feedback while retaining accessibility via `aria-label`.
