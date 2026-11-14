@@ -47,11 +47,37 @@ def is_webauthn_available() -> bool:
     return WEBAUTHN_AVAILABLE
 
 
+def _server_rp_origin() -> tuple[str, str]:
+    """WEBAUTHN-BE-001 (#4063): server-side trust anchors for WebAuthn.
+
+    The RP ID and expected origin MUST come from server configuration
+    (``settings.FRONTEND_URL``), never from the request body: passing
+    client-supplied values as the *expected* verification inputs verifies
+    attacker input against attacker input and neutralizes WebAuthn's
+    origin-binding (anti-phishing) guarantee. RP ID is the bare hostname
+    (WebAuthn forbids scheme/port in rpId); the origin keeps scheme and
+    port.
+    """
+    from urllib.parse import urlparse
+
+    from app.core.config import settings
+
+    raw = (settings.FRONTEND_URL or "").strip()
+    if not raw:
+        raise RuntimeError(
+            "FRONTEND_URL is not configured — cannot pin WebAuthn RP ID/origin"
+        )
+    parsed = urlparse(raw)
+    rp_id = parsed.hostname or raw
+    origin = f"{parsed.scheme or 'https'}://{parsed.netloc or raw}"
+    return rp_id, origin
+
+
 def begin_passkey_registration(
     db: Session,
     patient_id: int,
     *,
-    rp_id: str,
+    rp_id: str | None = None,
     rp_name: str,
     credential_name: str | None = None,
 ) -> dict[str, Any]:
@@ -59,13 +85,18 @@ def begin_passkey_registration(
 
     M4-P1-4: Step 1 of 2-step registration flow.
     Browser calls navigator.credentials.create() with this challenge.
+
+    ``rp_id`` is accepted for call-site compatibility but IGNORED — the RP
+    is server-pinned (WEBAUTHN-BE-001, #4063).
     """
     if not WEBAUTHN_AVAILABLE:
         raise RuntimeError("webauthn library not installed")
 
+    server_rp_id, _ = _server_rp_origin()
+
     # Generate registration options
     options = generate_registration_options(
-        rp_id=rp_id,
+        rp_id=server_rp_id,
         rp_name=rp_name,
         user_id=str(patient_id).encode(),
         user_name=f"patient_{patient_id}",
@@ -73,8 +104,6 @@ def begin_passkey_registration(
 
     # Store challenge in cache for verification (TTL=5min)
     from app.core.cache import cache_manager
-    import json
-    from webauthn.helpers.structs import PublicKeyCredentialCreationOptions
 
     challenge_b64 = options.challenge.decode() if isinstance(options.challenge, bytes) else options.challenge
     cache_manager.set(
@@ -86,7 +115,7 @@ def begin_passkey_registration(
     # Return JSON-serializable options
     return {
         "challenge": challenge_b64,
-        "rp": {"id": rp_id, "name": rp_name},
+        "rp": {"id": server_rp_id, "name": rp_name},
         "user": {
             "id": str(patient_id),
             "name": f"patient_{patient_id}",
@@ -103,16 +132,23 @@ def finish_passkey_registration(
     patient_id: int,
     *,
     credential_response: dict[str, Any],
-    rp_id: str,
-    origin: str,
+    rp_id: str | None = None,
+    origin: str | None = None,
     credential_name: str | None = None,
 ) -> PasskeyCredential:
     """Finish passkey registration — verify browser response + store credential.
 
     M4-P1-4: Step 2 of 2-step registration flow.
+
+    ``rp_id``/``origin`` are accepted for call-site compatibility but
+    IGNORED — the expected verification values are server-pinned
+    (WEBAUTHN-BE-001, #4063): client-supplied origin/RP would verify
+    attacker input against attacker input.
     """
     if not WEBAUTHN_AVAILABLE:
         raise RuntimeError("webauthn library not installed")
+
+    server_rp_id, server_origin = _server_rp_origin()
 
     from app.core.cache import cache_manager
 
@@ -121,12 +157,12 @@ def finish_passkey_registration(
     if not challenge:
         raise ValueError("Registration challenge expired or not found")
 
-    # Verify registration response
+    # Verify registration response against the SERVER's RP ID/origin
     verified = verify_registration_response(
         credential=credential_response,
         expected_challenge=challenge.encode() if isinstance(challenge, str) else challenge,
-        expected_origin=origin,
-        expected_rp_id=rp_id,
+        expected_origin=server_origin,
+        expected_rp_id=server_rp_id,
     )
 
     # Store credential
@@ -158,31 +194,54 @@ def begin_passkey_authentication(
     db: Session,
     patient_id: int,
     *,
-    rp_id: str,
+    rp_id: str | None = None,
 ) -> dict[str, Any]:
     """Begin passkey authentication — returns challenge for browser.
 
     M4-P1-4: Step 1 of 2-step authentication flow.
     Browser calls navigator.credentials.get() with this challenge.
+
+    ``rp_id`` is accepted for call-site compatibility but IGNORED — the RP
+    is server-pinned (WEBAUTHN-BE-001, #4063).
     """
     if not WEBAUTHN_AVAILABLE:
         raise RuntimeError("webauthn library not installed")
 
+    server_rp_id, _ = _server_rp_origin()
+
     options = generate_authentication_options(
-        rp_id=rp_id,
+        rp_id=server_rp_id,
     )
 
     from app.core.cache import cache_manager
     challenge_b64 = options.challenge.decode() if isinstance(options.challenge, bytes) else options.challenge
-    cache_manager.set(
-        f"webauthn_auth_challenge:{patient_id}",
-        challenge_b64,
-        ttl=300,
+
+    # WEBAUTHN-BE-002 (#4063): the begin endpoint is unauthenticated and
+    # takes an arbitrary patient_id — cache a challenge ONLY when that
+    # patient actually has an active credential. Unknown/gated patients get
+    # a byte-identical dummy response, but nothing is stored: the shared
+    # cache can no longer be grown by anonymous probing, and a dummy
+    # challenge can never complete a ceremony (its verify finds no cache
+    # entry and rejects).
+    has_active_credential = (
+        db.query(PasskeyCredential.id)
+        .filter(
+            PasskeyCredential.patient_id == patient_id,
+            PasskeyCredential.active == True,
+        )
+        .first()
+        is not None
     )
+    if has_active_credential:
+        cache_manager.set(
+            f"webauthn_auth_challenge:{patient_id}",
+            challenge_b64,
+            ttl=300,
+        )
 
     return {
         "challenge": challenge_b64,
-        "rpId": rp_id,
+        "rpId": server_rp_id,
         "timeout": 60000,
         "userVerification": "preferred",
     }
@@ -193,16 +252,22 @@ def finish_passkey_authentication(
     patient_id: int,
     *,
     assertion_response: dict[str, Any],
-    rp_id: str,
-    origin: str,
+    rp_id: str | None = None,
+    origin: str | None = None,
 ) -> dict[str, Any]:
     """Finish passkey authentication — verify assertion + issue JWT.
 
     M4-P1-4: Step 2 of 2-step authentication flow.
     Returns JWT tokens (same format as Telegram Mini App exchange).
+
+    ``rp_id``/``origin`` are accepted for call-site compatibility but
+    IGNORED — the expected verification values are server-pinned
+    (WEBAUTHN-BE-001, #4063).
     """
     if not WEBAUTHN_AVAILABLE:
         raise RuntimeError("webauthn library not installed")
+
+    server_rp_id, server_origin = _server_rp_origin()
 
     from app.core.cache import cache_manager
 
@@ -230,8 +295,8 @@ def finish_passkey_authentication(
     verified = verify_authentication_response(
         credential=assertion_response,
         expected_challenge=challenge.encode() if isinstance(challenge, str) else challenge,
-        expected_origin=origin,
-        expected_rp_id=rp_id,
+        expected_origin=server_origin,
+        expected_rp_id=server_rp_id,
         credential_public_key=public_key_bytes,
         credential_current_sign_count=credential.sign_count,
     )
@@ -325,8 +390,14 @@ def list_patient_passkeys(db: Session, patient_id: int) -> list[PasskeyCredentia
 
 
 def deactivate_passkey(db: Session, patient_id: int, credential_id: int) -> bool:
-    """Deactivate a passkey (soft delete)."""
-    from datetime import UTC, datetime
+    """Deactivate a passkey (soft delete).
+
+    WEBAUTHN-BE-003 (#4063): unknown AND already-inactive credentials both
+    return False (one opaque 404 at the endpoint — no state disclosure),
+    and deactivating the patient's LAST active passkey raises
+    ValueError("last_active_credential") — the endpoint maps it to 409 so a
+    phished initData session cannot lock the patient out of passkey login.
+    """
     credential = (
         db.query(PasskeyCredential)
         .filter(
@@ -335,8 +406,34 @@ def deactivate_passkey(db: Session, patient_id: int, credential_id: int) -> bool
         )
         .first()
     )
-    if not credential:
+    if not credential or not credential.active:
         return False
+
+    active_count = (
+        db.query(PasskeyCredential.id)
+        .filter(
+            PasskeyCredential.patient_id == patient_id,
+            PasskeyCredential.active == True,
+        )
+        .count()
+    )
+    if active_count <= 1:
+        raise ValueError("last_active_credential")
+
     credential.active = False
     db.commit()
+    # Audit trail: destructive action on the phishable initData session.
+    # Log sha256 fingerprints, NOT the raw ids — patient identifiers are
+    # PHI-adjacent and CodeQL flags clear-text logging of them (the
+    # fingerprint keeps cross-log correlation without exposing the value).
+    import hashlib
+
+    def _audit_fp(value: int) -> str:
+        return hashlib.sha256(str(value).encode()).hexdigest()[:12]
+
+    logger.warning(
+        "Passkey deactivated (WEBAUTHN-BE-003 audit): patient=%s credential=%s",
+        _audit_fp(patient_id),
+        _audit_fp(credential_id),
+    )
     return True

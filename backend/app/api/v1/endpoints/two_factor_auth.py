@@ -3,7 +3,7 @@ API endpoints для двухфакторной аутентификации (2F
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.rate_limiter import limiter
+from app.core.security import verify_password
 from app.crud.two_factor_auth import (
     two_factor_auth,
     two_factor_backup_code,
@@ -511,11 +512,15 @@ async def get_backup_codes(
         backup_codes = two_factor_backup_code.get_unused_codes(
             db, two_factor_auth_obj.id
         )
-        codes = [code.code for code in backup_codes]
-
+        # SECURITY (TWOFACTOR-BE-002, #4063): этот эндпоинт больше НЕ
+        # возвращает plaintext-коды — bearer-токен сам по себе не должен
+        # перечитывать одноразовый комплект (паритет с двухфакторной
+        # политикой /disable, AUTH-REAUDIT-28). Значения раскрываются ровно
+        # один раз: при enable или в /backup-codes/regenerate после
+        # повторной аутентификации. total = сколько кодов осталось.
         return TwoFactorBackupCodesResponse(
-            backup_codes=codes,
-            total=len(codes),
+            backup_codes=[],
+            total=len(backup_codes),
             generated_at=two_factor_auth_obj.created_at,
         )
 
@@ -527,9 +532,16 @@ async def get_backup_codes(
 
 @router.post("/backup-codes/regenerate", response_model=TwoFactorBackupCodesResponse)
 async def regenerate_backup_codes(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    request_data: TwoFactorDisableRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Перегенерировать backup коды"""
+    # SECURITY (TWOFACTOR-BE-002, #4063): требуется ОБА фактора — пароль +
+    # валидный 2FA-код (TOTP или backup) — паритет с /disable
+    # (AUTH-REAUDIT-28): украденный bearer-токен не может отчеканить новый
+    # комплект кодов повторного входа. Docstring намеренно однострочный,
+    # чтобы поверхность openapi.json не менялась (generated-types гейт).
     try:
         service = get_two_factor_service()
 
@@ -539,6 +551,30 @@ async def regenerate_backup_codes(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="2FA is not enabled for this user",
+            )
+
+        # 1-й фактор: пароль (паритет с /two-factor/devices/revoke-all).
+        if not verify_password(request_data.password, current_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный пароль",
+            )
+
+        # 2-й фактор: обязателен (паритет с /disable).
+        if not request_data.totp_code and not request_data.backup_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Перегенерация backup-кодов требует подтверждения текущим TOTP-кодом или backup-кодом.",
+            )
+
+        # 2-й фактор: проверка значения (TOTP ИЛИ backup-код).
+        second_factor_ok, _, _ = service.verify_two_factor(
+            db, current_user.id, request_data.totp_code, request_data.backup_code
+        )
+        if not second_factor_ok:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Неверный 2FA-код",
             )
 
         # Перегенерируем коды

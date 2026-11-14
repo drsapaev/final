@@ -18,6 +18,9 @@ from app.api.v1.endpoints.telegram_webhook._helpers import get_db, logger, Reque
 
 router = APIRouter(prefix="/webauthn", tags=["webauthn"])
 
+# WEBAUTHN-BE-002 (#4063): the login plane is unauthenticated — IP-throttle it
+from app.core.rate_limiter import limiter  # noqa: E402
+
 
 def _check_webauthn_available():
     """Raise 503 if webauthn library is not installed."""
@@ -30,7 +33,7 @@ def _check_webauthn_available():
 
 
 @router.post("/register/begin", operation_id="webauthn_register_begin")
-def webauthn_register_begin(
+async def webauthn_register_begin(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -47,7 +50,7 @@ def webauthn_register_begin(
     )
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -63,13 +66,14 @@ def webauthn_register_begin(
         reason = getattr(exc, "reason", "auth_failed")
         raise HTTPException(status_code=403, detail={"reason": reason}) from exc
 
-    rp_id = body.get("rp_id", "localhost")
+    # WEBAUTHN-BE-001 (#4063): rp_id/origin are server-pinned (settings.FRONTEND_URL);
+    # client-supplied values are ignored. rp_name is cosmetic (display only).
     rp_name = body.get("rp_name", "Medical Clinic")
     credential_name = body.get("credential_name")
 
     try:
         options = begin_passkey_registration(
-            db, scope.patient_id, rp_id=rp_id, rp_name=rp_name, credential_name=credential_name,
+            db, scope.patient_id, rp_name=rp_name, credential_name=credential_name,
         )
         return {"options": options}
     except Exception as exc:
@@ -78,7 +82,7 @@ def webauthn_register_begin(
 
 
 @router.post("/register/finish", operation_id="webauthn_register_finish")
-def webauthn_register_finish(
+async def webauthn_register_finish(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -94,7 +98,7 @@ def webauthn_register_finish(
     )
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -113,15 +117,14 @@ def webauthn_register_finish(
     if not credential_response:
         raise HTTPException(status_code=400, detail={"reason": "credential_response_required"})
 
-    rp_id = body.get("rp_id", "localhost")
-    origin = body.get("origin", "http://localhost:3000")
+    # WEBAUTHN-BE-001 (#4063): expected RP ID/origin are server-pinned —
+    # never taken from the request body (anti-phishing origin binding).
     credential_name = body.get("credential_name")
 
     try:
         credential = finish_passkey_registration(
             db, scope.patient_id,
             credential_response=credential_response,
-            rp_id=rp_id, origin=origin,
             credential_name=credential_name,
         )
         return {
@@ -137,7 +140,8 @@ def webauthn_register_finish(
 
 
 @router.post("/login/begin", operation_id="webauthn_login_begin")
-def webauthn_login_begin(
+@limiter.limit("10/minute")  # WEBAUTHN-BE-002: anonymous challenge-issuer throttle
+async def webauthn_login_begin(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -150,7 +154,7 @@ def webauthn_login_begin(
     from app.services.webauthn_service import begin_passkey_authentication
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -158,10 +162,9 @@ def webauthn_login_begin(
     if not patient_id:
         raise HTTPException(status_code=400, detail={"reason": "patient_id_required"})
 
-    rp_id = body.get("rp_id", "localhost")
-
     try:
-        options = begin_passkey_authentication(db, int(patient_id), rp_id=rp_id)
+        # WEBAUTHN-BE-001 (#4063): RP ID is server-pinned, body value ignored.
+        options = begin_passkey_authentication(db, int(patient_id))
         return {"options": options}
     except Exception as exc:
         logger.error("WebAuthn auth begin failed: %s", exc)
@@ -169,7 +172,8 @@ def webauthn_login_begin(
 
 
 @router.post("/login/finish", operation_id="webauthn_login_finish")
-def webauthn_login_finish(
+@limiter.limit("5/minute")  # WEBAUTHN-BE-002: unauthenticated assertion throttle
+async def webauthn_login_finish(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -182,7 +186,7 @@ def webauthn_login_finish(
     from app.services.webauthn_service import finish_passkey_authentication
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -194,25 +198,30 @@ def webauthn_login_finish(
     if not assertion_response:
         raise HTTPException(status_code=400, detail={"reason": "assertion_response_required"})
 
-    rp_id = body.get("rp_id", "localhost")
-    origin = body.get("origin", "http://localhost:3000")
-
     try:
+        # WEBAUTHN-BE-001 (#4063): expected RP ID/origin are server-pinned —
+        # never taken from the request body (anti-phishing origin binding).
         result = finish_passkey_authentication(
             db, int(patient_id),
             assertion_response=assertion_response,
-            rp_id=rp_id, origin=origin,
         )
         return result
     except ValueError as exc:
-        raise HTTPException(status_code=403, detail={"reason": str(exc)}) from exc
+        # WEBAUTHN-BE-002: every pre-verification failure (non-numeric id,
+        # unknown patient, no challenge, no active credential) shares ONE
+        # opaque 403 — the raw message was an enumeration oracle. Details go
+        # to the server log only.
+        logger.info("WebAuthn auth finish rejected: %s", exc)
+        raise HTTPException(status_code=403, detail={"reason": "auth_finish_failed"}) from exc
     except Exception as exc:
         logger.error("WebAuthn auth finish failed: %s", exc)
-        raise HTTPException(status_code=500, detail={"reason": "auth_finish_failed"}) from exc
+        # Uniform with the ValueError branch: infra failures on this
+        # anonymous plane must not be distinguishable from rejections.
+        raise HTTPException(status_code=403, detail={"reason": "auth_finish_failed"}) from exc
 
 
 @router.post("/credentials/list", operation_id="webauthn_list_credentials")
-def webauthn_list_credentials(
+async def webauthn_list_credentials(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -223,7 +232,7 @@ def webauthn_list_credentials(
     )
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -255,7 +264,7 @@ def webauthn_list_credentials(
 
 
 @router.post("/credentials/{credential_id}/deactivate", operation_id="webauthn_deactivate_credential")
-def webauthn_deactivate_credential(
+async def webauthn_deactivate_credential(
     credential_id: int,
     request: Request,
     db: Session = Depends(get_db),
@@ -267,7 +276,7 @@ def webauthn_deactivate_credential(
     )
 
     try:
-        body = request.json()
+        body = await request.json()
     except Exception:
         body = {}
 
@@ -278,11 +287,20 @@ def webauthn_deactivate_credential(
     try:
         scope, _ = _resolve_mini_app_patient_scope_from_auth(
             db, init_data_payload=init_data, entry_token=None, expected_section="cabinet",
+            # WEBAUTHN-BE-003 (#4063): destructive action — require a FRESH
+            # initData signature (15 min) instead of the 24h legacy window,
+            # so a phished initData blob cannot reach deactivation.
+            max_age_seconds=900,
         )
     except Exception as exc:
         raise HTTPException(status_code=403, detail={"reason": getattr(exc, "reason", "auth_failed")}) from exc
 
-    success = deactivate_passkey(db, scope.patient_id, credential_id)
+    try:
+        success = deactivate_passkey(db, scope.patient_id, credential_id)
+    except ValueError as exc:
+        # WEBAUTHN-BE-003: the patient's LAST active passkey is protected —
+        # removing it would lock them out of passkey login entirely.
+        raise HTTPException(status_code=409, detail={"reason": "last_active_credential"}) from exc
     if not success:
         raise HTTPException(status_code=404, detail={"reason": "credential_not_found"})
 

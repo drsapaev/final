@@ -19,6 +19,12 @@ from app.services.sms_providers import SMSProviderType
 
 router = APIRouter()
 
+# SECURITY (PHONEVER-BE-001/002, #4063): self-service surface is scoped to the
+# two purposes a user legitimately drives themselves. password_reset belongs to
+# the dedicated unauthenticated /password-reset/initiate flow (its own 3/minute
+# gate); registration has no authenticated caller.
+ALLOWED_SELF_PURPOSES = ("verification", "phone_change")
+
 
 class SendVerificationCodeRequest(BaseModel):
     """Запрос на отправку кода верификации"""
@@ -43,12 +49,11 @@ class SendVerificationCodeRequest(BaseModel):
     @field_validator('purpose')
     @classmethod
     def validate_purpose(cls, v: str) -> str:
-        allowed_purposes = [
-            'verification',
-            'password_reset',
-            'phone_change',
-            'registration',
-        ]
+        # SECURITY (PHONEVER-BE-001, #4063): password_reset удалён из
+        # аутентифицированной поверхности — коды сброса чеканит только
+        # /password-reset/initiate со своим лимитом 3/minute; registration —
+        # неаутентифицированный флоу.
+        allowed_purposes = list(ALLOWED_SELF_PURPOSES)
         if v not in allowed_purposes:
             raise ValueError(
                 f'Цель должна быть одной из: {", ".join(allowed_purposes)}'
@@ -103,12 +108,24 @@ class UpdatePhoneRequest(BaseModel):
 
 @router.post("/send-code", response_model=dict[str, Any])
 @limiter.limit("5/minute")  # P1-1: rate limit
-async def send_verification_code(request: Request,
-    request_data: SendVerificationCodeRequest, current_user: User = Depends(get_current_user)
+async def send_verification_code(
+    request: Request,
+    request_data: SendVerificationCodeRequest,
+    current_user: User = Depends(get_current_user),
 ):
     """Отправка кода верификации"""
     try:
         verification_service = get_phone_verification_service()
+
+        # SECURITY (PHONEVER-BE-001, #4063): произвольный текст SMS под
+        # sender-идентичностью клиники недоступен обычным пользователям —
+        # шаблоны сервиса фиксированы; кастомное сообщение — только
+        # администраторам через /admin/send-code.
+        if request_data.custom_message:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Кастомное сообщение SMS доступно только администраторам (используйте /admin/send-code).",
+            )
 
         # Определяем провайдера SMS
         provider_type = None
@@ -121,12 +138,15 @@ async def send_verification_code(request: Request,
                     detail=f"Неподдерживаемый SMS провайдер: {request_data.provider}",
                 )
 
-        # Отправляем код
+        # Отправляем код; SECURITY (PHONEVER-BE-001/002, #4063): запись
+        # привязывается к запросившему пользователю для ownership-проверок
+        # в status/cancel/verify.
         result = await verification_service.send_verification_code(
             phone=request_data.phone,
             purpose=request_data.purpose,
             provider_type=provider_type,
-            custom_message=request_data.custom_message,
+            custom_message=None,
+            user_id=current_user.id,
         )
 
         if result["success"]:
@@ -156,15 +176,48 @@ async def send_verification_code(request: Request,
 
 
 @router.post("/verify-code", response_model=dict[str, Any])
+@limiter.limit("5/minute")  # SECURITY (PHONEVER-BE-003, #4063): паритет с /send-code
 async def verify_code(
-    request_data: VerifyCodeRequest, current_user: User = Depends(get_current_user)
+    request: Request,
+    request_data: VerifyCodeRequest,
+    current_user: User = Depends(get_current_user),
 ):
     """Проверка кода верификации"""
     try:
         verification_service = get_phone_verification_service()
 
+        # SECURITY (PHONEVER-BE-002, #4063): чужая (или незнакомая purpose)
+        # запись неотличима от отсутствующей — ни успеха, ни attempts_left.
+        if request_data.purpose not in ALLOWED_SELF_PURPOSES:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "success": False,
+                    "error": "Код не найден или истек",
+                    "error_code": "CODE_NOT_FOUND",
+                },
+            )
+        record_owner = verification_service.get_record_user_id(
+            request_data.phone, request_data.purpose
+        )
+        if (
+            record_owner is not None
+            and record_owner != current_user.id
+            and current_user.role not in ("Admin", "SuperAdmin")
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "success": False,
+                    "error": "Код не найден или истек",
+                    "error_code": "CODE_NOT_FOUND",
+                },
+            )
+
         result = verification_service.verify_code(
-            phone=request_data.phone, code=request_data.code, purpose=request_data.purpose
+            phone=request_data.phone,
+            code=request_data.code,
+            purpose=request_data.purpose,
         )
 
         if result["success"]:
@@ -223,6 +276,18 @@ async def get_verification_status(
 
         verification_service = get_phone_verification_service()
 
+        # SECURITY (PHONEVER-BE-002, #4063): статус чужой записи (или
+        # незнакомой purpose) неотличим от отсутствующей — оракул закрыт.
+        if purpose not in ALLOWED_SELF_PURPOSES:
+            return {"exists": False, "verified": False}
+        record_owner = verification_service.get_record_user_id(phone, purpose)
+        if (
+            record_owner is not None
+            and record_owner != current_user.id
+            and current_user.role not in ("Admin", "SuperAdmin")
+        ):
+            return {"exists": False, "verified": False}
+
         status_info = verification_service.get_verification_status(phone, purpose)
 
         return status_info
@@ -253,6 +318,24 @@ async def cancel_verification(
             )
 
         verification_service = get_phone_verification_service()
+
+        # SECURITY (PHONEVER-BE-002, #4063): чужая (или незнакомая purpose)
+        # запись не отменяется и отвечает так же, как отсутствующая (404).
+        if purpose not in ALLOWED_SELF_PURPOSES:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Активная верификация не найдена",
+            )
+        record_owner = verification_service.get_record_user_id(phone, purpose)
+        if (
+            record_owner is not None
+            and record_owner != current_user.id
+            and current_user.role not in ("Admin", "SuperAdmin")
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Активная верификация не найдена",
+            )
 
         success = verification_service.cancel_verification(phone, purpose)
 
