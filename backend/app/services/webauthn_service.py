@@ -390,8 +390,14 @@ def list_patient_passkeys(db: Session, patient_id: int) -> list[PasskeyCredentia
 
 
 def deactivate_passkey(db: Session, patient_id: int, credential_id: int) -> bool:
-    """Deactivate a passkey (soft delete)."""
-    from datetime import UTC, datetime
+    """Deactivate a passkey (soft delete).
+
+    WEBAUTHN-BE-003 (#4063): unknown AND already-inactive credentials both
+    return False (one opaque 404 at the endpoint — no state disclosure),
+    and deactivating the patient's LAST active passkey raises
+    ValueError("last_active_credential") — the endpoint maps it to 409 so a
+    phished initData session cannot lock the patient out of passkey login.
+    """
     credential = (
         db.query(PasskeyCredential)
         .filter(
@@ -400,8 +406,34 @@ def deactivate_passkey(db: Session, patient_id: int, credential_id: int) -> bool
         )
         .first()
     )
-    if not credential:
+    if not credential or not credential.active:
         return False
+
+    active_count = (
+        db.query(PasskeyCredential.id)
+        .filter(
+            PasskeyCredential.patient_id == patient_id,
+            PasskeyCredential.active == True,
+        )
+        .count()
+    )
+    if active_count <= 1:
+        raise ValueError("last_active_credential")
+
     credential.active = False
     db.commit()
+    # Audit trail: destructive action on the phishable initData session.
+    # Log sha256 fingerprints, NOT the raw ids — patient identifiers are
+    # PHI-adjacent and CodeQL flags clear-text logging of them (the
+    # fingerprint keeps cross-log correlation without exposing the value).
+    import hashlib
+
+    def _audit_fp(value: int) -> str:
+        return hashlib.sha256(str(value).encode()).hexdigest()[:12]
+
+    logger.warning(
+        "Passkey deactivated (WEBAUTHN-BE-003 audit): patient=%s credential=%s",
+        _audit_fp(patient_id),
+        _audit_fp(credential_id),
+    )
     return True

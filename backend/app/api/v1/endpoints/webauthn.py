@@ -287,11 +287,20 @@ async def webauthn_deactivate_credential(
     try:
         scope, _ = _resolve_mini_app_patient_scope_from_auth(
             db, init_data_payload=init_data, entry_token=None, expected_section="cabinet",
+            # WEBAUTHN-BE-003 (#4063): destructive action — require a FRESH
+            # initData signature (15 min) instead of the 24h legacy window,
+            # so a phished initData blob cannot reach deactivation.
+            max_age_seconds=900,
         )
     except Exception as exc:
         raise HTTPException(status_code=403, detail={"reason": getattr(exc, "reason", "auth_failed")}) from exc
 
-    success = deactivate_passkey(db, scope.patient_id, credential_id)
+    try:
+        success = deactivate_passkey(db, scope.patient_id, credential_id)
+    except ValueError as exc:
+        # WEBAUTHN-BE-003: the patient's LAST active passkey is protected —
+        # removing it would lock them out of passkey login entirely.
+        raise HTTPException(status_code=409, detail={"reason": "last_active_credential"}) from exc
     if not success:
         raise HTTPException(status_code=404, detail={"reason": "credential_not_found"})
 
