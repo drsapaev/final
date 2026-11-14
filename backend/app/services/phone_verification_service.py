@@ -65,7 +65,14 @@ class PhoneVerificationService:
         purpose: str = "verification",
         provider_type: SMSProviderType | None = None,
         custom_message: str | None = None,
+        user_id: int | None = None,
     ) -> dict[str, Any]:
+        """Отправка кода верификации.
+
+        ``user_id`` — SECURITY (PHONEVER-BE-001/002, #4063): владелец записи;
+        ставится self-service эндпоинтом для ownership-биндинга
+        status/cancel/verify. None — системные/админские записи."""
+
         """Отправка кода верификации"""
         try:
             # Очищаем истекшие коды
@@ -107,6 +114,7 @@ class PhoneVerificationService:
                     "code": code,
                     "phone": phone,
                     "purpose": purpose,
+                    "user_id": user_id,
                     "created_at": datetime.now(),
                     "expires_at": expires_at,
                     "last_sent": datetime.now(),
@@ -269,6 +277,25 @@ class PhoneVerificationService:
         except Exception as e:
             logger.error(f"Error cancelling verification for {phone}: {e}")
             return False
+
+    def get_record_user_id(
+        self, phone: str, purpose: str = "verification"
+    ) -> int | None:
+        """SECURITY (PHONEVER-BE-002, #4063): идентификатор владельца активной
+        записи верификации (или None, если записи нет либо она не привязана).
+
+        Эндпоинты status/cancel/verify используют это, чтобы чужая запись была
+        неотличима от отсутствующей (без оракула и кросс-юзер отмены)."""
+        try:
+            self._clean_expired_codes()
+            key = self._get_code_key(phone, purpose)
+            record = self.verification_codes.get(key)
+            if record is None:
+                return None
+            return record.get("user_id")
+        except Exception as e:
+            logger.error(f"Error reading verification owner for {phone}: {e}")
+            return None
 
     async def verify_and_update_user_phone(
         self,
