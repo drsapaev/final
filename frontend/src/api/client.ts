@@ -492,6 +492,17 @@ function isPendingTwoFactorChallenge(url: string | undefined, data: unknown): bo
   return typeof pendingToken === 'string' && pendingToken.trim().length > 0;
 }
 
+function belongsToReplacedAuthSession(config: InternalAxiosRequestConfig | undefined): boolean {
+  if (!config
+    || isAuthBootstrapEndpoint(config.url)
+    || isPendingTwoFactorChallenge(config.url, config.data)) {
+    return false;
+  }
+
+  const requestSession = (config as SessionBoundRequestConfig)._authSessionSnapshot;
+  return requestSession !== undefined && !isCurrentAuthSession(requestSession);
+}
+
 // ✅ SECURITY: Get CSRF token from cookie
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`;
@@ -718,8 +729,20 @@ function isCSRFRejection(error: AxiosError): boolean {
 }
 
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
+  (response: AxiosResponse) => {
+    if (belongsToReplacedAuthSession(response.config)) {
+      return Promise.reject(createSessionChangedError());
+    }
+    return response;
+  },
   async (error: AxiosError) => {
+    // Discard every stale response before status-specific handling. Besides
+    // successful PHI responses, this prevents an old 403/500 from reaching
+    // a caller after another principal has replaced the request's session.
+    if (belongsToReplacedAuthSession(error.config ?? error.response?.config)) {
+      return Promise.reject(createSessionChangedError());
+    }
+
     // Reactive 401 recovery: one single-flight refresh + retry for requests
     // that went out WITH an Authorization header. Auth bootstrap endpoints
     // are exempt; anonymous requests stay untouched (route guards decide).

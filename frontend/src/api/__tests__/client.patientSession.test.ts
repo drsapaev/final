@@ -131,6 +131,26 @@ function make401FromRealConfig(config: InternalAxiosRequestConfig): AxiosError {
   );
 }
 
+function makeStatusErrorFromRealConfig(
+  config: InternalAxiosRequestConfig,
+  status: number
+): AxiosError {
+  const response: Partial<AxiosResponse> = {
+    status,
+    statusText: status === 403 ? 'Forbidden' : 'Internal Server Error',
+    headers: {},
+    data: { detail: 'Synthetic request failed' },
+    config
+  };
+  return new AxiosError(
+    `Request failed with status code ${status}`,
+    'ERR_BAD_RESPONSE',
+    config,
+    null,
+    response as AxiosResponse
+  );
+}
+
 const PATIENT_PROFILE = { id: 42, username: 'patient-42', role: 'Patient' } as Record<string, unknown>;
 
 const originalAdapter = api.defaults.adapter;
@@ -226,6 +246,86 @@ describe('access-only patient session replacement (P1)', () => {
     expect(tokenState.access).toBe(patientJwt);
     expect(tokenState.refresh).toBeNull();
     expect(tokenState.cleared).toBe(0);
+  });
+
+  it.each([200, 403, 500])(
+    'cancels a stale HTTP %i response after the session is replaced',
+    async (status) => {
+      let requestStarted = false;
+      let releaseResponse: () => void = () => {
+        throw new Error('The request adapter did not start');
+      };
+      api.defaults.adapter = async (config) => new Promise<AxiosResponse>((resolve, reject) => {
+        requestStarted = true;
+        releaseResponse = () => {
+          const response: AxiosResponse = {
+            status,
+            statusText: status === 200 ? 'OK' : status === 403 ? 'Forbidden' : 'Internal Server Error',
+            headers: {},
+            data: { source: 'old-session' },
+            config
+          };
+          if (status === 200) resolve(response);
+          else reject(makeStatusErrorFromRealConfig(config, status));
+        };
+      });
+
+      const consumeResponse = vi.fn((data: unknown) => data);
+      const requestPromise = api.get('/api/v1/patients/appointments')
+        .then((response) => consumeResponse(response.data));
+
+      await vi.waitFor(() => expect(requestStarted).toBe(true));
+
+      const patientJwt = createJwt(7200);
+      replaceAccessOnlySession(patientJwt, PATIENT_PROFILE);
+      releaseResponse();
+
+      await expect(requestPromise).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+      expect(consumeResponse).not.toHaveBeenCalled();
+      expect(tokenState.access).toBe(patientJwt);
+      expect(tokenState.refresh).toBeNull();
+      expect(tokenState.cleared).toBe(0);
+    }
+  );
+
+  it.each([
+    {
+      name: 'auth bootstrap',
+      url: '/api/v1/authentication/login',
+      data: { username: 'synthetic-user', password: 'synthetic-password' }
+    },
+    {
+      name: 'pending 2FA challenge',
+      url: '/api/v1/2fa/verify',
+      data: { pending_2fa_token: 'synthetic-pending-marker', totp_code: '000000' }
+    }
+  ])('preserves successful $name responses across a session replacement', async ({ url, data }) => {
+    let requestStarted = false;
+    let releaseResponse: () => void = () => {
+      throw new Error('The request adapter did not start');
+    };
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    api.defaults.adapter = async (config) => new Promise<AxiosResponse>((resolve) => {
+      requestStarted = true;
+      releaseResponse = () => resolve({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data: { authentication: 'accepted' },
+        config
+      });
+    });
+
+    const consumeResponse = vi.fn((response: unknown) => response);
+    const requestPromise = api.post(url, data).then((response) => consumeResponse(response.data));
+    await vi.waitFor(() => expect(requestStarted).toBe(true));
+
+    tokenState.access = createJwt(7200);
+    tokenState.refresh = 'replacement-refresh-token';
+    releaseResponse();
+
+    await expect(requestPromise).resolves.toEqual({ authentication: 'accepted' });
+    expect(consumeResponse).toHaveBeenCalledTimes(1);
   });
 
   it('does NOT wipe the replaced patient session in the reactive 401 cleanup (round-2 P1 race)', async () => {
