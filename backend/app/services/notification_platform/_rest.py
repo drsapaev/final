@@ -13,10 +13,29 @@ from app.services.notification_platform._base import (
 class RestMixin(NotificationPlatformServiceMixinBase):
     """Rest methods."""
 
-    async def _broadcast_delivery(self, user_id: int, delivery: NotificationDelivery) -> None:
+    @staticmethod
+    def _event_is_expired(event: NotificationEvent | None) -> bool:
+        if event is None or event.expires_at is None:
+            return False
+        expires_at = event.expires_at
+        if expires_at.tzinfo is not None:
+            expires_at = expires_at.astimezone(UTC).replace(tzinfo=None)
+        return expires_at <= datetime.now(UTC).replace(tzinfo=None)
+
+    async def _broadcast_delivery(
+        self,
+        user_id: int,
+        delivery: NotificationDelivery,
+        *,
+        state_update: bool = False,
+    ) -> None:
         event = delivery.event
+        if self._event_is_expired(event):
+            return
         transport_type = self.TRANSPORT_NOTIFICATION
-        if event.event_type in {"queue_update", "queue_changed"}:
+        if state_update:
+            transport_type = self.TRANSPORT_NOTIFICATION_UPDATE
+        elif event.event_type in {"queue_update", "queue_changed"}:
             transport_type = self.TRANSPORT_QUEUE_UPDATE
         elif event.event_type == "system_alert":
             transport_type = self.TRANSPORT_SYSTEM_ALERT
@@ -34,6 +53,7 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             "role": delivery.role,
             "department_key": delivery.department_key,
             "channel": delivery.channel,
+            "expires_at": event.expires_at.isoformat() if event.expires_at else None,
             "title": event.title,
             "message": event.message,
             "status": delivery.delivery_status,
@@ -82,6 +102,7 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             "correlation_id": event.correlation_id,
             "dedup_key": delivery.dedup_key,
             "deep_link": event.deep_link,
+            "expires_at": event.expires_at.isoformat() if event.expires_at else None,
             "payload_snapshot": delivery.payload_snapshot or event.payload_snapshot,
             "created_at": delivery.created_at.isoformat(),
             "dispatched_at": delivery.dispatched_at.isoformat()
@@ -141,7 +162,7 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             department_key=normalized_department,
             search=search,
             cursor=cursor,
-            limit=limit,
+            limit=limit + 1,
         )
         total = self.repository.count_deliveries(
             recipient_id=current_user.id,
@@ -158,12 +179,9 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             department_key=normalized_department,
         )
 
-        items = [self.serialize_delivery(delivery) for delivery in deliveries]
-        next_cursor = None
-        has_more = False
-        if len(items) == limit and items:
-            has_more = total > len(items)
-            next_cursor = str(items[-1]["sequence_id"]) if has_more else None
+        has_more = len(deliveries) > limit
+        items = [self.serialize_delivery(delivery) for delivery in deliveries[:limit]]
+        next_cursor = str(items[-1]["sequence_id"]) if has_more and items else None
 
         logger.info(
             "[Notifications] inbox fetched",
@@ -451,7 +469,7 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             raise PermissionError("Delivery not found")
         updated = self.repository.mark_delivery_seen(delivery=delivery)
         self.repository.commit()
-        await self._broadcast_delivery(current_user.id, updated)
+        await self._broadcast_delivery(current_user.id, updated, state_update=True)
         return updated
 
 
@@ -463,7 +481,7 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             raise PermissionError("Delivery not found")
         updated = self.repository.mark_delivery_read(delivery=delivery)
         self.repository.commit()
-        await self._broadcast_delivery(current_user.id, updated)
+        await self._broadcast_delivery(current_user.id, updated, state_update=True)
         return updated
 
 
@@ -475,7 +493,7 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             raise PermissionError("Delivery not found")
         updated = self.repository.archive_delivery(delivery=delivery)
         self.repository.commit()
-        await self._broadcast_delivery(current_user.id, updated)
+        await self._broadcast_delivery(current_user.id, updated, state_update=True)
         return updated
 
 

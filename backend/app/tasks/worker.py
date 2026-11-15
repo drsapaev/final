@@ -374,7 +374,7 @@ async def send_visit_reminder(
 
         if allowed_channel == "auto":
             best_channel = (
-                service._determine_best_channel(patient)
+                service._determine_best_channel(patient, db)
                 if patient is not None
                 else None
             )
@@ -388,6 +388,7 @@ async def send_visit_reminder(
                     TelegramUser.patient_id == claimed_visit.patient_id,
                     TelegramUser.active.is_(True),
                     TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
                     TelegramUser.appointment_reminders.is_(True),
                 )
                 .first()

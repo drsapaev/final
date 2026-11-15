@@ -39,10 +39,22 @@ class RemindersMixin(NotificationSenderMixinBase):
             # PR-1 (Codex round 18, P1): the reminder producer may pin the
             # delivery channel to one PERMITTED BY THE VISIT'S contract —
             # when it does, the auto-selection is bypassed entirely.
-            channel = channel or self._determine_best_channel(patient)
+            channel = channel or self._determine_best_channel(patient, db)
             notification_data = self._prepare_notification_data(db, visit, patient)
             notification_data["is_reminder"] = True
             notification_data["hours_before"] = hours_before
+            sms_opted_in = True
+
+            # Resolve patient preferences while the read transaction is
+            # active. Provider dispatch happens after commit, so it must not
+            # trigger another query on this session immediately before await.
+            if channel == "pwa":
+                sms_opted_in = self._patient_channel_opted_in(
+                    db=db,
+                    patient_id=patient.id,
+                    channel="sms",
+                    event_type="appointment_confirmation",
+                )
 
             # Codex round 12, P2: the provider dispatch can hold this
             # connection for up to the arq job timeout (300s). End the
@@ -56,28 +68,26 @@ class RemindersMixin(NotificationSenderMixinBase):
             # happened on this session so far — the commit carries no
             # caller state.
             if channel == "telegram":
-                # PR-1 (Codex round 18, P1): Patient has NO telegram_id
-                # column — the Telegram linkage lives in TelegramUser.
-                chat_id = getattr(patient, "telegram_id", None)
-                if chat_id is None:
-                    from app.models.telegram_config import TelegramUser
+                from app.models.telegram_config import TelegramUser
 
-                    link = (
-                        db.query(TelegramUser)
-                        .filter(
-                            TelegramUser.patient_id == visit.patient_id,
-                            TelegramUser.active.is_(True),
-                            TelegramUser.blocked.is_(False),
-                            TelegramUser.appointment_reminders.is_(True),
-                        )
-                        .first()
+                link = (
+                    db.query(TelegramUser)
+                    .filter(
+                        TelegramUser.patient_id == visit.patient_id,
+                        TelegramUser.active.is_(True),
+                        TelegramUser.blocked.is_(False),
+                        TelegramUser.notifications_enabled.is_(True),
+                        TelegramUser.appointment_reminders.is_(True),
                     )
-                    chat_id = link.chat_id if link is not None else None
-                if chat_id is None:
+                    .order_by(TelegramUser.id.desc())
+                    .first()
+                )
+                if link is None:
                     return {
                         "success": False,
                         "error": "Пациент не привязал Telegram",
                     }
+                chat_id = link.chat_id
             db.commit()
 
             if channel == "telegram":
@@ -91,46 +101,54 @@ class RemindersMixin(NotificationSenderMixinBase):
                 )
                 return {"success": result.get("success"), "error": result.get("error")}
             elif channel == "pwa":
-                return await self._send_pwa_invitation(patient, notification_data)
+                if not sms_opted_in:
+                    return {
+                        "success": False,
+                        "error": "SMS отключены настройками пациента",
+                    }
+                return await self._send_pwa_invitation(
+                    patient,
+                    notification_data,
+                    sms_opted_in=sms_opted_in,
+                )
             else:
-                return await self._send_phone_invitation(patient, notification_data)
+                return await self._send_phone_invitation(
+                    patient, notification_data, db=db
+                )
 
         except Exception as e:
             logger.error(f"Ошибка отправки напоминания: {e}")
             return {"success": False, "error": str(e)}
 
     async def send_telegram_message(
-        self, user_id: int | str, message: str, parse_mode: str = "HTML"
+        self,
+        user_id: int | str,
+        message: str,
+        parse_mode: str = "HTML",
+        *,
+        db: Session | None = None,
     ) -> dict[str, Any]:
         """
-        Отправляет сообщение через Telegram бот.
-        Метод-обертка для совместимости с кодом, использующим NotificationService.
+        Send through the Telegram link owned by this patient account.
+
+        ``user_id`` is never treated as a Telegram chat ID. The legacy
+        wrapper remains for compatibility, but requires a DB session so the
+        destination can be resolved from the canonical TelegramUser link.
         """
+        del parse_mode  # The canonical sender always applies the safe HTML mode.
+        if db is None:
+            return {"success": False, "error": "database session required"}
         try:
-            if not self.telegram_bot:
-                logger.warning("Telegram bot integration not initialized")
-                return {"success": False, "error": "Telegram bot not initialized"}
+            normalized_user_id = int(user_id)
+        except (TypeError, ValueError):
+            return {"success": False, "error": "patient account ID required"}
 
-            # Используем telegram_bot.send_message (предполагая что такой метод есть или будет добавлен)
-            # Если в TelegramBotService нет send_message, используем telegram_bot.application.bot.send_message
-            # Но лучше использовать методы сервиса.
-            # Проверим есть ли метод send_message в TelegramBotService,
-            # если нет - используем send_message из bot instance
-
-            # В TelegramBotService обычно есть send_message
-            if hasattr(self.telegram_bot, "send_message"):
-                return await self.telegram_bot.send_message(
-                    user_id=user_id, text=message, parse_mode=parse_mode
-                )
-            else:
-                # Fallback
-                await self.telegram_bot.application.bot.send_message(
-                    chat_id=user_id, text=message, parse_mode=parse_mode
-                )
-                return {"success": True}
-
-        except Exception as e:
-            logger.error(f"Error sending telegram message: {e}")
-            return {"success": False, "error": str(e)}
+        success = await self.send_linked_user_telegram_notification(
+            db=db,
+            user_id=normalized_user_id,
+            event_type="notification",
+            message=message,
+        )
+        return {"success": success}
 
     # === End merged methods ===

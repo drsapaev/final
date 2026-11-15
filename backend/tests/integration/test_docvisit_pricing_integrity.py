@@ -689,18 +689,27 @@ def test_fully_refunded_visit_is_mutable_again(client, db_session):
 
 
 class _FakeSender:
-    def __init__(self, *, result: Any = None, raise_exc: Exception | None = None):
+    def __init__(self, *, result: bool = True, raise_exc: Exception | None = None):
         self.result = result
         self.raise_exc = raise_exc
         self.calls: list[int] = []
+        self.telegram_calls: list[int] = []
+
+    async def send_canonical_notification_to_user(
+        self, *, recipient, **_kwargs
+    ) -> bool:
+        self.calls.append(recipient.id)
+        if self.raise_exc is not None:
+            raise self.raise_exc
+        return self.result
 
     async def send_telegram_message(
         self, *, user_id: int, message: str, parse_mode: str = "HTML"
     ) -> dict[str, Any]:
-        self.calls.append(user_id)
+        self.telegram_calls.append(user_id)
         if self.raise_exc is not None:
             raise self.raise_exc
-        return self.result
+        return {"success": self.result}
 
 
 def _create_dental_override(client, db_session, *, monkeypatch, sender) -> int:
@@ -742,24 +751,22 @@ def _create_dental_override(client, db_session, *, monkeypatch, sender) -> int:
     return override_id
 
 
-def test_dental_notification_flag_false_without_telegram_id(
+def test_dental_notification_uses_protected_inbox_without_telegram_link(
     client, db_session, monkeypatch
 ):
-    """Registrars exist but none has an active TelegramUser link → nothing
-    was delivered → the flag must stay False. Previously it was set to True
-    (and the send was skipped for EVERY registrar because the code probed a
-    nonexistent ``telegram_id`` attribute on User)."""
-    _create_registrar(db_session, label="notelegram", chat_id=None)
-    sender = _FakeSender(result={"success": True})
+    """A protected inbox delivery does not require an external chat link."""
+    registrar = _create_registrar(db_session, label="notelegram", chat_id=None)
+    sender = _FakeSender()
     override_id = _create_dental_override(
         client, db_session, monkeypatch=monkeypatch, sender=sender
     )
 
-    assert sender.calls == [], "no telegram link — the sender must not be called"
+    assert sender.calls == [registrar.id]
+    assert sender.telegram_calls == [], "the protected inbox path must not send Telegram"
     db_session.expire_all()
     stored = db_session.get(DoctorPriceOverride, override_id)
-    assert stored.notification_sent is False
-    assert stored.notification_sent_at is None
+    assert stored.notification_sent is True
+    assert stored.notification_sent_at is not None
 
 
 def test_dental_notification_flag_false_when_all_sends_raise(
@@ -782,7 +789,7 @@ def test_dental_notification_flag_false_when_notifier_reports_failure(
 ):
     """The notifier explicitly reporting failure must not count as sent."""
     _create_registrar(db_session, label="failing", chat_id=555000112)
-    sender = _FakeSender(result={"success": False, "error": "blocked"})
+    sender = _FakeSender(result=False)
     override_id = _create_dental_override(
         client, db_session, monkeypatch=monkeypatch, sender=sender
     )
@@ -797,15 +804,14 @@ def test_dental_notification_flag_true_on_one_confirmed_delivery(
     client, db_session, monkeypatch
 ):
     """Control: one confirmed delivery sets the flag (and only then)."""
-    _create_registrar(db_session, label="okone", chat_id=555000113)
-    sender = _FakeSender(result={"success": True})
+    registrar = _create_registrar(db_session, label="okone", chat_id=555000113)
+    sender = _FakeSender()
     override_id = _create_dental_override(
         client, db_session, monkeypatch=monkeypatch, sender=sender
     )
 
-    assert sender.calls == [555000113], (
-        "the send must target the registrar's REAL TelegramUser chat_id"
-    )
+    assert sender.calls == [registrar.id]
+    assert sender.telegram_calls == []
     db_session.expire_all()
     stored = db_session.get(DoctorPriceOverride, override_id)
     assert stored.notification_sent is True
@@ -820,18 +826,14 @@ def test_dental_notification_mixed_delivery_counts_confirmed_only(
 
     class _MixedSender:
         def __init__(self):
-            self.calls = 0
+            self.calls: list[int] = []
 
-        async def send_telegram_message(
-            self, *, user_id: int, message: str, parse_mode: str = "HTML"
-        ) -> dict[str, Any]:
-            self.calls += 1
-            # Первый registrar получит отказ, второй — успех.
-            return (
-                {"success": False, "error": "blocked"}
-                if self.calls == 1
-                else {"success": True}
-            )
+        async def send_canonical_notification_to_user(
+            self, *, recipient, **_kwargs
+        ) -> bool:
+            self.calls.append(recipient.id)
+            # The first protected inbox write fails; the second succeeds.
+            return len(self.calls) == 2
 
     _create_registrar(db_session, label="mixfail", chat_id=555000114)
     _create_registrar(db_session, label="mixok", chat_id=555000115)
@@ -840,7 +842,7 @@ def test_dental_notification_mixed_delivery_counts_confirmed_only(
         client, db_session, monkeypatch=monkeypatch, sender=sender
     )
 
-    assert sender.calls == 2
+    assert len(sender.calls) == 2
     db_session.expire_all()
     stored = db_session.get(DoctorPriceOverride, override_id)
     assert stored.notification_sent is True

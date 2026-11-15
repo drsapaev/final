@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from app.models.clinic import Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.service import Service
-from app.models.telegram_config import TelegramUser
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 
@@ -20,27 +19,6 @@ class DentalApiRepository:
 
     def list_registrars(self) -> list[User]:
         return self.db.query(User).filter(User.role == "Registrar").all()
-
-    def get_telegram_chat_ids_by_user_ids(
-        self, user_ids: list[int]
-    ) -> dict[int, int]:
-        """DENTPRICE-BE-001 (audit #3892, group 17): the REAL user↔chat
-        association lives in ``telegram_users`` (``user_id`` ↔ ``chat_id``);
-        the ``User`` model has no telegram column. Returns only active,
-        unblocked links with notifications enabled."""
-        if not user_ids:
-            return {}
-        rows = (
-            self.db.query(TelegramUser)
-            .filter(
-                TelegramUser.user_id.in_(user_ids),
-                TelegramUser.active.is_(True),
-                TelegramUser.blocked.is_(False),
-                TelegramUser.notifications_enabled.is_(True),
-            )
-            .all()
-        )
-        return {row.user_id: row.chat_id for row in rows if row.user_id is not None}
 
     def get_visit(self, visit_id: int) -> Visit | None:
         return self.db.query(Visit).filter(Visit.id == visit_id).first()

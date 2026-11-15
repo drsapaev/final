@@ -16,11 +16,25 @@ from app.services.notifications_pkg._base import (
 class FormattingMixin(NotificationSenderMixinBase):
     """Formatting methods for NotificationSenderService."""
 
-    def _determine_best_channel(self, patient: Any) -> str:
+    def _determine_best_channel(self, patient: Any, db: Session | None = None) -> str:
         """Определяет лучший канал для отправки уведомления"""
         # Приоритет: Telegram > PWA > Phone
-        if hasattr(patient, 'telegram_id') and patient.telegram_id:
-            return "telegram"
+        if db is not None and getattr(patient, "id", None) is not None:
+            from app.models.telegram_config import TelegramUser
+
+            linked_chat = (
+                db.query(TelegramUser.id)
+                .filter(
+                    TelegramUser.patient_id == patient.id,
+                    TelegramUser.active.is_(True),
+                    TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
+                    TelegramUser.appointment_reminders.is_(True),
+                )
+                .first()
+            )
+            if linked_chat:
+                return "telegram"
         if patient.phone and patient.phone.startswith('+998'):
             return "pwa"
         return "phone"
@@ -131,19 +145,36 @@ class FormattingMixin(NotificationSenderMixinBase):
 
 
     async def _send_telegram_invitation(
-        self, patient: Any, data: dict[str, Any]
+        self, patient: Any, data: dict[str, Any], db: Session | None = None
     ) -> dict[str, Any]:
         """Отправляет приглашение через Telegram"""
         try:
-            if not hasattr(patient, 'telegram_id') or not patient.telegram_id:
-                return {"success": False, "error": "У пациента нет Telegram ID"}
+            if db is None:
+                return {"success": False, "error": "Для Telegram нужна привязка пациента"}
+
+            from app.models.telegram_config import TelegramUser
+
+            telegram_user = (
+                db.query(TelegramUser)
+                .filter(
+                    TelegramUser.patient_id == patient.id,
+                    TelegramUser.active.is_(True),
+                    TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
+                    TelegramUser.appointment_reminders.is_(True),
+                )
+                .order_by(TelegramUser.id.desc())
+                .first()
+            )
+            if telegram_user is None:
+                return {"success": False, "error": "У пациента нет активной привязки Telegram"}
 
             message = self._format_telegram_message(data)
             keyboard = self._create_telegram_keyboard(data["confirmation_token"])
 
             # Используем telegram_bot для отправки
             result = await self.telegram_bot.send_confirmation_invitation(
-                chat_id=patient.telegram_id, message=message, keyboard=keyboard
+                chat_id=telegram_user.chat_id, message=message, keyboard=keyboard
             )
 
             if result.get("success"):
@@ -165,12 +196,26 @@ class FormattingMixin(NotificationSenderMixinBase):
 
 
     async def _send_pwa_invitation(
-        self, patient: Any, data: dict[str, Any]
+        self,
+        patient: Any,
+        data: dict[str, Any],
+        db: Session | None = None,
+        *,
+        sms_opted_in: bool | None = None,
     ) -> dict[str, Any]:
         """Отправляет приглашение через PWA (SMS с deep link)"""
         try:
             if not patient.phone:
                 return {"success": False, "error": "У пациента нет номера телефона"}
+            if sms_opted_in is None:
+                sms_opted_in = self._patient_channel_opted_in(
+                    db=db,
+                    patient_id=getattr(patient, "id", None),
+                    channel="sms",
+                    event_type="appointment_confirmation",
+                )
+            if not sms_opted_in:
+                return {"success": False, "error": "SMS отключены настройками пациента"}
 
             # Canonical public base URL for user-facing deep links — the
             # same source as the password-reset link, Telegram web-app
@@ -202,13 +247,37 @@ class FormattingMixin(NotificationSenderMixinBase):
 
 
     async def _send_phone_invitation(
-        self, patient: Any, data: dict[str, Any]
+        self, patient: Any, data: dict[str, Any], db: Session | None = None
     ) -> dict[str, Any]:
-        """Создает задачу для регистратуры - позвонить пациенту"""
-        # Пока просто логируем, в будущем можно интегрировать с CRM/Task системой
-        logger.info(f"Создано уведомление для регистратуры: позвонить пациенту {patient.id} для подтверждения визита {data['visit_id']}")
+        """Create a durable protected-inbox action for the registrar team."""
+        if db is None:
+            return {
+                "success": False,
+                "error": "Не удалось создать задачу регистратуре",
+            }
+
+        visit_id = data.get("visit_id")
+        patient_id = getattr(patient, "id", None)
+        created = await self.send_canonical_notification_to_roles(
+            db=db,
+            roles=["registrar"],
+            event_type="appointment_confirmation_task",
+            title="Задача регистратуре: позвонить пациенту",
+            message=f"Позвоните пациенту для подтверждения визита №{visit_id}.",
+            source_module="visit_confirmation",
+            metadata={"visit_id": visit_id, "patient_id": patient_id},
+            deep_link="/registrar",
+            severity="warning",
+            priority="high",
+            entity_type="visit",
+            entity_id=visit_id,
+        )
         return {
-            "success": True,
+            "success": created,
             "channel": "phone",
-            "message": "Создана задача для регистратуры",
+            "message": (
+                "Создана задача для регистратуры"
+                if created
+                else "Не удалось создать задачу для регистратуры"
+            ),
         }
