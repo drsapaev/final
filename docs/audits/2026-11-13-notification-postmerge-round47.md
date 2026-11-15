@@ -1,5 +1,40 @@
 # Notification platform post-merge source Code Review — group 47
 
+## Post-merge verification — 2026-11-15
+
+The 24 group 47–52 findings below were implemented in [fix PR #4060](https://github.com/drsapaev/final/pull/4060), squash-merged as [`2329735d4580b00621d6803d1854ab1e8ffd76a3`](https://github.com/drsapaev/final/commit/2329735d4580b00621d6803d1854ab1e8ffd76a3). Current `main` is that merge commit. The tested PR head was `431a55cab10a5d799d3c37eb8822ccaed2852e83`; its tree is byte-identical to the merged `main` tree (`77c2713f90c253bf226c7e1a04d82b51dec29c04`). **Disposition for all 24 IDs: `FIXED_VERIFIED_ON_MAIN`.**
+
+Exact-head [Unified CI run 43672214071](https://github.com/drsapaev/final/actions/runs/43672214071) passed, including backend tests, frontend unit and e2e tests, build/lint, OpenAPI freshness, parity and PR Required Gate. Exact-head security scan `43672214094`, Role System Integrity `43672214140`, Agent Workflow Guards `43672214087`, Regression Audit Gate `43672214089`, Gitleaks `43672214091`, i18n `43672214088`, PR Review Quality Gate `43673701454`, and PR Lifecycle Recommendation `43673701472` passed. The mandatory agent gate was rerun on the final fix head and returned `gate_ok`, with no misroute or override. No live patient data or messaging provider was used.
+
+| Finding | Regression evidence on the merged tree |
+| --- | --- |
+| `NOTIFYPATIENTOWNER-BE-001` | `test_doctor_notification_scope_requires_the_assigned_visit`; `test_doctor_reminder_hides_patient_existence_without_assigned_visit` |
+| `NOTIFYBURSTCROSSTYPE-BE-001` | `test_queue_burst_guard_keeps_a_different_event_type_for_same_visit` |
+| `NOTIFYMUTATIONTOAST-FE-001` | `test_state_mutation_broadcast_uses_update_transport_without_new_event`; NotificationWebSocketContext test “refreshes inbox state for mutation frames without creating a toast or new notification” |
+| `NOTIFYCHATDEEPLINK-BE-001` | NotificationInbox test “opens the chat overlay for message notifications without navigating to an unmounted route” |
+| `NOTIFYGLOBALTELEGRAM-BE-001` | `test_telegram_sender_never_falls_back_to_global_chat` (also checks token redaction) |
+| `NOTIFYBULKPREFOWNER-BE-001` | `test_templated_sender_honors_matching_event_preference_field`; `Patient.user_id` is resolved before applying settings |
+| `NOTIFYSCHEDULEIGNORE-BE-001` | `test_notification_endpoint_rejects_unsupported_and_scheduled_requests` |
+| `NOTIFYDIRECTOPTOUT-BE-001` | `test_direct_visit_confirmation_honors_global_and_event_opt_outs`; `test_templated_sender_skips_opted_out_channel_before_creating_history` |
+| `NOTIFYPRIORITYDROP-BE-001` | `test_bulk_sender_deduplicates_recipient_and_channels_and_keeps_priority`; `test_templated_inbox_state_is_separate_from_external_provider_status` |
+| `NOTIFYCHANNELSTATE-BE-001` | `test_templated_inbox_state_is_separate_from_external_provider_status` |
+| `NOTIFYBULKDUPLICATE-BE-001` | `test_bulk_sender_deduplicates_recipient_and_channels_and_keeps_priority` |
+| `NOTIFYTESTLIVE-BE-001` | `test_admin_notification_diagnostic_endpoint_schedules_no_sends` |
+| `NOTIFYSMTPTLS-BE-001` | `test_smtp_starttls_uses_a_verifying_default_context` |
+| `NOTIFYCONFIRMPUSH2X-BE-001` | `test_appointment_confirmation_does_not_repeat_push_in_visit_confirmation` |
+| `NOTIFYCURSORLAST-BE-001` | `test_inbox_cursor_uses_an_extra_row_to_report_more_items` |
+| `NOTIFYEXPIREFILTER-BE-001` | `test_expired_notification_is_absent_from_inbox_counts_and_realtime` |
+| `NOTIFYPHONETASK-BE-001` | `test_worker_send_failure_does_not_stamp_and_raises` verifies worker failure stays retryable; `_send_phone_invitation` now returns success only after creating the durable registrar inbox task. Both code and the full backend suite were checked on the tested tree. |
+| `NOTIFYVISITTELELINK-BE-001` | `test_worker_dispatches_linked_telegram_contract`; the linked-user sender resolves the chat from `TelegramUser`. |
+| `NOTIFYREMINDEROPT-BE-001` | `test_patient_telegram_event_helper_respects_patient_consent`; both ARQ and direct reminder paths now require global and appointment-reminder consent. |
+| `NOTIFYMEDICALUSERTELE-BE-001` | The latent medical methods now send through the linked-user Telegram helper using `User.id`; full backend CI passed. No active caller of those legacy methods was found. |
+| `NOTIFYTELEHTTPLOG-BE-001` | `test_telegram_sender_never_falls_back_to_global_chat` uses a synthetic token and verifies neither the token nor token-bearing API URL reaches logs. |
+| `NOTIFYJINJASANDBOX-BE-001` | `test_notification_template_rendering_uses_sandboxed_jinja` |
+| `NOTIFYBULKTELEZERO-BE-001` | The bulk route now supplies only an active, linked patient chat and the templated sender resolves the linked recipient; full backend CI passed. No live Telegram send was attempted. |
+| `NOTIFYNONPATIENTNOP-BE-001` | `test_notification_endpoint_rejects_unsupported_and_scheduled_requests` verifies unsupported recipient types return 422 instead of a success-shaped no-op. |
+
+The named tests live in `backend/tests/unit/test_notification_audit_round47_52.py` except where the table identifies a frontend or reminder-pipeline test. A few latent/route-composition findings are additionally supported by source-path review and the exact-head full backend suite; no external provider delivery is claimed.
+
 **Review date:** 2026-11-13, Asia/Tashkent. **Fresh reviewed main:** [`3c37aa46b1508c49568a280ef28102d282ca233d`](https://github.com/drsapaev/final/commit/3c37aa46b1508c49568a280ef28102d282ca233d). The latest change on main was limited to a laboratory hook/test; the notification files cited here were freshly fetched and have not changed from their previous reviewed blobs. Previous [PR #4052](https://github.com/drsapaev/final/pull/4052) is **merged** and must not be modified. Its groups 45–46 and preceding merged #4049/#3961 are historical input only. This file is the **first/only** allowed artifact in a separate, docs-only **Draft** PR for group 47.
 
 ## Execution boundary, skills and review-only validation
@@ -290,7 +325,7 @@
 ### Group 52 review ledger, security guardrails and validation
 
 - **Four NEW independent IDs:** `NOTIFYTELEHTTPLOG-BE-001` (**P1 conditional**), `NOTIFYJINJASANDBOX-BE-001` (**P1 conditional**), `NOTIFYBULKTELEZERO-BE-001` (**P2**), `NOTIFYNONPATIENTNOP-BE-001` (**P2**). No reclassification of previous observations or unsupported P0 claim.
-- **Historical total:** merged #3961 **199** + merged #4049 groups40–44 **20** + merged #4052 groups45–46 **8** + current Draft #4054 groups47–52 **24** = **251 cumulative static source observations**, **not 251 open/verified clinical production bugs**. Latest reviewed main `687f776bc3ffb2d64ceb1f03f9d0211874ee9290`; Draft base remains older main `3c37aa46b1508c49568a280ef28102d282ca233d` and is not rebased.
+- **Historical total at the time of the 2026-11-13 group52 review:** merged #3961 **199** + merged #4049 groups40–44 **20** + merged #4052 groups45–46 **8** + then-Draft #4054 groups47–52 **24** = **251 cumulative static source observations**, **not 251 open/verified clinical production bugs**. That review used main `687f776bc3ffb2d64ceb1f03f9d0211874ee9290` and the branch was based on `3c37aa46b1508c49568a280ef28102d282ca233d`; the new verification section above supersedes that pending status.
 - **Evidence:** freshly read source, current schema/routes/Telegram filter/PII masker, previous report IDs; benign local httpx 0.28.1 fake token HTTPStatusError string observation; benign local Jinja2 3.1.6 normal-vs-sandbox attribute-access observation. **No project pytest/Vitest/E2E, runtime FastAPI, actual provider, real Telegram token, clinic data, database, staging/prod or local worktree.** Synthetic negative/positive regression scenarios are **proposals**, not executed tests.
 - **Write scope:** append only one audit Markdown report in #4054; no source, test, migrations, infrastructure, secrets, role settings, alerts or providers changed; `run_agent_gate.ps1` **NOT run** for docs-only. Exact-HEAD GitHub checks should be reconciled separately. A successful documentation CI does not verify security exposure, consent or feature support.
-- **Proposed remediation order:** protect Telegram credential-bearing exception text and validate log filters against synthetic 401; replace unsafe Jinja with safe template contract + sandbox, retaining Admin-only editor; repair bulk Telegram patient-chat mapping/consent; resolve or reject unsupported recipient_type values honestly. Each protected source fix requires **actual mandatory `ai/langgraph/scripts/run_agent_gate.ps1`** with owner/scope handoff, synthetic RED tests and source CI proof. **Leave Draft; no merge or deployment.**
+- **Historical proposed remediation order (before fix #4060):** protect Telegram credential-bearing exception text and validate log filters against synthetic 401; replace unsafe Jinja with safe template contract + sandbox, retaining Admin-only editor; repair bulk Telegram patient-chat mapping/consent; resolve or reject unsupported `recipient_type` values honestly. The source fix was implemented and verified as recorded above; that earlier “Leave Draft” instruction described the pre-fix review state.
