@@ -4052,14 +4052,19 @@
    "merge_sha": null
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "QRRESTORE-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6734881451",
-   "status": "UNVERIFIED",
-   "fix_pr": null,
-   "merge_sha": null
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#4089",
+   "merge_sha": "77317ebf8",
+   "test_before": "RED on the pre-fix base (owner fail-first #4089, branch off 3dbb6f95c-era main): restore_entry_to_next had no cascade-visit guard — a ticket cancelled together with its linked Visit (canonical one-transaction cancel) restored to status='waiting' while the linked Visit stayed 'canceled' (irreversible lifecycle), breaking the entry↔visit invariant the operator was told was restored; the three guard tests fail on that base",
+   "root_cause": " | FIXED by owner PR #4089 (merge 77317ebf8, in main 1583e1ed7): qr_queue/_entries.py:48-80 — restore of a cascade-cancelled ticket (entry.status='cancelled' with a linked Visit 'canceled' from the canonical one-transaction cancel) now answers 409 with an actionable message (create a new appointment) instead of restoring a waiting ticket anchored to an irreversibly canceled Visit; no_show tickets and cancelled tickets WITHOUT a cascade-cancelled visit keep restoring as before",
+   "test_after": "tests/integration/test_qrrestore_cancelled_visit_guard.py (3 tests, owner PR #4089): cascade-cancelled restore denied 409 with no state mutation; independent fixing-agent verification on main 1583e1ed7: source read + 3/3 green; CI on #4089 all green",
+   "reviewer": "owner PR #4089 (group96) + fixing-agent registry v38 independent verification (source + 3/3 run on main 1583e1ed7)",
+   "date": "2026-11-15"
   },
   {
    "checked": false,
@@ -4263,18 +4268,18 @@
    "root_cause": "CONFIRMED on current main 2026-11-15: VisitService.__table_args__ has only a duration CheckConstraint — no unique (visit_id, service_id); duplicate lines for one service are legitimate (crud inserts directly), while dental/derma repositories resolve get_visit_service with .first() (dental_api_repository.py:58-66) — approval then mutates ONE row and leaves the twin at catalogue price, so the billable sum is neither 2×catalogue nor 2×override (half-applied approval); API identifies service_id, not visit_service_id"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGSTART-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
-   "merge_sha": null,
-   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (RBAC hole narrowed by post-audit work): registrar start_queue_visit (_queue_ops.py:628-683) still admits Admin/Registrar/Doctor/cardio/cardiology/derma/dentist/Lab and loads ANY OnlineQueueEntry by global id; the patient-mismatch guard now exists (linked_visit.patient_id != queue_entry.patient_id → 409) but there is NO queue-ownership scope check against the acting user — queue_entry.queue.specialist_id / resource axis is never compared, so doctor A (cardiology) can flip doctor B's (dentistry) queue entry and linked visit to in_progress, unlike the doctor-panel start route which checks owner/same-specialty and the legacy queue call helper which checks Doctor ownership | fixed by owner PR #4088 (merge 3dbb6f95c, current main): non-Admin/Registrar callers may start only queues they own (Doctor row match) or of the SAME specialty — mirroring the doctor-panel start route guard; Lab (no clinical queue ownership) gets 403; Admin/Registrar keep the full legacy operator workflow | RE-OPENED by owner group95 correction (2026-11-15): on main 3dbb6f95c the merged #4088 did NOT fully close this ID — the new non-operator guard executes only for doctor-owned queues (truthy specialist_id), but valid resource-owned DailyQueue rows use specialist_id=NULL (queue_resource_id set) and bypass it, so non-Admin/Registrar callers can still start resource queues; evidence: pre-merge warning #4088 comment (6894087106) + group95 exact-head code+test evidence; owner changed the one checkbox from [x] to [ ]; DOCSTART-BE-001 (separate binding fix) stays fixed",
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#4093",
+   "merge_sha": "1583e1ed7",
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (RBAC hole narrowed by post-audit work): registrar start_queue_visit (_queue_ops.py:628-683) still admits Admin/Registrar/Doctor/cardio/cardiology/derma/dentist/Lab and loads ANY OnlineQueueEntry by global id; the patient-mismatch guard now exists (linked_visit.patient_id != queue_entry.patient_id → 409) but there is NO queue-ownership scope check against the acting user — queue_entry.queue.specialist_id / resource axis is never compared, so doctor A (cardiology) can flip doctor B's (dentistry) queue entry and linked visit to in_progress, unlike the doctor-panel start route which checks owner/same-specialty and the legacy queue call helper which checks Doctor ownership | fixed by owner PR #4088 (merge 3dbb6f95c, current main): non-Admin/Registrar callers may start only queues they own (Doctor row match) or of the SAME specialty — mirroring the doctor-panel start route guard; Lab (no clinical queue ownership) gets 403; Admin/Registrar keep the full legacy operator workflow | RE-OPENED by owner group95 correction (2026-11-15): on main 3dbb6f95c the merged #4088 did NOT fully close this ID — the new non-operator guard executes only for doctor-owned queues (truthy specialist_id), but valid resource-owned DailyQueue rows use specialist_id=NULL (queue_resource_id set) and bypass it, so non-Admin/Registrar callers can still start resource queues; evidence: pre-merge warning #4088 comment (6894087106) + group95 exact-head code+test evidence; owner changed the one checkbox from [x] to [ ]; DOCSTART-BE-001 (separate binding fix) stays fixed | RESIDUAL CLOSED by owner PR #4093 (merge 1583e1ed7, in main 1583e1ed7): registrar start route gained a resource-owned branch — when DailyQueue.specialist_id is NULL (queue_resource_id XOR), non-Admin/Registrar callers now get 403 («Записи ресурсной очереди может начать только Админ или Регистратор»), mirroring the canonical doctor-panel contract; Admin/Registrar keep the legacy operator workflow (registrar_integration/_queue_ops.py:709-731)",
    "test_before": "RED on pre-#4088 main: a Doctor/ Lab caller could start ANY queue entry by global id — foreign doctor flipped another doctor's queue entry + linked visit to in_progress (200, rows mutated)",
-   "test_after": "residual branch unfixed: a resource-owned queue (specialist_id NULL) still admits non-operator starts — fix candidate: extend the #4088 guard so non-Admin/Registrar callers get 403 on resource-owned queues (symmetric with the QD-2C Admin-only resource call contract)",
-   "reviewer": "owner group95 correction (checkbox [x]->[ ]) + fixing-agent registry v37 sync",
+   "test_after": "owner PR #4093 adds +81 lines to tests/integration/test_start_visit_ownership_guards.py (resource-queue non-operator 403 + operator-allowed cases); independent fixing-agent verification on main 1583e1ed7: guard source read + test_start_visit_ownership_guards.py + test_qrrestore_cancelled_visit_guard.py = 10/10 green (7 ownership incl. the new resource-branch cases + 3 QRRESTORE); CI on #4093 all green",
+   "reviewer": "owner PR #4093 (group95 residual) + fixing-agent registry v38 independent verification (source + 10/10 run on main 1583e1ed7)",
    "date": "2026-11-15"
   },
   {
