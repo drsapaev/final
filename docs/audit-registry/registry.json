@@ -4486,6 +4486,29 @@
    "status": "UNVERIFIED",
    "fix_pr": null,
    "merge_sha": null
+  },
+  {
+   "id": "AUTHZAMBIENTDB-BE-001",
+   "priority": "P2",
+   "source": "#4063 issue checklist group 89 (cycle-1 revalidation new finding)",
+   "evidence": "https://github.com/drsapaev/final/pull/4078",
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#4078",
+   "merge_sha": "571a55014",
+   "test_before": "RED 2/22 PHI authz contract tests on main 1128b4b97: _check_relationship_access opened an unconditional ambient SessionLocal() bound to settings.DATABASE_URL — CI (Postgres) silently worked while local sqlite worlds hit a schemaless DB and the fail-closed branch returned relationship_check_error instead of the canonical patient_scope_mismatch contract (environment-dependent authorization error)",
+   "test_after": "GREEN 22/22 on merge 571a55014 (can_access_phi / require_phi_access / _check_relationship_access accept a caller-owned db session; ambient fallback unchanged for production callers); full backend unit suite 3123 passed / 0 failed; code-verified on current main 2026-11-15",
+   "reviewer": "fixing-agent session t47 (owner-authorized FIX-FIRST mandate) + registry v33 reconciliation",
+   "date": "2026-11-15",
+   "root_cause": "Ambient module-scoped DB session inside the PHI relationship check made the authz error contract environment-dependent; #4078 switched the check to the caller-owned session"
+  },
+  {
+   "id": "PASSRESETATOMIC-BE-001",
+   "priority": "P2 conditional",
+   "source": "#4063 issue checklist group 86",
+   "evidence": "https://github.com/drsapaev/final/issues/4063#issuecomment-6884286767",
+   "status": "CONFIRMED_OPEN",
+   "checked": true,
+   "root_cause": "CONFIRMED on current main 2026-11-15 (source-verified, concurrency not reproduced — owner group86 classification kept): password_reset_service.py still retrieves the token with a plain .first() (no with_for_update), checks token_row.used at :327, commits the user password at :370, and only then sets token_row.used=True with a SECOND commit at :376-378 — two PostgreSQL transactions can both read an unused token and race (last writer wins), and a failure on the second commit leaves the password updated while the token stays reusable. Distinct from PASSRESET-BE-001/002/003 (throttle/oracle, URL transport, password length); not covered by open PR #4075"
   }
  ]
 }
