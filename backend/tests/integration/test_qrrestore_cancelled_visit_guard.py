@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
-from unittest.mock import patch as mock_patch
 from uuid import uuid4
 
 import pytest
@@ -115,21 +114,30 @@ def _mk_entry(db, queue: DailyQueue, patient: Patient, *, visit: Visit | None,
     return entry
 
 
-def _fake_ws():
+class FakeManager:
+    """Silences display broadcasts inside tests.
+
+    Module-level so the class identity is stable; installed via the
+    ``monkeypatch`` fixture ONLY — never with patch().start()/stop():
+    mock silently tolerates stop() on an unstarted patcher, so a
+    start/stop pair built from two separate helper calls leaks the fake
+    into every later test in the worker (poisons the display-manager
+    singleton path used by real WS e2e tests).
+    """
+
+    connections: list = []
+
+    async def broadcast_queue_update(self, **kwargs):
+        pass
+
+
+def _install_fake_ws(monkeypatch):
     """Silence display/admin websocket broadcasts (unit-scope side effects)."""
     from app.services import display_websocket as dw
     from app.ws import queue_ws
 
-    class FakeManager:
-        connections: list = []
-
-        async def broadcast_queue_update(self, **kwargs):
-            pass
-
-    return [
-        mock_patch.object(dw, "get_display_manager", lambda: FakeManager()),
-        mock_patch.object(queue_ws, "broadcast_queue_update", lambda **k: None),
-    ]
+    monkeypatch.setattr(dw, "get_display_manager", lambda: FakeManager())
+    monkeypatch.setattr(queue_ws, "broadcast_queue_update", lambda **k: None)
 
 
 @pytest.mark.integration
@@ -140,8 +148,7 @@ class TestRestoreNextCancelledVisitGuard:
         """QRRESTORE-BE-001 RED: canonical cancel cascades the linked Visit
         to canceled; restore-next must NOT resurrect the ticket — 409,
         entry stays cancelled, visit stays canceled."""
-        for p in _fake_ws():
-            p.start()
+        _install_fake_ws(monkeypatch)
         owner = _mk_user(db_session, role="Doctor")
         doctor = _mk_doctor(db_session, owner)
         patient = _mk_patient(db_session)
@@ -176,15 +183,12 @@ class TestRestoreNextCancelledVisitGuard:
         db_session.refresh(visit)
         assert entry.status == "cancelled", entry.status
         assert visit.status == "canceled", visit.status
-        for p in _fake_ws():
-            p.stop()
 
     def test_no_show_without_cancelled_visit_still_restores(
         self, db_session, monkeypatch
     ):
         """Positive control (audit): no_show → waiting keeps working."""
-        for p in _fake_ws():
-            p.start()
+        _install_fake_ws(monkeypatch)
         owner = _mk_user(db_session, role="Doctor")
         doctor = _mk_doctor(db_session, owner)
         patient = _mk_patient(db_session)
@@ -209,16 +213,13 @@ class TestRestoreNextCancelledVisitGuard:
         db_session.refresh(entry)
         assert entry.status == "waiting"
         assert entry.priority == 1
-        for p in _fake_ws():
-            p.stop()
 
     def test_cancelled_entry_without_cascade_visit_still_restores(
         self, db_session, monkeypatch
     ):
         """Positive: a cancelled entry WITHOUT a cascade-cancelled visit
         (no visit link) is not falsely denied — restore keeps working."""
-        for p in _fake_ws():
-            p.start()
+        _install_fake_ws(monkeypatch)
         owner = _mk_user(db_session, role="Doctor")
         doctor = _mk_doctor(db_session, owner)
         patient = _mk_patient(db_session)
@@ -245,5 +246,3 @@ class TestRestoreNextCancelledVisitGuard:
         assert result["success"] is True
         db_session.refresh(entry)
         assert entry.status == "waiting"
-        for p in _fake_ws():
-            p.stop()
