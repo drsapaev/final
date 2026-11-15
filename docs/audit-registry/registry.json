@@ -126,24 +126,26 @@
    "merge_sha": null
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "CONFIRMSEC-BE-001",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726838798",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED: confirmation_security.py:438-450 _check_rate_limit_by_ip and _check_rate_limit_by_patient always return allowed=True ('Rate limit OK') and the counter update only logs — configured RATE_LIMITS never gate the public state-changing confirmation endpoint (separate/global middleware bounds must be checked before a system-wide no-throttle claim)"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "CONFIRMSEC-BE-002",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726838798",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED: POST /telegram/visits/confirm forwards VisitConfirmationDomainError detail verbatim via _raise_http_error including 5xx raw exception text, while the sibling PWA route explicitly redacts 5xx to a generic message — conditional internal-detail disclosure"
   },
   {
    "checked": true,
@@ -4140,44 +4142,48 @@
    "merge_sha": null
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "TGCONFIRM-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726838798",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED on current main 2026-11-15: bot.py:545 _confirm_visit_via_api formats settings.API_BASE_URL — no such field exists in the Settings model (config.py extra='ignore' swallows env too), AttributeError is caught and the callback answers success:false; the patient aiogram webhook route stays mounted, so the visit can never be confirmed through the bot"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "TGCONFIRM-BE-002",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726838798",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED latent behind TGCONFIRM-BE-001: bot.py:501 formats q['queue_name'] but visit_confirmation_service.py builds queue_numbers entries with only queue_tag/number/queue_id → KeyError while rendering a nonempty same-day queue list AFTER the confirmation has committed; outer handler shows a generic error for an already-committed operation"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "TGCONFIRM-BE-003",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726838798",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED: bot.py:521 cancel branch only edits the Telegram message to 'Визит отменен' — no cancellation endpoint/service call, no token revocation, no DB status change; the scheduled visit remains pending and confirmable"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "TGCONFIRM-BE-004",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726838798",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED: bot.py:535-546 outbound JSON is only {token, channel:'telegram'} — trusted callback.from_user.id is silently dropped; public /telegram/visits/confirm treats telegram_user_id as optional body data and records it as confirmation_telegram_id, so audit attribution is spoofable by anyone holding the (bearer) token; token itself remains the capability"
   },
   {
    "checked": false,
@@ -4320,34 +4326,37 @@
    "date": "2026-11-12"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "WSLIMIT-BE-001",
    "priority": "P2",
    "source": "Queue/display/WS rounds 29–39 (#3961)",
-   "evidence": null,
-   "status": "UNVERIFIED",
+   "evidence": "https://github.com/drsapaev/final/issues/3961#issuecomment-6824029326",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED: websocket_auth.py:145-155 rejected handshake (rate-limit/auth/access deny) returns BEFORE record_connection, but the finally at :294 unconditionally calls remove_connection → websocket_rate_limit.py:88-93 pop(0) removes ANOTHER live session's timestamp and decrements that IP's live count"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "WSLIMIT-BE-002",
    "priority": "P2",
    "source": "Queue/display/WS rounds 29–39 (#3961)",
-   "evidence": null,
-   "status": "UNVERIFIED",
+   "evidence": "https://github.com/drsapaev/final/issues/3961#issuecomment-6824029326",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED: websocket_rate_limit.py:82-93 record_connection appends now but remove_connection pops the OLDEST timestamp on every disconnect — sequential short sessions keep the sliding-minute list empty, bypassing the 5 new-connections/minute gate entirely"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "WSLIMIT-BE-003",
    "priority": "P2",
    "source": "Queue/display/WS rounds 29–39 (#3961)",
-   "evidence": null,
-   "status": "UNVERIFIED",
+   "evidence": "https://github.com/drsapaev/final/issues/3961#issuecomment-6824029326",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "VERIFIED: websocket_rate_limit.py:28-43 five-minute cleanup drops timestamps older than 300s and recomputes connections_per_ip = len(remaining timestamps) — long-lived (keep-alive) sockets fall out of the 10-concurrent-per-IP cap and new attempts can exceed it"
   },
   {
    "checked": false,
