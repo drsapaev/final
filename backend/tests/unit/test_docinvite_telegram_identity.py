@@ -46,6 +46,13 @@ def _patient(db, *, unique: str, phone: str | None = None):
 
 def _link(db, patient_id: int, chat_id: int, *, active=True, blocked=False,
           notifications=True) -> TelegramUser:
+    # CI runs on a persistent postgres DB where rows committed by earlier
+    # tests survive fixture isolation — defensively drop ANY existing link
+    # for this patient so the scenario is deterministic.
+    db.query(TelegramUser).filter(
+        TelegramUser.patient_id == patient_id
+    ).delete()
+    db.flush()
     tu = TelegramUser(
         patient_id=patient_id,
         chat_id=chat_id,
@@ -153,6 +160,10 @@ class TestDocInviteTelegramIdentity:
         monkeypatch.setattr(svc, "telegram_bot", bot, raising=False)
 
         unlinked = _patient(db_session, unique="neg1")
+        db_session.query(TelegramUser).filter(
+            TelegramUser.patient_id == unlinked.id
+        ).delete()
+        db_session.flush()
         blocked = _patient(db_session, unique="neg2")
         _link(db_session, blocked.id, 777003, blocked=True)
         no_consent = _patient(db_session, unique="neg3")
