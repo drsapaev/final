@@ -136,7 +136,15 @@ def _real_manager(
     mgr.connections = {name: set(socks) for name, socks in (rooms or {}).items()}
     mgr.board_states = {}
     mgr._redis_handlers = {}
-    mgr._name_format_cache = dict(cache or {})
+    # Cache entries carry their caching moment (value, time.monotonic()) —
+    # plain string values from older call sites are normalized as freshly
+    # cached entries.
+    import time as _time
+
+    mgr._name_format_cache = {
+        name: (value if isinstance(value, tuple) else (value, _time.monotonic()))
+        for name, value in (cache or {}).items()
+    }
     mgr._pubsub = pubsub
     return mgr
 
@@ -245,7 +253,7 @@ async def test_admin_downgrade_invalidates_cached_full(monkeypatch):
 
     # First resolve caches the row value.
     assert mgr._resolve_name_format(["main_board"]) == "full"
-    assert mgr._name_format_cache["main_board"] == "full"
+    assert mgr._name_format_cache["main_board"][0] == "full"
 
     # Admin downgrades the board privacy setting.
     boards["main_board"] = "none"
@@ -681,3 +689,85 @@ async def test_untargeted_announcement_excludes_inactive_boards(monkeypatch):
     channels = [ch for ch, _msg in pubsub.published]
     assert "board:retired_board" not in channels
     assert retired_ws.messages == []
+
+
+# ---------------------------------------------------------------------------
+# DISPLAYPRIVACY-BE-001 residual (group-87) — TTL-bounded revalidation of a
+# lost cross-worker control message; DISPLAYPRIVACY-BE-002 — fail-closed
+# resolver verification on the current source.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_lost_control_message_revalidates_after_ttl(monkeypatch):
+    """A worker that MISSES the nameformat_invalidate control message must
+    not keep a stale 'full' formatter forever: after NAME_FORMAT_CACHE_TTL_
+    SECONDS the entry revalidates against the registry and the downgraded
+    'none' policy takes effect on the same live manager, without restart."""
+    boards = {"main_board": "full"}
+    monkeypatch.setattr(
+        display_ws_service,
+        "SessionLocal",
+        lambda: _RegistrySession(boards),
+        raising=True,
+    )
+    mgr = _real_manager(_StubPubSub(), rooms={})
+
+    # Warm the cache on the first resolve.
+    assert mgr._resolve_name_format(["main_board"]) == "full"
+
+    # The admin downgrade lands on ANOTHER worker; the control message is
+    # lost (no invalidate call on this manager) — only the registry row
+    # changes.
+    boards["main_board"] = "none"
+
+    # Within the TTL the stale entry is still honored (bounded window).
+    monkeypatch.setattr(display_ws_service, "NAME_FORMAT_CACHE_TTL_SECONDS", 60.0)
+    assert mgr._resolve_name_format(["main_board"]) == "full"
+
+    # After the TTL elapses the entry revalidates to the downgraded policy.
+    monkeypatch.setattr(display_ws_service, "NAME_FORMAT_CACHE_TTL_SECONDS", 0.01)
+    await asyncio.sleep(0.02)
+    assert mgr._resolve_name_format(["main_board"]) == "none"
+
+
+@pytest.mark.asyncio
+async def test_cache_within_ttl_does_not_touch_registry(monkeypatch):
+    """A fresh cache entry must serve the resolver without a registry read —
+    the TTL revalidation must not turn every broadcast into a DB query."""
+    boards = {"main_board": "full"}
+    reads = {"count": 0}
+
+    class _CountingSession(_RegistrySession):
+        def query(self, *a, **kw):
+            reads["count"] += 1
+            return super().query(*a, **kw)
+
+    monkeypatch.setattr(
+        display_ws_service,
+        "SessionLocal",
+        lambda: _CountingSession(boards),
+        raising=True,
+    )
+    mgr = _real_manager(_StubPubSub(), rooms={})
+
+    assert mgr._resolve_name_format(["main_board"]) == "full"
+    first_reads = reads["count"]
+    assert first_reads >= 1
+
+    for _ in range(5):
+        assert mgr._resolve_name_format(["main_board"]) == "full"
+    assert reads["count"] == first_reads
+
+
+@pytest.mark.asyncio
+async def test_resolver_registry_outage_fails_closed_to_none(monkeypatch):
+    """DISPLAYPRIVACY-BE-002 verification on the current source: any failure
+    to resolve the privacy policy must yield 'none', never 'initials' or
+    'full', and must not cache the failure."""
+    monkeypatch.setattr(
+        display_ws_service, "SessionLocal", _RaisingSessionLocal, raising=True
+    )
+    mgr = _real_manager(_StubPubSub(), rooms={})
+    assert mgr._resolve_name_format(["main_board"]) == "none"
+    assert mgr._name_format_cache == {}

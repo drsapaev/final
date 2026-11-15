@@ -144,7 +144,15 @@ def _real_manager(
     mgr.connections = {name: set(socks) for name, socks in (rooms or {}).items()}
     mgr.board_states = {}
     mgr._redis_handlers = {}
-    mgr._name_format_cache = dict(cache or {})
+    # Cache entries carry their caching moment (value, time.monotonic()) —
+    # plain string values from older call sites are normalized as freshly
+    # cached entries (DISPLAYPRIVACY-BE-001 TTL residual).
+    import time as _time
+
+    mgr._name_format_cache = {
+        name: (value if isinstance(value, tuple) else (value, _time.monotonic()))
+        for name, value in (cache or {}).items()
+    }
     mgr._pubsub = pubsub
     return mgr
 
@@ -599,11 +607,14 @@ def test_resolve_name_format_valid_rows_cache_and_strict_priority(monkeypatch):
     assert mgr._resolve_name_format(["board_a", "board_b"]) == "initials"
     assert mgr._resolve_name_format(["board_a", "board_c"]) == "none"
     assert mgr._resolve_name_format(["board_a"]) == "full"
-    assert mgr._name_format_cache == {
+    assert {k: v[0] for k, v in mgr._name_format_cache.items()} == {
         "board_a": "full",
         "board_b": "initials",
         "board_c": "none",
     }
+    assert all(
+        isinstance(v[1], float) for v in mgr._name_format_cache.values()
+    )
 
 
 def test_patient_call_message_masks_when_resolution_fails(monkeypatch):
