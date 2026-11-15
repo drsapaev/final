@@ -11887,7 +11887,7 @@ export type paths = {
         put?: never;
         /**
          * Send Broadcast Message
-         * @description Отправить широковещательное сообщение
+         * @description Report that broadcast delivery is unavailable instead of claiming success.
          */
         post: operations["send_broadcast_message_api_v1_admin_telegram_broadcast_post"];
         delete?: never;
@@ -66713,17 +66713,6 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66731,6 +66720,22 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram broadcast delivery is disabled. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": "Telegram broadcast delivery is not configured; no messages were sent."
+                     *     }
+                     */
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
