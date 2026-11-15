@@ -107,7 +107,14 @@ def get_doctor_queue_today(
                 f"врача специальности '{specialty}'",
             )
 
-        today = date.today()
+        # DOCWORKLIST-BE-001 (audit 3892 group 24): the day must come from
+        # clinic_today — the queue SSOT clinic-local date (same discipline
+        # as the legacy qrcode/call surfaces) — NOT the host clock: a UTC
+        # backend behind the clinic (e.g. Asia/Tashkent) read the wrong
+        # day and answered queue_exists=false while patients waited.
+        from app.crud.clinic import clinic_today
+
+        today = clinic_today(db)
 
         candidate_specialist_ids = (
             {doctor.id}
@@ -192,6 +199,12 @@ def get_doctor_queue_today(
             )
 
         # Формируем данные для врача
+        # DOCWORKLIST-BE-002 (audit 3892 group 24): viewing/history stays
+        # readable for INACTIVE queues (owner-policy), but the operational
+        # next-call marker must be computed over ACTIVE queues only.
+        active_queue_ids = {
+            queue.id for queue in daily_queues if queue.active
+        }
         queue_entries = []
         next_call_entry_id = None
         for entry in entries:
@@ -205,7 +218,11 @@ def get_doctor_queue_today(
                     action for action in available_actions if action != "complete"
                 ]
                 action_flags["can_complete"] = False
-            if next_call_entry_id is None and action_flags["can_call"]:
+            if (
+                next_call_entry_id is None
+                and action_flags["can_call"]
+                and entry.queue_id in active_queue_ids
+            ):
                 next_call_entry_id = entry.id
 
             patient_data = None
@@ -560,6 +577,16 @@ def call_patient(
         if not daily_queue:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
+            )
+
+        # DOCWORKLIST-BE-002 (audit 3892 group 24): operational actions
+        # fail closed for INACTIVE queues — the previous guard set
+        # validated specialty and entry status only, so inactive same-day
+        # queues stayed operable. Viewing/history is unaffected.
+        if not daily_queue.active:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Очередь неактивна — вызов недоступен",
             )
 
         doctor = daily_queue.specialist
