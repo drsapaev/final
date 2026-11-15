@@ -231,6 +231,34 @@ def _validate_add_service_inputs(
             )
 
 
+def _validate_price_override_authorization(
+    service: Service, custom_price: float | None
+) -> None:
+    """DOCSCHED-BE-006 (audit #3892, group 21): произвольная положительная
+    цена — финансовая привилегия, задаваемая флагом СЕРВИСА
+    (``allow_doctor_price_override``), а не свойство входа. Явный
+    ``custom_price=0`` — осознанная бесплатная услуга (защищённый контракт
+    ``test_zero_custom_price_is_intended_free_not_catalogue_fallback``), а
+    цена, равная каталогу, — no-op: оба варианта разрешены без флага. Любое
+    иное отклонение от каталога требует флага — как в derma-плоскости
+    (``derma_api_service.create_price_override``, DERMAPRICE)."""
+    if custom_price is None:
+        return
+    catalogue_price = float(service.price or 0)
+    requested_price = float(custom_price)
+    if (
+        requested_price != 0.0
+        and not math.isclose(
+            requested_price, catalogue_price, rel_tol=1e-9, abs_tol=1e-9
+        )
+        and not service.allow_doctor_price_override
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Данная услуга не разрешает изменение цены врачом",
+        )
+
+
 def _find_recent_identical_add(
     db: Session,
     *,
@@ -336,6 +364,21 @@ async def schedule_next_visit(
                 detail="Некоторые услуги не найдены",
             )
 
+        # DOCSCHED-BE-007: существование ≠ пригодность. Услуга, выведенная
+        # из каталога (active=False), не бронируется в новый визит — иначе
+        # пациенту подтверждается назначение withdrawn-услуги, которую
+        # нельзя было показывать/оформлять. Исторические визиты остаются
+        # читаемыми: проверка затрагивает только НОВОЕ планирование.
+        unavailable = [service.name for service in services if not service.active]
+        if unavailable:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Некоторые услуги недоступны для новых назначений "
+                    f"(выведены из каталога): {', '.join(unavailable[:3])}"
+                ),
+            )
+
         # DOCSCHED-BE-002: канонизация бизнес-поля. discount_mode='all_free'
         # и all_free=True — ОДИН и тот же intent: все строки нулевые, визит
         # хранит discount_mode='all_free'. Прежний код принимал
@@ -352,6 +395,10 @@ async def schedule_next_visit(
         intended_lines: list[tuple[int, int, float]] = []
         for service_req in request.services:
             service = services_by_id[service_req.service_id]
+
+            # DOCSCHED-BE-006: произвольная цена — привилегия сервиса
+            # (флаг), а не вход; ноль и каталог-равная цена разрешены всегда.
+            _validate_price_override_authorization(service, service_req.custom_price)
 
             # DOCSCHED-BE-002 follow-up: явный custom_price=0 — осознанная
             # бесплатная цена, а не falsy-fallback на каталог.
@@ -788,6 +835,10 @@ def add_service_to_visit(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Услуга не найдена"
             )
+
+        # DOCSCHED-BE-006: тот же флаг-контракт на втором входе —
+        # произвольная цена требует Service.allow_doctor_price_override.
+        _validate_price_override_authorization(service, custom_price)
 
         # DOCVISIT-BE-003: the mutation must respect the payment ledger.
         _assert_visit_services_mutable(db, visit_id)
