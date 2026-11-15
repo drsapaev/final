@@ -13,6 +13,21 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string;
 
+// QUEUEPRINT-FE-002 (audit group97): printed-state identity is PER-TICKET —
+// the shared DailyQueue id (queue_id) collides for same-queue tickets
+// ({queue_id:17,queue_number:4} vs {queue_id:17,queue_number:5}): a Set over
+// queue_id produced mutually inconsistent allPrinted/hasUnprinted and could
+// silently treat a new same-queue ticket as printed. Composite
+// queue_id#queue_number fixes it; the bare-queue_id fallback keeps legacy
+// payloads without a queue_number on the old identity.
+const ticketIdentity = (ticket: Ticket): string => {
+  const num = ticket.queue_number;
+  if (num === undefined || num === null || num === '') {
+    return String(ticket.queue_id);
+  }
+  return `${String(ticket.queue_id)}#${String(num)}`;
+};
+
 interface Ticket {
   queue_id: string | number;
   queue_name?: string;
@@ -30,8 +45,8 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   onAllPrinted?: () => void;
 }) => {
   const { t: rawT } = useTranslation(); const t = rawT as TFunc;
-  const [printedTickets, setPrintedTickets] = useState<Set<string | number>>(new Set());
-  const [currentPrinting, setCurrentPrinting] = useState<string | number | null>(null);
+  const [printedTickets, setPrintedTickets] = useState<Set<string>>(new Set());
+  const [currentPrinting, setCurrentPrinting] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
   // CSH-FE-045 (follow-up audit 2026-11-02): окно пакетной печати открывается
   // синхронно в прямом жесте клика «Печать всех» (ДО сетевых запросов и
@@ -42,9 +57,14 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   const batchWindowRef = useRef<Window | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
 
-  // Функция печати одного талона (кнопка на карточке — прямой жест)
+  // Функция печати одного талона (кнопка на карточке — прямой жест).
+  // QUEUEPRINT-FE-001 (audit group97): успешный одиночный вывод помечает
+  // ТОЛЬКО этот талон напечатанным (invocation ≠ physical delivery —
+  // mark = честный сигнал браузер-уровня: окно открыто и наполнено);
+  // провал оставляет талон в очереди пакетной печати.
   const printSingleTicket = async (ticket: Ticket) => {
-    setCurrentPrinting(ticket.queue_id);
+    const identity = ticketIdentity(ticket);
+    setCurrentPrinting(identity);
 
     try {
       const result = await printPanelTicketInBrowserAsync(buildPanelTicketPayload(ticket));
@@ -53,7 +73,11 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
       } else if (!result?.success) {
         logger.warn('Browser ticket preview failed', ticket);
       }
-      return Boolean(result?.opened && result?.success);
+      const delivered = Boolean(result?.opened && result?.success);
+      if (delivered) {
+        setPrintedTickets((prev) => new Set(prev).add(identity));
+      }
+      return delivered;
     } catch (error) {
       logger.error('Browser ticket print failed', error);
       return false;
@@ -72,7 +96,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
       return;
     }
 
-    const pending = tickets.filter((ticket) => !printedTickets.has(ticket.queue_id));
+    const pending = tickets.filter((ticket) => !printedTickets.has(ticketIdentity(ticket)));
     if (pending.length === 0) {
       onAllPrinted && onAllPrinted();
       return;
@@ -84,7 +108,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
     );
 
     if (result.success) {
-      setPrintedTickets((prev) => new Set([...prev, ...pending.map((ticket) => ticket.queue_id)]));
+      setPrintedTickets((prev) => new Set([...prev, ...pending.map((ticket) => ticketIdentity(ticket))]));
       setBatchError(null);
       onAllPrinted && onAllPrinted();
     } else {
@@ -123,8 +147,8 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
     setCountdown(5);
   };
 
-  const allPrinted = printedTickets.size >= tickets.length;
-  const hasUnprinted = tickets.some((ticket) => !printedTickets.has(ticket.queue_id));
+  const allPrinted = tickets.length > 0 && tickets.every((ticket) => printedTickets.has(ticketIdentity(ticket)));
+  const hasUnprinted = tickets.some((ticket) => !printedTickets.has(ticketIdentity(ticket)));
   return (
     <div className="multiple-tickets-printer">
       <div className="printer-header">
@@ -136,8 +160,8 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
 
       <div className="tickets-grid">
         {tickets.map((ticket, index) => {
-          const isPrinted = printedTickets.has(ticket.queue_id);
-          const isPrinting = currentPrinting === ticket.queue_id;
+          const isPrinted = printedTickets.has(ticketIdentity(ticket));
+          const isPrinting = currentPrinting === ticketIdentity(ticket);
 
           return (
             <div
