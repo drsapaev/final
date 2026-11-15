@@ -702,64 +702,70 @@
    "root_cause": "CONFIRMED on current main 2026-11-15 (policy-dependent): DermatologistPanelUnified.tsx renders DermaVisitGallery without `disabled` for any patient+visit record, and backend `_dermatology_visit_is_owned` (file_system.py:70) checks patient+doctor+specialty but NOT Visit.status or signed-EMR state — photos of a completed visit remain uploadable/deletable; the auditor's own note says late-document reconciliation may be intended, so a clinical retention/amendment policy decision is required (owner, cf. AUTH-BE-004)"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAHIST-BE-001",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6698903715",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: derma_exam_has_content treats localization as sufficient (derma_history_projection.py:180-182) but _emr_examination_items builds DermaExaminationHistoryOut WITHOUT localization and DermaExaminationOut/derma.py schemas plus the frontend history DTO have no localization field — a localization-only exam publishes a history row whose content is unreachable; clinical attribute survives only inside canonical EMR JSON"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAHIST-BE-002",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6698903715",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15 (policy-dependent): history projection processes every EMRRecord with content without a record.status/is_draft check and DermaExaminationHistoryOut exposes no draft/signed state — an unsigned draft examination is published as ordinary history (test_derma_history_read_model confirms this is intentional-ish behavior); the list cannot communicate provenance. Needs a draft-badge/state field or exclusion policy (owner, cf. DERMAGALLERY-FE-008)"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAHIST-FE-001",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6683369678",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: useDermatologyPatientHistory page-N promises guard only current.patientId === patientId (4 call sites, no request/generation token) — a stale same-patient page-2 response landing after A→B→A appends into the NEW epoch snapshot (same ID, different generation)"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAHIST-FE-002",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693119519",
    "status": "UNVERIFIED",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "EVIDENCE UNRECOVERABLE: source comment 6693119519 has been deleted from GitHub (404 on both issue-comment and PR-review-comment endpoints); the finding text cannot be re-verified against main from the remaining audit trail. Left UNVERIFIED with checked=true-triaged evidence-loss marker; the neighboring plane (useDermatologyPatientHistory races, DERMAHIST-FE-001) still carries unresolved generation issues, so a re-derivation requires a fresh audit round"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAHIST-FE-003",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6698903715",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: DermatologistPanelUnified uses the history hook but never extracts/calls reload (only refreshCanonicalStatus on EMR persist) — newly saved examinations/procedures do not refresh the same-patient history until patient re-selection/remount"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAHIST-FE-004",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6698903715",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: DermaHistoryTab cards render only date/skin type/diagnosis (and date/type/area for procedures), no detail drilldown — backend sends lesions/distribution/symptoms/treatment_plan/products_used/results but the UI neither shows nor links them"
   },
   {
    "checked": false,
@@ -4077,64 +4083,70 @@
    "date": "2026-11-12"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGPRICE-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "38c929e22",
+   "root_cause": "FIXED on main 38c929e22 (#3945): both approval routes now delegate to canonical PriceOverrideApprovalService — approve updates chargeable VisitService.price AND Visit.doctor_price_override JSON mirror in one commit (registrar docstring REGPRICE-BE-001/002/003/005; test_registrar_approve_updates_chargeable_price_and_json_mirror + dental twin). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGPRICE-BE-002",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "38c929e22",
+   "root_cause": "FIXED on main 38c929e22 (#3945): canonical service locks the visit row (with_for_update, price_override_approval.py:108) and a non-pending override after the lock is a 409 conflict for the loser of the concurrent race. VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGPRICE-BE-003",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "38c929e22",
+   "root_cause": "FIXED on main 38c929e22 (#3945): duplicate pending-intent guard at creation (409, status stays pending) and stale-intent validation at approval time (current price != captured visit_price_before → 409); legacy NULL before-price stays processable. VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGPRICE-BE-004",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "38c929e22",
+   "root_cause": "FIXED on main 38c929e22 (#3945): registrar queue is paginated (offset Query + .offset, _cart.py:1238/1272, test_registrar_queue_is_fully_paginable_beyond_100). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGPRICE-BE-005",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "38c929e22",
+   "root_cause": "FIXED on main 38c929e22 (#3945): canonical service enforces a mandatory non-blank rejection reason on both routes (test_registrar_reject_requires_non_blank_reason + persists justified refusal). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGPRICE-BE-006",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726452772",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: VisitService.__table_args__ has only a duration CheckConstraint — no unique (visit_id, service_id); duplicate lines for one service are legitimate (crud inserts directly), while dental/derma repositories resolve get_visit_service with .first() (dental_api_repository.py:58-66) — approval then mutates ONE row and leaves the twin at catalogue price, so the billable sum is neither 2×catalogue nor 2×override (half-applied approval); API identifies service_id, not visit_service_id"
   },
   {
    "checked": false,
