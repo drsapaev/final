@@ -42,12 +42,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4077",
    "merge_sha": null,
-   "root_cause": "authentication.py:446+561 naive _dt.utcnow() compared with timezone-aware expires_at (DateTime(timezone=True)) -> TypeError -> blanket-catch 500 in production PostgreSQL",
+   "root_cause": "authentication.py:446+561 naive _dt.utcnow() compared with timezone-aware expires_at (DateTime(timezone=True)) -> TypeError -> blanket-catch 500 in production PostgreSQL; fix PR #4077 opened 2026-11-15 (head d507e56dc, independent on origin/main): both comparison sites now use UTC-aware datetime.now(timezone.utc) + a _aware_utc() normalizer for expires_at (DateTime(timezone=True) returns aware values on PostgreSQL, naive on SQLite — both shapes compare correctly); RED reproduced the 500s by stubbing the CRUD with aware datetimes",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "d507e56dc"
   },
   {
    "checked": false,
@@ -55,12 +56,13 @@
    "priority": "P2",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4077",
    "merge_sha": null,
-   "root_cause": "/authentication/password-reset propagates service verdict: 400 + 'Пользователь с таким email не найден' vs 200 + expires_at (auth_svc/_auth.py:18-25)",
+   "root_cause": "/authentication/password-reset propagates service verdict: 400 + 'Пользователь с таким email не найден' vs 200 + expires_at (auth_svc/_auth.py:18-25); fix PR #4077 opened 2026-11-15 (head d507e56dc): the endpoint answers 200 + the same generic message regardless of the lookup verdict and no longer echoes the reset-token expires_at (anti-enumeration); the service still mints tokens only for real users; FE string-match verified absent",
    "verified_main": "94d140f83",
-   "verified_date": "2026-11-13"
+   "verified_date": "2026-11-13",
+   "fix_pr_head": "d507e56dc"
   },
   {
    "checked": false,
@@ -4186,7 +4188,7 @@
    "status": "CONFIRMED_OPEN",
    "fix_pr": "https://github.com/drsapaev/final/pull/4067",
    "merge_sha": null,
-   "root_cause": "no @limiter.limit on /verify-setup /verify /recovery/verify /verify-code; verify_two_factor counts no attempts, no lockout (soft failure) — unlimited 6-digit guesses with password-only bootstrap; middleware bounds noted: /2fa/verify, /2fa/verify-setup and /2fa/verify-code share the 2fa_verify bucket 10/300 via '/2fa/verify' substring match, /2fa/recovery/verify falls to the api bucket 5000/3600 — the confirmed core is the absent service-side attempt cap/lockout in verify_two_factor; fix PR #4067 opened 2026-11-14 (head 127a667aa, off main 94d140f83): alembic 0093 adds two_factor_auth.failed_attempts (INT NOT NULL default 0) + locked_until (nullable ts); TwoFactorService.verify_two_factor now gates on lock before any code check, increments on failure (>=5 consecutive -> 15-minute lock, even correct code rejected with 200+success:false+lock message), resets on success, self-clears expired locks; endpoint contract unchanged (no new status codes, no remaining-attempt disclosure). RED 3 failed (6th attempt with correct code succeeded) -> GREEN 3 passed, neighborhood 64 passed; pyotp was removed from the project, test fixtures use the service's own generate_totp_code (wrong code = hour-ago window)",
+   "root_cause": "no @limiter.limit on /verify-setup /verify /recovery/verify /verify-code; verify_two_factor counts no attempts, no lockout (soft failure) — unlimited 6-digit guesses with password-only bootstrap; middleware bounds noted: /2fa/verify, /2fa/verify-setup and /2fa/verify-code share the 2fa_verify bucket 10/300 via '/2fa/verify' substring match, /2fa/recovery/verify falls to the api bucket 5000/3600 — the confirmed core is the absent service-side attempt cap/lockout in verify_two_factor; fix PR #4067 opened 2026-11-14 (head 127a667aa, off main 94d140f83): alembic 0093 adds two_factor_auth.failed_attempts (INT NOT NULL default 0) + locked_until (nullable ts); TwoFactorService.verify_two_factor now gates on lock before any code check, increments on failure (>=5 consecutive -> 15-minute lock, even correct code rejected with 200+success:false+lock message), resets on success, self-clears expired locks; endpoint contract unchanged (no new status codes, no remaining-attempt disclosure). RED 3 failed (6th attempt with correct code succeeded) -> GREEN 3 passed, neighborhood 64 passed; pyotp was removed from the project, test fixtures use the service's own generate_totp_code (wrong code = hour-ago window); 2026-11-15 wave-3h triage: deferred — limiter placement interacts with the middleware bucket already documented in this entry ('/2fa/verify' substring routing 10/300); a separate wave must reconcile endpoint-level @limiter with the middleware bucket to avoid double-limit surprises",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13",
    "fix_pr_head": "127a667aa"
@@ -4200,7 +4202,7 @@
    "status": "CONFIRMED_OPEN",
    "fix_pr": "https://github.com/drsapaev/final/pull/4071",
    "merge_sha": null,
-   "root_cause": "GET /two-factor/backup-codes returned every unused plaintext backup code to any bearer-token holder, and POST /backup-codes/regenerate minted ten fresh codes with NO password and NO TOTP — inconsistent with the same file's own policy (/disable demands both factors per AUTH-REAUDIT-28; /two-factor/devices/revoke-all verifies the password); a transient session compromise (token theft, unattended workstation) was convertible into a permanent, self-service re-entry kit; fix PR #4071 opened 2026-11-14 (head 803e44723, stacked on #4070/#4069/#4068): GET /backup-codes now returns one-time-disclosure-safe semantics — backup_codes=[] + total=remaining (values disclosed exactly once at enable or regenerate after re-auth); POST /backup-codes/regenerate requires BOTH factors mirroring /disable — new TwoFactorBackupCodesRegenerateRequest body {password, totp_code?, backup_code?}, 401 on password mismatch, 400 if second factor absent, 403 via the same service.verify_two_factor used at login, only then the kit is minted. RED (5 failed: plaintext re-read, 200 on no-body/wrong-password/no-second-factor/wrong-totp) -> GREEN 6 passed; 2FA regression 42 passed; response shape unchanged (no openapi regeneration). Follow-up candidates: PASSRESET/PHONEVER/ACTIVATION planes; CI on head 803e44723: Backend success (full suite), CodeQL success, Frontend lint/type-check success (openapi.json and generated api.ts kept byte-identical to #4070 by reusing the existing TwoFactorDisableRequest schema — zero spec delta), the docs-generation job failed with a cause not reproducible locally (app.openapi() OK, 1098 paths; CI logs unavailable to the agent PAT) — full diagnostic in PR #4071 comment; owner review of the docs job log requested",
+   "root_cause": "GET /two-factor/backup-codes returned every unused plaintext backup code to any bearer-token holder, and POST /backup-codes/regenerate minted ten fresh codes with NO password and NO TOTP — inconsistent with the same file's own policy (/disable demands both factors per AUTH-REAUDIT-28; /two-factor/devices/revoke-all verifies the password); a transient session compromise (token theft, unattended workstation) was convertible into a permanent, self-service re-entry kit; fix PR #4071 opened 2026-11-14 (head 803e44723, stacked on #4070/#4069/#4068): GET /backup-codes now returns one-time-disclosure-safe semantics — backup_codes=[] + total=remaining (values disclosed exactly once at enable or regenerate after re-auth); POST /backup-codes/regenerate requires BOTH factors mirroring /disable — new TwoFactorBackupCodesRegenerateRequest body {password, totp_code?, backup_code?}, 401 on password mismatch, 400 if second factor absent, 403 via the same service.verify_two_factor used at login, only then the kit is minted. RED (5 failed: plaintext re-read, 200 on no-body/wrong-password/no-second-factor/wrong-totp) -> GREEN 6 passed; 2FA regression 42 passed; response shape unchanged (no openapi regeneration). Follow-up candidates: PASSRESET/PHONEVER/ACTIVATION planes; CI on head 803e44723: Backend success (full suite), CodeQL success, Frontend lint/type-check success (openapi.json and generated api.ts kept byte-identical to #4070 by reusing the existing TwoFactorDisableRequest schema — zero spec delta), the docs-generation job failed with a cause not reproducible locally (app.openapi() OK, 1098 paths; CI logs unavailable to the agent PAT) — full diagnostic in PR #4071 comment; owner review of the docs job log requested; 2026-11-15 wave-3h triage: deferred — the fix is a breaking response-shape change (plaintext backup-code disclosure must become ceremony-gated); needs the ceremony contract settled before a mechanical PR (compare /disable's both-factor policy)",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13",
    "fix_pr_head": "803e44723"
@@ -4253,13 +4255,13 @@
    "priority": "P1",
    "source": "Extra outside the old 306 core count — #3892 authentication/security group 33",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6759909490",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": "https://github.com/drsapaev/final/pull/4068",
+   "status": "FIX_IN_PROGRESS",
+   "fix_pr": "https://github.com/drsapaev/final/pull/4077",
    "merge_sha": null,
-   "root_cause": "webauthn.py read rp_id/origin from the request body (defaults localhost/http://localhost:3000) and passed them as the EXPECTED verification values to verify_registration_response/verify_authentication_response; registration options embedded the client RP too — WebAuthn's origin binding verified attacker input against attacker input (phished initData -> attacker-origin passkey for victim patient_id -> end-to-end login); fix PR #4068 opened 2026-11-14 (head 512d4d806, off main 94d140f83): RP ID/origin server-pinned from settings.FRONTEND_URL (rpId=hostname, origin=scheme://netloc, missing FRONTEND_URL fails closed); client rp_id/origin ignored in all four flows (kwargs kept for call-site compatibility, documented as deprecated); rp_name stays display-only; dead webauthn.helpers.structs import removed. RED 4 failed (captured expected_* == evil.example) -> GREEN 4 passed; webauthn unit neighbors 15 passed, mini-app 16 passed; openapi unchanged (manual request.json parsing)",
+   "root_cause": "webauthn.py read rp_id/origin from the request body (defaults localhost/http://localhost:3000) and passed them as the EXPECTED verification values to verify_registration_response/verify_authentication_response; registration options embedded the client RP too — WebAuthn's origin binding verified attacker input against attacker input (phished initData -> attacker-origin passkey for victim patient_id -> end-to-end login); fix PR #4068 opened 2026-11-14 (head 512d4d806, off main 94d140f83): RP ID/origin server-pinned from settings.FRONTEND_URL (rpId=hostname, origin=scheme://netloc, missing FRONTEND_URL fails closed); client rp_id/origin ignored in all four flows (kwargs kept for call-site compatibility, documented as deprecated); rp_name stays display-only; dead webauthn.helpers.structs import removed. RED 4 failed (captured expected_* == evil.example) -> GREEN 4 passed; webauthn unit neighbors 15 passed, mini-app 16 passed; openapi unchanged (manual request.json parsing); fix PR #4077 opened 2026-11-15 (head d507e56dc): new _server_rp_config() derives rp_id/origin from WEBAUTHN_RP_ID/WEBAUTHN_ORIGIN falling back to FRONTEND_URL; all four ceremonies pass server values and ignore body rp_id/origin (evil.example RED test); side finding fixed in the same PR: all six webauthn endpoints were runtime-dead (sync def + Starlette 0.50 async Request.json() without await → AttributeError on every call) — now async def + await, so the server-pinned rp_id actually enforces",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13",
-   "fix_pr_head": "512d4d806"
+   "fix_pr_head": "d507e56dc"
   },
   {
    "checked": false,
@@ -4270,7 +4272,7 @@
    "status": "CONFIRMED_OPEN",
    "fix_pr": "https://github.com/drsapaev/final/pull/4069",
    "merge_sha": null,
-   "root_cause": "/webauthn/login/begin and /login/finish fully unauthenticated with arbitrary body patient_id, no rate limiter at all (webauthn.py imports none; router public at api.py:219); distinct 400/500 shapes vs success leaked existing patient ids and active-passkey possession (anonymous enumeration); login/begin cached a challenge for ANY caller-supplied id (unbounded cache growth); assertion attempts unthrottled; fix PR #4069 opened 2026-11-14 (head 900006e9d, stacked on #4068 which it includes): slowapi IP limits 10/min begin + 5/min finish (repo auth-plane pattern); begin caches challenge ONLY when an active PasskeyCredential exists (unknown/gated patients get byte-identical dummy 200, cache no longer growable); finish returns ONE opaque 403 auth_finish_failed for every pre-verify failure (raw str(exc) message removed, details to logs). PRE-EXISTING BREAKAGE repaired in the same PR: all six handlers called async request.json() from sync def handlers -> AttributeError 500 after the 503 guard (login plane dead on main); handlers now async def with await request.json(). RED 5 failed (503->coroutine 500, leaked message, no 429) -> GREEN 9 passed with stacked BE-001 suite; regression 24+16+57 passed",
+   "root_cause": "/webauthn/login/begin and /login/finish fully unauthenticated with arbitrary body patient_id, no rate limiter at all (webauthn.py imports none; router public at api.py:219); distinct 400/500 shapes vs success leaked existing patient ids and active-passkey possession (anonymous enumeration); login/begin cached a challenge for ANY caller-supplied id (unbounded cache growth); assertion attempts unthrottled; fix PR #4069 opened 2026-11-14 (head 900006e9d, stacked on #4068 which it includes): slowapi IP limits 10/min begin + 5/min finish (repo auth-plane pattern); begin caches challenge ONLY when an active PasskeyCredential exists (unknown/gated patients get byte-identical dummy 200, cache no longer growable); finish returns ONE opaque 403 auth_finish_failed for every pre-verify failure (raw str(exc) message removed, details to logs). PRE-EXISTING BREAKAGE repaired in the same PR: all six handlers called async request.json() from sync def handlers -> AttributeError 500 after the 503 guard (login plane dead on main); handlers now async def with await request.json(). RED 5 failed (503->coroutine 500, leaked message, no 429) -> GREEN 9 passed with stacked BE-001 suite; regression 24+16+57 passed; 2026-11-15 wave-3h triage: partially deferred — the arbitrary-body patient_id login model is a product decision; the mechanical subset (rate limiter + uniform error shapes) is scheduled for the next wave",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13",
    "fix_pr_head": "900006e9d"
