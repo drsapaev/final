@@ -276,8 +276,8 @@ async def request_password_reset(
         # shape was an active oracle: unknown emails got 400 + "Пользователь
         # с таким email не найден" while registered ones returned
         # 200 + machine-readable expires_at. The service result is
-        # deliberately not inspected for the response; side effects (token
-        # creation + email) still happen only for known emails.
+        # deliberately not inspected for the response; database token
+        # creation still happens only for known emails.
         del result
 
         return AuthSuccessResponse(

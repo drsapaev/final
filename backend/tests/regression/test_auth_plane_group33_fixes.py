@@ -123,8 +123,38 @@ class TestAuthBE002PasswordResetUniformResponse:
         known_body = known.json()
         unknown_body = unknown.json()
         assert set(known_body.keys()) == set(unknown_body.keys())
+        assert known_body == unknown_body
         # The old success shape leaked expires_at only for known emails.
         assert not (known_body.get("data") or {}).get("expires_at")
+
+    def test_service_failure_result_keeps_uniform_success_response(
+        self, client, admin_user, monkeypatch
+    ):
+        monkeypatch.setattr(
+            auth_module,
+            "get_authentication_service",
+            lambda: SimpleNamespace(
+                create_password_reset_token=lambda **kwargs: {
+                    "success": False,
+                    "message": "internal service failure",
+                }
+            ),
+        )
+
+        response = client.post(
+            "/api/v1/authentication/password-reset",
+            json={"email": admin_user.email},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "success": True,
+            "message": (
+                "Если пользователь с таким email существует, "
+                "ссылка для сброса отправлена"
+            ),
+            "data": None,
+        }
 
 
 # AUTH-BE-005 (CSRF Secure flag keyed to os.getenv) was REFUTED during
