@@ -4263,18 +4263,18 @@
    "root_cause": "CONFIRMED on current main 2026-11-15: VisitService.__table_args__ has only a duration CheckConstraint — no unique (visit_id, service_id); duplicate lines for one service are legitimate (crud inserts directly), while dental/derma repositories resolve get_visit_service with .first() (dental_api_repository.py:58-66) — approval then mutates ONE row and leaves the twin at catalogue price, so the billable sum is neither 2×catalogue nor 2×override (half-applied approval); API identifies service_id, not visit_service_id"
   },
   {
-   "checked": true,
+   "checked": false,
    "id": "REGSTART-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": "#4088",
-   "merge_sha": "3dbb6f95c",
-   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (RBAC hole narrowed by post-audit work): registrar start_queue_visit (_queue_ops.py:628-683) still admits Admin/Registrar/Doctor/cardio/cardiology/derma/dentist/Lab and loads ANY OnlineQueueEntry by global id; the patient-mismatch guard now exists (linked_visit.patient_id != queue_entry.patient_id → 409) but there is NO queue-ownership scope check against the acting user — queue_entry.queue.specialist_id / resource axis is never compared, so doctor A (cardiology) can flip doctor B's (dentistry) queue entry and linked visit to in_progress, unlike the doctor-panel start route which checks owner/same-specialty and the legacy queue call helper which checks Doctor ownership | fixed by owner PR #4088 (merge 3dbb6f95c, current main): non-Admin/Registrar callers may start only queues they own (Doctor row match) or of the SAME specialty — mirroring the doctor-panel start route guard; Lab (no clinical queue ownership) gets 403; Admin/Registrar keep the full legacy operator workflow",
+   "status": "CONFIRMED_OPEN",
+   "fix_pr": null,
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (RBAC hole narrowed by post-audit work): registrar start_queue_visit (_queue_ops.py:628-683) still admits Admin/Registrar/Doctor/cardio/cardiology/derma/dentist/Lab and loads ANY OnlineQueueEntry by global id; the patient-mismatch guard now exists (linked_visit.patient_id != queue_entry.patient_id → 409) but there is NO queue-ownership scope check against the acting user — queue_entry.queue.specialist_id / resource axis is never compared, so doctor A (cardiology) can flip doctor B's (dentistry) queue entry and linked visit to in_progress, unlike the doctor-panel start route which checks owner/same-specialty and the legacy queue call helper which checks Doctor ownership | fixed by owner PR #4088 (merge 3dbb6f95c, current main): non-Admin/Registrar callers may start only queues they own (Doctor row match) or of the SAME specialty — mirroring the doctor-panel start route guard; Lab (no clinical queue ownership) gets 403; Admin/Registrar keep the full legacy operator workflow | RE-OPENED by owner group95 correction (2026-11-15): on main 3dbb6f95c the merged #4088 did NOT fully close this ID — the new non-operator guard executes only for doctor-owned queues (truthy specialist_id), but valid resource-owned DailyQueue rows use specialist_id=NULL (queue_resource_id set) and bypass it, so non-Admin/Registrar callers can still start resource queues; evidence: pre-merge warning #4088 comment (6894087106) + group95 exact-head code+test evidence; owner changed the one checkbox from [x] to [ ]; DOCSTART-BE-001 (separate binding fix) stays fixed",
    "test_before": "RED on pre-#4088 main: a Doctor/ Lab caller could start ANY queue entry by global id — foreign doctor flipped another doctor's queue entry + linked visit to in_progress (200, rows mutated)",
-   "test_after": "RED 2/2 on main (foreign doctor 200'd another doctor's queue) → GREEN (403 with zero mutation; owner/registrar/same-specialty positives unchanged) — tests/integration/test_start_visit_ownership_guards.py; full unit suite 3144/0; 262 regression tests across the touched queue surfaces; ruff clean",
-   "reviewer": "owner PR #4088 (RED→GREEN evidence in commit body) + fixing-agent registry v36 sync",
+   "test_after": "residual branch unfixed: a resource-owned queue (specialist_id NULL) still admits non-operator starts — fix candidate: extend the #4088 guard so non-Admin/Registrar callers get 403 on resource-owned queues (symmetric with the QD-2C Admin-only resource call contract)",
+   "reviewer": "owner group95 correction (checkbox [x]->[ ]) + fixing-agent registry v37 sync",
    "date": "2026-11-15"
   },
   {
@@ -4543,6 +4543,66 @@
    "status": "CONFIRMED_OPEN",
    "checked": true,
    "root_cause": "CONFIRMED on current main 2026-11-15 (source-verified, concurrency not reproduced — owner group86 classification kept): password_reset_service.py still retrieves the token with a plain .first() (no with_for_update), checks token_row.used at :327, commits the user password at :370, and only then sets token_row.used=True with a SECOND commit at :376-378 — two PostgreSQL transactions can both read an unused token and race (last writer wins), and a failure on the second commit leaves the password updated while the token stays reusable. Distinct from PASSRESET-BE-001/002/003 (throttle/oracle, URL transport, password length); not covered by open PR #4075"
+  },
+  {
+   "checked": false,
+   "id": "QUEUEPRINT-FE-001",
+   "priority": "P2",
+   "source": "#4063 group97 independent queue-ticket print code review (owner, 2026-11-15, main 3dbb6f95c)",
+   "evidence": "https://github.com/drsapaev/final/blob/667ab4e961c302d5575bc57097fc6776c14c5b59/docs/audits/2026-11-15-queue-ticket-print-code-review-group97.md",
+   "status": "CONFIRMED_OPEN",
+   "fix_pr": null,
+   "merge_sha": null,
+   "title": "MultipleTicketsPrinter per-card single print never updates printedTickets — reprinted in batch (duplicate print operations)",
+   "root_cause": "frontend/src/components/tickets/MultipleTicketsPrinter.tsx:45-63 calls printPanelTicketInBrowserAsync and returns success on a per-card «Печать» click but NEVER updates printedTickets; only the batch path calls setPrintedTickets — already individually printed tickets remain visually unprinted and are included again by printAllTickets (duplicate browser print ops); the existing single-print unit test asserts only the call, not the printed-state transition. Owner acceptance: synthetic successful single print marks that ticket, excludes it from batch, failure leaves pending; distinguish print invocation from actual physical delivery",
+   "test_after": null,
+   "reviewer": "owner group97 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v37 sync",
+   "date": "2026-11-15"
+  },
+  {
+   "checked": false,
+   "id": "QUEUEPRINT-FE-002",
+   "priority": "P2",
+   "source": "#4063 group97 independent queue-ticket print code review (owner, 2026-11-15, main 3dbb6f95c)",
+   "evidence": "https://github.com/drsapaev/final/blob/667ab4e961c302d5575bc57097fc6776c14c5b59/docs/audits/2026-11-15-queue-ticket-print-code-review-group97.md",
+   "status": "CONFIRMED_OPEN",
+   "fix_pr": null,
+   "merge_sha": null,
+   "title": "MultipleTicketsPrinter uses shared queue_id as printed-state identity — same-queue tickets collide (Set size 1 vs two tickets; new ticket silently treated printed)",
+   "root_cause": "MultipleTicketsPrinter.tsx:33-35,75-89,126-149,189-215 uses ticket.queue_id (shared DailyQueue ID) as the unique state identity for individually printed tickets; backend visit_confirmation_service.py:944-1009 separates shared queue_id from queue_number — for [{queue_id:17,queue_number:4},{queue_id:17,queue_number:5}] a completed batch produces Set size 1 vs two tickets and mutually inconsistent allPrinted=false,hasUnprinted=false; a new ticket sharing queue_id can be silently treated printed; existing tests use distinct q1,q2,q3 IDs only. Owner acceptance: verified ticket/entry identity (or validated composite), same-queue/different-number regression with accurate printed/remaining state",
+   "test_after": null,
+   "reviewer": "owner group97 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v37 sync",
+   "date": "2026-11-15"
+  },
+  {
+   "checked": false,
+   "id": "QUEUEPRINT-FE-003",
+   "priority": "P2",
+   "source": "#4063 group97 independent queue-ticket print code review (owner, 2026-11-15, main 3dbb6f95c)",
+   "evidence": "https://github.com/drsapaev/final/blob/667ab4e961c302d5575bc57097fc6776c14c5b59/docs/audits/2026-11-15-queue-ticket-print-code-review-group97.md",
+   "status": "CONFIRMED_OPEN",
+   "fix_pr": null,
+   "merge_sha": null,
+   "title": "panelPrint extractQueueNumberCandidate falls back to nested obj.id — global queue entry PK printed as «Очередь №...» (P1/P2 conditional per owner)",
+   "root_cause": "frontend/src/services/panelPrint.ts:161-239 extractQueueNumberCandidate falls back from the true issued number to nested obj.id, falsely printing the global queue entry PK as «Очередь №...» in buildPanelTicketPayload (owner marks P1/P2 conditional; full line details in the group97 doc)",
+   "test_after": null,
+   "reviewer": "owner group97 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v37 sync",
+   "date": "2026-11-15"
+  },
+  {
+   "checked": false,
+   "id": "QUEUEPRINT-FE-004",
+   "priority": "P2",
+   "source": "#4063 group97 independent queue-ticket print code review (owner, 2026-11-15, main 3dbb6f95c)",
+   "evidence": "https://github.com/drsapaev/final/blob/667ab4e961c302d5575bc57097fc6776c14c5b59/docs/audits/2026-11-15-queue-ticket-print-code-review-group97.md",
+   "status": "CONFIRMED_OPEN",
+   "fix_pr": null,
+   "merge_sha": null,
+   "title": "panelPrint resolveServicePriceForTicket returns {} for unknown service — formatMoney labels missing price as 0 UZS when show_price=true (conditional)",
+   "root_cause": "frontend/src/services/panelPrint.ts:390-443,724-752,1128-1134 resolveServicePriceForTicket returns {} (truthy nonprice) if the queue label/tag fails to exactly match a service; render tests Number({})!==0 (NaN), then formatMoney({}) formats missing as 0 UZS — falsely labeling an unknown price as free when Admin opts to show price; the server print_tickets payload does NOT include per-ticket price and queue_label «Кардиолог» need not match service «Консультация кардиолога»; default show_price=false so this is conditional. Owner acceptance: null on unknown/nonfinite price, authoritative service mapping, genuine 0 vs missing, multi-service and show_price toggle tests",
+   "test_after": null,
+   "reviewer": "owner group97 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v37 sync",
+   "date": "2026-11-15"
   }
  ]
 }
