@@ -346,13 +346,14 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             # patient-binding invariant here, before any date logic or
             # mutation.
             if visit.patient_id != queue_entry.patient_id:
+                # CodeQL py/clear-text-logging-sensitive-data: patient IDs
+                # are PHI and must not be logged; entry_id + visit_id are
+                # enough for operators to locate the inconsistent link.
                 logger.warning(
-                    "start_patient_visit: entry visit patient mismatch entry_id=%d "
-                    "visit_id=%d visit_patient=%s entry_patient=%s",
+                    "start_patient_visit: entry visit patient mismatch "
+                    "entry_id=%d visit_id=%d",
                     queue_entry.id,
                     visit.id,
-                    visit.patient_id,
-                    queue_entry.patient_id,
                 )
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
