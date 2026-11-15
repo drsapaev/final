@@ -337,6 +337,27 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
     if queue_entry.visit_id:
         visit = db.query(Visit).filter(Visit.id == queue_entry.visit_id).first()
         if visit is not None:
+            # DOCSTART-BE-001 (audit #3892 group 24): the visit_id-first
+            # branch trusted queue_entry.visit_id without checking the
+            # visit belongs to the QUEUE PATIENT. An inconsistent
+            # historic/imported link would let a doctor put ANOTHER
+            # patient's visit in progress from this entry. The registrar
+            # start route already rejects this with 409 — mirror the
+            # patient-binding invariant here, before any date logic or
+            # mutation.
+            if visit.patient_id != queue_entry.patient_id:
+                logger.warning(
+                    "start_patient_visit: entry visit patient mismatch entry_id=%d "
+                    "visit_id=%d visit_patient=%s entry_patient=%s",
+                    queue_entry.id,
+                    visit.id,
+                    visit.patient_id,
+                    queue_entry.patient_id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Queue entry visit does not belong to the queue patient",
+                )
             # Codex round-40 P2 + round-41 P2: форс-мажор перенос
             # копирует visit_id на завтрашнюю запись — валидируем
             # удержанный визит против НОВОГО дня очереди записи на
