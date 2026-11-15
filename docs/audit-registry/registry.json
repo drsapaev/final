@@ -1584,10 +1584,14 @@
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
-   "merge_sha": null,
-   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (Codex round-40/41 hardened the DATE axis only): _resolve_entry_visit still returns the queue_entry.visit_id-linked Visit immediately when its visit_date matches the queue day (:345-347) without comparing visit.patient_id against queue_entry.patient_id — doctor start then transitions P2's visit to in_progress while the entry belongs to P1; the registrar route (patient-mismatch 409) and the doctor EMR-completion guard both prove patient binding is a defined invariant missing exactly at doctor start"
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#4088",
+   "merge_sha": "3dbb6f95c",
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (Codex round-40/41 hardened the DATE axis only): _resolve_entry_visit still returns the queue_entry.visit_id-linked Visit immediately when its visit_date matches the queue day (:345-347) without comparing visit.patient_id against queue_entry.patient_id — doctor start then transitions P2's visit to in_progress while the entry belongs to P1; the registrar route (patient-mismatch 409) and the doctor EMR-completion guard both prove patient binding is a defined invariant missing exactly at doctor start | fixed by owner PR #4088 (merge 3dbb6f95c, current main): patient-binding guard (409, no mutation) in the doctor start path compares resolved_visit.patient_id to queue_entry.patient_id BEFORE any date logic, mirroring the existing registrar-route invariant; the denial warning was PHI-scrubbed (CodeQL clear-text-logging fix, entry_id+visit_id only)",
+   "test_before": "RED on pre-#4088 main: an inconsistent historic/imported visit_id link let doctor start put ANOTHER patient's visit in_progress from a foreign queue entry (200, rows mutated; date logic ran before any binding check)",
+   "test_after": "RED 2/2 on main (inconsistent link 200'd another patient's visit) → GREEN (409 with zero mutation; correct-binding positive unchanged) — test_start_visit_ownership_guards.py; agent gate narrow_override documented (gate_misroute=true, route-local guards mirroring EXISTING sibling-panel guards)",
+   "reviewer": "owner PR #4088 (RED→GREEN evidence in commit body) + fixing-agent registry v36 sync",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -4264,10 +4268,14 @@
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
-   "merge_sha": null,
-   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (RBAC hole narrowed by post-audit work): registrar start_queue_visit (_queue_ops.py:628-683) still admits Admin/Registrar/Doctor/cardio/cardiology/derma/dentist/Lab and loads ANY OnlineQueueEntry by global id; the patient-mismatch guard now exists (linked_visit.patient_id != queue_entry.patient_id → 409) but there is NO queue-ownership scope check against the acting user — queue_entry.queue.specialist_id / resource axis is never compared, so doctor A (cardiology) can flip doctor B's (dentistry) queue entry and linked visit to in_progress, unlike the doctor-panel start route which checks owner/same-specialty and the legacy queue call helper which checks Doctor ownership"
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#4088",
+   "merge_sha": "3dbb6f95c",
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (RBAC hole narrowed by post-audit work): registrar start_queue_visit (_queue_ops.py:628-683) still admits Admin/Registrar/Doctor/cardio/cardiology/derma/dentist/Lab and loads ANY OnlineQueueEntry by global id; the patient-mismatch guard now exists (linked_visit.patient_id != queue_entry.patient_id → 409) but there is NO queue-ownership scope check against the acting user — queue_entry.queue.specialist_id / resource axis is never compared, so doctor A (cardiology) can flip doctor B's (dentistry) queue entry and linked visit to in_progress, unlike the doctor-panel start route which checks owner/same-specialty and the legacy queue call helper which checks Doctor ownership | fixed by owner PR #4088 (merge 3dbb6f95c, current main): non-Admin/Registrar callers may start only queues they own (Doctor row match) or of the SAME specialty — mirroring the doctor-panel start route guard; Lab (no clinical queue ownership) gets 403; Admin/Registrar keep the full legacy operator workflow",
+   "test_before": "RED on pre-#4088 main: a Doctor/ Lab caller could start ANY queue entry by global id — foreign doctor flipped another doctor's queue entry + linked visit to in_progress (200, rows mutated)",
+   "test_after": "RED 2/2 on main (foreign doctor 200'd another doctor's queue) → GREEN (403 with zero mutation; owner/registrar/same-specialty positives unchanged) — tests/integration/test_start_visit_ownership_guards.py; full unit suite 3144/0; 262 regression tests across the touched queue surfaces; ruff clean",
+   "reviewer": "owner PR #4088 (RED→GREEN evidence in commit body) + fixing-agent registry v36 sync",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
