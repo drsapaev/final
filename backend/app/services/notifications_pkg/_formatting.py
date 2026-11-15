@@ -114,6 +114,16 @@ class FormattingMixin(NotificationSenderMixinBase):
     def _create_telegram_keyboard(
         self, confirmation_token: str
     ) -> list[list[dict[str, str]]]:
+        # DOCINVITE-BE-001 / NOTIFYTGPHONEURL-BE-001 (audit #3892): the
+        # historical third button used a ``tel:`` URL scheme that Telegram
+        # inline keyboards do not support, built from
+        # ``settings.CLINIC_PHONE`` — a field the Settings model never
+        # declared. Every invitation died with AttributeError inside the
+        # keyboard builder (caught downstream as success:false) BEFORE the
+        # bot dispatch, so even the merged TelegramUser identity resolution
+        # never delivered an initial invitation. Telegram inline keyboards
+        # support only https/tg:// URLs — the unsupported contact button is
+        # removed; confirm/cancel remain the actionable surface.
         return [
             [
                 {
@@ -125,12 +135,6 @@ class FormattingMixin(NotificationSenderMixinBase):
                 {
                     "text": "❌ Отменить визит",
                     "callback_data": f"cancel_visit:{confirmation_token}",
-                }
-            ],
-            [
-                {
-                    "text": "📞 Связаться с клиникой",
-                    "url": f"tel:{settings.CLINIC_PHONE}",
                 }
             ],
         ]
