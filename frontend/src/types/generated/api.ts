@@ -9526,6 +9526,30 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/display/devices/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange Display Device Token
+         * @description Exchange a provisioned secret or HttpOnly device session for a scoped JWT.
+         */
+        post: operations["exchange_display_device_token_api_v1_display_devices_token_post"];
+        /**
+         * Forget Display Device Session
+         * @description Clear this browser's HttpOnly device sessions for one public board.
+         */
+        delete: operations["forget_display_device_session_api_v1_display_devices_token_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/display/call-patient": {
         parameters: {
             query?: never;
@@ -11103,6 +11127,70 @@ export type paths = {
         put: operations["update_display_board_api_v1_admin_display_boards__board_id__put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/display/boards/{board_id}/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Display Board Devices
+         * @description List device metadata without returning any stored credential material.
+         */
+        get: operations["list_display_board_devices_api_v1_admin_display_boards__board_id__devices_get"];
+        put?: never;
+        /**
+         * Create Display Board Device Endpoint
+         * @description Create a board device; return its random credential only in this response.
+         */
+        post: operations["create_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/display/boards/{board_id}/devices/{device_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Display Board Device Endpoint
+         * @description Replace a device credential and invalidate every previously issued JWT.
+         */
+        post: operations["rotate_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices__device_id__rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/display/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Display Board Device Endpoint
+         * @description Revoke one display device and terminate its already-issued JWT grants.
+         */
+        delete: operations["revoke_display_board_device_endpoint_api_v1_admin_display_devices__device_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -28286,6 +28374,64 @@ export type components = {
          */
         DisplayBannerRequest: {
             [key: string]: unknown;
+        };
+        /** DisplayBoardDeviceCreateRequest */
+        DisplayBoardDeviceCreateRequest: {
+            /** Device Name */
+            device_name: string;
+        };
+        /** DisplayBoardDeviceCreatedResponse */
+        DisplayBoardDeviceCreatedResponse: {
+            /** Id */
+            id: number;
+            /** Board Id */
+            board_id: number;
+            /** Device Name */
+            device_name: string;
+            /** Status */
+            status: string;
+            /** Secret */
+            secret: string;
+        };
+        /** DisplayBoardDeviceResponse */
+        DisplayBoardDeviceResponse: {
+            /** Id */
+            id: number;
+            /** Board Id */
+            board_id: number;
+            /** Device Name */
+            device_name: string;
+            /** Status */
+            status: string;
+            /** Last Connected At */
+            last_connected_at?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Rotated At */
+            rotated_at?: string | null;
+        };
+        /** DisplayBoardDeviceTokenRequest */
+        DisplayBoardDeviceTokenRequest: {
+            /** Board Name */
+            board_name: string;
+            /** Device Id */
+            device_id?: number | null;
+            /** Secret */
+            secret?: string | null;
+        };
+        /** DisplayBoardDeviceTokenResponse */
+        DisplayBoardDeviceTokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /** Expires In */
+            expires_in: number;
+            /** Board Name */
+            board_name: string;
         };
         /** DisplayBoardUpdate */
         DisplayBoardUpdate: {
@@ -61303,6 +61449,68 @@ export interface operations {
             };
         };
     };
+    exchange_display_device_token_api_v1_display_devices_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisplayBoardDeviceTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayBoardDeviceTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_display_device_session_api_v1_display_devices_token_delete: {
+        parameters: {
+            query: {
+                board_name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     call_patient_to_board_api_v1_display_call_patient_post: {
         parameters: {
             query?: never;
@@ -64683,6 +64891,133 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_display_board_devices_api_v1_admin_display_boards__board_id__devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayBoardDeviceResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisplayBoardDeviceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayBoardDeviceCreatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices__device_id__rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayBoardDeviceCreatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_display_board_device_endpoint_api_v1_admin_display_devices__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
