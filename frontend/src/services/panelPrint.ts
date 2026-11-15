@@ -175,21 +175,32 @@ function extractQueueNumberCandidate(value: unknown): string | null {
 
   if (typeof value === 'object' && value !== null) {
     const obj = value as Record<string, unknown>;
+    // QUEUEPRINT-FE-003 (audit group97): the global queue-entry PK (obj.id)
+    // is NOT a queue number — the previous fallback printed it as
+    // «Очередь №42» when no true issued number existed. Only honest
+    // number-shaped fields are candidates; a payload without one renders
+    // no queue-number line at all.
     const direct = getFirstDefined(
       obj.queue_number,
       obj.number,
       obj.ticket_number,
       obj.queue_position,
       obj.queue_no,
-      obj.display_number,
-      obj.id
+      obj.display_number
     );
 
     if (direct !== null && direct !== undefined && direct !== '') {
       return String(direct);
     }
 
+    // QUEUEPRINT-FE-003 (audit group97): the nested walk may enter nested
+    // CONTAINERS only (objects/arrays hunting an honest number-shaped
+    // field) — bare scalars are skipped, so the entry PK inside {id: 42}
+    // is never printed as a queue number.
     for (const nestedValue of Object.values(value)) {
+      if (nestedValue === null || typeof nestedValue !== 'object') {
+        continue;
+      }
       const nestedCandidate = extractQueueNumberCandidate(nestedValue);
       if (nestedCandidate !== null && nestedCandidate !== undefined && nestedCandidate !== '') {
         return String(nestedCandidate);
@@ -439,7 +450,10 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
     }
   }
 
-  return {};
+  // QUEUEPRINT-FE-004 (audit group97): a label mismatch means UNKNOWN
+  // price — null (honest absence), never a truthy {} placeholder that
+  // Number() coerces to NaN and formatMoney() labels as a false «0 UZS».
+  return null;
 }
 
 function resolveTicketCabinet(row: Record<string, unknown>, source: Record<string, unknown> | null = null, overrides: Record<string, unknown> = {}): unknown {
@@ -726,7 +740,11 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
   const logoUrl = resolveClinicLogo(payload, {}, branding);
   const servicePrice = resolveServicePrice(payload);
   const qrPayload = payload?.qr_payload;
-  const showPriceValue = settings.show_price && servicePrice !== null && servicePrice !== undefined && String(servicePrice) !== '' && Number(servicePrice) !== 0;
+  // QUEUEPRINT-FE-004 (audit group97): show an honest finite price — a
+  // GENUINE 0 stays visible («0 UZS»), an unknown/nonfinite value
+  // (NaN from a {} placeholder upstream) hides the price line instead of
+  // being labeled free.
+  const showPriceValue = settings.show_price && servicePrice !== null && servicePrice !== undefined && String(servicePrice) !== '' && Number.isFinite(Number(servicePrice));
   const priceValue = showPriceValue ? formatMoney(servicePrice, 'UZS') : null;
 
   // REG-FE-082: блок бренда рендерится только при честном имени/логотипе
@@ -744,7 +762,9 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
       ` : ''}
       ${settings.show_service_name ? `<div class="center service-name">${escapeHtml(payload.specialty_name)}</div>` : ''}
       <div class="line"></div>
-      ${settings.show_queue_number ? `<div class="center queue-number">Очередь №${escapeHtml(payload.queue_number)}</div>` : ''}
+      // QUEUEPRINT-FE-003 (audit group97): a missing true number renders
+      // NO queue-number line — never a placeholder like «Очередь №null».
+      ${settings.show_queue_number && payload.queue_number ? `<div class="center queue-number">Очередь №${escapeHtml(payload.queue_number)}</div>` : ''}
       <div class="line"></div>
       ${renderTicketMetadata('Пациент', payload.patient_name, settings.show_patient_name)}
       ${renderTicketMetadata('Врач', payload.doctor_name, settings.show_doctor_name)}
