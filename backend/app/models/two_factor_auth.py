@@ -58,7 +58,7 @@ class TwoFactorAuth(Base):
     # limiter is per-IP and trivially bypassed, so the verify counter and the
     # temporary lockout live on the 2FA record itself. See
     # TwoFactorService.verify_two_factor and alembic
-    # 0093_two_factor_attempt_lockout.
+    # 0095_two_factor_attempt_lockout.
     failed_attempts: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=sa_text("0")
     )

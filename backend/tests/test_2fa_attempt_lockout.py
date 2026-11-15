@@ -10,7 +10,7 @@ Fix contract (wave 3b2):
 - after 5 failed verifications the account's 2FA locks for 15 minutes
   (``locked_until``), enforced service-side, storage-backed via the new
   ``failed_attempts``/``locked_until`` columns on ``two_factor_auth``
-  (alembic 0093_two_factor_attempt_lockout);
+  (alembic 0095_two_factor_attempt_lockout);
 - a successful verification resets the counter;
 - an expired lock self-clears and verification resumes normally;
 - the endpoint contract is unchanged (200 + ``success:false`` + message on

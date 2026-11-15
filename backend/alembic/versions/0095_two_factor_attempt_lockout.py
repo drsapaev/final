@@ -25,8 +25,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # alembic_version.version_num is VARCHAR(32) on PostgreSQL.
-revision = "0093_two_factor_attempt_lockout"
-down_revision = "0092_price_override_visit_price"
+revision = "0095_two_factor_attempt_lockout"
+down_revision = "0094_2fa_trust_expiry"
 branch_labels = None
 depends_on = None
 

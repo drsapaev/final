@@ -47,7 +47,7 @@ class TwoFactorService:
         # TWOFACTOR-BE-001 (#4063): brute-force defense on the second factor.
         # The endpoint limiter is per-IP (bypassable), so the cap lives on the
         # 2FA record: N consecutive failures -> temporary lock, storage-backed
-        # (two_factor_auth.failed_attempts / locked_until, alembic 0093).
+        # (two_factor_auth.failed_attempts / locked_until, alembic 0095).
         self.max_verify_attempts = 5
         self.verify_lockout_minutes = 15
         self.sms_manager = get_sms_manager()
@@ -447,10 +447,19 @@ class TwoFactorService:
     ) -> tuple[bool, str, str | None]:
         """Верифицирует 2FA код"""
         try:
+            # Serialize verification decisions on the per-user 2FA record.
+            # Without this lock, concurrent failures can read the same counter
+            # and overwrite one another, bypassing the account-level cap.
             two_factor_auth = (
-                db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+                db.query(TwoFactorAuth)
+                .filter(
+                    TwoFactorAuth.user_id == user_id,
+                    TwoFactorAuth.totp_enabled.is_(True),
+                )
+                .with_for_update()
+                .first()
             )
-            if not two_factor_auth or not two_factor_auth.totp_enabled:
+            if not two_factor_auth:
                 return False, "2FA not enabled", None
 
             # TWOFACTOR-BE-001 (#4063): service-side lockout gate — checked
@@ -466,6 +475,9 @@ class TwoFactorService:
                     remaining_minutes = max(
                         1, int((locked_until - now).total_seconds() // 60) + 1
                     )
+                    # Release the row lock before returning; the service's
+                    # callers may reuse this session beyond this request.
+                    db.commit()
                     return (
                         False,
                         "2FA temporarily locked after repeated failed "
@@ -474,7 +486,6 @@ class TwoFactorService:
                     )
                 two_factor_auth.locked_until = None
                 two_factor_auth.failed_attempts = 0
-                db.commit()
 
             _method_used = None
             success = False
