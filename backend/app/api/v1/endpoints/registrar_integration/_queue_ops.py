@@ -662,6 +662,53 @@ def start_queue_visit(
             )
 
         if queue_entry:
+            # REGSTART-BE-001 (audit #3892 group 24): Doctor/specialty/Lab
+            # callers must not start another doctor's queue. Admin/Registrar
+            # keep the full legacy operator workflow; a Doctor (or specialty
+            # role) may start only the queue they own — or a queue of the
+            # SAME specialty, mirroring the doctor-panel start route guard.
+            # Lab has no clinical queue ownership at all.
+            if current_user.role not in ("Admin", "Registrar"):
+                entry_queue = queue_entry.queue
+                queue_specialist_id = getattr(entry_queue, "specialist_id", None)
+                if queue_specialist_id:
+                    from app.models.clinic import Doctor as _QueueDoctor
+
+                    queue_doctor = (
+                        db.query(_QueueDoctor)
+                        .filter(_QueueDoctor.id == queue_specialist_id)
+                        .first()
+                    )
+                    caller_doctor = (
+                        db.query(_QueueDoctor)
+                        .filter(_QueueDoctor.user_id == current_user.id)
+                        .first()
+                    )
+                    is_owner = (
+                        caller_doctor is not None
+                        and queue_doctor is not None
+                        and caller_doctor.id == queue_doctor.id
+                    )
+                    same_specialty = (
+                        caller_doctor is not None
+                        and queue_doctor is not None
+                        and bool(caller_doctor.specialty)
+                        and bool(queue_doctor.specialty)
+                        and (caller_doctor.specialty or "").lower().strip()
+                        == (queue_doctor.specialty or "").lower().strip()
+                    )
+                    if not (is_owner or same_specialty):
+                        logger.warning(
+                            "start_queue_visit: foreign specialist denied entry_id=%d "
+                            "queue_specialist_id=%s caller_user_id=%d",
+                            queue_entry.id,
+                            queue_specialist_id,
+                            current_user.id,
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Queue entry belongs to another specialist",
+                        )
             linked_visit = None
             if queue_entry.visit_id:
                 linked_visit = (
