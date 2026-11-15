@@ -43955,88 +43955,26 @@
           "two-factor-sms-email"
         ],
         "summary": "Send Verification Code",
-        "description": "Отправить код подтверждения по SMS или Email",
+        "description": "Send a code only to the recovery contact configured for the account.",
         "operationId": "send_verification_code_api_v1_2fa_send_code_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "method",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Метод отправки: sms или email",
-              "title": "Method"
-            },
-            "description": "Метод отправки: sms или email"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationMethodRequest"
+              }
+            }
           },
-          {
-            "name": "phone_number",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Номер телефона для SMS",
-              "title": "Phone Number"
-            },
-            "description": "Номер телефона для SMS"
-          },
-          {
-            "name": "email_address",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Email адрес",
-              "title": "Email Address"
-            },
-            "description": "Email адрес"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "SMS провайдер: eskiz, playmobile, mock",
-              "title": "Provider"
-            },
-            "description": "SMS провайдер: eskiz, playmobile, mock"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Send Verification Code Api V1 2Fa Send Code Post"
                 }
               }
@@ -44052,7 +43990,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/2fa/verify-code": {
@@ -44063,79 +44006,24 @@
         "summary": "Verify Verification Code",
         "description": "Проверить код подтверждения",
         "operationId": "verify_verification_code_api_v1_2fa_verify_code_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "method",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Метод верификации: sms или email",
-              "title": "Method"
-            },
-            "description": "Метод верификации: sms или email"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest"
+              }
+            }
           },
-          {
-            "name": "code",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Код подтверждения",
-              "title": "Code"
-            },
-            "description": "Код подтверждения"
-          },
-          {
-            "name": "phone_number",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Номер телефона для SMS",
-              "title": "Phone Number"
-            },
-            "description": "Номер телефона для SMS"
-          },
-          {
-            "name": "email_address",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Email адрес",
-              "title": "Email Address"
-            },
-            "description": "Email адрес"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Verify Verification Code Api V1 2Fa Verify Code Post"
                 }
               }
@@ -44151,7 +44039,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/2fa/verification-status": {
@@ -44173,6 +44066,10 @@
             "in": "query",
             "required": true,
             "schema": {
+              "enum": [
+                "sms",
+                "email"
+              ],
               "type": "string",
               "description": "Метод: sms или email",
               "title": "Method"
@@ -44214,68 +44111,24 @@
         "summary": "Resend Verification Code",
         "description": "Повторно отправить код подтверждения",
         "operationId": "resend_verification_code_api_v1_2fa_resend_code_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "method",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Метод отправки: sms или email",
-              "title": "Method"
-            },
-            "description": "Метод отправки: sms или email"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationMethodRequest"
+              }
+            }
           },
-          {
-            "name": "phone_number",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Номер телефона для SMS",
-              "title": "Phone Number"
-            },
-            "description": "Номер телефона для SMS"
-          },
-          {
-            "name": "email_address",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Email адрес",
-              "title": "Email Address"
-            },
-            "description": "Email адрес"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Resend Verification Code Api V1 2Fa Resend Code Post"
                 }
               }
@@ -44291,7 +44144,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/2fa/supported-methods": {
@@ -44690,7 +44548,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
+              "type": "integer",
               "title": "Device Id"
             }
           },
@@ -44700,11 +44558,13 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "description": "Длительность доверия в днях",
+              "maximum": 30,
+              "minimum": 1,
+              "description": "Длительность доверия в днях (1–30)",
               "default": 30,
               "title": "Trust Duration Days"
             },
-            "description": "Длительность доверия в днях"
+            "description": "Длительность доверия в днях (1–30)"
           }
         ],
         "responses": {
@@ -47662,7 +47522,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VerifyCodeRequest"
+                "$ref": "#/components/schemas/app__api__v1__endpoints__phone_verification__VerifyCodeRequest"
               }
             }
           },
@@ -83256,7 +83116,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -83266,14 +83127,18 @@
           },
           "device_fingerprint": {
             "type": "string",
+            "maxLength": 64,
+            "minLength": 32,
             "title": "Device Fingerprint"
           },
           "user_agent": {
             "type": "string",
+            "maxLength": 2000,
             "title": "User Agent"
           },
           "ip_address": {
             "type": "string",
+            "maxLength": 45,
             "title": "Ip Address"
           }
         },
@@ -83353,8 +83218,15 @@
             "title": "Created At"
           },
           "last_used": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Last Used"
           },
           "is_current": {
@@ -83369,8 +83241,7 @@
           "device_type",
           "ip_address",
           "user_agent",
-          "created_at",
-          "last_used"
+          "created_at"
         ],
         "title": "DeviceInfo"
       },
@@ -122010,29 +121881,23 @@
         ],
         "title": "ValidationError"
       },
-      "VerifyCodeRequest": {
+      "VerificationMethodRequest": {
         "properties": {
-          "phone": {
+          "method": {
             "type": "string",
-            "title": "Phone"
-          },
-          "code": {
-            "type": "string",
-            "title": "Code"
-          },
-          "purpose": {
-            "type": "string",
-            "title": "Purpose",
-            "default": "verification"
+            "enum": [
+              "sms",
+              "email"
+            ],
+            "title": "Method"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
-          "phone",
-          "code"
+          "method"
         ],
-        "title": "VerifyCodeRequest",
-        "description": "Запрос на проверку кода верификации"
+        "title": "VerificationMethodRequest"
       },
       "VisitCreate": {
         "properties": {
@@ -125123,6 +124988,30 @@
         "title": "PasswordResetConfirmRequest",
         "description": "Запрос на подтверждение сброса пароля"
       },
+      "app__api__v1__endpoints__phone_verification__VerifyCodeRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose",
+            "default": "verification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "title": "VerifyCodeRequest",
+        "description": "Запрос на проверку кода верификации"
+      },
       "app__api__v1__endpoints__phrase_suggest__TelemetryResponse": {
         "properties": {
           "success": {
@@ -125696,6 +125585,31 @@
         ],
         "title": "TelemetryResponse",
         "description": "Response for telemetry submission"
+      },
+      "app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "email"
+            ],
+            "title": "Method"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "method",
+          "code"
+        ],
+        "title": "VerifyCodeRequest",
+        "description": "TWOFACTOR-BE-004 (#4063): the six-digit code rides the BODY, not URL Query.\nThis completes the AUTH-REAUDIT-28\nremediation (totp_code/recovery_token moved to body two endpoints over\nin two_factor_auth.py). Query transport put a replayable code and PII\ncontacts into intermediary/server logs for the full 300-second validity\nwindow."
       },
       "app__models__discount_benefits__DiscountType": {
         "type": "string",

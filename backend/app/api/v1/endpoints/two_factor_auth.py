@@ -3,7 +3,7 @@ API endpoints для двухфакторной аутентификации (2F
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -287,7 +287,11 @@ async def verify_two_factor(
             totp_code=request_data.totp_code,
             backup_code=request_data.backup_code,
             recovery_token=request_data.recovery_token,
-            device_fingerprint=request_data.device_fingerprint,
+            # Device metadata is recorded only when the user opts in. A
+            # recorded device never bypasses the next TOTP challenge.
+            device_fingerprint=(
+                request_data.device_fingerprint if request_data.remember_device else None
+            ),
             ip_address=ip_address,
             user_agent=user_agent,
         )
@@ -597,22 +601,16 @@ async def untrust_device(
     The duplicate has been removed from two_factor_devices.py.
     """
     try:
-        # Проверяем, что устройство принадлежит пользователю
-        device = two_factor_device.get(device_id)
-        if not device or device.user_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
-            )
-
-        success = two_factor_device.untrust_device(db, device_id)
+        # TWOFACTOR-BE-003 (#4063): enforce ownership in the update query so
+        # ownership cannot race between a separate check and the write.
+        success = two_factor_device.untrust_device(db, device_id, current_user.id)
         if success:
             return TwoFactorSuccessResponse(
                 success=True, message="Device untrusted successfully"
             )
         else:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to untrust device",
+                status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
             )
 
     except HTTPException:

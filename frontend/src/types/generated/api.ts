@@ -14649,7 +14649,7 @@ export type paths = {
         put?: never;
         /**
          * Send Verification Code
-         * @description Отправить код подтверждения по SMS или Email
+         * @description Send a code only to the recovery contact configured for the account.
          */
         post: operations["send_verification_code_api_v1_2fa_send_code_post"];
         delete?: never;
@@ -28176,11 +28176,8 @@ export type components = {
              * Format: date-time
              */
             created_at: string;
-            /**
-             * Last Used
-             * Format: date-time
-             */
-            last_used: string;
+            /** Last Used */
+            last_used?: string | null;
             /**
              * Is Current
              * @default false
@@ -42668,20 +42665,13 @@ export type components = {
             /** Context */
             ctx?: Record<string, never>;
         };
-        /**
-         * VerifyCodeRequest
-         * @description Запрос на проверку кода верификации
-         */
-        VerifyCodeRequest: {
-            /** Phone */
-            phone: string;
-            /** Code */
-            code: string;
+        /** VerificationMethodRequest */
+        VerificationMethodRequest: {
             /**
-             * Purpose
-             * @default verification
+             * Method
+             * @enum {string}
              */
-            purpose: string;
+            method: "sms" | "email";
         };
         /** VisitCreate */
         VisitCreate: {
@@ -43730,6 +43720,21 @@ export type components = {
             new_password: string;
         };
         /**
+         * VerifyCodeRequest
+         * @description Запрос на проверку кода верификации
+         */
+        app__api__v1__endpoints__phone_verification__VerifyCodeRequest: {
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
+            /**
+             * Purpose
+             * @default verification
+             */
+            purpose: string;
+        };
+        /**
          * TelemetryResponse
          * @description Ответ на telemetry
          */
@@ -43942,6 +43947,24 @@ export type components = {
             accepted: number;
             /** Rejected */
             rejected: number;
+        };
+        /**
+         * VerifyCodeRequest
+         * @description TWOFACTOR-BE-004 (#4063): the six-digit code rides the BODY, not URL Query.
+         *     This completes the AUTH-REAUDIT-28
+         *     remediation (totp_code/recovery_token moved to body two endpoints over
+         *     in two_factor_auth.py). Query transport put a replayable code and PII
+         *     contacts into intermediary/server logs for the full 300-second validity
+         *     window.
+         */
+        app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest: {
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "sms" | "email";
+            /** Code */
+            code: string;
         };
         /**
          * DiscountType
@@ -71152,21 +71175,16 @@ export interface operations {
     };
     send_verification_code_api_v1_2fa_send_code_post: {
         parameters: {
-            query: {
-                /** @description Метод отправки: sms или email */
-                method: string;
-                /** @description Номер телефона для SMS */
-                phone_number?: string | null;
-                /** @description Email адрес */
-                email_address?: string | null;
-                /** @description SMS провайдер: eskiz, playmobile, mock */
-                provider?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationMethodRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -71192,21 +71210,16 @@ export interface operations {
     };
     verify_verification_code_api_v1_2fa_verify_code_post: {
         parameters: {
-            query: {
-                /** @description Метод верификации: sms или email */
-                method: string;
-                /** @description Код подтверждения */
-                code: string;
-                /** @description Номер телефона для SMS */
-                phone_number?: string | null;
-                /** @description Email адрес */
-                email_address?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -71234,7 +71247,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description Метод: sms или email */
-                method: string;
+                method: "sms" | "email";
             };
             header?: never;
             path?: never;
@@ -71266,19 +71279,16 @@ export interface operations {
     };
     resend_verification_code_api_v1_2fa_resend_code_post: {
         parameters: {
-            query: {
-                /** @description Метод отправки: sms или email */
-                method: string;
-                /** @description Номер телефона для SMS */
-                phone_number?: string | null;
-                /** @description Email адрес */
-                email_address?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationMethodRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -71546,12 +71556,12 @@ export interface operations {
     trust_device_api_v1_2fa_devices__device_id__trust_post: {
         parameters: {
             query?: {
-                /** @description Длительность доверия в днях */
+                /** @description Длительность доверия в днях (1–30) */
                 trust_duration_days?: number;
             };
             header?: never;
             path: {
-                device_id: string;
+                device_id: number;
             };
             cookie?: never;
         };
@@ -73569,7 +73579,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VerifyCodeRequest"];
+                "application/json": components["schemas"]["app__api__v1__endpoints__phone_verification__VerifyCodeRequest"];
             };
         };
         responses: {
