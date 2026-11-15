@@ -725,6 +725,17 @@ def start_queue_visit(
                         detail="Queue entry visit does not belong to the queue patient",
                     )
 
+            # REGSTART-BE-002 (audit 3892 group 24): terminal queue
+            # entries are terminal — cancelled/no_show/served must not
+            # resurrect to in_progress even for a legitimate Registrar
+            # when the ticket carries no linked Visit to gate the
+            # transition (fail-closed, zero mutation).
+            if queue_entry.status in ("cancelled", "no_show", "served"):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Queue entry is terminal ({queue_entry.status}) and cannot be restarted",
+                )
+
             changed_at = datetime.now(UTC)
             queue_entry.status = "in_progress"
             queue_entry.updated_at = changed_at
