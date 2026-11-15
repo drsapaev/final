@@ -907,3 +907,54 @@ def test_notification_template_rendering_uses_sandboxed_jinja():
 
     assert "object" not in output
     assert "tuple" not in output
+
+
+@pytest.mark.asyncio
+async def test_appointment_confirmation_does_not_repeat_push_in_visit_confirmation():
+    from app.models.appointment import Appointment
+    from app.models.user import User
+
+    service = NotificationSenderService()
+    patient = SimpleNamespace(
+        user_id=71,
+        email="synthetic@example.test",
+        phone="+998000000071",
+    )
+    appointment = SimpleNamespace(
+        id=91,
+        patient_id=72,
+        patient=patient,
+        doctor=SimpleNamespace(name="Synthetic Doctor", specialty="General"),
+        appointment_date=datetime(2026, 11, 15).date(),
+        appointment_time="09:15",
+        department_key="general",
+    )
+
+    class _Query:
+        def __init__(self, value):
+            self.value = value
+
+        def filter(self, *_args):
+            return self
+
+        def first(self):
+            return self.value
+
+    class _DB:
+        def query(self, model):
+            if model is Appointment:
+                return _Query(appointment)
+            if model is User:
+                return _Query(SimpleNamespace(id=patient.user_id))
+            raise AssertionError(f"Unexpected query model: {model!r}")
+
+    push = AsyncMock(return_value=True)
+    visit_confirmation = AsyncMock(return_value={"push": False})
+    service.send_push = push
+    service.send_visit_confirmation = visit_confirmation
+
+    await service.send_appointment_confirmation(_DB(), appointment.id)
+
+    push.assert_awaited_once()
+    visit_confirmation.assert_awaited_once()
+    assert visit_confirmation.await_args.kwargs["send_push_notification"] is False
