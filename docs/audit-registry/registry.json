@@ -1430,14 +1430,15 @@
    "root_cause": "CONFIRMED on current main 2026-11-15: crud_visit.complete_visit is still invoked on nonempty visit_data at _queue_ops.py:947 (direct Visit branch) and :1211 (queue-entry post-commit tail) while backend/app/crud/visit.py defines NO complete_visit → AttributeError: in the direct branch an HTTP 500 fires AFTER Visit.status is durably completed; in the queue branch the broad except swallows it and the response still reports success with the medical payload never applied. The in-code NOTE labels the site LEGACY-DEPRECATED but the call is live"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCGENERAL-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (conditional on numeric-ID collision): the general-worklist fallback still substitutes User.id for Doctor.id — candidate_specialist_ids = {doctor.id} if doctor else ({current_user.id} if normalized_specialty=='general' else set()) (:112-114) while DailyQueue.specialist_id is an FK to doctors.id (models/online_queue.py:154-172); a Cashier/Registrar/Lab User.id colliding with an unrelated Doctor.id that owns a general queue receives that queue's full patient PHI (name/phone/DOB serialization :185-249); the legacy doctor-like general path must be preserved but separated from coincidental numeric matches for non-clinician staff"
   },
   {
    "checked": false,
@@ -1578,14 +1579,15 @@
    "root_cause": "CONFIRMED on current main 2026-11-15: schedule-next catalogue query `db.query(Service).filter(Service.id.in_(service_ids))` checks existence only — no Service.active/is_active filter — so a withdrawn service stays bookable and priceable into a new pending_confirmation visit"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSTART-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (Codex round-40/41 hardened the DATE axis only): _resolve_entry_visit still returns the queue_entry.visit_id-linked Visit immediately when its visit_date matches the queue day (:345-347) without comparing visit.patient_id against queue_entry.patient_id — doctor start then transitions P2's visit to in_progress while the entry belongs to P1; the registrar route (patient-mismatch 409) and the doctor EMR-completion guard both prove patient binding is a defined invariant missing exactly at doctor start"
   },
   {
    "checked": true,
@@ -1640,24 +1642,26 @@
    "root_cause": "CONFIRMED on current main 2026-11-15 (conditional owner policy): call_patient/start_patient_visit explicitly allow another active same-specialty doctor (_queue_ops.py:562-594, 732-765), but the completion authorization helper _ensure_legacy_complete_doctor_access (_helpers.py:181-211) permits ONLY users:manage holders or the record owner — the covering doctor gets 403 on the very visit they started, stranding the queue unless owner/Admin intervenes"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCWORKLIST-BE-001",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15: get_doctor_queue_today still hardcodes today=date.today() (:110) — host-server date, not the queue SSOT clinic-local date; on a UTC backend at 2026-11-08 21:30Z the doctor panel reads November 8 while the clinic (Asia/Tashkent) is already November 9, and the response publishes the incorrect date; the service's own clinic-now helper and clinic_today discipline exist in the same module"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCWORKLIST-BE-002",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15: daily_queue_query filters day+specialist only (:116-121, no DailyQueue.active=True) and the entries/available-action projection never tests the active flag (may set next_call_entry_id for a waiting entry); doctor call_patient (:526-610) validates specialty and entry.status but not daily_queue.active — inactive same-day queues remain operable (viewing history is a separate owner-policy question; operational actions must fail closed)"
   },
   {
    "checked": false,
@@ -4255,24 +4259,26 @@
    "root_cause": "CONFIRMED on current main 2026-11-15: VisitService.__table_args__ has only a duration CheckConstraint — no unique (visit_id, service_id); duplicate lines for one service are legitimate (crud inserts directly), while dental/derma repositories resolve get_visit_service with .first() (dental_api_repository.py:58-66) — approval then mutates ONE row and leaves the twin at catalogue price, so the billable sum is neither 2×catalogue nor 2×override (half-applied approval); API identifies service_id, not visit_service_id"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGSTART-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15 (RBAC hole narrowed by post-audit work): registrar start_queue_visit (_queue_ops.py:628-683) still admits Admin/Registrar/Doctor/cardio/cardiology/derma/dentist/Lab and loads ANY OnlineQueueEntry by global id; the patient-mismatch guard now exists (linked_visit.patient_id != queue_entry.patient_id → 409) but there is NO queue-ownership scope check against the acting user — queue_entry.queue.specialist_id / resource axis is never compared, so doctor A (cardiology) can flip doctor B's (dentistry) queue entry and linked visit to in_progress, unlike the doctor-panel start route which checks owner/same-specialty and the legacy queue call helper which checks Doctor ownership"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "REGSTART-BE-002",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732140744",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main c9b3d7271 2026-11-15: the same handler still sets queue_entry.status='in_progress' unconditionally (~:682) with NO prior-status guard and calls the lifecycle service only when queue_entry.visit_id resolves — an unlinked ticket in terminal cancelled/no_show/served resurrects straight to in_progress even for a legitimate Registrar (statuses at models/online_queue.py:330-335); distinct from REGSTART-BE-001 (pure data-integrity path, no ownership needed)"
   },
   {
    "checked": true,
