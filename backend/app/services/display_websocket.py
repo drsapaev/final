@@ -729,7 +729,15 @@ class DisplayWebSocketManager:
                     entry = cache.get(b)
                     cached = None
                     if entry is not None:
-                        fmt, cached_at = entry
+                        # Legacy shape: callers/tests that write plain strings
+                        # directly into the cache are treated as freshly
+                        # cached entries — the TTL contract applies from that
+                        # moment on (the entry normalizes to (value, moment)
+                        # on its next write).
+                        if isinstance(entry, str):
+                            fmt, cached_at = entry, time.monotonic()
+                        else:
+                            fmt, cached_at = entry
                         # TTL-bounded revalidation: a lost nameformat_invalidate
                         # control message can hold a stale entry only until the
                         # TTL elapses, then the registry row is re-read.
