@@ -620,9 +620,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6682603299",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3942",
    "merge_sha": "3d6e11fe4",
-   "root_cause": "FIXED on main 3d6e11fe4 (gallery context invalidation, audit 3892 round 20): contextEpochRef invalidates ALL async work of the previous patient/visit context on switch; photos/totalFiles/analysis are synchronously reset in the context effect before the new fetch. VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 3d6e11fe4 (gallery context invalidation, audit 3892 round 20): contextEpochRef invalidates ALL async work of the previous patient/visit context on switch; photos/totalFiles/analysis are synchronously reset in the context effect before the new fetch. VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 20): gallery plane raced raw fetch(es) and stale pagination state; no fail-first suite existed pre-fix",
+   "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -631,9 +635,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6682603299",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3942",
    "merge_sha": "3d6e11fe4",
-   "root_cause": "FIXED on main 3d6e11fe4: upload/delete completions capture contextKeyRef and compare with the current `${patientId}:${visitId}` before refreshing or applying results; RETRO-3942-01 (#3950) added listEpoch/requestSeq counters — a late old-context refresh can no longer overwrite the new context's list. VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 3d6e11fe4: upload/delete completions capture contextKeyRef and compare with the current `${patientId}:${visitId}` before refreshing or applying results; RETRO-3942-01 (#3950) added listEpoch/requestSeq counters — a late old-context refresh can no longer overwrite the new context's list. VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 20): gallery plane raced raw fetch(es) and stale pagination state; no fail-first suite existed pre-fix",
+   "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -642,9 +650,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6683369678",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3942",
    "merge_sha": "3d6e11fe4",
-   "root_cause": "FIXED on main 3d6e11fe4: context switch/reload resets a stuck loadingMore flag explicitly (loadGallery clears it; old finally with stale seq cannot). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 3d6e11fe4: context switch/reload resets a stuck loadingMore flag explicitly (loadGallery clears it; old finally with stale seq cannot). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 20): gallery plane raced raw fetch(es) and stale pagination state; no fail-first suite existed pre-fix",
+   "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -653,9 +665,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693281655",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3942",
    "merge_sha": "3d6e11fe4",
-   "root_cause": "FIXED on main 3d6e11fe4 (honest pagination per audit round 20). VERIFIED via fix commit scope 2026-11-15"
+   "root_cause": "FIXED on main 3d6e11fe4 (honest pagination per audit round 20). VERIFIED via fix commit scope 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 20): gallery plane raced raw fetch(es) and stale pagination state; no fail-first suite existed pre-fix",
+   "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -664,9 +680,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693281655",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3942",
    "merge_sha": "3d6e11fe4",
-   "root_cause": "FIXED on main 3d6e11fe4 (multi-file upload partial-success handling per audit round 20). VERIFIED via fix commit scope 2026-11-15"
+   "root_cause": "FIXED on main 3d6e11fe4 (multi-file upload partial-success handling per audit round 20). VERIFIED via fix commit scope 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 20): gallery plane raced raw fetch(es) and stale pagination state; no fail-first suite existed pre-fix",
+   "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -675,9 +695,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693281655",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3942",
    "merge_sha": "3d6e11fe4",
-   "root_cause": "FIXED on main 3d6e11fe4: two-step explicit delete confirmation (confirmDeleteId state; DELETE leaves on the second, explicit click). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 3d6e11fe4: two-step explicit delete confirmation (confirmDeleteId state; DELETE leaves on the second, explicit click). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 20): gallery plane raced raw fetch(es) and stale pagination state; no fail-first suite existed pre-fix",
+   "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -686,9 +710,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693281655",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3942",
    "merge_sha": "3d6e11fe4",
-   "root_cause": "FIXED on main 118342f84 (#3950, RETRO-3942-01): private previews run in bounded parallel batches (PREVIEW_CONCURRENCY), do not block list render, and one failed preview no longer strands the rest. VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 118342f84 (#3950, RETRO-3942-01): private previews run in bounded parallel batches (PREVIEW_CONCURRENCY), do not block list render, and one failed preview no longer strands the rest. VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 20): gallery plane raced raw fetch(es) and stale pagination state; no fail-first suite existed pre-fix",
+   "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -773,19 +801,25 @@
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690288950",
-   "status": "UNVERIFIED",
-   "fix_pr": null,
-   "merge_sha": null
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#3906",
+   "merge_sha": "473396865",
+   "root_cause": "FIXED on main 473396865 (#3906): Escape no longer clears the selection under an open modal — handler returns early when e.defaultPrevented or a [role=dialog][aria-modal=true] is present (useDermaHotkeys.ts Escape branch, matches the dental hotkey gate); code-verified 2026-11-15. Residual scope: a dirty-EMR confirmation for non-modal Escape strokes is NOT part of this fix and is tracked within the completion-flow guard (DERMACOMPLETE-FE-001)",
+   "test_before": "audit-observed (source review #3892 round 9): raw SPA-relative fetches, queue-row id preselection, unguarded Escape selection clear; no fail-first coverage pre-fix",
+   "test_after": "verified on current main: panel write-integrity suite (test_dermatologist_panel_integrity) green; full integration 2286 passed locally 2026-11-15; code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAHOTKEY-FE-002",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690288950",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: useDermaHotkeys guards 'if (tab && handleTabChange)' but DermatologistPanelUnified.tsx:365 still passes the no-op handleTabChange: (tab: string) => {} — Ctrl/Cmd+1..4 preventDefault + 'Switched to tab' log fire while activeTab never changes"
   },
   {
    "checked": false,
@@ -967,9 +1001,14 @@
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690288950",
-   "status": "UNVERIFIED",
-   "fix_pr": null,
-   "merge_sha": null
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#3906",
+   "merge_sha": "473396865",
+   "root_cause": "FIXED on main 473396865 (#3906): ScheduleNextModal dropped raw SPA-relative fetch('patients/')/fetch('services') — both loaders now use the shared authenticated client (api.get('/patients'), api.get('/services')) with versioned paths; code-verified in ScheduleNextModal.tsx:135-160 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 9): raw SPA-relative fetches, queue-row id preselection, unguarded Escape selection clear; no fail-first coverage pre-fix",
+   "test_after": "verified on current main: panel write-integrity suite (test_dermatologist_panel_integrity) green; full integration 2286 passed locally 2026-11-15; code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": false,
@@ -977,29 +1016,36 @@
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690288950",
-   "status": "UNVERIFIED",
-   "fix_pr": null,
-   "merge_sha": null
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#3906",
+   "merge_sha": "473396865",
+   "root_cause": "FIXED on main 473396865 (#3906): modal init prefers the canonical patient_id over the queue-row id (String(patient.patient_id ?? patient.id)) — ScheduleNextModal.tsx:84-92; code-verified 2026-11-15",
+   "test_before": "audit-observed (source review #3892 round 9): raw SPA-relative fetches, queue-row id preselection, unguarded Escape selection clear; no fail-first coverage pre-fix",
+   "test_after": "verified on current main: panel write-integrity suite (test_dermatologist_panel_integrity) green; full integration 2286 passed locally 2026-11-15; code-verified 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMSCHED-FE-003",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690288950",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: loadPatients() issues api.get('/patients') with NO q/skip/limit/selected-patient option and renders only the returned array — the canonical endpoint defaults to limit=100, so permitted patients beyond the first page are silently unselectable even when the parent already holds their valid ID (ScheduleNextModal.tsx:133-149)"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMSCHED-FE-004",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690288950",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: the post-success dismiss timer is a bare untracked setTimeout(()=>{onClose?.();resetForm();},2000) (ScheduleNextModal.tsx:241) — no clearTimeout on unmount or modal-generation token, so success-on-A then reopen-B within 2s closes B mid-form"
   },
   {
    "checked": false,
@@ -1334,44 +1380,48 @@
    "merge_sha": null
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCAPPT-BE-001",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732302508",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: the Appointment-ID completion fallback checks doctor access/EMR-presence only for EMR-required specialties and then unconditionally sets appointment.status='completed' (_queue_ops.py:1015) with no allowed-prior-state guard — cancelled/no_show appointments in EMR-optional specialties are directly revivable, while CanonicalVisitService and the standard start route both fail-closed on terminal states"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCAPPT-BE-002",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732302508",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: the post-completion Appointment linkage filters only patient_id/appointment_date/doctor_id and takes .first() (_queue_ops.py:1195-1205) — visit_time/department/status pairing ignored, so a patient with two same-day appointments for the same doctor can have the WRONG one completed; the canonical pairing resolver (crud/visit_appointment_pairing.py:75-181) already demonstrates the fail-closed exact-identity policy this path bypasses"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCCALL-BE-001",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732302508",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: call_patient is a sync def route (worker thread, _queue_ops.py:501) yet dispatches the display event via asyncio.create_task(send_to_display()) at :648 — no running event loop exists in the thread → RuntimeError, caught by the 'Не прерываем основной процесс' except at :650 which only warns; HTTP returns success while the TV-display publish never ran"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCCOMP-BE-001",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732302508",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: crud_visit.complete_visit is still invoked on nonempty visit_data at _queue_ops.py:947 (direct Visit branch) and :1211 (queue-entry post-commit tail) while backend/app/crud/visit.py defines NO complete_visit → AttributeError: in the direct branch an HTTP 500 fires AFTER Visit.status is durably completed; in the queue branch the broad except swallows it and the response still reports success with the medical payload never applied. The in-code NOTE labels the site LEGACY-DEPRECATED but the call is live"
   },
   {
    "checked": false,
@@ -1430,9 +1480,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3960",
    "merge_sha": "a8f7b555b",
-   "root_cause": "FIXED on main a8f7b555b (honest schedule-next plane): _acquire_schedule_next_dedup_lock + _find_recent_identical_schedule_next treat a repeated identical intent (same patient/date/service lines) as a replay, not a second visit; channel change counts as a different intent (3afe005c7/#3988). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main a8f7b555b (honest schedule-next plane): _acquire_schedule_next_dedup_lock + _find_recent_identical_schedule_next treat a repeated identical intent (same patient/date/service lines) as a replay, not a second visit; channel change counts as a different intent (3afe005c7/#3988). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 18): replayed schedule-next POST duplicated pending_confirmation visits+tokens; all_free preserved catalogue totals; host-tz date check; admin doctor_id FK/attribution; arbitrary HH:MM accepted",
+   "test_after": "verified on current main: tests/integration/test_docsched_schedule_next_integrity.py (replay/all_free/clinic-today/admin-identity/HH:MM) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -1441,9 +1495,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3960",
    "merge_sha": "a8f7b555b",
-   "root_cause": "FIXED on main a8f7b555b: effective_all_free = request.all_free or discount_mode=='all_free' canonicalizes the business field BEFORE persistence; contradictory inputs no longer keep catalogue prices (visit_confirmation reads zeroed rows). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main a8f7b555b: effective_all_free = request.all_free or discount_mode=='all_free' canonicalizes the business field BEFORE persistence; contradictory inputs no longer keep catalogue prices (visit_confirmation reads zeroed rows). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 18): replayed schedule-next POST duplicated pending_confirmation visits+tokens; all_free preserved catalogue totals; host-tz date check; admin doctor_id FK/attribution; arbitrary HH:MM accepted",
+   "test_after": "verified on current main: tests/integration/test_docsched_schedule_next_integrity.py (replay/all_free/clinic-today/admin-identity/HH:MM) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -1452,9 +1510,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3960",
    "merge_sha": "a8f7b555b",
-   "root_cause": "FIXED on main a8f7b555b: past-date check uses clinic_today(db) SSOT (clinic queue timezone), not host date.today(). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main a8f7b555b: past-date check uses clinic_today(db) SSOT (clinic queue timezone), not host date.today(). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 18): replayed schedule-next POST duplicated pending_confirmation visits+tokens; all_free preserved catalogue totals; host-tz date check; admin doctor_id FK/attribution; arbitrary HH:MM accepted",
+   "test_after": "verified on current main: tests/integration/test_docsched_schedule_next_integrity.py (replay/all_free/clinic-today/admin-identity/HH:MM) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -1463,9 +1525,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3960",
    "merge_sha": "a8f7b555b",
-   "root_cause": "FIXED on main a8f7b555b: Admin without a Doctor profile no longer writes users.id into the doctors.id FK — doctor_id=doctor.id if doctor else None; doctorless visit is a supported state (fail-closed D-08, operator decision). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main a8f7b555b: Admin without a Doctor profile no longer writes users.id into the doctors.id FK — doctor_id=doctor.id if doctor else None; doctorless visit is a supported state (fail-closed D-08, operator decision). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 18): replayed schedule-next POST duplicated pending_confirmation visits+tokens; all_free preserved catalogue totals; host-tz date check; admin doctor_id FK/attribution; arbitrary HH:MM accepted",
+   "test_after": "verified on current main: tests/integration/test_docsched_schedule_next_integrity.py (replay/all_free/clinic-today/admin-identity/HH:MM) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -1474,9 +1540,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3960",
    "merge_sha": "a8f7b555b",
-   "root_cause": "FIXED on main a8f7b555b: ScheduleNextVisitRequest.visit_time has a field_validator enforcing canonical HH:MM (helpers.py:310). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main a8f7b555b: ScheduleNextVisitRequest.visit_time has a field_validator enforcing canonical HH:MM (helpers.py:310). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 18): replayed schedule-next POST duplicated pending_confirmation visits+tokens; all_free preserved catalogue totals; host-tz date check; admin doctor_id FK/attribution; arbitrary HH:MM accepted",
+   "test_after": "verified on current main: tests/integration/test_docsched_schedule_next_integrity.py (replay/all_free/clinic-today/admin-identity/HH:MM) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -1511,14 +1581,15 @@
    "merge_sha": null
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSTART-BE-002",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732302508",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: start_patient_visit still executes visit.notes = f\"Прием начат в {clinic_now:%H:%M}\" unconditionally (_queue_ops.py:826) — a persistent narrative field (models/visit.py:42-48) is clobbered for already-linked/confirmed visits, deleting scheduling-context notes"
   },
   {
    "checked": false,
@@ -1551,14 +1622,15 @@
    "merge_sha": null
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCWORKFLOW-BE-001",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6732302508",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15 (conditional owner policy): call_patient/start_patient_visit explicitly allow another active same-specialty doctor (_queue_ops.py:562-594, 732-765), but the completion authorization helper _ensure_legacy_complete_doctor_access (_helpers.py:181-211) permits ONLY users:manage holders or the record owner — the covering doctor gets 403 on the very visit they started, stranding the queue unless owner/Admin intervenes"
   },
   {
    "checked": false,
@@ -4089,9 +4161,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3945",
    "merge_sha": "38c929e22",
-   "root_cause": "FIXED on main 38c929e22 (#3945): both approval routes now delegate to canonical PriceOverrideApprovalService — approve updates chargeable VisitService.price AND Visit.doctor_price_override JSON mirror in one commit (registrar docstring REGPRICE-BE-001/002/003/005; test_registrar_approve_updates_chargeable_price_and_json_mirror + dental twin). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 38c929e22 (#3945): both approval routes now delegate to canonical PriceOverrideApprovalService — approve updates chargeable VisitService.price AND Visit.doctor_price_override JSON mirror in one commit (registrar docstring REGPRICE-BE-001/002/003/005; test_registrar_approve_updates_chargeable_price_and_json_mirror + dental twin). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 16): two approval routes diverged (price vs JSON), unlocked double-approve, duplicate/stale pending overrides, unpaginated queue, optional blank rejection reason",
+   "test_after": "verified on current main: tests/integration/test_regprice_approval_integrity.py (locked 409, price+JSON one-commit, stale/duplicate guards, pagination>100, mandatory reason) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -4100,9 +4176,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3945",
    "merge_sha": "38c929e22",
-   "root_cause": "FIXED on main 38c929e22 (#3945): canonical service locks the visit row (with_for_update, price_override_approval.py:108) and a non-pending override after the lock is a 409 conflict for the loser of the concurrent race. VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 38c929e22 (#3945): canonical service locks the visit row (with_for_update, price_override_approval.py:108) and a non-pending override after the lock is a 409 conflict for the loser of the concurrent race. VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 16): two approval routes diverged (price vs JSON), unlocked double-approve, duplicate/stale pending overrides, unpaginated queue, optional blank rejection reason",
+   "test_after": "verified on current main: tests/integration/test_regprice_approval_integrity.py (locked 409, price+JSON one-commit, stale/duplicate guards, pagination>100, mandatory reason) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -4111,9 +4191,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3945",
    "merge_sha": "38c929e22",
-   "root_cause": "FIXED on main 38c929e22 (#3945): duplicate pending-intent guard at creation (409, status stays pending) and stale-intent validation at approval time (current price != captured visit_price_before → 409); legacy NULL before-price stays processable. VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 38c929e22 (#3945): duplicate pending-intent guard at creation (409, status stays pending) and stale-intent validation at approval time (current price != captured visit_price_before → 409); legacy NULL before-price stays processable. VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 16): two approval routes diverged (price vs JSON), unlocked double-approve, duplicate/stale pending overrides, unpaginated queue, optional blank rejection reason",
+   "test_after": "verified on current main: tests/integration/test_regprice_approval_integrity.py (locked 409, price+JSON one-commit, stale/duplicate guards, pagination>100, mandatory reason) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -4122,9 +4206,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3945",
    "merge_sha": "38c929e22",
-   "root_cause": "FIXED on main 38c929e22 (#3945): registrar queue is paginated (offset Query + .offset, _cart.py:1238/1272, test_registrar_queue_is_fully_paginable_beyond_100). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 38c929e22 (#3945): registrar queue is paginated (offset Query + .offset, _cart.py:1238/1272, test_registrar_queue_is_fully_paginable_beyond_100). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 16): two approval routes diverged (price vs JSON), unlocked double-approve, duplicate/stale pending overrides, unpaginated queue, optional blank rejection reason",
+   "test_after": "verified on current main: tests/integration/test_regprice_approval_integrity.py (locked 409, price+JSON one-commit, stale/duplicate guards, pagination>100, mandatory reason) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -4133,9 +4221,13 @@
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726387122",
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": null,
+   "fix_pr": "#3945",
    "merge_sha": "38c929e22",
-   "root_cause": "FIXED on main 38c929e22 (#3945): canonical service enforces a mandatory non-blank rejection reason on both routes (test_registrar_reject_requires_non_blank_reason + persists justified refusal). VERIFIED in code 2026-11-15"
+   "root_cause": "FIXED on main 38c929e22 (#3945): canonical service enforces a mandatory non-blank rejection reason on both routes (test_registrar_reject_requires_non_blank_reason + persists justified refusal). VERIFIED in code 2026-11-15",
+   "test_before": "audit-observed (source review #3892 group 16): two approval routes diverged (price vs JSON), unlocked double-approve, duplicate/stale pending overrides, unpaginated queue, optional blank rejection reason",
+   "test_after": "verified on current main: tests/integration/test_regprice_approval_integrity.py (locked 409, price+JSON one-commit, stale/duplicate guards, pagination>100, mandatory reason) green; full integration 2286 passed locally 2026-11-15",
+   "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
