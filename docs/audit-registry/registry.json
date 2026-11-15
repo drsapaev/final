@@ -614,84 +614,92 @@
    "merge_sha": null
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAGALLERY-FE-001",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6682603299",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "3d6e11fe4",
+   "root_cause": "FIXED on main 3d6e11fe4 (gallery context invalidation, audit 3892 round 20): contextEpochRef invalidates ALL async work of the previous patient/visit context on switch; photos/totalFiles/analysis are synchronously reset in the context effect before the new fetch. VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAGALLERY-FE-002",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6682603299",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "3d6e11fe4",
+   "root_cause": "FIXED on main 3d6e11fe4: upload/delete completions capture contextKeyRef and compare with the current `${patientId}:${visitId}` before refreshing or applying results; RETRO-3942-01 (#3950) added listEpoch/requestSeq counters — a late old-context refresh can no longer overwrite the new context's list. VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAGALLERY-FE-003",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6683369678",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "3d6e11fe4",
+   "root_cause": "FIXED on main 3d6e11fe4: context switch/reload resets a stuck loadingMore flag explicitly (loadGallery clears it; old finally with stale seq cannot). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAGALLERY-FE-004",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693281655",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "3d6e11fe4",
+   "root_cause": "FIXED on main 3d6e11fe4 (honest pagination per audit round 20). VERIFIED via fix commit scope 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAGALLERY-FE-005",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693281655",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "3d6e11fe4",
+   "root_cause": "FIXED on main 3d6e11fe4 (multi-file upload partial-success handling per audit round 20). VERIFIED via fix commit scope 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAGALLERY-FE-006",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693281655",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "3d6e11fe4",
+   "root_cause": "FIXED on main 3d6e11fe4: two-step explicit delete confirmation (confirmDeleteId state; DELETE leaves on the second, explicit click). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAGALLERY-FE-007",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693281655",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "3d6e11fe4",
+   "root_cause": "FIXED on main 118342f84 (#3950, RETRO-3942-01): private previews run in bounded parallel batches (PREVIEW_CONCURRENCY), do not block list render, and one failed preview no longer strands the rest. VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DERMAGALLERY-FE-008",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693521150",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15 (policy-dependent): DermatologistPanelUnified.tsx renders DermaVisitGallery without `disabled` for any patient+visit record, and backend `_dermatology_visit_is_owned` (file_system.py:70) checks patient+doctor+specialty but NOT Visit.status or signed-EMR state — photos of a completed visit remain uploadable/deletable; the auditor's own note says late-document reconciliation may be intended, so a clinical retention/amendment policy decision is required (owner, cf. AUTH-BE-004)"
   },
   {
    "checked": false,
@@ -1410,74 +1418,81 @@
    "merge_sha": null
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSCHED-BE-001",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "a8f7b555b",
+   "root_cause": "FIXED on main a8f7b555b (honest schedule-next plane): _acquire_schedule_next_dedup_lock + _find_recent_identical_schedule_next treat a repeated identical intent (same patient/date/service lines) as a replay, not a second visit; channel change counts as a different intent (3afe005c7/#3988). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSCHED-BE-002",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "a8f7b555b",
+   "root_cause": "FIXED on main a8f7b555b: effective_all_free = request.all_free or discount_mode=='all_free' canonicalizes the business field BEFORE persistence; contradictory inputs no longer keep catalogue prices (visit_confirmation reads zeroed rows). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSCHED-BE-003",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "a8f7b555b",
+   "root_cause": "FIXED on main a8f7b555b: past-date check uses clinic_today(db) SSOT (clinic queue timezone), not host date.today(). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSCHED-BE-004",
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "a8f7b555b",
+   "root_cause": "FIXED on main a8f7b555b: Admin without a Doctor profile no longer writes users.id into the doctors.id FK — doctor_id=doctor.id if doctor else None; doctorless visit is a supported state (fail-closed D-08, operator decision). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSCHED-BE-005",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726529134",
-   "status": "UNVERIFIED",
+   "status": "FIXED_VERIFIED_ON_MAIN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": "a8f7b555b",
+   "root_cause": "FIXED on main a8f7b555b: ScheduleNextVisitRequest.visit_time has a field_validator enforcing canonical HH:MM (helpers.py:310). VERIFIED in code 2026-11-15"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSCHED-BE-006",
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726956761",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: schedule-next applies custom_price directly (`if service_req.custom_price is not None: service_price = float(service_req.custom_price)`) with NO Service.allow_doctor_price_override check and NO approved DoctorPriceOverride lookup; _validate_add_service_inputs only bounds non-negative finite values (DOCVISIT-BE-002 root) — a doctor can silently persist any positive price without financial approval, same bypass lives in the add-service route"
   },
   {
-   "checked": false,
+   "checked": true,
    "id": "DOCSCHED-BE-007",
    "priority": "P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726956761",
-   "status": "UNVERIFIED",
+   "status": "CONFIRMED_OPEN",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "CONFIRMED on current main 2026-11-15: schedule-next catalogue query `db.query(Service).filter(Service.id.in_(service_ids))` checks existence only — no Service.active/is_active filter — so a withdrawn service stays bookable and priceable into a new pending_confirmation visit"
   },
   {
    "checked": false,
