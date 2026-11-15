@@ -179,6 +179,8 @@ def get_telegram_stats(
     try:
         now = datetime.now(UTC)
         period_start = now - timedelta(days=days_back)
+        # Telegram timestamps follow the existing naive-UTC convention; keep
+        # these bounds aligned with the stored values when filtering history.
         query_period_start = period_start.replace(tzinfo=None)
         query_period_end = now.replace(tzinfo=None)
 
