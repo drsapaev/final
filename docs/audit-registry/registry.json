@@ -1228,12 +1228,13 @@
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 4035,
-   "merge_sha": "25be911ca24251c11c12608f9d18542a03679551",
-   "test_before": "fail-first tests for stale display-name cache included in PR #4035 test files",
-   "test_after": "PR suite green; exact-head CI green per verified-gate policy",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "fix_pr": "#4080",
+   "merge_sha": "825a66c69d",
+   "test_before": "RED on main: stale 'full' survived a LOST nameformat_invalidate control message indefinitely (multi-worker privacy exposure)",
+   "test_after": "GREEN on merge 825a66c69d: test_lost_control_message_revalidates_after_ttl, test_cache_within_ttl_does_not_touch_registry; post-merge re-verified on main 825a66c69d — 43 privacy-plane tests green",
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group91 cycle-4: #4035 added local cache invalidation + best-effort cross-worker control message but a remote live worker could still cache 'full' and expose names under Redis/control failure (P1 privacy fail-closed guarantee unproven) — closed by #4080 (merge 825a66c69d): TTL-bounded revalidation ≤30s (NAME_FORMAT_CACHE_TTL_SECONDS), explicit invalidation intact, failures never cached; legacy plain-string cache entries treated as freshly cached (first-run CI integration regression fixed)"
   },
   {
    "checked": false,
@@ -1241,9 +1242,14 @@
    "priority": "P1/P2",
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
-   "status": "UNVERIFIED",
-   "fix_pr": null,
-   "merge_sha": null
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#4080",
+   "merge_sha": "825a66c69d",
+   "root_cause": "group91 cycle-4 (owner verification-only tick): the fail-closed resolver was already merged on main — docstring-cited DISPLAYPRIVACY-BE-002 behavior: unknown board / invalid value / registry outage resolve to 'none', never 'initials'/'full', failures not cached; pinned by a new test in the same PR #4080",
+   "test_before": "no dedicated pinning test for the outage path existed pre-#4080",
+   "test_after": "new pinning test test_resolver_registry_outage_fails_closed_to_none (uses the existing _RaisingSessionLocal outage double) merged via #4080 (825a66c69d); re-verified on current main 2026-11-15",
+   "reviewer": "owner group91 cycle-4 verification-only tick + fixing-agent registry v34 sync",
+   "date": "2026-11-15"
   },
   {
    "checked": false,
@@ -1441,7 +1447,8 @@
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726622686",
    "status": "UNVERIFIED",
    "fix_pr": null,
-   "merge_sha": null
+   "merge_sha": null,
+   "root_cause": "UNVERIFIED candidate | group95 cycle-8: second root cause live (keyboard built tel: URL from nonexistent settings.CLINIC_PHONE — AttributeError killed EVERY initial invitation even after #4060's identity fix) — residual remediation merged via #4084 (c9b3d7271, current main, tel:-free keyboard + honest DOCINVITE contract); full triage pending (owner checklist not yet ticked)"
   },
   {
    "checked": false,
@@ -1659,12 +1666,13 @@
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 4046,
-   "merge_sha": "d3ea3fdc82339b97ed484e7a2a2d649887763a27",
+   "fix_pr": "#4048",
+   "merge_sha": "b59cebae3",
    "test_before": "9-case legacy-transport integration suite RED (7 failed/2 passed, incl. exact TypeError)",
-   "test_after": "suite GREEN 9/9 + stacked 56 passed + WS neighborhood 249 passed; exact-head CI green",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "test_after": "group87 revalidation: test_legacy_ws_queue_auth_endpoints.py green on revalidated main b142a30dc; full suites green on current main",
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group87 reconciliation: the fixing PR is #4048 (b59cebae3), NOT #4046 (d3ea3fdc8) — websocket_auth.py:565-594/662+ validates client call_patient against the queue SSOT before relay; test_legacy_ws_queue_auth_endpoints.py rejects nonexistent/served/foreign-room entries"
   },
   {
    "checked": false,
@@ -1673,12 +1681,13 @@
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 4046,
-   "merge_sha": "d3ea3fdc82339b97ed484e7a2a2d649887763a27",
+   "fix_pr": "#4048",
+   "merge_sha": "b59cebae3",
    "test_before": "9-case legacy-transport integration suite RED (7 failed/2 passed, incl. exact TypeError)",
    "test_after": "suite GREEN 9/9 + stacked 56 passed + WS neighborhood 249 passed; exact-head CI green",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group87 reconciliation: shared #4048 websocket-auth plane fix (b59cebae3), NOT #4046 (d3ea3fdc8)"
   },
   {
    "checked": false,
@@ -1997,12 +2006,13 @@
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 3977,
-   "merge_sha": "ce8c23f61077b6b4c72469ea7dbcf2a88f3be932",
+   "fix_pr": "#3979",
+   "merge_sha": "e831c2da4",
    "test_before": "fail-first WS-release tests included in PR #3977 test files",
-   "test_after": "PR suite green; exact-head CI green per verified-gate policy (owner-merged)",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "test_after": "group87 revalidation: test_notification_ws_cross_loop.py failed-send tests green on revalidated main b142a30dc",
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group87 reconciliation: the fixing PR is #3979 (e831c2da4), NOT #3977 — notification_websocket.py manager:121-163 prunes/disconnects the failed send_json socket while other sockets keep working; test_notification_ws_cross_loop.py failed-send tests"
   },
   {
    "checked": false,
@@ -2541,12 +2551,13 @@
    "source": "Personal notifications groups 40–44 (#4049)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 3977,
-   "merge_sha": "ce8c23f61077b6b4c72469ea7dbcf2a88f3be932",
+   "fix_pr": "#4079",
+   "merge_sha": "0f78bc60e",
    "test_before": "fail-first WS-release tests included in PR #3977 test files",
-   "test_after": "PR suite green; exact-head CI green per verified-gate policy (owner-merged)",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "test_after": "group90 cycle-3 re-verification on merged #4079: periodic live re-auth tests green on current main; session-lifetime proof the group87 reconciliation demanded",
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group90 cycle-3: #3977 fixed teardown only, not live re-authorization — closed by dedicated merged fix #4079 (periodic live re-authorization of accepted sockets, merge 0f78bc60e): accepted sockets are re-authorized on an interval and closed on revocation/expiry; audit no-extra-checkout constraint honored"
   },
   {
    "checked": false,
@@ -3249,12 +3260,13 @@
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 3977,
-   "merge_sha": "ce8c23f61077b6b4c72469ea7dbcf2a88f3be932",
+   "fix_pr": "#3980",
+   "merge_sha": "4651c1ff9",
    "test_before": "fail-first WS-release tests included in PR #3977 test files",
-   "test_after": "PR suite green; exact-head CI green per verified-gate policy (owner-merged)",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "test_after": "group87 revalidation: FE tests 'requests bounded inbox replay' / 'replays again on a fresh reconnect' green on revalidated main b142a30dc",
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group87 reconciliation: the fixing PR is #3980 (4651c1ff9), NOT #3977 — NotificationWebSocketContext.tsx:209-247 sends a bounded one-page notification_sync on each new handshake and restores the inbox; scope limitation: latest 50 entries, history uses REST"
   },
   {
    "checked": false,
@@ -3441,12 +3453,13 @@
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 3977,
-   "merge_sha": "ce8c23f61077b6b4c72469ea7dbcf2a88f3be932",
+   "fix_pr": "#3978",
+   "merge_sha": "74a874402",
    "test_before": "fail-first WS-release tests included in PR #3977 test files",
-   "test_after": "PR suite green; exact-head CI green per verified-gate policy (owner-merged)",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "test_after": "group87 revalidation: test_notification_websocket_sync_limit.py green on revalidated main b142a30dc",
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group87 reconciliation: the fixing PR is #3978 (74a874402), NOT #3977 — notification_websocket.py:174-211 validates 1≤limit≤200 and handles errors without an unbounded query or closing the socket; test_notification_websocket_sync_limit.py"
   },
   {
    "checked": false,
@@ -3589,7 +3602,7 @@
    "status": "FIX_IN_PROGRESS",
    "fix_pr": "https://github.com/drsapaev/final/pull/4076",
    "merge_sha": null,
-   "root_cause": "_formatting.py:119 inline keyboard url uses tel: scheme — Telegram Bot API InlineKeyboardButton.url accepts HTTP/tg:// only; whole invitation/confirmation send can be rejected; fix PR #4076 opened 2026-11-14 (head 8117d442b, independent on main b142a30dc): tel: InlineKeyboardButton removed (Bot API accepts HTTP(S)/tg:// only); contact line moved to the message body with getattr(settings, 'CLINIC_PHONE', '') fallback — side finding: the attribute does not exist in Settings at all, so the old line was a guaranteed runtime AttributeError, not just a rejected scheme; 2026-11-15: fix PR #4076 round-3 FULLY GREEN (40/40 checks, all named gates success) — ready to merge",
+   "root_cause": "_formatting.py:119 inline keyboard url uses tel: scheme — Telegram Bot API InlineKeyboardButton.url accepts HTTP/tg:// only; whole invitation/confirmation send can be rejected; fix PR #4076 opened 2026-11-14 (head 8117d442b, independent on main b142a30dc): tel: InlineKeyboardButton removed (Bot API accepts HTTP(S)/tg:// only); contact line moved to the message body with getattr(settings, 'CLINIC_PHONE', '') fallback — side finding: the attribute does not exist in Settings at all, so the old line was a guaranteed runtime AttributeError, not just a rejected scheme; 2026-11-15: fix PR #4076 round-3 FULLY GREEN (40/40 checks, all named gates success) — ready to merge | group95 cycle-8: the second root cause (tel: keyboard URL from nonexistent settings.CLINIC_PHONE) was remediated by merged #4084 (c9b3d7271); the #4076 honest-ack plane stays FIX_IN_PROGRESS",
    "verified_main": "94d140f83",
    "verified_date": "2026-11-13",
    "fix_pr_head": "8117d442b"
@@ -4147,12 +4160,13 @@
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 4044,
-   "merge_sha": "6b8b14c6f6a5319a174b8222ffb5bff25d4d715b",
+   "fix_pr": "#4057",
+   "merge_sha": "052be9d38",
    "test_before": "28-case queue-room ownership suite RED pre-fix; 3 canonical-endpoint ownership cases",
-   "test_after": "suite GREEN + stacked 56 passed + WS neighborhood 249 passed; exact-head CI green",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "test_after": "group90 cycle-3: test_established_queue_socket_closes_when_authorization_is_revoked (monkeypatched interval, slow first receive) passes; 93 queue/display/auth plane tests green on main 0f78bc60e/571a55014",
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group90 cycle-3: #4044 fixed initial room ownership only — closed by source+test re-verification of merged #4057 session-lifetime contract on current main: ws_queue/ws_queue_authenticated/ws_queue_optional_auth run refresh_queue_auth every QUEUE_WS_AUTH_RECHECK_SECONDS=15 re-resolving token/JTI/sentinel + _has_department_access and close WS 1008 on failure"
   },
   {
    "checked": true,
@@ -4266,10 +4280,14 @@
    "priority": "P1",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726838798",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
-   "merge_sha": null,
-   "root_cause": "VERIFIED on current main 2026-11-15: bot.py:545 _confirm_visit_via_api formats settings.API_BASE_URL — no such field exists in the Settings model (config.py extra='ignore' swallows env too), AttributeError is caught and the callback answers success:false; the patient aiogram webhook route stays mounted, so the visit can never be confirmed through the bot"
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#4082",
+   "merge_sha": "9e5fb3fd9",
+   "root_cause": "group91 cycle-5 (owner-ticked FIXED_VERIFIED_ON_MAIN): the patient Telegram confirmation callback referenced a nonexistent Settings.API_BASE_URL (extra='ignore' made it unfixable via env) so EVERY patient confirmation died with AttributeError, and the call also omitted the /api/v1 prefix — #4082 (merge 9e5fb3fd9) declares the supported field, POSTs to {origin}/api/v1/telegram/visits/confirm, and an unset origin fails honestly with zero HTTP calls (no internal/localhost default per audit)",
+   "test_before": "RED 3/3 on main: callback AttributeError + missing /api/v1 prefix + silent localhost default",
+   "test_after": "GREEN on merge 9e5fb3fd9: test_settings_declares_api_base_url family; full unit suite 3136/0; exact-head CI 38 checks 0 failures; post-merge re-verified on main 9e5fb3fd9 — 3/3",
+   "reviewer": "owner group91 cycle-5 tick + fixing-agent registry v34 sync",
+   "date": "2026-11-15"
   },
   {
    "checked": true,
@@ -4428,7 +4446,8 @@
    "test_before": "6/6 new tests RED pre-fix (held pool connection, query-only disconnects, spoofed call frames)",
    "test_after": "legacy suite 15 passed + stacked 62 passed + WS neighborhood 249 passed; exact-head CI green",
    "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "date": "2026-11-12",
+   "root_cause": "fixed on main | group87: backend fix #4048 (b59cebae3) + helper tests #4050 (6c9eafd1a)"
   },
   {
    "checked": false,
@@ -4437,12 +4456,13 @@
    "source": "Queue/display/WS rounds 29–39 (#3961)",
    "evidence": null,
    "status": "FIXED_VERIFIED_ON_MAIN",
-   "fix_pr": 4048,
-   "merge_sha": "b59cebae3bef85082522c645aa94cc1fe1be689f",
+   "fix_pr": "#4050",
+   "merge_sha": "6c9eafd1a",
    "test_before": "6/6 new tests RED pre-fix (held pool connection, query-only disconnects, spoofed call frames)",
-   "test_after": "legacy suite 15 passed + stacked 62 passed + WS neighborhood 249 passed; exact-head CI green",
-   "reviewer": "independent Code Review on merged PR + exact-head CI green (verified-gate policy)",
-   "date": "2026-11-12"
+   "test_after": "group87 revalidation: FE websocketAuth.test.ts green on revalidated main b142a30dc",
+   "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
+   "date": "2026-11-15",
+   "root_cause": "group87 reconciliation: the fixing PR is #4050 (6c9eafd1a), NOT #4048 — websocketAuth.ts:85-116 delivers raw MessageEvent and auto-pongs server ping; FE websocketAuth.test.ts"
   },
   {
    "checked": true,
