@@ -549,8 +549,8 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    # Head pin follows the latest migration (0093 — display board devices).
-    assert revision == "0093_display_board_devices"
+    # Head pin follows the latest migration (0094 — 2FA trust expiry/codes).
+    assert revision == "0094_2fa_trust_expiry"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",
