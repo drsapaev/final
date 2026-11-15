@@ -823,7 +823,12 @@ def start_patient_visit(
         # неверное время приёма
         clinic_now = _clinic_now(db)
         visit.visit_time = clinic_now.strftime("%H:%M")
-        visit.notes = f"Прием начат в {clinic_now.strftime('%H:%M')}"
+        # DOCSTART-BE-002 (audit 3892): Visit.notes — постоянное
+        # нарративное поле (модели visit.py); старт приёма ДОБАВЛЯЕТ
+        # клиник-штамп, а не затирает существующий контекст записи из
+        # регистратуры/предыдущей стадии.
+        start_stamp = f"Прием начат в {clinic_now.strftime('%H:%M')}"
+        visit.notes = f"{visit.notes}\n{start_stamp}" if visit.notes else start_stamp
 
         visit.updated_at = changed_at
 

@@ -765,6 +765,85 @@ class TestDoctorGeneralQueue:
         assert unrelated_visit.visit_time == "08:00"
         assert unrelated_visit.notes == "do not touch"
 
+    def test_start_visit_preserves_pre_existing_visit_notes(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        """DOCSTART-BE-002 (audit 3892): doctor start must APPEND the
+        clinic stamp to pre-existing Visit.notes, never clobber the
+        persistent narrative field — scheduling context from the
+        registrar or a prior stage must survive the start transition."""
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        pre_existing_visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=doctor.id,
+            visit_date=date.today(),
+            visit_time="08:00",
+            status="open",
+            notes="SYNTHETIC scheduling instruction from registrar — keep me",
+            discount_mode="none",
+            source="desk",
+        )
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add_all([pre_existing_visit, queue])
+        db_session.commit()
+        db_session.refresh(pre_existing_visit)
+        db_session.refresh(queue)
+
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="called",
+            visit_id=pre_existing_visit.id,
+        )
+        db_session.add(entry)
+        db_session.commit()
+        db_session.refresh(entry)
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/start-visit",
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+
+        db_session.refresh(entry)
+        db_session.refresh(pre_existing_visit)
+        assert entry.status == "in_progress"
+        # The registrar's narrative context must survive...
+        assert "SYNTHETIC scheduling instruction from registrar — keep me" in (
+            pre_existing_visit.notes or ""
+        )
+        # ...AND the clinic stamp must be appended.
+        assert "Прием начат в" in (pre_existing_visit.notes or "")
+
     def test_general_queue_returns_empty_payload_without_configuration(
         self,
         client,
