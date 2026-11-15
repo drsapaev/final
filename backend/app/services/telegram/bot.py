@@ -536,13 +536,27 @@ class ClinicTelegramBot:
     ) -> dict[str, Any]:
         """Подтверждает визит через API"""
         try:
-            # Здесь должен быть вызов API подтверждения
-            # Пока возвращаем заглушку
             import httpx
+
+            # TGCONFIRM-BE-001 (audit #3892, group 20): the callback must call
+            # the configured PUBLIC backend origin with the full /api/v1
+            # prefix (the route is POST /api/v1/telegram/visits/confirm).
+            # Without an explicit API_BASE_URL the callback fails honestly —
+            # never silently assume an internal/localhost origin in a public
+            # deployment, and never raise the historical AttributeError.
+            origin = (settings.API_BASE_URL or "").strip().rstrip("/")
+            if not origin:
+                logger.warning(
+                    "Telegram visit confirmation unavailable: API_BASE_URL is not configured"
+                )
+                return {
+                    "success": False,
+                    "message": "Подтверждение временно недоступно: backend API origin не настроен (API_BASE_URL)",
+                }
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{settings.API_BASE_URL}/telegram/visits/confirm",
+                    f"{origin}/api/v1/telegram/visits/confirm",
                     json={"token": token, "channel": "telegram"},
                     headers={"Content-Type": "application/json"},
                     timeout=10,
