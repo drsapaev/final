@@ -14649,7 +14649,7 @@ export type paths = {
         put?: never;
         /**
          * Send Verification Code
-         * @description Отправить код подтверждения по SMS или Email
+         * @description Send a code only to the recovery contact configured for the account.
          */
         post: operations["send_verification_code_api_v1_2fa_send_code_post"];
         delete?: never;
@@ -28176,11 +28176,8 @@ export type components = {
              * Format: date-time
              */
             created_at: string;
-            /**
-             * Last Used
-             * Format: date-time
-             */
-            last_used: string;
+            /** Last Used */
+            last_used?: string | null;
             /**
              * Is Current
              * @default false
@@ -42668,6 +42665,14 @@ export type components = {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** VerificationMethodRequest */
+        VerificationMethodRequest: {
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "sms" | "email";
+        };
         /** VisitCreate */
         VisitCreate: {
             /** Patient Id */
@@ -43945,22 +43950,21 @@ export type components = {
         };
         /**
          * VerifyCodeRequest
-         * @description TWOFACTOR-BE-004 (#4063): the 6-digit code and destination contacts
-         *     ride the request BODY, not URL Query — completing the AUTH-REAUDIT-28
+         * @description TWOFACTOR-BE-004 (#4063): the six-digit code rides the BODY, not URL Query.
+         *     This completes the AUTH-REAUDIT-28
          *     remediation (totp_code/recovery_token moved to body two endpoints over
          *     in two_factor_auth.py). Query transport put a replayable code and PII
          *     contacts into intermediary/server logs for the full 300-second validity
          *     window.
          */
         app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest: {
-            /** Method */
-            method: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "sms" | "email";
             /** Code */
             code: string;
-            /** Phone Number */
-            phone_number?: string | null;
-            /** Email Address */
-            email_address?: string | null;
         };
         /**
          * DiscountType
@@ -71171,21 +71175,16 @@ export interface operations {
     };
     send_verification_code_api_v1_2fa_send_code_post: {
         parameters: {
-            query: {
-                /** @description Метод отправки: sms или email */
-                method: string;
-                /** @description Номер телефона для SMS */
-                phone_number?: string | null;
-                /** @description Email адрес */
-                email_address?: string | null;
-                /** @description SMS провайдер: eskiz, playmobile, mock */
-                provider?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationMethodRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -71248,7 +71247,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description Метод: sms или email */
-                method: string;
+                method: "sms" | "email";
             };
             header?: never;
             path?: never;
@@ -71280,19 +71279,16 @@ export interface operations {
     };
     resend_verification_code_api_v1_2fa_resend_code_post: {
         parameters: {
-            query: {
-                /** @description Метод отправки: sms или email */
-                method: string;
-                /** @description Номер телефона для SMS */
-                phone_number?: string | null;
-                /** @description Email адрес */
-                email_address?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationMethodRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -71565,7 +71561,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                device_id: string;
+                device_id: number;
             };
             cookie?: never;
         };

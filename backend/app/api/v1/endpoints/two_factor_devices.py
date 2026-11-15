@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -43,15 +43,15 @@ class DeviceInfo(BaseModel):
     ip_address: str
     user_agent: str
     created_at: datetime
-    last_used: datetime
+    last_used: datetime | None = None
     is_current: bool = False
 
 
 class DeviceCreateRequest(BaseModel):
-    name: str | None = None
-    device_fingerprint: str
-    user_agent: str
-    ip_address: str
+    name: str | None = Field(default=None, max_length=100)
+    device_fingerprint: str = Field(..., min_length=32, max_length=64)
+    user_agent: str = Field(..., max_length=2000)
+    ip_address: str = Field(..., max_length=45)
 
 
 # P0-3 FIX (ENDPOINT-VALIDATION-AUDIT):
@@ -81,8 +81,20 @@ async def add_trusted_device(
             ip_address=device_data.ip_address,
         )
 
-        return device
+        return DeviceInfo(
+            id=str(device.id),
+            name=device.device_name,
+            device_type=device.device_type,
+            ip_address=device.ip_address or "",
+            user_agent=device.user_agent or "",
+            created_at=device.created_at or datetime.now(UTC),
+            last_used=device.last_used,
+        )
 
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Device cannot be registered"
+        ) from e
     except Exception as e:
         raise_two_factor_device_internal_error(
             "add-device", "Ошибка добавления устройства", e
@@ -203,7 +215,7 @@ async def get_device_statistics(
 
 @router.post("/devices/{device_id}/trust", response_model=dict[str, Any])
 async def trust_device(
-    device_id: str,
+    device_id: int,
     # TWOFACTOR-BE-005 (#4063): bound the 2FA-exempting trust grant — the
     # previous unbounded Query accepted e.g. 365000 days (~1000 years).
     # 30 days matches the documented default and keeps re-verification

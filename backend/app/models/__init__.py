@@ -211,6 +211,7 @@ from .two_factor_auth import (
     TwoFactorDevice,
     TwoFactorRecovery,
     TwoFactorSession,
+    TwoFactorVerificationCode,
 )
 
 # Import all models to ensure they are registered with SQLAlchemy
@@ -266,6 +267,7 @@ __all__ = [
     "TwoFactorRecovery",
     "TwoFactorSession",
     "TwoFactorDevice",
+    "TwoFactorVerificationCode",
     "RefreshToken",
     "UserSession",
     "PasswordResetToken",

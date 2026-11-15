@@ -4,26 +4,20 @@ API endpoints для SMS/Email двухфакторной аутентифика
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any, NoReturn
+from typing import Any, Literal, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.rate_limiter import limiter
 from app.db.session import get_db
 from app.models.user import User
-from app.services.notifications import notification_service
-from app.services.sms_providers import SMSProviderType
 from app.services.two_factor_service import get_two_factor_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def get_safe_two_factor_method(method: str) -> str:
-    return method if method in {"sms", "email"} else "unknown"
 
 
 def raise_two_factor_sms_internal_error(
@@ -40,89 +34,108 @@ def raise_two_factor_sms_internal_error(
     )
 
 
+class VerificationMethodRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["sms", "email"]
+
+
+class VerifyCodeRequest(VerificationMethodRequest):
+    """TWOFACTOR-BE-004 (#4063): the six-digit code rides the BODY, not URL Query.
+    This completes the AUTH-REAUDIT-28
+    remediation (totp_code/recovery_token moved to body two endpoints over
+    in two_factor_auth.py). Query transport put a replayable code and PII
+    contacts into intermediary/server logs for the full 300-second validity
+    window."""
+
+    code: str = Field(..., pattern=r"^[0-9]{6}$")
+
+
+async def _send_and_store_code(
+    service: Any,
+    db: Session,
+    user: User,
+    method: Literal["sms", "email"],
+) -> dict[str, Any]:
+    """Deliver to the configured contact, then store only a keyed code hash."""
+    contact = service.get_recovery_contact(db=db, user_id=user.id, method=method)
+    if not contact:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Для этого метода не настроен контакт восстановления",
+        )
+    result = await service.send_verification_code(
+        method=method,
+        contact=contact,
+        user_name=user.username,
+    )
+    if not result.get("success") or not result.get("code"):
+        logger.warning("2FA SMS/email provider send failed method=%s", method)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Ошибка отправки {method.upper()}",
+        )
+
+    service.save_verification_code(
+        db=db,
+        user_id=user.id,
+        method=method,
+        code=result["code"],
+        contact=contact,
+        expires_at=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    masked_contact = _mask_recovery_contact(method, contact)
+    return {
+        "success": True,
+        "message": "Код отправлен на настроенный контакт",
+        "method": method,
+        "destination": masked_contact,
+        "expires_in": 300,
+    }
+
+
+def _mask_recovery_contact(method: str, contact: str) -> str:
+    if method == "sms":
+        digits = "".join(character for character in contact if character.isdigit())
+        return f"••••{digits[-4:]}" if len(digits) >= 4 else "••••"
+    local_part, separator, domain = contact.rpartition("@")
+    if not separator or not local_part or not domain:
+        return "••••"
+    return f"{local_part[0]}•••@{domain}"
+
+
 @router.post("/send-code", response_model=dict[str, Any])
-@limiter.limit("5/minute")  # P1-1: rate limit
-async def send_verification_code(request: Request,
-    method: str = Query(..., description="Метод отправки: sms или email"),
-    phone_number: str | None = Query(None, description="Номер телефона для SMS"),
-    email_address: str | None = Query(None, description="Email адрес"),
-    provider: str | None = Query(
-        None, description="SMS провайдер: eskiz, playmobile, mock"
-    ),
+@limiter.limit("5/minute")
+async def send_verification_code(
+    request: Request,
+    request_data: VerificationMethodRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Отправить код подтверждения по SMS или Email"""
+    """Send a code only to the recovery contact configured for the account."""
     try:
         service = get_two_factor_service()
-
-        # Определяем контакт для отправки
-        if method == 'sms' and phone_number:
-            contact = phone_number
-        elif method == 'email' and email_address:
-            contact = email_address
-        else:
+        if not service.get_recovery_contact(db, current_user.id, request_data.method):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Необходимо указать номер телефона для SMS или email адрес",
+                detail="Для этого метода не настроен контакт восстановления",
             )
-
-        # Определяем SMS провайдер
-        provider_type = None
-        if method == 'sms' and provider:
-            try:
-                provider_type = SMSProviderType(provider)
-            except ValueError:
-                provider_type = None
-
-        # Отправляем код через новый сервис
-        result = await service.send_verification_code(
-            method=method,
-            contact=contact,
-            user_name=current_user.username,
-            provider_type=provider_type,
-        )
-
-        if not result["success"]:
-            safe_method = get_safe_two_factor_method(method)
-            logger.warning(
-                "2FA SMS/email provider send failed method=%s",
-                safe_method,
-            )
+        if not service.can_send_code(db, current_user.id, request_data.method):
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка отправки {safe_method.upper()}",
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Запросите новый код через минуту",
             )
-
-        return {
-            "success": True,
-            "message": f"Код отправлен на {phone_number if method == 'sms' else email_address}",
-            "method": method,
-            "expires_in": 300,  # 5 минут в секундах
-        }
-
+        return await _send_and_store_code(service, db, current_user, request_data.method)
     except HTTPException:
         raise
     except Exception as e:
         raise_two_factor_sms_internal_error("send-code", "Ошибка отправки кода", e)
 
 
-class VerifyCodeRequest(BaseModel):
-    """TWOFACTOR-BE-004 (#4063): the 6-digit code and destination contacts
-    ride the request BODY, not URL Query — completing the AUTH-REAUDIT-28
-    remediation (totp_code/recovery_token moved to body two endpoints over
-    in two_factor_auth.py). Query transport put a replayable code and PII
-    contacts into intermediary/server logs for the full 300-second validity
-    window."""
-
-    method: str
-    code: str
-    phone_number: str | None = None
-    email_address: str | None = None
-
-
 @router.post("/verify-code", response_model=dict[str, Any])
+@limiter.limit("10/minute")
 async def verify_verification_code(
+    request: Request,
     request_data: VerifyCodeRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -143,16 +156,11 @@ async def verify_verification_code(
                 detail="Неверный или истекший код",
             )
 
-        # Генерируем токен сессии
-        session_token = service.create_session_token(
-            db=db, user_id=current_user.id, method=method
-        )
-
         return {
             "success": True,
             "message": "Код подтвержден успешно",
-            "session_token": session_token,
             "method": method,
+            "verified": True,
         }
 
     except HTTPException:
@@ -163,7 +171,7 @@ async def verify_verification_code(
 
 @router.get("/verification-status", response_model=dict[str, Any])
 async def get_verification_status(
-    method: str = Query(..., description="Метод: sms или email"),
+    method: Literal["sms", "email"] = Query(..., description="Метод: sms или email"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -184,17 +192,22 @@ async def get_verification_status(
 
 
 @router.post("/resend-code", response_model=dict[str, Any])
-@limiter.limit("3/minute")  # P1-1: rate limit
-async def resend_verification_code(request: Request,
-    method: str = Query(..., description="Метод отправки: sms или email"),
-    phone_number: str | None = Query(None, description="Номер телефона для SMS"),
-    email_address: str | None = Query(None, description="Email адрес"),
+@limiter.limit("3/minute")
+async def resend_verification_code(
+    request: Request,
+    request_data: VerificationMethodRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Повторно отправить код подтверждения"""
     try:
         service = get_two_factor_service()
+        method = request_data.method
+        if not service.get_recovery_contact(db, current_user.id, method):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Для этого метода не настроен контакт восстановления",
+            )
 
         # Проверяем, можно ли отправить повторно
         can_resend = service.can_resend_code(
@@ -207,53 +220,7 @@ async def resend_verification_code(request: Request,
                 detail="Слишком много запросов. Попробуйте позже.",
             )
 
-        # Генерируем новый код
-        # NOTIF-REAUDIT-28 P0-3: secrets.randbelow — криптографически стойкий
-        # генератор. random.choices НЕ криптостойкий — предсказуемые 2FA-коды.
-        import secrets as _secrets
-        code = ''.join([str(_secrets.randbelow(10)) for _ in range(6)])
-
-        # Сохраняем код
-        service.save_verification_code(
-            db=db,
-            user_id=current_user.id,
-            method=method,
-            code=code,
-            expires_at=datetime.now(UTC) + timedelta(minutes=5),
-        )
-
-        # Отправляем код
-        # notification_service уже импортирован
-
-        if method == 'sms' and phone_number:
-            success = await notification_service.send_sms(
-                phone=phone_number,
-                message=f"Ваш код подтверждения: {code}. Код действителен 5 минут.",
-            )
-        elif method == 'email' and email_address:
-            success = await notification_service.send_email(
-                to_email=email_address,
-                subject="Код подтверждения",
-                body=f"Ваш код подтверждения: {code}. Код действителен 5 минут.",
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Неверный метод или отсутствуют контактные данные",
-            )
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка отправки кода",
-            )
-
-        return {
-            "success": True,
-            "message": f"Код повторно отправлен на {phone_number if method == 'sms' else email_address}",
-            "method": method,
-            "expires_in": 300,
-        }
+        return await _send_and_store_code(service, db, current_user, method)
 
     except HTTPException:
         raise
