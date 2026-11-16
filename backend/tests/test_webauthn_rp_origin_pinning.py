@@ -52,8 +52,10 @@ def webauthn_stub(monkeypatch):
     them again on undo). Individual tests then replace them with capturing
     fakes.
     """
+    from app.core.config import settings
     from app.services import webauthn_service as ws
 
+    monkeypatch.setattr(settings, "FRONTEND_URL", "https://clinic.example")
     monkeypatch.setattr(ws, "WEBAUTHN_AVAILABLE", True, raising=False)
     for name in (
         "generate_registration_options",
@@ -64,6 +66,48 @@ def webauthn_stub(monkeypatch):
         if not hasattr(ws, name):
             monkeypatch.setattr(ws, name, None, raising=False)
     return ws
+
+
+@pytest.mark.parametrize(
+    "frontend_url, expected",
+    [
+        (
+            "https://clinic.example:443/path",
+            ("clinic.example", "https://clinic.example"),
+        ),
+        (
+            "https://clinic.example:8443",
+            ("clinic.example", "https://clinic.example:8443"),
+        ),
+        ("http://localhost:5173", ("localhost", "http://localhost:5173")),
+    ],
+)
+def test_server_origin_is_canonical(monkeypatch, frontend_url, expected):
+    from app.core.config import settings
+    from app.services.webauthn_service import _server_rp_origin
+
+    monkeypatch.setattr(settings, "FRONTEND_URL", frontend_url)
+    assert _server_rp_origin() == expected
+
+
+@pytest.mark.parametrize(
+    "frontend_url",
+    [
+        "",
+        "clinic.example",
+        "http://clinic.example",
+        "https://user@clinic.example",
+        "https://clinic.example?x=1",
+        "https://clinic.example:invalid",
+    ],
+)
+def test_invalid_server_origin_fails_closed(monkeypatch, frontend_url):
+    from app.core.config import settings
+    from app.services.webauthn_service import _server_rp_origin
+
+    monkeypatch.setattr(settings, "FRONTEND_URL", frontend_url)
+    with pytest.raises(RuntimeError):
+        _server_rp_origin()
 
 
 class TestWebAuthnBE001ServerPinnedRp:

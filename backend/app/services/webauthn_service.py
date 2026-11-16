@@ -58,7 +58,7 @@ def _server_rp_origin() -> tuple[str, str]:
     (WebAuthn forbids scheme/port in rpId); the origin keeps scheme and
     port.
     """
-    from urllib.parse import urlparse
+    from urllib.parse import urlsplit
 
     from app.core.config import settings
 
@@ -67,9 +67,32 @@ def _server_rp_origin() -> tuple[str, str]:
         raise RuntimeError(
             "FRONTEND_URL is not configured — cannot pin WebAuthn RP ID/origin"
         )
-    parsed = urlparse(raw)
-    rp_id = parsed.hostname or raw
-    origin = f"{parsed.scheme or 'https'}://{parsed.netloc or raw}"
+    try:
+        parsed = urlsplit(raw)
+        host = parsed.hostname
+        port = parsed.port
+        if (
+            any(ord(char) < 32 or ord(char) == 127 for char in raw)
+            or "\\" in raw
+            or parsed.scheme not in {"http", "https"}
+            or not host
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("invalid origin")
+        rp_id = host.encode("idna").decode("ascii").lower()
+        if parsed.scheme == "http" and rp_id != "localhost":
+            raise ValueError("WebAuthn requires HTTPS outside localhost")
+        # Origin serialization omits the default port, as browsers do.
+        default_port = 443 if parsed.scheme == "https" else 80
+        authority = f"[{rp_id}]" if ":" in rp_id else rp_id
+        if port is not None and port != default_port:
+            authority += f":{port}"
+        origin = f"{parsed.scheme}://{authority}"
+    except (UnicodeError, ValueError) as exc:
+        raise RuntimeError("FRONTEND_URL is not a valid WebAuthn origin") from exc
     return rp_id, origin
 
 
