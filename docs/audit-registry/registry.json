@@ -4651,6 +4651,66 @@
       "test_after": null,
       "reviewer": "owner group98 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v39 sync",
       "date": "2026-11-16"
+    },
+    {
+      "checked": false,
+      "id": "REGCSV-FE-001",
+      "priority": "P3",
+      "source": "#4063 group101 independent Registrar CSV download and table regressions review (owner, 2026-11-16, main a8531540c)",
+      "evidence": "https://github.com/drsapaev/final/blob/fba174bf2ace7d448a8618a3f260b9e21401a40a/docs/audits/2026-11-16-registrar-csv-lifecycle-group101-review.md",
+      "status": "CONFIRMED_OPEN",
+      "fix_pr": null,
+      "merge_sha": null,
+      "title": "Registrar CSV downloads retain Blob object URLs (createObjectURL without revokeObjectURL) in shared registrarCsv.ts helper used by Welcome and EnhancedAppointmentsTable; browser memory impact not measured (BROWSER_REPRO_PENDING)",
+      "root_cause": "VERIFIED by owner: registrarCsv.ts:105-115 invokes URL.createObjectURL(blob) per download, removes the anchor but never URL.revokeObjectURL(url) and does not hand URL ownership to the caller; long-lived registrar tabs retain a Blob URL per CSV export until unload. Distinct from REG-FE-045 (cell values) and REG-FE-046 (formula neutralization). Acceptance: repeated synthetic downloads with every URL revoked incl. exception cleanup; browser smoke."
+    },
+    {
+      "checked": false,
+      "id": "REGAGG-FE-001",
+      "priority": "P2",
+      "source": "#4063 group100 independent Registrar all-departments patient aggregation code review (owner, 2026-11-16, main a8531540c)",
+      "evidence": "https://github.com/drsapaev/final/blob/8ba44dbf8d8ddc1a4d5ac0c7729844c6104df8ed/docs/audits/2026-11-16-registrar-aggregation-group100-review.md",
+      "status": "CONFIRMED_OPEN",
+      "fix_pr": null,
+      "merge_sha": null,
+      "title": "Unverified patient identity collision in «Все отделения»: FIO|phone|birth fallback key merges two DIFFERENT queue records with identical missing/fallback identity into one card and grouped command selection",
+      "root_cause": "VERIFIED by owner: registrarAggregation.ts:223-246,294-312 derives identity key when patient_id absent; backend _today_queues.py:485-494 initializes patient_id=None, patient_name='Неизвестный пациент', phone='Не указан'. Existing tests cover different non-null IDs with same display name, not null-ID collision. Not proven backend cross-patient mutation or privacy breach; SSOT must own identity. Acceptance: two independent unknown rows -> two distinct cards/record refs; same verified patient ID across services -> one card."
+    },
+    {
+      "checked": false,
+      "id": "REGAGG-FE-002",
+      "priority": "P2",
+      "source": "#4063 group100 independent Registrar all-departments patient aggregation code review (owner, 2026-11-16, main a8531540c)",
+      "evidence": "https://github.com/drsapaev/final/blob/8ba44dbf8d8ddc1a4d5ac0c7729844c6104df8ed/docs/audits/2026-11-16-registrar-aggregation-group100-review.md",
+      "status": "CONFIRMED_OPEN",
+      "fix_pr": null,
+      "merge_sha": null,
+      "title": "Mixed per-record clinical status misrepresented by first row in «Все отделения» aggregation: group status initialized from appointment.status and never reconciled for later members; renderStatus(row.status) shown as aggregate primary status",
+      "root_cause": "VERIFIED by owner: registrarAggregation.ts:299-341 initializes group status=appointment.status, never reconciles for later members (L375-643); appointmentsTableColumns.tsx:1260-1272 renders it as the aggregate's primary status. Synthetic regression: first done + second waiting must show truthful mixed/per-record presentation regardless of input order. Distinct from fixed REG-FE-052 and REG-FE-063. No invented backend/composite clinical state."
+    },
+    {
+      "checked": false,
+      "id": "REGDATA-FE-001",
+      "priority": "P2",
+      "source": "#4063 group99 independent Registrar worklist refresh code review (owner, 2026-11-16, main b93ea7117)",
+      "evidence": "https://github.com/drsapaev/final/blob/f0de60a5d07d9cd1af829617afc636ad63351d2e/docs/audits/2026-11-16-registrar-worklist-refresh-group99-review.md",
+      "status": "CONFIRMED_OPEN",
+      "fix_pr": null,
+      "merge_sha": null,
+      "title": "Delayed queueUpdated critical-event timer can start an obsolete-date fetch AFTER a calendar-date switch and acquire the newest requestSeqRef ID, overriding the newer selected date's rows/loadedDate (late-starting stale closure)",
+      "root_cause": "VERIFIED by owner: useRegistrarWorklistData.ts:493-523 schedules 300/500ms setTimeout without cleanup; callback closes over old date (L284-288). Scope distinct from REG-FE-020 (late response) — this is a late-STARTING stale closure. Fail-first: event on A -> switch B before 500ms -> B reload -> timer must not start A; unmount -> no GET. Mandatory agent gate (queue behavior)."
+    },
+    {
+      "checked": false,
+      "id": "REGDATA-FE-002",
+      "priority": "P2",
+      "source": "#4063 group99 independent Registrar worklist refresh code review (owner, 2026-11-16, main b93ea7117)",
+      "evidence": "https://github.com/drsapaev/final/blob/f0de60a5d07d9cd1af829617afc636ad63351d2e/docs/audits/2026-11-16-registrar-worklist-refresh-group99-review.md",
+      "status": "CONFIRMED_OPEN",
+      "fix_pr": null,
+      "merge_sha": null,
+      "title": "Older queue request returning HTTP 401 runs direct sessionStorage.removeItem('auth_token') BEFORE the isSuperseded() check — may clear the token of a new live session even though the shared API interceptor protects newer token identity",
+      "root_cause": "VERIFIED by owner: useRegistrarWorklistData.ts:422-432 removes the auth token before the supersession check; tokenManager.ts:16-30 verifies the same sessionStorage key. Fail-first: start A under synthetic token A -> token/session replacement B and success -> A fails 401 -> token B must remain, auth state consistent; genuine invalid-current-session 401 still handled. Not proven production incident. Mandatory agent gate (auth)."
     }
   ]
 }
