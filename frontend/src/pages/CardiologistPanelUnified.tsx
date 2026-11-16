@@ -1529,6 +1529,12 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
       const completedTabParams = new URLSearchParams(location.search);
       completedTabParams.set('tab', 'queue');
+      // Remove completed visit deep-link anchors. Otherwise the panel's
+      // patientIdFromUrl / visitIdFromUrl hydration effect can re-select
+      // the just-completed patient after the authoritative deselection.
+      completedTabParams.delete('patientId');
+      completedTabParams.delete('visitId');
+      completedTabParams.delete('visit_id');
       navigate(
         { pathname: location.pathname, search: completedTabParams.toString() },
         { replace: true },
