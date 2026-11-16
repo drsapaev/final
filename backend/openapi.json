@@ -82483,6 +82483,17 @@
             ],
             "title": "Symptoms"
           },
+          "localization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Localization"
+          },
           "diagnosis": {
             "anyOf": [
               {
@@ -82668,6 +82679,17 @@
               }
             ],
             "title": "Symptoms"
+          },
+          "localization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Localization"
           },
           "diagnosis": {
             "anyOf": [
