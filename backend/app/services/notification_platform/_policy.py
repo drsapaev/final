@@ -246,6 +246,10 @@ class PolicyMixin(NotificationPlatformServiceMixinBase):
                 NotificationEvent.event_type.in_(
                     tuple(self.QUEUE_BURST_SUPPRESSION_EVENT_TYPES)
                 ),
+                or_(
+                    NotificationEvent.expires_at.is_(None),
+                    NotificationEvent.expires_at > datetime.now(UTC).replace(tzinfo=None),
+                ),
             )
             .order_by(
                 NotificationDelivery.created_at.desc(),
@@ -260,18 +264,12 @@ class PolicyMixin(NotificationPlatformServiceMixinBase):
         if recent_event is None:
             return False, "missing_recent_event"
 
-        same_entity = bool(
-            event.entity_type
-            and event.entity_id
-            and recent_event.entity_type == event.entity_type
-            and recent_event.entity_id == event.entity_id
-        )
         recent_type = self.normalize_event_type(recent_event.event_type)
         same_type_same_message = (
             recent_type == normalized_type
             and (recent_event.message or "").strip() == (event.message or "").strip()
         )
-        if same_entity or same_type_same_message:
+        if same_type_same_message:
             return True, f"queue_burst_suppression:{recent_delivery.delivery_id}"
 
         return False, "recent_queue_delivery_not_similar"

@@ -16,6 +16,7 @@ import qrcode
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.pii_masker import mask_email
 from app.core.security import verify_password
 from app.models.two_factor_auth import (
@@ -24,6 +25,7 @@ from app.models.two_factor_auth import (
     TwoFactorDevice,
     TwoFactorRecovery,
     TwoFactorSession,
+    TwoFactorVerificationCode,
 )
 from app.models.user import User
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
@@ -42,6 +44,12 @@ class TwoFactorService:
         self.session_expiry_hours = 24  # Время жизни сессии
         self.recovery_expiry_hours = 1  # Время жизни токена восстановления
         self.recovery_rate_limit_per_hour = 3  # dispatch-запросов на аккаунт в час
+        # TWOFACTOR-BE-001 (#4063): brute-force defense on the second factor.
+        # The endpoint limiter is per-IP (bypassable), so the cap lives on the
+        # 2FA record: N consecutive failures -> temporary lock, storage-backed
+        # (two_factor_auth.failed_attempts / locked_until, alembic 0095).
+        self.max_verify_attempts = 5
+        self.verify_lockout_minutes = 15
         self.sms_manager = get_sms_manager()
         self.email_service = EmailSMSEnhancedService()
 
@@ -403,9 +411,16 @@ class TwoFactorService:
         """Верифицирует настройку TOTP"""
         try:
             two_factor_auth = (
-                db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+                db.query(TwoFactorAuth)
+                .filter(TwoFactorAuth.user_id == user_id)
+                .with_for_update()
+                .populate_existing()
+                .first()
             )
-            if not two_factor_auth or not two_factor_auth.totp_secret:
+            if not two_factor_auth:
+                return False
+            if two_factor_auth.totp_enabled or not two_factor_auth.totp_secret:
+                db.commit()
                 return False
 
             # Проверяем код
@@ -419,6 +434,7 @@ class TwoFactorService:
                 db.commit()
                 return True
 
+            db.commit()
             return False
 
         except Exception as e:
@@ -439,11 +455,46 @@ class TwoFactorService:
     ) -> tuple[bool, str, str | None]:
         """Верифицирует 2FA код"""
         try:
+            # Serialize verification decisions on the per-user 2FA record.
+            # Without this lock, concurrent failures can read the same counter
+            # and overwrite one another, bypassing the account-level cap.
             two_factor_auth = (
-                db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+                db.query(TwoFactorAuth)
+                .filter(
+                    TwoFactorAuth.user_id == user_id,
+                    TwoFactorAuth.totp_enabled.is_(True),
+                )
+                .with_for_update()
+                .populate_existing()
+                .first()
             )
-            if not two_factor_auth or not two_factor_auth.totp_enabled:
+            if not two_factor_auth:
                 return False, "2FA not enabled", None
+
+            # TWOFACTOR-BE-001 (#4063): service-side lockout gate — checked
+            # BEFORE any code verification. After max_verify_attempts
+            # consecutive failures even a correct code is rejected until
+            # locked_until passes; the lock self-clears on the next verify.
+            now = datetime.now(UTC)
+            locked_until = two_factor_auth.locked_until
+            if locked_until is not None:
+                if locked_until.tzinfo is None:
+                    locked_until = locked_until.replace(tzinfo=UTC)
+                if now < locked_until:
+                    remaining_minutes = max(
+                        1, int((locked_until - now).total_seconds() // 60) + 1
+                    )
+                    # Release the row lock before returning; the service's
+                    # callers may reuse this session beyond this request.
+                    db.commit()
+                    return (
+                        False,
+                        "2FA temporarily locked after repeated failed "
+                        f"attempts. Try again in ~{remaining_minutes} minute(s).",
+                        None,
+                    )
+                two_factor_auth.locked_until = None
+                two_factor_auth.failed_attempts = 0
 
             _method_used = None
             success = False
@@ -501,6 +552,11 @@ class TwoFactorService:
                 # Обновляем время последнего использования
                 two_factor_auth.last_used = datetime.now(UTC)
 
+                # TWOFACTOR-BE-001 (#4063): a successful verification resets
+                # the brute-force counter and clears any lock state.
+                two_factor_auth.failed_attempts = 0
+                two_factor_auth.locked_until = None
+
                 # Создаем сессию если нужно
                 session_token = None
                 if device_fingerprint:
@@ -511,6 +567,23 @@ class TwoFactorService:
                 db.commit()
                 return True, "Verification successful", session_token
 
+            # TWOFACTOR-BE-001 (#4063): persist the failed attempt. After
+            # max_verify_attempts consecutive failures, lock the second
+            # factor for verify_lockout_minutes — even a correct code is
+            # rejected while the lock is active (gate above).
+            two_factor_auth.failed_attempts = (
+                two_factor_auth.failed_attempts or 0
+            ) + 1
+            if two_factor_auth.failed_attempts >= self.max_verify_attempts:
+                two_factor_auth.locked_until = datetime.now(UTC) + timedelta(
+                    minutes=self.verify_lockout_minutes
+                )
+                db.commit()
+                return False, (
+                    "Invalid verification code. 2FA temporarily locked after "
+                    "repeated failed attempts."
+                ), None
+            db.commit()
             return False, "Invalid verification code", None
 
         except Exception as e:
@@ -550,14 +623,26 @@ class TwoFactorService:
             # Создаем или обновляем устройство
             device = (
                 db.query(TwoFactorDevice)
+                .filter(
+                    TwoFactorDevice.device_fingerprint == device_fingerprint,
+                    TwoFactorDevice.user_id == user_id,
+                )
+                .with_for_update()
+                .first()
+            )
+            fingerprint_owner = (
+                db.query(TwoFactorDevice.user_id)
                 .filter(TwoFactorDevice.device_fingerprint == device_fingerprint)
                 .first()
             )
+            if fingerprint_owner and fingerprint_owner[0] != user_id:
+                raise ValueError("Device fingerprint already belongs to another user")
 
             if device:
                 device.last_used = datetime.now(UTC)
                 device.trusted = True
                 device.active = True
+                device.trusted_until = datetime.now(UTC) + timedelta(days=30)
             else:
                 device = TwoFactorDevice(
                     user_id=user_id,
@@ -566,6 +651,7 @@ class TwoFactorService:
                     device_fingerprint=device_fingerprint,
                     trusted=True,
                     active=True,
+                    trusted_until=datetime.now(UTC) + timedelta(days=30),
                     ip_address=ip_address,
                     user_agent=user_agent,
                 )
@@ -576,8 +662,330 @@ class TwoFactorService:
 
         except Exception as e:
             db.rollback()
-            logger.error(f"Error creating trusted session: {e}")
+            logger.warning(
+                "2FA trusted session creation failed error_type=%s",
+                type(e).__name__,
+            )
             raise
+
+    @staticmethod
+    def _is_six_ascii_digits(code: str) -> bool:
+        return len(code) == 6 and all("0" <= character <= "9" for character in code)
+
+    @staticmethod
+    def _hash_verification_code(user_id: int, method: str, code: str) -> str:
+        """Keyed digest prevents offline guessing if the code table is exposed."""
+        message = f"2fa-code:v1:{user_id}:{method}:{code}".encode()
+        return hmac.new(settings.SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()
+
+    @staticmethod
+    def _hash_verification_contact(user_id: int, method: str, contact: str) -> str:
+        """Bind a pending code to its configured destination without storing PII."""
+        normalized = contact.strip().lower()
+        message = f"2fa-contact:v1:{user_id}:{method}:{normalized}".encode()
+        return hmac.new(settings.SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()
+
+    def get_recovery_contact(
+        self, db: Session, user_id: int, method: str
+    ) -> str | None:
+        """Return only the contact already configured for this account/method."""
+        if method not in {"sms", "email"}:
+            return None
+        two_factor_auth = (
+            db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+        )
+        if not two_factor_auth or not two_factor_auth.recovery_enabled:
+            return None
+        contact = (
+            two_factor_auth.recovery_phone
+            if method == "sms"
+            else two_factor_auth.recovery_email
+        )
+        return contact.strip() if contact and contact.strip() else None
+
+    def save_verification_code(
+        self,
+        db: Session,
+        user_id: int,
+        method: str,
+        code: str,
+        contact: str,
+        expires_at: datetime,
+    ) -> None:
+        """Persist a single-use code as a keyed hash after successful delivery."""
+        if method not in {"sms", "email"} or not self._is_six_ascii_digits(code):
+            raise ValueError("Invalid verification code")
+        now = datetime.now(UTC)
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        configured_contact = self.get_recovery_contact(db, user_id, method)
+        if (
+            not configured_contact
+            or not hmac.compare_digest(
+                self._hash_verification_contact(user_id, method, configured_contact),
+                self._hash_verification_contact(user_id, method, contact),
+            )
+        ):
+            raise ValueError("Verification contact changed before code was stored")
+        if expires_at <= now or expires_at > now + timedelta(minutes=5, seconds=1):
+            raise ValueError("Verification code expiry must be within five minutes")
+
+        record = (
+            db.query(TwoFactorVerificationCode)
+            .filter(
+                TwoFactorVerificationCode.user_id == user_id,
+                TwoFactorVerificationCode.method == method,
+            )
+            .with_for_update()
+            .first()
+        )
+        values = {
+            "code_hash": self._hash_verification_code(user_id, method, code),
+            "contact_hash": self._hash_verification_contact(
+                user_id, method, contact
+            ),
+            "expires_at": expires_at,
+            "attempts_remaining": 5,
+            "created_at": now,
+            "consumed_at": None,
+            "verified_at": None,
+        }
+        if record:
+            for key, value in values.items():
+                setattr(record, key, value)
+        else:
+            db.add(
+                TwoFactorVerificationCode(
+                    user_id=user_id, method=method, **values
+                )
+            )
+        db.commit()
+
+    def verify_code(
+        self, db: Session, user_id: int, method: str, code: str
+    ) -> bool:
+        """Consume a valid current code once, under a row lock and attempt cap."""
+        if method not in {"sms", "email"} or not self._is_six_ascii_digits(code):
+            return False
+        try:
+            record = (
+                db.query(TwoFactorVerificationCode)
+                .filter(
+                    TwoFactorVerificationCode.user_id == user_id,
+                    TwoFactorVerificationCode.method == method,
+                )
+                .with_for_update()
+                .first()
+            )
+            now = datetime.now(UTC)
+            contact = self.get_recovery_contact(db, user_id, method)
+            if not record or not contact:
+                return False
+            expires_at = record.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if (
+                record.consumed_at is not None
+                or expires_at <= now
+                or record.attempts_remaining <= 0
+                or not hmac.compare_digest(
+                    record.contact_hash,
+                    self._hash_verification_contact(user_id, method, contact),
+                )
+            ):
+                return False
+
+            expected_hash = self._hash_verification_code(user_id, method, code)
+            if not hmac.compare_digest(record.code_hash, expected_hash):
+                record.attempts_remaining -= 1
+                if record.attempts_remaining == 0:
+                    record.consumed_at = now
+                db.commit()
+                return False
+
+            record.consumed_at = now
+            record.verified_at = now
+            db.commit()
+            return True
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _as_utc(value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+    def get_verification_status(
+        self, db: Session, user_id: int, method: str
+    ) -> dict[str, Any]:
+        """Return non-sensitive state for the authenticated settings UI."""
+        now = datetime.now(UTC)
+        record = (
+            db.query(TwoFactorVerificationCode)
+            .filter(
+                TwoFactorVerificationCode.user_id == user_id,
+                TwoFactorVerificationCode.method == method,
+            )
+            .first()
+        )
+        contact = self.get_recovery_contact(db, user_id, method)
+        created_at = self._as_utc(record.created_at) if record else None
+        expires_at = self._as_utc(record.expires_at) if record else None
+        contact_matches = bool(
+            record
+            and contact
+            and hmac.compare_digest(
+                record.contact_hash,
+                self._hash_verification_contact(user_id, method, contact),
+            )
+        )
+        active = bool(
+            record
+            and contact_matches
+            and record.consumed_at is None
+            and record.attempts_remaining > 0
+            and expires_at
+            and expires_at > now
+        )
+        resend_available_at = created_at + timedelta(seconds=60) if created_at else None
+        return {
+            "method": method,
+            "configured": bool(contact),
+            "active": active,
+            "verified": bool(record and record.verified_at and contact_matches),
+            "expires_at": expires_at,
+            "attempts_remaining": record.attempts_remaining if record else 0,
+            "resend_available_at": resend_available_at,
+            "can_resend": self.can_resend_code(db, user_id, method),
+        }
+
+    def can_resend_code(self, db: Session, user_id: int, method: str) -> bool:
+        if method not in {"sms", "email"}:
+            return False
+        contact = self.get_recovery_contact(db, user_id, method)
+        if not contact:
+            return False
+        record = (
+            db.query(TwoFactorVerificationCode)
+            .filter(
+                TwoFactorVerificationCode.user_id == user_id,
+                TwoFactorVerificationCode.method == method,
+            )
+            .first()
+        )
+        if not record:
+            return False
+        current_contact_hash = self._hash_verification_contact(
+            user_id, method, contact
+        )
+        if not hmac.compare_digest(record.contact_hash, current_contact_hash):
+            return True
+        if record.verified_at is not None:
+            return False
+        return self.can_send_code(db, user_id, method)
+
+    def can_send_code(self, db: Session, user_id: int, method: str) -> bool:
+        """Apply an account-scoped 60-second cooldown to every code dispatch."""
+        if method not in {"sms", "email"}:
+            return False
+        contact = self.get_recovery_contact(db, user_id, method)
+        if not contact:
+            return False
+        record = (
+            db.query(TwoFactorVerificationCode)
+            .filter(
+                TwoFactorVerificationCode.user_id == user_id,
+                TwoFactorVerificationCode.method == method,
+            )
+            .first()
+        )
+        if not record:
+            return True
+        if not hmac.compare_digest(
+            record.contact_hash,
+            self._hash_verification_contact(user_id, method, contact),
+        ):
+            return True
+        created_at = self._as_utc(record.created_at)
+        return bool(
+            created_at is None
+            or created_at + timedelta(seconds=60) <= datetime.now(UTC)
+        )
+
+    def add_trusted_device(
+        self,
+        db: Session,
+        user_id: int,
+        name: str | None,
+        device_fingerprint: str,
+        user_agent: str,
+        ip_address: str,
+    ) -> TwoFactorDevice:
+        """Register an owner-scoped device with a maximum 30-day trust grant."""
+        if not 32 <= len(device_fingerprint) <= 64:
+            raise ValueError("Invalid device fingerprint")
+        now = datetime.now(UTC)
+        device = (
+            db.query(TwoFactorDevice)
+            .filter(TwoFactorDevice.device_fingerprint == device_fingerprint)
+            .with_for_update()
+            .first()
+        )
+        if device and device.user_id != user_id:
+            raise ValueError("Device fingerprint already belongs to another user")
+        device_type = (
+            "tablet"
+            if "tablet" in user_agent.lower()
+            else "mobile"
+            if "mobile" in user_agent.lower() or "android" in user_agent.lower()
+            else "desktop"
+        )
+        if device:
+            device.device_name = name or device.device_name
+            device.device_type = device_type
+            device.user_agent = user_agent
+            device.ip_address = ip_address
+            device.active = True
+            device.trusted = True
+            device.trusted_until = now + timedelta(days=30)
+            device.last_used = now
+        else:
+            device = TwoFactorDevice(
+                user_id=user_id,
+                device_name=name or "Unknown Device",
+                device_type=device_type,
+                device_fingerprint=device_fingerprint,
+                trusted=True,
+                active=True,
+                trusted_until=now + timedelta(days=30),
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+            db.add(device)
+        db.commit()
+        db.refresh(device)
+        return device
+
+    def trust_device(
+        self,
+        db: Session,
+        user_id: int,
+        device_id: int,
+        trust_until: datetime,
+    ) -> bool:
+        """Grant time-bounded trust to a device owned by the current user."""
+        from app.crud.two_factor_auth import two_factor_device
+
+        now = datetime.now(UTC)
+        if trust_until.tzinfo is None:
+            trust_until = trust_until.replace(tzinfo=UTC)
+        if trust_until <= now or trust_until > now + timedelta(days=30):
+            return False
+        return two_factor_device.trust_device(
+            db, device_id, user_id, trust_until
+        )
 
     def disable_two_factor_auth(
         self,
@@ -692,6 +1100,7 @@ class TwoFactorService:
                         TwoFactorDevice.user_id == user_id,
                         TwoFactorDevice.trusted == True,
                         TwoFactorDevice.active == True,
+                        TwoFactorDevice.trusted_until > datetime.now(UTC),
                     )
                 )
                 .count()
@@ -865,8 +1274,10 @@ class TwoFactorService:
             }
 
         except Exception as e:
-            logger.error(f"Error sending SMS code: {e}")
-            return {"success": False, "error": str(e), "provider": "unknown"}
+            logger.warning(
+                "2FA SMS dispatch failed error_type=%s", type(e).__name__
+            )
+            return {"success": False, "error": "provider_error", "provider": "unknown"}
 
     async def send_email_code(
         self, email: str, code: str, user_name: str | None = None
@@ -946,8 +1357,10 @@ class TwoFactorService:
             }
 
         except Exception as e:
-            logger.error(f"Error sending email code: {e}")
-            return {"success": False, "error": str(e), "provider": "email"}
+            logger.warning(
+                "2FA email dispatch failed error_type=%s", type(e).__name__
+            )
+            return {"success": False, "error": "provider_error", "provider": "email"}
 
     def generate_verification_code(self, length: int = 6) -> str:
         """Генерирует код верификации"""
@@ -985,8 +1398,11 @@ class TwoFactorService:
             return result
 
         except Exception as e:
-            logger.error(f"Error sending verification code: {e}")
-            return {"success": False, "error": str(e), "provider": "unknown"}
+            logger.warning(
+                "2FA verification-code dispatch failed error_type=%s",
+                type(e).__name__,
+            )
+            return {"success": False, "error": "provider_error", "provider": "unknown"}
 
 
 # Глобальный экземпляр сервиса

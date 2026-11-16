@@ -24,12 +24,18 @@ class FakeSession:
 
 
 class FakeSocket:
-    def __init__(self, messages=()) -> None:
+    def __init__(self, messages=(), slow_first_receive: bool = False) -> None:
         self.messages = list(messages)
+        self.slow_first_receive = slow_first_receive
         self.closed: list[int] = []
         self.sent: list[dict] = []
 
     async def receive_text(self) -> str:
+        if self.slow_first_receive:
+            self.slow_first_receive = False
+            # Force the periodic-recheck timeout path deterministically:
+            # the receive blocks longer than the patched recheck interval.
+            await asyncio.sleep(0.05)
         if self.messages:
             item = self.messages.pop(0)
             if isinstance(item, BaseException):
@@ -85,6 +91,7 @@ def wire_endpoint(
     authorized: bool = True,
     fail_during_connect: bool = False,
     fail_counts: bool = False,
+    auth_results=None,
 ):
     db = FakeSession()
     manager = FakeManager(fail_during_connect=fail_during_connect)
@@ -92,11 +99,22 @@ def wire_endpoint(
     platform = FakePlatform(fail_counts=fail_counts)
 
     async def authenticate(_token, _db):
+        if auth_results is not None:
+            return auth_results.pop(0) if auth_results else None
+        return user if authorized else None
+
+    def resolve_sync(_token, _db):
+        # NOTIFYLIVEAUTH-BE-001: the periodic re-check uses the synchronous
+        # canonical resolver; the shared auth_results sequence keeps the
+        # handshake -> recheck ordering deterministic.
+        if auth_results is not None:
+            return auth_results.pop(0) if auth_results else None
         return user if authorized else None
 
     monkeypatch.setattr(endpoint, "SessionLocal", lambda: db)
     monkeypatch.setattr(endpoint, "extract_ws_token", lambda _socket: "synthetic-jwt")
     monkeypatch.setattr(endpoint, "authenticate_websocket_token", authenticate)
+    monkeypatch.setattr(endpoint, "resolve_websocket_token_user", resolve_sync)
     monkeypatch.setattr(endpoint, "get_notification_ws_manager", lambda: manager)
     monkeypatch.setattr(
         endpoint, "get_notification_platform_service", lambda _db: platform
@@ -194,3 +212,62 @@ async def test_invalid_token_never_registers_or_disconnects_socket(monkeypatch):
     assert manager.disconnect_calls == []
     assert db.close_calls == 1
     assert socket.closed == [status.WS_1008_POLICY_VIOLATION]
+
+
+# ---------------------------------------------------------------------------
+# NOTIFYLIVEAUTH-BE-001 — periodic live re-authorization of an ACCEPTED
+# personal-notification socket (round 40, P1 conditional).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_established_notification_socket_closes_when_authorization_is_revoked(
+    monkeypatch,
+):
+    """A socket accepted at handshake must close once its principal/token
+    is revoked mid-session (NOTIFYLIVEAUTH-BE-001).
+
+    The endpoint authenticated once and never re-checked JWT exp, per-JTI
+    revocation, the ``all_user_tokens`` bulk sentinel or ``User.is_active``
+    during the receive loop, so a socket connected before a revoke kept
+    receiving user-scoped broadcasts. The periodic re-check reuses the
+    handshake's canonical ``authenticate_websocket_token`` resolver (which
+    covers all four revocation sources) on the SAME session — no extra DB
+    checkout per idle socket.
+    """
+    principal = SimpleNamespace(id=41, username="synthetic-registrar")
+    db, manager, user = wire_endpoint(monkeypatch, auth_results=[principal, None])
+    monkeypatch.setattr(endpoint, "NOTIFICATION_WS_AUTH_RECHECK_SECONDS", 0.001, raising=False)
+    socket = FakeSocket(slow_first_receive=True)
+
+    await endpoint.websocket_notifications(socket)
+
+    assert manager.connect_calls == 1
+    assert manager.disconnect_calls == [(socket, user.id)]
+    assert manager.active == {}
+    assert socket.closed == [status.WS_1008_POLICY_VIOLATION]
+    assert db.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_notification_socket_survives_valid_periodic_recheck(monkeypatch):
+    """Positive control: a still-valid principal must keep receiving and
+    processing messages across periodic re-checks, and the socket must end
+    with the normal client-disconnect teardown (no policy close)."""
+    principal = SimpleNamespace(id=41, username="synthetic-registrar")
+    db, manager, user = wire_endpoint(monkeypatch, auth_results=[principal, principal, principal])
+    monkeypatch.setattr(endpoint, "NOTIFICATION_WS_AUTH_RECHECK_SECONDS", 0.001, raising=False)
+    socket = FakeSocket(
+        messages=['{"type": "notification_sync", "cursor": null, "limit": 50}'],
+        slow_first_receive=True,
+    )
+
+    await endpoint.websocket_notifications(socket)
+
+    assert socket.closed == []
+    assert manager.disconnect_calls == [(socket, user.id)]
+    assert socket.sent[0]["type"] == "connection_established"
+    assert any(
+        message.get("type") == "notification_sync_response" for message in socket.sent
+    )
+    assert db.close_calls == 1

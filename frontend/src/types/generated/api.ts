@@ -1813,6 +1813,31 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/visits/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Visit By Telegram
+         * @description Отмена визита пациентом через Telegram бот по токену.
+         *
+         *     TGCONFIRM-BE-003 (audit #3892, group 20): the ``cancel_visit:<token>``
+         *     callback must persist a real cancellation through the authorized
+         *     lifecycle state machine and invalidate the token — the token is the
+         *     capability, mirroring the confirm route's trust model.
+         */
+        post: operations["cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/patient/visits/confirm": {
         parameters: {
             query?: never;
@@ -9526,6 +9551,30 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/display/devices/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange Display Device Token
+         * @description Exchange a provisioned secret or HttpOnly device session for a scoped JWT.
+         */
+        post: operations["exchange_display_device_token_api_v1_display_devices_token_post"];
+        /**
+         * Forget Display Device Session
+         * @description Clear this browser's HttpOnly device sessions for one public board.
+         */
+        delete: operations["forget_display_device_session_api_v1_display_devices_token_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/display/call-patient": {
         parameters: {
             query?: never;
@@ -11108,6 +11157,70 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/display/boards/{board_id}/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Display Board Devices
+         * @description List device metadata without returning any stored credential material.
+         */
+        get: operations["list_display_board_devices_api_v1_admin_display_boards__board_id__devices_get"];
+        put?: never;
+        /**
+         * Create Display Board Device Endpoint
+         * @description Create a board device; return its random credential only in this response.
+         */
+        post: operations["create_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/display/boards/{board_id}/devices/{device_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Display Board Device Endpoint
+         * @description Replace a device credential and invalidate every previously issued JWT.
+         */
+        post: operations["rotate_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices__device_id__rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/display/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Display Board Device Endpoint
+         * @description Revoke one display device and terminate its already-issued JWT grants.
+         */
+        delete: operations["revoke_display_board_device_endpoint_api_v1_admin_display_devices__device_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/display/boards/{board_id}/banners": {
         parameters: {
             query?: never;
@@ -11799,7 +11912,7 @@ export type paths = {
         put?: never;
         /**
          * Send Broadcast Message
-         * @description Отправить широковещательное сообщение
+         * @description Report that broadcast delivery is unavailable instead of claiming success.
          */
         post: operations["send_broadcast_message_api_v1_admin_telegram_broadcast_post"];
         delete?: never;
@@ -14561,7 +14674,7 @@ export type paths = {
         put?: never;
         /**
          * Send Verification Code
-         * @description Отправить код подтверждения по SMS или Email
+         * @description Send a code only to the recovery contact configured for the account.
          */
         post: operations["send_verification_code_api_v1_2fa_send_code_post"];
         delete?: never;
@@ -18884,7 +18997,7 @@ export type paths = {
         put?: never;
         /**
          * Test Notifications
-         * @description Тестирование всех типов уведомлений
+         * @description Report diagnostic endpoint status without sending to external recipients.
          */
         post: operations["test_notifications_api_v1_notifications_test_notifications_post"];
         delete?: never;
@@ -26199,7 +26312,7 @@ export type components = {
         BulkNotificationRequest: {
             /**
              * Recipient Type
-             * @description Тип получателей
+             * @description Тип получателей; поддерживается только patient
              */
             recipient_type: string;
             /**
@@ -26456,6 +26569,19 @@ export type components = {
             };
             /** New Total Amount */
             new_total_amount: number;
+        };
+        /** CancelVisitResponse */
+        CancelVisitResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+            /** Visit Id */
+            visit_id: number;
+            /** Status */
+            status: string;
+            /** Patient Name */
+            patient_name: string;
         };
         /** CanonicalVisitResponse */
         CanonicalVisitResponse: {
@@ -27869,6 +27995,8 @@ export type components = {
             distribution?: string | null;
             /** Symptoms */
             symptoms?: string | null;
+            /** Localization */
+            localization?: string | null;
             /** Diagnosis */
             diagnosis?: string | null;
             /** Treatment Plan */
@@ -27922,6 +28050,8 @@ export type components = {
             distribution?: string | null;
             /** Symptoms */
             symptoms?: string | null;
+            /** Localization */
+            localization?: string | null;
             /** Diagnosis */
             diagnosis?: string | null;
             /** Treatment Plan */
@@ -28088,11 +28218,8 @@ export type components = {
              * Format: date-time
              */
             created_at: string;
-            /**
-             * Last Used
-             * Format: date-time
-             */
-            last_used: string;
+            /** Last Used */
+            last_used?: string | null;
             /**
              * Is Current
              * @default false
@@ -28286,6 +28413,64 @@ export type components = {
          */
         DisplayBannerRequest: {
             [key: string]: unknown;
+        };
+        /** DisplayBoardDeviceCreateRequest */
+        DisplayBoardDeviceCreateRequest: {
+            /** Device Name */
+            device_name: string;
+        };
+        /** DisplayBoardDeviceCreatedResponse */
+        DisplayBoardDeviceCreatedResponse: {
+            /** Id */
+            id: number;
+            /** Board Id */
+            board_id: number;
+            /** Device Name */
+            device_name: string;
+            /** Status */
+            status: string;
+            /** Secret */
+            secret: string;
+        };
+        /** DisplayBoardDeviceResponse */
+        DisplayBoardDeviceResponse: {
+            /** Id */
+            id: number;
+            /** Board Id */
+            board_id: number;
+            /** Device Name */
+            device_name: string;
+            /** Status */
+            status: string;
+            /** Last Connected At */
+            last_connected_at?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Rotated At */
+            rotated_at?: string | null;
+        };
+        /** DisplayBoardDeviceTokenRequest */
+        DisplayBoardDeviceTokenRequest: {
+            /** Board Name */
+            board_name: string;
+            /** Device Id */
+            device_id?: number | null;
+            /** Secret */
+            secret?: string | null;
+        };
+        /** DisplayBoardDeviceTokenResponse */
+        DisplayBoardDeviceTokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /** Expires In */
+            expires_in: number;
+            /** Board Name */
+            board_name: string;
         };
         /** DisplayBoardUpdate */
         DisplayBoardUpdate: {
@@ -39676,7 +39861,7 @@ export type components = {
         SendNotificationRequest: {
             /**
              * Recipient Type
-             * @description Тип получателя: patient, doctor, admin
+             * @description Тип получателя; этот endpoint поддерживает только patient
              */
             recipient_type: string;
             /**
@@ -39723,7 +39908,7 @@ export type components = {
             priority: string;
             /**
              * Scheduled At
-             * @description Время отправки (для отложенных)
+             * @description Время отложенной отправки; сейчас непустое значение отклоняется с 422, так как нет durable scheduler
              */
             scheduled_at?: string | null;
         };
@@ -40795,6 +40980,13 @@ export type components = {
             messages_sent_today: number;
             /** Commands Processed Today */
             commands_processed_today: number;
+        };
+        /** TelegramCancelRequest */
+        TelegramCancelRequest: {
+            /** Token */
+            token: string;
+            /** Telegram User Id */
+            telegram_user_id?: string | null;
         };
         /** TelegramConfirmRequest */
         TelegramConfirmRequest: {
@@ -42522,20 +42714,13 @@ export type components = {
             /** Context */
             ctx?: Record<string, never>;
         };
-        /**
-         * VerifyCodeRequest
-         * @description Запрос на проверку кода верификации
-         */
-        VerifyCodeRequest: {
-            /** Phone */
-            phone: string;
-            /** Code */
-            code: string;
+        /** VerificationMethodRequest */
+        VerificationMethodRequest: {
             /**
-             * Purpose
-             * @default verification
+             * Method
+             * @enum {string}
              */
-            purpose: string;
+            method: "sms" | "email";
         };
         /** VisitCreate */
         VisitCreate: {
@@ -43584,6 +43769,21 @@ export type components = {
             new_password: string;
         };
         /**
+         * VerifyCodeRequest
+         * @description Запрос на проверку кода верификации
+         */
+        app__api__v1__endpoints__phone_verification__VerifyCodeRequest: {
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
+            /**
+             * Purpose
+             * @default verification
+             */
+            purpose: string;
+        };
+        /**
          * TelemetryResponse
          * @description Ответ на telemetry
          */
@@ -43796,6 +43996,24 @@ export type components = {
             accepted: number;
             /** Rejected */
             rejected: number;
+        };
+        /**
+         * VerifyCodeRequest
+         * @description TWOFACTOR-BE-004 (#4063): the six-digit code rides the BODY, not URL Query.
+         *     This completes the AUTH-REAUDIT-28
+         *     remediation (totp_code/recovery_token moved to body two endpoints over
+         *     in two_factor_auth.py). Query transport put a replayable code and PII
+         *     contacts into intermediary/server logs for the full 300-second validity
+         *     window.
+         */
+        app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest: {
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "sms" | "email";
+            /** Code */
+            code: string;
         };
         /**
          * DiscountType
@@ -47944,6 +48162,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfirmationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelVisitResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61303,6 +61554,68 @@ export interface operations {
             };
         };
     };
+    exchange_display_device_token_api_v1_display_devices_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisplayBoardDeviceTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayBoardDeviceTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_display_device_session_api_v1_display_devices_token_delete: {
+        parameters: {
+            query: {
+                board_name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     call_patient_to_board_api_v1_display_call_patient_post: {
         parameters: {
             query?: never;
@@ -64695,6 +65008,133 @@ export interface operations {
             };
         };
     };
+    list_display_board_devices_api_v1_admin_display_boards__board_id__devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayBoardDeviceResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisplayBoardDeviceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayBoardDeviceCreatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices__device_id__rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayBoardDeviceCreatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_display_board_device_endpoint_api_v1_admin_display_devices__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_display_banners_api_v1_admin_display_boards__board_id__banners_get: {
         parameters: {
             query?: {
@@ -66378,17 +66818,6 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66396,6 +66825,22 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram broadcast delivery is disabled. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": "Telegram broadcast delivery is not configured; no messages were sent."
+                     *     }
+                     */
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -70812,21 +71257,16 @@ export interface operations {
     };
     send_verification_code_api_v1_2fa_send_code_post: {
         parameters: {
-            query: {
-                /** @description Метод отправки: sms или email */
-                method: string;
-                /** @description Номер телефона для SMS */
-                phone_number?: string | null;
-                /** @description Email адрес */
-                email_address?: string | null;
-                /** @description SMS провайдер: eskiz, playmobile, mock */
-                provider?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationMethodRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -70852,21 +71292,16 @@ export interface operations {
     };
     verify_verification_code_api_v1_2fa_verify_code_post: {
         parameters: {
-            query: {
-                /** @description Метод верификации: sms или email */
-                method: string;
-                /** @description Код подтверждения */
-                code: string;
-                /** @description Номер телефона для SMS */
-                phone_number?: string | null;
-                /** @description Email адрес */
-                email_address?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -70894,7 +71329,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description Метод: sms или email */
-                method: string;
+                method: "sms" | "email";
             };
             header?: never;
             path?: never;
@@ -70926,19 +71361,16 @@ export interface operations {
     };
     resend_verification_code_api_v1_2fa_resend_code_post: {
         parameters: {
-            query: {
-                /** @description Метод отправки: sms или email */
-                method: string;
-                /** @description Номер телефона для SMS */
-                phone_number?: string | null;
-                /** @description Email адрес */
-                email_address?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationMethodRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -71206,12 +71638,12 @@ export interface operations {
     trust_device_api_v1_2fa_devices__device_id__trust_post: {
         parameters: {
             query?: {
-                /** @description Длительность доверия в днях */
+                /** @description Длительность доверия в днях (1–30) */
                 trust_duration_days?: number;
             };
             header?: never;
             path: {
-                device_id: string;
+                device_id: number;
             };
             cookie?: never;
         };
@@ -73229,7 +73661,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VerifyCodeRequest"];
+                "application/json": components["schemas"]["app__api__v1__endpoints__phone_verification__VerifyCodeRequest"];
             };
         };
         responses: {

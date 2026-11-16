@@ -494,6 +494,105 @@ class VisitConfirmationService:
                 detail=f"Ошибка подтверждения визита: {exc}",
             ) from exc
 
+    def cancel_by_telegram(
+        self,
+        *,
+        token: str,
+        telegram_user_id: str | None = None,
+        source_ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> dict[str, Any]:
+        """TGCONFIRM-BE-003 (audit #3892, group 20): patient-initiated
+        cancellation through the Telegram ``cancel_visit:<token>`` callback.
+
+        The token IS the capability (same trust model as confirm), but the
+        cancellation itself goes through the authorized lifecycle state
+        machine (``pending_confirmation -> canceled``) — never a raw
+        unauthenticated status write. The confirmation token is invalidated
+        by clearing it, so the invitation link cannot confirm, re-cancel or
+        render info for a canceled visit.
+
+        Honest failures: unknown token → 404; anything already processed
+        (confirmed/open/canceled/processing) → 409 with a contact-clinic
+        message; a live reminder lease → 409 (the confirm/reminder worker
+        owns the row right now).
+        """
+        try:
+            visit = (
+                self.repository.db.query(Visit)
+                .filter(Visit.confirmation_token == token)
+                .first()
+            )
+            if visit is None:
+                raise VisitConfirmationDomainError(
+                    status_code=404,
+                    detail="Визит по токену не найден — возможно, ссылка уже использована",
+                )
+            if visit.status != "pending_confirmation":
+                raise VisitConfirmationDomainError(
+                    status_code=409,
+                    detail=(
+                        "Визит уже обработан "
+                        f"(статус: {visit.status}) — для отмены свяжитесь с клиникой"
+                    ),
+                )
+            claimed_at = getattr(visit, "reminder_claimed_at", None)
+            if claimed_at is not None:
+                from datetime import UTC, datetime
+
+                from app.tasks.lease import LEASE_TTL
+
+                if claimed_at.tzinfo is None:
+                    claimed_at = claimed_at.replace(tzinfo=UTC)
+                if datetime.now(UTC) - claimed_at < LEASE_TTL:
+                    raise VisitConfirmationDomainError(
+                        status_code=409,
+                        detail=(
+                            "Визит сейчас обрабатывается — повторите попытку "
+                            "через минуту или свяжитесь с клиникой"
+                        ),
+                    )
+
+            class _CancelActor:
+                id = "patient_telegram"
+
+            from app.services.visit_lifecycle_service import VisitLifecycleService
+
+            lifecycle = VisitLifecycleService(self.repository.db)
+            lifecycle.cancel_visit(
+                visit_id=visit.id,
+                current_user=_CancelActor(),
+                commit=False,
+            )
+            visit.confirmation_token = None
+            self.repository.commit()
+            self.repository.refresh(visit)
+            logger.info(
+                "telegram visit cancel visit_id=%s tg_user=%s ip=%s",
+                visit.id,
+                telegram_user_id,
+                source_ip,
+            )
+            patient = self.repository.get_patient(visit.patient_id)
+            return {
+                "success": True,
+                "message": "❌ Визит отменен",
+                "visit_id": visit.id,
+                "status": visit.status,
+                "patient_name": (
+                    patient.short_name() if patient else "Неизвестный пациент"
+                ),
+            }
+        except VisitConfirmationDomainError:
+            self.repository.rollback()
+            raise
+        except Exception as exc:
+            self.repository.rollback()
+            raise VisitConfirmationDomainError(
+                status_code=500,
+                detail=f"Ошибка отмены визита: {exc}",
+            ) from exc
+
     def get_visit_info(self, token: str) -> dict[str, Any]:
         try:
             visit = self.repository.get_visit_by_token(token)

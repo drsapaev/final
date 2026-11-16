@@ -716,7 +716,7 @@ const ChatWindow = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
         // PR-69 / H-8: added role="dialog" + aria-modal + Esc-to-close
         role="dialog"
         aria-modal="true"
-        aria-label={t('chatTitle')}
+        aria-label={t('legacy.chatTitle')}
         className={`chat-window ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''} ${isCompactViewport ? 'compact' : ''}`}
         onPointerDown={isCompactViewport ? undefined : handleMouseDown}
         onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Escape' && isOpen) { onClose(); } }}

@@ -99,6 +99,24 @@ _MAX_CACHE_ENTRIES = 10_000
 # real generator (uuid4 hex = 32, ULID = 26) while bounding key material.
 _IDEMPOTENCY_KEY_MAX_LENGTH = 128
 
+# Credential issuance returns cleartext secrets/JWTs by design. Never put
+# those responses into the idempotency cache (or its Redis snapshot), where
+# they would be replayable for the 24-hour cache window.
+_DISPLAY_DEVICE_ISSUANCE_PATH = re.compile(
+    r"^/api/v1/admin/display/boards/[0-9]+/devices(?:/[0-9]+/rotate)?/?$"
+)
+_DISPLAY_DEVICE_TOKEN_PATH = "/api/v1/display/devices/token"
+
+
+def _is_display_device_idempotency_exempt(method: str, path: str) -> bool:
+    """Whether a request can return display-device credential material."""
+    if method.upper() != "POST":
+        return False
+    normalized_path = path.rstrip("/") or "/"
+    return normalized_path == _DISPLAY_DEVICE_TOKEN_PATH or bool(
+        _DISPLAY_DEVICE_ISSUANCE_PATH.fullmatch(normalized_path)
+    )
+
 # Round-6 (owner P1, PR #3340): the in-process scope-binding mirror is
 # attacker-reachable (every keyed request with a fresh key creates an entry
 # BEFORE endpoint validation), so it is a bounded LRU — the response cache
@@ -1940,6 +1958,28 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
+        # Device create/rotate responses contain a one-time cleartext secret;
+        # the token exchange returns a bearer JWT. Keep all three out of the
+        # in-process and Redis idempotency response caches.
+        if _is_display_device_idempotency_exempt(
+            request.method, request.url.path
+        ):
+            if (
+                request.headers.get("Idempotency-Key")
+                or request.headers.get("idempotency-key")
+            ):
+                return Response(
+                    status_code=400,
+                    headers={"Cache-Control": "no-store"},
+                    content=(
+                        '{"code":"idempotency_key_unsupported",'
+                        '"detail":"Credential issuance does not support '
+                        'Idempotency-Key."}'
+                    ),
+                    media_type="application/json",
+                )
+            return await call_next(request)
+
         # Only intercept methods that benefit from idempotency
         if request.method.upper() not in _IDEMPOTENT_METHODS:
             return await call_next(request)

@@ -6060,6 +6060,48 @@
         }
       }
     },
+    "/api/v1/telegram/visits/cancel": {
+      "post": {
+        "tags": [
+          "visit-confirmation"
+        ],
+        "summary": "Cancel Visit By Telegram",
+        "description": "Отмена визита пациентом через Telegram бот по токену.\n\nTGCONFIRM-BE-003 (audit #3892, group 20): the ``cancel_visit:<token>``\ncallback must persist a real cancellation through the authorized\nlifecycle state machine and invalidate the token — the token is the\ncapability, mirroring the confirm route's trust model.",
+        "operationId": "cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelVisitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patient/visits/confirm": {
       "post": {
         "tags": [
@@ -27860,6 +27902,84 @@
         ]
       }
     },
+    "/api/v1/display/devices/token": {
+      "post": {
+        "tags": [
+          "display-websocket"
+        ],
+        "summary": "Exchange Display Device Token",
+        "description": "Exchange a provisioned secret or HttpOnly device session for a scoped JWT.",
+        "operationId": "exchange_display_device_token_api_v1_display_devices_token_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisplayBoardDeviceTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayBoardDeviceTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "display-websocket"
+        ],
+        "summary": "Forget Display Device Session",
+        "description": "Clear this browser's HttpOnly device sessions for one public board.",
+        "operationId": "forget_display_device_session_api_v1_display_devices_token_delete",
+        "parameters": [
+          {
+            "name": "board_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Board Name"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/display/call-patient": {
       "post": {
         "tags": [
@@ -33527,6 +33647,212 @@
         }
       }
     },
+    "/api/v1/admin/display/boards/{board_id}/devices": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Display Board Devices",
+        "description": "List device metadata without returning any stored credential material.",
+        "operationId": "list_display_board_devices_api_v1_admin_display_boards__board_id__devices_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DisplayBoardDeviceResponse"
+                  },
+                  "title": "Response List Display Board Devices Api V1 Admin Display Boards  Board Id  Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Display Board Device Endpoint",
+        "description": "Create a board device; return its random credential only in this response.",
+        "operationId": "create_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisplayBoardDeviceCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayBoardDeviceCreatedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/display/boards/{board_id}/devices/{device_id}/rotate": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Rotate Display Board Device Endpoint",
+        "description": "Replace a device credential and invalidate every previously issued JWT.",
+        "operationId": "rotate_display_board_device_endpoint_api_v1_admin_display_boards__board_id__devices__device_id__rotate_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayBoardDeviceCreatedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/display/devices/{device_id}": {
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Revoke Display Board Device Endpoint",
+        "description": "Revoke one display device and terminate its already-issued JWT grants.",
+        "operationId": "revoke_display_board_device_endpoint_api_v1_admin_display_devices__device_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/display/boards/{board_id}/banners": {
       "get": {
         "tags": [
@@ -36005,6 +36331,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
               "default": 7,
               "title": "Days Back"
             }
@@ -36056,6 +36384,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "default": 0,
               "title": "Skip"
             }
@@ -36066,6 +36395,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 100,
               "title": "Limit"
             }
@@ -36113,7 +36444,7 @@
           "admin"
         ],
         "summary": "Send Broadcast Message",
-        "description": "Отправить широковещательное сообщение",
+        "description": "Report that broadcast delivery is unavailable instead of claiming success.",
         "operationId": "send_broadcast_message_api_v1_admin_telegram_broadcast_post",
         "security": [
           {
@@ -36156,14 +36487,23 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "501": {
+            "description": "Telegram broadcast delivery is disabled.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Send Broadcast Message Api V1 Admin Telegram Broadcast Post"
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                },
+                "example": {
+                  "detail": "Telegram broadcast delivery is not configured; no messages were sent."
                 }
               }
             }
@@ -43657,88 +43997,26 @@
           "two-factor-sms-email"
         ],
         "summary": "Send Verification Code",
-        "description": "Отправить код подтверждения по SMS или Email",
+        "description": "Send a code only to the recovery contact configured for the account.",
         "operationId": "send_verification_code_api_v1_2fa_send_code_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "method",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Метод отправки: sms или email",
-              "title": "Method"
-            },
-            "description": "Метод отправки: sms или email"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationMethodRequest"
+              }
+            }
           },
-          {
-            "name": "phone_number",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Номер телефона для SMS",
-              "title": "Phone Number"
-            },
-            "description": "Номер телефона для SMS"
-          },
-          {
-            "name": "email_address",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Email адрес",
-              "title": "Email Address"
-            },
-            "description": "Email адрес"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "SMS провайдер: eskiz, playmobile, mock",
-              "title": "Provider"
-            },
-            "description": "SMS провайдер: eskiz, playmobile, mock"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Send Verification Code Api V1 2Fa Send Code Post"
                 }
               }
@@ -43754,7 +44032,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/2fa/verify-code": {
@@ -43765,79 +44048,24 @@
         "summary": "Verify Verification Code",
         "description": "Проверить код подтверждения",
         "operationId": "verify_verification_code_api_v1_2fa_verify_code_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "method",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Метод верификации: sms или email",
-              "title": "Method"
-            },
-            "description": "Метод верификации: sms или email"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest"
+              }
+            }
           },
-          {
-            "name": "code",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Код подтверждения",
-              "title": "Code"
-            },
-            "description": "Код подтверждения"
-          },
-          {
-            "name": "phone_number",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Номер телефона для SMS",
-              "title": "Phone Number"
-            },
-            "description": "Номер телефона для SMS"
-          },
-          {
-            "name": "email_address",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Email адрес",
-              "title": "Email Address"
-            },
-            "description": "Email адрес"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Verify Verification Code Api V1 2Fa Verify Code Post"
                 }
               }
@@ -43853,7 +44081,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/2fa/verification-status": {
@@ -43875,6 +44108,10 @@
             "in": "query",
             "required": true,
             "schema": {
+              "enum": [
+                "sms",
+                "email"
+              ],
               "type": "string",
               "description": "Метод: sms или email",
               "title": "Method"
@@ -43916,68 +44153,24 @@
         "summary": "Resend Verification Code",
         "description": "Повторно отправить код подтверждения",
         "operationId": "resend_verification_code_api_v1_2fa_resend_code_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "method",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Метод отправки: sms или email",
-              "title": "Method"
-            },
-            "description": "Метод отправки: sms или email"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationMethodRequest"
+              }
+            }
           },
-          {
-            "name": "phone_number",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Номер телефона для SMS",
-              "title": "Phone Number"
-            },
-            "description": "Номер телефона для SMS"
-          },
-          {
-            "name": "email_address",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Email адрес",
-              "title": "Email Address"
-            },
-            "description": "Email адрес"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Resend Verification Code Api V1 2Fa Resend Code Post"
                 }
               }
@@ -43993,7 +44186,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/2fa/supported-methods": {
@@ -44392,7 +44590,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
+              "type": "integer",
               "title": "Device Id"
             }
           },
@@ -44402,11 +44600,13 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "description": "Длительность доверия в днях",
+              "maximum": 30,
+              "minimum": 1,
+              "description": "Длительность доверия в днях (1–30)",
               "default": 30,
               "title": "Trust Duration Days"
             },
-            "description": "Длительность доверия в днях"
+            "description": "Длительность доверия в днях (1–30)"
           }
         ],
         "responses": {
@@ -47364,7 +47564,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VerifyCodeRequest"
+                "$ref": "#/components/schemas/app__api__v1__endpoints__phone_verification__VerifyCodeRequest"
               }
             }
           },
@@ -56522,7 +56722,7 @@
           "notifications"
         ],
         "summary": "Test Notifications",
-        "description": "Тестирование всех типов уведомлений",
+        "description": "Report diagnostic endpoint status without sending to external recipients.",
         "operationId": "test_notifications_api_v1_notifications_test_notifications_post",
         "responses": {
           "200": {
@@ -77802,7 +78002,7 @@
           "recipient_type": {
             "type": "string",
             "title": "Recipient Type",
-            "description": "Тип получателей"
+            "description": "Тип получателей; поддерживается только patient"
           },
           "recipient_ids": {
             "items": {
@@ -78426,6 +78626,39 @@
         ],
         "title": "CancelServiceResponse",
         "description": "Ответ на отмену услуги"
+      },
+      "CancelVisitResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "visit_id",
+          "status",
+          "patient_name"
+        ],
+        "title": "CancelVisitResponse"
       },
       "CanonicalVisitResponse": {
         "properties": {
@@ -82250,6 +82483,17 @@
             ],
             "title": "Symptoms"
           },
+          "localization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Localization"
+          },
           "diagnosis": {
             "anyOf": [
               {
@@ -82435,6 +82679,17 @@
               }
             ],
             "title": "Symptoms"
+          },
+          "localization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Localization"
           },
           "diagnosis": {
             "anyOf": [
@@ -82958,7 +83213,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -82968,14 +83224,18 @@
           },
           "device_fingerprint": {
             "type": "string",
+            "maxLength": 64,
+            "minLength": 32,
             "title": "Device Fingerprint"
           },
           "user_agent": {
             "type": "string",
+            "maxLength": 2000,
             "title": "User Agent"
           },
           "ip_address": {
             "type": "string",
+            "maxLength": 45,
             "title": "Ip Address"
           }
         },
@@ -83055,8 +83315,15 @@
             "title": "Created At"
           },
           "last_used": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Last Used"
           },
           "is_current": {
@@ -83071,8 +83338,7 @@
           "device_type",
           "ip_address",
           "user_agent",
-          "created_at",
-          "last_used"
+          "created_at"
         ],
         "title": "DeviceInfo"
       },
@@ -83575,6 +83841,186 @@
         "type": "object",
         "title": "DisplayBannerRequest",
         "description": "Request body for POST /display/boards/{board_id}/banners."
+      },
+      "DisplayBoardDeviceCreateRequest": {
+        "properties": {
+          "device_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Device Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_name"
+        ],
+        "title": "DisplayBoardDeviceCreateRequest"
+      },
+      "DisplayBoardDeviceCreatedResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "board_id": {
+            "type": "integer",
+            "title": "Board Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "device_name",
+          "status",
+          "secret"
+        ],
+        "title": "DisplayBoardDeviceCreatedResponse"
+      },
+      "DisplayBoardDeviceResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "board_id": {
+            "type": "integer",
+            "title": "Board Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "last_connected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Connected At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "rotated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "device_name",
+          "status"
+        ],
+        "title": "DisplayBoardDeviceResponse"
+      },
+      "DisplayBoardDeviceTokenRequest": {
+        "properties": {
+          "board_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Board Name"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "board_name"
+        ],
+        "title": "DisplayBoardDeviceTokenRequest"
+      },
+      "DisplayBoardDeviceTokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "board_name": {
+            "type": "string",
+            "title": "Board Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in",
+          "board_name"
+        ],
+        "title": "DisplayBoardDeviceTokenResponse"
       },
       "DisplayBoardUpdate": {
         "properties": {
@@ -113440,7 +113886,7 @@
           "recipient_type": {
             "type": "string",
             "title": "Recipient Type",
-            "description": "Тип получателя: patient, doctor, admin"
+            "description": "Тип получателя; этот endpoint поддерживает только patient"
           },
           "recipient_id": {
             "anyOf": [
@@ -113518,7 +113964,7 @@
               }
             ],
             "title": "Scheduled At",
-            "description": "Время отправки (для отложенных)"
+            "description": "Время отложенной отправки; сейчас непустое значение отклоняется с 422, так как нет durable scheduler"
           }
         },
         "type": "object",
@@ -116543,6 +116989,31 @@
         ],
         "title": "TelegramBotStatsResponse",
         "description": "Статистика Telegram бота"
+      },
+      "TelegramCancelRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 10,
+            "title": "Token"
+          },
+          "telegram_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "TelegramCancelRequest"
       },
       "TelegramConfirmRequest": {
         "properties": {
@@ -121532,29 +122003,23 @@
         ],
         "title": "ValidationError"
       },
-      "VerifyCodeRequest": {
+      "VerificationMethodRequest": {
         "properties": {
-          "phone": {
+          "method": {
             "type": "string",
-            "title": "Phone"
-          },
-          "code": {
-            "type": "string",
-            "title": "Code"
-          },
-          "purpose": {
-            "type": "string",
-            "title": "Purpose",
-            "default": "verification"
+            "enum": [
+              "sms",
+              "email"
+            ],
+            "title": "Method"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
-          "phone",
-          "code"
+          "method"
         ],
-        "title": "VerifyCodeRequest",
-        "description": "Запрос на проверку кода верификации"
+        "title": "VerificationMethodRequest"
       },
       "VisitCreate": {
         "properties": {
@@ -124645,6 +125110,30 @@
         "title": "PasswordResetConfirmRequest",
         "description": "Запрос на подтверждение сброса пароля"
       },
+      "app__api__v1__endpoints__phone_verification__VerifyCodeRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose",
+            "default": "verification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "title": "VerifyCodeRequest",
+        "description": "Запрос на проверку кода верификации"
+      },
       "app__api__v1__endpoints__phrase_suggest__TelemetryResponse": {
         "properties": {
           "success": {
@@ -125218,6 +125707,31 @@
         ],
         "title": "TelemetryResponse",
         "description": "Response for telemetry submission"
+      },
+      "app__api__v1__endpoints__two_factor_sms_email__VerifyCodeRequest": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "email"
+            ],
+            "title": "Method"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "method",
+          "code"
+        ],
+        "title": "VerifyCodeRequest",
+        "description": "TWOFACTOR-BE-004 (#4063): the six-digit code rides the BODY, not URL Query.\nThis completes the AUTH-REAUDIT-28\nremediation (totp_code/recovery_token moved to body two endpoints over\nin two_factor_auth.py). Query transport put a replayable code and PII\ncontacts into intermediary/server logs for the full 300-second validity\nwindow."
       },
       "app__models__discount_benefits__DiscountType": {
         "type": "string",

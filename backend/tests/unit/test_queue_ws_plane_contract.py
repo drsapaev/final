@@ -58,7 +58,12 @@ _ROOM = "specialist_7::2026-11-11"
 class _FakeWebSocket:
     """Minimal WebSocket double for the ws_queue handler."""
 
-    def __init__(self, headers: dict | None = None, fail_sends: bool = False) -> None:
+    def __init__(
+        self,
+        headers: dict | None = None,
+        fail_sends: bool = False,
+        slow_first_receive: bool = False,
+    ) -> None:
         self.headers = dict(headers or {})
         self.url = SimpleNamespace(path="/ws/queue", query="")
         self.query_params: dict = {}
@@ -67,6 +72,7 @@ class _FakeWebSocket:
         self.closed: list[dict] = []
         self.accepted_subprotocol: str | None | object = "UNSET"
         self.receive_calls = 0
+        self.slow_first_receive = slow_first_receive
 
     async def accept(self, subprotocol: str | None = None) -> None:
         self.accepted_subprotocol = subprotocol
@@ -81,6 +87,8 @@ class _FakeWebSocket:
 
     async def receive_text(self) -> str:
         self.receive_calls += 1
+        if self.slow_first_receive and self.receive_calls == 1:
+            await asyncio.sleep(1)
         raise WebSocketDisconnect(code=1000)
 
 
@@ -103,12 +111,15 @@ def _stub_manager(monkeypatch: pytest.MonkeyPatch):
     return manager
 
 
-def _mint_jwt(*, sub, jti: str = "synthetic-jti") -> str:
+def _mint_jwt(*, sub, jti: str | None = "synthetic-jti") -> str:
     from app.core.config import settings
 
     now = datetime.now(timezone.utc)
+    claims = {"sub": sub, "iat": now, "exp": now + timedelta(hours=1)}
+    if jti is not None:
+        claims["jti"] = jti
     return jwt.encode(
-        {"sub": sub, "jti": jti, "iat": now, "exp": now + timedelta(hours=1)},
+        claims,
         settings.SECRET_KEY,
         algorithm="HS256",
     )
@@ -338,6 +349,27 @@ def test_username_sub_all_user_sentinel_rejected(
     assert queue_ws._auth_ok({"authorization": f"Bearer {token}"}, None) is False
 
 
+def test_username_sub_without_jti_still_checks_all_user_sentinel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("ENV", "dev")
+    blacklist_calls: list[tuple[str, int | None]] = []
+
+    def fake_blacklist(db, jti, user_id=None):
+        blacklist_calls.append((jti, user_id))
+        return user_id == 7
+
+    _stub_blacklist(monkeypatch, fake_blacklist)
+    _stub_user_resolver(
+        monkeypatch, SimpleNamespace(id=7, role="Doctor", username="synthetic-staff")
+    )
+
+    token = _mint_jwt(sub="synthetic-staff", jti=None)
+    assert queue_ws._auth_ok({"authorization": f"Bearer {token}"}, None) is False
+    assert blacklist_calls == [("", 7)]
+
+
 def test_username_sub_unrevoked_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.setenv("ENV", "dev")
@@ -513,6 +545,36 @@ async def test_doctor_denied_foreign_department_name_room(
     manager.connect.assert_not_awaited()
     assert ws.closed and ws.closed[0]["code"] == 1008
     assert ws.sent and "queue room" in ws.sent[0]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_established_queue_socket_closes_when_authorization_is_revoked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("ENV", "dev")
+    monkeypatch.setenv("CORS_DISABLE", "1")
+    monkeypatch.setattr(ws_auth_module, "QUEUE_WS_AUTH_RECHECK_SECONDS", 0.001)
+    calls = 0
+    principal = SimpleNamespace(id=11, role="Registrar", username="syn-registrar")
+
+    def auth_on_handshake_then_revoke(headers, token):
+        nonlocal calls
+        calls += 1
+        return principal if calls == 1 else None
+
+    monkeypatch.setattr(queue_ws, "_resolve_ws_auth", auth_on_handshake_then_revoke)
+    manager = _stub_manager(monkeypatch)
+    ws = _FakeWebSocket(
+        headers={"origin": "http://localhost:5173"}, slow_first_receive=True
+    )
+
+    await asyncio.wait_for(queue_ws.ws_queue(ws, "specialist_7", "2026-11-11"), timeout=2)
+
+    manager.connect.assert_awaited_once_with(ws, _ROOM)
+    manager.disconnect.assert_called_once_with(ws, _ROOM)
+    assert calls == 2
+    assert ws.closed and ws.closed[-1]["code"] == 1008
 
 
 # ---------------------------------------------------------------------------

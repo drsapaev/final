@@ -35,8 +35,13 @@ import app.api.v1.endpoints.websocket_auth as ws_auth
 from app.api.v1.endpoints.websocket_auth import _has_department_access
 
 
-def _user(role: str, user_id: int = 1) -> SimpleNamespace:
-    return SimpleNamespace(id=user_id, username=f"{role.lower()}-ws-user", role=role)
+def _user(role: str, user_id: int = 1, *, is_superuser: bool = False) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=user_id,
+        username=f"{role.lower()}-ws-user",
+        role=role,
+        is_superuser=is_superuser,
+    )
 
 
 def _department(key: str) -> SimpleNamespace:
@@ -47,8 +52,11 @@ def _doctor(
     doctor_id: int = 42,
     specialty: str = "cardio",
     department: SimpleNamespace | None = None,
+    active: bool = True,
 ) -> SimpleNamespace:
-    return SimpleNamespace(id=doctor_id, specialty=specialty, department=department)
+    return SimpleNamespace(
+        id=doctor_id, specialty=specialty, department=department, active=active
+    )
 
 
 # Any non-None object works: the resolver is monkeypatched, so the session
@@ -108,11 +116,18 @@ def test_forged_specialist_room_names_denied_for_doctors(patch_doctor, room):
     assert _has_department_access(_user("cardio"), room, _FAKE_DB) is False
 
 
-def test_specialist_room_whitespace_and_zero_padded_id_normalized(patch_doctor):
+def test_specialist_room_whitespace_normalized_but_zero_padding_rejected(patch_doctor):
     patch_doctor(_doctor(doctor_id=42, specialty="cardio"))
     assert _has_department_access(_user("cardio"), " specialist_42 ", _FAKE_DB) is True
-    # Numeric equality after the canonical decimal parse.
-    assert _has_department_access(_user("cardio"), "specialist_0042", _FAKE_DB) is True
+    assert _has_department_access(_user("cardio"), "specialist_0042", _FAKE_DB) is False
+
+
+@pytest.mark.parametrize("suffix", ["²", "0", "0042", "9" * 5000])
+def test_noncanonical_or_unbounded_specialist_id_rejected(patch_doctor, suffix):
+    patch_doctor(_doctor(doctor_id=42, specialty="cardio"))
+    assert _has_department_access(
+        _user("cardio"), f"specialist_{suffix}", _FAKE_DB
+    ) is False
 
 
 def test_empty_department_denied_for_doctor(patch_doctor):
@@ -161,6 +176,24 @@ def test_doctor_specialty_family_matches_department_room(patch_doctor):
         )
 
 
+@pytest.mark.parametrize(
+    ("specialty", "department"),
+    [
+        ("cardio", "cardiology"),
+        ("cardiology", "cardio"),
+        ("cardiologist", "cardio"),
+        ("derma", "dermatology"),
+        ("dermatology", "derma"),
+        ("dermatologist", "derma"),
+    ],
+)
+def test_cardio_and_derma_specialty_aliases_match_department_rooms(
+    patch_doctor, specialty, department
+):
+    patch_doctor(_doctor(specialty=specialty, department=None))
+    assert _has_department_access(_user("Doctor"), department, _FAKE_DB) is True
+
+
 def test_doctor_denied_department_outside_own_family(patch_doctor):
     patch_doctor(_doctor(doctor_id=73, specialty="derma", department=None))
     for foreign in ("cardiology", "dentistry", "stomatology", "laboratory"):
@@ -170,6 +203,44 @@ def test_doctor_denied_department_outside_own_family(patch_doctor):
 def test_doctor_without_department_or_specialty_denied_department_rooms(patch_doctor):
     patch_doctor(_doctor(doctor_id=42, specialty="", department=None))
     assert _has_department_access(_user("cardio"), "cardiology", _FAKE_DB) is False
+
+
+@pytest.mark.parametrize("specialty", ["", "general"])
+def test_incomplete_doctor_profiles_do_not_own_department_rooms(
+    monkeypatch, specialty
+):
+    doctor = _doctor(specialty=specialty, department=None)
+    monkeypatch.setattr(
+        "app.crud.clinic.get_doctor_by_user_id", lambda db, user_id: doctor
+    )
+    monkeypatch.setattr(
+        "app.crud.queue_owner_policy.eligible_real_doctor",
+        lambda db, doctor_id: bool(doctor.active and doctor.specialty.strip() not in ("", "general")),
+    )
+    assert _has_department_access(_user("Doctor"), "general", _FAKE_DB) is False
+    assert _has_department_access(_user("Doctor"), "specialist_42", _FAKE_DB) is False
+
+
+def test_inactive_doctor_profile_is_denied_while_user_remains_active(monkeypatch):
+    inactive = _doctor(doctor_id=42, specialty="cardiology", active=False)
+    monkeypatch.setattr(
+        "app.crud.clinic.get_doctor_by_user_id", lambda db, user_id: inactive
+    )
+    monkeypatch.setattr(
+        "app.crud.queue_owner_policy.eligible_real_doctor",
+        lambda db, doctor_id: bool(inactive.active),
+    )
+    assert _has_department_access(_user("Doctor"), "specialist_42", _FAKE_DB) is False
+
+    active = _doctor(doctor_id=42, specialty="cardiology", active=True)
+    monkeypatch.setattr(
+        "app.crud.clinic.get_doctor_by_user_id", lambda db, user_id: active
+    )
+    monkeypatch.setattr(
+        "app.crud.queue_owner_policy.eligible_real_doctor",
+        lambda db, doctor_id: bool(active.active),
+    )
+    assert _has_department_access(_user("Doctor"), "specialist_42", _FAKE_DB) is True
 
 
 # ---------------------------------------------------------------------------
@@ -184,22 +255,31 @@ def test_doctor_role_without_doctor_row_owns_nothing(patch_doctor):
 
 
 # ---------------------------------------------------------------------------
-# Admin / Registrar keep full cross-department access (no doctor lookup)
+# Canonical administrators / Registrar keep full cross-department access
 # ---------------------------------------------------------------------------
 
 
-def test_admin_keeps_full_access_without_doctor_row(patch_doctor):
+@pytest.mark.parametrize(
+    "role", ["Admin", "admin", "SuperAdmin", "superadmin", "Registrar", "registrar"]
+)
+def test_admin_and_registrar_variants_keep_full_access_without_doctor_row(
+    patch_doctor, role
+):
     patch_doctor(None)  # must not even be consulted
-    assert _has_department_access(_user("Admin"), "specialist_999", _FAKE_DB) is True
-    assert _has_department_access(_user("Admin"), "stomatology", _FAKE_DB) is True
+    assert (
+        _has_department_access(_user(role), "specialist_999", _FAKE_DB) is True
+    )
+    assert _has_department_access(_user(role), "dermatology", _FAKE_DB) is True
 
 
-def test_registrar_keeps_full_access_without_doctor_row(patch_doctor):
+def test_is_superuser_gets_the_same_cross_department_scope(patch_doctor):
     patch_doctor(None)
     assert (
-        _has_department_access(_user("Registrar"), "specialist_999", _FAKE_DB) is True
+        _has_department_access(
+            _user("Patient", is_superuser=True), "specialist_999", _FAKE_DB
+        )
+        is True
     )
-    assert _has_department_access(_user("Registrar"), "dermatology", _FAKE_DB) is True
 
 
 # ---------------------------------------------------------------------------
@@ -222,3 +302,9 @@ def test_doctor_family_membership_stays_staff_only(patch_doctor):
     patch_doctor(None)
     for role in ("Lab", "laboratory", "Patient", "Cashier", "Guest"):
         assert _has_department_access(_user(role), "cardiology", _FAKE_DB) is False
+
+
+@pytest.mark.parametrize("role", sorted(ws_auth._STAFF_DOCTOR_ROLES))
+def test_every_canonical_doctor_role_spelling_is_recognized(patch_doctor, role):
+    patch_doctor(_doctor(doctor_id=42, specialty="cardiology"))
+    assert _has_department_access(_user(role), "specialist_42", _FAKE_DB) is True

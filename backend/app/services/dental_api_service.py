@@ -169,15 +169,6 @@ class DentalApiService:
             logger.warning("Не найдены пользователи с ролью Registrar для отправки уведомлений")
             return
 
-        # DENTPRICE-BE-001 (audit #3892, group 17): the REAL user↔chat
-        # association lives in ``telegram_users`` (user_id ↔ chat_id); the
-        # User model has no telegram_id attribute, so the old ``hasattr``
-        # probe skipped EVERY send while the flag below still claimed
-        # success.
-        chat_ids = self.repository.get_telegram_chat_ids_by_user_ids(
-            [registrar.id for registrar in registrars]
-        )
-
         doctor_name = doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
         patient_info = f"Пациент #{visit.patient_id}" if visit else "Неизвестный пациент"
         details_line = f"Детали: {price_override.details}\n" if price_override.details else ""
@@ -196,19 +187,23 @@ class DentalApiService:
 
         confirmed_deliveries = 0
         for registrar in registrars:
-            chat_id = chat_ids.get(registrar.id)
-            if chat_id is None:
-                logger.info(
-                    "У регистратора %s нет активной привязки Telegram — "
-                    "уведомление не отправлено",
-                    registrar.username,
-                )
-                continue
             try:
-                result = await notification_sender_service.send_telegram_message(
-                    user_id=chat_id,
+                result = await notification_sender_service.send_canonical_notification_to_user(
+                    db=self.db,
+                    recipient=registrar,
+                    event_type="dental_price_override_pending",
+                    title="Запрос стоматолога на изменение цены",
                     message=message,
-                    parse_mode="HTML",
+                    source_module="dental",
+                    metadata={
+                        "override_id": price_override.id,
+                        "visit_id": price_override.visit_id,
+                        "patient_id": getattr(visit, "patient_id", None),
+                        "doctor_id": getattr(doctor, "id", None),
+                        "service_id": price_override.service_id,
+                    },
+                    entity_type="doctor_price_override",
+                    entity_id=price_override.id,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.error(
@@ -217,7 +212,7 @@ class DentalApiService:
                     exc,
                 )
                 continue
-            if isinstance(result, dict) and result.get("success") is True:
+            if result is True:
                 confirmed_deliveries += 1
                 logger.info(
                     "Уведомление о изменении цены доставлено регистратору %s",
@@ -230,10 +225,8 @@ class DentalApiService:
                     result,
                 )
 
-        # DENTPRICE-BE-001: ``notification_sent`` means at least one
-        # CONFIRMED delivery — «отправлено» ≠ «попытка отправки». The
-        # pending request itself stays committed and reviewable regardless
-        # of the delivery outcome.
+        # The flag means at least one protected inbox delivery was created;
+        # the pending request remains committed and reviewable either way.
         if confirmed_deliveries > 0:
             price_override.notification_sent = True
             price_override.notification_sent_at = datetime.now(UTC)
@@ -351,17 +344,35 @@ class DentalApiService:
             f"{f'Причина отклонения: {price_override.rejection_reason}' if price_override.rejection_reason else ''}"
         )
 
-        if hasattr(doctor.user, "telegram_id") and doctor.user.telegram_id:
-            await notification_sender_service.send_telegram_message(
-                user_id=doctor.user.telegram_id,
-                message=message,
-                parse_mode="HTML",
-            )
-
-        logger.info(
-            "Уведомление о результате изменения цены отправлено врачу %s",
-            doctor.user.username,
+        delivered = await notification_sender_service.send_canonical_notification_to_user(
+            db=self.db,
+            recipient=doctor.user,
+            event_type="dental_price_override_result",
+            title=f"Изменение цены {status_text.lower()}",
+            message=message,
+            source_module="dental",
+            metadata={
+                "override_id": price_override.id,
+                "visit_id": price_override.visit_id,
+                "service_id": price_override.service_id,
+                "status": price_override.status,
+            },
+            entity_type="doctor_price_override",
+            entity_id=price_override.id,
         )
+
+        if delivered:
+            logger.info(
+                "Уведомление о результате изменения цены "
+                "записано в inbox врача %s",
+                doctor.user.username,
+            )
+        else:
+            logger.warning(
+                "Не удалось записать результат изменения "
+                "цены в inbox врача %s",
+                doctor.user.username,
+            )
 
     def get_pending_price_overrides(self, *, limit: int, offset: int = 0) -> dict[str, Any]:
         # REGPRICE-BE-004 (audit #3892, group 16): deterministic ordering and

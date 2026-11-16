@@ -25,6 +25,48 @@ from app.services.notifications_pkg._helpers import (  # noqa: F401
 class CanonicalMixin(NotificationSenderMixinBase):
     """Canonical methods for NotificationSenderService."""
 
+    async def send_linked_user_telegram_notification(
+        self,
+        *,
+        db: Session,
+        user_id: int,
+        event_type: str,
+        message: str,
+    ) -> bool:
+        """Send only to an active Telegram link owned by this app user."""
+        from app.models.patient import Patient
+        from app.models.telegram_config import TelegramUser
+
+        normalized_event_type = _normalize_notification_event_type(
+            event_type, fallback="notification"
+        )
+        preference_field = PATIENT_TELEGRAM_EVENT_PREFERENCES.get(
+            normalized_event_type, "notifications_enabled"
+        )
+        live_link_filter = (
+            TelegramUser.active.is_(True),
+            TelegramUser.blocked.is_(False),
+        )
+        patient = db.query(Patient).filter(Patient.user_id == user_id).first()
+        if patient is None:
+            return False
+        telegram_user = (
+            db.query(TelegramUser)
+            .filter(
+                TelegramUser.patient_id == patient.id,
+                *live_link_filter,
+            )
+            .order_by(TelegramUser.id.desc())
+            .first()
+        )
+
+        if telegram_user is None or not telegram_user.notifications_enabled:
+            return False
+        if not bool(getattr(telegram_user, preference_field, False)):
+            return False
+
+        return await self.send_telegram(message, chat_id=str(telegram_user.chat_id))
+
     async def send_patient_telegram_event_notification(
         self,
         *,
