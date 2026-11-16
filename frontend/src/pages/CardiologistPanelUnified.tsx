@@ -1503,6 +1503,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
           // Ambiguous outcome — refresh the visible queue from the server.
           void loadMacOSCardiologyAppointments(true);
         }
+        return;
+      }
       notify.success(tI18n('cardio.visit_completed'));
 
       // Очищаем форму и возвращаемся в очередь
