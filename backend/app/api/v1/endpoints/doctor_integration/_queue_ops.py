@@ -1109,6 +1109,24 @@ def complete_patient_visit(
             department_hint = resource_department or (
                 getattr(daily_queue, "queue_tag", None) or "general"
             )
+            # DOCWORKLIST-neighbor hardening (2026-11-16): capture whether
+            # the anchored visit is DATELESS *before* _resolve_entry_visit —
+            # a dateless solo visit gets re-stamped to the queue day there
+            # (visit.visit_date = queue_day), but the canonical pairing
+            # (patient/date/time/doctor) can never have paired a NULL-day
+            # visit: Appointment.appointment_date == NULL matches nothing,
+            # so move_paired_appointment_to_day was a no-op for it. The
+            # appointment-sync further down must therefore NOT treat the
+            # re-stamped host-day date as a proven visit↔appointment link,
+            # or the doctor's unrelated TODAY appointment (same patient)
+            # gets falsely completed.
+            anchored_dateless = (
+                queue_entry.visit_id is not None
+                and db.query(Visit.visit_date)
+                .filter(Visit.id == queue_entry.visit_id)
+                .scalar()
+                is None
+            )
             resolved_visit = _resolve_entry_visit(
                 db, queue_entry, doctor, department_hint
             )
@@ -1204,21 +1222,35 @@ def complete_patient_visit(
                 # ✅ Также обновляем соответствующий Appointment, если он существует
                 from app.models.appointment import Appointment
 
-                appointment = (
-                    db.query(Appointment)
-                    .filter(
-                        and_(
-                            Appointment.patient_id == queue_entry.patient_id,
-                            (
-                                Appointment.appointment_date == visit.visit_date
-                                if visit.visit_date
-                                else date.today()
-                            ),
-                            Appointment.doctor_id == visit.doctor_id,
-                        )
+                # DOCWORKLIST-neighbor hardening (2026-11-16): a legacy
+                # DATELESS anchored visit was re-stamped to the queue day by
+                # _resolve_entry_visit above, but no canonical visit↔appointment
+                # pair ever existed for a NULL-day visit (pairing matches
+                # Appointment.appointment_date == NULL — always empty). Syncing
+                # the appointment of the re-stamped host day would falsely
+                # complete the doctor's unrelated TODAY appointment; skip the
+                # sync for anchored dateless visits instead.
+                if anchored_dateless:
+                    logger.warning(
+                        "complete_patient_visit: entry %d anchors a dateless "
+                        "visit %d — appointment sync skipped (no canonical "
+                        "pair existed for a NULL-day visit)",
+                        queue_entry.id,
+                        visit.id,
                     )
-                    .first()
-                )
+                    appointment = None
+                else:
+                    appointment = (
+                        db.query(Appointment)
+                        .filter(
+                            and_(
+                                Appointment.patient_id == queue_entry.patient_id,
+                                Appointment.appointment_date == visit.visit_date,
+                                Appointment.doctor_id == visit.doctor_id,
+                            )
+                        )
+                        .first()
+                    )
 
                 if appointment:
                     appointment.status = "completed"
