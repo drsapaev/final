@@ -1,3 +1,7 @@
+## T19 — resume PR #4117 CI correction — 2026-11-16
+
+Task ad5eac7f-734f-4b24-8d57-437008bacdb8, registrar-tabs-unified / codex/registrar-tabs-unified. Draft PR #4117 source HEAD c82a6cbde exists. Gitleaks recovered and hosted scan PASS. Full CI revealed old unit mocks/labels (now 43 focused tests PASS) and missing registry visual fixture (fixed in 2 E2E files; E2E tsc, scoped lint and exact4 collection PASS). No PNG accepted yet. Finish ordinary hook-enabled test/journal commit, push and monitor ordinary exact-head CI. If only intentional visual deltas remain, inspect corrected Linux actual/diff artifacts before changing ONLY 4 allowed PNGs; do not bless error-state screenshots or alter thresholds. Current source/runtime unchanged; Tier-2/Admin2FA NOT_RUN, no deferral/merge/deploy.
+
 ## T19 — final publication checkpoint — 2026-11-16
 
 Continue task ad5eac7f-734f-4b24-8d57-437008bacdb8 in registrar-tabs-unified / codex/registrar-tabs-unified. Gitleaks recovered with verified official pinned release, standard full pre-commit PASS. Feature commit 28746c3b4 and main sync 5bac9c1f9 exist. Two final review P2 fixed locally: owner-scoped in-memory draft recovery and hidden-filter accessible name. Final 68 focused UI tests and type-check PASS. Final build PASS and bounded review no new P0–P2. Complete ordinary hook-enabled follow-up commit, push and Draft PR; monitor actual exact-head CI. Tier-2/normal Admin2FA NOT_RUN. No merge/deploy. All earlier journal entries below are historical; this checkpoint supersedes their pending Gitleaks/commit steps.
