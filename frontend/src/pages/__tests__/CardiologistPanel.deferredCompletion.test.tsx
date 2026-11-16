@@ -11,7 +11,7 @@
  */
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type TestSelection = {
@@ -166,10 +166,16 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function RouteQueryProbe() {
+  const location = useLocation();
+  return <output data-testid="cardio-route-query">{location.search}</output>;
+}
+
 async function mount() {
   render(
     <MemoryRouter initialEntries={['/doctor/cardiology?tab=visit']}>
       <CardiologistPanelUnified />
+      <RouteQueryProbe />
     </MemoryRouter>,
   );
   await screen.findByTestId('cardio-visit');
@@ -235,6 +241,7 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
 
     expect(state.currentSelection?.patient_id).toBe(B.patient_id);
     expect(state.activeTab).toBe('visit');
+    expect(screen.getByTestId('cardio-route-query').textContent).toContain('tab=visit');
     expect(screen.getByTestId('cardio-visit').getAttribute('data-patient')).toBe('22');
     expect(screen.getByTestId('cardio-visit').getAttribute('data-entry')).toBe('2002');
     // An old A completion must not leave B's controls permanently busy.
@@ -267,6 +274,7 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
 
     expect(state.currentSelection?.patient_id).toBe(22);
     expect(state.activeTab).toBe('visit');
+    expect(screen.getByTestId('cardio-route-query').textContent).toContain('tab=visit');
     expect(screen.getByTestId('cardio-visit').getAttribute('data-patient')).toBe('22');
     expect(screen.getByTestId('cardio-visit').getAttribute('data-loading')).toBe('false');
     expect(vi.mocked(notify.error)).not.toHaveBeenCalled();
@@ -291,6 +299,7 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
     await waitFor(() => {
       expect(state.currentSelection).toBeNull();
       expect(state.activeTab).toBe('queue');
+      expect(screen.getByTestId('cardio-route-query').textContent).toContain('tab=queue');
     });
     expect(vi.mocked(notify.success)).toHaveBeenCalledWith('cardio.visit_completed');
     expect(vi.mocked(notify.error)).not.toHaveBeenCalled();
