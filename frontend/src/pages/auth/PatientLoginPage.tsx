@@ -33,6 +33,7 @@ import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { tokenManager } from '../../utils/tokenManager';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { HttpApiError } from '../../types/errors';
+import '../patient.css';
 
 type PatientLoginStep = 'phone' | 'code';
 
@@ -276,7 +277,7 @@ const PatientLoginPage = () => {
           ) : null}
 
           {passkeyAttempted && !isAuthenticating && passkeyError && (
-            <Alert variant="danger" style={{ marginBottom: 16 }} role="alert">
+            <Alert variant="danger" className="patient-login-passkey-alert" role="alert">
               {t(passkeyError === 'authentication_unavailable' ? 'patientPortal.pl_unavailable' :
                 passkeyError === 'authentication_rate_limited' ? 'patientPortal.pl_rate_limited' :
                 passkeyError === 'authentication_cancelled' ? 'patient.pat_web_login_cancelled' : 'patient.pat_web_login_error')}
@@ -362,7 +363,7 @@ const PatientLoginPage = () => {
           )}
 
           {step === 'phone' && passkeySupported && (
-            <Button type="button" variant="outline" disabled={loading || isAuthenticating} onClick={handlePasskey} style={{ width: '100%', marginTop: 12 }}>
+            <Button type="button" variant="outline" disabled={loading || isAuthenticating} onClick={handlePasskey} className="patient-login-passkey-button">
               {t('patient.pat_web_login')}
             </Button>
           )}

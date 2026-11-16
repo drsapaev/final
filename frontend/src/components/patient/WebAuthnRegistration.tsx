@@ -9,6 +9,7 @@ import type { HttpApiError } from '../../types/errors';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
 import { Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import '../../pages/patient.css';
 
 /**
  * WebAuthn Registration UI — P5 frontend integration.
@@ -206,7 +207,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
         </div>}
 
         {action && (
-          <div style={{ display: 'grid', gap: 8 }}>
+          <div className="passkey-step-up">
             <p>{t(action.kind === 'register' ? 'patient.pat_web_verify_add' : 'patient.pat_web_verify_delete')}</p>
             {step === 'phone' ? (
               <label>{t('patientPortal.pl_phone_label')}<Input value={phone} disabled={busy} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPhone(e.target.value)} placeholder={t('patientPortal.pl_phone_placeholder')} type="tel" autoComplete="tel" /></label>
@@ -214,7 +215,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
               <label>{t('patientPortal.pl_code_label')}<Input value={code} disabled={busy} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCode(e.target.value)} placeholder={t('patientPortal.pl_code_placeholder')} autoComplete="one-time-code" inputMode="numeric" /></label>
             )}
             {otpError && <Alert severity="error">{otpError}</Alert>}
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="passkey-step-up-actions">
               <Button variant="primary" disabled={busy} loading={busy} onClick={step === 'phone' ? requestCode : confirmAction}>
                 {t(step === 'phone' ? 'patientPortal.pl_send_code' : 'patient.pat_web_confirm')}
               </Button>
