@@ -1,3 +1,11 @@
+## T19 — штатное восстановление Gitleaks — 2026-11-16
+
+Gitleaks recovery PASS. The pinned official v8.21.2 Windows release passed its published archive checksum and Windows execution policy. Replaced only the generated hook-cache executable after backing it up; hook/config/policy unchanged. Standard Gitleaks and the full pre-commit suite passed. Commit/push/Draft PR preparation continues; Tier-2 remains NOT_RUN.
+
+## T19 — единые вкладки — 2026-11-16
+
+T19 implementation prepared in isolated worktree registrar-tabs-unified from main 0f593d291 (#4073 merged). Unified registry/service/API/admin editor/strip implemented. Backend 25/25 (12 PG on disposable migrated DB), frontend 59/59, type-check/lint/build passed. OpenAPI/types regenerated. Mocked browser 6 assertions passed with recorded limitations. Normal Admin 2FA/Tier-2 NOT_RUN; no production/deploy/merge. Standard pre-commit Gitleaks Windows block remains pending.
+
 ## Current checkpoint — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
 
 - Umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80: T00–T17 are MERGED; T18/Tier-2 is still PARTIAL. User owns merge/deployment.

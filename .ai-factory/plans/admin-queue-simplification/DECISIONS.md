@@ -1,3 +1,7 @@
+## T19 — единые вкладки — 2026-11-16
+
+D-T19 implemented: internal Registrar tabs have one explicit configuration in ClinicSettings registrar_tabs_v1 with typed profile/doctor IDs, order, visibility and optional custom label. QueueProfile/Doctor/queue records are not tab entities. First save explicitly fixes legacy snapshot; future targets do not auto-add. Empty saved list stays empty. profile_filters preserve old dept links; missing selected filter is visible and cleared only by the user.
+
 # Decisions and contract
 
 Plan version: 2.9

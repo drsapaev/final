@@ -14,12 +14,25 @@ vi.mock('../../../i18n/useTranslation', () => ({
       'admin2.asv_tab_catalog': 'Каталог услуг',
       'admin2.asv_tab_queue_profiles': 'Профили очередей',
       'admin2.sdx_title': 'Направления и очереди',
+      'registrarPanel.rt_title': 'Вкладки регистратуры',
+      'registrarPanel.rt_unsaved_warning': 'Сохранить изменения перед уходом?',
+      'registrarPanel.rt_discard_confirm': 'Отменить изменения',
+      'common.cancel': 'Остаться',
     })[key] ?? key,
   }),
 }));
 
-vi.mock('../QueueProfilesManager', () => ({
-  default: () => <div data-testid="queue-profiles-panel">Queue profiles</div>,
+vi.mock('../RegistrarTabsManager', () => ({
+  default: ({ onDirtyChange, onSavingChange, defaultOpenProfiles }: {
+    onDirtyChange?: (dirty: boolean) => void;
+    onSavingChange?: (saving: boolean) => void;
+    defaultOpenProfiles?: boolean;
+  }) => <div data-testid="registrar-tabs-panel">
+    Registrar tabs
+    <button type="button" onClick={() => onDirtyChange?.(true)}>Edit registrar tabs</button>
+    <button type="button" onClick={() => onSavingChange?.(true)}>Start saving registrar tabs</button>
+    {defaultOpenProfiles && <span>Profile settings open</span>}
+  </div>,
 }));
 
 vi.mock('../ServiceCatalog', () => ({
@@ -76,7 +89,7 @@ describe('AdminServices URL-backed tab navigation', () => {
   it('opens the queue-profile compatibility URL without redirecting the services route', async () => {
     renderAdminServices('/admin/services?servicesTab=queue-profiles');
 
-    expect(await screen.findByTestId('queue-profiles-panel')).toBeInTheDocument();
+    expect(await screen.findByTestId('registrar-tabs-panel')).toBeInTheDocument();
     expect(screen.getByTestId('current-location')).toHaveTextContent(
       '/admin/services?servicesTab=queue-profiles',
     );
@@ -94,7 +107,7 @@ describe('AdminServices URL-backed tab navigation', () => {
       expect(current.searchParams.get('servicesTab')).toBe('catalog');
       expect(current.searchParams.get('keep')).toBe('1');
     });
-    expect(screen.queryByTestId('queue-profiles-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('registrar-tabs-panel')).not.toBeInTheDocument();
   });
 
   it('normalizes repeated servicesTab parameters to the safe catalog tab', async () => {
@@ -114,7 +127,7 @@ describe('AdminServices URL-backed tab navigation', () => {
 
     expect(await screen.findByTestId('service-catalog-panel')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Профили очередей' }));
-    expect(await screen.findByTestId('queue-profiles-panel')).toBeInTheDocument();
+    expect(await screen.findByTestId('registrar-tabs-panel')).toBeInTheDocument();
     expect(screen.getByTestId('current-location')).toHaveTextContent('servicesTab=queue-profiles');
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
@@ -122,10 +135,10 @@ describe('AdminServices URL-backed tab navigation', () => {
     expect(screen.getByTestId('current-location')).toHaveTextContent('servicesTab=catalog');
 
     await user.click(screen.getByRole('button', { name: 'Forward' }));
-    expect(await screen.findByTestId('queue-profiles-panel')).toBeInTheDocument();
+    expect(await screen.findByTestId('registrar-tabs-panel')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Set queue profiles query' }));
-    expect(await screen.findByTestId('queue-profiles-panel')).toBeInTheDocument();
+    expect(await screen.findByTestId('registrar-tabs-panel')).toBeInTheDocument();
     expect(screen.getByTestId('queue-setup-return')).toHaveTextContent('Направления и очереди');
   });
 
@@ -133,11 +146,52 @@ describe('AdminServices URL-backed tab navigation', () => {
     mockLegacySavedTab();
     renderAdminServices('/admin/services');
 
-    expect(await screen.findByTestId('queue-profiles-panel')).toBeInTheDocument();
+    expect(await screen.findByTestId('registrar-tabs-panel')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByTestId('current-location')).toHaveTextContent(
         '/admin/services?servicesTab=queue-profiles',
       );
     });
+  });
+
+  it('keeps the edited registrar tab list when the administrator cancels navigation', async () => {
+    const user = userEvent.setup();
+    renderAdminServices('/admin/services?servicesTab=queue-profiles&keep=1');
+    await screen.findByTestId('registrar-tabs-panel');
+    await user.click(screen.getByRole('button', { name: 'Edit registrar tabs' }));
+    await user.click(screen.getByRole('button', { name: 'Каталог услуг' }));
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Сохранить изменения перед уходом?');
+    await user.click(screen.getByRole('button', { name: 'Остаться' }));
+
+    expect(screen.getByTestId('registrar-tabs-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('service-catalog-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('current-location')).toHaveTextContent('servicesTab=queue-profiles');
+  });
+
+  it('leaves the registrar editor only after explicit discard confirmation', async () => {
+    const user = userEvent.setup();
+    renderAdminServices('/admin/services?servicesTab=queue-profiles&keep=2');
+    await screen.findByTestId('registrar-tabs-panel');
+    await user.click(screen.getByRole('button', { name: 'Edit registrar tabs' }));
+    await user.click(screen.getByRole('button', { name: 'Каталог услуг' }));
+
+    await screen.findByRole('dialog');
+    await user.click(screen.getByRole('button', { name: 'Отменить изменения' }));
+
+    expect(await screen.findByTestId('service-catalog-panel')).toBeInTheDocument();
+    const current = new URL(screen.getByTestId('current-location').textContent ?? '', 'http://local');
+    expect(current.searchParams.get('servicesTab')).toBe('catalog');
+    expect(current.searchParams.get('keep')).toBe('2');
+  });
+
+  it('disables tab navigation while the registrar configuration is being saved', async () => {
+    const user = userEvent.setup();
+    renderAdminServices('/admin/services?servicesTab=queue-profiles');
+    await screen.findByTestId('registrar-tabs-panel');
+    await user.click(screen.getByRole('button', { name: 'Start saving registrar tabs' }));
+
+    expect(screen.getByRole('button', { name: 'Каталог услуг' })).toBeDisabled();
+    expect(screen.getByTestId('current-location')).toHaveTextContent('servicesTab=queue-profiles');
   });
 });

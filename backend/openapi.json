@@ -20075,6 +20075,182 @@
         }
       }
     },
+    "/api/v1/registrar/tabs": {
+      "get": {
+        "tags": [
+          "registrar"
+        ],
+        "summary": "Get Registrar Tabs",
+        "operationId": "get_registrar_tabs_api_v1_registrar_tabs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsValidationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/registrar-tabs": {
+      "get": {
+        "tags": [
+          "registrar"
+        ],
+        "summary": "Get Admin Registrar Tabs",
+        "operationId": "get_admin_registrar_tabs_api_v1_admin_registrar_tabs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegistrarTabsOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsValidationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "registrar"
+        ],
+        "summary": "Update Admin Registrar Tabs",
+        "operationId": "update_admin_registrar_tabs_api_v1_admin_registrar_tabs_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarTabsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegistrarTabsOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarTabsValidationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/registrar/queues/today": {
       "get": {
         "tags": [
@@ -73459,6 +73635,52 @@
         ],
         "title": "AdminQueueDirectionsResponse"
       },
+      "AdminRegistrarTabsOut": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "configured"
+            ],
+            "title": "Mode"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "tabs": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedRegistrarTab"
+            },
+            "type": "array",
+            "title": "Tabs"
+          },
+          "profile_filters": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrarProfileFilter"
+            },
+            "type": "array",
+            "title": "Profile Filters"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedRegistrarTab"
+            },
+            "type": "array",
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "version",
+          "tabs",
+          "profile_filters",
+          "options"
+        ],
+        "title": "AdminRegistrarTabsOut"
+      },
       "AdminUnattachedCatalog": {
         "properties": {
           "queue_tags": {
@@ -111974,6 +112196,45 @@
         ],
         "title": "RegistrarPaymentSummaryRequest"
       },
+      "RegistrarProfileFilter": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "queue_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queue Tags"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "title_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Ru"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "queue_tags",
+          "title",
+          "title_ru"
+        ],
+        "title": "RegistrarProfileFilter",
+        "description": "Historical deep-link filter metadata; does not create a visible tab."
+      },
       "RegistrarRecordActionItemResponse": {
         "properties": {
           "record_kind": {
@@ -112216,6 +112477,164 @@
           "record_id"
         ],
         "title": "RegistrarRecordRef"
+      },
+      "RegistrarTabInput": {
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "profile",
+              "doctor"
+            ],
+            "title": "Target Kind"
+          },
+          "target_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Target Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_kind",
+          "target_id"
+        ],
+        "title": "RegistrarTabInput"
+      },
+      "RegistrarTabsErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "RegistrarTabsErrorDetail"
+      },
+      "RegistrarTabsErrorResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/RegistrarTabsErrorDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "RegistrarTabsErrorResponse"
+      },
+      "RegistrarTabsOut": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "configured"
+            ],
+            "title": "Mode"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "tabs": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedRegistrarTab"
+            },
+            "type": "array",
+            "title": "Tabs"
+          },
+          "profile_filters": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrarProfileFilter"
+            },
+            "type": "array",
+            "title": "Profile Filters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "version",
+          "tabs",
+          "profile_filters"
+        ],
+        "title": "RegistrarTabsOut"
+      },
+      "RegistrarTabsUpdate": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "tabs": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrarTabInput"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Tabs"
+          },
+          "reason": {
+            "type": "string",
+            "const": "configure_registrar_tabs",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "tabs",
+          "reason"
+        ],
+        "title": "RegistrarTabsUpdate"
+      },
+      "RegistrarTabsValidationResponse": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrarTabsErrorDetail"
+              },
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "RegistrarTabsValidationResponse"
       },
       "RegistrarVisitPaymentSummary": {
         "properties": {
@@ -112498,6 +112917,127 @@
         ],
         "title": "ReportResponse",
         "description": "Ответ с отчетом"
+      },
+      "ResolvedRegistrarTab": {
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "profile",
+              "doctor"
+            ],
+            "title": "Target Kind"
+          },
+          "target_id": {
+            "type": "integer",
+            "title": "Target Id"
+          },
+          "custom_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Title"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "title_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Ru"
+          },
+          "profile_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Key"
+          },
+          "queue_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queue Tags"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "missing_target",
+                  "inactive_target"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_kind",
+          "target_id",
+          "custom_title",
+          "title",
+          "title_ru",
+          "profile_key",
+          "queue_tags",
+          "icon",
+          "color",
+          "visible",
+          "available",
+          "reason_code"
+        ],
+        "title": "ResolvedRegistrarTab"
       },
       "RestoreRequest": {
         "properties": {

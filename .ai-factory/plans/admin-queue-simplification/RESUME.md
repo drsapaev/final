@@ -1,3 +1,11 @@
+## T19 — штатное восстановление Gitleaks — 2026-11-16
+
+Standard Gitleaks recovery succeeded without changing policy or hook configuration. Full pre-commit PASS. Next: conventional commit of the staged unified-tab implementation, merge current origin/main in this isolated worktree, push and prepare Draft PR, monitor exact-head CI. Keep live Admin2FA/staging NOT_RUN and preserve previous evidence.
+
+## T19 — единые вкладки — 2026-11-16
+
+Continue task ad5eac7f-734f-4b24-8d57-437008bacdb8 in registrar-tabs-unified, branch codex/registrar-tabs-unified, base0f593d291. Runtime implementation and targeted checks complete; full Tier-2/normal Admin2FA NOT_RUN. Own PG and Vite/browser cleaned. Next: resolve standard Gitleaks Windows application-control block without bypass; commit final reviewed candidate, then push/CI/PR. Old grouped patch remains separately retained and must not be published.
+
 ## Resume — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final, branch codex/aqs-t18-rq18-recorder-fix-20261111. T00–T17 are merged. T18/Tier-2 remains PARTIAL, without a deferral; user owns merge/deployment.

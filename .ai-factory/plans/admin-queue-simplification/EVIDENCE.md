@@ -1,3 +1,22 @@
+## T19 — штатное восстановление Gitleaks — 2026-11-16
+
+Gitleaks v8.21.2 local Go-build was denied by CodeIntegrity3077/3033. Official Windows x64 archive SHA256 f238c85e5f47e18fac779ce71ee11091cf70a0a8fb4415f165efba2800eef133 matched upstream checksums; binary SHA256 671591bd75e11fcd4a25732852afbbf0c3892b368181164ba19aa72e7513af8e ran normally. Generated cache binary replaced with identical verified official artifact; original backed up. Standard staged hook: PASS/no leaks. Full pre-commit: PASS (ESLint one ignored-generated-file warning); no SKIP/no-verify/policy change. Operational cache recovery is local and not an application source change.
+
+## T19 — единые вкладки — 2026-11-16
+
+T19 candidate is WORKTREE_ONLY (not a committed acceptance SHA), base0f593d291. QueueProfile inspection and plan preceded implementation. Backend launcher ran tests/unit/test_registrar_tabs_schema.py and tests/integration/test_registrar_tabs.py: 25 PASS, 0 skipped (13 schema +12 PG). PG was a task-owned postgres16-alpine on loopback55491; unique scratch DB migrated to Alembic head then dropped, container removed. Frontend targeted: RegistrarTabsManager, AdminServices.navigation, Tabs.a11y, Tabs.focusRefresh, RegistrarPanel.contract:59 PASS. type-check, scoped ESLint/Ruff and build PASS; existing build warnings remain. OpenAPI and generated API types refreshed.
+
+Mocked Chromium smoke: 6 assertions passed for mixed list/order/name/save/hide, no automatic extra doctor, mobile and desktop text visibility. Tested1280/375. All API/external requests intercepted and WebSockets closed, no live auth/2FA. Three parser errors were retained in report; source inspection plus offline parse reproduction strongly attributes them to JSON returned for SpeedInsights JavaScript by the harness; browser stacks absent, so this remains inference. Mobile shell overflow outside the scrollable tab strip remains a separate limitation. Own Vite5198 stopped and browser closed. No normal Admin2FA, integrated staging/runbook or production validation is claimed.
+
+Local source fingerprints after formatting (for handoff only):
+
+| File | SHA256 |
+|---|---|
+| backend/app/services/registrar_tabs.py | c1965c3e39fbc3be19161f67153ef3a696be4e4373fed7bdda086982878f09cf |
+| backend/app/schemas/registrar_tabs.py | 48af9ec9fee741eb355d1602410b7b761fa604038c9b411a43bf7bc614993be9 |
+| frontend/src/components/admin/RegistrarTabsManager.tsx | d9afe081959133e4dc499cc9e57828b6a208f0ac1eb92e3c0c71d7c579e7b2e9 |
+| frontend/src/components/navigation/Tabs.tsx | 30bef0db1ebe04efe73dd8ef46885d8a89b17ee8386b934cd90f299dc0a52730 |
+
 ## T18 — PR #4026 exact-head CI completed — 2026-11-12T02:12:26+05:00
 
 - Commit under test: 592d327d7053a1031cef157e1c34adbb2e0d978a; base 80a616d16e407362bac16b9b2092e83070676711 (#4031). This head includes the prior test-only synchronization changes at 9869a837 and an evidence-only commit; application/test source did not change after 9869a837.

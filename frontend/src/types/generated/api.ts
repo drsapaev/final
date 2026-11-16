@@ -6533,6 +6533,41 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/registrar/tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Registrar Tabs */
+        get: operations["get_registrar_tabs_api_v1_registrar_tabs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/registrar-tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Registrar Tabs */
+        get: operations["get_admin_registrar_tabs_api_v1_admin_registrar_tabs_get"];
+        /** Update Admin Registrar Tabs */
+        put: operations["update_admin_registrar_tabs_api_v1_admin_registrar_tabs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/registrar/queues/today": {
         parameters: {
             query?: never;
@@ -24755,6 +24790,22 @@ export type components = {
             directions?: components["schemas"]["AdminQueueDirection"][];
             unattached: components["schemas"]["AdminUnattachedCatalog"];
         };
+        /** AdminRegistrarTabsOut */
+        AdminRegistrarTabsOut: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "legacy" | "configured";
+            /** Version */
+            version: number;
+            /** Tabs */
+            tabs: components["schemas"]["ResolvedRegistrarTab"][];
+            /** Profile Filters */
+            profile_filters: components["schemas"]["RegistrarProfileFilter"][];
+            /** Options */
+            options: components["schemas"]["ResolvedRegistrarTab"][];
+        };
         /** AdminUnattachedCatalog */
         AdminUnattachedCatalog: {
             /** Queue Tags */
@@ -39126,6 +39177,20 @@ export type components = {
             /** Records */
             records: components["schemas"]["RegistrarRecordRef"][];
         };
+        /**
+         * RegistrarProfileFilter
+         * @description Historical deep-link filter metadata; does not create a visible tab.
+         */
+        RegistrarProfileFilter: {
+            /** Key */
+            key: string;
+            /** Queue Tags */
+            queue_tags: string[];
+            /** Title */
+            title: string;
+            /** Title Ru */
+            title_ru: string | null;
+        };
         /** RegistrarRecordActionItemResponse */
         RegistrarRecordActionItemResponse: {
             /** Record Kind */
@@ -39194,6 +39259,65 @@ export type components = {
             record_kind: string;
             /** Record Id */
             record_id: number;
+        };
+        /** RegistrarTabInput */
+        RegistrarTabInput: {
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "profile" | "doctor";
+            /** Target Id */
+            target_id: number;
+            /** Title */
+            title?: string | null;
+            /**
+             * Visible
+             * @default true
+             */
+            visible: boolean;
+        };
+        /** RegistrarTabsErrorDetail */
+        RegistrarTabsErrorDetail: {
+            /** Code */
+            code: string;
+        };
+        /** RegistrarTabsErrorResponse */
+        RegistrarTabsErrorResponse: {
+            detail: components["schemas"]["RegistrarTabsErrorDetail"];
+        };
+        /** RegistrarTabsOut */
+        RegistrarTabsOut: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "legacy" | "configured";
+            /** Version */
+            version: number;
+            /** Tabs */
+            tabs: components["schemas"]["ResolvedRegistrarTab"][];
+            /** Profile Filters */
+            profile_filters: components["schemas"]["RegistrarProfileFilter"][];
+        };
+        /** RegistrarTabsUpdate */
+        RegistrarTabsUpdate: {
+            /** Expected Version */
+            expected_version: number;
+            /** Tabs */
+            tabs: components["schemas"]["RegistrarTabInput"][];
+            /**
+             * Reason
+             * @constant
+             */
+            reason: "configure_registrar_tabs";
+        };
+        /** RegistrarTabsValidationResponse */
+        RegistrarTabsValidationResponse: {
+            /** Detail */
+            detail: components["schemas"]["RegistrarTabsErrorDetail"] | {
+                [key: string]: unknown;
+            }[];
         };
         /** RegistrarVisitPaymentSummary */
         RegistrarVisitPaymentSummary: {
@@ -39295,6 +39419,36 @@ export type components = {
             size?: number | null;
             /** Error */
             error?: string | null;
+        };
+        /** ResolvedRegistrarTab */
+        ResolvedRegistrarTab: {
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "profile" | "doctor";
+            /** Target Id */
+            target_id: number;
+            /** Custom Title */
+            custom_title: string | null;
+            /** Title */
+            title: string;
+            /** Title Ru */
+            title_ru: string | null;
+            /** Profile Key */
+            profile_key: string | null;
+            /** Queue Tags */
+            queue_tags: string[];
+            /** Icon */
+            icon: string | null;
+            /** Color */
+            color: string | null;
+            /** Visible */
+            visible: boolean;
+            /** Available */
+            available: boolean;
+            /** Reason Code */
+            reason_code: ("missing_target" | "inactive_target") | null;
         };
         /**
          * RestoreRequest
@@ -56745,6 +56899,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_registrar_tabs_api_v1_registrar_tabs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsValidationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+        };
+    };
+    get_admin_registrar_tabs_api_v1_admin_registrar_tabs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegistrarTabsOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsValidationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+        };
+    };
+    update_admin_registrar_tabs_api_v1_admin_registrar_tabs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarTabsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegistrarTabsOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsValidationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
                 };
             };
         };
