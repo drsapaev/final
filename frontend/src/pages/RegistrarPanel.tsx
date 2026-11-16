@@ -381,7 +381,7 @@ const RegistrarPanel = () => {
             setContextMenu={setContextMenu as unknown as React.Dispatch<React.SetStateAction<{ open: boolean; row: unknown; position: { x: number; y: number } }>>}
             openRecordPreview={openRecordPreview}
             openRecordEditor={openRecordEditor}
-            updateAppointmentStatus={updateAppointmentStatus as unknown as (id: unknown, status: string, note: string, row?: unknown) => void | Promise<void>}
+            handleTableAction={handleTableAction}
             handleStartVisit={handleStartVisit as unknown as (row: unknown) => void | Promise<void>}
             generateCSV={generateCSV as unknown as (...args: unknown[]) => unknown}
             downloadCSV={downloadCSV as unknown as (...args: unknown[]) => void}

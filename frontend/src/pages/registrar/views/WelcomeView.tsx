@@ -150,7 +150,7 @@ export interface WelcomeViewProps {
   // Action: records
   openRecordPreview: (row: unknown) => void;
   openRecordEditor: (row: unknown) => void;
-  updateAppointmentStatus: (id: unknown, status: string, note: string, row?: unknown) => void | Promise<void>;
+  handleTableAction: (action: string, row: Record<string, unknown>, event?: unknown) => void | Promise<void>;
   handleStartVisit: (row: unknown) => void | Promise<void>;
   // Action: CSV — actual signatures come from registrarCsv.ts; loosened here.
   generateCSV: (...args: unknown[]) => unknown;
@@ -198,7 +198,7 @@ const WelcomeView = React.memo(({
   setContextMenu,
   openRecordPreview,
   openRecordEditor,
-  updateAppointmentStatus,
+  handleTableAction,
   handleStartVisit,
   generateCSV,
   downloadCSV,
@@ -797,17 +797,14 @@ const WelcomeView = React.memo(({
                     setPaymentDialog({ open: true, row, paid: false, source: 'welcome' });
                     break;
                   case 'in_cabinet':
-                    logger.info('[Welcome] Row action: in_cabinet', { recordId: row.id });
-                    updateAppointmentStatus(row.id, 'in_cabinet', '', row);
-                    break;
+                    // REG-FE-006: use the shared confirmation-gated row router.
+                    return handleTableAction('in_cabinet', row as Record<string, unknown>, event);
                   case 'call':
                     logger.info('[Welcome] Row action: call', { recordId: row.id });
                     handleStartVisit(row);
                     break;
                   case 'complete':
-                    logger.info('[Welcome] Row action: complete', { recordId: row.id });
-                    updateAppointmentStatus(row.id, 'done', '', row);
-                    break;
+                    return handleTableAction('complete', row as Record<string, unknown>, event);
                   case 'print':
                     logger.info('[Welcome] Row action: print', { recordId: row.id });
                     setPrintDialog({ open: true, type: 'ticket', data: row });
