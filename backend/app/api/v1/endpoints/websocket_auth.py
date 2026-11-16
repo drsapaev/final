@@ -11,7 +11,10 @@ import jwt
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from jwt import PyJWTError as JWTError
 from sqlalchemy import func
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import ObjectDeletedError
 
 from app.core.config import settings
 from app.core.roles import (
@@ -53,6 +56,29 @@ def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
             "WebSocket auth rejected: unsupported 'sub' type %s", type(subject).__name__
         )
         return None
+
+    # NOTIFYLIVEAUTH-BE-001 residual (re-check freshness): the periodic live
+    # re-authorization reuses the handshake DB session, so a plain re-query
+    # emits the SELECT but keeps the identity-map copy loaded at handshake
+    # time without overwriting its column values — a deactivation or role
+    # change committed by another session/process stayed invisible and the
+    # socket survived revocation. refresh() forces the current row to
+    # overwrite cached attributes on every resolution, so the handshake and
+    # each periodic re-check across the notify, queue and display-board
+    # planes that share this resolver observe current principal state.
+    try:
+        persistent_here = sa_inspect(user).persistent
+    except NoInspectionAvailable:
+        persistent_here = False
+    if persistent_here:
+        try:
+            db.refresh(user)
+        except ObjectDeletedError:
+            # The row was removed after the handshake identity map cached it.
+            logger.warning(
+                "WebSocket auth rejected: token subject row no longer exists"
+            )
+            return None
 
     if user is None:
         logger.warning(
