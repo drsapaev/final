@@ -2,11 +2,11 @@ diff --git a/frontend/src/pages/registrar/views/WelcomeView.tsx b/frontend/src/p
 --- a/frontend/src/pages/registrar/views/WelcomeView.tsx
 +++ b/frontend/src/pages/registrar/views/WelcomeView.tsx
 @@ -45,4 +45,4 @@
- * @param {Function} props.openRecordPreview - open a read-only record preview
- * @param {Function} props.openRecordEditor - open the wizard in edit mode for a row
+  * @param {Function} props.openRecordPreview - open a read-only record preview
+  * @param {Function} props.openRecordEditor - open the wizard in edit mode for a row
 - * @param {Function} props.updateAppointmentStatus - patch a row status (e.g. 'in_cabinet', 'done')
 + * @param {Function} props.handleTableAction - route clinical row commands through the shared confirmation gate
- * @param {Function} props.handleStartVisit - call the patient into the cabinet (start visit)
+  * @param {Function} props.handleStartVisit - call the patient into the cabinet (start visit)
 @@ -150,7 +150,7 @@ export interface WelcomeViewProps {
    // Action: records
    openRecordPreview: (row: unknown) => void;
