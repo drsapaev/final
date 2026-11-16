@@ -1,5 +1,5 @@
 import { createElement, lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 // P-016 (UX audit): persist cardiologist settings (ldlThreshold) in
@@ -118,6 +118,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   // Всегда вызываем хуки первыми
   const { isDark, getColor, getSpacing, getFontSize } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   // P-009: navigate removed — useDoctorPanelState handles tab URL sync
 
   // P-009 fix: use shared useDoctorPanelState hook for tab/URL/patient state.
@@ -1517,36 +1518,35 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       }
       notify.success(tI18n('cardio.visit_completed'));
 
-      // After a confirmed completion, the URL tab and rendered tab must
-      // transition together. Direct setActiveTab('queue') left ?tab=visit
-      // in the URL; the panel's URL-sync effect then reopened an empty visit.
-      // RETRO-3971-04: use the shared route-leave guard rather than clearing
-      // a potentially dirty EMR before the user authorizes navigation.
-      goToTab('queue', () => {
-        // The decision to leave may have been delayed by the dirty guard.
-        // Do not deselect a different patient selected in the meantime.
-        if (!completionStillOwned()) return;
-        // RETRO-3963-01: completing the visit invalidates older navigation.
-        navigationEpochRef.current += 1;
-        setSelectedPatient(null);
-        setSelectedServices([]);
-        setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
-        // Only call the next patient after the queue transition is accepted.
-        // A rejected Stay choice must not auto-call over an open EMR.
-        void (async () => {
-          try {
-            const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
-            if (next?.success && next.entry) {
-              notify.success(tI18n('cardio.cardio_panel_next_patient_called', { number: (next.entry as Record<string, unknown>).number }));
-            }
-          } catch (err) {
-            notify.warning(getErrorMessage(
-              err,
-              tI18n('cardio.cardio_panel_next_patient_call_failed')
-            ));
-          }
-        })();
-      });
+      // Confirmed completion is an authoritative transition: clear the
+      // completed clinical context and synchronize BOTH the tab and URL.
+      // A bare setActiveTab('queue') left ?tab=visit in the URL, and the
+      // panel's URL-sync effect reopened an empty visit (CI regression).
+      // Do not route an unconfirmed/stale ACK through this branch.
+      navigationEpochRef.current += 1;
+      setSelectedPatient(null);
+      setSelectedServices([]);
+      setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
+      const completedTabParams = new URLSearchParams(location.search);
+      completedTabParams.set('tab', 'queue');
+      navigate(
+        { pathname: location.pathname, search: completedTabParams.toString() },
+        { replace: true },
+      );
+      setActiveTab('queue');
+
+      // Existing next-call behavior is preserved after confirmed completion.
+      try {
+        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
+        if (next?.success && next.entry) {
+          notify.success(tI18n('cardio.cardio_panel_next_patient_called', { number: (next.entry as Record<string, unknown>).number }));
+        }
+      } catch (err) {
+        notify.warning(getErrorMessage(
+          err,
+          tI18n('cardio.cardio_panel_next_patient_call_failed')
+        ));
+      }
 
     } catch (error: unknown) {
       // The request may have failed after selecting a DIFFERENT patient.
