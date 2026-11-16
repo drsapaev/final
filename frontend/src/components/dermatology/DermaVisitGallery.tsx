@@ -155,28 +155,37 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   // постраничного запроса: загрузка страницы 2 (апенд того же списка) больше
   // не инвалидирует ожидающие превью страницы 1 — их карточки получают
   // свои blob-URL, когда ответы приходят.
-  // Запросы идут ограниченными пачками (DERMAGALLERY-FE-007): один зависший
-  // или упавший запрос не блокирует остальные превью своей пачки, а отказ
-  // одного файла оставляет остальные карточки живыми.
+  // DERMAGALLERY-FE-007: replenishing pool instead of sequential batches.
+  // A stalled request holds only its own slot: fast workers continue to fetch
+  // later previews (including photo #5) with at most four in-flight requests
+  // per page. A full reload or visit switch invalidates every old worker.
   const attachPreviews = useCallback(async (files: StoredFile[], contextEpoch: number, listEpoch: number) => {
-    for (let offset = 0; offset < files.length; offset += PREVIEW_CONCURRENCY) {
-      if (contextEpoch !== contextEpochRef.current) return;
-      if (listEpoch !== listEpochRef.current) return;
-      const batch = files.slice(offset, offset + PREVIEW_CONCURRENCY);
-      await Promise.allSettled(batch.map(async (file) => {
+    let nextFileIndex = 0;
+    const contextIsCurrent = () => (
+      contextEpoch === contextEpochRef.current && listEpoch === listEpochRef.current
+    );
+    const worker = async () => {
+      while (contextIsCurrent()) {
+        // The index claim is synchronous: concurrent async workers cannot
+        // start the same file. Do not schedule work from an obsolete context.
+        const file = files[nextFileIndex++];
+        if (!file) return;
         try {
           const previewResponse = await api.get<Blob>(`/files/${file.id}/preview`, { responseType: 'blob' });
-          if (contextEpoch !== contextEpochRef.current) return;
-          if (listEpoch !== listEpochRef.current) return;
+          if (!contextIsCurrent()) return;
           const url = URL.createObjectURL(previewResponse.data);
           objectUrlsRef.current.add(url);
           setPhotos((prev) => prev.map((photo) => (photo.id === file.id ? { ...photo, previewUrl: url } : photo)));
         } catch (error) {
-          // Превью недоступно — карточка файла остаётся с заглушкой.
+          // A single failed preview is not a page-level failure: this worker
+          // continues to the next photo and the card keeps its placeholder.
           logger.warn('[DermaVisitGallery] preview failed', { fileId: file.id, errorType: (error as { name?: string })?.name });
         }
-      }));
-    }
+      }
+    };
+    await Promise.allSettled(
+      Array.from({ length: Math.min(PREVIEW_CONCURRENCY, files.length) }, () => worker()),
+    );
   }, []);
 
   const loadGallery = useCallback(async () => {
