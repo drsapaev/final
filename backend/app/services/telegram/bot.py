@@ -488,21 +488,40 @@ class ClinicTelegramBot:
 
         Возвращает True, если callback уже был подтвержден/обработан через answer().
         """
+        # TGCONFIRM-BE-002: если серверная операция уже закоммичена, падение
+        # рендера/редактирования НЕ должно повторять подтверждение и не
+        # должно показывать generic-ошибку на коммитнутый успех.
+        committed = False
         try:
             if confirm:
                 # Подтверждаем визит через API
                 result = await self._confirm_visit_via_api(token, callback.from_user.id)
 
                 if result.get("success"):
+                    committed = True
                     message = "✅ Визит успешно подтвержден!"
-                    if result.get("queue_numbers"):
+                    queue_entries = result.get("queue_numbers") or []
+                    if queue_entries:
+                        # TGCONFIRM-BE-002: authoritative VisitConfirmationService
+                        # отдаёт queue_tag/number/queue_id БЕЗ queue_name.
+                        # Форматируем безопасно: queue_name -> queue_tag ->
+                        # queue_id, неизвестное — честный fallback, не KeyError.
+                        def _queue_label(q: dict) -> str:
+                            return (
+                                q.get("queue_name")
+                                or q.get("queue_tag")
+                                or f"Очередь #{q.get('queue_id', '?')}"
+                            )
+
                         queue_info = ", ".join(
                             [
-                                f"{q['queue_name']}: №{q['number']}"
-                                for q in result["queue_numbers"]
+                                f"{_queue_label(q)}: №{q.get('number', '?')}"
+                                for q in queue_entries
+                                if isinstance(q, dict)
                             ]
                         )
-                        message += f"\n\n🎫 Ваши номера в очередях:\n{queue_info}"
+                        if queue_info:
+                            message += f"\n\n🎫 Ваши номера в очередях:\n{queue_info}"
 
                     await callback.message.edit_text(
                         text=f"{callback.message.text}\n\n{message}",
@@ -526,7 +545,17 @@ class ClinicTelegramBot:
         except Exception as e:
             logger.error(f"Ошибка подтверждения визита: {e}")
             try:
-                await callback.answer("Произошла ошибка при подтверждении", show_alert=True)
+                if committed:
+                    # TGCONFIRM-BE-002: подтверждение уже закоммичено —
+                    # сообщаем об успехе операции, а не о generic-ошибке.
+                    await callback.answer(
+                        "✅ Визит подтвержден; не удалось обновить сообщение — номера в очереди уточните у регистратуры",
+                        show_alert=True,
+                    )
+                else:
+                    await callback.answer(
+                        "Произошла ошибка при подтверждении", show_alert=True
+                    )
             except Exception:
                 pass
             return True
