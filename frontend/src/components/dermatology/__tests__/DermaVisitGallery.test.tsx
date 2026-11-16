@@ -688,6 +688,55 @@ describe('DermaVisitGallery', () => {
     });
   });
 
+  it('continues scheduling previews beyond the first four while one request never settles (DERMAGALLERY-FE-007)', async () => {
+    // RED against old await Promise.allSettled(batch): file 5 never starts
+    // while the first batch contains a still-pending preview for file 1.
+    const hanging = deferred<{ data: Blob }>();
+    const previewsStarted: number[] = [];
+    let activePreviews = 0;
+    let maxActivePreviews = 0;
+    const files = Array.from({ length: 5 }, (_, index) => ({
+      id: index + 1,
+      title: `synthetic-photo-${index + 1}.jpg`,
+      mime_type: 'image/jpeg',
+      tags: ['dermatology', 'photo', 'examination'],
+    }));
+
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse(files);
+      const preview = /^\/files\/(\d+)\/preview$/.exec(url);
+      if (!preview) throw new Error(`unexpected GET ${url}`);
+
+      const id = Number(preview[1]);
+      previewsStarted.push(id);
+      activePreviews += 1;
+      maxActivePreviews = Math.max(maxActivePreviews, activePreviews);
+      try {
+        if (id === 1) return await hanging.promise;
+        return { data: imageBlob };
+      } finally {
+        activePreviews -= 1;
+      }
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+
+    // The fifth image must not starve behind an indefinitely stalled first
+    // preview. The slot freed by 2/3/4 must be filled automatically.
+    await waitFor(() => {
+      expect(previewsStarted).toContain(5);
+      expect(screen.getAllByRole('img')).toHaveLength(4);
+    });
+    expect(maxActivePreviews).toBeLessThanOrEqual(4);
+    expect(createObjectURLMock).toHaveBeenCalledTimes(4);
+
+    hanging.resolve({ data: imageBlob });
+    await waitFor(() => {
+      expect(screen.getAllByRole('img')).toHaveLength(5);
+    });
+    expect(activePreviews).toBe(0);
+  });
+
   it('shows an error state with retry when the list request fails', async () => {
     apiState.get.mockRejectedValueOnce(new Error('network down'));
     apiState.get.mockImplementation(async (url: string) => {
@@ -965,8 +1014,8 @@ describe('DermaVisitGallery — RETRO-3942-01 (post-merge review #3944)', () => 
 
   it('loading page 2 does not cancel pending page-1 previews — they attach when their responses arrive', async () => {
     let page = 1;
-    // Страница 1: пять фото (больше PREVIEW_CONCURRENCY=4 — вторая пачка
-    // превью стартует только после первой), total 7 → есть «Показать ещё».
+    // Страница 1: пять фото (больше PREVIEW_CONCURRENCY=4 — свободный
+    // worker подхватывает пятый файл без ожидания зависшего первого), total 7.
     const page1 = [1, 2, 3, 4, 5].map((id) => ({
       id, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'], title: `photo-${id}.jpg`,
     }));
@@ -974,7 +1023,7 @@ describe('DermaVisitGallery — RETRO-3942-01 (post-merge review #3944)', () => 
       id, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'], title: `photo-${id}.jpg`,
     }));
 
-    // Превью файла 1 (первая пачка) подвешено до явного resolve.
+    // Превью файла 1 подвешено до явного resolve.
     const file1Preview = deferred<{ data: Blob }>();
     apiState.get.mockImplementation(async (url: string) => {
       if (url === '/files/') {
@@ -986,19 +1035,17 @@ describe('DermaVisitGallery — RETRO-3942-01 (post-merge review #3944)', () => 
     });
 
     render(<DermaVisitGallery patientId={42} visitId={900} />);
-    // Карточки страницы 1 уже видны; превью первой пачки приходят сразу,
-    // НО файл 5 (вторая пачка) ждёт подвешенное превью файла 1 из первой
-    // пачки — сейчас видны 3 готовых превью (файлы 2, 3, 4).
+    // Превью 2–5 готовы без ожидания превью 1.
     await waitFor(() => {
-      expect(screen.getAllByRole('img').length).toBe(3);
+      expect(screen.getAllByRole('img').length).toBe(4);
     });
 
     // «Показать ещё» ДО завершения превью файла 1 (аппенд того же списка).
     page = 2;
     fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_load_more' }));
-    // Карточек стало 7; превью файлов 6 и 7 прикрепились сразу.
+    // Карточек стало 7; готовы превью 2–7, превью 1 ещё ожидается.
     await waitFor(() => {
-      expect(screen.getAllByRole('img').length).toBe(5);
+      expect(screen.getAllByRole('img').length).toBe(6);
     });
 
     // Поздний ответ превью файла 1 приходит ПОСЛЕ загрузки страницы 2 —
