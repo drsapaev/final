@@ -44,6 +44,12 @@ class TwoFactorService:
         self.session_expiry_hours = 24  # Время жизни сессии
         self.recovery_expiry_hours = 1  # Время жизни токена восстановления
         self.recovery_rate_limit_per_hour = 3  # dispatch-запросов на аккаунт в час
+        # TWOFACTOR-BE-001 (#4063): brute-force defense on the second factor.
+        # The endpoint limiter is per-IP (bypassable), so the cap lives on the
+        # 2FA record: N consecutive failures -> temporary lock, storage-backed
+        # (two_factor_auth.failed_attempts / locked_until, alembic 0095).
+        self.max_verify_attempts = 5
+        self.verify_lockout_minutes = 15
         self.sms_manager = get_sms_manager()
         self.email_service = EmailSMSEnhancedService()
 
@@ -405,9 +411,16 @@ class TwoFactorService:
         """Верифицирует настройку TOTP"""
         try:
             two_factor_auth = (
-                db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+                db.query(TwoFactorAuth)
+                .filter(TwoFactorAuth.user_id == user_id)
+                .with_for_update()
+                .populate_existing()
+                .first()
             )
-            if not two_factor_auth or not two_factor_auth.totp_secret:
+            if not two_factor_auth:
+                return False
+            if two_factor_auth.totp_enabled or not two_factor_auth.totp_secret:
+                db.commit()
                 return False
 
             # Проверяем код
@@ -421,6 +434,7 @@ class TwoFactorService:
                 db.commit()
                 return True
 
+            db.commit()
             return False
 
         except Exception as e:
@@ -441,11 +455,46 @@ class TwoFactorService:
     ) -> tuple[bool, str, str | None]:
         """Верифицирует 2FA код"""
         try:
+            # Serialize verification decisions on the per-user 2FA record.
+            # Without this lock, concurrent failures can read the same counter
+            # and overwrite one another, bypassing the account-level cap.
             two_factor_auth = (
-                db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+                db.query(TwoFactorAuth)
+                .filter(
+                    TwoFactorAuth.user_id == user_id,
+                    TwoFactorAuth.totp_enabled.is_(True),
+                )
+                .with_for_update()
+                .populate_existing()
+                .first()
             )
-            if not two_factor_auth or not two_factor_auth.totp_enabled:
+            if not two_factor_auth:
                 return False, "2FA not enabled", None
+
+            # TWOFACTOR-BE-001 (#4063): service-side lockout gate — checked
+            # BEFORE any code verification. After max_verify_attempts
+            # consecutive failures even a correct code is rejected until
+            # locked_until passes; the lock self-clears on the next verify.
+            now = datetime.now(UTC)
+            locked_until = two_factor_auth.locked_until
+            if locked_until is not None:
+                if locked_until.tzinfo is None:
+                    locked_until = locked_until.replace(tzinfo=UTC)
+                if now < locked_until:
+                    remaining_minutes = max(
+                        1, int((locked_until - now).total_seconds() // 60) + 1
+                    )
+                    # Release the row lock before returning; the service's
+                    # callers may reuse this session beyond this request.
+                    db.commit()
+                    return (
+                        False,
+                        "2FA temporarily locked after repeated failed "
+                        f"attempts. Try again in ~{remaining_minutes} minute(s).",
+                        None,
+                    )
+                two_factor_auth.locked_until = None
+                two_factor_auth.failed_attempts = 0
 
             _method_used = None
             success = False
@@ -503,6 +552,11 @@ class TwoFactorService:
                 # Обновляем время последнего использования
                 two_factor_auth.last_used = datetime.now(UTC)
 
+                # TWOFACTOR-BE-001 (#4063): a successful verification resets
+                # the brute-force counter and clears any lock state.
+                two_factor_auth.failed_attempts = 0
+                two_factor_auth.locked_until = None
+
                 # Создаем сессию если нужно
                 session_token = None
                 if device_fingerprint:
@@ -513,6 +567,23 @@ class TwoFactorService:
                 db.commit()
                 return True, "Verification successful", session_token
 
+            # TWOFACTOR-BE-001 (#4063): persist the failed attempt. After
+            # max_verify_attempts consecutive failures, lock the second
+            # factor for verify_lockout_minutes — even a correct code is
+            # rejected while the lock is active (gate above).
+            two_factor_auth.failed_attempts = (
+                two_factor_auth.failed_attempts or 0
+            ) + 1
+            if two_factor_auth.failed_attempts >= self.max_verify_attempts:
+                two_factor_auth.locked_until = datetime.now(UTC) + timedelta(
+                    minutes=self.verify_lockout_minutes
+                )
+                db.commit()
+                return False, (
+                    "Invalid verification code. 2FA temporarily locked after "
+                    "repeated failed attempts."
+                ), None
+            db.commit()
             return False, "Invalid verification code", None
 
         except Exception as e:
