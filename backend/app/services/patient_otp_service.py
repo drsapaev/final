@@ -67,8 +67,8 @@ LOCALES = ("ru", "uz")
 _DEFAULT_LOCALE = "ru"
 
 _OTP_MESSAGES = {
-    "ru": "Код входа: {code}. Действителен 5 минут.",
-    "uz": "Kod: {code}. Amal qilish muddati: 5 daqiqa.",
+    "ru": "Код подтверждения: {code}. Действителен 5 минут.",
+    "uz": "Tasdiqlash kodi: {code}. Amal qilish muddati: 5 daqiqa.",
 }
 
 # --- Neutral, non-enumerable error texts (client-visible) ---
@@ -113,40 +113,65 @@ class _MemoryBackend:
     def __init__(self) -> None:
         self._store: dict[str, tuple[str, float]] = {}
         self._counters: dict[str, tuple[int, float]] = {}
-        self._reservation_lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def _alive(self, expires_at: float) -> bool:
         return time.monotonic() < expires_at
 
     def get(self, key: str) -> str | None:
-        entry = self._store.get(key)
-        if entry and self._alive(entry[1]):
-            return entry[0]
-        self._store.pop(key, None)
-        return None
+        with self._lock:
+            entry = self._store.get(key)
+            if entry and self._alive(entry[1]):
+                return entry[0]
+            self._store.pop(key, None)
+            return None
 
     def set(self, key: str, value: str, ttl: int) -> None:
-        self._store[key] = (value, time.monotonic() + ttl)
+        with self._lock:
+            self._store[key] = (value, time.monotonic() + ttl)
 
     def delete(self, key: str) -> None:
-        self._store.pop(key, None)
+        with self._lock:
+            self._store.pop(key, None)
 
     def getdel(self, key: str) -> str | None:
-        value = self.get(key)
-        self._store.pop(key, None)
-        return value
+        with self._lock:
+            value = self.get(key)
+            self._store.pop(key, None)
+            return value
 
     def incr_with_ttl(self, key: str, ttl: int) -> int:
-        count, expires_at = self._counters.get(key, (0, time.monotonic() + ttl))
-        if not self._alive(expires_at):
-            count, expires_at = 0, time.monotonic() + ttl
-        count += 1
-        self._counters[key] = (count, expires_at)
-        return count
+        with self._lock:
+            count, expires_at = self._counters.get(key, (0, time.monotonic() + ttl))
+            if not self._alive(expires_at):
+                count, expires_at = 0, time.monotonic() + ttl
+            count += 1
+            self._counters[key] = (count, expires_at)
+            return count
+
+    def consume_otp(self, key: str, code_hash: str, max_attempts: int) -> bool:
+        """Check, count failures and consume under a single lock."""
+        with self._lock:
+            actual = self.get(key)
+            if actual is None:
+                return False
+            if hmac.compare_digest(actual, code_hash):
+                self.delete(key)
+                return True
+            meta_key = f"meta:{key}"
+            record = self.get(meta_key)
+            if record is not None and not re.fullmatch(r"[0-9]+", record):
+                self.delete(key)
+                return False
+            attempts = (int(record) if record is not None else 0) + 1
+            self.set(meta_key, str(attempts), CODE_TTL_SECONDS)
+            if attempts >= max_attempts:
+                self.delete(key)
+            return False
 
     def reserve_once(self, key: str, value: str, ttl: int) -> bool:
         """Atomically reserve a single-use key in the TESTING backend."""
-        with self._reservation_lock:
+        with self._lock:
             current = self._store.get(key)
             if current and self._alive(current[1]):
                 return False
@@ -155,7 +180,7 @@ class _MemoryBackend:
 
     def release_if_value(self, key: str, value: str) -> bool:
         """Release only the live reservation owned by this send attempt."""
-        with self._reservation_lock:
+        with self._lock:
             current = self._store.get(key)
             if current and self._alive(current[1]) and current[0] == value:
                 self._store.pop(key, None)
@@ -200,6 +225,53 @@ class _RedisBackend:
 
     def set(self, key: str, value: str, ttl: int) -> None:
         self._run(self._client.set, key, value, ex=ttl)
+
+    def consume_otp(self, key: str, code_hash: str, max_attempts: int) -> bool:
+        """Atomically verify and consume the code or count a failed attempt."""
+        script = """
+        local actual = redis.call('GET', KEYS[1])
+        if not actual then return 0 end
+        local ttl = redis.call('PTTL', KEYS[1])
+        if ttl <= 0 then
+            redis.call('DEL', KEYS[1])
+            return 0
+        end
+        if actual == ARGV[1] then
+            redis.call('DEL', KEYS[1])
+            return 1
+        end
+        local record = redis.call('GET', KEYS[2])
+        local attempts = 0
+        if record then
+            if not string.match(record, '^%d+$') then
+                redis.call('DEL', KEYS[1])
+                return 0
+            end
+            attempts = tonumber(record)
+            if not attempts then
+                redis.call('DEL', KEYS[1])
+                return 0
+            end
+        end
+        attempts = attempts + 1
+        redis.call('SET', KEYS[2], tostring(attempts), 'EX', ARGV[3])
+        if attempts >= tonumber(ARGV[2]) then
+            redis.call('DEL', KEYS[1])
+        end
+        return 0
+        """
+        return bool(
+            self._run(
+                self._client.eval,
+                script,
+                2,
+                key,
+                f"meta:{key}",
+                code_hash,
+                max_attempts,
+                CODE_TTL_SECONDS,
+            )
+        )
 
     def delete(self, key: str) -> None:
         self._run(self._client.delete, key)
@@ -406,29 +478,11 @@ class PatientOtpService:
 
         backend = self._get_backend()
         code_key = f"{namespace}:code:{normalized}"
-        raw = backend.get(code_key)
-        if raw is None:
-            raise PatientOtpError(400, ERR_OTP_INVALID)
-
-        if not hmac.compare_digest(raw, _hash_code(code)):
-            attempts = self._bump_attempts(backend, code_key)
-            if attempts >= MAX_ATTEMPTS:
-                backend.delete(code_key)
+        if not backend.consume_otp(code_key, _hash_code(code), MAX_ATTEMPTS):
             logger.info("patient OTP mismatch: phone_fingerprint=%s", normalized[:7])
             raise PatientOtpError(400, ERR_OTP_INVALID)
 
-        backend.delete(code_key)  # single-use code
         return normalized
-
-    def _bump_attempts(self, backend: Any, code_key: str) -> int:
-        """Best-effort attempt counter; corrupt/missing entries stay generic."""
-        try:
-            record = backend.get(f"meta:{code_key}")
-            attempts = (int(record) if record else 0) + 1
-            backend.set(f"meta:{code_key}", str(attempts), CODE_TTL_SECONDS)
-            return attempts
-        except Exception:  # noqa: BLE001
-            return 0
 
     # -- grant -----------------------------------------------------------
     def consume_grant(self, grant: str) -> str | None:

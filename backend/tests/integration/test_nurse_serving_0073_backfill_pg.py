@@ -60,7 +60,6 @@ from sqlalchemy.orm import sessionmaker
 
 from app.models.online_queue import OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
-from app.models.user import User
 from app.models.visit import Visit
 
 pytestmark = pytest.mark.integration
@@ -188,21 +187,24 @@ def backfill_world():
 def _seed_pre_0073_world(engine) -> dict:
     """Seed 0072-compatible supporting rows and execution rows.
 
-    Doctor and Service use raw SQL because their HEAD ORM models include
-    public-site fields added after 0072. DailyQueue and execution rows also
+    User, Doctor, and Service use raw SQL because their HEAD ORM models
+    include fields added after 0072. DailyQueue and execution rows also
     use raw SQL because their HEAD models include later migration columns.
     """
-    Session = sessionmaker(bind=engine, future=True)
-    session = Session()
-    nurse = User(
-        username="n23_bf_nurse",
-        email="n23_bf_nurse@example.com",
-        full_name="n23_bf_nurse",
-        hashed_password="x",
-        role="Nurse",
-        is_active=True,
-        is_superuser=False,
-    )
+    with sessionmaker(bind=engine, future=True)() as session:
+        return _seed_pre_0073_world_in_session(engine, session)
+
+
+def _seed_pre_0073_world_in_session(engine, session) -> dict:
+    nurse_id = session.execute(
+        text(
+            "INSERT INTO users "
+            "(username, email, full_name, hashed_password, role, "
+            "is_active, is_superuser, must_change_password) "
+            "VALUES ('n23_bf_nurse', 'n23_bf_nurse@example.com', "
+            "'n23_bf_nurse', 'x', 'Nurse', true, false, false) RETURNING id"
+        )
+    ).scalar_one()
     patient = Patient(first_name="Backfill", last_name="Test")
     # The bridged surface: a DOCTOR-axis queue (the XOR check forbids an
     # ownerless queue since 0063) that still carries the station's tag —
@@ -232,9 +234,9 @@ def _seed_pre_0073_world(engine) -> dict:
         max_online_per_day=15,
         default_cabinet="c1",
     )
-    session.add_all([nurse, patient, resource])
+    session.add_all([patient, resource])
     session.commit()
-    for row in (nurse, patient, resource):
+    for row in (patient, resource):
         session.refresh(row)
 
     # This fixture intentionally remains at migration 0072. The current
@@ -370,7 +372,7 @@ def _seed_pre_0073_world(engine) -> dict:
         session.refresh(row)
     # Capture plain ints BEFORE close — ORM instances detach + expire.
     ids = {
-        "nurse_id": nurse.id,
+        "nurse_id": nurse_id,
         "vs_routed_id": vs_routed_id,
         "vs_retagged_id": vs_retagged_id,
         "vs_orphan_id": vs_orphan_id,

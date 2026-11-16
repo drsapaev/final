@@ -32,15 +32,18 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-interface RegisterOptions {
-  name?: string;
-  rpId?: string;
-  rpName?: string;
+interface StepUp {
+  phone: string;
+  verification_grant: string;
+}
+
+interface RegisterOptions extends StepUp {
+  name: string;
 }
 
 interface AuthenticateOptions {
-  patientId: string;
-  rpId?: string;
+  patientId?: string;
+  isCurrent?: () => boolean;
 }
 
 export interface UseWebAuthnReturn {
@@ -48,10 +51,10 @@ export interface UseWebAuthnReturn {
   isRegistering: boolean;
   isAuthenticating: boolean;
   error: string;
-  register: (options?: RegisterOptions) => Promise<boolean>;
-  authenticate: (options: AuthenticateOptions) => Promise<PatientSession | null>;
+  register: (options: RegisterOptions) => Promise<boolean>;
+  authenticate: (options?: AuthenticateOptions) => Promise<PatientSession | null>;
   listCredentials: () => Promise<unknown[]>;
-  deactivateCredential: (credentialId: string) => Promise<boolean>;
+  deactivateCredential: (credentialId: string | number, stepUp: StepUp) => Promise<boolean>;
 }
 
 export function useWebAuthn(): UseWebAuthnReturn {
@@ -63,7 +66,7 @@ export function useWebAuthn(): UseWebAuthnReturn {
     typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
 
   const register = useCallback(
-    async (options: RegisterOptions = {}): Promise<boolean> => {
+    async (options: RegisterOptions): Promise<boolean> => {
       if (!isSupported) {
         setError('webauthn_not_supported');
         return false;
@@ -71,18 +74,22 @@ export function useWebAuthn(): UseWebAuthnReturn {
 
       setIsRegistering(true);
       setError('');
+      const token = tokenManager.getAccessToken();
+      let sessionChanged = false;
+      const onAuthChange = () => { sessionChanged = true; };
+      window.addEventListener('authStateChanged', onAuthChange);
+      const sessionIsCurrent = () => !sessionChanged && tokenManager.getAccessToken() === token;
 
       try {
-        const token = sessionStorage.getItem('patient_jwt_token');
         if (!token) {
           setError('not_authenticated');
           return false;
         }
 
         const beginResponse = await api.post('/webauthn/register/begin', {
+          phone: options.phone,
+          verification_grant: options.verification_grant,
           credential_name: options.name,
-          rp_id: options.rpId || window.location.hostname,
-          rp_name: options.rpName || 'Medical Clinic',
         });
 
         const optionsData = beginResponse.data as {
@@ -92,8 +99,17 @@ export function useWebAuthn(): UseWebAuthnReturn {
             user: { id: string; name: string; displayName: string };
             pubKeyCredParams?: Array<{ type: string; alg: number }>;
             timeout?: number;
+            ceremony_id: string;
+            authenticatorSelection?: AuthenticatorSelectionCriteria;
+            attestation?: AttestationConveyancePreference;
+            excludeCredentials?: Array<{ id: string; type: PublicKeyCredentialType; transports?: AuthenticatorTransport[] }>;
           };
         };
+        if (!optionsData?.options?.ceremony_id || !optionsData.options.challenge ||
+            !optionsData.options.user?.id || !optionsData.options.rp?.id ||
+            !sessionIsCurrent()) {
+          throw new Error('Invalid or superseded registration ceremony');
+        }
 
         const publicKeyOptions: PublicKeyCredentialCreationOptions = {
           challenge: base64urlToBuffer(optionsData.options.challenge),
@@ -110,7 +126,11 @@ export function useWebAuthn(): UseWebAuthnReturn {
             { type: 'public-key' as const, alg: -7 },
           ]) as PublicKeyCredentialParameters[],
           timeout: optionsData.options.timeout || 60000,
-          attestation: 'none' as AttestationConveyancePreference,
+          authenticatorSelection: optionsData.options.authenticatorSelection,
+          attestation: optionsData.options.attestation,
+          excludeCredentials: optionsData.options.excludeCredentials?.map((item) => ({
+            ...item, id: base64urlToBuffer(item.id),
+          })),
         };
 
         const credential = (await navigator.credentials.create({
@@ -133,21 +153,25 @@ export function useWebAuthn(): UseWebAuthnReturn {
           },
         };
 
+        if (!sessionIsCurrent()) {
+          throw new Error('Superseded registration ceremony');
+        }
         await api.post('/webauthn/register/finish', {
+          ceremony_id: optionsData.options.ceremony_id,
           credential_response: credentialResponse,
-          rp_id: options.rpId || window.location.hostname,
-          origin: window.location.origin,
           credential_name: options.name,
         });
 
-        return true;
+        return sessionIsCurrent();
       } catch (err) {
         const e = err as HttpApiError;
         const detail = e?.response?.data?.detail;
         const reason = typeof detail === 'object' && detail ? detail.reason : undefined;
-        setError(reason || 'registration_failed');
+        setError(e?.response?.status === 503 ? 'management_unavailable' :
+          reason === 'step_up_failed' || reason === 'step_up_required' ? 'step_up_failed' : 'registration_failed');
         return false;
       } finally {
+        window.removeEventListener('authStateChanged', onAuthChange);
         setIsRegistering(false);
       }
     },
@@ -155,7 +179,7 @@ export function useWebAuthn(): UseWebAuthnReturn {
   );
 
   const authenticate = useCallback(
-    async (options: AuthenticateOptions): Promise<PatientSession | null> => {
+    async (options: AuthenticateOptions = {}): Promise<PatientSession | null> => {
       if (!isSupported) {
         setError('webauthn_not_supported');
         return null;
@@ -165,11 +189,18 @@ export function useWebAuthn(): UseWebAuthnReturn {
       setError('');
       // A pending browser ceremony must not replace a newer login in this tab.
       const originalToken = tokenManager.getAccessToken();
+      let sessionChanged = false;
+      const onAuthChange = () => { sessionChanged = true; };
+      window.addEventListener('authStateChanged', onAuthChange);
+      const sessionIsCurrent = () => !sessionChanged && tokenManager.getAccessToken() === originalToken &&
+        (!options.isCurrent || options.isCurrent());
 
       try {
-        const beginResponse = await api.post('/webauthn/login/begin', {
-          patient_id: options.patientId,
-        });
+        const discoverable = !options.patientId;
+        const beginResponse = await api.post(
+          discoverable ? '/webauthn/login/discoverable/begin' : '/webauthn/login/begin',
+          discoverable ? {} : { patient_id: options.patientId },
+        );
 
         const optionsData = beginResponse.data as {
           options: {
@@ -186,7 +217,8 @@ export function useWebAuthn(): UseWebAuthnReturn {
           typeof optionsData.options.rpId !== 'string' ||
           !optionsData.options.rpId ||
           typeof optionsData.options.ceremony_id !== 'string' ||
-          !optionsData.options.ceremony_id
+          !optionsData.options.ceremony_id ||
+          !sessionIsCurrent()
         ) {
           throw new Error('Invalid passkey authentication options');
         }
@@ -222,11 +254,17 @@ export function useWebAuthn(): UseWebAuthnReturn {
           },
         };
 
-        const finishResponse = await api.post('/webauthn/login/finish', {
-          patient_id: options.patientId,
-          ceremony_id: optionsData.options.ceremony_id,
-          assertion_response: assertionData,
-        });
+        if (!sessionIsCurrent()) {
+          throw new Error('Superseded authentication ceremony');
+        }
+        const finishResponse = await api.post(
+          discoverable ? '/webauthn/login/discoverable/finish' : '/webauthn/login/finish',
+          {
+            ...(!discoverable ? { patient_id: options.patientId } : {}),
+            ceremony_id: optionsData.options.ceremony_id,
+            assertion_response: assertionData,
+          },
+        );
 
         const session = mapPatientSession(finishResponse.data);
         const accessToken = session.access_token.trim();
@@ -236,7 +274,7 @@ export function useWebAuthn(): UseWebAuthnReturn {
           session.user.role.toLowerCase() !== 'patient' ||
           !session.user.is_active ||
           session.user.is_superuser ||
-          tokenManager.getAccessToken() !== originalToken
+          !sessionIsCurrent()
         ) {
           throw new Error('Invalid or superseded patient session');
         }
@@ -253,9 +291,13 @@ export function useWebAuthn(): UseWebAuthnReturn {
         const e = err as HttpApiError;
         const detail = e?.response?.data?.detail;
         const reason = typeof detail === 'object' && detail ? detail.reason : undefined;
-        setError(reason || 'authentication_failed');
+        setError(e?.response?.status === 503 ? 'authentication_unavailable' :
+          e?.response?.status === 429 ? 'authentication_rate_limited' :
+          (err instanceof DOMException && err.name === 'NotAllowedError') || reason === 'authentication_cancelled'
+            ? 'authentication_cancelled' : 'authentication_failed');
         return null;
       } finally {
+        window.removeEventListener('authStateChanged', onAuthChange);
         setIsAuthenticating(false);
       }
     },
@@ -278,12 +320,25 @@ export function useWebAuthn(): UseWebAuthnReturn {
   }, []);
 
   const deactivateCredential = useCallback(
-    async (credentialId: string): Promise<boolean> => {
+    async (credentialId: string | number, stepUp: StepUp): Promise<boolean> => {
+      setError('');
+      const token = tokenManager.getAccessToken();
+      let sessionChanged = false;
+      const onAuthChange = () => { sessionChanged = true; };
+      window.addEventListener('authStateChanged', onAuthChange);
       try {
-        await api.post(`/webauthn/credentials/${credentialId}/deactivate`, {});
-        return true;
-      } catch {
+        if (!token) { setError('not_authenticated'); return false; }
+        await api.post(`/webauthn/credentials/${encodeURIComponent(String(credentialId))}/deactivate`, stepUp);
+        return !sessionChanged && tokenManager.getAccessToken() === token;
+      } catch (err) {
+        const response = (err as HttpApiError)?.response;
+        const detail = response?.data?.detail;
+        const reason = typeof detail === 'object' && detail ? detail.reason : undefined;
+        setError(response?.status === 503 ? 'management_unavailable' :
+          reason === 'last_active_credential' ? 'last_active_credential' : 'deactivation_failed');
         return false;
+      } finally {
+        window.removeEventListener('authStateChanged', onAuthChange);
       }
     },
     [],

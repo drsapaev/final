@@ -29,9 +29,11 @@ import {
   hasPublicBookingResubmitHandoff,
 } from '../../api/publicBooking';
 import { isValidUzbekPhone, normalizeUzbekPhoneForApi } from '../../utils/phoneUtils';
+import { useWebAuthn } from '../../hooks/useWebAuthn';
+import { tokenManager } from '../../utils/tokenManager';
 import { useTranslation } from '../../i18n/useTranslation';
-import logger from '../../utils/logger';
 import type { HttpApiError } from '../../types/errors';
+import '../patient.css';
 
 type PatientLoginStep = 'phone' | 'code';
 
@@ -58,6 +60,10 @@ const PatientLoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const { isSupported: passkeySupported, isAuthenticating, authenticate, error: passkeyError } = useWebAuthn();
+  const [passkeyAttempted, setPasskeyAttempted] = useState(false);
+  const pendingAction = useRef(false);
+  const mounted = useRef(false);
   const [step, setStep] = useState<PatientLoginStep>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -67,7 +73,9 @@ const PatientLoginPage = () => {
   const resendTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    mounted.current = true;
     return () => {
+      mounted.current = false;
       if (resendTimerRef.current !== null) {
         window.clearInterval(resendTimerRef.current);
       }
@@ -109,8 +117,29 @@ const PatientLoginPage = () => {
     [t]
   );
 
+  const navigateAfterLogin = (user: Record<string, unknown>) => {
+    const hasResubmitHandoff = hasPublicBookingResubmitHandoff(location.state);
+    const handoffLocale = getPublicBookingResubmitHandoffLocale(location.state);
+    const pendingBookingLocale = getPendingPublicBookingLocale();
+    const fallbackLocale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl'
+      ? 'uz-Latn'
+      : 'ru';
+    const bookingLocale = handoffLocale ?? pendingBookingLocale
+      ?? (hasResubmitHandoff ? fallbackLocale : null);
+    const isPatient = String(user.role ?? '').toLowerCase() === 'patient';
+    const target = bookingLocale && isPatient
+      ? getPublicBookingPath(bookingLocale)
+      : getRouteForProfile(user);
+    navigate(target, {
+      replace: true,
+      ...(bookingLocale && isPatient && hasResubmitHandoff ? { state: location.state } : {}),
+    });
+  };
+
   const handleRequestOtp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (pendingAction.current) return;
+    setPasskeyAttempted(false);
     setError('');
 
     const normalized = normalizeUzbekPhoneForApi(phone);
@@ -119,23 +148,26 @@ const PatientLoginPage = () => {
       return;
     }
 
+    pendingAction.current = true;
     setLoading(true);
     try {
       const locale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl' ? 'uz' : 'ru';
       const response = await requestPatientOtp({ phone: normalized, locale });
+      if (!mounted.current) return;
       startResendCountdown(response.resend_after_seconds || 60);
       setPhone(normalized);
       setStep('code');
     } catch (err) {
-      logger.warn('[PatientLogin] request-otp failed:', err);
-      setError(normalizeError(err, 'patientPortal.pl_login_error'));
+      if (mounted.current) setError(normalizeError(err, 'patientPortal.pl_login_error'));
     } finally {
-      setLoading(false);
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
     }
   };
 
   const handleVerifyAndLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (pendingAction.current) return;
     setError('');
 
     const trimmedCode = code.trim();
@@ -144,12 +176,20 @@ const PatientLoginPage = () => {
       return;
     }
 
+    pendingAction.current = true;
+    const originalToken = tokenManager.getAccessToken();
+    let sessionChanged = false;
+    const onAuthChange = () => { sessionChanged = true; };
+    window.addEventListener('authStateChanged', onAuthChange);
+    const sessionIsCurrent = () => mounted.current && !sessionChanged && tokenManager.getAccessToken() === originalToken;
     setLoading(true);
     try {
       // Step 2+3: verify OTP → one-time grant → canonical patient session.
       const grantResponse = await verifyPatientOtp({ phone, code: trimmedCode });
+      if (!sessionIsCurrent()) return;
       const session = await patientLogin({ phone, verification_grant: grantResponse.verification_grant });
 
+      if (!sessionIsCurrent()) return;
       const accessToken = session.access_token.trim();
       // Phase 0 PR-B review P1: patient sessions are access-only (no refresh
       // token). REPLACE any previous staff principal in this tab — never merge
@@ -161,46 +201,48 @@ const PatientLoginPage = () => {
         // Non-fatal — the request interceptor fetches CSRF on demand.
       });
 
-      const user = session.user as unknown as Record<string, unknown>;
-      const hasResubmitHandoff = hasPublicBookingResubmitHandoff(location.state);
-      const handoffLocale = getPublicBookingResubmitHandoffLocale(location.state);
-      const pendingBookingLocale = getPendingPublicBookingLocale();
-      const fallbackLocale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl'
-        ? 'uz-Latn'
-        : 'ru';
-      const bookingLocale = handoffLocale ?? pendingBookingLocale
-        ?? (hasResubmitHandoff ? fallbackLocale : null);
-      const isPatient = String(user.role ?? '').toLowerCase() === 'patient';
-      const target = bookingLocale && isPatient
-        ? getPublicBookingPath(bookingLocale)
-        : getRouteForProfile(user);
-      navigate(target, {
-        replace: true,
-        ...(bookingLocale && isPatient && hasResubmitHandoff ? { state: location.state } : {}),
-      });
+      navigateAfterLogin(session.user as unknown as Record<string, unknown>);
     } catch (err) {
-      logger.warn('[PatientLogin] verify/login failed:', err);
-      setError(normalizeError(err, 'patientPortal.pl_login_error'));
+      if (mounted.current) setError(normalizeError(err, 'patientPortal.pl_login_error'));
     } finally {
-      setLoading(false);
+      window.removeEventListener('authStateChanged', onAuthChange);
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
     }
   };
 
   const handleResend = async () => {
-    if (resendAfter > 0 || loading) {
+    if (resendAfter > 0 || loading || pendingAction.current) {
       return;
     }
     setError('');
+    pendingAction.current = true;
     setLoading(true);
     try {
       const locale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl' ? 'uz' : 'ru';
       const response = await requestPatientOtp({ phone, locale });
+      if (!mounted.current) return;
       startResendCountdown(response.resend_after_seconds || 60);
     } catch (err) {
-      logger.warn('[PatientLogin] resend failed:', err);
-      setError(normalizeError(err, 'patientPortal.pl_login_error'));
+      if (mounted.current) setError(normalizeError(err, 'patientPortal.pl_login_error'));
     } finally {
-      setLoading(false);
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
+    }
+  };
+
+  const handlePasskey = async () => {
+    if (pendingAction.current) return;
+    pendingAction.current = true;
+    setPasskeyAttempted(true);
+    setError('');
+    setLoading(true);
+    try {
+      const session = await authenticate({ isCurrent: () => mounted.current });
+      if (session && mounted.current) navigateAfterLogin(session.user as unknown as Record<string, unknown>);
+    } finally {
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
     }
   };
 
@@ -233,6 +275,14 @@ const PatientLoginPage = () => {
               {error}
             </Alert>
           ) : null}
+
+          {passkeyAttempted && !isAuthenticating && passkeyError && (
+            <Alert variant="danger" className="patient-login-passkey-alert" role="alert">
+              {t(passkeyError === 'authentication_unavailable' ? 'patientPortal.pl_unavailable' :
+                passkeyError === 'authentication_rate_limited' ? 'patientPortal.pl_rate_limited' :
+                passkeyError === 'authentication_cancelled' ? 'patient.pat_web_login_cancelled' : 'patient.pat_web_login_error')}
+            </Alert>
+          )}
 
           {step === 'phone' ? (
             <form onSubmit={handleRequestOtp} noValidate>
@@ -286,6 +336,7 @@ const PatientLoginPage = () => {
                 <button
                   type="button"
                   onClick={handleBackToPhone}
+                  disabled={loading}
                   style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', ...footerLinkStyle }}
                 >
                   {t('patientPortal.pl_back_to_phone')}
@@ -309,6 +360,12 @@ const PatientLoginPage = () => {
                 </button>
               </div>
             </form>
+          )}
+
+          {step === 'phone' && passkeySupported && (
+            <Button type="button" variant="outline" disabled={loading || isAuthenticating} onClick={handlePasskey} className="patient-login-passkey-button">
+              {t('patient.pat_web_login')}
+            </Button>
           )}
 
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--mac-border, #d2d2d7)', fontSize: 13, color: 'var(--mac-text-secondary, #6e6e73)' }}>

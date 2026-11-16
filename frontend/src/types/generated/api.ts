@@ -1943,10 +1943,7 @@ export type paths = {
         put?: never;
         /**
          * Webauthn Register Begin
-         * @description Begin passkey registration (M4-P1-4).
-         *
-         *     Requires existing patient authentication (initData in body).
-         *     Returns WebAuthn registration options for navigator.credentials.create().
+         * @description Begin registration after a one-use patient OTP step-up.
          */
         post: operations["webauthn_register_begin"];
         delete?: never;
@@ -1971,6 +1968,46 @@ export type paths = {
          *     Verifies browser response and stores credential.
          */
         post: operations["webauthn_register_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/discoverable/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Discoverable Begin
+         * @description Begin anonymous passkey login under shared distributed quotas.
+         */
+        post: operations["webauthn_discoverable_begin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/discoverable/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Discoverable Finish
+         * @description Consume one challenge and issue a session only for its current owner.
+         */
+        post: operations["webauthn_discoverable_finish"];
         delete?: never;
         options?: never;
         head?: never;
@@ -48343,18 +48380,76 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Verified phone of the authenticated patient */
+                    phone: string;
+                    /** @description Single-use patient OTP grant */
+                    verification_grant: string;
+                };
+            };
+        };
         responses: {
-            /** @description Successful Response */
+            /** @description Registration ceremony options */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        options: {
+                            challenge: string;
+                            ceremony_id: string;
+                            rp: {
+                                id: string;
+                                name: string;
+                            };
+                            user: {
+                                id: string;
+                                name: string;
+                                displayName: string;
+                            };
+                        };
+                    } & {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Invalid or missing request data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Patient identity or step-up rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication service temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -48365,16 +48460,254 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    ceremony_id: string;
+                    credential_response: {
+                        id: string;
+                        rawId: string;
+                        type: string;
+                        response: {
+                            attestationObject: string;
+                            clientDataJSON: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    credential_name?: string | null;
+                };
+            };
+        };
         responses: {
-            /** @description Successful Response */
+            /** @description Registered credential */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        registered: boolean;
+                        credential_id: number;
+                        name: string | null;
+                    } & {
                         [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid or missing request data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Patient identity or step-up rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication service temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    webauthn_discoverable_begin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Discoverable login options */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        options: {
+                            challenge: string;
+                            ceremony_id: string;
+                            rpId: string;
+                            timeout: number;
+                            userVerification: string;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Authentication service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    webauthn_discoverable_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ceremony_id: string;
+                    assertion_response: {
+                        id: string;
+                        rawId: string;
+                        type: string;
+                        response: {
+                            authenticatorData: string;
+                            clientDataJSON: string;
+                            signature: string;
+                            userHandle?: string | null;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Patient access session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        access_token: string;
+                        token_type: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Authentication service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
                     };
                 };
             };
@@ -48433,16 +48766,39 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Active credentials for the current patient */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        credentials: {
+                            id: number;
+                            name: string | null;
+                            device_type: string | null;
+                            created_at: string | null;
+                            last_used_at: string | null;
+                        }[];
+                        total: number;
+                    } & {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Authentication required or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Patient identity or step-up rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -48455,18 +48811,65 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Verified phone of the authenticated patient */
+                    phone: string;
+                    /** @description Single-use patient OTP grant */
+                    verification_grant: string;
+                };
+            };
+        };
         responses: {
-            /** @description Successful Response */
+            /** @description Credential deactivated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        deactivated: boolean;
+                        credential_id: number;
+                    } & {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Invalid or missing request data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Patient identity or step-up rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Credential not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cannot deactivate last active credential */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -48476,6 +48879,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication service temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

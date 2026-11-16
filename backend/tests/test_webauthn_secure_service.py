@@ -54,6 +54,7 @@ def linked_patient(db_session, admin_user):
         [
             PasskeyCredential(
                 patient_id=patient.id,
+                owner_user_id=user.id,
                 credential_id="Zmlyc3Q=",
                 public_key="cHVibGljMQ==",
                 sign_count=0,
@@ -61,6 +62,7 @@ def linked_patient(db_session, admin_user):
             ),
             PasskeyCredential(
                 patient_id=patient.id,
+                owner_user_id=user.id,
                 credential_id="c2Vjb25k",
                 public_key="cHVibGljMg==",
                 sign_count=0,
@@ -208,7 +210,12 @@ def test_wrong_patient_or_unknown_ceremony_fails(db_session, linked_patient, web
         ws._consume_ceremony(options["ceremony_id"], patient.id)
     dummy = ws.begin_passkey_authentication(db_session, 123456789)
     with pytest.raises(ValueError):
-        ws._consume_ceremony(dummy["ceremony_id"], 123456789)
+        ws.finish_passkey_authentication(
+            db_session,
+            123456789,
+            assertion_response={"id": "Zmlyc3Q"},
+            ceremony_id=dummy["ceremony_id"],
+        )
 
 
 def test_expired_ceremony_is_rejected(
@@ -223,30 +230,13 @@ def test_expired_ceremony_is_rejected(
         ws._consume_ceremony(options["ceremony_id"], patient.id)
 
 
-def test_redis_backend_uses_atomic_getdel_and_expiry(webauthn, monkeypatch):
+def test_redis_lua_failure_fails_closed(webauthn):
     class RedisDouble:
-        value = None
-        args = None
+        def eval(self, *args):
+            raise ConnectionError("synthetic Redis failure")
 
-        def set(self, key, value, *, ex, nx):
-            self.args = (key, ex, nx)
-            self.value = value
-            return True
-
-        def execute_command(self, command, key):
-            assert command == "GETDEL"
-            assert key == self.args[0]
-            value, self.value = self.value, None
-            return value
-
-    store = RedisDouble()
-    ceremony_id = "b" * 43
-    ws._store_ceremony(store, ceremony_id, 7, b"secret")
-    assert store.args == (f"webauthn:login:{ceremony_id}", 300, True)
-    monkeypatch.setattr(ws, "_ceremony_store", lambda: store)
-    assert ws._consume_ceremony(ceremony_id, 7) == b"secret"
-    with pytest.raises(ValueError):
-        ws._consume_ceremony(ceremony_id, 7)
+    with pytest.raises(ws.WebAuthnStoreUnavailable):
+        ws._store_ceremony(RedisDouble(), "b" * 43, 7, b"secret")
 
 
 def test_production_redis_failure_does_not_fallback(webauthn, monkeypatch):

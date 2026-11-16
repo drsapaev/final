@@ -468,9 +468,19 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/patient-access/login',
   '/webauthn/login/begin',
   '/webauthn/login/finish',
+  '/webauthn/login/discoverable/begin',
+  '/webauthn/login/discoverable/finish',
   '/patient-access/activate/request-otp',
   '/patient-access/activate/confirm'
 ];
+
+// Browser cross-origin POSTs need the CSRF cookie paired with the token header.
+// Keep credentials scoped to relative patient-auth routes on the configured API.
+function requiresPatientAuthCsrfCookie(config: InternalAxiosRequestConfig): boolean {
+  if (config.method?.toLowerCase() !== 'post' || config.baseURL !== API_BASE) return false;
+  const path = String(config.url || '').split(/[?#]/, 1)[0];
+  return /^\/(?:api\/v1\/)?(?:webauthn\/(?:register\/(?:begin|finish)|login\/(?:begin|finish|discoverable\/(?:begin|finish))|credentials\/(?:list|[0-9]+\/deactivate))|patient-access\/(?:request-otp|verify-otp|login|activate\/(?:request-otp|confirm)))$/.test(path);
+}
 
 function isAuthBootstrapEndpoint(url: string | undefined): boolean {
   const path = String(url || '').split(/[?#]/, 1)[0];
@@ -619,6 +629,10 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     if (t) {
       config.headers.set('Authorization', `Bearer ${t}`);
     }
+  }
+
+  if (requiresPatientAuthCsrfCookie(config)) {
+    config.withCredentials = true;
   }
 
   // ✅ CSRF: Add X-CSRF-Token for state-changing requests

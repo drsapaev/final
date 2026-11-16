@@ -6284,22 +6284,122 @@
           "webauthn"
         ],
         "summary": "Webauthn Register Begin",
-        "description": "Begin passkey registration (M4-P1-4).\n\nRequires existing patient authentication (initData in body).\nReturns WebAuthn registration options for navigator.credentials.create().",
+        "description": "Begin registration after a one-use patient OTP step-up.",
         "operationId": "webauthn_register_begin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Verified phone of the authenticated patient"
+                  },
+                  "verification_grant": {
+                    "type": "string",
+                    "description": "Single-use patient OTP grant"
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "phone",
+                  "verification_grant"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Registration ceremony options",
             "content": {
               "application/json": {
                 "schema": {
+                  "properties": {
+                    "options": {
+                      "properties": {
+                        "challenge": {
+                          "type": "string"
+                        },
+                        "ceremony_id": {
+                          "type": "string"
+                        },
+                        "rp": {
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "name"
+                          ]
+                        },
+                        "user": {
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "name",
+                            "displayName"
+                          ]
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "challenge",
+                        "ceremony_id",
+                        "rp",
+                        "user"
+                      ]
+                    }
+                  },
                   "additionalProperties": true,
                   "type": "object",
+                  "required": [
+                    "options"
+                  ],
                   "title": "Response Webauthn Register Begin"
                 }
               }
             }
+          },
+          "401": {
+            "description": "Authentication required or invalid session"
+          },
+          "403": {
+            "description": "Patient identity or step-up rejected"
+          },
+          "400": {
+            "description": "Invalid or missing request data"
+          },
+          "429": {
+            "description": "Too many requests"
+          },
+          "503": {
+            "description": "Authentication service temporarily unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/webauthn/register/finish": {
@@ -6311,15 +6411,479 @@
         "summary": "Webauthn Register Finish",
         "description": "Finish passkey registration (M4-P1-4).\n\nVerifies browser response and stores credential.",
         "operationId": "webauthn_register_finish",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ceremony_id": {
+                    "type": "string"
+                  },
+                  "credential_response": {
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "rawId": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "properties": {
+                          "attestationObject": {
+                            "type": "string"
+                          },
+                          "clientDataJSON": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true,
+                        "type": "object",
+                        "required": [
+                          "attestationObject",
+                          "clientDataJSON"
+                        ]
+                      }
+                    },
+                    "additionalProperties": true,
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "rawId",
+                      "type",
+                      "response"
+                    ]
+                  },
+                  "credential_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 100
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "ceremony_id",
+                  "credential_response"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Registered credential",
             "content": {
               "application/json": {
                 "schema": {
+                  "properties": {
+                    "registered": {
+                      "type": "boolean"
+                    },
+                    "credential_id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
                   "additionalProperties": true,
                   "type": "object",
+                  "required": [
+                    "registered",
+                    "credential_id",
+                    "name"
+                  ],
                   "title": "Response Webauthn Register Finish"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid session"
+          },
+          "403": {
+            "description": "Patient identity or step-up rejected"
+          },
+          "400": {
+            "description": "Invalid or missing request data"
+          },
+          "429": {
+            "description": "Too many requests"
+          },
+          "503": {
+            "description": "Authentication service temporarily unavailable"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webauthn/login/discoverable/begin": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn Discoverable Begin",
+        "description": "Begin anonymous passkey login under shared distributed quotas.",
+        "operationId": "webauthn_discoverable_begin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "description": "Discoverable login options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "options": {
+                      "properties": {
+                        "challenge": {
+                          "type": "string"
+                        },
+                        "ceremony_id": {
+                          "type": "string"
+                        },
+                        "rpId": {
+                          "type": "string"
+                        },
+                        "timeout": {
+                          "type": "integer"
+                        },
+                        "userVerification": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "challenge",
+                        "ceremony_id",
+                        "rpId",
+                        "timeout",
+                        "userVerification"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true,
+                  "type": "object",
+                  "required": [
+                    "options"
+                  ],
+                  "title": "Response Webauthn Discoverable Begin"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authentication rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webauthn/login/discoverable/finish": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn Discoverable Finish",
+        "description": "Consume one challenge and issue a session only for its current owner.",
+        "operationId": "webauthn_discoverable_finish",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ceremony_id": {
+                    "type": "string"
+                  },
+                  "assertion_response": {
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "rawId": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "properties": {
+                          "authenticatorData": {
+                            "type": "string"
+                          },
+                          "clientDataJSON": {
+                            "type": "string"
+                          },
+                          "signature": {
+                            "type": "string"
+                          },
+                          "userHandle": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "additionalProperties": true,
+                        "type": "object",
+                        "required": [
+                          "authenticatorData",
+                          "clientDataJSON",
+                          "signature"
+                        ]
+                      }
+                    },
+                    "additionalProperties": true,
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "rawId",
+                      "type",
+                      "response"
+                    ]
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "ceremony_id",
+                  "assertion_response"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Patient access session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    },
+                    "token_type": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "username": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "is_active": {
+                          "type": "boolean"
+                        },
+                        "is_superuser": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "username",
+                        "role",
+                        "is_active",
+                        "is_superuser"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true,
+                  "type": "object",
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "user"
+                  ],
+                  "title": "Response Webauthn Discoverable Finish"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authentication rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -6388,18 +6952,80 @@
         "operationId": "webauthn_list_credentials",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Active credentials for the current patient",
             "content": {
               "application/json": {
                 "schema": {
+                  "properties": {
+                    "credentials": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "device_type": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "created_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "last_used_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "device_type",
+                          "created_at",
+                          "last_used_at"
+                        ]
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
                   "additionalProperties": true,
                   "type": "object",
+                  "required": [
+                    "credentials",
+                    "total"
+                  ],
                   "title": "Response Webauthn List Credentials"
                 }
               }
             }
+          },
+          "401": {
+            "description": "Authentication required or invalid session"
+          },
+          "403": {
+            "description": "Patient identity or step-up rejected"
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/webauthn/credentials/{credential_id}/deactivate": {
@@ -6411,6 +7037,11 @@
         "summary": "Webauthn Deactivate Credential",
         "description": "Deactivate a passkey (M4-P1-4).",
         "operationId": "webauthn_deactivate_credential",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "credential_id",
@@ -6424,16 +7055,49 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Credential deactivated",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Webauthn Deactivate Credential"
+                  "title": "Response Webauthn Deactivate Credential",
+                  "required": [
+                    "deactivated",
+                    "credential_id"
+                  ],
+                  "properties": {
+                    "deactivated": {
+                      "type": "boolean"
+                    },
+                    "credential_id": {
+                      "type": "integer"
+                    }
+                  }
                 }
               }
             }
+          },
+          "401": {
+            "description": "Authentication required or invalid session"
+          },
+          "403": {
+            "description": "Patient identity or step-up rejected"
+          },
+          "400": {
+            "description": "Invalid or missing request data"
+          },
+          "429": {
+            "description": "Too many requests"
+          },
+          "503": {
+            "description": "Authentication service temporarily unavailable"
+          },
+          "404": {
+            "description": "Credential not found"
+          },
+          "409": {
+            "description": "Cannot deactivate last active credential"
           },
           "422": {
             "description": "Validation Error",
@@ -6441,6 +7105,30 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "verification_grant"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Verified phone of the authenticated patient"
+                  },
+                  "verification_grant": {
+                    "type": "string",
+                    "description": "Single-use patient OTP grant"
+                  }
                 }
               }
             }

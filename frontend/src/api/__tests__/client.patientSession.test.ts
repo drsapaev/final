@@ -348,6 +348,74 @@ describe('access-only patient session replacement (P1)', () => {
     },
   );
 
+  it.each([
+    ['/api/v1/webauthn/login/discoverable/begin', 120, 200],
+    ['/api/v1/webauthn/login/discoverable/finish', 120, 200],
+    ['/api/v1/webauthn/login/discoverable/begin', -60, 200],
+    ['/api/v1/webauthn/login/discoverable/finish', -60, 200],
+    ['/api/v1/webauthn/login/discoverable/begin', 120, 401],
+    ['/api/v1/webauthn/login/discoverable/finish', 120, 401],
+    ['/api/v1/webauthn/login/discoverable/begin', -60, 401],
+    ['/api/v1/webauthn/login/discoverable/finish', -60, 401],
+  ])('keeps staff session unchanged for discoverable %s with expiry %i and status %i', async (url, expiry, status) => {
+    tokenState.access = createJwt(expiry);
+    const originalAccess = tokenState.access;
+    const originalUser = tokenState.user;
+    const refreshSpy = vi.spyOn(axios, 'post').mockResolvedValue(make200({ access_token: 'unexpected-refresh' }));
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+      if (status === 401) throw make401FromRealConfig(config);
+      return { ...make200({ ok: true }), config };
+    });
+    api.defaults.adapter = adapter;
+
+    const request = api.post(url, {});
+    if (status === 401) {
+      await expect(request).rejects.toMatchObject({ response: { status: 401 } });
+    } else {
+      await expect(request).resolves.toMatchObject({ data: { ok: true } });
+    }
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(refreshSpy).not.toHaveBeenCalled();
+    expect(tokenState.access).toBe(originalAccess);
+    expect(tokenState.refresh).toBe('staff-refresh-token');
+    expect(tokenState.user).toEqual(originalUser);
+    expect(tokenState.cleared).toBe(0);
+  });
+
+  it.each([
+    '/webauthn/register/begin', '/webauthn/register/finish',
+    '/webauthn/login/begin', '/webauthn/login/finish',
+    '/webauthn/login/discoverable/begin', '/webauthn/login/discoverable/finish',
+    '/webauthn/credentials/list', '/webauthn/credentials/5/deactivate',
+    '/patient-access/request-otp', '/patient-access/verify-otp', '/patient-access/login',
+    '/patient-access/activate/request-otp', '/patient-access/activate/confirm',
+  ])('sends credentials and CSRF header on patient auth POST %s', async (url) => {
+    document.cookie = 'csrf_token=; Max-Age=0; path=/';
+    const csrfSpy = vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.post(url, {});
+    const config = adapter.mock.calls[0][0];
+    expect(config.withCredentials).toBe(true);
+    expect(config.headers.get('X-CSRF-Token')).toBe('synthetic-csrf');
+    expect(csrfSpy).toHaveBeenCalledWith(expect.stringContaining('/auth/csrf-token'), { withCredentials: true });
+  });
+
+  it.each([
+    { url: '/patients/appointments', method: 'post' as const },
+    { url: '/webauthn/register/begin/other', method: 'post' as const },
+    { url: '/webauthn/register/begin', method: 'get' as const },
+    { url: 'https://other.example/webauthn/register/begin', method: 'post' as const },
+    { url: '/webauthn/register/begin', method: 'post' as const, baseURL: 'https://other.example' },
+  ])('does not enable credentials for an unrelated request $url', async ({ url, method, baseURL }) => {
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.request({ url, method, ...(baseURL ? { baseURL } : {}) });
+    expect(adapter.mock.calls[0][0].withCredentials).not.toBe(true);
+  });
+
   it('scopes a passkey 429 without Retry-After to the login request', async () => {
     vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
     api.defaults.adapter = async (config) => {

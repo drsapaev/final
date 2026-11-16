@@ -329,9 +329,8 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                 version = conn.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-                # Head pin follows the latest migration (0095 —
-                # TWOFACTOR-BE-001 verify attempt cap/lockout columns).
-                assert version == "0095_two_factor_attempt_lockout", version
+                # Head pin follows the latest passkey owner binding migration.
+                assert version == "0096_passkey_owner_user", version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(
