@@ -63,13 +63,14 @@ def webauthn_register_begin(
         reason = getattr(exc, "reason", "auth_failed")
         raise HTTPException(status_code=403, detail={"reason": reason}) from exc
 
-    rp_id = body.get("rp_id", "localhost")
+    # WEBAUTHN-BE-001 (#4063): rp_id/origin are server-pinned (settings.FRONTEND_URL);
+    # client-supplied values are ignored. rp_name is cosmetic (display only).
     rp_name = body.get("rp_name", "Medical Clinic")
     credential_name = body.get("credential_name")
 
     try:
         options = begin_passkey_registration(
-            db, scope.patient_id, rp_id=rp_id, rp_name=rp_name, credential_name=credential_name,
+            db, scope.patient_id, rp_name=rp_name, credential_name=credential_name,
         )
         return {"options": options}
     except Exception as exc:
@@ -113,15 +114,14 @@ def webauthn_register_finish(
     if not credential_response:
         raise HTTPException(status_code=400, detail={"reason": "credential_response_required"})
 
-    rp_id = body.get("rp_id", "localhost")
-    origin = body.get("origin", "http://localhost:3000")
+    # WEBAUTHN-BE-001 (#4063): expected RP ID/origin are server-pinned —
+    # never taken from the request body (anti-phishing origin binding).
     credential_name = body.get("credential_name")
 
     try:
         credential = finish_passkey_registration(
             db, scope.patient_id,
             credential_response=credential_response,
-            rp_id=rp_id, origin=origin,
             credential_name=credential_name,
         )
         return {
@@ -158,10 +158,9 @@ def webauthn_login_begin(
     if not patient_id:
         raise HTTPException(status_code=400, detail={"reason": "patient_id_required"})
 
-    rp_id = body.get("rp_id", "localhost")
-
     try:
-        options = begin_passkey_authentication(db, int(patient_id), rp_id=rp_id)
+        # WEBAUTHN-BE-001 (#4063): RP ID is server-pinned, body value ignored.
+        options = begin_passkey_authentication(db, int(patient_id))
         return {"options": options}
     except Exception as exc:
         logger.error("WebAuthn auth begin failed: %s", exc)
@@ -194,14 +193,12 @@ def webauthn_login_finish(
     if not assertion_response:
         raise HTTPException(status_code=400, detail={"reason": "assertion_response_required"})
 
-    rp_id = body.get("rp_id", "localhost")
-    origin = body.get("origin", "http://localhost:3000")
-
     try:
+        # WEBAUTHN-BE-001 (#4063): expected RP ID/origin are server-pinned —
+        # never taken from the request body (anti-phishing origin binding).
         result = finish_passkey_authentication(
             db, int(patient_id),
             assertion_response=assertion_response,
-            rp_id=rp_id, origin=origin,
         )
         return result
     except ValueError as exc:
