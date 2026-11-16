@@ -58,6 +58,28 @@ def _valid_code(service):
 
 
 class TestTwoFactorBE001AttemptCap:
+    def test_completed_setup_cannot_bypass_active_lock(
+        self, client, auth_headers, two_factor_enabled, db_session
+    ):
+        from app.services.two_factor_service import get_two_factor_service
+
+        two_factor_enabled.failed_attempts = 5
+        two_factor_enabled.locked_until = datetime.now(UTC) + timedelta(minutes=15)
+        db_session.commit()
+        service = get_two_factor_service()
+
+        response = client.post(
+            "/api/v1/2fa/verify-setup",
+            json={"totp_code": _valid_code(service)},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is False
+        db_session.refresh(two_factor_enabled)
+        assert two_factor_enabled.failed_attempts == 5
+        assert two_factor_enabled.locked_until is not None
+
     def test_five_wrong_codes_lock_even_correct_code(
         self, client, auth_headers, admin_user, two_factor_enabled, db_session
     ):

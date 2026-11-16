@@ -411,9 +411,16 @@ class TwoFactorService:
         """Верифицирует настройку TOTP"""
         try:
             two_factor_auth = (
-                db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+                db.query(TwoFactorAuth)
+                .filter(TwoFactorAuth.user_id == user_id)
+                .with_for_update()
+                .populate_existing()
+                .first()
             )
-            if not two_factor_auth or not two_factor_auth.totp_secret:
+            if not two_factor_auth:
+                return False
+            if two_factor_auth.totp_enabled or not two_factor_auth.totp_secret:
+                db.commit()
                 return False
 
             # Проверяем код
@@ -427,6 +434,7 @@ class TwoFactorService:
                 db.commit()
                 return True
 
+            db.commit()
             return False
 
         except Exception as e:
@@ -457,6 +465,7 @@ class TwoFactorService:
                     TwoFactorAuth.totp_enabled.is_(True),
                 )
                 .with_for_update()
+                .populate_existing()
                 .first()
             )
             if not two_factor_auth:
