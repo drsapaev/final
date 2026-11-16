@@ -7071,6 +7071,7 @@ const en = {
     eat_status_diagnostics: 'Diagnostics',
     eat_status_incomplete: 'Visit incomplete',
     eat_status_rescheduled: 'Rescheduled',
+    eat_status_mixed: 'Mixed',
     eat_q_status_waiting: 'Ожидает',
     eat_q_status_unknown: 'Неизвестно',
     eat_service_label: 'Услуга {service}',

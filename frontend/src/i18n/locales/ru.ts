@@ -7201,6 +7201,7 @@ const ru = {
     eat_status_diagnostics: 'Диагностика',
     eat_status_incomplete: 'Приём не завершён',
     eat_status_rescheduled: 'Перенесён',
+    eat_status_mixed: 'Смешанный',
     eat_q_status_waiting: 'Ожидает',
     eat_q_status_unknown: 'Неизвестно',
     eat_service_label: 'Услуга {service}',

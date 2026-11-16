@@ -7070,6 +7070,7 @@ const uzLatn = {
     eat_status_diagnostics: 'Tashxis',
     eat_status_incomplete: 'Qabul tugallanmadi',
     eat_status_rescheduled: "Ko'chirilgan",
+    eat_status_mixed: "Aralash",
     eat_q_status_waiting: 'Kutmoqda',
     eat_q_status_unknown: 'Nomaʼlum',
     eat_service_label: 'Xizmat {service}',

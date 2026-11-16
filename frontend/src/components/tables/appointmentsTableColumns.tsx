@@ -20,7 +20,7 @@
  */
 
 import { useCallback } from 'react';
-import { Phone, Home, FileText, Eye, Edit, X, MoreHorizontal, CalendarClock, Calendar, Clock } from 'lucide-react';
+import { Phone, Home, FileText, Eye, Edit, X, MoreHorizontal, CalendarClock, Calendar, Clock, Layers } from 'lucide-react';
 import {
   CheckCircle,
   User,
@@ -246,6 +246,18 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
         icon: CalendarClock,
         text: t('misc.eat_status_rescheduled'),
         emoji: '🔁'
+      },
+
+      // REGAGG-FE-002 (owner group100, 2026-11-16): агрегат «Все отделения»
+      // с разными per-record статусами — честная mixed-пометка, а не статус
+      // первой записи. Не клиническое состояние: состав статусов виден в
+      // grouped_record_statuses / grouped_records[].status.
+      mixed: {
+        color: 'var(--mac-accent-purple, rgb(175 82 222))',
+        bg: withOpacity('var(--mac-accent-purple, rgb(175 82 222))', 0.12),
+        icon: Layers,
+        text: t('misc.eat_status_mixed', 'Смешанный'),
+        emoji: '🧩'
       }
     };
 
