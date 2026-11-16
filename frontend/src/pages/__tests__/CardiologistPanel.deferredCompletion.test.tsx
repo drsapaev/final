@@ -46,6 +46,10 @@ vi.mock('../../hooks/useDoctorPanelState', async () => {
   const ReactHooks = await import('react');
   return {
     useDoctorPanelState: () => {
+      const location = useLocation();
+      const query = new URLSearchParams(location.search);
+      const patientIdFromUrl = Number(query.get('patientId')) || null;
+      const visitIdFromUrl = Number(query.get('visitId') ?? query.get('visit_id')) || null;
       const [activeTab, setActiveTab] = ReactHooks.useState('visit');
       const [selectedPatient, setSelectedPatient] = ReactHooks.useState<TestSelection | null>({
         id: 1001, patient_id: 11, visit_id: 101,
@@ -62,8 +66,8 @@ vi.mock('../../hooks/useDoctorPanelState', async () => {
           beforeTransition?.();
           setActiveTab(tab);
         },
-        patientIdFromUrl: null,
-        visitIdFromUrl: null,
+        patientIdFromUrl,
+        visitIdFromUrl,
         selectedPatient,
         setSelectedPatient,
       };
@@ -171,9 +175,9 @@ function RouteQueryProbe() {
   return <output data-testid="cardio-route-query">{location.search}</output>;
 }
 
-async function mount() {
+async function mount(initialEntry = '/doctor/cardiology?tab=visit') {
   render(
-    <MemoryRouter initialEntries={['/doctor/cardiology?tab=visit']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <CardiologistPanelUnified />
       <RouteQueryProbe />
     </MemoryRouter>,
@@ -285,7 +289,7 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
   it('positive control: the current visit A still finishes on an explicit success ACK', async () => {
     const held = deferred<{ success: boolean }>();
     vi.mocked(queueService.completeVisit).mockReturnValue(held.promise as never);
-    await mount();
+    await mount('/doctor/cardiology?tab=visit&patientId=11&visitId=101');
     vi.mocked(notify.success).mockClear();
     vi.mocked(notify.error).mockClear();
 
@@ -299,7 +303,11 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
     await waitFor(() => {
       expect(state.currentSelection).toBeNull();
       expect(state.activeTab).toBe('queue');
-      expect(screen.getByTestId('cardio-route-query').textContent).toContain('tab=queue');
+      const query = screen.getByTestId('cardio-route-query').textContent ?? '';
+      expect(query).toContain('tab=queue');
+      expect(query).not.toContain('patientId=');
+      expect(query).not.toContain('visitId=');
+      expect(query).not.toContain('visit_id=');
     });
     expect(vi.mocked(notify.success)).toHaveBeenCalledWith('cardio.visit_completed');
     expect(vi.mocked(notify.error)).not.toHaveBeenCalled();
