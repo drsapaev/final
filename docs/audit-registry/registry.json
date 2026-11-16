@@ -547,9 +547,11 @@
       "priority": "P2",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6682603299",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4105",
+      "merge_sha": "1532acda4adc0d5109e941b0681fb8091c6dd5b5",
+      "test_after": "owner merge #4105 (1532acda4: DermaVisitGallery fail-closed on invalid skin AI response envelope, +51 test lines); registry-agent batch verification on exact main 835eb01b6: DermaVisitGallery.test.tsx within 6-file owner-merge batch 44/44 GREEN (2026-11-16)",
+      "date": "2026-11-16"
     },
     {
       "checked": false,
@@ -597,9 +599,11 @@
       "priority": "P1",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6682603299",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4109",
+      "merge_sha": "eb8fff18d01729da3f719c9219148c646d41d7c0",
+      "test_after": "owner merge #4109 (eb8fff18d: completion honours the shared EMR dirty registry; new DermatologistPanel.dermaCompleteDirtyGate.test.tsx 347 lines + deferredAcks/races/DoctorVisitCompletionAck contract updates); registry-agent batch verification on exact main 835eb01b6: 44/44 GREEN across the 6 owner-merge test files (2026-11-16)",
+      "date": "2026-11-16"
     },
     {
       "checked": false,
@@ -4782,14 +4786,14 @@
       "priority": "P2",
       "source": "#4063 group97 independent queue-ticket print code review (owner, 2026-11-15, main 3dbb6f95c)",
       "evidence": "https://github.com/drsapaev/final/blob/667ab4e961c302d5575bc57097fc6776c14c5b59/docs/audits/2026-11-15-queue-ticket-print-code-review-group97.md",
-      "status": "CONFIRMED_OPEN",
-      "fix_pr": null,
-      "merge_sha": null,
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4114",
+      "merge_sha": "835eb01b6a664ef3485a6ce4e1590313ca937b75",
       "title": "panelPrint extractQueueNumberCandidate falls back to nested obj.id — global queue entry PK printed as «Очередь №...» (P1/P2 conditional per owner)",
       "root_cause": "frontend/src/services/panelPrint.ts:161-239 extractQueueNumberCandidate falls back from the true issued number to nested obj.id, falsely printing the global queue entry PK as «Очередь №...» in buildPanelTicketPayload (owner marks P1/P2 conditional; full line details in the group97 doc)",
-      "test_after": null,
+      "test_after": "owner merge #4114 (835eb01b6: never fabricate ticket identity from unrelated record PKs; new panelPrint.queueIdentity.test.ts 106 lines); registry-agent batch verification on exact main 835eb01b6: 44/44 GREEN across the 6 owner-merge test files (2026-11-16). Note: agent PR #4095 also proposed a FE-003 fix — the owner merge supersedes its FE-003 half; #4095 remains relevant for FE-004 only",
       "reviewer": "owner group97 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v37 sync",
-      "date": "2026-11-15"
+      "date": "2026-11-16"
     },
     {
       "checked": false,
