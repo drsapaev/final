@@ -1,7 +1,7 @@
 diff --git a/frontend/src/pages/registrar/views/WelcomeView.tsx b/frontend/src/pages/registrar/views/WelcomeView.tsx
 --- a/frontend/src/pages/registrar/views/WelcomeView.tsx
 +++ b/frontend/src/pages/registrar/views/WelcomeView.tsx
-@@ -149,7 +149,7 @@ export interface WelcomeViewProps {
+@@ -150,7 +150,7 @@ export interface WelcomeViewProps {
    // Action: records
    openRecordPreview: (row: unknown) => void;
    openRecordEditor: (row: unknown) => void;
@@ -10,7 +10,7 @@ diff --git a/frontend/src/pages/registrar/views/WelcomeView.tsx b/frontend/src/p
    handleStartVisit: (row: unknown) => void | Promise<void>;
    // Action: CSV — actual signatures come from registrarCsv.ts; loosened here.
    generateCSV: (...args: unknown[]) => unknown;
-@@ -197,7 +197,7 @@ const WelcomeView = React.memo(({
+@@ -198,7 +198,7 @@ const WelcomeView = React.memo(({
    setContextMenu,
    openRecordPreview,
    openRecordEditor,
@@ -19,7 +19,7 @@ diff --git a/frontend/src/pages/registrar/views/WelcomeView.tsx b/frontend/src/p
    handleStartVisit,
    generateCSV,
    downloadCSV,
-@@ -796,17 +796,14 @@ const WelcomeView = React.memo(({
+@@ -797,17 +797,14 @@ const WelcomeView = React.memo(({
                      setPaymentDialog({ open: true, row, paid: false, source: 'welcome' });
                      break;
                    case 'in_cabinet':
@@ -43,7 +43,7 @@ diff --git a/frontend/src/pages/registrar/views/WelcomeView.tsx b/frontend/src/p
 diff --git a/frontend/src/pages/RegistrarPanel.tsx b/frontend/src/pages/RegistrarPanel.tsx
 --- a/frontend/src/pages/RegistrarPanel.tsx
 +++ b/frontend/src/pages/RegistrarPanel.tsx
-@@ -380,7 +380,7 @@
+@@ -381,7 +381,7 @@
              setContextMenu={setContextMenu as unknown as React.Dispatch<React.SetStateAction<{ open: boolean; row: unknown; position: { x: number; y: number } }>>}
              openRecordPreview={openRecordPreview}
              openRecordEditor={openRecordEditor}
@@ -79,7 +79,7 @@ diff --git a/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStat
 +    </div>
    ),
  }));
-@@ -113,7 +124,7 @@ const makeProps = (overrides: Record<string, unknown> = {}) => ({
+@@ -120,7 +131,7 @@ const makeProps = (overrides: Record<string, unknown> = {}) => ({
    setContextMenu: vi.fn(),
    openRecordPreview: vi.fn(),
    openRecordEditor: vi.fn(),
@@ -88,7 +88,7 @@ diff --git a/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStat
    handleStartVisit: vi.fn(),
    generateCSV: vi.fn(),
    downloadCSV: vi.fn(),
-@@ -414,1 +425,23 @@
+@@ -413,1 +424,23 @@
  });
 +
 +// REG-FE-006: the Welcome action must never bypass the parent table router,
@@ -115,7 +115,7 @@ diff --git a/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStat
 diff --git a/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts b/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts
 --- a/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts
 +++ b/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts
-@@ -156,8 +156,17 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
+@@ -161,8 +161,17 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
    it('complete from the table routes to the done status after confirmation', async () => {
      const { hook, updateAppointmentStatus } = renderRowActions();
      const row = { id: 9, patient_name: 'C D' };
