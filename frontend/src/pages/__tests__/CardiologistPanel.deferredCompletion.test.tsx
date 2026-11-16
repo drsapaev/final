@@ -100,11 +100,13 @@ vi.mock('../../components/cardiology/VisitTab', () => ({
   default: (props: {
     selectedPatient: TestSelection | null;
     onComplete: (saved: Record<string, unknown>) => Promise<void>;
+    loading?: boolean;
   }) => (
     <div
       data-testid="cardio-visit"
       data-patient={String(props.selectedPatient?.patient_id ?? 'none')}
       data-entry={String(props.selectedPatient?.doctor_queue_entry_id ?? 'none')}
+      data-loading={String(props.loading ?? false)}
     >
       <button
         type="button"
@@ -235,6 +237,8 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
     expect(state.activeTab).toBe('visit');
     expect(screen.getByTestId('cardio-visit').getAttribute('data-patient')).toBe('22');
     expect(screen.getByTestId('cardio-visit').getAttribute('data-entry')).toBe('2002');
+    // An old A completion must not leave B's controls permanently busy.
+    expect(screen.getByTestId('cardio-visit').getAttribute('data-loading')).toBe('false');
     expect(vi.mocked(notify.success)).not.toHaveBeenCalled();
     expect(vi.mocked(notify.error)).not.toHaveBeenCalled();
     expect(queueService.callNextWaiting).not.toHaveBeenCalled();
@@ -264,6 +268,7 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
     expect(state.currentSelection?.patient_id).toBe(22);
     expect(state.activeTab).toBe('visit');
     expect(screen.getByTestId('cardio-visit').getAttribute('data-patient')).toBe('22');
+    expect(screen.getByTestId('cardio-visit').getAttribute('data-loading')).toBe('false');
     expect(vi.mocked(notify.error)).not.toHaveBeenCalled();
     expect(vi.mocked(notify.success)).not.toHaveBeenCalled();
     expect(queueService.callNextWaiting).not.toHaveBeenCalled();
