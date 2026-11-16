@@ -488,17 +488,18 @@ class ClinicTelegramBot:
 
         Возвращает True, если callback уже был подтвержден/обработан через answer().
         """
-        # TGCONFIRM-BE-002: если серверная операция уже закоммичена, падение
-        # рендера/редактирования НЕ должно повторять подтверждение и не
-        # должно показывать generic-ошибку на коммитнутый успех.
-        committed = False
+        # TGCONFIRM-BE-002/BE-003: если серверная операция (подтверждение
+        # или отмена) уже закоммичена, падение рендера/редактирования НЕ
+        # должно повторять операцию и не должно показывать generic-ошибку
+        # на коммитнутый успех. committed хранит тип операции.
+        committed: str | None = None
         try:
             if confirm:
                 # Подтверждаем визит через API
                 result = await self._confirm_visit_via_api(token, callback.from_user.id)
 
                 if result.get("success"):
-                    committed = True
+                    committed = "confirm"
                     message = "✅ Визит успешно подтвержден!"
                     queue_entries = result.get("queue_numbers") or []
                     if queue_entries:
@@ -535,21 +536,39 @@ class ClinicTelegramBot:
                 )
                 return True
 
-            # Отменяем визит
-            await callback.message.edit_text(
-                text=f"{callback.message.text}\n\n❌ Визит отменен",
-                parse_mode="Markdown",
+            # Отменяем визит через API (TGCONFIRM-BE-003): отмена должна
+            # реально сохраниться и инвалидировать токен — не только
+            # редактировать сообщение. Честный отказ, если API не отменил.
+            result = await self._cancel_visit_via_api(token, callback.from_user.id)
+
+            if result.get("success"):
+                committed = "cancel"
+                await callback.message.edit_text(
+                    text=f"{callback.message.text}\n\n❌ Визит отменен",
+                    parse_mode="Markdown",
+                )
+                return False
+
+            await callback.answer(
+                f"Не удалось отменить визит: {result.get('message', 'Неизвестная ошибка')}",
+                show_alert=True,
             )
-            return False
+            return True
 
         except Exception as e:
             logger.error(f"Ошибка подтверждения визита: {e}")
             try:
-                if committed:
+                if committed == "confirm":
                     # TGCONFIRM-BE-002: подтверждение уже закоммичено —
                     # сообщаем об успехе операции, а не о generic-ошибке.
                     await callback.answer(
                         "✅ Визит подтвержден; не удалось обновить сообщение — номера в очереди уточните у регистратуры",
+                        show_alert=True,
+                    )
+                elif committed == "cancel":
+                    # TGCONFIRM-BE-003: отмена уже закоммичена на бэкенде.
+                    await callback.answer(
+                        "✅ Визит отменен; не удалось обновить сообщение",
                         show_alert=True,
                     )
                 else:
@@ -598,6 +617,44 @@ class ClinicTelegramBot:
 
         except Exception as e:
             logger.error(f"Ошибка API подтверждения: {e}")
+            return {"success": False, "message": str(e)}
+
+    async def _cancel_visit_via_api(
+        self, token: str, telegram_user_id: int
+    ) -> dict[str, Any]:
+        """Отменяет визит через API (TGCONFIRM-BE-003).
+
+        Зеркало _confirm_visit_via_api: тот же PUBLIC origin, полный
+        /api/v1 префикс, честный отказ без внутреннего/localhost-предположения.
+        """
+        try:
+            import httpx
+
+            origin = (settings.API_BASE_URL or "").strip().rstrip("/")
+            if not origin:
+                logger.warning(
+                    "Telegram visit cancellation unavailable: API_BASE_URL is not configured"
+                )
+                return {
+                    "success": False,
+                    "message": "Отмена временно недоступна: backend API origin не настроен (API_BASE_URL)",
+                }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{origin}/api/v1/telegram/visits/cancel",
+                    json={"token": token, "telegram_user_id": str(telegram_user_id)},
+                    headers={"Content-Type": "application/json"},
+                    timeout=10,
+                )
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {"success": False, "message": f"HTTP {response.status_code}"}
+
+        except Exception as e:
+            logger.error(f"Ошибка API отмены: {e}")
             return {"success": False, "message": str(e)}
 
 

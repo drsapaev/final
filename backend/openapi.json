@@ -6060,6 +6060,48 @@
         }
       }
     },
+    "/api/v1/telegram/visits/cancel": {
+      "post": {
+        "tags": [
+          "visit-confirmation"
+        ],
+        "summary": "Cancel Visit By Telegram",
+        "description": "Отмена визита пациентом через Telegram бот по токену.\n\nTGCONFIRM-BE-003 (audit #3892, group 20): the ``cancel_visit:<token>``\ncallback must persist a real cancellation through the authorized\nlifecycle state machine and invalidate the token — the token is the\ncapability, mirroring the confirm route's trust model.",
+        "operationId": "cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelVisitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patient/visits/confirm": {
       "post": {
         "tags": [
@@ -78585,6 +78627,39 @@
         "title": "CancelServiceResponse",
         "description": "Ответ на отмену услуги"
       },
+      "CancelVisitResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "visit_id",
+          "status",
+          "patient_name"
+        ],
+        "type": "object",
+        "title": "CancelVisitResponse"
+      },
       "CanonicalVisitResponse": {
         "properties": {
           "appointment_id": {
@@ -116892,6 +116967,31 @@
         ],
         "title": "TelegramBotStatsResponse",
         "description": "Статистика Telegram бота"
+      },
+      "TelegramCancelRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 10,
+            "title": "Token"
+          },
+          "telegram_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram User Id"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object",
+        "title": "TelegramCancelRequest"
       },
       "TelegramConfirmRequest": {
         "properties": {
