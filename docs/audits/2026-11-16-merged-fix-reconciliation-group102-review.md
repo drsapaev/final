@@ -10,7 +10,7 @@ Only review/report/checklist activity. No source edits, new fix PR, runtime test
 - 57 distinct existing UNCHECKED IDs are mentioned in merged PR titles, not automatically fixed.
 - 120 unique audit-like IDs are mentioned in merged PR titles but are entirely MISSING as checkboxes from owner #4063. They must be crosschecked against original #3886/#3892/#3961 findings and not bulk-added.
 - This group verifies 29 existing unchecked IDs using actual main source, checked-in regression test definitions, merged PR patch/metadata and successful head-specific GitHub CI. Reviewer did not rerun tests.
-- After those 29 checks: 416 total, 111 checked, 305 open, assuming no concurrent ledger update.
+- **Observed after owner update:** 416 total, **112 checked, 304 open**. The owner moved independently from 82 to 83 checked while this review was in progress; this group credited exactly 29 (83 → 112), without overwriting the concurrent separate check. Main moved from `a8531540` to `186e5980` during reconciliation, changing only `backend/tests/unit/test_docinvite_phone_task.py`, not any of the reviewed remediation source/test paths.
 
 ## Source+test+CI verified (29; one ID counted once)
 
