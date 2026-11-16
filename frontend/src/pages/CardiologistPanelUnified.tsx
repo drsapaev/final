@@ -1548,8 +1548,12 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       }
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_action_failed')));
     } finally {
-      // A no longer owns B's global visit busy state once B was selected.
-      if (completionStillOwned()) setLoading(false);
+      // The single shared loading flag must still be released when A settles:
+      // otherwise B can remain permanently disabled after an A→B switch.
+      // This preserves the pre-existing cleanup contract; a future dedicated
+      // per-operation loading ticket would be needed for true overlapping
+      // completion requests, outside this narrow stale-ACK repair.
+      setLoading(false);
     }
   };
 
