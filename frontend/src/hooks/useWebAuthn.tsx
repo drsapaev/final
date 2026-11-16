@@ -4,11 +4,12 @@
  * Uses Web Authentication API (navigator.credentials) to register
  * and authenticate with passkeys. Requires HTTPS (or localhost).
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ensureCSRFToken } from '../api/client';
-import { mapPatientSession } from '../api/mappers/patientAccess';
+import { mapPatientLoginResult } from '../api/mappers/patientAccess';
 import { replaceAccessOnlySession } from '../stores/auth';
-import type { PatientSession } from '../types/domain/patientAccess';
+import { isPatientPendingTwoFactor } from '../types/domain/patientAccess';
+import type { PatientLoginResult } from '../types/domain/patientAccess';
 import type { HttpApiError } from '../types/errors';
 import { tokenManager } from '../utils/tokenManager';
 
@@ -32,6 +33,30 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
+function requiredBase64url(value: unknown): ArrayBuffer {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new Error('Invalid WebAuthn value');
+  }
+  const decoded = base64urlToBuffer(value);
+  if (decoded.byteLength === 0 || bufferToBase64url(decoded) !== value) throw new Error('Invalid WebAuthn value');
+  return decoded;
+}
+
+function serializeAssertion(assertion: PublicKeyCredential) {
+  const response = assertion.response as AuthenticatorAssertionResponse;
+  return {
+    id: assertion.id,
+    rawId: bufferToBase64url(assertion.rawId),
+    type: assertion.type,
+    response: {
+      authenticatorData: bufferToBase64url(response.authenticatorData),
+      clientDataJSON: bufferToBase64url(response.clientDataJSON),
+      signature: bufferToBase64url(response.signature),
+      userHandle: response.userHandle ? bufferToBase64url(response.userHandle) : null,
+    },
+  };
+}
+
 interface StepUp {
   phone: string;
   verification_grant: string;
@@ -50,9 +75,12 @@ export interface UseWebAuthnReturn {
   isSupported: boolean;
   isRegistering: boolean;
   isAuthenticating: boolean;
+  authenticationStep: 'select' | 'confirm' | 'confirming' | null;
   error: string;
   register: (options: RegisterOptions) => Promise<boolean>;
-  authenticate: (options?: AuthenticateOptions) => Promise<PatientSession | null>;
+  authenticate: (options?: AuthenticateOptions) => Promise<PatientLoginResult | null>;
+  confirmAuthentication: () => void;
+  cancelAuthentication: () => void;
   listCredentials: () => Promise<unknown[]>;
   deactivateCredential: (credentialId: string | number, stepUp: StepUp) => Promise<boolean>;
 }
@@ -60,7 +88,23 @@ export interface UseWebAuthnReturn {
 export function useWebAuthn(): UseWebAuthnReturn {
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
+  const [authenticationStep, setAuthenticationStep] = useState<'select' | 'confirm' | 'confirming' | null>(null);
   const [error, setError] = useState<string>('');
+  const mounted = useRef(true);
+  const authenticationGeneration = useRef(0);
+  const authenticationAbort = useRef<AbortController | null>(null);
+  const confirmationControl = useRef<{ generation: number; start: () => void } | null>(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      authenticationGeneration.current += 1;
+      authenticationAbort.current?.abort();
+      authenticationAbort.current = null;
+      confirmationControl.current = null;
+    };
+  }, []);
 
   const isSupported =
     typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
@@ -179,21 +223,33 @@ export function useWebAuthn(): UseWebAuthnReturn {
   );
 
   const authenticate = useCallback(
-    async (options: AuthenticateOptions = {}): Promise<PatientSession | null> => {
+    async (options: AuthenticateOptions = {}): Promise<PatientLoginResult | null> => {
       if (!isSupported) {
         setError('webauthn_not_supported');
         return null;
       }
 
+      authenticationAbort.current?.abort();
+      const controller = new AbortController();
+      authenticationAbort.current = controller;
+      const generation = ++authenticationGeneration.current;
       setIsAuthenticating(true);
+      setAuthenticationStep('select');
       setError('');
       // A pending browser ceremony must not replace a newer login in this tab.
       const originalToken = tokenManager.getAccessToken();
       let sessionChanged = false;
-      const onAuthChange = () => { sessionChanged = true; };
+      const onAuthChange = () => { sessionChanged = true; controller.abort(); };
       window.addEventListener('authStateChanged', onAuthChange);
-      const sessionIsCurrent = () => !sessionChanged && tokenManager.getAccessToken() === originalToken &&
-        (!options.isCurrent || options.isCurrent());
+      const sessionIsCurrent = () => {
+        if (!mounted.current || generation !== authenticationGeneration.current || controller.signal.aborted || sessionChanged) return false;
+        if (tokenManager.getAccessToken() !== originalToken || (options.isCurrent && !options.isCurrent())) {
+          sessionChanged = true;
+          controller.abort();
+          return false;
+        }
+        return true;
+      };
 
       try {
         const discoverable = !options.patientId;
@@ -224,7 +280,7 @@ export function useWebAuthn(): UseWebAuthnReturn {
         }
 
         const publicKeyOptions: PublicKeyCredentialRequestOptions = {
-          challenge: base64urlToBuffer(optionsData.options.challenge),
+          challenge: requiredBase64url(optionsData.options.challenge),
           rpId: optionsData.options.rpId,
           timeout: optionsData.options.timeout || 60000,
           userVerification: 'required' as UserVerificationRequirement,
@@ -232,27 +288,15 @@ export function useWebAuthn(): UseWebAuthnReturn {
 
         const assertion = (await navigator.credentials.get({
           publicKey: publicKeyOptions,
+          signal: controller.signal,
         })) as PublicKeyCredential | null;
 
         if (!assertion) {
-          setError('authentication_cancelled');
+          if (sessionIsCurrent()) setError('authentication_cancelled');
           return null;
         }
 
-        const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
-        const assertionData = {
-          id: assertion.id,
-          rawId: bufferToBase64url(assertion.rawId),
-          type: assertion.type,
-          response: {
-            authenticatorData: bufferToBase64url(assertionResponse.authenticatorData),
-            clientDataJSON: bufferToBase64url(assertionResponse.clientDataJSON),
-            signature: bufferToBase64url(assertionResponse.signature),
-            userHandle: assertionResponse.userHandle
-              ? bufferToBase64url(assertionResponse.userHandle)
-              : null,
-          },
-        };
+        const assertionData = serializeAssertion(assertion);
 
         if (!sessionIsCurrent()) {
           throw new Error('Superseded authentication ceremony');
@@ -266,7 +310,77 @@ export function useWebAuthn(): UseWebAuthnReturn {
           },
         );
 
-        const session = mapPatientSession(finishResponse.data);
+        let sessionPayload = finishResponse.data;
+        if (discoverable) {
+          if (!sessionIsCurrent()) throw new Error('Superseded authentication ceremony');
+          const firstResult = finishResponse.data as Record<string, unknown>;
+          if (!firstResult || typeof firstResult !== 'object' ||
+              'access_token' in firstResult || 'token_type' in firstResult || 'user' in firstResult) {
+            throw new Error('Invalid first authentication result');
+          }
+          const next = firstResult.next_options as {
+            challenge?: unknown; ceremony_id?: unknown; rpId?: unknown; timeout?: unknown;
+            userVerification?: unknown; allowCredentials?: unknown;
+          } | null;
+          if (!next || typeof next !== 'object' || typeof next.ceremony_id !== 'string' || !next.ceremony_id ||
+              typeof next.rpId !== 'string' || !next.rpId || next.rpId !== optionsData.options.rpId ||
+              next.userVerification !== 'required' || !Array.isArray(next.allowCredentials) || next.allowCredentials.length !== 1) {
+            throw new Error('Invalid second authentication options');
+          }
+          const allowed = next.allowCredentials[0] as { id?: unknown; type?: unknown } | null;
+          if (!allowed || typeof allowed !== 'object' || allowed.type !== 'public-key') {
+            throw new Error('Invalid allowed credential');
+          }
+          const allowedId = requiredBase64url(allowed.id);
+          if (bufferToBase64url(allowedId) !== assertionData.rawId) throw new Error('Credential changed between ceremonies');
+          const nextOptions: PublicKeyCredentialRequestOptions = {
+            challenge: requiredBase64url(next.challenge),
+            rpId: next.rpId,
+            timeout: typeof next.timeout === 'number' && Number.isFinite(next.timeout) && next.timeout > 0 ? next.timeout : 60000,
+            userVerification: 'required',
+            allowCredentials: [{ type: 'public-key', id: allowedId }],
+          };
+          const confirmation = await new Promise<PublicKeyCredential | null>((resolve, reject) => {
+            const onAbort = () => {
+              if (confirmationControl.current?.generation === generation) confirmationControl.current = null;
+              reject(new DOMException('Authentication cancelled', 'AbortError'));
+            };
+            if (!sessionIsCurrent()) { onAbort(); return; }
+            controller.signal.addEventListener('abort', onAbort, { once: true });
+            confirmationControl.current = {
+              generation,
+              start: () => {
+                controller.signal.removeEventListener('abort', onAbort);
+                if (!sessionIsCurrent()) { onAbort(); return; }
+                // This call is synchronous in the user's click handler, so
+                // browsers that require a fresh user activation can open it.
+                try {
+                  Promise.resolve(navigator.credentials.get({ publicKey: nextOptions, signal: controller.signal }))
+                    .then((credential) => resolve(credential as PublicKeyCredential | null), reject);
+                } catch (error) { reject(error); }
+              },
+            };
+            setAuthenticationStep('confirm');
+          });
+          if (!confirmation) {
+            if (sessionIsCurrent()) setError('authentication_cancelled');
+            return null;
+          }
+          if (!sessionIsCurrent()) throw new Error('Superseded authentication ceremony');
+          const confirmationData = serializeAssertion(confirmation);
+          if (confirmationData.rawId !== assertionData.rawId) throw new Error('Credential changed between ceremonies');
+          const completeResponse = await api.post('/webauthn/login/discoverable/complete', {
+            ceremony_id: next.ceremony_id,
+            assertion_response: confirmationData,
+          });
+          sessionPayload = completeResponse.data;
+        }
+
+        const session = mapPatientLoginResult(sessionPayload);
+        if (isPatientPendingTwoFactor(session)) {
+          if (!sessionIsCurrent()) throw new Error('Superseded authentication ceremony');
+          return session;
+        }
         const accessToken = session.access_token.trim();
         if (
           !accessToken ||
@@ -291,18 +405,39 @@ export function useWebAuthn(): UseWebAuthnReturn {
         const e = err as HttpApiError;
         const detail = e?.response?.data?.detail;
         const reason = typeof detail === 'object' && detail ? detail.reason : undefined;
-        setError(e?.response?.status === 503 ? 'authentication_unavailable' :
+        if (sessionIsCurrent()) setError(e?.response?.status === 503 ? 'authentication_unavailable' :
           e?.response?.status === 429 ? 'authentication_rate_limited' :
           (err instanceof DOMException && err.name === 'NotAllowedError') || reason === 'authentication_cancelled'
             ? 'authentication_cancelled' : 'authentication_failed');
         return null;
       } finally {
         window.removeEventListener('authStateChanged', onAuthChange);
-        setIsAuthenticating(false);
+        if (authenticationAbort.current === controller) authenticationAbort.current = null;
+        if (confirmationControl.current?.generation === generation) confirmationControl.current = null;
+        if (mounted.current && generation === authenticationGeneration.current) {
+          setIsAuthenticating(false);
+          setAuthenticationStep(null);
+        }
       }
     },
     [isSupported],
   );
+
+  const confirmAuthentication = useCallback(() => {
+    const control = confirmationControl.current;
+    if (!control || control.generation !== authenticationGeneration.current) return;
+    confirmationControl.current = null;
+    setAuthenticationStep('confirming');
+    control.start();
+  }, []);
+
+  const cancelAuthentication = useCallback(() => {
+    const controller = authenticationAbort.current;
+    if (controller && !controller.signal.aborted) {
+      setError('authentication_cancelled');
+      controller.abort();
+    }
+  }, []);
 
   const listCredentials = useCallback(async (): Promise<unknown[]> => {
     const response = await api.post('/webauthn/credentials/list', {});
@@ -348,9 +483,12 @@ export function useWebAuthn(): UseWebAuthnReturn {
     isSupported,
     isRegistering,
     isAuthenticating,
+    authenticationStep,
     error,
     register,
     authenticate,
+    confirmAuthentication,
+    cancelAuthentication,
     listCredentials,
     deactivateCredential,
   };

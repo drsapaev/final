@@ -122,19 +122,19 @@ def test_inflight_old_legacy_key_is_consumed_once(shared_redis):
 
 @pytest.mark.parametrize("patient_id", [1234, 987654321])
 def test_legacy_and_discoverable_saturation_are_independent(
-    shared_redis, monkeypatch, patient_id
+    shared_redis, monkeypatch, patient_id, db_session
 ):
     client, prefix = shared_redis
     monkeypatch.setattr(settings, "FRONTEND_URL", "https://clinic.example")
     monkeypatch.setattr(ws, "_DISCOVERABLE_GLOBAL_LIMIT", 1)
     legacy = ws.begin_passkey_authentication(
-        None, patient_id, client_ip="legacy-client"
+        db_session, patient_id, client_ip="legacy-client"
     )
     assert client.zcard(prefix + "login:outstanding") == 1
     discovery = ws.begin_discoverable_authentication("discovery-client")
     assert client.zcard(prefix + "discoverable:outstanding") == 1
     saturated_legacy = ws.begin_passkey_authentication(
-        None, patient_id + 1, client_ip="legacy-other"
+        db_session, patient_id + 1, client_ip="legacy-other"
     )
     assert set(legacy) == set(saturated_legacy)
     assert not client.exists(prefix + "login:" + saturated_legacy["ceremony_id"])
@@ -144,7 +144,7 @@ def test_legacy_and_discoverable_saturation_are_independent(
     # Discovery remains saturated after legacy is freed, and the converse too.
     with pytest.raises(ws.WebAuthnQuotaExceeded):
         ws.begin_discoverable_authentication("discovery-other")
-    ws.begin_passkey_authentication(None, patient_id, client_ip="legacy-client")
+    ws.begin_passkey_authentication(db_session, patient_id, client_ip="legacy-client")
     assert client.zcard(prefix + "login:outstanding") == 1
     assert ws._consume_discoverable_ceremony(
         discovery["ceremony_id"], "discovery-client"

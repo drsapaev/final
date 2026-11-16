@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Integer, String
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -48,6 +49,10 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="Patient", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Incremented atomically to revoke access and refresh credentials.
+    auth_epoch: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default=sa_text("0")
+    )
     # Требуется смена пароля при следующем входе
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
 

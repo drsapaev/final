@@ -65,6 +65,8 @@ def pg_engine():
 
 
 def test_distinct_ceremonies_serialize_credential_sign_count(pg_engine, monkeypatch):
+    # This test isolates counter serialization; the revoke-on-login path is tested separately.
+    monkeypatch.setattr(settings, "REVOKE_SESSIONS_ON_NEW_LOGIN", False)
     monkeypatch.setattr(settings, "TESTING", True)
     monkeypatch.setattr(settings, "FRONTEND_URL", "https://clinic.example")
     monkeypatch.setattr(ws, "WEBAUTHN_AVAILABLE", True)

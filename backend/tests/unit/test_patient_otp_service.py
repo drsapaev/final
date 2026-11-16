@@ -15,6 +15,7 @@ Covers owner-approved identity contract v3:
 from __future__ import annotations
 
 import asyncio
+import json
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
@@ -460,7 +461,7 @@ async def test_send_login_otp_stores_hash_only_and_sends(
     backend = svc._get_backend()
     stored = backend.get("patotp:code:+998901112233")
     assert stored is not None
-    assert len(stored) == 64  # sha256 hex — plaintext code is never stored
+    assert len(json.loads(stored)["code_hash"]) == 64
     assert len(sms_ok) == 1
     assert sms_ok[0]["phone"] == "+998901112233"
     assert message_label in sms_ok[0]["message"]
@@ -516,7 +517,8 @@ async def test_verify_grant_single_use(svc, sms_ok, monkeypatch):
 
     result = svc.verify_login_otp(phone, code)
     grant = result["verification_grant"]
-    assert svc.consume_grant(grant) == phone
+    proof = svc.consume_grant(grant)
+    assert proof.phone == phone and proof.binding is None
     assert svc.consume_grant(grant) is None  # single-use
 
 
@@ -563,7 +565,10 @@ async def test_verify_attempts_exhaustion(svc, sms_ok, monkeypatch):
 def test_concurrent_correct_codes_are_consumed_once(svc, namespace):
     phone, code = "+998901112233", "123456"
     backend = svc.get_backend()
-    backend.set(f"{namespace}:code:{phone}", _hash_code(code), 60)
+    stored = _hash_code(code)
+    if namespace == "patotp":
+        stored = json.dumps({"version": 1, "code_hash": stored})
+    backend.set(f"{namespace}:code:{phone}", stored, 60)
     barrier = Barrier(16)
 
     def verify():
@@ -584,7 +589,11 @@ def test_concurrent_correct_codes_are_consumed_once(svc, namespace):
 def test_concurrent_wrong_codes_exhaust_attempts(svc):
     phone = "+998901112233"
     backend = svc.get_backend()
-    backend.set(f"patotp:code:{phone}", _hash_code("123456"), 60)
+    backend.set(
+        f"patotp:code:{phone}",
+        json.dumps({"version": 1, "code_hash": _hash_code("123456")}),
+        60,
+    )
     barrier = Barrier(16)
 
     def verify_wrong():
@@ -600,7 +609,11 @@ def test_concurrent_wrong_codes_exhaust_attempts(svc):
 
 def test_memory_grant_concurrent_consume_is_single_use(svc):
     grant = "test-grant-" + "x" * 24
-    svc.get_backend().set(f"patotp:grant:{grant}", "+998901112233", 60)
+    svc.get_backend().set(
+        f"patotp:grant:{grant}",
+        json.dumps({"version": 1, "phone": "+998901112233"}),
+        60,
+    )
     barrier = Barrier(16)
 
     def consume():
@@ -609,7 +622,16 @@ def test_memory_grant_concurrent_consume_is_single_use(svc):
 
     with ThreadPoolExecutor(max_workers=16) as pool:
         results = list(pool.map(lambda _: consume(), range(16)))
-    assert results.count("+998901112233") == 1
+    assert (
+        len(
+            [
+                result
+                for result in results
+                if result is not None and result.phone == "+998901112233"
+            ]
+        )
+        == 1
+    )
     assert results.count(None) == 15
 
 
@@ -707,9 +729,11 @@ async def test_login_with_grant_happy_path(svc, sms_ok, monkeypatch, db_session)
     )
     user = _patient_user(db_session, username="login_ok", phone="+998901112233")
     phone = "+998901112233"
-    await svc.send_login_otp(phone, "ru")
+    await svc.send_login_otp(
+        phone, "ru", binding=svc.binding_for_phone(db_session, phone)
+    )
     code = svc._get_backend().last_sent_code[phone]
-    grant = svc.verify_login_otp(phone, code)["verification_grant"]
+    grant = svc.verify_login_otp(phone, code, db=db_session)["verification_grant"]
 
     payload = svc.login_with_grant(db_session, phone, grant)
     assert payload["token_type"] == "bearer"

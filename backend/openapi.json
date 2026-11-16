@@ -6685,7 +6685,7 @@
           "webauthn"
         ],
         "summary": "Webauthn Discoverable Finish",
-        "description": "Consume one challenge and issue a session only for its current owner.",
+        "description": "Verify the first assertion and request a fresh bound assertion.",
         "operationId": "webauthn_discoverable_finish",
         "requestBody": {
           "content": {
@@ -6755,54 +6755,356 @@
         },
         "responses": {
           "200": {
-            "description": "Patient access session",
+            "description": "Second user-verified assertion required",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "properties": {
-                    "access_token": {
-                      "type": "string"
-                    },
-                    "token_type": {
-                      "type": "string"
-                    },
-                    "user": {
+                    "next_options": {
                       "properties": {
-                        "id": {
+                        "challenge": {
+                          "type": "string"
+                        },
+                        "ceremony_id": {
+                          "type": "string"
+                        },
+                        "rpId": {
+                          "type": "string"
+                        },
+                        "timeout": {
                           "type": "integer"
                         },
-                        "username": {
+                        "userVerification": {
+                          "type": "string",
+                          "const": "required"
+                        },
+                        "allowCredentials": {
+                          "items": {
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "public-key"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "required": [
+                              "type",
+                              "id"
+                            ]
+                          },
+                          "type": "array",
+                          "maxItems": 1,
+                          "minItems": 1
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "challenge",
+                        "ceremony_id",
+                        "rpId",
+                        "timeout",
+                        "userVerification",
+                        "allowCredentials"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "next_options"
+                  ],
+                  "title": "Response Webauthn Discoverable Finish"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authentication rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
                           "type": "string"
-                        },
-                        "role": {
-                          "type": "string"
-                        },
-                        "is_active": {
-                          "type": "boolean"
-                        },
-                        "is_superuser": {
-                          "type": "boolean"
                         }
                       },
                       "additionalProperties": true,
                       "type": "object",
                       "required": [
-                        "id",
-                        "username",
-                        "role",
-                        "is_active",
-                        "is_superuser"
+                        "reason"
                       ]
                     }
                   },
-                  "additionalProperties": true,
                   "type": "object",
                   "required": [
-                    "access_token",
-                    "token_type",
-                    "user"
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webauthn/login/discoverable/complete": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn Discoverable Complete",
+        "description": "Verify a second, epoch-bound assertion before issuing a session.",
+        "operationId": "webauthn_discoverable_complete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ceremony_id": {
+                    "type": "string"
+                  },
+                  "assertion_response": {
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "rawId": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "properties": {
+                          "authenticatorData": {
+                            "type": "string"
+                          },
+                          "clientDataJSON": {
+                            "type": "string"
+                          },
+                          "signature": {
+                            "type": "string"
+                          },
+                          "userHandle": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "additionalProperties": true,
+                        "type": "object",
+                        "required": [
+                          "authenticatorData",
+                          "clientDataJSON",
+                          "signature"
+                        ]
+                      }
+                    },
+                    "additionalProperties": true,
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "rawId",
+                      "type",
+                      "response"
+                    ]
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "ceremony_id",
+                  "assertion_response"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Patient access session or second-factor challenge",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "access_token": {
+                          "type": "string"
+                        },
+                        "token_type": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "username": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string"
+                            },
+                            "is_active": {
+                              "type": "boolean"
+                            },
+                            "is_superuser": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "username",
+                            "role",
+                            "is_active",
+                            "is_superuser"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "access_token",
+                        "token_type",
+                        "user"
+                      ]
+                    },
+                    {
+                      "properties": {
+                        "requires_2fa": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "two_factor_method": {
+                          "type": "string",
+                          "const": "totp"
+                        },
+                        "pending_2fa_token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "username": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string"
+                            },
+                            "is_active": {
+                              "type": "boolean"
+                            },
+                            "is_superuser": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "username",
+                            "role",
+                            "is_active",
+                            "is_superuser"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "requires_2fa",
+                        "two_factor_method",
+                        "pending_2fa_token",
+                        "user"
+                      ]
+                    }
                   ],
-                  "title": "Response Webauthn Discoverable Finish"
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Webauthn Discoverable Complete"
                 }
               }
             }
@@ -6923,17 +7225,205 @@
           "webauthn"
         ],
         "summary": "Webauthn Login Finish",
-        "description": "Finish passkey authentication (M4-P1-4).\n\nVerifies assertion and issues JWT.",
+        "description": "Finish passkey authentication (M4-P1-4).\n\nVerifies assertion and issues a session or a second-factor challenge.",
         "operationId": "webauthn_login_finish",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Patient access session or second-factor challenge",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "access_token": {
+                          "type": "string"
+                        },
+                        "token_type": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "username": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string"
+                            },
+                            "is_active": {
+                              "type": "boolean"
+                            },
+                            "is_superuser": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "username",
+                            "role",
+                            "is_active",
+                            "is_superuser"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "access_token",
+                        "token_type",
+                        "user"
+                      ]
+                    },
+                    {
+                      "properties": {
+                        "requires_2fa": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "two_factor_method": {
+                          "type": "string",
+                          "const": "totp"
+                        },
+                        "pending_2fa_token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "username": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string"
+                            },
+                            "is_active": {
+                              "type": "boolean"
+                            },
+                            "is_superuser": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "username",
+                            "role",
+                            "is_active",
+                            "is_superuser"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "requires_2fa",
+                        "two_factor_method",
+                        "pending_2fa_token",
+                        "user"
+                      ]
+                    }
+                  ],
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Webauthn Login Finish"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authentication rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -37849,7 +38339,7 @@
           "mobile"
         ],
         "summary": "Mobile Login",
-        "description": "Мобильная аутентификация\n\nПоддерживает:\n- Вход по номеру телефона и паролю\n- Вход через Telegram ID\n- Регистрация нового пользователя",
+        "description": "Authenticate a linked active patient by phone/password and configured 2FA.",
         "operationId": "mobile_login_api_v1_mobile_auth_login_post",
         "requestBody": {
           "content": {
@@ -37864,10 +38354,73 @@
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MobileLoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported login method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials or second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Authentication service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -44304,11 +44857,75 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "2FA setup artifacts",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response must not be cached",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TwoFactorSetupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "2FA is already enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or enrollment session invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -44346,11 +44963,75 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Verification result and optional session tokens",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response must not be cached",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TwoFactorVerifyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid TOTP code format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or enrollment session invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -44388,11 +45069,75 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "2FA verification and optional session tokens",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response must not be cached",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TwoFactorVerifyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A verification factor is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or pending session invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -44435,6 +45180,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TwoFactorSuccessResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this client",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "retry_after": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail",
+                    "retry_after"
+                  ]
                 }
               }
             }
@@ -44561,11 +45338,75 @@
         "operationId": "get_backup_codes_api_v1_2fa_backup_codes_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Remaining count; backup values are not returned",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response must not be cached",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TwoFactorBackupCodesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "2FA not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -44584,15 +45425,149 @@
           "two-factor-auth"
         ],
         "summary": "Regenerate Backup Codes",
-        "description": "Перегенерировать backup коды",
+        "description": "Rotate backup codes after password and second-factor verification.",
         "operationId": "regenerate_backup_codes_api_v1_2fa_backup_codes_regenerate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorDisableRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "New codes, disclosed only in this response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response must not be cached",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TwoFactorBackupCodesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A second factor is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Reauthentication failed or is temporarily locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this client",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "retry_after": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail",
+                    "retry_after"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -48911,10 +49886,118 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Patient access-only session or restricted second-factor challenge",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "access_token": {
+                          "type": "string"
+                        },
+                        "token_type": {
+                          "type": "string",
+                          "const": "bearer"
+                        },
+                        "user": {
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "username": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string"
+                            },
+                            "is_active": {
+                              "type": "boolean"
+                            },
+                            "is_superuser": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "username",
+                            "role",
+                            "is_active",
+                            "is_superuser"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "access_token",
+                        "token_type",
+                        "user"
+                      ]
+                    },
+                    {
+                      "properties": {
+                        "requires_2fa": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "two_factor_method": {
+                          "type": "string",
+                          "const": "totp"
+                        },
+                        "pending_2fa_token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "username": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string"
+                            },
+                            "is_active": {
+                              "type": "boolean"
+                            },
+                            "is_superuser": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "username",
+                            "role",
+                            "is_active",
+                            "is_superuser"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "requires_2fa",
+                        "two_factor_method",
+                        "pending_2fa_token",
+                        "user"
+                      ]
+                    }
+                  ],
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Patient Login Api V1 Patient Access Login Post"
@@ -60831,6 +61914,46 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Bearer session unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Verification request limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Email delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Verification unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -60865,6 +61988,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or expired verification token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
                 }
               }
             }
@@ -61063,6 +62206,9 @@
               }
             }
           },
+          "409": {
+            "description": "Отзыв отдельной сессии пока недоступен"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -61250,6 +62396,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Текущая сессия не может быть определена"
           }
         },
         "security": [
@@ -61307,6 +62456,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Отзыв отдельной сессии пока недоступен"
           },
           "422": {
             "description": "Validation Error",
@@ -61372,6 +62524,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Сохранение текущей сессии пока недоступно"
           },
           "422": {
             "description": "Validation Error",
@@ -71925,6 +73080,21 @@
   },
   "components": {
     "schemas": {
+      "AIChatSafetyMeta": {
+        "properties": {
+          "requires_doctor_confirmation": {
+            "type": "boolean",
+            "const": true,
+            "title": "Requires Doctor Confirmation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requires_doctor_confirmation"
+        ],
+        "title": "AIChatSafetyMeta",
+        "description": "A strict, explicit clinical boundary for each AI chat message."
+      },
       "AILearningInsightsResponse": {
         "properties": {
           "period": {
@@ -80565,6 +81735,9 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "ai_safety_meta": {
+            "$ref": "#/components/schemas/AIChatSafetyMeta"
           }
         },
         "type": "object",
@@ -80578,7 +81751,8 @@
           "latency_ms",
           "is_error",
           "was_cached",
-          "created_at"
+          "created_at",
+          "ai_safety_meta"
         ],
         "title": "ChatMessageResponse",
         "description": "Ответ с сообщением"
@@ -98043,6 +99217,34 @@
             ],
             "title": "Password",
             "description": "Пароль (опционально)"
+          },
+          "totp_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 6,
+                "minLength": 6
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp Code",
+            "description": "TOTP код при включённой 2FA; значение действует в стандартном временном окне и не ограничено одним входом"
+          },
+          "backup_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10,
+                "minLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Code",
+            "description": "Одноразовый резервный код при включённой 2FA"
           },
           "telegram_id": {
             "anyOf": [

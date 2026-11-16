@@ -549,8 +549,8 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    # Head pin follows the latest passkey owner binding migration.
-    assert revision == "0096_passkey_owner_user"
+    # Head pin follows the sensitive 2FA reauthentication migration.
+    assert revision == "0097_two_factor_sensitive_totp"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

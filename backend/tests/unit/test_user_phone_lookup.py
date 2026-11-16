@@ -53,7 +53,7 @@ async def test_password_reset_phone_branch_reaches_dispatch(db_session, monkeypa
     svc = get_password_reset_service()
     svc.reset_tokens = {}
 
-    async def fake_code(phone, purpose, custom_message=None):
+    async def fake_code(phone, purpose, custom_message=None, account_binding=None):
         return {"success": True, "expires_in_minutes": 5}
 
     monkeypatch.setattr(svc.phone_verification, "send_verification_code", fake_code)

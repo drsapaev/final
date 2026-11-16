@@ -20,6 +20,7 @@
  * backend/app/services/patient_otp_service.py.
  */
 import { api } from './client';
+import { mapPatientLoginResult, mapPatientTwoFactorResult } from './mappers/patientAccess';
 import { API_ENDPOINTS } from './endpoints';
 import {
   mapPatientActivationOtpSent,
@@ -44,6 +45,7 @@ import type {
   PatientOtpGrantResult,
   PatientOtpSentResult,
   PatientSession,
+  PatientLoginResult,
 } from '../types/domain/patientAccess';
 
 /** PR-A1 step 1: send login OTP to the patient phone. */
@@ -71,12 +73,18 @@ export async function verifyPatientOtp(
 /** PR-A1 step 3: exchange phone + grant for the canonical patient session. */
 export async function patientLogin(
   input: PatientGrantLoginInput
-): Promise<PatientSession> {
+): Promise<PatientLoginResult> {
   const response = await api.post(
     API_ENDPOINTS.PATIENT_ACCESS.LOGIN,
     toPatientLoginRequestDto(input)
   );
-  return mapPatientSession(response.data);
+  return mapPatientLoginResult(response.data);
+}
+
+/** Complete an in-memory pending patient challenge without persisting credentials. */
+export async function verifyPatientTwoFactor(input: { pending_2fa_token: string; totp_code?: string; backup_code?: string }) {
+  const response = await api.post('/2fa/verify', input);
+  return mapPatientTwoFactorResult(response.data);
 }
 
 /** PR-A2 public step 1: request the activation OTP (OTP goes ONLY to the card phone captured at issuance). */

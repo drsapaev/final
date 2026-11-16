@@ -462,12 +462,21 @@ class OperationsMixin(UserManagementServiceMixinBase):
                                 user.profile.status = prev_status
                             raise
                     elif action_data.action == "deactivate":
-                        user.is_active = False
-                        if user.profile:
-                            user.profile.status = UserStatus.INACTIVE
-                        self._sync_doctor_active(
-                            db, user_id, False, reason="bulk_deactivate"
+                        # Keep per-user failure isolation: a failed revoke or
+                        # doctor mirror rolls back this user's whole action,
+                        # including the epoch bump and session changes.
+                        from app.services.token_blacklist_service import (
+                            revoke_account_sessions_locked,
                         )
+
+                        with db.begin_nested():
+                            revoke_account_sessions_locked(db, user, revoke_password_resets=True)
+                            user.is_active = False
+                            if user.profile:
+                                user.profile.status = UserStatus.INACTIVE
+                            self._sync_doctor_active(
+                                db, user_id, False, reason="bulk_deactivate"
+                            )
                     elif action_data.action == "suspend":
                         if user.profile:
                             user.profile.status = UserStatus.SUSPENDED
@@ -484,12 +493,14 @@ class OperationsMixin(UserManagementServiceMixinBase):
                                     db, user.profile.phone, exclude_user_id=user.id
                                 )
                             old_role = user.role
-                            # Codex #3031 round-4 P1: same restore contract —
-                            # if the lifecycle's catalog guard rejects the
-                            # promotion, the assigned role must not survive
-                            # the final commit of a batch that reports this
-                            # user as failed.
-                            try:
+                            from app.services.token_blacklist_service import (
+                                revoke_account_sessions_locked,
+                            )
+
+                            # A failed promotion must roll back both the role
+                            # and credential revocation for this account.
+                            with db.begin_nested():
+                                revoke_account_sessions_locked(db, user, revoke_password_resets=True)
                                 user.role = action_data.role
                                 # Lifecycle invariant: bulk role changes follow the
                                 # SAME transition contract as update_user —
@@ -504,9 +515,6 @@ class OperationsMixin(UserManagementServiceMixinBase):
                                     action_data.role,
                                     prelocked_queue_tags=prelocked_doctor_tags,
                                 )
-                            except Exception:
-                                user.role = old_role
-                                raise
                     elif action_data.action == "delete":
                         # Проверяем, что не удаляем последнего администратора
                         if user.role == "Admin" and user.is_superuser:

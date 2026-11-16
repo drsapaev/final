@@ -4,6 +4,7 @@
 
 import logging
 import secrets
+import threading
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -21,6 +22,7 @@ class PhoneVerificationService:
     def __init__(self):
         self.sms_manager = get_sms_manager()
         self.verification_codes = {}  # В production использовать Redis
+        self._codes_lock = threading.RLock()
         self.code_length = 6
         self.code_ttl_minutes = 5
         self.max_attempts = 3
@@ -49,15 +51,12 @@ class PhoneVerificationService:
 
     def _clean_expired_codes(self):
         """Очистка истекших кодов"""
-        now = datetime.now()
-        expired_keys = []
-
-        for key, data in self.verification_codes.items():
-            if data.get('expires_at') and now > data['expires_at']:
-                expired_keys.append(key)
-
-        for key in expired_keys:
-            del self.verification_codes[key]
+        with self._codes_lock:
+            now = datetime.now()
+            expired_keys = [key for key, data in self.verification_codes.items()
+                            if data.get('expires_at') and now > data['expires_at']]
+            for key in expired_keys:
+                del self.verification_codes[key]
 
     async def send_verification_code(
         self,
@@ -65,6 +64,7 @@ class PhoneVerificationService:
         purpose: str = "verification",
         provider_type: SMSProviderType | None = None,
         custom_message: str | None = None,
+        account_binding: tuple[int, int] | None = None,
     ) -> dict[str, Any]:
         """Отправка кода верификации"""
         try:
@@ -103,7 +103,7 @@ class PhoneVerificationService:
             if sms_result.success:
                 # Сохраняем код
                 key = self._get_code_key(phone, purpose)
-                self.verification_codes[key] = {
+                code_data = {
                     "code": code,
                     "phone": phone,
                     "purpose": purpose,
@@ -114,7 +114,10 @@ class PhoneVerificationService:
                     "verified": False,
                     "message_id": sms_result.message_id,
                     "provider": sms_result.provider,
+                    "account_binding": account_binding,
                 }
+                with self._codes_lock:
+                    self.verification_codes[key] = code_data
 
                 logger.info(f"Verification code sent to {phone} for {purpose}")
 
@@ -145,8 +148,16 @@ class PhoneVerificationService:
         code: str,
         purpose: str = "verification",
         remove_after_verification: bool = True,
+        include_account_binding: bool = False,
     ) -> dict[str, Any]:
         """Проверка кода верификации"""
+        with self._codes_lock:
+            return self._verify_code_locked(phone, code, purpose, remove_after_verification, include_account_binding)
+
+    def _verify_code_locked(
+        self, phone: str, code: str, purpose: str,
+        remove_after_verification: bool, include_account_binding: bool,
+    ) -> dict[str, Any]:
         try:
             # Очищаем истекшие коды
             self._clean_expired_codes()
@@ -205,6 +216,8 @@ class PhoneVerificationService:
                 "purpose": purpose,
                 "verified_at": verification_data['verified_at'].isoformat(),
             }
+            if include_account_binding:
+                result["account_binding"] = verification_data.get("account_binding")
 
             # Удаляем код после успешной верификации
             if remove_after_verification:

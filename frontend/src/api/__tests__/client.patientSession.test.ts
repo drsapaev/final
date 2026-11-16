@@ -159,6 +159,7 @@ const originalGet = axios.get;
 
 beforeEach(() => {
   globalThis.URL = RealURL as unknown as typeof URL;
+  delete api.defaults.headers.common['Authorization'];
   // Live staff principal (as after a staff login via LoginFormStyled):
   // access token + refresh token + profile.
   tokenState.access = createJwt(3600);
@@ -211,6 +212,7 @@ describe('access-only patient session replacement (P1)', () => {
     tokenState.access = createJwt(120);
 
     const refreshResolvers: Array<(value: AxiosResponse) => void> = [];
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
     vi.spyOn(axios, 'post').mockImplementation(
       () => new Promise<AxiosResponse>((resolve) => {
         refreshResolvers.push(resolve);
@@ -357,6 +359,10 @@ describe('access-only patient session replacement (P1)', () => {
     ['/api/v1/webauthn/login/discoverable/finish', 120, 401],
     ['/api/v1/webauthn/login/discoverable/begin', -60, 401],
     ['/api/v1/webauthn/login/discoverable/finish', -60, 401],
+    ['/api/v1/webauthn/login/discoverable/complete', 120, 200],
+    ['/api/v1/webauthn/login/discoverable/complete', -60, 200],
+    ['/api/v1/webauthn/login/discoverable/complete', 120, 401],
+    ['/api/v1/webauthn/login/discoverable/complete', -60, 401],
   ])('keeps staff session unchanged for discoverable %s with expiry %i and status %i', async (url, expiry, status) => {
     tokenState.access = createJwt(expiry);
     const originalAccess = tokenState.access;
@@ -384,9 +390,141 @@ describe('access-only patient session replacement (P1)', () => {
   });
 
   it.each([
+    { url: '/webauthn/login/discoverable/complete', method: 'get' as const },
+    { url: '/webauthn/login/discoverable/complete/other', method: 'post' as const },
+  ])('does not exempt an unrelated complete-shaped request from session binding: $url', async ({ url, method }) => {
+    tokenState.access = createJwt(-60);
+    const refreshed = createJwt(3600);
+    const refreshSpy = vi.spyOn(axios, 'post').mockResolvedValue(make200({ access_token: refreshed }));
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.request({ url, method, data: {} });
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(tokenState.access).toBe(refreshed);
+  });
+
+  it.each([200, 401])('does not refresh or clear an old session for email verification response %s', async (status) => {
+    tokenState.access = createJwt(-60);
+    const oldToken = tokenState.access;
+    const refresh = vi.spyOn(axios, 'post');
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    api.defaults.adapter = async (config) => {
+      expect(config.headers.get('Authorization')).toBeUndefined();
+      if (status === 401) throw make401FromRealConfig(config);
+      return { ...make200({ success: true }), config };
+    };
+    const request = api.post('/authentication/email-verification/confirm', { token: 'synthetic' });
+    if (status === 401) await expect(request).rejects.toMatchObject({ response: { status } });
+    else await expect(request).resolves.toMatchObject({ data: { success: true } });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(tokenState.access).toBe(oldToken);
+    expect(tokenState.cleared).toBe(0);
+  });
+
+  it.each([
+    ['/2fa/setup', 120, 200, false], ['/2fa/setup', -60, 200, false],
+    ['/2fa/setup', 120, 401, false], ['/2fa/setup', -60, 401, false],
+    ['/2fa/setup', 120, 200, true], ['/2fa/setup', -60, 401, true],
+    ['/2fa/verify-setup', 120, 200, false], ['/2fa/verify-setup', -60, 200, false],
+    ['/2fa/verify-setup', 120, 401, false], ['/2fa/verify-setup', -60, 401, false],
+    ['/api/v1/2fa/verify-setup', 120, 200, true], ['/api/v1/2fa/verify-setup', -60, 401, true],
+  ])('preserves the old session for enrollment bootstrap %s expiry %i status %i serialized %s', async (url, expiry, status, serialized) => {
+    tokenState.access = createJwt(expiry);
+    const originalAccess = tokenState.access;
+    const originalUser = tokenState.user;
+    const refreshSpy = vi.spyOn(axios, 'post').mockResolvedValue(make200({ access_token: 'unexpected-refresh' }));
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+      if (status === 401) throw make401FromRealConfig(config);
+      return { ...make200({ ok: true }), config };
+    });
+    api.defaults.adapter = adapter;
+    const body = { enrollment_token: 'synthetic-enrollment-token', totp_code: '000000' };
+    const request = api.post(url, serialized ? JSON.stringify(body) : body);
+    if (status === 401) await expect(request).rejects.toMatchObject({ response: { status: 401 } });
+    else await expect(request).resolves.toMatchObject({ data: { ok: true } });
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(refreshSpy).not.toHaveBeenCalled();
+    expect(tokenState.access).toBe(originalAccess);
+    expect(tokenState.refresh).toBe('staff-refresh-token');
+    expect(tokenState.user).toEqual(originalUser);
+    expect(tokenState.cleared).toBe(0);
+  });
+
+  it.each([
+    ['/2fa/setup', 200], ['/2fa/setup', 401],
+    ['/2fa/verify-setup', 200], ['/2fa/verify-setup', 401],
+  ])('does not discard %s enrollment response or clear a replacement session on %i', async (url, status) => {
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const refreshSpy = vi.spyOn(axios, 'post');
+    let resolveRequest!: (value: AxiosResponse) => void;
+    let rejectRequest!: (reason: unknown) => void;
+    let actualConfig!: InternalAxiosRequestConfig;
+    const adapter = vi.fn((config: InternalAxiosRequestConfig) => {
+      actualConfig = config;
+      return new Promise<AxiosResponse>((resolve, reject) => { resolveRequest = resolve; rejectRequest = reject; });
+    });
+    api.defaults.adapter = adapter;
+    const request = api.post(url, { enrollment_token: 'synthetic-enrollment-token' });
+    // Attach a rejection handler before completing the adapter to avoid an unhandled promise.
+    const outcome = request.then((value) => ({ value }), (error: unknown) => ({ error }));
+    await vi.waitFor(() => expect(adapter).toHaveBeenCalledTimes(1));
+    const replacement = createJwt(7200);
+    tokenState.access = replacement;
+    tokenState.refresh = 'new-session-refresh';
+    tokenState.user = { id: 2, role: 'Doctor' };
+    if (status === 401) rejectRequest(make401FromRealConfig(actualConfig));
+    else resolveRequest({ ...make200({ ok: true }), config: actualConfig });
+    const result = await outcome;
+    if (status === 401) expect(result).toMatchObject({ error: { response: { status: 401 } } });
+    else expect(result).toMatchObject({ value: { data: { ok: true } } });
+    expect(refreshSpy).not.toHaveBeenCalled();
+    expect(tokenState.access).toBe(replacement);
+    expect(tokenState.refresh).toBe('new-session-refresh');
+    expect(tokenState.user).toEqual({ id: 2, role: 'Doctor' });
+    expect(tokenState.cleared).toBe(0);
+  });
+
+  it.each([
+    { url: '/2fa/setup', data: {} },
+    { url: '/2fa/verify-setup', data: { totp_code: '000000' } },
+    { url: '/2fa/setup', data: { enrollment_token: '' } },
+    { url: '/2fa/verify-setup', data: { enrollment_token: '  ' } },
+    { url: '/2fa/setup', data: { enrollment_token: 123 } },
+    { url: '/2fa/setup', data: '{invalid-json' },
+    { url: '/2fa/setup/other', data: { enrollment_token: 'synthetic-enrollment-token' } },
+    { url: '/2fa/backup-codes/regenerate', data: { enrollment_token: 'synthetic-enrollment-token' } },
+  ])('keeps bearer-only or unrelated requests session-bound: $url', async ({ url, data }) => {
+    tokenState.access = createJwt(-60);
+    const refreshed = createJwt(3600);
+    const refreshSpy = vi.spyOn(axios, 'post').mockResolvedValue(make200({ access_token: refreshed }));
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.post(url, data);
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(tokenState.access).toBe(refreshed);
+    expect(adapter).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not treat a non-POST enrollment-shaped request as a bootstrap', async () => {
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    tokenState.access = createJwt(-60);
+    const refreshed = createJwt(3600);
+    const refreshSpy = vi.spyOn(axios, 'post').mockResolvedValue(make200({ access_token: refreshed }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.request({ url: '/2fa/setup', method: 'get', data: { enrollment_token: 'synthetic-enrollment-token' } });
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(tokenState.access).toBe(refreshed);
+  });
+
+  it.each([
     '/webauthn/register/begin', '/webauthn/register/finish',
     '/webauthn/login/begin', '/webauthn/login/finish',
     '/webauthn/login/discoverable/begin', '/webauthn/login/discoverable/finish',
+    '/webauthn/login/discoverable/complete',
     '/webauthn/credentials/list', '/webauthn/credentials/5/deactivate',
     '/patient-access/request-otp', '/patient-access/verify-otp', '/patient-access/login',
     '/patient-access/activate/request-otp', '/patient-access/activate/confirm',
@@ -403,17 +541,115 @@ describe('access-only patient session replacement (P1)', () => {
   });
 
   it.each([
+    '/2fa/setup', '/2fa/verify-setup', '/2fa/verify', '/2fa/disable',
+    '/2fa/backup-codes/regenerate', '/api/v1/2fa/backup-codes/regenerate',
+  ])('sends credentials and CSRF header on 2FA POST %s', async (url) => {
+    document.cookie = 'csrf_token=; Max-Age=0; path=/';
+    const csrfSpy = vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.post(url, {});
+    const config = adapter.mock.calls[0][0];
+    expect(config.withCredentials).toBe(true);
+    expect(config.headers.get('X-CSRF-Token')).toBe('synthetic-csrf');
+    expect(csrfSpy).toHaveBeenCalledWith(expect.stringContaining('/auth/csrf-token'), { withCredentials: true });
+  });
+
+  it.each(['/2fa/devices/5', '/api/v1/2fa/devices/5'])('sends credentials and CSRF header when revoking device %s', async (url) => {
+    document.cookie = 'csrf_token=; Max-Age=0; path=/';
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.delete(url);
+    expect(adapter.mock.calls[0][0].withCredentials).toBe(true);
+    expect(adapter.mock.calls[0][0].headers.get('X-CSRF-Token')).toBe('synthetic-csrf');
+  });
+
+  it.each([
+    { url: '/authentication/login', method: 'post' as const },
     { url: '/patients/appointments', method: 'post' as const },
-    { url: '/webauthn/register/begin/other', method: 'post' as const },
-    { url: '/webauthn/register/begin', method: 'get' as const },
-    { url: 'https://other.example/webauthn/register/begin', method: 'post' as const },
-    { url: '/webauthn/register/begin', method: 'post' as const, baseURL: 'https://other.example' },
-  ])('does not enable credentials for an unrelated request $url', async ({ url, method, baseURL }) => {
+    { url: '/patients/42', method: 'put' as const },
+    { url: '/patients/42', method: 'patch' as const },
+    { url: '/patients/42', method: 'delete' as const },
+    { url: 'patients/42', method: 'post' as const },
+  ])('enables credentials for a trusted mutation $method $url', async ({ url, method }) => {
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.request({ url, method });
+    expect(adapter.mock.calls[0][0].withCredentials).toBe(true);
+    expect(adapter.mock.calls[0][0].headers.get('X-CSRF-Token')).toBe('synthetic-csrf');
+  });
+
+  it.each([
+    { url: '/patients/appointments', method: 'get' as const },
+    { url: 'https://other.example/patients', method: 'post' as const },
+    { url: '//other.example/patients', method: 'post' as const },
+    { url: '/patients', method: 'post' as const, baseURL: 'https://other.example' },
+    { url: '/\\other.example/patients', method: 'post' as const },
+    { url: '/%2f%2fother.example/patients', method: 'post' as const },
+    { url: '/%5cother.example/patients', method: 'post' as const },
+    { url: '/%0aother.example/patients', method: 'post' as const },
+    { url: '/../../outside-api', method: 'post' as const },
+    { url: '/patients\n/appointments', method: 'post' as const },
+  ])('does not send automatic credentials to an untrusted request $url', async ({ url, method, baseURL }) => {
     vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
     const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
     api.defaults.adapter = adapter;
     await api.request({ url, method, ...(baseURL ? { baseURL } : {}) });
-    expect(adapter.mock.calls[0][0].withCredentials).not.toBe(true);
+    const config = adapter.mock.calls[0][0];
+    expect(config.withCredentials).not.toBe(true);
+    if (method !== 'get') {
+      expect(config.headers.get('Authorization')).toBeUndefined();
+      expect(config.headers.get('X-CSRF-Token')).toBeUndefined();
+    }
+  });
+
+  it('preserves caller credentials on external requests and explicit no-credentials on trusted requests', async () => {
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config }));
+    api.defaults.adapter = adapter;
+    await api.post('https://other.example/receive', {}, { headers: { Authorization: 'Bearer caller-owned' }, withCredentials: true });
+    expect(adapter.mock.calls[0][0].headers.get('Authorization')).toBe('Bearer caller-owned');
+    expect(adapter.mock.calls[0][0].headers.get('X-CSRF-Token')).toBeUndefined();
+    await api.post('/patients/appointments', {}, { withCredentials: false });
+    expect(adapter.mock.calls[1][0].withCredentials).toBe(false);
+  });
+
+  it('sends the CSRF cookie and header on direct staff refresh', async () => {
+    document.cookie = 'csrf_token=; Max-Age=0; path=/';
+    tokenState.access = createJwt(-60);
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const refresh = vi.spyOn(axios, 'post').mockResolvedValue(make200({ access_token: createJwt(3600) }));
+    api.defaults.adapter = async (config) => ({ ...make200({ ok: true }), config });
+    await api.get('/patients/appointments');
+    expect(refresh).toHaveBeenCalledWith(expect.stringContaining('/authentication/refresh'),
+      { refresh_token: 'staff-refresh-token' }, { withCredentials: true, headers: { 'X-CSRF-Token': 'synthetic-csrf' } });
+  });
+
+  it('does not send the previous refresh token when the session changes during CSRF bootstrap', async () => {
+    document.cookie = 'csrf_token=; Max-Age=0; path=/';
+    tokenState.access = createJwt(-60);
+    let resolveCsrf!: (value: AxiosResponse) => void;
+    vi.spyOn(axios, 'get').mockImplementation(() => new Promise((resolve) => { resolveCsrf = resolve; }));
+    const refresh = vi.spyOn(axios, 'post');
+    api.defaults.adapter = async (config) => ({ ...make200({ ok: true }), config });
+    const request = api.get('/patients/appointments');
+    for (let i = 0; i < 100 && !resolveCsrf; i++) await Promise.resolve();
+    expect(resolveCsrf).toBeDefined();
+    replaceAccessOnlySession(createJwt(3600), PATIENT_PROFILE);
+    resolveCsrf(make200({ csrf_token: 'synthetic-csrf' }));
+    await expect(request).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('does not refresh the session on an external 401', async () => {
+    tokenState.access = createJwt(-60);
+    const refresh = vi.spyOn(axios, 'post');
+    api.defaults.adapter = async (config) => { throw make401FromRealConfig(config); };
+    await expect(api.get('https://other.example/resource')).rejects.toMatchObject({ response: { status: 401 } });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(tokenState.cleared).toBe(0);
   });
 
   it('scopes a passkey 429 without Retry-After to the login request', async () => {
@@ -452,6 +688,7 @@ describe('access-only patient session replacement (P1)', () => {
     };
 
     const refreshResolvers: Array<(value: AxiosResponse) => void> = [];
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
     vi.spyOn(axios, 'post').mockImplementation(
       () => new Promise<AxiosResponse>((resolve) => {
         refreshResolvers.push(resolve);
@@ -511,6 +748,7 @@ describe('access-only patient session replacement (P1)', () => {
       if (url.includes('/visits/')) throw make401FromRealConfig(config);
       throw new Error(`unexpected adapter call: ${url}`);
     };
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
     vi.spyOn(axios, 'post').mockRejectedValue(
       make401('/api/v1/authentication/refresh', 'post')
     );

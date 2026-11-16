@@ -161,12 +161,11 @@ class EmailSMSEnhancedService:
 
         except Exception as e:
             self.stats['emails_failed'] += 1
-            # PII: провайдерские исключения (SMTPRecipientsRefused)
-            # содержат адрес получателя — чистим до лога и до возврата
-            # вызывающему (текст доходит до detail HTTP-ответа).
-            masked = mask_pii_text(str(e))
-            logger.error("Ошибка отправки email: %s", masked)
-            return False, masked
+            # SMTP exceptions can contain the complete message, including
+            # one-time links; neither masking addresses nor echoing provider
+            # text is sufficient to protect credentials.
+            logger.error("Email delivery failed error_type=%s", type(e).__name__)
+            return False, "Не удалось отправить email"
 
     def _smtp_send_message(self, msg) -> None:
         """Синхронная SMTP-отправка; вызывается через asyncio.to_thread."""

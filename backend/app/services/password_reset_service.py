@@ -15,8 +15,10 @@ from app.core.pii_masker import mask_pii_text
 from app.core.security import get_password_hash, verify_password
 from app.crud import user as crud_user
 from app.models.authentication import PasswordResetToken
+from app.models.user import User
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
 from app.services.phone_verification_service import get_phone_verification_service
+from app.services.token_blacklist_service import revoke_account_sessions_locked
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +63,35 @@ class PasswordResetService:
         # Normalize before python-side comparisons.
         return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
-    def _store_reset_token(self, db: Session, raw_token: str, user_id: int) -> None:
-        # Opportunistic cleanup: истёкшие строки больше не нужны.
+    def _store_reset_token(
+        self, db: Session, raw_token: str, user_id: int, *, expected_email: str | None = None,
+        expected_epoch: int | None = None, expected_phone: str | None = None,
+    ) -> bool:
+        # Cleanup is a separate transaction: never lock other accounts' reset
+        # rows while holding this account's User lock.
         db.query(PasswordResetToken).filter(
             PasswordResetToken.expires_at < datetime.now(UTC)
         ).delete(synchronize_session=False)
+        db.commit()
+        user = (
+            db.query(User).filter(User.id == user_id)
+            .with_for_update(key_share=True).populate_existing().first()
+        )
+        if (not user or not user.is_active
+            or (expected_email is not None and user.email != expected_email)
+            or (expected_epoch is not None and user.auth_epoch != expected_epoch)):
+            db.rollback()
+            return False
+        if expected_phone is not None:
+            from app.models.user_profile import UserProfile
+
+            profile = (
+                db.query(UserProfile).filter(UserProfile.user_id == user_id)
+                .with_for_update().populate_existing().first()
+            )
+            if not profile or profile.phone != expected_phone:
+                db.rollback()
+                return False
         db.add(
             PasswordResetToken(
                 user_id=user_id,
@@ -75,6 +101,7 @@ class PasswordResetService:
             )
         )
         db.commit()
+        return True
 
     def _find_token_row(self, db: Session, raw_token: str) -> PasswordResetToken | None:
         return (
@@ -88,7 +115,7 @@ class PasswordResetService:
         try:
             # Проверяем, существует ли пользователь с таким номером
             user = crud_user.get_user_by_phone(db, phone=phone)
-            if not user:
+            if not user or not user.is_active:
                 # Одинаковая форма ответа для всех исходов.
                 return {
                     "success": True,
@@ -101,6 +128,7 @@ class PasswordResetService:
                 phone=phone,
                 purpose="password_reset",
                 custom_message="Код для сброса пароля: {code}. Код действителен 5 минут.",
+                account_binding=(user.id, user.auth_epoch),
             )
 
             if verification_result["success"]:
@@ -155,7 +183,14 @@ class PasswordResetService:
             expires_at = datetime.now() + timedelta(hours=self.token_ttl_hours)
 
             # Сохраняем токен в БД (переживает рестарты/деплои)
-            self._store_reset_token(db, reset_token, user.id)
+            if not self._store_reset_token(
+                db, reset_token, user.id, expected_email=email, expected_epoch=user.auth_epoch
+            ):
+                return {
+                    "success": True,
+                    "message": _EMAIL_RESET_GENERIC_MESSAGE,
+                    "expires_in_hours": self.token_ttl_hours,
+                }
 
             # Формируем ссылку для сброса
             reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
@@ -266,15 +301,21 @@ class PasswordResetService:
         try:
             # Проверяем код верификации
             verification_result = self.phone_verification.verify_code(
-                phone=phone, code=verification_code, purpose="password_reset"
+                phone=phone, code=verification_code, purpose="password_reset",
+                include_account_binding=True,
             )
 
             if not verification_result["success"]:
                 return verification_result
 
+            binding = verification_result.get("account_binding")
+            if (not isinstance(binding, tuple) or len(binding) != 2
+                or type(binding[0]) is not int or type(binding[1]) is not int):
+                return {"success": False, "error": "Код не найден или истек", "error_code": "CODE_NOT_FOUND"}
+
             # Проверяем, существует ли пользователь
             user = crud_user.get_user_by_phone(db, phone=phone)
-            if not user:
+            if not user or user.id != binding[0]:
                 return {
                     "success": False,
                     "error": "Пользователь не найден",
@@ -286,7 +327,14 @@ class PasswordResetService:
             expires_at = datetime.now() + timedelta(hours=self.token_ttl_hours)
 
             # Сохраняем токен в БД (переживает рестарты/деплои)
-            self._store_reset_token(db, reset_token, user.id)
+            if not self._store_reset_token(
+                db, reset_token, user.id, expected_epoch=binding[1], expected_phone=phone
+            ):
+                return {
+                    "success": False,
+                    "error": "Пользователь не найден",
+                    "error_code": "USER_NOT_FOUND",
+                }
 
             logger.info("Reset token generated after phone verification")
 
@@ -298,8 +346,9 @@ class PasswordResetService:
             }
 
         except Exception as e:
-            logger.error(f"Error verifying phone and getting token: {e}")
-            return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
+            db.rollback()
+            logger.error("Error verifying phone and getting token: %s", type(e).__name__)
+            return {"success": False, "error": "Внутренняя ошибка", "error_code": "INTERNAL_ERROR"}
 
     def reset_password_with_token(
         self, db: Session, token: str, new_password: str
@@ -333,19 +382,41 @@ class PasswordResetService:
 
             user_id = token_row.user_id
 
-            # Проверяем пользователя
-            # get_user is a ghost name (Sentry PYTHON-FASTAPI-10); the
-            # crud.user module exposes get(db, id).
-            user = crud_user.get(db, id=user_id)
-            if not user:
+            # The first lookup is only an identity hint. Serialize with login,
+            # deactivation and every other account-wide revocation first.
+            user = (
+                db.query(User).filter(User.id == user_id)
+                .with_for_update(key_share=True).populate_existing().first()
+            )
+            if not user or not user.is_active:
+                db.rollback()
                 return {
                     "success": False,
-                    "error": "Пользователь не найден",
-                    "error_code": "USER_NOT_FOUND",
+                    "error": "Токен не найден или истек",
+                    "error_code": "TOKEN_NOT_FOUND",
                 }
+
+            token_row = (
+                db.query(PasswordResetToken)
+                .filter(
+                    PasswordResetToken.user_id == user_id,
+                    PasswordResetToken.token == self._hash_token(token),
+                )
+                .with_for_update().populate_existing().first()
+            )
+            if token_row is None:
+                db.rollback()
+                return {"success": False, "error": "Токен не найден или истек", "error_code": "TOKEN_NOT_FOUND"}
+            if token_row.used:
+                db.rollback()
+                return {"success": False, "error": "Токен уже использован", "error_code": "TOKEN_ALREADY_USED"}
+            if datetime.now(UTC) >= self._aware(token_row.expires_at):
+                db.rollback()
+                return {"success": False, "error": "Токен истек", "error_code": "TOKEN_EXPIRED"}
 
             # Проверяем новый пароль
             if len(new_password) < 6:
+                db.rollback()
                 return {
                     "success": False,
                     "error": "Пароль должен содержать минимум 6 символов",
@@ -354,46 +425,40 @@ class PasswordResetService:
 
             # Проверяем, не совпадает ли новый пароль со старым
             if verify_password(new_password, user.hashed_password):
+                db.rollback()
                 return {
                     "success": False,
                     "error": "Новый пароль должен отличаться от текущего",
                     "error_code": "PASSWORD_SAME_AS_OLD",
                 }
 
-            # Пароль меняем ПРЯМО здесь: whitelist update_user не содержит
-            # hashed_password/password_changed_at (и не должен — он для FCM-
-            # профиля), а этот сервис — санкционированный владелец смены
-            # пароля. Иначе update_user молча пропускал поля: success=True
-            # при НЕИЗМЕНЁННОМ пароле.
-            user.hashed_password = get_password_hash(new_password)
-            user.password_changed_at = datetime.now()
+            # Epoch, sessions, password and token consumption commit together.
+            # A stale access token or concurrent reset cannot survive rotation.
+            revoke_account_sessions_locked(db, user, revoke_password_resets=True)
+            if datetime.now(UTC) >= self._aware(token_row.expires_at):
+                db.rollback()
+                return {"success": False, "error": "Токен истек", "error_code": "TOKEN_EXPIRED"}
+            new_hash = get_password_hash(new_password)
+            if datetime.now(UTC) >= self._aware(token_row.expires_at):
+                db.rollback()
+                return {"success": False, "error": "Токен истек", "error_code": "TOKEN_EXPIRED"}
+            user.hashed_password = new_hash
+            user.password_changed_at = datetime.now(UTC)
+            token_row.used = True
+            token_row.used_at = datetime.now(UTC)
             db.commit()
-            db.refresh(user)
 
-            if user.id:
-                # Помечаем токен как использованный (в той же транзакции,
-                # что и смена пароля)
-                token_row.used = True
-                token_row.used_at = datetime.now(UTC)
-                db.commit()
-
-                logger.info(f"Password reset completed for user {user.id}")
-
-                return {
-                    "success": True,
-                    "message": "Пароль успешно изменен",
-                    "user_id": user.id,
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": "Ошибка обновления пароля",
-                    "error_code": "PASSWORD_UPDATE_FAILED",
-                }
+            logger.info("Password reset completed")
+            return {
+                "success": True,
+                "message": "Пароль успешно изменен",
+                "user_id": user.id,
+            }
 
         except Exception as e:
-            logger.error(f"Error resetting password with token: {e}")
-            return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
+            db.rollback()
+            logger.error("Error resetting password with token: %s", type(e).__name__)
+            return {"success": False, "error": "Внутренняя ошибка", "error_code": "INTERNAL_ERROR"}
 
     def validate_reset_token(self, db: Session, token: str) -> dict[str, Any]:
         """Проверка валидности токена сброса"""

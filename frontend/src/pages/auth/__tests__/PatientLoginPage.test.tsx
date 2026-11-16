@@ -8,9 +8,9 @@ import PatientLoginPage from '../PatientLoginPage';
 import PatientBookingPage from '../../PatientBookingPage';
 
 const authState = vi.hoisted(() => ({ current: { token: null as string | null, profile: null as Record<string, unknown> | null } }));
-const passkey = vi.hoisted(() => ({ supported: false, error: '', authenticate: vi.fn() }));
+const passkey = vi.hoisted(() => ({ supported: false, authenticating: false, step: null as null | 'select' | 'confirm' | 'confirming', error: '', authenticate: vi.fn(), confirm: vi.fn(), cancel: vi.fn() }));
 vi.mock('../../../hooks/useWebAuthn', () => ({
-  useWebAuthn: () => ({ isSupported: passkey.supported, isAuthenticating: false, authenticate: passkey.authenticate, error: passkey.error }),
+  useWebAuthn: () => ({ isSupported: passkey.supported, isAuthenticating: passkey.authenticating, authenticationStep: passkey.step, authenticate: passkey.authenticate, confirmAuthentication: passkey.confirm, cancelAuthentication: passkey.cancel, error: passkey.error }),
 }));
 vi.mock('../../../utils/tokenManager', () => ({ tokenManager: { getAccessToken: () => authState.current.token } }));
 
@@ -18,6 +18,7 @@ vi.mock('../../../api/patientAccess', () => ({
   requestPatientOtp: vi.fn(),
   verifyPatientOtp: vi.fn(),
   patientLogin: vi.fn(),
+  verifyPatientTwoFactor: vi.fn(),
   requestActivationOtp: vi.fn(),
   confirmActivation: vi.fn(),
   issueActivationToken: vi.fn(),
@@ -65,6 +66,7 @@ import {
   patientLogin,
   requestPatientOtp,
   verifyPatientOtp,
+  verifyPatientTwoFactor,
 } from '../../../api/patientAccess';
 import { ensureCSRFToken } from '../../../api/client';
 import { replaceAccessOnlySession, setProfile, setToken } from '../../../stores/auth';
@@ -132,6 +134,10 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
     vi.clearAllMocks();
     authState.current = { token: null, profile: null };
     passkey.supported = false;
+    passkey.authenticating = false;
+    passkey.step = null;
+    passkey.confirm.mockReset();
+    passkey.cancel.mockReset();
     passkey.error = '';
     passkey.authenticate.mockReset();
     clearPendingPublicBookingSelection();
@@ -165,6 +171,92 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
     }) as never);
     vi.mocked(createPatientPublicBookingRequest).mockResolvedValue({ id: 'new-request' } as never);
     vi.mocked(resubmitPatientPublicBookingRequest).mockResolvedValue({ id: 'same-request', status: 'pending' } as never);
+  });
+
+  it.each(['sms', 'passkey'])('requires a second factor after %s before installing a session', async (method) => {
+    const pending = { requires_2fa: true as const, two_factor_method: 'totp' as const, pending_2fa_token: 'pending', user: PATIENT_SESSION.user };
+    if (method === 'sms') mockedPatientLogin.mockResolvedValueOnce(pending);
+    else { passkey.supported = true; passkey.authenticate.mockResolvedValueOnce(pending); }
+    vi.mocked(verifyPatientTwoFactor).mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, access_token: 'verified', token_type: 'bearer' });
+    renderPage();
+    if (method === 'sms') {
+      fireEvent.change(screen.getByLabelText('patientPortal.pl_phone_label'), { target: { value: '+998901234567' } });
+      fireEvent.click(screen.getByRole('button', { name: 'patientPortal.pl_send_code' }));
+      fireEvent.change(await screen.findByLabelText('patientPortal.pl_code_label'), { target: { value: '123456' } });
+      fireEvent.click(screen.getByRole('button', { name: 'patientPortal.pl_verify' }));
+    } else fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_login' }));
+    const input = await screen.findByLabelText('patientPortal.pl_totp_label');
+    expect(replaceAccessOnlySession).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'patientPortal.pl_second_factor_submit' }));
+    expect(await screen.findByText('patientPortal.pl_second_factor_invalid')).toBeInTheDocument();
+    expect(replaceAccessOnlySession).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('patientPortal.pl_backup_option'));
+    fireEvent.change(screen.getByLabelText('patientPortal.pl_backup_label'), { target: { value: 'aBcd-123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'patientPortal.pl_second_factor_submit' }));
+    await waitFor(() => expect(replaceAccessOnlySession).toHaveBeenCalledWith('verified', PATIENT_SESSION.user));
+    expect(verifyPatientTwoFactor).toHaveBeenLastCalledWith({ pending_2fa_token: 'pending', backup_code: 'aBcd-123' });
+  });
+
+  it('discards a pending factor result when another session starts', async () => {
+    passkey.supported = true;
+    passkey.authenticate.mockResolvedValueOnce({ requires_2fa: true, two_factor_method: 'totp', pending_2fa_token: 'pending', user: PATIENT_SESSION.user });
+    let resolve!: (v: { success: true; access_token: string; token_type: string }) => void;
+    vi.mocked(verifyPatientTwoFactor).mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_login' }));
+    fireEvent.change(await screen.findByLabelText('patientPortal.pl_totp_label'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'patientPortal.pl_second_factor_submit' }));
+    authState.current = { token: 'new-session', profile: null };
+    fireEvent(window, new Event('authStateChanged'));
+    resolve({ success: true, access_token: 'late-token', token_type: 'bearer' });
+    await waitFor(() => expect(screen.getByLabelText('patientPortal.pl_phone_label')).toBeInTheDocument());
+    expect(replaceAccessOnlySession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [401, 'patientPortal.pl_second_factor_expired'],
+    [429, 'patientPortal.pl_rate_limited'],
+    [503, 'patientPortal.pl_unavailable'],
+  ])('reports factor verification status %s safely', async (status, message) => {
+    passkey.supported = true;
+    passkey.authenticate.mockResolvedValueOnce({ requires_2fa: true, two_factor_method: 'totp', pending_2fa_token: 'pending', user: PATIENT_SESSION.user });
+    vi.mocked(verifyPatientTwoFactor).mockRejectedValueOnce({ response: { status } });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_login' }));
+    fireEvent.change(await screen.findByLabelText('patientPortal.pl_totp_label'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'patientPortal.pl_second_factor_submit' }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(replaceAccessOnlySession).not.toHaveBeenCalled();
+    if (status === 401) expect(screen.getByLabelText('patientPortal.pl_phone_label')).toBeInTheDocument();
+    else expect(screen.getByLabelText('patientPortal.pl_totp_label')).toHaveValue('');
+  });
+
+  it('cancels a pending challenge and clears the factor input', async () => {
+    passkey.supported = true;
+    passkey.authenticate.mockResolvedValueOnce({ requires_2fa: true, two_factor_method: 'totp', pending_2fa_token: 'pending', user: PATIENT_SESSION.user });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_login' }));
+    fireEvent.change(await screen.findByLabelText('patientPortal.pl_totp_label'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'patientPortal.pl_second_factor_cancel' }));
+    expect(screen.getByLabelText('patientPortal.pl_phone_label')).toBeInTheDocument();
+    expect(verifyPatientTwoFactor).not.toHaveBeenCalled();
+    expect(replaceAccessOnlySession).not.toHaveBeenCalled();
+  });
+
+  it('does not install a pending factor response after unmount', async () => {
+    passkey.supported = true;
+    passkey.authenticate.mockResolvedValueOnce({ requires_2fa: true, two_factor_method: 'totp', pending_2fa_token: 'pending', user: PATIENT_SESSION.user });
+    let resolve!: (v: { success: true; access_token: string; token_type: string }) => void;
+    vi.mocked(verifyPatientTwoFactor).mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
+    const { unmount } = renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_login' }));
+    fireEvent.change(await screen.findByLabelText('patientPortal.pl_totp_label'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'patientPortal.pl_second_factor_submit' }));
+    unmount();
+    resolve({ success: true, access_token: 'late-token', token_type: 'bearer' });
+    await Promise.resolve();
+    expect(replaceAccessOnlySession).not.toHaveBeenCalled();
   });
 
   it('offers discoverable passkey login while retaining phone OTP', async () => {
@@ -208,6 +300,20 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
     renderPage();
     expect(screen.queryByRole('button', { name: 'patient.pat_web_login' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('patientPortal.pl_send_code')).toBeEnabled();
+  });
+
+  it('announces the second system confirmation while it is pending', () => {
+    passkey.supported = true;
+    passkey.authenticating = true;
+    passkey.step = 'confirm';
+    renderPage();
+    expect(screen.getByText('patient.pat_web_second_confirmation')).toBeInTheDocument();
+    const continueButton = screen.getByRole('button', { name: 'patient.pat_web_continue_confirmation' });
+    expect(continueButton).toHaveFocus();
+    fireEvent.click(continueButton);
+    expect(passkey.confirm).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_cancel' }));
+    expect(passkey.cancel).toHaveBeenCalledTimes(1);
   });
 
   it('does not replace a session changed during OTP verification', async () => {

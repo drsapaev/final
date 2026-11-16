@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, UTC
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Any, Sequence
+from typing import Any
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -168,7 +169,7 @@ def ensure_setup(db: Session) -> None:
 
 
 def upsert_demo_users(db: Session) -> dict[str, Any]:
-    from app.core.security import get_password_hash
+    from app.core.security import get_password_hash, verify_password
     from app.models.user import User
     from app.models.user_profile import (
         UserNotificationSettings,
@@ -176,15 +177,30 @@ def upsert_demo_users(db: Session) -> dict[str, Any]:
         UserProfile,
         UserStatus,
     )
+    from app.services.patient_otp_service import normalize_phone
+    from app.services.patient_phone_scope import acquire_phone_scope_lock
+    from app.services.token_blacklist_service import revoke_account_sessions_locked
 
     users: dict[str, Any] = {}
-    password_hash = get_password_hash(demo_passcode())
+    password = demo_passcode()
+    password_hash = get_password_hash(password)
+    identifiers = [spec.email for spec in DEMO_USERS]
+    # Lock every pre-existing account in stable order before touching profiles
+    # or session rows. This seed commits all accounts together.
+    existing_users = (
+        db.query(User)
+        .filter(or_(User.username.in_(identifiers), User.email.in_(identifiers)))
+        .order_by(User.id)
+        .with_for_update(key_share=True)
+        .populate_existing()
+        .all()
+    )
     for spec in DEMO_USERS:
-        user = (
-            db.query(User)
-            .filter(or_(User.username == spec.email, User.email == spec.email))
-            .first()
-        )
+        matches = [user for user in existing_users if user.username == spec.email or user.email == spec.email]
+        if len(matches) > 1:
+            raise DevDatabaseSafetyError("Demo account identity is ambiguous")
+        user = matches[0] if matches else None
+        is_new = user is None
         if user is None:
             user = User(
                 username=spec.email,
@@ -197,28 +213,46 @@ def upsert_demo_users(db: Session) -> dict[str, Any]:
                 must_change_password=False,
             )
             db.add(user)
-
+            db.flush()
+        profile = (
+            db.query(UserProfile).filter(UserProfile.user_id == user.id)
+            .with_for_update().populate_existing().first()
+        )
+        email_changed = not is_new and user.email != spec.email
+        old_phone = profile.phone if profile else None
+        phone_changed = not is_new and (normalize_phone(old_phone or "") or old_phone) != (normalize_phone(spec.phone) or spec.phone)
+        password_changed = not is_new and not verify_password(password, user.hashed_password)
+        if phone_changed:
+            for phone in sorted({p for p in (normalize_phone(old_phone or ""), normalize_phone(spec.phone)) if p}):
+                acquire_phone_scope_lock(db, phone)
+        if not is_new and (
+            user.username != spec.email or email_changed or phone_changed or password_changed
+            or user.role != spec.role or not user.is_active
+            or user.is_superuser != (spec.role == "Admin") or user.must_change_password
+        ):
+            revoke_account_sessions_locked(db, user, revoke_password_resets=True)
+        if profile is not None:
+            if email_changed:
+                profile.email_verified = False
+            if phone_changed:
+                profile.phone_verified = False
         user.username = spec.email
         user.email = spec.email
         user.full_name = spec.full_name
-        user.hashed_password = password_hash
+        if is_new or password_changed:
+            user.hashed_password = password_hash
         user.role = spec.role
         user.is_active = True
         user.is_superuser = spec.role == "Admin"
         user.must_change_password = False
-        if user.id is None:
-            db.flush()
-
-        profile = (
-            db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
-        )
         if profile is None:
             profile = UserProfile(user_id=user.id)
             db.add(profile)
             db.flush()
         profile.full_name = spec.full_name
         profile.phone = spec.phone
-        profile.email_verified = True
+        if is_new:
+            profile.email_verified = True
         profile.language = "ru"
         profile.timezone = DEMO_TIMEZONE
         profile.status = UserStatus.ACTIVE
@@ -963,7 +997,10 @@ def seed_lab_examples(
     patients: dict[str, Any],
     lab_user: Any,
 ) -> None:
-    from app.services.lab_reporting_service import LabReportingDomainError, LabReportingService
+    from app.services.lab_reporting_service import (
+        LabReportingDomainError,
+        LabReportingService,
+    )
 
     service = LabReportingService(db)
     templates = service.list_templates()

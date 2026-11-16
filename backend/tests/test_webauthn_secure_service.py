@@ -252,12 +252,20 @@ def test_production_redis_failure_does_not_fallback(webauthn, monkeypatch):
         ws._ceremony_store()
 
 
+@pytest.mark.parametrize("has_totp", [False, True])
 @pytest.mark.parametrize(
     "origin, should_pass",
     [("https://clinic.example", True), ("https://evil.example", False)],
 )
 def test_real_webauthn_signed_assertion_checks_origin(
-    db_session, linked_patient, webauthn, monkeypatch, origin, should_pass
+    client,
+    db_session,
+    linked_patient,
+    webauthn,
+    monkeypatch,
+    origin,
+    should_pass,
+    has_totp,
 ):
     """Use a real EC signature and the optional library's verifier."""
     import hashlib
@@ -270,6 +278,19 @@ def test_real_webauthn_signed_assertion_checks_origin(
     from webauthn.helpers.exceptions import InvalidAuthenticationResponse
 
     patient, user, _ = linked_patient
+    user.auth_epoch = 9
+    if has_totp:
+        from app.models.two_factor_auth import TwoFactorAuth
+        from app.services.two_factor_service import get_two_factor_service
+
+        db_session.add(
+            TwoFactorAuth(
+                user_id=user.id,
+                totp_enabled=True,
+                totp_verified=True,
+                totp_secret=get_two_factor_service().generate_totp_secret(),
+            )
+        )
     credential = (
         db_session.query(PasskeyCredential)
         .filter_by(patient_id=patient.id, credential_id="Zmlyc3Q=")
@@ -322,13 +343,30 @@ def test_real_webauthn_signed_assertion_checks_origin(
         },
     }
     if should_pass:
-        result = ws.finish_passkey_authentication(
-            db_session,
-            patient.id,
-            assertion_response=assertion,
-            ceremony_id=options["ceremony_id"],
+        response = client.post(
+            "/api/v1/webauthn/login/finish",
+            json={
+                "patient_id": patient.id,
+                "assertion_response": assertion,
+                "ceremony_id": options["ceremony_id"],
+            },
         )
+        assert response.status_code == 200, response.text
+        assert response.headers["cache-control"] == "no-store"
+        result = response.json()
         assert result["user"]["id"] == user.id
+        if has_totp:
+            assert result["requires_2fa"] is True
+            assert result["two_factor_method"] == "totp"
+            assert result["pending_2fa_token"]
+            assert "access_token" not in result and "refresh_token" not in result
+        else:
+            claims = jwt.decode(
+                result["access_token"],
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM],
+            )
+            assert claims["sub"] == str(user.id) and claims["auth_epoch"] >= 9
     else:
         with pytest.raises(InvalidAuthenticationResponse):
             ws.finish_passkey_authentication(
@@ -337,3 +375,57 @@ def test_real_webauthn_signed_assertion_checks_origin(
                 assertion_response=assertion,
                 ceremony_id=options["ceremony_id"],
             )
+
+
+def test_identified_challenge_issued_before_epoch_revocation_cannot_login(
+    db_session, linked_patient, webauthn, monkeypatch
+):
+    patient, user, _ = linked_patient
+    monkeypatch.setattr(
+        ws,
+        "verify_authentication_response",
+        lambda **_: SimpleNamespace(new_sign_count=1),
+        raising=False,
+    )
+    challenge = ws.begin_passkey_authentication(db_session, patient.id)
+    user.auth_epoch += 1
+    db_session.commit()
+    with pytest.raises(ValueError):
+        ws.finish_passkey_authentication(
+            db_session,
+            patient.id,
+            assertion_response={"id": "c2Vjb25k", "rawId": "c2Vjb25k"},
+            ceremony_id=challenge["ceremony_id"],
+        )
+
+
+def test_inconsistent_second_factor_never_bypasses_passkey_login(
+    db_session, linked_patient, webauthn, monkeypatch
+):
+    from app.models.two_factor_auth import TwoFactorAuth
+
+    patient, user, _ = linked_patient
+    db_session.add(
+        TwoFactorAuth(user_id=user.id, totp_enabled=True, totp_verified=False)
+    )
+    db_session.commit()
+    monkeypatch.setattr(
+        ws,
+        "verify_authentication_response",
+        lambda **_: SimpleNamespace(new_sign_count=1),
+        raising=False,
+    )
+    options = ws.begin_passkey_authentication(db_session, patient.id)
+    with pytest.raises(ValueError):
+        ws.finish_passkey_authentication(
+            db_session,
+            patient.id,
+            ceremony_id=options["ceremony_id"],
+            assertion_response={"id": "c2Vjb25k", "rawId": "c2Vjb25k"},
+        )
+    key = (
+        db_session.query(PasskeyCredential)
+        .filter_by(patient_id=patient.id, credential_id="c2Vjb25k")
+        .one()
+    )
+    assert key.sign_count == 0
