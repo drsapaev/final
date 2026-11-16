@@ -159,8 +159,9 @@ import CardiologistPanelUnified from '../CardiologistPanelUnified';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => { resolve = res; });
-  return { promise, resolve };
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
 }
 
 async function mount() {
@@ -241,6 +242,31 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
     if (response.unknown === true) {
       expect(vi.mocked(apiClient.get).mock.calls.length).toBe(backgroundGetCalls);
     }
+  });
+
+  it('drops a late network rejection from A after switching to B, without an A error toast', async () => {
+    const held = deferred<{ success: boolean }>();
+    vi.mocked(queueService.completeVisit).mockReturnValue(held.promise as never);
+    await mount();
+    vi.mocked(notify.error).mockClear();
+    vi.mocked(notify.success).mockClear();
+
+    fireEvent.click(screen.getByTestId('cardio-complete'));
+    await waitFor(() => expect(queueService.completeVisit).toHaveBeenCalledTimes(1));
+    await switchToB();
+
+    await act(async () => {
+      held.reject(new Error('SYNTHETIC failed A transport'));
+      await held.promise.catch(() => undefined);
+      await Promise.resolve();
+    });
+
+    expect(state.currentSelection?.patient_id).toBe(22);
+    expect(state.activeTab).toBe('visit');
+    expect(screen.getByTestId('cardio-visit').getAttribute('data-patient')).toBe('22');
+    expect(vi.mocked(notify.error)).not.toHaveBeenCalled();
+    expect(vi.mocked(notify.success)).not.toHaveBeenCalled();
+    expect(queueService.callNextWaiting).not.toHaveBeenCalled();
   });
 
   it('positive control: the current visit A still finishes on an explicit success ACK', async () => {
