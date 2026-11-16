@@ -12,7 +12,6 @@ from __future__ import annotations
 import pytest
 
 from app.core.security import get_password_hash
-from app.crud import user as crud_user
 from app.models.user import User
 from app.services.password_reset_service import get_password_reset_service
 
@@ -64,7 +63,7 @@ def _phone_svc(monkeypatch, ok: bool, known_phone: str | None = None):
     svc = get_password_reset_service()
     svc.reset_tokens = {}
 
-    async def fake_code(phone, purpose, custom_message=None):
+    async def fake_code(phone, purpose, custom_message=None, account_binding=None):
         if ok:
             return {"success": True, "expires_in_minutes": 5}
         return {"success": False, "error": "sms provider down"}

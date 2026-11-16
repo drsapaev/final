@@ -3,7 +3,9 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import DBAPIError
 
 from app.scripts.migrate_users_to_postgres import migrate_users
 
@@ -93,6 +95,7 @@ def _create_target_engine(path: Path):
                     role VARCHAR(20) NOT NULL,
                     is_active BOOLEAN NOT NULL,
                     is_superuser BOOLEAN NOT NULL,
+                    auth_epoch INTEGER NOT NULL DEFAULT 0,
                     must_change_password BOOLEAN NOT NULL,
                     device_token VARCHAR(255),
                     created_at DATETIME,
@@ -101,6 +104,13 @@ def _create_target_engine(path: Path):
                 """
             )
         )
+        for statement in (
+            "CREATE TABLE user_profiles (id INTEGER PRIMARY KEY, user_id INTEGER, email_verified BOOLEAN)",
+            "CREATE TABLE user_sessions (id INTEGER PRIMARY KEY, user_id INTEGER, revoked BOOLEAN)",
+            "CREATE TABLE refresh_tokens (id INTEGER PRIMARY KEY, user_id INTEGER, revoked BOOLEAN, revoked_at DATETIME)",
+            "CREATE TABLE password_reset_tokens (id INTEGER PRIMARY KEY, user_id INTEGER, used BOOLEAN, used_at DATETIME)",
+        ):
+            connection.execute(text(statement))
     return engine
 
 
@@ -165,7 +175,7 @@ def test_migrate_users_updates_existing_user_without_duplication(tmp_path):
                     3,
                     'registrar@example.com',
                     'Old Registrar',
-                    'registrar@example.com',
+                    'old-registrar@example.com',
                     'old-hash',
                     'OldRole',
                     0,
@@ -178,6 +188,10 @@ def test_migrate_users_updates_existing_user_without_duplication(tmp_path):
                 """
             )
         )
+        connection.execute(text("INSERT INTO user_profiles VALUES (1, 3, true)"))
+        connection.execute(text("INSERT INTO user_sessions VALUES (1, 3, false)"))
+        connection.execute(text("INSERT INTO refresh_tokens VALUES (1, 3, false, NULL)"))
+        connection.execute(text("INSERT INTO password_reset_tokens VALUES (1, 3, false, NULL)"))
 
     summary = migrate_users(source_sqlite_path=source_db, target_engine=engine)
 
@@ -198,9 +212,40 @@ def test_migrate_users_updates_existing_user_without_duplication(tmp_path):
             )
         ).one()
         user_count = connection.execute(text("SELECT COUNT(*) FROM users")).scalar_one()
+        assert connection.execute(text("SELECT auth_epoch FROM users WHERE id=3")).scalar_one() == 1
+        assert connection.execute(text("SELECT revoked FROM user_sessions WHERE user_id=3")).scalar_one()
+        assert connection.execute(text("SELECT revoked FROM refresh_tokens WHERE user_id=3")).scalar_one()
+        assert connection.execute(text("SELECT used FROM password_reset_tokens WHERE user_id=3")).scalar_one()
+        assert not connection.execute(text("SELECT email_verified FROM user_profiles WHERE user_id=3")).scalar_one()
 
     # REC-1 write-freeze (Codex review P1, PR #3025): the UPDATE path must
     # store the canonical 'Registrar' even though the legacy source row
     # spells the role 'Receptionist'.
     assert registrar == (3, "Registrar", "hash-registrar", "Registrar", 1)
     assert user_count == 2
+
+
+def test_migration_repeat_does_not_revoke_unchanged_account(tmp_path):
+    source = tmp_path / "source.db"
+    _create_source_db(source)
+    engine = _create_target_engine(tmp_path / "target.db")
+    migrate_users(source_sqlite_path=source, target_engine=engine)
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO user_sessions VALUES (1, 20, false)"))
+    migrate_users(source_sqlite_path=source, target_engine=engine)
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT auth_epoch FROM users WHERE id=20")).scalar_one() == 0
+        assert not connection.execute(text("SELECT revoked FROM user_sessions WHERE user_id=20")).scalar_one()
+
+
+def test_old_target_schema_fails_closed_for_existing_account(tmp_path):
+    source = tmp_path / "source.db"
+    _create_source_db(source)
+    engine = _create_target_engine(tmp_path / "target.db")
+    migrate_users(source_sqlite_path=source, target_engine=engine)
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE users DROP COLUMN auth_epoch"))
+    with pytest.raises(DBAPIError):
+        migrate_users(source_sqlite_path=source, target_engine=engine)
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT COUNT(*) FROM users")).scalar_one() == 2

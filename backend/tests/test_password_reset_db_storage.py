@@ -44,14 +44,17 @@ def reset_user(db_session) -> User:
 
 
 class _StubPhone:
-    def verify_code(self, phone, code, purpose):
-        return {"success": True}
+    def __init__(self, user):
+        self.user = user
+
+    def verify_code(self, phone, code, purpose, include_account_binding=False):
+        return {"success": True, "account_binding": (self.user.id, self.user.auth_epoch)}
 
 
 def _issue_token_via_phone(db_session, user, raw="raw-test-token-abc") -> str:
     """Phone flow with a stubbed verification service: returns the raw token."""
     svc = PasswordResetService()
-    svc.phone_verification = _StubPhone()
+    svc.phone_verification = _StubPhone(user)
     with mock.patch.object(svc, "generate_reset_token", return_value=raw):
         result = asyncio.run(
             svc.verify_phone_and_get_token(db_session, "+998900000000", "000000")

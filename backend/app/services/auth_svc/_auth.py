@@ -4,8 +4,32 @@ Split from authentication_service.py.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
+
 from app.services.auth_svc._base import *  # noqa: F401, F403
 from app.services.auth_svc._base import AuthenticationServiceMixinBase
+
+
+def _email_verification_mac(user: User, nonce: str) -> str:
+    # The token never contains contact information. Domain separation and a
+    # protocol version prevent confusing this MAC with other uses of SECRET_KEY.
+    payload = json.dumps(
+        ["email-verification-v1", user.id, user.auth_epoch, (user.email or "").strip().casefold(), nonce],
+        ensure_ascii=True, separators=(",", ":"),
+    ).encode()
+    digest = hmac.new(settings.SECRET_KEY.encode(), payload, hashlib.sha256).digest()[:16]
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")
+
+
+def _matches_email_verification_token(user: User, token: str) -> bool:
+    parts = token.split(".")
+    return (
+        len(parts) == 3 and parts[0] == "v1" and len(parts[1]) == 22
+        and hmac.compare_digest(parts[2], _email_verification_mac(user, parts[1]))
+    )
 
 
 class AuthMixin(AuthenticationServiceMixinBase):
@@ -16,8 +40,12 @@ class AuthMixin(AuthenticationServiceMixinBase):
     ) -> dict[str, Any]:
         """Создает токен для сброса пароля"""
         try:
-            user = db.query(User).filter(User.email == email).first()
-            if not user:
+            user = (
+                db.query(User).filter(User.email == email)
+                .with_for_update(key_share=True).populate_existing().first()
+            )
+            if not user or not user.is_active:
+                db.rollback()
                 return {
                     "success": False,
                     "message": "Пользователь с таким email не найден",
@@ -64,7 +92,8 @@ class AuthMixin(AuthenticationServiceMixinBase):
             }
 
         except Exception as e:
-            logger.error(f"Error creating password reset token: {e}")
+            db.rollback()
+            logger.error("Error creating password reset token: %s", type(e).__name__)
             return {"success": False, "message": "Ошибка создания токена сброса пароля"}
 
 
@@ -92,35 +121,51 @@ class AuthMixin(AuthenticationServiceMixinBase):
                     "message": "Недействительный или истекший токен",
                 }
 
-            # Обновляем пароль
-            user = db.query(User).filter(User.id == reset_token.user_id).first()
-            if not user:
-                return {"success": False, "message": "Пользователь не найден"}
+            # Establish a common account lock before consuming a reset token
+            # or touching the user's sessions. Re-read both records under lock:
+            # the initial token lookup is only an untrusted identity hint.
+            user = (
+                db.query(User).filter(User.id == reset_token.user_id)
+                .with_for_update(key_share=True).populate_existing().first()
+            )
+            if not user or not user.is_active:
+                db.rollback()
+                return {"success": False, "message": "Недействительный или истекший токен"}
 
-            user.hashed_password = get_password_hash(new_password)
+            reset_token = (
+                db.query(PasswordResetToken)
+                .filter(
+                    PasswordResetToken.token == token,
+                    PasswordResetToken.user_id == user.id,
+                    PasswordResetToken.used.is_(False),
+                    PasswordResetToken.expires_at > datetime.now(UTC),
+                )
+                .with_for_update().populate_existing().first()
+            )
+            if not reset_token:
+                db.rollback()
+                return {"success": False, "message": "Недействительный или истекший токен"}
+
+            from app.services.token_blacklist_service import (
+                revoke_account_sessions_locked,
+            )
+            revoke_account_sessions_locked(db, user, revoke_password_resets=True)
+            expires_at = reset_token.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if datetime.now(UTC) >= expires_at:
+                db.rollback()
+                return {"success": False, "message": "Недействительный или истекший токен"}
+
+            new_hash = get_password_hash(new_password)
+            if datetime.now(UTC) >= expires_at:
+                db.rollback()
+                return {"success": False, "message": "Недействительный или истекший токен"}
+            user.hashed_password = new_hash
             reset_token.used = True
             reset_token.used_at = datetime.now(UTC)
 
-            # SECURITY: Отзываем все refresh токены пользователя ВНУТРИ транзакции
-            # (раньше update шёл после commit и терялся).
-            db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update(
-                {"revoked": True, "revoked_at": datetime.now(UTC)}
-            )
-
-            # SECURITY: Деактивируем все активные сессии пользователя
-            db.query(UserSession).filter(
-                UserSession.user_id == user.id,
-                UserSession.revoked == False,
-            ).update({"revoked": True})
-
             db.commit()
-
-            # SECURITY: Отзываем все access-токены пользователя (sentinel-запись).
-            # Должно быть ПОСЛЕ commit() — blacklist-сервис сам делает commit.
-            from app.services.token_blacklist_service import token_blacklist_service
-            token_blacklist_service.blacklist_all_user_tokens(
-                db, user.id, reason="password_reset"
-            )
 
             self._log_user_activity(db, user.id, "password_reset", "Пароль сброшен")
             self._log_security_event(
@@ -134,45 +179,58 @@ class AuthMixin(AuthenticationServiceMixinBase):
             return {"success": True, "message": "Пароль успешно сброшен"}
 
         except Exception as e:
-            logger.error(f"Error resetting password: {e}")
+            db.rollback()
+            logger.error("Error resetting password: %s", type(e).__name__)
             return {"success": False, "message": "Ошибка сброса пароля"}
 
 
     def change_password(
-        self, db: Session, user_id: int, current_password: str, new_password: str
+        self, db: Session, user_id: int, current_password: str, new_password: str,
+        *, bearer_context=None,
     ) -> dict[str, Any]:
         """Меняет пароль пользователя"""
+        from app.services.profile_contact_security import (
+            ProfileBearerInvalid,
+            check_bearer_expiry,
+            check_patient_scope,
+            check_profile_bearer,
+        )
+
         try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return {"success": False, "message": "Пользователь не найден"}
+            user = (
+                db.query(User).filter(User.id == user_id)
+                .with_for_update(key_share=True).populate_existing().first()
+            )
+            if bearer_context is not None:
+                if user is None:
+                    raise ProfileBearerInvalid("Bearer session unavailable")
+                check_profile_bearer(db, user, bearer_context)
+                check_patient_scope(db, user, bearer_context)
+            if not user or not user.is_active:
+                db.rollback()
+                return {"success": False, "message": "Неверный текущий пароль"}
 
             # Проверяем текущий пароль
             if not verify_password(current_password, user.hashed_password):
+                db.rollback()
                 return {"success": False, "message": "Неверный текущий пароль"}
 
+            new_hash = get_password_hash(new_password)
+            if bearer_context is not None:
+                check_bearer_expiry(bearer_context)
+
+            from app.services.token_blacklist_service import (
+                revoke_account_sessions_locked,
+            )
+            revoke_account_sessions_locked(db, user, revoke_password_resets=True)
+            if bearer_context is not None:
+                check_bearer_expiry(bearer_context)
+
             # Обновляем пароль и сбрасываем флаг must_change_password
-            user.hashed_password = get_password_hash(new_password)
+            user.hashed_password = new_hash
             user.must_change_password = False
 
-            # SECURITY: Отзываем все refresh токены ВНУТРИ транзакции.
-            db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update(
-                {"revoked": True, "revoked_at": datetime.now(UTC)}
-            )
-
-            # SECURITY: Деактивируем все активные сессии
-            db.query(UserSession).filter(
-                UserSession.user_id == user.id,
-                UserSession.revoked == False,
-            ).update({"revoked": True})
-
             db.commit()
-
-            # SECURITY: Отзываем все access-токены (sentinel-запись, после commit).
-            from app.services.token_blacklist_service import token_blacklist_service
-            token_blacklist_service.blacklist_all_user_tokens(
-                db, user.id, reason="password_change"
-            )
 
             self._log_user_activity(db, user.id, "password_changed", "Пароль изменен")
             self._log_security_event(
@@ -185,18 +243,31 @@ class AuthMixin(AuthenticationServiceMixinBase):
 
             return {"success": True, "message": "Пароль успешно изменен"}
 
+        except ProfileBearerInvalid:
+            db.rollback()
+            raise
         except Exception as e:
-            logger.error(f"Error changing password: {e}")
+            db.rollback()
+            logger.error("Error changing password: %s", type(e).__name__)
             return {"success": False, "message": "Ошибка смены пароля"}
 
 
     def create_email_verification_token(
-        self, db: Session, user_id: int, ip_address: str = None, user_agent: str = None
+        self, db: Session, user_id: int, ip_address: str = None, user_agent: str = None,
+        *, expected_auth_epoch: int | None = None, expected_email: str | None = None,
     ) -> dict[str, Any]:
         """Создает токен для верификации email"""
         try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
+            hint = db.query(User).filter(User.id == user_id).first()
+            if not hint:
+                return {"success": False, "message": "Пользователь не найден"}
+            snapshot_epoch = hint.auth_epoch if expected_auth_epoch is None else expected_auth_epoch
+            snapshot_email = hint.email if expected_email is None else expected_email
+            user = (db.query(User).filter(User.id == user_id)
+                    .with_for_update(key_share=True).populate_existing().first())
+            if (not user or not user.is_active or not user.email
+                or user.auth_epoch != snapshot_epoch or user.email != snapshot_email):
+                db.rollback()
                 return {"success": False, "message": "Пользователь не найден"}
 
             # Отзываем старые токены
@@ -208,7 +279,8 @@ class AuthMixin(AuthenticationServiceMixinBase):
             ).update({"verified": True, "verified_at": datetime.now(UTC)})
 
             # Создаем новый токен
-            token = secrets.token_urlsafe(32)
+            nonce = secrets.token_urlsafe(16)
+            token = f"v1.{nonce}.{_email_verification_mac(user, nonce)}"
             expires_at = datetime.now(UTC) + timedelta(
                 hours=self.email_verification_expire_hours
             )
@@ -231,7 +303,8 @@ class AuthMixin(AuthenticationServiceMixinBase):
             }
 
         except Exception as e:
-            logger.error(f"Error creating email verification token: {e}")
+            db.rollback()
+            logger.error("Error creating email verification token: %s", type(e).__name__)
             return {
                 "success": False,
                 "message": "Ошибка создания токена верификации email",
@@ -260,7 +333,31 @@ class AuthMixin(AuthenticationServiceMixinBase):
                     "message": "Недействительный или истекший токен",
                 }
 
-            # Отмечаем email как верифицированный
+            user = (db.query(User).filter(User.id == verification_token.user_id)
+                    .with_for_update(key_share=True).populate_existing().first())
+            if not user or not user.is_active or not user.email or not _matches_email_verification_token(user, token):
+                db.rollback()
+                return {"success": False, "message": "Недействительный или истекший токен"}
+
+            from app.models.user_profile import UserProfile
+
+            profile = (db.query(UserProfile).filter(UserProfile.user_id == user.id)
+                       .with_for_update().populate_existing().first())
+            if profile is None:
+                profile, _, _ = get_user_management_service().ensure_user_support_records(db, user, commit=False)
+            verification_token = (db.query(EmailVerificationToken).filter(
+                EmailVerificationToken.user_id == user.id,
+                EmailVerificationToken.token == token,
+                EmailVerificationToken.verified.is_(False),
+                EmailVerificationToken.expires_at > datetime.now(UTC),
+            ).with_for_update().populate_existing().first())
+            if not verification_token:
+                db.rollback()
+                return {"success": False, "message": "Недействительный или истекший токен"}
+
+            # Profile is the sole current-email verification state. The token
+            # records only one-time consumption, not a permanent assertion.
+            profile.email_verified = True
             verification_token.verified = True
             verification_token.verified_at = datetime.now(UTC)
 
@@ -273,7 +370,8 @@ class AuthMixin(AuthenticationServiceMixinBase):
             return {"success": True, "message": "Email успешно верифицирован"}
 
         except Exception as e:
-            logger.error(f"Error verifying email: {e}")
+            db.rollback()
+            logger.error("Error verifying email: %s", type(e).__name__)
             return {"success": False, "message": "Ошибка верификации email"}
 
 
@@ -298,19 +396,7 @@ class AuthMixin(AuthenticationServiceMixinBase):
                 .first()
             )
 
-            # Проверяем верификацию email
-            token_email_verified = (
-                db.query(EmailVerificationToken)
-                .filter(
-                    and_(
-                        EmailVerificationToken.user_id == user.id,
-                        EmailVerificationToken.verified == True,
-                    )
-                )
-                .first()
-                is not None
-            )
-            email_verified = bool(getattr(profile, "email_verified", False) or token_email_verified)
+            email_verified = bool(getattr(profile, "email_verified", False))
 
             # Проверяем 2FA (строго булево значение)
             two_factor_enabled = bool(
@@ -351,7 +437,7 @@ class AuthMixin(AuthenticationServiceMixinBase):
             }
 
         except Exception as e:
-            logger.error(f"Error getting user profile: {e}")
+            logger.error("Error getting user profile: %s", type(e).__name__)
             return None
 
 
@@ -378,7 +464,7 @@ class AuthMixin(AuthenticationServiceMixinBase):
             db.add(login_attempt)
             db.commit()
         except Exception as e:
-            logger.error(f"Error logging login attempt: {e}")
+            logger.error("Error logging login attempt: %s", type(e).__name__)
 
 
     def _log_user_activity(
@@ -436,6 +522,6 @@ class AuthMixin(AuthenticationServiceMixinBase):
             db.add(security_event)
             db.commit()
         except Exception as e:
-            logger.error(f"Error logging security event: {e}")
+            logger.error("Error logging security event: %s", type(e).__name__)
 
 

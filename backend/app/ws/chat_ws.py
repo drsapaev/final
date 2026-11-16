@@ -12,11 +12,11 @@ import json
 import logging
 import time
 from collections import defaultdict
+from contextlib import suppress
 
 import jwt
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
-from jwt import PyJWTError as JWTError
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
@@ -27,7 +27,6 @@ from app.core.messaging_contract import (
     build_ws_event_payload,
     is_supported_contract_version,
 )
-from app.core.roles import is_login_blocked_role
 from app.db.session import SessionLocal
 from app.middleware.websocket_rate_limit import websocket_rate_limiter
 from app.models.message import Message
@@ -37,6 +36,65 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 WS_AUTH_TIMEOUT_SECONDS = 5.0
+WS_AUTH_RECHECK_SECONDS = 15.0
+WS_AUTH_DB_TIMEOUT_SECONDS = 5.0
+WS_SEND_TIMEOUT_SECONDS = 2.0
+
+
+class WebSocketAuthorizationRevoked(Exception):
+    """The socket has been revoked or its outbound path has stalled."""
+
+
+async def close_revoked_websocket(websocket, revoked, close_lock):
+    """Serialize competing revocation paths and send at most one close frame."""
+    async with close_lock:
+        # Revocation may have been marked before acquiring the lock, so it
+        # cannot also serve as the marker that a close was already attempted.
+        if getattr(revoked, "_ws_close_started", False):
+            return
+        revoked.set()
+        revoked._ws_close_started = True
+        try:
+            await asyncio.wait_for(
+                websocket.close(code=4001, reason="Authorization expired"),
+                timeout=2.0,
+            )
+        except Exception:
+            pass
+
+
+async def send_authorized_websocket(
+    websocket, payload, revoked, close_lock, on_timeout=None, is_current=None
+):
+    """Bound the whole send, including queueing, and serialize it with close."""
+    try:
+        async with asyncio.timeout(WS_SEND_TIMEOUT_SECONDS):
+            async with close_lock:
+                if revoked.is_set() or (is_current is not None and not is_current()):
+                    raise WebSocketAuthorizationRevoked
+                await websocket.send_json(payload)
+    except TimeoutError:
+        revoked.set()
+        if on_timeout is not None:
+            on_timeout()
+        await close_revoked_websocket(websocket, revoked, close_lock)
+        raise WebSocketAuthorizationRevoked from None
+
+
+async def monitor_websocket_authorization(websocket, check, revoked, owner_task, close_lock):
+    """Close idle or busy sockets after revocation without sharing a DB session."""
+    while True:
+        await asyncio.sleep(WS_AUTH_RECHECK_SECONDS)
+        try:
+            allowed = await asyncio.wait_for(
+                asyncio.to_thread(check), timeout=WS_AUTH_DB_TIMEOUT_SECONDS
+            )
+        except Exception:
+            allowed = False
+        if not allowed:
+            await close_revoked_websocket(websocket, revoked, close_lock)
+            owner_task.cancel()
+            return
 
 
 class ChatEventRateLimiter:
@@ -84,6 +142,7 @@ class ChatConnectionManager:
 
     def __init__(self):
         self.active_connections: dict[int, WebSocket] = {}
+        self._connection_states: dict[int, tuple] = {}
         # F-014: Redis bridge for cross-instance delivery
         self._redis_bridge = None
         self._redis_initialized = False
@@ -126,26 +185,66 @@ class ChatConnectionManager:
 
     async def _local_deliver(self, user_id: int, data: dict) -> bool:
         """Deliver message to local WebSocket connection only."""
-        if user_id in self.active_connections:
+        connection = self.active_connections.get(user_id)
+        if connection is not None:
+            state = self._connection_states.get(user_id)
+            if state is None or state[0] is not connection:
+                state = (connection, asyncio.Event(), asyncio.Lock(), None)
+                self._connection_states[user_id] = state
+            _, revoked, close_lock, owner_task = state
+
+            def cleanup_target():
+                if self._connection_states.get(user_id) is state:
+                    self.disconnect(user_id, connection)
+                if (owner_task is not None and owner_task is not asyncio.current_task()
+                        and not owner_task.done() and not owner_task.cancelling()):
+                    owner_task.cancel()
+
             try:
-                await self.active_connections[user_id].send_json(jsonable_encoder(data))
+                await send_authorized_websocket(
+                    connection, jsonable_encoder(data), revoked, close_lock,
+                    on_timeout=cleanup_target,
+                    is_current=lambda: (
+                        self.active_connections.get(user_id) is connection
+                        and self._connection_states.get(user_id) is state
+                    ),
+                )
                 return True
+            except WebSocketAuthorizationRevoked:
+                cleanup_target()
             except Exception as e:
                 logger.error(f"Chat WebSocket send error: {e}")
-                self.disconnect(user_id)
+                if self._connection_states.get(user_id) is state:
+                    self.disconnect(user_id, connection)
         return False
 
-    async def connect(self, user_id: int, websocket: WebSocket) -> bool:
+    async def connect(self, user_id: int, websocket: WebSocket,
+                      revoked=None, close_lock=None, owner_task=None) -> bool:
         try:
-            if user_id in self.active_connections:
+            previous = self.active_connections.get(user_id)
+            previous_state = self._connection_states.get(user_id)
+            self.active_connections[user_id] = websocket
+            self._connection_states[user_id] = (
+                websocket, revoked if revoked is not None else asyncio.Event(),
+                close_lock if close_lock is not None else asyncio.Lock(), owner_task,
+            )
+            if previous is not None:
                 try:
-                    await self.active_connections[user_id].close()
+                    if previous_state is not None and previous_state[0] is previous:
+                        _, previous_revoked, previous_lock, previous_owner = previous_state
+                        try:
+                            await close_revoked_websocket(previous, previous_revoked, previous_lock)
+                        finally:
+                            if (previous_owner is not None and previous_owner is not asyncio.current_task()
+                                    and not previous_owner.done() and not previous_owner.cancelling()):
+                                previous_owner.cancel()
+                    else:
+                        await asyncio.wait_for(previous.close(), timeout=2.0)
                 except Exception:
                     pass
             # ASGI: хендлер уже вызвал accept() до аутентификации — повторный
             # accept() даёт протокольную ошибку ("Expected websocket.send or
             # websocket.close, but got websocket.accept") и роняет соединение.
-            self.active_connections[user_id] = websocket
             await self._ensure_redis_bridge()
             logger.info(f"Chat WebSocket connected: user_id={user_id}")
             return True
@@ -153,9 +252,12 @@ class ChatConnectionManager:
             logger.error(f"Chat WebSocket connect error: {e}")
             return False
 
-    def disconnect(self, user_id: int):
-        if user_id in self.active_connections:
+    def disconnect(self, user_id: int, websocket: WebSocket | None = None):
+        if user_id in self.active_connections and (
+            websocket is None or self.active_connections[user_id] is websocket
+        ):
             del self.active_connections[user_id]
+            self._connection_states.pop(user_id, None)
             logger.info(f"Chat WebSocket disconnected: user_id={user_id}")
 
     async def send_to_user(self, user_id: int, data: dict) -> bool:
@@ -204,12 +306,14 @@ class ChatConnectionManager:
         if not user_ids:
             return
         payload = build_ws_event_payload(event_type, data)
+        recipients = []
         for raw_user_id in dict.fromkeys(user_ids):
             try:
                 user_id = int(raw_user_id)
             except (TypeError, ValueError):
                 continue
-            await self.send_to_user(user_id, payload)
+            recipients.append(user_id)
+        await asyncio.gather(*(self.send_to_user(user_id, payload) for user_id in recipients))
 
 
 chat_manager = ChatConnectionManager()
@@ -248,7 +352,7 @@ def _get_user_conversation_partners(db: Session, user_id: int) -> set[int]:
 # F-001: Аутентификация по токену из первого сообщения
 # ============================================================================
 
-async def _authenticate_by_token(token: str, db: Session) -> User | None:
+def _resolve_chat_user(token: str, db: Session) -> User | None:
     try:
         payload = jwt.decode(
             token,
@@ -257,35 +361,54 @@ async def _authenticate_by_token(token: str, db: Session) -> User | None:
         )
         from app.core.user_token_claims import is_user_access_claims
 
-        # This socket has no live reauthorization after the handshake. A
-        # patient-scoped token must not survive a role/card change here.
+        # Keep the patient-scoped token boundary even with live reauthorization.
         if not is_user_access_claims(payload) or payload.get("scope") == "patient_portal":
             return None
-        user_id = payload.get("sub")
-        if not user_id:
-            return None
-        query = db.query(User)
-        if isinstance(user_id, str) and not user_id.isdigit():
-            query = query.filter(User.username == user_id)
-        else:
-            query = query.filter(User.id == int(user_id))
-        user = query.first()
-        # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
-        # sentinel roles are structural non-logins — the chat WebSocket must
-        # reject their tokens like every HTTP surface.
-        if user is not None and is_login_blocked_role(getattr(user, "role", None)):
-            logger.warning(
-                "Chat WebSocket auth rejected: internal-only role user_id=%s",
-                user.id,
-            )
-            return None
-        return user
-    except JWTError as e:
-        logger.warning("Chat WebSocket JWT error: %s", e)
+        from app.api.v1.endpoints.websocket_auth import resolve_websocket_token_user
+
+        return resolve_websocket_token_user(token, db)
+    except Exception:
+        logger.warning("Chat WebSocket authorization failed")
         return None
-    except Exception as e:
-        logger.error("Chat WebSocket auth error: %s", e)
-        return None
+
+
+async def _authenticate_by_token(token: str, db: Session) -> User | None:
+    return _resolve_chat_user(token, db)
+
+
+def _chat_session_is_current(token: str, user_id: int) -> bool:
+    db = SessionLocal()
+    try:
+        user = _resolve_chat_user(token, db)
+        return user is not None and user.id == user_id
+    except Exception:
+        return False
+    finally:
+        db.close()
+
+
+def _authenticate_chat_fresh(token: str) -> User | None:
+    db = SessionLocal()
+    try:
+        return _resolve_chat_user(token, db)
+    finally:
+        db.close()
+
+
+def _chat_partners_fresh(user_id: int) -> set[int]:
+    db = SessionLocal()
+    try:
+        return _get_user_conversation_partners(db, user_id)
+    finally:
+        db.close()
+
+
+def _chat_conversation_exists_fresh(user_id: int, recipient_id: int) -> bool:
+    db = SessionLocal()
+    try:
+        return _users_have_conversation(db, user_id, recipient_id)
+    finally:
+        db.close()
 
 
 # Backward-compat alias for tests/external callers that import the old name.
@@ -331,24 +454,23 @@ async def chat_websocket_handler(websocket: WebSocket):
         await websocket.close(code=4001, reason="Invalid JSON in auth")
         return
 
-    if auth_msg.get("type") != "auth" or not auth_msg.get("token"):
+    if not isinstance(auth_msg, dict) or auth_msg.get("type") != "auth" or not isinstance(auth_msg.get("token"), str) or not auth_msg["token"]:
         await websocket.close(code=4001, reason="Auth message required")
         return
 
-    db = SessionLocal()
     try:
-        user = await _authenticate_by_token(auth_msg["token"], db)
-    finally:
-        db.close()
+        user = await asyncio.wait_for(
+            asyncio.to_thread(_authenticate_chat_fresh, auth_msg["token"]),
+            timeout=WS_AUTH_DB_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        user = None
 
     if not user:
         await websocket.close(code=4001, reason="Invalid token")
         return
 
-    logger.info(
-        "Chat WebSocket authenticated: user_id=%s, username=%s",
-        user.id, user.username,
-    )
+    logger.info("Chat WebSocket authenticated")
 
     # F-005: IP-based rate limit
     ip_address = websocket.client.host if websocket.client else "unknown"
@@ -359,25 +481,24 @@ async def chat_websocket_handler(websocket: WebSocket):
         return
     websocket_rate_limiter.record_connection(ip_address)
 
-    if not await chat_manager.connect(user.id, websocket):
-        websocket_rate_limiter.remove_connection(ip_address)
-        return
-
-    # F-006: отправляем init с собеседниками
-    init_db = SessionLocal()
+    token = auth_msg["token"]
+    revoked = asyncio.Event()
+    close_lock = asyncio.Lock()
+    owner_task = asyncio.current_task()
+    watchdog = asyncio.create_task(
+        monitor_websocket_authorization(
+            websocket, lambda: _chat_session_is_current(token, user.id), revoked, owner_task, close_lock
+        )
+    )
     try:
-        partner_ids = list(_get_user_conversation_partners(init_db, user.id))
-    finally:
-        init_db.close()
-
-    try:
-        await websocket.send_json(
+        if not await chat_manager.connect(user.id, websocket, revoked, close_lock, owner_task):
+            return
+        async def send_authorized(payload):
+            await send_authorized_websocket(websocket, payload, revoked, close_lock)
+        partner_ids = list(await asyncio.to_thread(_chat_partners_fresh, user.id))
+        await send_authorized(
             build_ws_event_payload("init", {"conversation_partners": partner_ids})
         )
-    except Exception:
-        pass
-
-    try:
         contract_version_mismatch_logged = False
         while True:
             data = await websocket.receive_text()
@@ -400,7 +521,7 @@ async def chat_websocket_handler(websocket: WebSocket):
 
                 # F-005: per-event rate limiting
                 if not _chat_event_limiter.check(user.id, msg_type or ""):
-                    await websocket.send_json(
+                    await send_authorized(
                         build_ws_event_payload(
                             "error",
                             {"message": f"Rate limit exceeded for event: {msg_type}"},
@@ -419,16 +540,10 @@ async def chat_websocket_handler(websocket: WebSocket):
                         continue
 
                     # F-006: проверяем существующую переписку
-                    conv_db = SessionLocal()
-                    try:
-                        if not _users_have_conversation(conv_db, user.id, recipient_id_int):
-                            logger.info(
-                                "Typing rejected (no conversation): user_id=%s -> recipient_id=%s",
-                                user.id, recipient_id_int,
-                            )
-                            continue
-                    finally:
-                        conv_db.close()
+                    if not await asyncio.to_thread(
+                        _chat_conversation_exists_fresh, user.id, recipient_id_int
+                    ):
+                        continue
 
                     await chat_manager.broadcast_typing(
                         sender_id=user.id,
@@ -437,14 +552,14 @@ async def chat_websocket_handler(websocket: WebSocket):
                     )
 
                 elif msg_type == MessageEventType.PING.value:
-                    await websocket.send_json(
+                    await send_authorized(
                         build_ws_event_payload(MessageEventType.PONG)
                     )
 
                 elif msg_type == MessageEventType.GET_ONLINE_STATUS.value:
                     requested_ids = message.get("user_ids", [])
                     if not isinstance(requested_ids, list) or len(requested_ids) > 50:
-                        await websocket.send_json(
+                        await send_authorized(
                             build_ws_event_payload(
                                 "error",
                                 {"message": "Invalid user_ids (max 50)"},
@@ -453,11 +568,7 @@ async def chat_websocket_handler(websocket: WebSocket):
                         continue
 
                     # F-006: только собеседники
-                    partner_db = SessionLocal()
-                    try:
-                        allowed_partners = _get_user_conversation_partners(partner_db, user.id)
-                    finally:
-                        partner_db.close()
+                    allowed_partners = await asyncio.to_thread(_chat_partners_fresh, user.id)
 
                     safe_ids = []
                     for uid in requested_ids:
@@ -469,7 +580,7 @@ async def chat_websocket_handler(websocket: WebSocket):
                             safe_ids.append(uid_int)
 
                     online_status = {uid: chat_manager.is_online(uid) for uid in safe_ids}
-                    await websocket.send_json(
+                    await send_authorized(
                         build_ws_event_payload(
                             MessageEventType.ONLINE_STATUS,
                             {"users": online_status},
@@ -480,7 +591,7 @@ async def chat_websocket_handler(websocket: WebSocket):
                     continue
 
                 else:
-                    await websocket.send_json(
+                    await send_authorized(
                         build_ws_event_payload(
                             "error",
                             {"message": f"Unknown message type: {msg_type}"},
@@ -488,13 +599,17 @@ async def chat_websocket_handler(websocket: WebSocket):
                     )
 
             except json.JSONDecodeError:
-                await websocket.send_json(
+                await send_authorized(
                     build_ws_event_payload("error", {"message": "Invalid JSON"})
                 )
 
+    except WebSocketAuthorizationRevoked:
+        pass
     except WebSocketDisconnect:
-        chat_manager.disconnect(user.id)
-        websocket_rate_limiter.remove_connection(ip_address)
+        pass
+    except asyncio.CancelledError:
+        if not revoked.is_set():
+            raise
     except Exception as e:
         # Starlette: 'WebSocket is not connected. Need to call "accept"
         # first.' — приложение шлёт в сокет, который уже разорвала вторая
@@ -506,6 +621,10 @@ async def chat_websocket_handler(websocket: WebSocket):
                 user.id,
             )
         else:
-            logger.error(f"Chat WebSocket error: {e}")
-        chat_manager.disconnect(user.id)
+            logger.error("Chat WebSocket error: %s", type(e).__name__)
+    finally:
+        watchdog.cancel()
+        with suppress(asyncio.CancelledError):
+            await watchdog
+        chat_manager.disconnect(user.id, websocket)
         websocket_rate_limiter.remove_connection(ip_address)

@@ -1,5 +1,6 @@
 """OTP atomicity against Redis, with isolated, disposable keys."""
 
+import json
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -79,7 +80,39 @@ def test_redis_invalid_metadata_and_missing_expiry_fail_closed(redis_otp):
     client.set(f"meta:{key}", "invalid", ex=60)
     assert not backend.consume_otp(key, _hash_code("999999"), 3)
     assert client.get(key) is None
-
     client.set(key, code)
     assert not backend.consume_otp(key, code, 3)
+    assert client.get(key) is None
+
+
+def test_bound_code_and_binding_are_consumed_atomically(redis_otp):
+    backend, client, key = redis_otp
+    code = _hash_code("123456")
+    record = json.dumps(
+        {"version": 1, "code_hash": code, "user_id": 42, "auth_epoch": 7}
+    )
+    backend.set(key, record, 60)
+    results = _parallel(24, lambda: backend.consume_bound_otp(key, code, 3))
+    assert results.count(record) == 1
+    assert results.count(None) == 23
+    assert client.get(key) is None
+
+
+def test_bound_attempts_reissue_legacy_and_outage_fail_closed(redis_otp):
+    backend, client, key = redis_otp
+    code = _hash_code("123456")
+    wrong = _hash_code("999999")
+    record = json.dumps(
+        {"version": 1, "code_hash": code, "user_id": 42, "auth_epoch": 7}
+    )
+    backend.set(key, record, 60)
+    assert backend.consume_bound_otp(key, wrong, 3) is None
+    backend.set(key, record, 60)
+    assert (
+        _parallel(24, lambda: backend.consume_bound_otp(key, wrong, 3)) == [None] * 24
+    )
+    assert backend.consume_bound_otp(key, code, 3) is None
+    client.delete(f"meta:{key}")
+    backend.set(key, code, 60)  # Pre-upgrade unbound value.
+    assert backend.consume_bound_otp(key, code, 3) is None
     assert client.get(key) is None

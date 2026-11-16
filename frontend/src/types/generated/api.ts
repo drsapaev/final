@@ -2005,9 +2005,29 @@ export type paths = {
         put?: never;
         /**
          * Webauthn Discoverable Finish
-         * @description Consume one challenge and issue a session only for its current owner.
+         * @description Verify the first assertion and request a fresh bound assertion.
          */
         post: operations["webauthn_discoverable_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/discoverable/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Discoverable Complete
+         * @description Verify a second, epoch-bound assertion before issuing a session.
+         */
+        post: operations["webauthn_discoverable_complete"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2049,7 +2069,7 @@ export type paths = {
          * Webauthn Login Finish
          * @description Finish passkey authentication (M4-P1-4).
          *
-         *     Verifies assertion and issues JWT.
+         *     Verifies assertion and issues a session or a second-factor challenge.
          */
         post: operations["webauthn_login_finish"];
         delete?: never;
@@ -12230,12 +12250,7 @@ export type paths = {
         put?: never;
         /**
          * Mobile Login
-         * @description Мобильная аутентификация
-         *
-         *     Поддерживает:
-         *     - Вход по номеру телефона и паролю
-         *     - Вход через Telegram ID
-         *     - Регистрация нового пользователя
+         * @description Authenticate a linked active patient by phone/password and configured 2FA.
          */
         post: operations["mobile_login_api_v1_mobile_auth_login_post"];
         delete?: never;
@@ -14645,7 +14660,7 @@ export type paths = {
         put?: never;
         /**
          * Regenerate Backup Codes
-         * @description Перегенерировать backup коды
+         * @description Rotate backup codes after password and second-factor verification.
          */
         post: operations["regenerate_backup_codes_api_v1_2fa_backup_codes_regenerate_post"];
         delete?: never;
@@ -23835,6 +23850,17 @@ export type webhooks = Record<string, never>;
 export type components = {
     schemas: {
         /**
+         * AIChatSafetyMeta
+         * @description A strict, explicit clinical boundary for each AI chat message.
+         */
+        AIChatSafetyMeta: {
+            /**
+             * Requires Doctor Confirmation
+             * @constant
+             */
+            requires_doctor_confirmation: true;
+        };
+        /**
          * AILearningInsightsResponse
          * @description Схема ответа с инсайтами для обучения AI
          */
@@ -27019,6 +27045,7 @@ export type components = {
             was_cached: boolean;
             /** Created At */
             created_at: string;
+            ai_safety_meta: components["schemas"]["AIChatSafetyMeta"];
         };
         /**
          * ChatSessionCreate
@@ -33487,6 +33514,16 @@ export type components = {
              * @description Пароль (опционально)
              */
             password?: string | null;
+            /**
+             * Totp Code
+             * @description TOTP код при включённой 2FA; значение действует в стандартном временном окне и не ограничено одним входом
+             */
+            totp_code?: string | null;
+            /**
+             * Backup Code
+             * @description Одноразовый резервный код при включённой 2FA
+             */
+            backup_code?: string | null;
             /**
              * Telegram Id
              * @description Telegram ID
@@ -48643,13 +48680,117 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Patient access session */
+            /** @description Second user-verified assertion required */
             200: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        next_options: {
+                            challenge: string;
+                            ceremony_id: string;
+                            rpId: string;
+                            timeout: number;
+                            /** @constant */
+                            userVerification: "required";
+                            allowCredentials: {
+                                /** @constant */
+                                type: "public-key";
+                                id: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Authentication rejected */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Authentication service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    webauthn_discoverable_complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ceremony_id: string;
+                    assertion_response: {
+                        id: string;
+                        rawId: string;
+                        type: string;
+                        response: {
+                            authenticatorData: string;
+                            clientDataJSON: string;
+                            signature: string;
+                            userHandle?: string | null;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Patient access session or second-factor challenge */
+            200: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    } & ({
                         access_token: string;
                         token_type: string;
                         user: {
@@ -48661,9 +48802,22 @@ export interface operations {
                         } & {
                             [key: string]: unknown;
                         };
-                    } & {
-                        [key: string]: unknown;
-                    };
+                    } | {
+                        /** @constant */
+                        requires_2fa: true;
+                        /** @constant */
+                        two_factor_method: "totp";
+                        pending_2fa_token: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    });
                 };
             };
             /** @description Authentication rejected */
@@ -48744,14 +48898,87 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Patient access session or second-factor challenge */
             200: {
                 headers: {
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         [key: string]: unknown;
+                    } & ({
+                        access_token: string;
+                        token_type: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** @constant */
+                        requires_2fa: true;
+                        /** @constant */
+                        two_factor_method: "totp";
+                        pending_2fa_token: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    });
+                };
+            };
+            /** @description Authentication rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Authentication service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
                     };
                 };
             };
@@ -67670,10 +67897,33 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["MobileLoginResponse"];
+                };
+            };
+            /** @description Unsupported login method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Invalid credentials or second factor */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -67683,6 +67933,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Authentication service unavailable */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -71392,13 +71653,37 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 2FA setup artifacts */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorSetupResponse"];
+                };
+            };
+            /** @description 2FA is already enabled */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Authentication or enrollment session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -71408,6 +71693,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -71425,13 +71721,37 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Verification result and optional session tokens */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorVerifyResponse"];
+                };
+            };
+            /** @description Invalid TOTP code format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Authentication or enrollment session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -71441,6 +71761,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -71458,13 +71789,37 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 2FA verification and optional session tokens */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorVerifyResponse"];
+                };
+            };
+            /** @description A verification factor is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Authentication or pending session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -71474,6 +71829,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -71507,6 +71873,19 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests from this client */
+            429: {
+                headers: {
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                        retry_after: number | null;
+                    };
                 };
             };
         };
@@ -71586,13 +71965,48 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Remaining count; backup values are not returned */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorBackupCodesResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description 2FA not configured */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -71604,15 +72018,87 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorDisableRequest"];
+            };
+        };
         responses: {
-            /** @description Successful Response */
+            /** @description New codes, disclosed only in this response */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorBackupCodesResponse"];
+                };
+            };
+            /** @description A second factor is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Reauthentication failed or is temporarily locked */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests from this client */
+            429: {
+                headers: {
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                        retry_after: number | null;
+                    };
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -74517,15 +75003,44 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Patient access-only session or restricted second-factor challenge */
             200: {
                 headers: {
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    } & ({
+                        access_token: string;
+                        /** @constant */
+                        token_type: "bearer";
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** @constant */
+                        requires_2fa: true;
+                        /** @constant */
+                        two_factor_method: "totp";
+                        pending_2fa_token: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    });
                 };
             };
             /** @description Validation Error */
@@ -80987,6 +81502,42 @@ export interface operations {
                     "application/json": components["schemas"]["AuthSuccessResponse"];
                 };
             };
+            /** @description Bearer session unavailable */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
+            /** @description Verification request limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
+            /** @description Email delivery failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
+            /** @description Verification unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
         };
     };
     confirm_email_verification_api_v1_authentication_email_verification_confirm_post: {
@@ -81011,6 +81562,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuthSuccessResponse"];
                 };
             };
+            /** @description Invalid or expired verification token */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -81018,6 +81578,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };
@@ -81166,6 +81735,13 @@ export interface operations {
                     };
                 };
             };
+            /** @description Отзыв отдельной сессии пока недоступен */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -81270,6 +81846,13 @@ export interface operations {
                     };
                 };
             };
+            /** @description Текущая сессия не может быть определена */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     revoke_user_session_api_v1_authentication_sessions__session_id__revoke_post: {
@@ -81296,6 +81879,13 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Отзыв отдельной сессии пока недоступен */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -81332,6 +81922,13 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Сохранение текущей сессии пока недоступно */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

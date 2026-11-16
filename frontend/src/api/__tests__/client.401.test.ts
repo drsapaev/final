@@ -68,6 +68,7 @@ function makeHttpError(
 ): AxiosError {
   const config = {
     url: configUrl,
+    baseURL: api.defaults.baseURL,
     method,
     headers: AxiosHeaders.from(authHeader ? { Authorization: authHeader } : {})
   } as never;
@@ -160,6 +161,8 @@ const originalGet = axios.get;
 
 beforeEach(() => {
   globalThis.URL = RealURL as unknown as typeof URL;
+  vi.clearAllMocks();
+  vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
   tokenState.access = 'old-access-token';
   tokenState.refresh = 'refresh-token-1';
   tokenState.cleared = 0;

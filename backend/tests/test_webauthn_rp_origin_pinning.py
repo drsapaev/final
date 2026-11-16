@@ -225,7 +225,6 @@ class TestWebAuthnBE001ServerPinnedRp:
 
         ws = webauthn_stub
         ceremony_id = "a" * 43
-        ws._store_ceremony(None, ceremony_id, 7, b"challenge-bytes")
         user = User(
             username="synthetic-origin-patient",
             hashed_password="synthetic",
@@ -250,6 +249,14 @@ class TestWebAuthnBE001ServerPinnedRp:
             )
         )
         db_session.commit()
+        ws._store_ceremony(
+            None,
+            ceremony_id,
+            7,
+            b"challenge-bytes",
+            owner_id=user.id,
+            auth_epoch=user.auth_epoch,
+        )
         captured: dict = {}
 
         def fake_verify_authentication_response(**kwargs):

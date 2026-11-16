@@ -69,6 +69,20 @@ export interface PatientSession {
   [key: string]: unknown;
 }
 
+/** A patient must complete TOTP or a backup code before a session is issued. */
+export interface PatientPendingTwoFactor {
+  requires_2fa: true;
+  two_factor_method: 'totp';
+  pending_2fa_token: string;
+  user: PatientSessionUser;
+}
+
+export type PatientLoginResult = PatientSession | PatientPendingTwoFactor;
+
+export function isPatientPendingTwoFactor(result: PatientLoginResult): result is PatientPendingTwoFactor {
+  return result.requires_2fa === true;
+}
+
 /** Activation step-1 input: the staff-issued activation token (PR-A2). */
 export interface PatientActivationOtpInput {
   activation_token: string;

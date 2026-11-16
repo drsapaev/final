@@ -43,7 +43,7 @@ class TestPasskeyManagement:
         from app.services import webauthn_service
 
         monkeypatch.setattr(
-            webauthn_service, "_lock_patient_identity", lambda *args: True
+            webauthn_service, "_lock_patient_identity", lambda *args, **kwargs: True
         )
 
     def test_list_patient_passkeys_returns_empty_list(self):
@@ -52,9 +52,7 @@ class TestPasskeyManagement:
 
         db = MagicMock()
         query = MagicMock()
-        query.join.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = (
-            []
-        )
+        query.join.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = []
         db.query.return_value = query
 
         result = list_patient_passkeys(db, patient_id=42, user_id=7)

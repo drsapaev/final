@@ -214,7 +214,7 @@ def test_relink_and_legacy_credentials_fail_closed(db_session, identity):
         ws.deactivate_passkey(db_session, identity[0], current_id, user_id=new_user_id)
     for key in ("c3ludGhldGljLWNyZWRlbnRpYWwt_w", "bGVnYWN5"):
         ceremony_id = ws.secrets.token_urlsafe(32)
-        ws._store_ceremony(None, ceremony_id, identity[0], b"synthetic-challenge")
+        ws._store_ceremony(None, ceremony_id, identity[0], b"synthetic-challenge", owner_id=new_user_id, auth_epoch=new_user.auth_epoch)
         with pytest.raises(ValueError, match="No active passkey"):
             ws.finish_passkey_authentication(
                 db_session,

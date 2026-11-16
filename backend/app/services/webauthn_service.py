@@ -53,6 +53,10 @@ class WebAuthnQuotaExceeded(RuntimeError):
     """A shared WebAuthn abuse limit was reached."""
 
 
+class WebAuthnBearerInvalid(ValueError):
+    """The management bearer was revoked or expired before the mutation."""
+
+
 _DISCOVERABLE_PREFIX = "webauthn:{discoverable}:"
 _DISCOVERABLE_GLOBAL_LIMIT = 1000
 _DISCOVERABLE_CLIENT_LIMIT = 10
@@ -249,8 +253,17 @@ def _store_ceremony(
     patient_id: int,
     challenge: bytes,
     client_ip: str = "unknown",
+    *,
+    owner_id: int | None = None,
+    auth_epoch: int | None = None,
 ) -> None:
-    value = json.dumps({"patient_id": patient_id, "challenge": _b64url(challenge)})
+    record = {
+        "patient_id": patient_id,
+        "challenge": _b64url(challenge),
+        "owner_id": owner_id,
+        "auth_epoch": auth_epoch,
+    }
+    value = json.dumps(record)
     key = f"webauthn:login:{ceremony_id}"
     if store is None:
         with _test_ceremonies_lock:
@@ -267,12 +280,16 @@ def _store_ceremony(
             "login",
             ceremony_id,
             client_ip,
-            {"patient_id": patient_id, "challenge": _b64url(challenge)},
+            record,
         )
 
 
 def _consume_ceremony(
-    ceremony_id: str, patient_id: int, client_ip: str = "unknown"
+    ceremony_id: str,
+    patient_id: int,
+    client_ip: str = "unknown",
+    *,
+    include_binding: bool = False,
 ) -> bytes:
     if not isinstance(ceremony_id, str) or not _CEREMONY_ID_RE.fullmatch(ceremony_id):
         raise ValueError("Invalid authentication ceremony")
@@ -304,7 +321,18 @@ def _consume_ceremony(
         record = json.loads(value)
         if record["patient_id"] != patient_id:
             raise ValueError("Authentication ceremony does not match")
-        return _decode_b64url(record["challenge"])
+        challenge = _decode_b64url(record["challenge"])
+        if include_binding:
+            owner, epoch = record.get("owner_id"), record.get("auth_epoch")
+            if (
+                type(owner) is not int
+                or owner <= 0
+                or type(epoch) is not int
+                or epoch < 0
+            ):
+                raise ValueError("Unbound authentication ceremony")
+            return challenge, owner, epoch
+        return challenge
     except (KeyError, TypeError, json.JSONDecodeError) as exc:
         raise ValueError("Invalid authentication ceremony") from exc
 
@@ -376,11 +404,51 @@ def _consume_registration_ceremony(ceremony_id, patient_id, user_id, session_jti
         raise ValueError("Invalid registration ceremony") from exc
 
 
-def _lock_current_patient_identity(db: Session, patient_id: int):
-    """Lock the patient and linked user in a consistent order for all mutations."""
+def _lock_current_patient_identity(
+    db: Session,
+    patient_id: int,
+    *,
+    expected_auth_epoch: int | None = None,
+    expected_jti: str | None = None,
+    expected_exp: int | None = None,
+    expected_user_id: int | None = None,
+    step_up=None,
+):
+    """Lock User before Patient and recheck their binding under both locks."""
     from app.models.patient import Patient
     from app.models.user import User
 
+    # The unlocked lookup is only a hint; the binding is authoritative only
+    # after both rows are locked in the account-wide revocation order.
+    owner_id = db.query(Patient.user_id).filter(Patient.id == patient_id).scalar()
+    if owner_id is None:
+        return None
+    user = (
+        db.query(User)
+        .filter(User.id == owner_id)
+        .with_for_update(key_share=True)
+        .populate_existing()
+        .first()
+    )
+    if not user or user.role != "Patient" or not user.is_active or user.is_superuser:
+        return None
+    if expected_user_id is not None and user.id != expected_user_id:
+        return None
+    if expected_auth_epoch is not None:
+        from app.services.token_blacklist_service import TokenBlacklistService
+
+        if (
+            user.auth_epoch != expected_auth_epoch
+            or not expected_jti
+            or expected_exp is None
+            or time.time() >= expected_exp
+            or TokenBlacklistService.is_token_blacklisted(
+                db, expected_jti, user_id=user.id, auth_epoch=expected_auth_epoch
+            )
+        ):
+            raise WebAuthnBearerInvalid("Bearer session unavailable")
+    if step_up is not None:
+        step_up()
     patient = (
         db.query(Patient)
         .filter(Patient.id == patient_id)
@@ -388,23 +456,23 @@ def _lock_current_patient_identity(db: Session, patient_id: int):
         .populate_existing()
         .first()
     )
-    if patient is None or patient.is_deleted is not False or patient.user_id is None:
-        return None
-    user = (
-        db.query(User)
-        .filter(User.id == patient.user_id)
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
-    if not user or user.role != "Patient" or not user.is_active or user.is_superuser:
+    if patient is None or patient.is_deleted is not False or patient.user_id != user.id:
         return None
     return user
 
 
-def _lock_patient_identity(db: Session, patient_id: int, user_id: int) -> bool:
-    user = _lock_current_patient_identity(db, patient_id)
+def _lock_patient_identity(
+    db: Session, patient_id: int, user_id: int, **bearer
+) -> bool:
+    user = _lock_current_patient_identity(
+        db, patient_id, expected_user_id=user_id, **bearer
+    )
     return user is not None and user.id == user_id
+
+
+def _check_bearer_expiry(expected_exp: int | None) -> None:
+    if expected_exp is not None and time.time() >= expected_exp:
+        raise WebAuthnBearerInvalid("Bearer session unavailable")
 
 
 def _b64url(value: bytes) -> str:
@@ -508,6 +576,10 @@ def begin_passkey_registration(
     rp_id: str | None = None,
     rp_name: str,
     credential_name: str | None = None,
+    expected_auth_epoch: int | None = None,
+    expected_jti: str | None = None,
+    expected_exp: int | None = None,
+    step_up=None,
 ) -> dict[str, Any]:
     """Begin passkey registration — returns challenge for browser.
 
@@ -526,7 +598,15 @@ def begin_passkey_registration(
         raise ValueError("Invalid patient session")
 
     try:
-        user = _lock_current_patient_identity(db, patient_id)
+        user = _lock_current_patient_identity(
+            db,
+            patient_id,
+            expected_auth_epoch=expected_auth_epoch,
+            expected_jti=expected_jti,
+            expected_exp=expected_exp,
+            expected_user_id=user_id,
+            step_up=step_up,
+        )
         if user is None or user.id != user_id:
             raise ValueError("Patient portal identity unavailable")
         if not user.passkey_user_handle:
@@ -568,6 +648,7 @@ def begin_passkey_registration(
             session_jti,
             options.challenge,
         )
+        _check_bearer_expiry(expected_exp)
         db.commit()
         result["ceremony_id"] = ceremony_id
         return result
@@ -587,6 +668,9 @@ def finish_passkey_registration(
     rp_id: str | None = None,
     origin: str | None = None,
     credential_name: str | None = None,
+    expected_auth_epoch: int | None = None,
+    expected_jti: str | None = None,
+    expected_exp: int | None = None,
 ) -> PasskeyCredential:
     """Finish passkey registration — verify browser response + store credential.
 
@@ -615,7 +699,14 @@ def finish_passkey_registration(
             expected_rp_id=server_rp_id,
             require_user_verification=True,
         )
-        if not _lock_patient_identity(db, patient_id, user_id):
+        if not _lock_patient_identity(
+            db,
+            patient_id,
+            user_id,
+            expected_auth_epoch=expected_auth_epoch,
+            expected_jti=expected_jti,
+            expected_exp=expected_exp,
+        ):
             raise ValueError("Patient portal identity unavailable")
         device_type = getattr(verified, "credential_device_type", None)
         device_type = getattr(device_type, "value", device_type)
@@ -634,6 +725,7 @@ def finish_passkey_registration(
             active=True,
         )
         db.add(credential)
+        _check_bearer_expiry(expected_exp)
         db.commit()
     except Exception:
         db.rollback()
@@ -673,11 +765,36 @@ def begin_passkey_authentication(
     challenge_b64 = _b64url(options.challenge)
     ceremony_id = secrets.token_urlsafe(32)
 
+    from app.models.patient import Patient
+    from app.models.user import User
+
+    row = (
+        db.query(User.id, User.auth_epoch)
+        .join(Patient, Patient.user_id == User.id)
+        .filter(
+            Patient.id == patient_id,
+            Patient.is_deleted.is_not(True),
+            User.is_active.is_(True),
+            User.is_superuser.is_(False),
+            User.role == "Patient",
+        )
+        .first()
+    )
+    owner_id, auth_epoch = (row.id, row.auth_epoch) if row else (0, 0)
+
     # Issue the same bounded Redis operation for every patient ID. This keeps
     # quota exhaustion and Redis failures independent of identity existence.
     # Unknown patients cannot complete the owner-checked authentication.
     try:
-        _store_ceremony(store, ceremony_id, patient_id, options.challenge, client_ip)
+        _store_ceremony(
+            store,
+            ceremony_id,
+            patient_id,
+            options.challenge,
+            client_ip,
+            owner_id=owner_id,
+            auth_epoch=auth_epoch,
+        )
     except WebAuthnQuotaExceeded:
         # A saturated legacy plane returns an unusable dummy for every caller.
         pass
@@ -735,7 +852,7 @@ def finish_discoverable_authentication(
             raise ValueError("Invalid assertion")
         patient_id = candidate[0]
         rp_id, origin = _server_rp_origin()
-        return _complete_patient_authentication(
+        binding = _complete_patient_authentication(
             db,
             patient_id,
             assertion_response,
@@ -743,6 +860,75 @@ def finish_discoverable_authentication(
             rp_id,
             origin,
             check_user_handle=True,
+            identify_only=True,
+        )
+        options = generate_authentication_options(
+            rp_id=rp_id,
+            allow_credentials=[PublicKeyCredentialDescriptor(id=credential_id)],
+            user_verification=UserVerificationRequirement.REQUIRED,
+        )
+        next_id = secrets.token_urlsafe(32)
+        _store_bounded_ceremony(
+            _discoverable_store(),
+            "discoverable_second",
+            next_id,
+            client_ip,
+            {
+                "purpose": "discoverable_second",
+                "challenge": _b64url(options.challenge),
+                **binding,
+            },
+        )
+        return {
+            "next_options": {
+                "challenge": _b64url(options.challenge),
+                "ceremony_id": next_id,
+                "rpId": rp_id,
+                "timeout": 60000,
+                "userVerification": "required",
+                "allowCredentials": [
+                    {"type": "public-key", "id": _b64url(credential_id)}
+                ],
+            }
+        }
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+def complete_discoverable_authentication(
+    db: Session, *, client_ip: str, ceremony_id: str, assertion_response: dict[str, Any]
+) -> dict[str, Any]:
+    """Require a fresh UV assertion bound to the identified credential and epoch."""
+    try:
+        value = _consume_bounded_ceremony(
+            _discoverable_store(), "discoverable_second", ceremony_id, client_ip
+        )
+        record = json.loads(value)
+        if (
+            record.get("purpose") != "discoverable_second"
+            or type(record.get("user_id")) is not int
+            or record["user_id"] <= 0
+            or type(record.get("patient_id")) is not int
+            or record["patient_id"] <= 0
+            or type(record.get("auth_epoch")) is not int
+            or record["auth_epoch"] < 0
+            or not isinstance(record.get("credential_id"), str)
+        ):
+            raise ValueError("Invalid authentication ceremony")
+        rp_id, origin = _server_rp_origin()
+        return _complete_patient_authentication(
+            db,
+            record["patient_id"],
+            assertion_response,
+            _decode_b64url(record["challenge"]),
+            rp_id,
+            origin,
+            check_user_handle=True,
+            expected_user_id=record["user_id"],
+            expected_auth_epoch=record["auth_epoch"],
+            expected_credential_id=record["credential_id"],
         )
     except Exception:
         db.rollback()
@@ -799,10 +985,19 @@ def _finish_passkey_authentication(
 
     server_rp_id, server_origin = _server_rp_origin()
 
-    challenge = _consume_ceremony(ceremony_id, patient_id, client_ip)
+    challenge, owner_id, epoch = _consume_ceremony(
+        ceremony_id, patient_id, client_ip, include_binding=True
+    )
 
     return _complete_patient_authentication(
-        db, patient_id, assertion_response, challenge, server_rp_id, server_origin
+        db,
+        patient_id,
+        assertion_response,
+        challenge,
+        server_rp_id,
+        server_origin,
+        expected_user_id=owner_id,
+        expected_auth_epoch=epoch,
     )
 
 
@@ -815,6 +1010,10 @@ def _complete_patient_authentication(
     server_origin,
     *,
     check_user_handle=False,
+    expected_user_id=None,
+    expected_auth_epoch=None,
+    expected_credential_id=None,
+    identify_only=False,
 ):
     if not isinstance(assertion_response, dict):
         raise ValueError("Invalid assertion")
@@ -827,7 +1026,15 @@ def _complete_patient_authentication(
     # Lock the live identity before the credential, matching management's lock
     # order and preventing relinking/deactivation from changing token ownership.
     user = _lock_current_patient_identity(db, patient_id)
-    if user is None:
+    if (
+        user is None
+        or (expected_user_id is not None and user.id != expected_user_id)
+        or (expected_auth_epoch is not None and user.auth_epoch != expected_auth_epoch)
+        or (
+            expected_credential_id is not None
+            and credential_id_b64 != expected_credential_id
+        )
+    ):
         raise ValueError("Patient portal identity unavailable")
     if check_user_handle:
         response = assertion_response.get("response")
@@ -870,13 +1077,40 @@ def _complete_patient_authentication(
     from datetime import UTC, datetime
 
     credential.last_used_at = datetime.now(UTC)
+    if identify_only:
+        result = {
+            "user_id": user.id,
+            "patient_id": patient_id,
+            "auth_epoch": user.auth_epoch,
+            "credential_id": credential_id_b64,
+        }
+        db.commit()
+        return result
+    # A passkey proves possession and user verification, but configured TOTP
+    # is a separate account policy. Persist the pending challenge atomically
+    # with the credential counter and defer session revocation until 2FA succeeds.
+    from app.services.two_factor_patient_pending import (
+        create_patient_pending_2fa_locked,
+    )
+
+    challenge = create_patient_pending_2fa_locked(db, user, patient_id=patient_id)
+    if challenge is not None:
+        db.commit()
+        return challenge
     # The canonical patient-portal identity is the linked, active Patient
     # user. Patient IDs and User IDs are different namespaces; signing a
     # patient ID as a generic JWT subject can impersonate an unrelated user.
     from app.api.deps import create_access_token
+    from app.services.authentication_service import get_authentication_service
 
+    get_authentication_service().revoke_all_for_new_login_locked(db, user)
     access_token = create_access_token(
-        data={"sub": str(user.id), "scope": "patient_portal", "patient_id": patient_id}
+        data={
+            "sub": str(user.id),
+            "scope": "patient_portal",
+            "patient_id": patient_id,
+            "auth_epoch": user.auth_epoch,
+        }
     )
     result = {
         "access_token": access_token,
@@ -923,7 +1157,15 @@ def list_patient_passkeys(
 
 
 def deactivate_passkey(
-    db: Session, patient_id: int, credential_id: int, *, user_id: int
+    db: Session,
+    patient_id: int,
+    credential_id: int,
+    *,
+    user_id: int,
+    expected_auth_epoch: int | None = None,
+    expected_jti: str | None = None,
+    expected_exp: int | None = None,
+    step_up=None,
 ) -> bool:
     """Deactivate a passkey (soft delete).
 
@@ -933,7 +1175,20 @@ def deactivate_passkey(
     ValueError("last_active_credential") — the endpoint maps it to 409 so a
     phished initData session cannot lock the patient out of passkey login.
     """
-    if not _lock_patient_identity(db, patient_id, user_id):
+    try:
+        authorized = _lock_patient_identity(
+            db,
+            patient_id,
+            user_id,
+            expected_auth_epoch=expected_auth_epoch,
+            expected_jti=expected_jti,
+            expected_exp=expected_exp,
+            step_up=step_up,
+        )
+    except Exception:
+        db.rollback()
+        raise
+    if not authorized:
         db.rollback()
         return False
     credential = (
@@ -963,6 +1218,11 @@ def deactivate_passkey(
         raise ValueError("last_active_credential")
 
     credential.active = False
+    try:
+        _check_bearer_expiry(expected_exp)
+    except Exception:
+        db.rollback()
+        raise
     db.commit()
     logger.warning("Passkey deactivated")
     return True

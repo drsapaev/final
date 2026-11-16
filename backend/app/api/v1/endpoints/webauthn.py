@@ -10,10 +10,12 @@ require a fresh, single-use patient OTP grant.
 
 from __future__ import annotations
 
+import time
+from datetime import UTC, datetime
 from typing import Any
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -311,13 +313,76 @@ _DISCOVERABLE_BEGIN_RESPONSE = {
         }
     },
 }
+_DISCOVERABLE_NEXT_RESPONSE = {
+    "description": "Second user-verified assertion required",
+    "headers": {
+        "Cache-Control": {
+            "required": True,
+            "schema": {"type": "string", "const": "no-store"},
+        }
+    },
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["next_options"],
+                "properties": {
+                    "next_options": {
+                        "type": "object",
+                        "required": [
+                            "challenge",
+                            "ceremony_id",
+                            "rpId",
+                            "timeout",
+                            "userVerification",
+                            "allowCredentials",
+                        ],
+                        "properties": {
+                            "challenge": {"type": "string"},
+                            "ceremony_id": {"type": "string"},
+                            "rpId": {"type": "string"},
+                            "timeout": {"type": "integer"},
+                            "userVerification": {"type": "string", "const": "required"},
+                            "allowCredentials": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1,
+                                "items": {
+                                    "type": "object",
+                                    "required": ["type", "id"],
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "const": "public-key",
+                                        },
+                                        "id": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    }
+                },
+            }
+        }
+    },
+}
+
+
 _DISCOVERABLE_FINISH_RESPONSE = {
     "description": "Patient access session",
+    "headers": {
+        "Cache-Control": {
+            "required": True,
+            "schema": {"type": "string", "const": "no-store"},
+        }
+    },
     "content": {
         "application/json": {
             "schema": {
                 "type": "object",
                 "required": ["access_token", "token_type", "user"],
+                "additionalProperties": False,
                 "properties": {
                     "access_token": {"type": "string"},
                     "token_type": {"type": "string"},
@@ -343,6 +408,30 @@ _DISCOVERABLE_FINISH_RESPONSE = {
             }
         }
     },
+}
+
+
+# Final assertions can yield an access session or a restricted 2FA challenge.
+# No bearer or refresh token is issued until the challenge succeeds.
+_patient_access_schema = _DISCOVERABLE_FINISH_RESPONSE["content"]["application/json"][
+    "schema"
+]
+_patient_2fa_schema = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["requires_2fa", "two_factor_method", "pending_2fa_token", "user"],
+    "properties": {
+        "requires_2fa": {"type": "boolean", "const": True},
+        "two_factor_method": {"type": "string", "const": "totp"},
+        "pending_2fa_token": {"type": "string"},
+        "user": _patient_access_schema["properties"]["user"],
+    },
+}
+_DISCOVERABLE_FINISH_RESPONSE["description"] = (
+    "Patient access session or second-factor challenge"
+)
+_DISCOVERABLE_FINISH_RESPONSE["content"]["application/json"]["schema"] = {
+    "oneOf": [_patient_access_schema, _patient_2fa_schema]
 }
 
 
@@ -398,17 +487,49 @@ def _management_identity(
     return row[0], row[1]
 
 
-def _session_jti(token: str) -> str:
+def _bearer_context(token: str, user_id: int) -> dict:
+    from app.core.user_token_claims import is_user_access_claims, parse_user_auth_epoch
+
     try:
         claims = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        jti = claims.get("jti")
-    except jwt.PyJWTError as exc:
+        jti, exp = claims.get("jti"), claims.get("exp")
+        if (
+            not is_user_access_claims(claims)
+            or int(claims["sub"]) != user_id
+            or not isinstance(jti, str)
+            or not 1 <= len(jti) <= 128
+            or type(exp) is not int
+            or exp <= time.time()
+        ):
+            raise ValueError("invalid session")
+        return {
+            "expected_auth_epoch": parse_user_auth_epoch(claims),
+            "expected_jti": jti,
+            "expected_exp": exp,
+            "scoped_id": claims.get("patient_id")
+            if claims.get("scope") == "patient_portal"
+            else None,
+        }
+    except (jwt.PyJWTError, ValueError, TypeError, KeyError) as exc:
         raise HTTPException(
             status_code=401, detail={"reason": "invalid_session"}
         ) from exc
-    if not isinstance(jti, str) or not 1 <= len(jti) <= 128:
-        raise HTTPException(status_code=401, detail={"reason": "invalid_session"})
-    return jti
+
+
+def _bearer_args(context: dict) -> dict:
+    return {
+        key: context[key]
+        for key in ("expected_auth_epoch", "expected_jti", "expected_exp")
+    }
+
+
+def _validate_step_up(body: Any) -> None:
+    if (
+        not isinstance(body, dict)
+        or not isinstance(body.get("phone"), str)
+        or not isinstance(body.get("verification_grant"), str)
+    ):
+        raise HTTPException(status_code=400, detail={"reason": "step_up_required"})
 
 
 def _consume_patient_step_up(db: Session, user_id: int, body: Any) -> None:
@@ -427,22 +548,14 @@ def _consume_patient_step_up(db: Session, user_id: int, body: Any) -> None:
     normalized = normalize_phone(phone)
     try:
         service = get_patient_otp_service()
-        verified_phone = service.consume_grant(grant)
-        resolved_user = (
-            service.resolve_patient_user_by_phone(db, normalized)
-            if normalized
-            else None
+        valid = normalized and service.consume_bound_grant(
+            db, user_id, normalized, grant
         )
     except PatientOtpError as exc:
         raise HTTPException(
             status_code=503, detail={"reason": "step_up_unavailable"}
         ) from exc
-    if (
-        not normalized
-        or verified_phone != normalized
-        or resolved_user is None
-        or resolved_user.id != user_id
-    ):
+    if not valid:
         raise HTTPException(status_code=403, detail={"reason": "step_up_failed"})
 
 
@@ -481,6 +594,7 @@ async def webauthn_register_begin(
     _check_webauthn_available()
 
     from app.services.webauthn_service import (
+        WebAuthnBearerInvalid,
         WebAuthnStoreUnavailable,
         begin_passkey_registration,
     )
@@ -490,11 +604,12 @@ async def webauthn_register_begin(
     except Exception:
         body = {}
 
+    _validate_step_up(body)
     user_id, patient_id = await run_in_threadpool(
         _management_identity, db, current_user, token
     )
-    session_jti = _session_jti(token)
-    await run_in_threadpool(_consume_patient_step_up, db, user_id, body)
+    context = _bearer_context(token, user_id)
+    session_jti = context["expected_jti"]
 
     try:
         options = await run_in_threadpool(
@@ -504,8 +619,16 @@ async def webauthn_register_begin(
             user_id=user_id,
             session_jti=session_jti,
             rp_name="Medical Clinic",
+            step_up=lambda: _consume_patient_step_up(db, user_id, body),
+            **_bearer_args(context),
         )
         return {"options": options}
+    except WebAuthnBearerInvalid as exc:
+        raise HTTPException(
+            status_code=401, detail={"reason": "invalid_session"}
+        ) from exc
+    except HTTPException:
+        raise
     except WebAuthnStoreUnavailable as exc:
         raise HTTPException(
             status_code=503, detail={"reason": "auth_temporarily_unavailable"}
@@ -537,6 +660,7 @@ async def webauthn_register_finish(
     _check_webauthn_available()
 
     from app.services.webauthn_service import (
+        WebAuthnBearerInvalid,
         WebAuthnStoreUnavailable,
         finish_passkey_registration,
     )
@@ -561,7 +685,8 @@ async def webauthn_register_finish(
     user_id, patient_id = await run_in_threadpool(
         _management_identity, db, current_user, token
     )
-    session_jti = _session_jti(token)
+    context = _bearer_context(token, user_id)
+    session_jti = context["expected_jti"]
     credential_name = body.get("credential_name")
     if credential_name is not None and (
         not isinstance(credential_name, str) or len(credential_name) > 100
@@ -580,12 +705,17 @@ async def webauthn_register_finish(
             ceremony_id=ceremony_id,
             credential_response=credential_response,
             credential_name=credential_name,
+            **_bearer_args(context),
         )
         return {
             "registered": True,
             "credential_id": credential.id,
             "name": credential.name,
         }
+    except WebAuthnBearerInvalid as exc:
+        raise HTTPException(
+            status_code=401, detail={"reason": "invalid_session"}
+        ) from exc
     except WebAuthnStoreUnavailable as exc:
         raise HTTPException(
             status_code=503, detail={"reason": "auth_temporarily_unavailable"}
@@ -641,13 +771,13 @@ async def webauthn_discoverable_begin(request: Request) -> dict[str, Any]:
     "/login/discoverable/finish",
     operation_id="webauthn_discoverable_finish",
     openapi_extra=_DISCOVERABLE_FINISH_BODY,
-    responses={**_DISCOVERABLE_ERRORS, 200: _DISCOVERABLE_FINISH_RESPONSE},
+    responses={**_DISCOVERABLE_ERRORS, 200: _DISCOVERABLE_NEXT_RESPONSE},
 )
 @limiter.limit("30/minute")
 async def webauthn_discoverable_finish(
-    request: Request, db: Session = Depends(get_db)
+    request: Request, response: Response, db: Session = Depends(get_db)
 ) -> dict[str, Any]:
-    """Consume one challenge and issue a session only for its current owner."""
+    """Verify the first assertion and request a fresh bound assertion."""
     _check_webauthn_available()
     from app.services.webauthn_service import (
         WebAuthnQuotaExceeded,
@@ -662,13 +792,64 @@ async def webauthn_discoverable_finish(
     if not isinstance(body, dict):
         body = {}
     try:
-        return await run_in_threadpool(
+        result = await run_in_threadpool(
             finish_discoverable_authentication,
             db,
             client_ip=get_client_ip(request),
             ceremony_id=body.get("ceremony_id"),
             assertion_response=body.get("assertion_response"),
         )
+        response.headers["Cache-Control"] = "no-store"
+        return result
+    except WebAuthnQuotaExceeded as exc:
+        raise HTTPException(
+            status_code=429, detail={"reason": "auth_rate_limited"}
+        ) from exc
+    except WebAuthnStoreUnavailable as exc:
+        raise HTTPException(
+            status_code=503, detail={"reason": "auth_temporarily_unavailable"}
+        ) from exc
+    except Exception as exc:
+        logger.info("Discoverable authentication rejected: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=403, detail={"reason": "auth_finish_failed"}
+        ) from exc
+
+
+@router.post(
+    "/login/discoverable/complete",
+    operation_id="webauthn_discoverable_complete",
+    openapi_extra=_DISCOVERABLE_FINISH_BODY,
+    responses={**_DISCOVERABLE_ERRORS, 200: _DISCOVERABLE_FINISH_RESPONSE},
+)
+@limiter.limit("30/minute")
+async def webauthn_discoverable_complete(
+    request: Request, response: Response, db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    """Verify a second, epoch-bound assertion before issuing a session."""
+    _check_webauthn_available()
+    from app.services.webauthn_service import (
+        WebAuthnQuotaExceeded,
+        WebAuthnStoreUnavailable,
+        complete_discoverable_authentication,
+    )
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    try:
+        result = await run_in_threadpool(
+            complete_discoverable_authentication,
+            db,
+            client_ip=get_client_ip(request),
+            ceremony_id=body.get("ceremony_id"),
+            assertion_response=body.get("assertion_response"),
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return result
     except WebAuthnQuotaExceeded as exc:
         raise HTTPException(
             status_code=429, detail={"reason": "auth_rate_limited"}
@@ -730,15 +911,20 @@ async def webauthn_login_begin(
         ) from exc
 
 
-@router.post("/login/finish", operation_id="webauthn_login_finish")
+@router.post(
+    "/login/finish",
+    operation_id="webauthn_login_finish",
+    responses={**_DISCOVERABLE_ERRORS, 200: _DISCOVERABLE_FINISH_RESPONSE},
+)
 @limiter.limit("5/minute")  # WEBAUTHN-BE-002: unauthenticated assertion throttle
 async def webauthn_login_finish(
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Finish passkey authentication (M4-P1-4).
 
-    Verifies assertion and issues JWT.
+    Verifies assertion and issues a session or a second-factor challenge.
     """
     _check_webauthn_available()
 
@@ -776,6 +962,7 @@ async def webauthn_login_finish(
             ceremony_id=ceremony_id,
             client_ip=get_client_ip(request),
         )
+        response.headers["Cache-Control"] = "no-store"
         return result
     except WebAuthnStoreUnavailable as exc:
         raise HTTPException(
@@ -811,30 +998,59 @@ async def webauthn_list_credentials(
     token: str = Depends(oauth2_scheme),
 ) -> dict[str, Any]:
     """List active passkeys for the authenticated patient (M4-P1-4)."""
+    from sqlalchemy import and_, select
+
+    from app.models.authentication import TokenBlacklist
     from app.models.passkey_credential import PasskeyCredential
 
-    _, patient_id = await run_in_threadpool(
-        _management_identity, db, current_user, token
-    )
+    user_id = current_user.id
+    context = _bearer_context(token, user_id)
 
     def _list():
-        return (
+        revoked = (
+            select(TokenBlacklist.id)
+            .where(TokenBlacklist.jti == context["expected_jti"])
+            .exists()
+        )
+        legacy = (
+            select(TokenBlacklist.id)
+            .where(
+                TokenBlacklist.user_id == User.id,
+                TokenBlacklist.reason.like("all_user_tokens:%"),
+                TokenBlacklist.expires_at > datetime.now(UTC),
+            )
+            .exists()
+        )
+        query = (
             db.query(PasskeyCredential)
-            .join(Patient, Patient.id == PasskeyCredential.patient_id)
-            .join(User, User.id == Patient.user_id)
+            .select_from(User)
+            .join(Patient, Patient.user_id == User.id)
+            .outerjoin(
+                PasskeyCredential,
+                and_(
+                    PasskeyCredential.patient_id == Patient.id,
+                    PasskeyCredential.owner_user_id == User.id,
+                    PasskeyCredential.active.is_(True),
+                ),
+            )
             .filter(
-                User.id == current_user.id,
+                User.id == user_id,
                 User.role == "Patient",
                 User.is_active.is_(True),
                 User.is_superuser.is_(False),
-                Patient.id == patient_id,
+                User.auth_epoch == context["expected_auth_epoch"],
                 Patient.is_deleted.is_not(True),
-                PasskeyCredential.active.is_(True),
-                PasskeyCredential.owner_user_id == User.id,
+                ~revoked,
             )
-            .order_by(PasskeyCredential.created_at.desc())
-            .all()
         )
+        if context["expected_auth_epoch"] == 0:
+            query = query.filter(~legacy)
+        if context["scoped_id"] is not None:
+            query = query.filter(Patient.id == context["scoped_id"])
+        rows = query.order_by(PasskeyCredential.created_at.desc()).all()
+        if not rows or time.time() >= context["expected_exp"]:
+            raise HTTPException(status_code=401, detail={"reason": "invalid_session"})
+        return [row for row in rows if row is not None]
 
     passkeys = await run_in_threadpool(_list)
     return {
@@ -872,22 +1088,33 @@ async def webauthn_deactivate_credential(
     token: str = Depends(oauth2_scheme),
 ) -> dict[str, Any]:
     """Deactivate a passkey (M4-P1-4)."""
-    from app.services.webauthn_service import deactivate_passkey
+    from app.services.webauthn_service import WebAuthnBearerInvalid, deactivate_passkey
 
     try:
         body = await request.json()
     except Exception:
         body = {}
 
+    _validate_step_up(body)
     user_id, patient_id = await run_in_threadpool(
         _management_identity, db, current_user, token
     )
-    await run_in_threadpool(_consume_patient_step_up, db, user_id, body)
+    context = _bearer_context(token, user_id)
 
     try:
         success = await run_in_threadpool(
-            deactivate_passkey, db, patient_id, credential_id, user_id=user_id
+            deactivate_passkey,
+            db,
+            patient_id,
+            credential_id,
+            user_id=user_id,
+            step_up=lambda: _consume_patient_step_up(db, user_id, body),
+            **_bearer_args(context),
         )
+    except WebAuthnBearerInvalid as exc:
+        raise HTTPException(
+            status_code=401, detail={"reason": "invalid_session"}
+        ) from exc
     except ValueError as exc:
         # WEBAUTHN-BE-003: the patient's LAST active passkey is protected —
         # removing it would lock them out of passkey login entirely.
