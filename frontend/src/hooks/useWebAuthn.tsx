@@ -5,7 +5,12 @@
  * and authenticate with passkeys. Requires HTTPS (or localhost).
  */
 import { useCallback, useState } from 'react';
-import { api } from '../api/client';
+import { api, ensureCSRFToken } from '../api/client';
+import { mapPatientSession } from '../api/mappers/patientAccess';
+import { replaceAccessOnlySession } from '../stores/auth';
+import type { PatientSession } from '../types/domain/patientAccess';
+import type { HttpApiError } from '../types/errors';
+import { tokenManager } from '../utils/tokenManager';
 
 function base64urlToBuffer(base64url: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64url.length % 4)) % 4);
@@ -38,23 +43,13 @@ interface AuthenticateOptions {
   rpId?: string;
 }
 
-interface AuthResponseData {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  [key: string]: unknown;
-}
-
-// ADR-0016: WebAuthnErrorResponse replaced by canonical HttpApiError from types/errors.ts.
-import type { HttpApiError } from '../types/errors';
-
 export interface UseWebAuthnReturn {
   isSupported: boolean;
   isRegistering: boolean;
   isAuthenticating: boolean;
   error: string;
   register: (options?: RegisterOptions) => Promise<boolean>;
-  authenticate: (options: AuthenticateOptions) => Promise<AuthResponseData | null>;
+  authenticate: (options: AuthenticateOptions) => Promise<PatientSession | null>;
   listCredentials: () => Promise<unknown[]>;
   deactivateCredential: (credentialId: string) => Promise<boolean>;
 }
@@ -160,7 +155,7 @@ export function useWebAuthn(): UseWebAuthnReturn {
   );
 
   const authenticate = useCallback(
-    async (options: AuthenticateOptions): Promise<AuthResponseData | null> => {
+    async (options: AuthenticateOptions): Promise<PatientSession | null> => {
       if (!isSupported) {
         setError('webauthn_not_supported');
         return null;
@@ -168,20 +163,33 @@ export function useWebAuthn(): UseWebAuthnReturn {
 
       setIsAuthenticating(true);
       setError('');
+      // A pending browser ceremony must not replace a newer login in this tab.
+      const originalToken = tokenManager.getAccessToken();
 
       try {
         const beginResponse = await api.post('/webauthn/login/begin', {
           patient_id: options.patientId,
-          rp_id: options.rpId || window.location.hostname,
         });
 
         const optionsData = beginResponse.data as {
           options: {
             challenge: string;
             rpId: string;
+            ceremony_id: string;
             timeout?: number;
           };
         };
+        if (
+          !optionsData?.options ||
+          typeof optionsData.options.challenge !== 'string' ||
+          !optionsData.options.challenge ||
+          typeof optionsData.options.rpId !== 'string' ||
+          !optionsData.options.rpId ||
+          typeof optionsData.options.ceremony_id !== 'string' ||
+          !optionsData.options.ceremony_id
+        ) {
+          throw new Error('Invalid passkey authentication options');
+        }
 
         const publicKeyOptions: PublicKeyCredentialRequestOptions = {
           challenge: base64urlToBuffer(optionsData.options.challenge),
@@ -216,22 +224,31 @@ export function useWebAuthn(): UseWebAuthnReturn {
 
         const finishResponse = await api.post('/webauthn/login/finish', {
           patient_id: options.patientId,
+          ceremony_id: optionsData.options.ceremony_id,
           assertion_response: assertionData,
-          rp_id: options.rpId || window.location.hostname,
-          origin: window.location.origin,
         });
 
-        const data = finishResponse.data as AuthResponseData | undefined;
-        if (data?.access_token) {
-          sessionStorage.setItem('patient_jwt_token', data.access_token);
-          sessionStorage.setItem('patient_refresh_token', data.refresh_token);
-          sessionStorage.setItem(
-            'patient_token_expires_at',
-            String(Date.now() + data.expires_in * 1000),
-          );
+        const session = mapPatientSession(finishResponse.data);
+        const accessToken = session.access_token.trim();
+        if (
+          !accessToken ||
+          session.token_type.toLowerCase() !== 'bearer' ||
+          session.user.role.toLowerCase() !== 'patient' ||
+          !session.user.is_active ||
+          session.user.is_superuser ||
+          tokenManager.getAccessToken() !== originalToken
+        ) {
+          throw new Error('Invalid or superseded patient session');
         }
 
-        return data ?? null;
+        // Remove any prior staff refresh token before installing the new
+        // access-only patient principal, exactly like patient OTP login.
+        const profile: Record<string, unknown> = session.user;
+        replaceAccessOnlySession(accessToken, profile);
+        void ensureCSRFToken().catch(() => {
+          // The interceptor retries CSRF initialization on demand.
+        });
+        return { ...session, access_token: accessToken };
       } catch (err) {
         const e = err as HttpApiError;
         const detail = e?.response?.data?.detail;
@@ -246,12 +263,18 @@ export function useWebAuthn(): UseWebAuthnReturn {
   );
 
   const listCredentials = useCallback(async (): Promise<unknown[]> => {
-    try {
-      const response = await api.post('/webauthn/credentials/list', {});
-      return (response.data as { credentials?: unknown[] })?.credentials || [];
-    } catch {
-      return [];
+    const response = await api.post('/webauthn/credentials/list', {});
+    const credentials = (response.data as { credentials?: unknown } | null)?.credentials;
+    if (!Array.isArray(credentials) || credentials.some((item: unknown) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return true;
+      const entry = item as Record<string, unknown>;
+      return (typeof entry.id !== 'number' && typeof entry.id !== 'string') ||
+        ['name', 'device_type', 'last_used_at'].some((key) =>
+          entry[key] !== null && entry[key] !== undefined && typeof entry[key] !== 'string');
+    })) {
+      throw new Error('Invalid passkey list response');
     }
+    return credentials;
   }, []);
 
   const deactivateCredential = useCallback(
