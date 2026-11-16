@@ -1,204 +1,287 @@
-"""Fail-first regression tests for WEBAUTHN-BE-003 (audit group 33, #4063).
-
-``POST /webauthn/credentials/{credential_id}/deactivate`` authenticated solely
-via the long-lived Telegram ``initData`` session (legacy max_age=24h,
-replay_check=False): a phished initData blob allowed listing and silently
-removing every passkey — no WebAuthn ceremony, no re-authentication, and no
-last-credential guard (full lockout). Deactivation of an already-inactive
-credential returned the same 200 ``{"deactivated": true}`` as a real removal.
-
-Fix contract (wave 3c-3):
-- destructive window: the deactivate handler resolves initData with
-  ``max_age_seconds=900`` (15 min) instead of the 24h legacy window;
-- last-credential guard: deactivating the patient's ONLY active passkey is
-  rejected with ``409 {"reason": "last_active_credential"}`` (no lockout);
-- inactive/unknown credentials return the SAME opaque
-  ``404 {"reason": "credential_not_found"}`` (no state disclosure);
-- deactivation is logged (audit trail) — the phish still needs a fresh
-  signature, and the last passkey is safe.
-"""
-
+"""Security regressions for authenticated passkey management (PR #4070)."""
 from __future__ import annotations
 
 import base64
-import hashlib
-import hmac
-import json
-import time
-from types import SimpleNamespace
-from urllib.parse import urlencode
 
 import pytest
 
-DEACTIVATE_PATH = "/api/v1/webauthn/credentials/{cid}/deactivate"
-BOT_TOKEN = "123456:test-mini-app-token"
+from app.api.deps import create_access_token
+from app.models.passkey_credential import PasskeyCredential
+from app.models.patient import Patient
+from app.models.user import User
+from app.models.user_profile import UserProfile
+from app.services import patient_otp_service as otp
+
+LIST = "/api/v1/webauthn/credentials/list"
+BEGIN = "/api/v1/webauthn/register/begin"
+FINISH = "/api/v1/webauthn/register/finish"
+DEACTIVATE = "/api/v1/webauthn/credentials/{}/deactivate"
 
 
-def _cred_b64(raw: bytes) -> str:
-    return base64.urlsafe_b64encode(raw).decode()
-
-
-def _make_credential(db_session, patient_id: int, n: int, active: bool = True):
-    from app.models.passkey_credential import PasskeyCredential
-
-    cred = PasskeyCredential(
-        patient_id=patient_id,
-        credential_id=_cred_b64(f"cred-{patient_id}-{n}".encode()),
-        public_key=_cred_b64(f"pubkey-{patient_id}-{n}".encode()),
-        sign_count=0,
-        active=active,
-    )
-    db_session.add(cred)
+@pytest.fixture
+def identities(db_session):
+    result = []
+    for i in (1, 2):
+        user = User(username=f"SYNTHETIC-passkey-{i}", hashed_password="test-only", role="Patient", is_active=True, is_superuser=False)
+        db_session.add(user)
+        db_session.flush()
+        patient = Patient(user_id=user.id, first_name="SYNTHETIC", last_name=f"PATIENT-{i}")
+        phone = f"+99800000000{i}"
+        db_session.add_all([patient, UserProfile(user_id=user.id, phone=phone, phone_verified=True)])
+        db_session.flush()
+        result.append((user, patient, phone))
     db_session.commit()
-    return cred
+    return result
 
 
-@pytest.fixture()
-def fake_scope(monkeypatch):
-    """Bypass telegram auth at the endpoint boundary; capture max_age window."""
-    captured: dict = {}
-
-    def _fake_resolve(
-        db, *, init_data_payload=None, entry_token=None, expected_section=None, **kwargs
-    ):
-        captured["max_age_seconds"] = kwargs.get("max_age_seconds")
-        if init_data_payload == "stale-payload":
-            raise RuntimeError("auth_failed")
-        return SimpleNamespace(patient_id=4242), "init_data"
-
-    from app.api.v1.endpoints.telegram_webhook import _clinic_bot
-
-    monkeypatch.setattr(
-        _clinic_bot, "_resolve_mini_app_patient_scope_from_auth", _fake_resolve
-    )
-    return captured
+def _headers(user):
+    token = create_access_token(data={"sub": str(user.id)})
+    return {"Authorization": f"Bearer {token}"}
 
 
-def _post(client, cid: int, init_data: str = "fresh-payload"):
-    return client.post(DEACTIVATE_PATH.format(cid=cid), json={"init_data": init_data})
+def _credential(db, patient, name):
+    encoded = base64.urlsafe_b64encode(f"SYNTHETIC-{patient.id}-{name}".encode()).decode()
+    credential = PasskeyCredential(patient_id=patient.id, owner_user_id=patient.user_id, credential_id=encoded, public_key=encoded, sign_count=0, active=True, name=name)
+    db.add(credential)
+    db.commit()
+    return credential
 
 
-class TestWebAuthnBE003DeactivateGuard:
-    def test_last_active_credential_rejected_409(self, client, db_session, fake_scope):
-        """RED: the only active passkey could be silently removed (lockout).
-        GREEN: 409 last_active_credential, credential stays active."""
-        cred = _make_credential(db_session, 4242, 1)
-
-        r = _post(client, cred.id)
-
-        assert r.status_code == 409, (r.status_code, r.text[:200])
-        assert r.json() == {"detail": {"reason": "last_active_credential"}}
-        db_session.refresh(cred)
-        assert cred.active is True, "last passkey must NOT be deactivated"
-
-    def test_second_credential_deactivates_ok(self, client, db_session, fake_scope):
-        """The legitimate case is preserved: with >=2 active passkeys,
-        deactivating one still returns 200 and keeps the other active."""
-        c1 = _make_credential(db_session, 4242, 1)
-        c2 = _make_credential(db_session, 4242, 2)
-
-        r = _post(client, c1.id)
-
-        assert r.status_code == 200, (r.status_code, r.text[:200])
-        assert r.json() == {"deactivated": True, "credential_id": c1.id}
-        db_session.refresh(c1)
-        db_session.refresh(c2)
-        assert c1.active is False
-        assert c2.active is True
-
-    def test_already_inactive_uniform_404(self, client, db_session, fake_scope):
-        """RED: re-deactivating an inactive credential returned the same 200
-        {"deactivated": true}. GREEN: opaque 404, same as unknown id."""
-        c1 = _make_credential(db_session, 4242, 1)
-        _make_credential(db_session, 4242, 2)
-        _post(client, c1.id)
-
-        r = _post(client, c1.id)
-        assert r.status_code == 404, (r.status_code, r.text[:200])
-        assert r.json() == {"detail": {"reason": "credential_not_found"}}
-
-    def test_unknown_credential_uniform_404(self, client, db_session, fake_scope):
-        r = _post(client, 999999)
-        assert r.status_code == 404
-        assert r.json() == {"detail": {"reason": "credential_not_found"}}
-
-    def test_destructive_window_900s_applied(self, client, db_session, fake_scope):
-        """The handler must resolve initData with the 15-min destructive
-        window (not the 24h legacy window)."""
-        _make_credential(db_session, 4242, 1)
-        _make_credential(db_session, 4242, 2)
-        _post(client, 999999)
-        assert (
-            fake_scope.get("max_age_seconds") == 900
-        ), "deactivate must use max_age_seconds=900 (WEBAUTHN-BE-003)"
+def _step_up(phone):
+    """Exercise the real verification-grant issuer and store without sending SMS."""
+    service = otp.get_patient_otp_service()
+    code = "123456"
+    service._get_backend().set(f"{otp._NS_LOGIN}:code:{phone}", otp._hash_code(code), 300)
+    grant = service.verify_login_otp(phone, code)["verification_grant"]
+    return {"phone": phone, "verification_grant": grant}
 
 
-class TestWebAuthnBE003FreshInitData:
-    def test_validate_rejects_payload_older_than_900s(self):
-        """Direct validator contract for the destructive window."""
-        from app.services.telegram_mini_app_init_data import (
-            TelegramMiniAppInitDataError,
-            validate_telegram_mini_app_init_data,
-        )
+def test_list_is_scoped_to_authenticated_patient(client, db_session, identities):
+    user, patient, _ = identities[0]
+    _, other_patient, _ = identities[1]
+    own = _credential(db_session, patient, "own")
+    _credential(db_session, other_patient, "other")
+    response = client.post(LIST, headers=_headers(user), json={"patient_id": other_patient.id})
+    assert response.status_code == 200, response.text
+    assert [item["id"] for item in response.json()["credentials"]] == [own.id]
 
-        def signed(auth_age_s: int) -> str:
-            params = {
-                "auth_date": str(int(time.time()) - auth_age_s),
-                "query_id": "AAEAAAE",
-                "user": json.dumps({"id": 777}, separators=(",", ":")),
-            }
-            dcs = "\n".join(f"{k}={v}" for k, v in sorted(params.items()))
-            secret = hmac.new(
-                b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256
-            ).digest()
-            sig = hmac.new(secret, dcs.encode(), hashlib.sha256).hexdigest()
-            return urlencode({**params, "hash": sig})
 
-        from datetime import UTC, datetime
+def test_unowned_legacy_and_relinked_credentials_are_not_visible_or_manageable(client, db_session, identities):
+    user, patient, phone = identities[0]
+    other_user, _, _ = identities[1]
+    legacy = _credential(db_session, patient, "legacy")
+    legacy.owner_user_id = None
+    relinked = _credential(db_session, patient, "relinked")
+    relinked.owner_user_id = other_user.id
+    db_session.commit()
+    headers = _headers(user)
+    listed = client.post(LIST, headers=headers, json={})
+    assert listed.status_code == 200
+    assert listed.json()["credentials"] == []
+    for credential in (legacy, relinked):
+        response = client.post(DEACTIVATE.format(credential.id), headers=headers, json=_step_up(phone))
+        assert response.status_code == 404, response.text
+        db_session.refresh(credential)
+        assert credential.active is True
 
-        now_dt = datetime.fromtimestamp(time.time(), UTC)
-        with pytest.raises(TelegramMiniAppInitDataError):
-            validate_telegram_mini_app_init_data(
-                signed(3600),
-                bot_token=BOT_TOKEN,
-                max_age_seconds=900,
-                replay_check=False,
-                now=now_dt,
-            )
-        ok = validate_telegram_mini_app_init_data(
-            signed(60),
-            bot_token=BOT_TOKEN,
-            max_age_seconds=900,
-            replay_check=False,
-            now=now_dt,
-        )
-        assert ok is not None
 
-    def test_resolver_propagates_destructive_window(self, db_session, monkeypatch):
-        """RED: the patient-scope resolver had no max_age parameter at all —
-        every caller was stuck with the 24h legacy window."""
-        from app.api.v1.endpoints.telegram_webhook import _clinic_bot
-        from app.services.telegram_mini_app_init_data import (
-            TelegramMiniAppInitDataError,
-        )
+def test_last_active_credential_remains_usable(client, db_session, identities):
+    user, patient, phone = identities[0]
+    credential = _credential(db_session, patient, "last")
+    legacy = _credential(db_session, patient, "legacy-not-counted")
+    legacy.owner_user_id = None
+    db_session.commit()
+    response = client.post(DEACTIVATE.format(credential.id), headers=_headers(user), json=_step_up(phone))
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["reason"] == "last_active_credential"
+    db_session.refresh(credential)
+    assert credential.active is True
 
-        monkeypatch.setattr(
-            _clinic_bot, "_get_configured_bot_token", lambda db: BOT_TOKEN
-        )
 
-        params = {
-            "auth_date": str(
-                int(time.time()) - 7200
-            ),  # 2h old: fresh for legacy, stale for 900s
-            "query_id": "AAEAAAE",
-            "user": json.dumps({"id": 777}, separators=(",", ":")),
-        }
-        dcs = "\n".join(f"{k}={v}" for k, v in sorted(params.items()))
-        secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-        sig = hmac.new(secret, dcs.encode(), hashlib.sha256).hexdigest()
-        stale = urlencode({**params, "hash": sig})
+def test_deactivation_consumes_grant_and_preserves_other_key(client, db_session, identities):
+    user, patient, phone = identities[0]
+    first = _credential(db_session, patient, "first")
+    second = _credential(db_session, patient, "second")
+    step_up = _step_up(phone)
+    response = client.post(DEACTIVATE.format(first.id), headers=_headers(user), json=step_up)
+    assert response.status_code == 200, response.text
+    replay = client.post(DEACTIVATE.format(second.id), headers=_headers(user), json=step_up)
+    assert replay.status_code == 403
+    db_session.refresh(first)
+    db_session.refresh(second)
+    assert first.active is False and second.active is True
 
-        with pytest.raises(TelegramMiniAppInitDataError):
-            _clinic_bot._resolve_mini_app_patient_scope_from_init_data(
-                db_session, stale, max_age_seconds=900
-            )
+
+def test_foreign_unknown_and_inactive_credentials_return_same_404(client, db_session, identities):
+    user, patient, phone = identities[0]
+    _, foreign_patient, _ = identities[1]
+    _credential(db_session, patient, "spare")
+    inactive = _credential(db_session, patient, "inactive")
+    inactive.active = False
+    db_session.commit()
+    foreign = _credential(db_session, foreign_patient, "foreign")
+    bodies = []
+    for credential_id in (inactive.id, foreign.id, 9999999):
+        response = client.post(DEACTIVATE.format(credential_id), headers=_headers(user), json=_step_up(phone))
+        assert response.status_code == 404, response.text
+        bodies.append(response.json())
+    assert bodies == [{"detail": {"reason": "credential_not_found"}}] * 3
+    db_session.refresh(foreign)
+    assert foreign.active is True
+
+
+def test_grant_for_other_patient_is_rejected_and_consumed(client, db_session, identities):
+    user, patient, _ = identities[0]
+    _, _, other_phone = identities[1]
+    first = _credential(db_session, patient, "first")
+    _credential(db_session, patient, "second")
+    step_up = _step_up(other_phone)
+    response = client.post(DEACTIVATE.format(first.id), headers=_headers(user), json=step_up)
+    assert response.status_code == 403
+    assert otp.get_patient_otp_service().consume_grant(step_up["verification_grant"]) is None
+    db_session.refresh(first)
+    assert first.active is True
+
+
+def test_unverified_or_ambiguous_phone_cannot_authorize_mutation(client, db_session, identities):
+    user, patient, phone = identities[0]
+    other, _, _ = identities[1]
+    first = _credential(db_session, patient, "first")
+    _credential(db_session, patient, "second")
+    profile = db_session.query(UserProfile).filter_by(user_id=other.id).one()
+    profile.phone = phone
+    db_session.commit()
+    response = client.post(DEACTIVATE.format(first.id), headers=_headers(user), json=_step_up(phone))
+    assert response.status_code == 403
+    profile.phone_verified = False
+    own_profile = db_session.query(UserProfile).filter_by(user_id=user.id).one()
+    own_profile.phone_verified = False
+    db_session.commit()
+    response = client.post(DEACTIVATE.format(first.id), headers=_headers(user), json=_step_up(phone))
+    assert response.status_code == 403
+    db_session.refresh(first)
+    assert first.active is True
+
+
+def test_registration_requires_single_use_step_up(client, db_session, identities, monkeypatch):
+    from app.services import webauthn_service as ws
+    user, _, phone = identities[0]
+    monkeypatch.setattr(ws, "WEBAUTHN_AVAILABLE", True)
+    monkeypatch.setattr(ws, "begin_passkey_registration", lambda *a, **k: {"ceremony_id": "synthetic"})
+    headers = _headers(user)
+    assert client.post(BEGIN, headers=headers, json={}).status_code == 400
+    step_up = _step_up(phone)
+    response = client.post(BEGIN, headers=headers, json=step_up)
+    assert response.status_code == 200, response.text
+    assert client.post(BEGIN, headers=headers, json=step_up).status_code == 403
+
+
+def test_nonpatient_bearer_cannot_manage_passkeys(client, db_session, identities):
+    user, _, phone = identities[0]
+    user.role = "Doctor"
+    db_session.commit()
+    for path, payload in [(LIST, {}), (DEACTIVATE.format(1), _step_up(phone))]:
+        response = client.post(path, headers=_headers(user), json=payload)
+        assert response.status_code == 403, response.text
+
+
+def test_step_up_store_failure_is_unavailable_and_does_not_mutate(client, db_session, identities, monkeypatch):
+    user, patient, phone = identities[0]
+    first = _credential(db_session, patient, "first")
+    _credential(db_session, patient, "second")
+    service = otp.get_patient_otp_service()
+
+    def fail_store(_grant):
+        raise otp.PatientOtpError(503, "store offline")
+
+    monkeypatch.setattr(service, "consume_grant", fail_store)
+    response = client.post(DEACTIVATE.format(first.id), headers=_headers(user), json={"phone": phone, "verification_grant": "x" * 32})
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"reason": "step_up_unavailable"}}
+    db_session.refresh(first)
+    assert first.active is True
+
+
+def test_management_openapi_documents_security_bodies_and_errors(client):
+    schema = client.get("/openapi.json").json()
+    paths = schema["paths"]
+    cases = {
+        BEGIN: ({"phone", "verification_grant"}, {"400", "401", "403", "503"}),
+        FINISH: ({"ceremony_id", "credential_response"}, {"400", "401", "403", "503"}),
+        LIST: (set(), {"401", "403"}),
+        "/api/v1/webauthn/credentials/{credential_id}/deactivate": (
+            {"phone", "verification_grant"}, {"400", "401", "403", "404", "409", "503"}
+        ),
+    }
+    for path, (required_fields, statuses) in cases.items():
+        operation = paths[path]["post"]
+        assert operation.get("security"), path
+        assert statuses <= operation["responses"].keys(), path
+        if not required_fields:
+            continue
+        request_body = operation["requestBody"]
+        assert request_body.get("required") is True, path
+        request_schema = request_body["content"]["application/json"]["schema"]
+        if "$ref" in request_schema:
+            request_schema = schema["components"]["schemas"][request_schema["$ref"].rsplit("/", 1)[-1]]
+        assert required_fields <= set(request_schema.get("required", [])), path
+        properties = request_schema["properties"]
+        for field in required_fields - {"credential_response"}:
+            assert properties[field].get("type") == "string", (path, field)
+        if "credential_response" in required_fields:
+            assert properties["credential_response"].get("type") == "object"
+
+
+@pytest.mark.parametrize("operation", ["list", "deactivate"])
+def test_scoped_patient_session_rejects_relink_between_dependency_and_handler(
+    client, db_session, identities, operation
+):
+    from app.api.deps import get_current_user
+    from app.main import app
+
+    user, old_patient, phone = identities[0]
+    _, new_patient, _ = identities[1]
+    key = _credential(db_session, new_patient, "relink-target")
+    spare = _credential(db_session, new_patient, "relink-spare")
+    key.owner_user_id = spare.owner_user_id = user.id
+    db_session.commit()
+    token = create_access_token(data={"sub": str(user.id), "scope": "patient_portal", "patient_id": old_patient.id})
+
+    async def authenticated_then_relinked():
+        principal = await get_current_user(token=token, db=db_session)
+        old_patient.user_id = None
+        new_patient.user_id = None
+        db_session.flush()
+        new_patient.user_id = user.id
+        db_session.commit()
+        return principal
+
+    app.dependency_overrides[get_current_user] = authenticated_then_relinked
+    headers = {"Authorization": f"Bearer {token}"}
+    if operation == "list":
+        response = client.post(LIST, headers=headers, json={})
+    else:
+        response = client.post(DEACTIVATE.format(key.id), headers=headers, json=_step_up(phone))
+    assert response.status_code in (401, 403), response.text
+    db_session.refresh(key)
+    assert key.active is True
+
+
+def test_unscoped_patient_session_uses_current_relinked_card(client, db_session, identities):
+    user, old_patient, phone = identities[0]
+    _, new_patient, _ = identities[1]
+    old_patient.user_id = None
+    new_patient.user_id = None
+    db_session.flush()
+    new_patient.user_id = user.id
+    db_session.commit()
+    key = _credential(db_session, new_patient, "current")
+    _credential(db_session, new_patient, "spare")
+    headers = _headers(user)
+    listed = client.post(LIST, headers=headers, json={})
+    assert listed.status_code == 200, listed.text
+    assert key.id in [item["id"] for item in listed.json()["credentials"]]
+    response = client.post(DEACTIVATE.format(key.id), headers=headers, json=_step_up(phone))
+    assert response.status_code == 200, response.text
+    db_session.refresh(key)
+    assert key.active is False

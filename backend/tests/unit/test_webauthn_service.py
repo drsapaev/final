@@ -38,16 +38,26 @@ class TestWebAuthnAvailability:
 class TestPasskeyManagement:
     """Tests for passkey list/deactivate (no webauthn library needed)."""
 
+    @pytest.fixture(autouse=True)
+    def valid_identity(self, monkeypatch):
+        from app.services import webauthn_service
+
+        monkeypatch.setattr(
+            webauthn_service, "_lock_patient_identity", lambda *args: True
+        )
+
     def test_list_patient_passkeys_returns_empty_list(self):
         """Returns empty list when patient has no passkeys."""
         from app.services.webauthn_service import list_patient_passkeys
 
         db = MagicMock()
         query = MagicMock()
-        query.filter.return_value.order_by.return_value.all.return_value = []
+        query.join.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = (
+            []
+        )
         db.query.return_value = query
 
-        result = list_patient_passkeys(db, patient_id=42)
+        result = list_patient_passkeys(db, patient_id=42, user_id=7)
         assert result == []
 
     def test_list_patient_passkeys_returns_active_only(self):
@@ -61,12 +71,12 @@ class TestPasskeyManagement:
         mock_passkey.active = True
 
         query = MagicMock()
-        query.filter.return_value.order_by.return_value.all.return_value = [
+        query.join.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = [
             mock_passkey
         ]
         db.query.return_value = query
 
-        result = list_patient_passkeys(db, patient_id=42)
+        result = list_patient_passkeys(db, patient_id=42, user_id=7)
         assert len(result) == 1
         assert result[0].name == "iPhone 15"
 
@@ -88,7 +98,7 @@ class TestPasskeyManagement:
         )
         db.query.return_value = query
 
-        result = deactivate_passkey(db, patient_id=42, credential_id=1)
+        result = deactivate_passkey(db, patient_id=42, credential_id=1, user_id=7)
         assert result is True
         assert mock_passkey.active is False
         assert db.commit.called
@@ -102,7 +112,7 @@ class TestPasskeyManagement:
         query.filter.return_value.first.return_value = None
         db.query.return_value = query
 
-        result = deactivate_passkey(db, patient_id=42, credential_id=999)
+        result = deactivate_passkey(db, patient_id=42, credential_id=999, user_id=7)
         assert result is False
 
     def test_deactivate_passkey_returns_false_when_already_inactive(self):
@@ -118,7 +128,7 @@ class TestPasskeyManagement:
         query.filter.return_value.first.return_value = mock_passkey
         db.query.return_value = query
 
-        result = deactivate_passkey(db, patient_id=42, credential_id=1)
+        result = deactivate_passkey(db, patient_id=42, credential_id=1, user_id=7)
         assert result is False
         assert not db.commit.called
 
@@ -137,7 +147,7 @@ class TestPasskeyManagement:
         db.query.return_value = query
 
         with pytest.raises(ValueError, match="last_active_credential"):
-            deactivate_passkey(db, patient_id=42, credential_id=1)
+            deactivate_passkey(db, patient_id=42, credential_id=1, user_id=7)
         assert not db.commit.called
 
 

@@ -90,6 +90,7 @@ def test_distinct_ceremonies_serialize_credential_sign_count(pg_engine, monkeypa
         db.add(
             PasskeyCredential(
                 patient_id=patient.id,
+                owner_user_id=user.id,
                 credential_id="Zmlyc3Q=",
                 public_key="cHVibGlj",
                 sign_count=0,
@@ -193,7 +194,7 @@ def test_redis_getdel_consumes_once_across_connections(monkeypatch):
     monkeypatch.setattr(settings, "TESTING", False)
     monkeypatch.setenv("REDIS_URL", url)
     ceremony_id = ws.secrets.token_urlsafe(32)
-    key = f"webauthn:login:{ceremony_id}"
+    key = f"{ws._DISCOVERABLE_PREFIX}login:{ceremony_id}"
     try:
         ws._store_ceremony(client, ceremony_id, 71, b"binary\xff")
         assert 0 < client.ttl(key) <= 300

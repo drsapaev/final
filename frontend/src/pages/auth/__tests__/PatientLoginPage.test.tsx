@@ -8,6 +8,11 @@ import PatientLoginPage from '../PatientLoginPage';
 import PatientBookingPage from '../../PatientBookingPage';
 
 const authState = vi.hoisted(() => ({ current: { token: null as string | null, profile: null as Record<string, unknown> | null } }));
+const passkey = vi.hoisted(() => ({ supported: false, error: '', authenticate: vi.fn() }));
+vi.mock('../../../hooks/useWebAuthn', () => ({
+  useWebAuthn: () => ({ isSupported: passkey.supported, isAuthenticating: false, authenticate: passkey.authenticate, error: passkey.error }),
+}));
+vi.mock('../../../utils/tokenManager', () => ({ tokenManager: { getAccessToken: () => authState.current.token } }));
 
 vi.mock('../../../api/patientAccess', () => ({
   requestPatientOtp: vi.fn(),
@@ -126,6 +131,9 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authState.current = { token: null, profile: null };
+    passkey.supported = false;
+    passkey.error = '';
+    passkey.authenticate.mockReset();
     clearPendingPublicBookingSelection();
     mockedRequestOtp.mockResolvedValue({
       success: true,
@@ -157,6 +165,79 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
     }) as never);
     vi.mocked(createPatientPublicBookingRequest).mockResolvedValue({ id: 'new-request' } as never);
     vi.mocked(resubmitPatientPublicBookingRequest).mockResolvedValue({ id: 'same-request', status: 'pending' } as never);
+  });
+
+  it('offers discoverable passkey login while retaining phone OTP', async () => {
+    passkey.supported = true;
+    passkey.authenticate.mockResolvedValue(PATIENT_SESSION);
+    renderPage();
+    expect(screen.getByLabelText('patientPortal.pl_phone_label')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_login' }));
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/patient'));
+    expect(passkey.authenticate).toHaveBeenCalledWith({ isCurrent: expect.any(Function) });
+    expect(mockedRequestOtp).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['authentication_unavailable', 'patientPortal.pl_unavailable'],
+    ['authentication_rate_limited', 'patientPortal.pl_rate_limited'],
+  ])('shows %s while keeping the OTP form available', async (reason, message) => {
+    passkey.supported = true;
+    passkey.error = reason;
+    passkey.authenticate.mockResolvedValue(null);
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_login' }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.getByLabelText('patientPortal.pl_send_code')).toBeEnabled();
+  });
+
+  it('blocks an OTP request while passkey authentication is pending', async () => {
+    passkey.supported = true;
+    let resolvePasskey: (value: null) => void = () => {};
+    passkey.authenticate.mockReturnValue(new Promise((resolve) => { resolvePasskey = resolve; }));
+    renderPage();
+    fireEvent.change(screen.getByLabelText('patientPortal.pl_phone_label'), { target: { value: '+998900000000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'patient.pat_web_login' }));
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_send_code').closest('form')!);
+    expect(mockedRequestOtp).not.toHaveBeenCalled();
+    resolvePasskey(null);
+    await waitFor(() => expect(screen.getByLabelText('patientPortal.pl_send_code')).toBeEnabled());
+  });
+
+  it('keeps OTP available when this browser lacks passkey support', () => {
+    renderPage();
+    expect(screen.queryByRole('button', { name: 'patient.pat_web_login' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('patientPortal.pl_send_code')).toBeEnabled();
+  });
+
+  it('does not replace a session changed during OTP verification', async () => {
+    let resolveVerify: (value: Awaited<ReturnType<typeof verifyPatientOtp>>) => void = () => {};
+    mockedVerifyOtp.mockReturnValueOnce(new Promise((resolve) => { resolveVerify = resolve; }));
+    renderPage();
+    fireEvent.change(screen.getByLabelText('patientPortal.pl_phone_label'), { target: { value: '+998900000000' } });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_send_code').closest('form')!);
+    fireEvent.change(await screen.findByLabelText('patientPortal.pl_code_label'), { target: { value: '123456' } });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_verify').closest('form')!);
+    authState.current = { token: 'newer-session', profile: { role: 'Admin' } };
+    resolveVerify({ success: true, verification_grant: 'synthetic-grant', expires_in: 120 });
+    await waitFor(() => expect(screen.getByLabelText('patientPortal.pl_verify')).toBeEnabled());
+    expect(mockedPatientLogin).not.toHaveBeenCalled();
+    expect(replaceAccessOnlySession).not.toHaveBeenCalled();
+  });
+
+  it('does not install an OTP session if authentication changes while login finishes', async () => {
+    mockedPatientLogin.mockImplementationOnce(async () => {
+      window.dispatchEvent(new CustomEvent('authStateChanged'));
+      return PATIENT_SESSION;
+    });
+    renderPage();
+    fireEvent.change(screen.getByLabelText('patientPortal.pl_phone_label'), { target: { value: '+998900000000' } });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_send_code').closest('form')!);
+    fireEvent.change(await screen.findByLabelText('patientPortal.pl_code_label'), { target: { value: '123456' } });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_verify').closest('form')!);
+    await waitFor(() => expect(screen.getByLabelText('patientPortal.pl_verify')).toBeEnabled());
+    expect(mockedPatientLogin).toHaveBeenCalled();
+    expect(replaceAccessOnlySession).not.toHaveBeenCalled();
   });
 
   it('renders the phone step and rejects an invalid phone client-side', async () => {

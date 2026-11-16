@@ -38,6 +38,10 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     full_name: Mapped[str | None] = mapped_column(String(100), default=None)
     email: Mapped[str | None] = mapped_column(String(120), default=None, unique=True)
+    # Random, stable WebAuthn user handle. NULL until first enrollment.
+    passkey_user_handle: Mapped[str | None] = mapped_column(
+        String(43), nullable=True, unique=True, index=True
+    )
     hashed_password: Mapped[str] = mapped_column(String(255))
     # Least privilege: users created without an explicit role get
     # minimal permissions, not Admin.

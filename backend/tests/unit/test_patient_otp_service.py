@@ -15,6 +15,8 @@ Covers owner-approved identity contract v3:
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import pytest
 
@@ -26,6 +28,7 @@ from app.services.patient_otp_service import (
     ERR_OTP_INVALID,
     PatientOtpError,
     PatientOtpService,
+    _hash_code,
     normalize_phone,
 )
 
@@ -188,7 +191,7 @@ async def test_staging_textbee_override_is_used_only_for_patient_otp(
 
     assert len(sent) == 1
     assert sent[0].phone == "+998901112233"
-    assert sent[0].text.startswith("Код входа: ")
+    assert sent[0].text.startswith("Код подтверждения: ")
     assert sms_ok == []
 
     # Even if the normal resend cooldown is cleared, this acceptance key can
@@ -442,11 +445,17 @@ def test_normalize_phone_canonical(raw, expected):
 
 # ------------------------------------------------------------------ send
 @pytest.mark.asyncio
-async def test_send_login_otp_stores_hash_only_and_sends(svc, sms_ok, monkeypatch):
+@pytest.mark.parametrize(
+    ("locale", "message_label"),
+    [("ru", "Код подтверждения:"), ("uz", "Tasdiqlash kodi:")],
+)
+async def test_send_login_otp_stores_hash_only_and_sends(
+    svc, sms_ok, monkeypatch, locale, message_label
+):
     monkeypatch.setattr(
         "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
     )
-    await svc.send_login_otp("+998 90 111 22 33", "ru")
+    await svc.send_login_otp("+998 90 111 22 33", locale)
 
     backend = svc._get_backend()
     stored = backend.get("patotp:code:+998901112233")
@@ -454,7 +463,7 @@ async def test_send_login_otp_stores_hash_only_and_sends(svc, sms_ok, monkeypatc
     assert len(stored) == 64  # sha256 hex — plaintext code is never stored
     assert len(sms_ok) == 1
     assert sms_ok[0]["phone"] == "+998901112233"
-    assert "Код входа:" in sms_ok[0]["message"]
+    assert message_label in sms_ok[0]["message"]
     # TEST HOOK exposes the code only under TESTING
     code = backend.last_sent_code["+998901112233"]
     assert len(code) == 6
@@ -548,6 +557,95 @@ async def test_verify_attempts_exhaustion(svc, sms_ok, monkeypatch):
     # even the CORRECT code is dead after exhaustion (code deleted)
     with pytest.raises(PatientOtpError):
         svc.verify_login_otp(phone, code)
+
+
+@pytest.mark.parametrize("namespace", ["patotp", "patact"])
+def test_concurrent_correct_codes_are_consumed_once(svc, namespace):
+    phone, code = "+998901112233", "123456"
+    backend = svc.get_backend()
+    backend.set(f"{namespace}:code:{phone}", _hash_code(code), 60)
+    barrier = Barrier(16)
+
+    def verify():
+        barrier.wait()
+        try:
+            if namespace == "patotp":
+                return svc.verify_login_otp(phone, code)["verification_grant"]
+            return svc.verify_activation_otp(phone, code)
+        except PatientOtpError as exc:
+            assert (exc.status_code, exc.detail) == (400, ERR_OTP_INVALID)
+            return None
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        results = list(pool.map(lambda _: verify(), range(16)))
+    assert len([result for result in results if result is not None]) == 1
+
+
+def test_concurrent_wrong_codes_exhaust_attempts(svc):
+    phone = "+998901112233"
+    backend = svc.get_backend()
+    backend.set(f"patotp:code:{phone}", _hash_code("123456"), 60)
+    barrier = Barrier(16)
+
+    def verify_wrong():
+        barrier.wait()
+        with pytest.raises(PatientOtpError):
+            svc.verify_login_otp(phone, "999999")
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        list(pool.map(lambda _: verify_wrong(), range(16)))
+    with pytest.raises(PatientOtpError):
+        svc.verify_login_otp(phone, "123456")
+
+
+def test_memory_grant_concurrent_consume_is_single_use(svc):
+    grant = "test-grant-" + "x" * 24
+    svc.get_backend().set(f"patotp:grant:{grant}", "+998901112233", 60)
+    barrier = Barrier(16)
+
+    def consume():
+        barrier.wait()
+        return svc.consume_grant(grant)
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        results = list(pool.map(lambda _: consume(), range(16)))
+    assert results.count("+998901112233") == 1
+    assert results.count(None) == 15
+
+
+def test_reissue_preserves_attempts_and_corrupt_metadata_fails_closed(svc):
+    backend = svc.get_backend()
+    key = "patotp:code:+998901112233"
+    backend.set(key, _hash_code("123456"), 60)
+    assert not backend.consume_otp(key, _hash_code("999999"), 3)
+    assert not backend.consume_otp(key, _hash_code("999999"), 3)
+    backend.set(key, _hash_code("654321"), 60)
+    assert not backend.consume_otp(key, _hash_code("999999"), 3)
+    assert not backend.consume_otp(key, _hash_code("654321"), 3)
+    backend.set(key, _hash_code("654321"), 60)
+    assert backend.consume_otp(key, _hash_code("654321"), 3)
+
+    backend.set(key, _hash_code("123456"), 60)
+    backend.set(f"meta:{key}", "corrupt", 60)
+    assert not backend.consume_otp(key, _hash_code("999999"), 3)
+    assert backend.get(key) is None
+
+
+def test_redis_failure_during_verification_fails_closed(svc):
+    import redis
+
+    from app.services.patient_otp_service import ERR_SMS_UNAVAILABLE, _RedisBackend
+
+    class UnavailableRedis:
+        def eval(self, *args):
+            raise redis.ConnectionError("unavailable")
+
+    backend = _RedisBackend.__new__(_RedisBackend)
+    backend._client = UnavailableRedis()
+    svc._backend = backend
+    with pytest.raises(PatientOtpError) as error:
+        svc.verify_login_otp("+998901112233", "123456")
+    assert (error.value.status_code, error.value.detail) == (503, ERR_SMS_UNAVAILABLE)
 
 
 # ----------------------------------------------------------------- resolver
