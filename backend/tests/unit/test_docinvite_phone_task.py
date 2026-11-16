@@ -25,7 +25,6 @@ from app.services.notifications_pkg import NotificationSenderService
 
 
 @pytest.mark.unit
-@pytest.mark.notifications
 class TestDocInvitePhoneTask:
     def test_phone_invitation_persists_registrar_task_bound_to_visit(
         self, db_session, test_patient, test_visit, registrar_user
