@@ -1813,6 +1813,31 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/visits/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Visit By Telegram
+         * @description Отмена визита пациентом через Telegram бот по токену.
+         *
+         *     TGCONFIRM-BE-003 (audit #3892, group 20): the ``cancel_visit:<token>``
+         *     callback must persist a real cancellation through the authorized
+         *     lifecycle state machine and invalidate the token — the token is the
+         *     capability, mirroring the confirm route's trust model.
+         */
+        post: operations["cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/patient/visits/confirm": {
         parameters: {
             query?: never;
@@ -26545,6 +26570,19 @@ export type components = {
             /** New Total Amount */
             new_total_amount: number;
         };
+        /** CancelVisitResponse */
+        CancelVisitResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+            /** Visit Id */
+            visit_id: number;
+            /** Status */
+            status: string;
+            /** Patient Name */
+            patient_name: string;
+        };
         /** CanonicalVisitResponse */
         CanonicalVisitResponse: {
             /** Appointment Id */
@@ -40939,6 +40977,13 @@ export type components = {
             /** Commands Processed Today */
             commands_processed_today: number;
         };
+        /** TelegramCancelRequest */
+        TelegramCancelRequest: {
+            /** Token */
+            token: string;
+            /** Telegram User Id */
+            telegram_user_id?: string | null;
+        };
         /** TelegramConfirmRequest */
         TelegramConfirmRequest: {
             /** Token */
@@ -48113,6 +48158,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfirmationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelVisitResponse"];
                 };
             };
             /** @description Validation Error */

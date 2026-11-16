@@ -109,6 +109,48 @@ def confirm_visit_by_telegram(
         _raise_http_error(exc)
 
 
+class TelegramCancelRequest(BaseModel):
+    token: str = Field(..., min_length=10)
+    telegram_user_id: str | None = None
+
+
+class CancelVisitResponse(BaseModel):
+    success: bool
+    message: str
+    visit_id: int
+    status: str
+    patient_name: str
+
+
+@router.post("/telegram/visits/cancel", response_model=CancelVisitResponse)
+def cancel_visit_by_telegram(
+    request_body: TelegramCancelRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Отмена визита пациентом через Telegram бот по токену.
+
+    TGCONFIRM-BE-003 (audit #3892, group 20): the ``cancel_visit:<token>``
+    callback must persist a real cancellation through the authorized
+    lifecycle state machine and invalidate the token — the token is the
+    capability, mirroring the confirm route's trust model.
+    """
+    service = VisitConfirmationService(db)
+    source_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    try:
+        result = service.cancel_by_telegram(
+            token=request_body.token,
+            telegram_user_id=request_body.telegram_user_id,
+            source_ip=source_ip,
+            user_agent=user_agent,
+        )
+        return CancelVisitResponse(**result)
+    except VisitConfirmationDomainError as exc:
+        _raise_http_error(exc)
+
+
 @router.post("/patient/visits/confirm", response_model=ConfirmationResponse)
 def confirm_visit_by_pwa(
     request_body: PWAConfirmRequest,
