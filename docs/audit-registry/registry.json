@@ -552,7 +552,8 @@
       "merge_sha": "1532acda4adc0d5109e941b0681fb8091c6dd5b5",
       "test_after": "owner merge #4105 (1532acda4: DermaVisitGallery fail-closed on invalid skin AI response envelope, +51 test lines); registry-agent batch verification on exact main 835eb01b6: DermaVisitGallery.test.tsx within 6-file owner-merge batch 44/44 GREEN (2026-11-16)",
       "date": "2026-11-16",
-      "test_before": "pre-merge state (owner group109): invalid skin AI response envelope (missing/non-canonical root fields) was not rejected client-side — gallery rendered a broken AI photo analysis result; no checked-in regression existed before owner merge #4105"
+      "test_before": "pre-merge state (owner group109): invalid skin AI response envelope (missing/non-canonical root fields) was not rejected client-side — gallery rendered a broken AI photo analysis result; no checked-in regression existed before owner merge #4105",
+      "reviewer": "registry-agent owner-merge reconciliation 2026-11-16 (batch 44/44 GREEN on exact main 835eb01b6)"
     },
     {
       "checked": false,
@@ -605,7 +606,8 @@
       "merge_sha": "eb8fff18d01729da3f719c9219148c646d41d7c0",
       "test_after": "owner merge #4109 (eb8fff18d: completion honours the shared EMR dirty registry; new DermatologistPanel.dermaCompleteDirtyGate.test.tsx 347 lines + deferredAcks/races/DoctorVisitCompletionAck contract updates); registry-agent batch verification on exact main 835eb01b6: 44/44 GREEN across the 6 owner-merge test files (2026-11-16)",
       "date": "2026-11-16",
-      "test_before": "pre-merge state (owner group109 lane): derma visit completion did not honour the shared EMR dirty registry — a dirty EMR could be bypassed by the completion ACK path; no behavioral regression existed before owner merge #4109"
+      "test_before": "pre-merge state (owner group109 lane): derma visit completion did not honour the shared EMR dirty registry — a dirty EMR could be bypassed by the completion ACK path; no behavioral regression existed before owner merge #4109",
+      "reviewer": "registry-agent owner-merge reconciliation 2026-11-16 (batch 44/44 GREEN on exact main 835eb01b6)"
     },
     {
       "checked": false,
