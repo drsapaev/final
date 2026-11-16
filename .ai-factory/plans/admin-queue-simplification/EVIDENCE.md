@@ -1,3 +1,30 @@
+## T19 — PR #4117 reviewed visual baseline proof — 2026-11-16
+
+Corrected source/test HEAD: 82fb7f7cad967f5ab82951756450c7c6b423892c. [Hosted run](https://github.com/drsapaev/final/actions/runs/43919809748): full frontend unit 525 files / 4427 PASS; build, lint, quality, Gitleaks, OpenAPI freshness and metadata gates PASS. Backend was still running. Visual step: 134 PASS, four screenshot assertions failed after all new registry response/count/name/readiness assertions succeeded.
+
+Canonical Linux actual images came from playwright-failure-artifacts, artifact 14252484656, digest be89790137adf3e3f545eea02ec26ba8901355a0c4be343fbf5085231086bfac (expires 2026-11-30). All four expected/actual/diff triplets were visually reviewed. Only four approved PNG baselines were replaced, byte-identically from actual files; no thresholds, masks, skips or source changes.
+
+| Image | Different pixels before replacement | Reviewed cause |
+|---|---:|---|
+| registrar-eat-desktop | 25360 (3%) | One mixed profile/doctor strip, compact desktop padding; content rises 16px. |
+| registrar-eat-mobile-scroll | 7481 (3%) | Mobile labels retained and horizontal scroll; content moves 4px. |
+| pr18-registrar-light | 27202 (3%) | Same six labels/order/icons, compact strip and content offset 16px. |
+| pr18-registrar-dark | 30152 (4%) | Same light-theme structural delta in dark theme. |
+
+Inherited baseline drift is explicit: EAT desktop PNG predates main at f9a6eca0e, mobile at f0650f6d1; PR18 PNGs at d4dd0ac73 (#3068). Main header change 8041e9b72 (#3075) removed max-width:fit-content from icon controls, shortening available search width; source anchors frontend/src/styles/header-new.css:90 and frontend/src/components/layout/HeaderNew.tsx:498. Counter change 61232b20e (#3272) already renders patient-based labels; anchors frontend/src/pages/registrar/views/WorklistView.tsx:153 and frontend/src/pages/registrar/registrarWorklistRows.ts:441. All four source files are unchanged between base d7eaa2d24 and tested HEAD82fb7f7ca. This is classified as stale visual-baseline drift, not new application behavior. New strip delta follows removed inline 8px/16px padding in Tabs.tsx and current Tabs.css desktop/mobile padding. Review found no unexplained differences, error banners, missing blocks or new clipping.
+
+Committed PNG byte proof:
+
+| Baseline file | SHA256 of canonical actual / committed copy |
+|---|---|
+| registrar-eat-mobile-scroll-chromium-linux.png | af62113e43ff83cf910b3c7fc0d6ecec0b88bd36718f9a64b19b2143602cb522 |
+| registrar-eat-desktop-chromium-linux.png | c6ebf73ddbff58a7f9777d0001826975f52f6ee7a78a413b040db7ecf4521d74 |
+| pr18-registrar-light-chromium-linux.png | 36654095d3cdd821f3bbcbac9d53d78dc332f2be55f3bf484fd7e90666db7f3d |
+| pr18-registrar-dark-chromium-linux.png | 4629c8c1698feccb02906052a8c551264cf6a3ec66848f4bee27d3bcf577151b |
+
+Normal hook-enabled baseline commit/new exact-head CI follow. Full Tier-2/Admin2FA and system runbook remain NOT_RUN/PARTIAL; no production, merge or deploy.
+
+
 ## T19 — PR #4117 full-suite fixture correction — 2026-11-16
 
 Hosted source HEAD c82a6cbde: Gitleaks and GitGuardian PASS; frontend build/lint, code quality, OpenAPI freshness, Regression Audit and metadata gates PASS. Full frontend unit reported 7 failed / 4420 passed in 2 suites: QueueProfilesManager.interactions used previous translated profile labels; WorklistView.tabpanel mocked the previous profiles endpoint/automatic doctor props. Both corrected with behavioral assertions retained; combined focused rerun 43/43 PASS. Prior runtime checks (68 focused tests, type-check/build) remain recorded above/below, not reclassified as full-suite proof.

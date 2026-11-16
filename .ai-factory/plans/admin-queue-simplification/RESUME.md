@@ -1,3 +1,7 @@
+## T19 — PR #4117 baseline checkpoint — 2026-11-16
+
+Task ad5eac7f-734f-4b24-8d57-437008bacdb8, registrar-tabs-unified. Corrected tested HEAD82fb7f7ca has full unit4427 PASS and build/lint/quality/docs/Gitleaks PASS. Four reviewed Linux actual PNGs copied to four allowed baselines; exact source/hash/visual causality in EVIDENCE. Finish ordinary hook-enabled baseline/journal commit, push, refresh PR body and inspect new exact-head CI. No runtime change after82fb7f7ca. If known failures remain, fix within current PR; never weaken thresholds. Keep Draft and Tier-2/Admin2FA NOT_RUN; no merge/deploy. Worktree retained for PR review and pending validation, production tree untouched.
+
 ## T19 — resume PR #4117 CI correction — 2026-11-16
 
 Task ad5eac7f-734f-4b24-8d57-437008bacdb8, registrar-tabs-unified / codex/registrar-tabs-unified. Draft PR #4117 source HEAD c82a6cbde exists. Gitleaks recovered and hosted scan PASS. Full CI revealed old unit mocks/labels (now 43 focused tests PASS) and missing registry visual fixture (fixed in 2 E2E files; E2E tsc, scoped lint and exact4 collection PASS). No PNG accepted yet. Finish ordinary hook-enabled test/journal commit, push and monitor ordinary exact-head CI. If only intentional visual deltas remain, inspect corrected Linux actual/diff artifacts before changing ONLY 4 allowed PNGs; do not bless error-state screenshots or alter thresholds. Current source/runtime unchanged; Tier-2/Admin2FA NOT_RUN, no deferral/merge/deploy.

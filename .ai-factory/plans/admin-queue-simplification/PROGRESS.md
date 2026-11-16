@@ -1,3 +1,7 @@
+## T19 — PR #4117: full unit PASS, четыре проверенных baseline — 2026-11-16
+
+На 82fb7f7ca полный frontend unit: 525 файлов / 4427 PASS. Build/lint/quality/OpenAPI/Gitleaks/metadata PASS; backend ещё выполнялся. Четыре visual assertions отличаются только намеренной compact mixed strip/mobile labels и явно разобранными старыми дельтами main. Все 12 expected/actual/diff просмотрены; обновлены ровно четыре PNG из canonical Linux artifact с проверкой byte identity/SHA256. Ошибочный error-state из первого прогона не принят. Подробная причинность, исторические commits, counts и hashes сохранены в EVIDENCE. Новый hosted CI нужен на baseline commit. Draft #4117; Tier-2/Admin2FA NOT_RUN, T18 PARTIAL, без deferral/merge/deploy.
+
 ## T19 — PR #4117: исправление CI fixtures — 2026-11-16
 
 Draft PR #4117 опубликован на c82a6cbde. Gitleaks, build, lint, code quality, OpenAPI freshness и metadata checks PASS. Full unit: 7 failures / 4420 PASS из-за старых подписей и mocks в двух прежних suites; ожидания приведены к новому контракту без ослабления assertions, 43/43 focused PASS. Четыре visual failures показали missing /registrar/tabs mock и error banner. Исправлены два E2E fixture-файла; снимки требуют GET200, configured version, точное число/имена вкладок и отсутствие error/loading. E2E TypeScript PASS, collection 4 targeted tests PASS; эти четыре browser-сценария после исправления пока НЕ выполнены. PNG и thresholds не изменены. Повторный CI нужен на corrective commit; normal Admin2FA/Tier-2 NOT_RUN, T18 PARTIAL. Production/очереди/история не затрагиваются.
