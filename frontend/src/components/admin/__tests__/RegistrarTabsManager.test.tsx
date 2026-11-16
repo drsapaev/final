@@ -1,11 +1,21 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import RegistrarTabsManager from '../RegistrarTabsManager';
+import RegistrarTabsManager, { type RegistrarTabsManagerHandle } from '../RegistrarTabsManager';
 import type { AdminRegistrarTabsResponse, ResolvedRegistrarTab } from '../../../api/registrarTabs';
 
 const apiMocks = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }));
+const ownerState = vi.hoisted(() => ({
+  profile: { id: 1, clinic_id: 1 } as { id: number; clinic_id: number } | null,
+  sequence: 0,
+}));
+
+vi.mock('../../../stores/auth', () => ({
+  getProfileFromStorage: () => ownerState.profile,
+  subscribeAuth: () => () => {},
+}));
 
 vi.mock('../../../api/registrarTabs', () => ({
   getAdminRegistrarTabs: apiMocks.load,
@@ -42,6 +52,7 @@ const configuration = (tabs = [direction, doctor], mode: 'legacy' | 'configured'
 
 beforeEach(() => {
   vi.clearAllMocks();
+  ownerState.profile = { id: ++ownerState.sequence, clinic_id: 1 };
   apiMocks.load.mockResolvedValue(configuration());
   apiMocks.save.mockImplementation(async (request: { tabs: Array<{ target_kind: string; target_id: number; title: string | null; visible: boolean }> }) => {
     const options = [direction, doctor, otherDoctor];
@@ -140,5 +151,82 @@ describe('RegistrarTabsManager', () => {
     render(<RegistrarTabsManager />);
     expect(await screen.findByText('registrarPanel.rt_unavailable')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'registrarPanel.rt_remove_label SYNTHETIC Doctor — registrarPanel.rt_doctor · #7' })).toBeEnabled();
+  });
+
+  it('restores an owner draft after route remount with its original expected version', async () => {
+    apiMocks.load.mockResolvedValue(configuration([direction, doctor], 'configured'));
+    const first = render(<RegistrarTabsManager />);
+    fireEvent.change(await screen.findByDisplayValue('SYNTHETIC Direction'), { target: { value: 'SYNTHETIC Retained Draft' } });
+    first.unmount();
+
+    apiMocks.load.mockResolvedValue({ ...configuration([otherDoctor], 'configured'), version: 3 });
+    render(<RegistrarTabsManager />);
+    expect(await screen.findByDisplayValue('SYNTHETIC Retained Draft')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('registrarPanel.rt_conflict');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'registrarPanel.rt_save' }));
+    await waitFor(() => expect(apiMocks.save).toHaveBeenCalledWith(expect.objectContaining({
+      expected_version: 2,
+      tabs: expect.arrayContaining([{ target_kind: 'profile', target_id: 7, title: 'SYNTHETIC Retained Draft', visible: true }]),
+    })));
+  });
+
+  it('does not reveal a retained draft until a current-owner read succeeds', async () => {
+    const first = render(<RegistrarTabsManager />);
+    fireEvent.change(await screen.findByDisplayValue('SYNTHETIC Direction'), { target: { value: 'SYNTHETIC Private Draft' } });
+    first.unmount();
+
+    apiMocks.load.mockRejectedValueOnce({ response: { status: 403 } });
+    render(<RegistrarTabsManager />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('registrarPanel.rt_load_error');
+    expect(screen.queryByDisplayValue('SYNTHETIC Private Draft')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'registrarPanel.rt_retry' }));
+    expect(await screen.findByDisplayValue('SYNTHETIC Private Draft')).toBeInTheDocument();
+  });
+
+  it.each(['user', 'clinic', 'unknown'] as const)('does not restore a draft for a different or unknown %s owner', async (change) => {
+    const first = render(<RegistrarTabsManager />);
+    fireEvent.change(await screen.findByDisplayValue('SYNTHETIC Direction'), { target: { value: 'SYNTHETIC Owner Draft' } });
+    first.unmount();
+
+    if (change === 'user') ownerState.profile = { id: 100000, clinic_id: 1 };
+    if (change === 'clinic') ownerState.profile = { id: ownerState.sequence, clinic_id: 2 };
+    if (change === 'unknown') ownerState.profile = null;
+    render(<RegistrarTabsManager />);
+    expect(await screen.findByDisplayValue('SYNTHETIC Direction')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('SYNTHETIC Owner Draft')).not.toBeInTheDocument();
+  });
+
+  it('never caches a draft while the authenticated owner is unknown', async () => {
+    ownerState.profile = null;
+    const first = render(<RegistrarTabsManager />);
+    fireEvent.change(await screen.findByDisplayValue('SYNTHETIC Direction'), { target: { value: 'SYNTHETIC Unknown Draft' } });
+    first.unmount();
+    render(<RegistrarTabsManager />);
+    expect(await screen.findByDisplayValue('SYNTHETIC Direction')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('SYNTHETIC Unknown Draft')).not.toBeInTheDocument();
+  });
+
+  it.each(['reload', 'discard', 'save'] as const)('clears the retained draft after explicit %s', async (action) => {
+    const handle = React.createRef<RegistrarTabsManagerHandle>();
+    const first = render(<RegistrarTabsManager ref={handle} />);
+    fireEvent.change(await screen.findByDisplayValue('SYNTHETIC Direction'), { target: { value: 'SYNTHETIC Cleared Draft' } });
+    const user = userEvent.setup();
+    if (action === 'reload') {
+      await user.click(screen.getByRole('button', { name: 'registrarPanel.rt_discard_reload' }));
+      await screen.findByDisplayValue('SYNTHETIC Direction');
+    } else if (action === 'discard') {
+      act(() => handle.current?.discardDraft());
+    } else {
+      await user.click(screen.getByRole('button', { name: 'registrarPanel.rt_save' }));
+      await screen.findByText('registrarPanel.rt_saved');
+    }
+    first.unmount();
+
+    apiMocks.load.mockResolvedValue({ ...configuration([otherDoctor], 'configured'), version: 9 });
+    render(<RegistrarTabsManager />);
+    expect(await screen.findByDisplayValue('SYNTHETIC Other Doctor')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('SYNTHETIC Cleared Draft')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

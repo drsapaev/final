@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const managerActions = vi.hoisted(() => ({ discardDraft: vi.fn() }));
+
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({ isDark: false }),
 }));
@@ -23,16 +25,19 @@ vi.mock('../../../i18n/useTranslation', () => ({
 }));
 
 vi.mock('../RegistrarTabsManager', () => ({
-  default: ({ onDirtyChange, onSavingChange, defaultOpenProfiles }: {
+  default: React.forwardRef<{ discardDraft: () => void }, {
     onDirtyChange?: (dirty: boolean) => void;
     onSavingChange?: (saving: boolean) => void;
     defaultOpenProfiles?: boolean;
-  }) => <div data-testid="registrar-tabs-panel">
-    Registrar tabs
-    <button type="button" onClick={() => onDirtyChange?.(true)}>Edit registrar tabs</button>
-    <button type="button" onClick={() => onSavingChange?.(true)}>Start saving registrar tabs</button>
-    {defaultOpenProfiles && <span>Profile settings open</span>}
-  </div>,
+  }>(function MockRegistrarTabsManager({ onDirtyChange, onSavingChange, defaultOpenProfiles }, ref) {
+    React.useImperativeHandle(ref, () => ({ discardDraft: managerActions.discardDraft }));
+    return <div data-testid="registrar-tabs-panel">
+      Registrar tabs
+      <button type="button" onClick={() => onDirtyChange?.(true)}>Edit registrar tabs</button>
+      <button type="button" onClick={() => onSavingChange?.(true)}>Start saving registrar tabs</button>
+      {defaultOpenProfiles && <span>Profile settings open</span>}
+    </div>;
+  }),
 }));
 
 vi.mock('../ServiceCatalog', () => ({
@@ -82,6 +87,7 @@ function mockLegacySavedTab() {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  managerActions.discardDraft.mockClear();
   localStorage.clear();
 });
 
@@ -129,6 +135,7 @@ describe('AdminServices URL-backed tab navigation', () => {
     await user.click(screen.getByRole('button', { name: 'Профили очередей' }));
     expect(await screen.findByTestId('registrar-tabs-panel')).toBeInTheDocument();
     expect(screen.getByTestId('current-location')).toHaveTextContent('servicesTab=queue-profiles');
+    expect(managerActions.discardDraft).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByTestId('service-catalog-panel')).toBeInTheDocument();
@@ -167,6 +174,7 @@ describe('AdminServices URL-backed tab navigation', () => {
     expect(screen.getByTestId('registrar-tabs-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('service-catalog-panel')).not.toBeInTheDocument();
     expect(screen.getByTestId('current-location')).toHaveTextContent('servicesTab=queue-profiles');
+    expect(managerActions.discardDraft).not.toHaveBeenCalled();
   });
 
   it('leaves the registrar editor only after explicit discard confirmation', async () => {
@@ -183,6 +191,7 @@ describe('AdminServices URL-backed tab navigation', () => {
     const current = new URL(screen.getByTestId('current-location').textContent ?? '', 'http://local');
     expect(current.searchParams.get('servicesTab')).toBe('catalog');
     expect(current.searchParams.get('keep')).toBe('2');
+    expect(managerActions.discardDraft).toHaveBeenCalledTimes(1);
   });
 
   it('disables tab navigation while the registrar configuration is being saved', async () => {

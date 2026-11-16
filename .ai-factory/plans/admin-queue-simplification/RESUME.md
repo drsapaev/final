@@ -1,3 +1,7 @@
+## T19 — final publication checkpoint — 2026-11-16
+
+Continue task ad5eac7f-734f-4b24-8d57-437008bacdb8 in registrar-tabs-unified / codex/registrar-tabs-unified. Gitleaks recovered with verified official pinned release, standard full pre-commit PASS. Feature commit 28746c3b4 and main sync 5bac9c1f9 exist. Two final review P2 fixed locally: owner-scoped in-memory draft recovery and hidden-filter accessible name. Final 68 focused UI tests and type-check PASS. Final build PASS and bounded review no new P0–P2. Complete ordinary hook-enabled follow-up commit, push and Draft PR; monitor actual exact-head CI. Tier-2/normal Admin2FA NOT_RUN. No merge/deploy. All earlier journal entries below are historical; this checkpoint supersedes their pending Gitleaks/commit steps.
+
 ## T19 — штатное восстановление Gitleaks — 2026-11-16
 
 Standard Gitleaks recovery succeeded without changing policy or hook configuration. Full pre-commit PASS. Next: conventional commit of the staged unified-tab implementation, merge current origin/main in this isolated worktree, push and prepare Draft PR, monitor exact-head CI. Keep live Admin2FA/staging NOT_RUN and preserve previous evidence.

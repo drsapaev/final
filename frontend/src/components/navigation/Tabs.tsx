@@ -223,7 +223,11 @@ const Tabs = ({ activeTab, activeDoctorId = null, onTabChange, onDoctorChange, o
       </div>
     </div>
     {hiddenFilter && <div className="registrar-stale-banner" role="status">
-      <span>{t('registrarPanel.rt_hidden_filter')}</span>
+      {/* WorklistView keeps this selected-filter IDREF for historical links.
+          Supply its label without adding a selectable tab to the strip. */}
+      <span id={activeDoctorId != null ? doctorTabButtonIdFor(activeDoctorId) : activeTab ? tabButtonIdFor(activeTab) : undefined}>
+        {t('registrarPanel.rt_hidden_filter')}
+      </span>
       <button type="button" onClick={clearFilter}>{t('registrarPanel.rt_clear_filter')}</button>
     </div>}
   </div>;

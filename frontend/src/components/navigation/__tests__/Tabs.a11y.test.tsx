@@ -155,9 +155,18 @@ describe('unified configured registrar strip', () => {
     vi.mocked(getRegistrarTabs).mockResolvedValue(response([]));
     const onTabChange = vi.fn();
     const onDoctorChange = vi.fn();
-    render(<Tabs activeTab={kind === 'profile' ? 'hidden' : null} activeDoctorId={kind === 'doctor' ? 7 : null}
-      onTabChange={onTabChange} onDoctorChange={onDoctorChange} />);
-    expect(await screen.findByText('registrarPanel.rt_hidden_filter')).toBeVisible();
+    const selectedLabelId = kind === 'profile' ? tabButtonIdFor('hidden') : doctorTabButtonIdFor(7);
+    render(<>
+      <Tabs activeTab={kind === 'profile' ? 'hidden' : null} activeDoctorId={kind === 'doctor' ? 7 : null}
+        onTabChange={onTabChange} onDoctorChange={onDoctorChange} />
+      <div role="tabpanel" aria-labelledby={selectedLabelId}>SYNTHETIC historical worklist</div>
+    </>);
+    const hiddenFilterLabel = await screen.findByText('registrarPanel.rt_hidden_filter');
+    expect(hiddenFilterLabel).toBeVisible();
+    expect(hiddenFilterLabel).toHaveAttribute('id', selectedLabelId);
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('registrarPanel.rt_hidden_filter');
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.getByRole('tablist')).not.toContainElement(hiddenFilterLabel);
     expect(onTabChange).not.toHaveBeenCalled();
     expect(onDoctorChange).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'registrarPanel.rt_clear_filter' }));

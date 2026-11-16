@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FolderTree, Package } from 'lucide-react';
 import { useConfirm } from '../common/ConfirmDialog';
+import type { RegistrarTabsManagerHandle } from './RegistrarTabsManager';
 
 import {
   Skeleton,
@@ -123,6 +124,7 @@ const AdminServices = () => {
   const [tabsDirty, setTabsDirty] = useState(false);
   const [tabsSaving, setTabsSaving] = useState(false);
   const [confirmDiscard, discardDialog] = useConfirm();
+  const tabsEditorRef = React.useRef<RegistrarTabsManagerHandle | null>(null);
   const [initialLocation] = useState(() => ({
     key: location.key,
     tab: getInitialServicesTab(location.search),
@@ -171,13 +173,15 @@ const AdminServices = () => {
   const confirmLeaveTabs = async () => {
     if (tabsSaving) return false;
     if (!tabsDirty) return true;
-    return confirmDiscard({
+    const discard = await confirmDiscard({
       title: t('registrarPanel.rt_title'),
       message: t('registrarPanel.rt_unsaved_warning'),
       confirmLabel: t('registrarPanel.rt_discard_confirm'),
       cancelLabel: t('common.cancel'),
       intent: 'warning',
     });
+    if (discard) tabsEditorRef.current?.discardDraft();
+    return discard;
   };
 
   const selectTab = async (tabKey: ServiceTabKey) => {
@@ -259,7 +263,7 @@ const AdminServices = () => {
       )}
       {servicesTab === 'queue-profiles' && (
         <React.Suspense fallback={<Skeleton className="admin-skeleton-h-384" />}>
-          <LazyRegistrarTabsManager theme={isDark ? 'dark' : 'light'}
+          <LazyRegistrarTabsManager ref={tabsEditorRef} theme={isDark ? 'dark' : 'light'}
             defaultOpenProfiles={setupReturnContext?.entity?.kind === 'queue_profile'}
             onDirtyChange={setTabsDirty} onSavingChange={setTabsSaving} />
         </React.Suspense>

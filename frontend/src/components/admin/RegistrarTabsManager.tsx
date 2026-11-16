@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore } from 'react';
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
@@ -11,11 +11,36 @@ import {
 } from '../../api/registrarTabs';
 import { Button, Checkbox, Input, Select, Skeleton } from '../ui/macos';
 import { useBeforeUnload } from '../../hooks/useNavigationGuard';
+import { getProfileFromStorage, subscribeAuth } from '../../stores/auth';
 
 const QueueProfilesManager = React.lazy(() => import('./QueueProfilesManager'));
 
 interface DraftTab extends RegistrarTabInput {
   target: ResolvedRegistrarTab;
+}
+
+interface CachedDraft {
+  ownerId: string;
+  baseConfig: AdminRegistrarTabsResponse;
+  draft: DraftTab[];
+}
+
+// One owner-scoped draft per SPA lifetime. Staff labels never enter browser
+// storage, and a different/unknown owner clears the prior owner's draft.
+let cachedDraft: CachedDraft | null = null;
+
+const draftOwnerId = (): string | null => {
+  const profile = getProfileFromStorage();
+  if (typeof profile?.id !== 'number' || !Number.isSafeInteger(profile.id) || profile.id <= 0) return null;
+  const clinicId = profile.clinic_id;
+  const clinicKey = typeof clinicId === 'string' || typeof clinicId === 'number' ? String(clinicId) : 'global';
+  return `${clinicKey}:${profile.id}`;
+};
+
+const subscribeOwner = (listener: () => void) => subscribeAuth(() => listener());
+
+export interface RegistrarTabsManagerHandle {
+  discardDraft: () => void;
 }
 
 const toDraft = (tab: ResolvedRegistrarTab): DraftTab => ({
@@ -40,8 +65,12 @@ interface RegistrarTabsManagerProps {
   onSavingChange?: (saving: boolean) => void;
 }
 
-export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfiles = false, onDirtyChange, onSavingChange }: RegistrarTabsManagerProps) {
+const RegistrarTabsManager = React.forwardRef<RegistrarTabsManagerHandle, RegistrarTabsManagerProps>(function RegistrarTabsManager(
+  { theme = 'light', defaultOpenProfiles = false, onDirtyChange, onSavingChange },
+  ref,
+) {
   const { t, language } = useTranslation();
+  const ownerId = useSyncExternalStore(subscribeOwner, draftOwnerId, () => null);
   const [config, setConfig] = useState<AdminRegistrarTabsResponse | null>(null);
   const [draft, setDraft] = useState<DraftTab[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,18 +82,36 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
   const [profilesOpen, setProfilesOpen] = useState(defaultOpenProfiles);
   const requestGeneration = useRef(0);
   const savingRef = useRef(false);
+  const loadedOwner = useRef<string | null | undefined>(undefined);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (discard = false) => {
+    const requestOwner = draftOwnerId();
+    if (!requestOwner || cachedDraft?.ownerId !== requestOwner) cachedDraft = null;
+    if (discard && cachedDraft?.ownerId === requestOwner) cachedDraft = null;
+    const restore = !discard && requestOwner ? cachedDraft : null;
     const generation = ++requestGeneration.current;
     setLoading(true);
     setLoadError(false);
     try {
       const response = await getAdminRegistrarTabs();
-      if (requestGeneration.current !== generation) return;
-      setConfig(response);
-      setDraft(response.tabs.map(toDraft));
+      if (requestGeneration.current !== generation || draftOwnerId() !== requestOwner) return;
+      loadedOwner.current = requestOwner;
+      if (restore && restore.ownerId === requestOwner) {
+        // Resolve display metadata from this authorized read, but keep the
+        // original base/version so a concurrent save remains a real conflict.
+        const targets = new Map([...response.options, ...response.tabs].map((tab) => [registrarTabIdentity(tab), tab]));
+        setConfig({ ...restore.baseConfig, options: response.options, profile_filters: response.profile_filters });
+        setDraft(restore.draft.map((row) => ({
+          ...row,
+          target: targets.get(registrarTabIdentity(row)) || { ...row.target, available: false },
+        })));
+        setSaveError(response.version === restore.baseConfig.version ? null : 'conflict');
+      } else {
+        setConfig(response);
+        setDraft(response.tabs.map(toDraft));
+        setSaveError(null);
+      }
       setSelectedTarget('');
-      setSaveError(null);
       setSaved(false);
     } catch {
       if (requestGeneration.current === generation) setLoadError(true);
@@ -74,9 +121,14 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
   }, []);
 
   useEffect(() => {
+    loadedOwner.current = undefined;
+    setConfig(null);
+    setDraft([]);
+    setSaving(false);
+    savingRef.current = false;
     void load();
     return () => { requestGeneration.current += 1; };
-  }, [load]);
+  }, [load, ownerId]);
 
   useEffect(() => {
     if (defaultOpenProfiles) setProfilesOpen(true);
@@ -84,15 +136,29 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
 
   const labelFor = (target: ResolvedRegistrarTab): string =>
     language === 'ru' ? target.title_ru || target.title : target.title || target.title_ru || '';
+  const currentConfig = loadedOwner.current === ownerId ? config : null;
   const inputs = draft.map(toInput);
-  const dirty = config !== null
-    && JSON.stringify(inputs) !== JSON.stringify(config.tabs.map(toDraft).map(toInput));
+  const dirty = currentConfig !== null
+    && JSON.stringify(inputs) !== JSON.stringify(currentConfig.tabs.map(toDraft).map(toInput));
+  useEffect(() => {
+    if (!ownerId) { cachedDraft = null; return; }
+    if (!currentConfig || loading) return;
+    if (dirty) cachedDraft = { ownerId, baseConfig: currentConfig, draft };
+    else if (cachedDraft?.ownerId === ownerId) cachedDraft = null;
+  }, [currentConfig, dirty, draft, loading, ownerId]);
+  const discardDraft = useCallback(() => {
+    if (cachedDraft?.ownerId === ownerId) cachedDraft = null;
+    if (currentConfig) setDraft(currentConfig.tabs.map(toDraft));
+    setSaveError(null);
+    setSaved(false);
+  }, [currentConfig, ownerId]);
+  useImperativeHandle(ref, () => ({ discardDraft }), [discardDraft]);
   useBeforeUnload(dirty || saving, t('registrarPanel.rt_unsaved_warning'));
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => { onSavingChange?.(saving); }, [saving, onSavingChange]);
   useEffect(() => () => { onDirtyChange?.(false); onSavingChange?.(false); }, [onDirtyChange, onSavingChange]);
   const usedTargets = new Set(draft.map(registrarTabIdentity));
-  const availableOptions = config?.options.filter((target) => target.available && !usedTargets.has(registrarTabIdentity(target))) || [];
+  const availableOptions = currentConfig?.options.filter((target) => target.available && !usedTargets.has(registrarTabIdentity(target))) || [];
 
   const updateDraft = (next: DraftTab[]) => {
     setDraft(next);
@@ -115,7 +181,7 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
   };
 
   const save = async () => {
-    if (!config || savingRef.current || loading) return;
+    if (!currentConfig || savingRef.current || loading || draftOwnerId() !== ownerId) return;
     savingRef.current = true;
     setSaving(true);
     setSaveError(null);
@@ -123,11 +189,12 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
     const generation = ++requestGeneration.current;
     try {
       const response = await saveRegistrarTabs({
-        expected_version: config.version,
+        expected_version: currentConfig.version,
         tabs: draft.map(toInput),
         reason: 'configure_registrar_tabs',
       });
-      if (requestGeneration.current !== generation) return;
+      if (requestGeneration.current !== generation || draftOwnerId() !== ownerId) return;
+      if (cachedDraft?.ownerId === ownerId) cachedDraft = null;
       setConfig(response);
       setDraft(response.tabs.map(toDraft));
       setLoadError(false);
@@ -138,8 +205,10 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
       const status = (error as { response?: { status?: number } })?.response?.status;
       setSaveError(status === 409 ? 'conflict' : 'error');
     } finally {
-      savingRef.current = false;
-      if (requestGeneration.current === generation) setSaving(false);
+      if (requestGeneration.current === generation) {
+        savingRef.current = false;
+        setSaving(false);
+      }
     }
   };
 
@@ -148,10 +217,10 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
       <div className="admin-qp-header">
         <h2 id="registrar-tabs-title" className="admin-qp-title">{t('registrarPanel.rt_title')}</h2>
         <div className="admin-qp-toolbar">
-          <Button variant="secondary" disabled={saving || loading} onClick={() => { void load(); }}>
+          <Button variant="secondary" disabled={saving || loading} onClick={() => { discardDraft(); void load(true); }}>
             {t(dirty ? 'registrarPanel.rt_discard_reload' : 'registrarPanel.rt_reload')}
           </Button>
-          <Button disabled={!config || saving || loading || (config.mode === 'configured' && !dirty)} loading={saving} onClick={() => { void save(); }}>
+          <Button disabled={!currentConfig || saving || loading || (currentConfig.mode === 'configured' && !dirty)} loading={saving} onClick={() => { void save(); }}>
             {t('registrarPanel.rt_save')}
           </Button>
         </div>
@@ -165,8 +234,8 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
       </div>}
       {saveError && <p role="alert">{t(saveError === 'conflict' ? 'registrarPanel.rt_conflict' : 'registrarPanel.rt_save_error')}</p>}
       {saved && <p role="status">{t('registrarPanel.rt_saved')}</p>}
-      {config && <>
-        <p>{t(config.mode === 'legacy' ? 'registrarPanel.rt_legacy_notice' : 'registrarPanel.rt_configured_notice')}</p>
+      {currentConfig && <>
+        <p>{t(currentConfig.mode === 'legacy' ? 'registrarPanel.rt_legacy_notice' : 'registrarPanel.rt_configured_notice')}</p>
         {draft.length === 0 ? <p>{t('registrarPanel.rt_empty')}</p> : <div className="admin-overflow-x-auto">
           <table className="admin-qp-table" aria-label={t('registrarPanel.rt_title')}>
             <thead><tr>
@@ -177,7 +246,7 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
             </tr></thead>
             <tbody>{draft.map((row, index) => {
               const identity = registrarTabIdentity(row);
-              const sourceTarget = config.options.find((target) => registrarTabIdentity(target) === identity) || row.target;
+              const sourceTarget = currentConfig.options.find((target) => registrarTabIdentity(target) === identity) || row.target;
               const name = labelFor(sourceTarget);
               const targetType = t(row.target_kind === 'doctor' ? 'registrarPanel.rt_doctor' : 'registrarPanel.rt_profile');
               const controlName = `${name} — ${targetType} · #${row.target_id}`;
@@ -220,4 +289,6 @@ export default function RegistrarTabsManager({ theme = 'light', defaultOpenProfi
       </React.Suspense>}
     </details>
   </div>;
-}
+});
+
+export default RegistrarTabsManager;
