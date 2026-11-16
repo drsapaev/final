@@ -1517,27 +1517,36 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       }
       notify.success(tI18n('cardio.visit_completed'));
 
-      // Очищаем форму и возвращаемся в очередь
-      // RETRO-3963-01: completion deselect is an authoritative selection
-      // change — invalidate in-flight navigation tickets.
-      navigationEpochRef.current += 1;
-      setSelectedPatient(null);
-      setSelectedServices([]);
-      setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
-      setActiveTab('queue');
-
-      // Автоматически вызвать следующего пациента для кардиолога
-      try {
-        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
-        if (next?.success && next.entry) {
-          notify.success(tI18n('cardio.cardio_panel_next_patient_called', { number: (next.entry as Record<string, unknown>).number }));
-        }
-      } catch (err) {
-        notify.warning(getErrorMessage(
-          err,
-          tI18n('cardio.cardio_panel_next_patient_call_failed')
-        ));
-      }
+      // After a confirmed completion, the URL tab and rendered tab must
+      // transition together. Direct setActiveTab('queue') left ?tab=visit
+      // in the URL; the panel's URL-sync effect then reopened an empty visit.
+      // RETRO-3971-04: use the shared route-leave guard rather than clearing
+      // a potentially dirty EMR before the user authorizes navigation.
+      goToTab('queue', () => {
+        // The decision to leave may have been delayed by the dirty guard.
+        // Do not deselect a different patient selected in the meantime.
+        if (!completionStillOwned()) return;
+        // RETRO-3963-01: completing the visit invalidates older navigation.
+        navigationEpochRef.current += 1;
+        setSelectedPatient(null);
+        setSelectedServices([]);
+        setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
+        // Only call the next patient after the queue transition is accepted.
+        // A rejected Stay choice must not auto-call over an open EMR.
+        void (async () => {
+          try {
+            const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
+            if (next?.success && next.entry) {
+              notify.success(tI18n('cardio.cardio_panel_next_patient_called', { number: (next.entry as Record<string, unknown>).number }));
+            }
+          } catch (err) {
+            notify.warning(getErrorMessage(
+              err,
+              tI18n('cardio.cardio_panel_next_patient_call_failed')
+            ));
+          }
+        })();
+      });
 
     } catch (error: unknown) {
       // The request may have failed after selecting a DIFFERENT patient.
