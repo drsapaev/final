@@ -726,9 +726,9 @@
       "merge_sha": "3d6e11fe4",
       "root_cause": "FIXED on main 118342f84 (#3950, RETRO-3942-01): private previews run in bounded parallel batches (PREVIEW_CONCURRENCY), do not block list render, and one failed preview no longer strands the rest. VERIFIED in code 2026-11-15",
       "test_before": "audit-observed (source review #3892 round 20): gallery plane raced raw fetch(es) and stale pagination state; no fail-first suite existed pre-fix",
-      "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15",
+      "test_after": "verified on current main: gallery plane covered by panel write-integrity suite (DERMAGALLERY tests) + full integration green (2286 passed locally 2026-11-15); code-verified 2026-11-15 | 2026-11-16 registry-agent recheck on exact main d7eb97292: owner supplement #4103 (replenishing preview worker pool — stalled private preview no longer starves later photos) merged; DermaVisitGallery.test.tsx 28/28 GREEN",
       "reviewer": "fixing-agent audit ledger (registry v30 triage, code-verified on current main)",
-      "date": "2026-11-15"
+      "date": "2026-11-16"
     },
     {
       "checked": true,
@@ -4854,11 +4854,15 @@
       "priority": "P2",
       "source": "#4063 group100 independent Registrar all-departments patient aggregation code review (owner, 2026-11-16, main a8531540c)",
       "evidence": "https://github.com/drsapaev/final/blob/8ba44dbf8d8ddc1a4d5ac0c7729844c6104df8ed/docs/audits/2026-11-16-registrar-aggregation-group100-review.md",
-      "status": "CONFIRMED_OPEN",
-      "fix_pr": null,
+      "status": "FIX_PROPOSED_DRAFT",
+      "fix_pr": 4107,
       "merge_sha": null,
       "title": "Unverified patient identity collision in «Все отделения»: FIO|phone|birth fallback key merges two DIFFERENT queue records with identical missing/fallback identity into one card and grouped command selection",
-      "root_cause": "VERIFIED by owner: registrarAggregation.ts:223-246,294-312 derives identity key when patient_id absent; backend _today_queues.py:485-494 initializes patient_id=None, patient_name='Неизвестный пациент', phone='Не указан'. Existing tests cover different non-null IDs with same display name, not null-ID collision. Not proven backend cross-patient mutation or privacy breach; SSOT must own identity. Acceptance: two independent unknown rows -> two distinct cards/record refs; same verified patient ID across services -> one card."
+      "root_cause": "VERIFIED by owner: registrarAggregation.ts:223-246,294-312 derives identity key when patient_id absent; backend _today_queues.py:485-494 initializes patient_id=None, patient_name='Неизвестный пациент', phone='Не указан'. Existing tests cover different non-null IDs with same display name, not null-ID collision. Not proven backend cross-patient mutation or privacy breach; SSOT must own identity. Acceptance: two independent unknown rows -> two distinct cards/record refs; same verified patient ID across services -> one card.",
+      "test_before": "RED before patch (registry-agent, PR head d7e572bc9 vs base d7eb97292): 6/7 new group100 acceptance tests failed — identity collision (2 unknown entries -> 1 card) and first-row status misrepresentation reproduced deterministically",
+      "test_after": "GREEN after patch: target file 44/44; full frontend suite 4338/4338; production build OK; agent gate PASS (--known-root-cause frontend/src/utils/registrarAggregation.ts, scope = 6 touched files); mixed badge + per-record breakdown (grouped_records[].status / grouped_record_statuses); same verified patient_id still aggregates into one card",
+      "reviewer": "registry-agent gated wave 2026-11-16 (owner group100 fail-first acceptance)",
+      "date": "2026-11-16"
     },
     {
       "checked": false,
@@ -4866,11 +4870,15 @@
       "priority": "P2",
       "source": "#4063 group100 independent Registrar all-departments patient aggregation code review (owner, 2026-11-16, main a8531540c)",
       "evidence": "https://github.com/drsapaev/final/blob/8ba44dbf8d8ddc1a4d5ac0c7729844c6104df8ed/docs/audits/2026-11-16-registrar-aggregation-group100-review.md",
-      "status": "CONFIRMED_OPEN",
-      "fix_pr": null,
+      "status": "FIX_PROPOSED_DRAFT",
+      "fix_pr": 4107,
       "merge_sha": null,
       "title": "Mixed per-record clinical status misrepresented by first row in «Все отделения» aggregation: group status initialized from appointment.status and never reconciled for later members; renderStatus(row.status) shown as aggregate primary status",
-      "root_cause": "VERIFIED by owner: registrarAggregation.ts:299-341 initializes group status=appointment.status, never reconciles for later members (L375-643); appointmentsTableColumns.tsx:1260-1272 renders it as the aggregate's primary status. Synthetic regression: first done + second waiting must show truthful mixed/per-record presentation regardless of input order. Distinct from fixed REG-FE-052 and REG-FE-063. No invented backend/composite clinical state."
+      "root_cause": "VERIFIED by owner: registrarAggregation.ts:299-341 initializes group status=appointment.status, never reconciles for later members (L375-643); appointmentsTableColumns.tsx:1260-1272 renders it as the aggregate's primary status. Synthetic regression: first done + second waiting must show truthful mixed/per-record presentation regardless of input order. Distinct from fixed REG-FE-052 and REG-FE-063. No invented backend/composite clinical state.",
+      "test_before": "RED before patch (registry-agent, PR head d7e572bc9 vs base d7eb97292): 6/7 new group100 acceptance tests failed — identity collision (2 unknown entries -> 1 card) and first-row status misrepresentation reproduced deterministically",
+      "test_after": "GREEN after patch: target file 44/44; full frontend suite 4338/4338; production build OK; agent gate PASS (--known-root-cause frontend/src/utils/registrarAggregation.ts, scope = 6 touched files); mixed badge + per-record breakdown (grouped_records[].status / grouped_record_statuses); same verified patient_id still aggregates into one card",
+      "reviewer": "registry-agent gated wave 2026-11-16 (owner group100 fail-first acceptance)",
+      "date": "2026-11-16"
     },
     {
       "checked": false,
