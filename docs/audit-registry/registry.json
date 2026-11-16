@@ -975,7 +975,7 @@
       "reviewer": "owner checklist credit [x] 2026-11-16 (registry-agent resync v42)",
       "date": "2026-11-16",
       "test_before": "owner checklist line (2026-11-16, [x] FIXED credit): - [x] `DERMARX-FE-004` — P1/P2 — **FIXED_VERIFIED_ON_MAIN** (group103 `SOURCE_GUARD_PRESENT / RUNTIME_REGRESSION_MISSING` gap closed): source guard on main (`savePrescription` captures `saveContext = currentVisitContext`",
-      "test_after": "owner reconciliation 2026-11-16: fix PR #4104 merged (merge 3b25b03e6); registry-agent v42 resync verified merged state via GitHub API (merged=true, merge_commit_sha recorded)"
+      "test_after": "owner reconciliation 2026-11-16: fix PR #4104 merged (merge 3b25b03e6); registry-agent v42 resync verified merged state via GitHub API (merged=true, merge_commit_sha recorded) | 2026-11-16 registry-agent recheck on exact main 3b25b03e6: owner test-pin #4104 (3b25b03e6) — DermatologistPanel.deferredRxSave.test.tsx present, 4/4 GREEN across both #4104 files"
     },
     {
       "checked": false,
@@ -1029,7 +1029,7 @@
       "reviewer": "owner checklist credit [x] 2026-11-16 (registry-agent resync v42)",
       "date": "2026-11-16",
       "test_before": "owner checklist line (2026-11-16, [x] FIXED credit): - [x] `DERMAURL-FE-002` — P1/P2 — **FIXED_VERIFIED_ON_MAIN** (group103 `SOURCE_GUARD_PRESENT / EXACT_DEFERRED_REGRESSION_MISSING` gap closed): source guard on main (`urlResolutionGenerationRef` generation token; awaited-",
-      "test_after": "owner reconciliation 2026-11-16: fix PR #4104 merged (merge 3b25b03e6); registry-agent v42 resync verified merged state via GitHub API (merged=true, merge_commit_sha recorded)"
+      "test_after": "owner reconciliation 2026-11-16: fix PR #4104 merged (merge 3b25b03e6); registry-agent v42 resync verified merged state via GitHub API (merged=true, merge_commit_sha recorded) | 2026-11-16 registry-agent recheck on exact main 3b25b03e6: owner test-pin #4104 (3b25b03e6) — DermatologistPanel.deferredDeepLink.test.tsx present, 4/4 GREEN across both #4104 files"
     },
     {
       "checked": false,
@@ -2711,9 +2711,9 @@
       "fix_pr": 4079,
       "merge_sha": "0f78bc60e",
       "test_before": "fail-first WS-release tests included in PR #3977 test files",
-      "test_after": "group90 cycle-3 re-verification on merged #4079: periodic live re-auth tests green on current main; session-lifetime proof the group87 reconciliation demanded",
+      "test_after": "group90 cycle-3 re-verification on merged #4079: periodic live re-auth tests green on current main; session-lifetime proof the group87 reconciliation demanded | 2026-11-16 registry-agent recheck on exact main 3b25b03e6: owner residual fix #4102 (e3addd044, websocket_auth.py live re-authorization observes fresh principal attributes) + test_websocket_auth_identity_freshness.py 3/3 GREEN",
       "reviewer": "group87–group95 owner-side reconciliation (issue #4063 snapshots) synced by fixing-agent registry v34",
-      "date": "2026-11-15",
+      "date": "2026-11-16",
       "root_cause": "group90 cycle-3: #3977 fixed teardown only, not live re-authorization — closed by dedicated merged fix #4079 (periodic live re-authorization of accepted sockets, merge 0f78bc60e): accepted sockets are re-authorized on an interval and closed on revocation/expiry; audit no-extra-checkout constraint honored"
     },
     {
