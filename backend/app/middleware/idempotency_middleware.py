@@ -383,6 +383,7 @@ def _user_authorized_in_db(
     username: str | None,
     jti: Any,
     require_active_doctor_profile: bool = False,
+    patient_scope_id: int | None = None,
 ) -> tuple[bool, str | None, bool]:
     """Pure DB-backed authorization query — fails CLOSED (Codex R3/R4 #3092).
 
@@ -438,12 +439,32 @@ def _user_authorized_in_db(
             jti_bl.label("jti_bl"),
             sentinel_bl.label("sentinel_bl"),
         ).where(subject_filter)
+        if patient_scope_id is not None:
+            from app.models.patient import Patient
+
+            patient_binding = (
+                select(Patient.id)
+                .where(
+                    Patient.id == patient_scope_id,
+                    Patient.user_id == User.id,
+                    Patient.is_deleted.is_not(True),
+                )
+                .exists()
+            )
+            stmt = stmt.add_columns(patient_binding.label("patient_binding"))
         row = db.execute(stmt).first()
         if row is None:
             return False, None, False
-        subject_id, is_active, role, is_superuser, jti_hit, sentinel_hit = row
+        subject_id, is_active, role, is_superuser, jti_hit, sentinel_hit = row[:6]
         role_label = str(role) if role is not None else None
         authorized = bool(is_active) and not (jti_hit or sentinel_hit)
+        if patient_scope_id is not None:
+            authorized = (
+                authorized
+                and bool(row[6])
+                and (role_label or "").strip().lower() == "patient"
+                and is_superuser is False
+            )
         if authorized and require_active_doctor_profile and role_label == "Doctor":
             from app.models.clinic import Doctor
 
@@ -802,6 +823,7 @@ def _check_principal_authorized_sync(
     username: str | None,
     jti: Any,
     require_active_doctor_profile: bool = False,
+    patient_scope_id: int | None = None,
 ) -> tuple[bool, str | None, bool]:
     """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
 
@@ -814,10 +836,10 @@ def _check_principal_authorized_sync(
         generator = _resolve_request_db(request)
         try:
             db = next(generator)
-            return _user_authorized_in_db(
-                db, user_id, username, jti,
-                require_active_doctor_profile=require_active_doctor_profile,
-            )
+            kwargs = {"require_active_doctor_profile": require_active_doctor_profile}
+            if patient_scope_id is not None:
+                kwargs["patient_scope_id"] = patient_scope_id
+            return _user_authorized_in_db(db, user_id, username, jti, **kwargs)
         finally:
             try:
                 next(generator)
@@ -3879,11 +3901,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
             # No leeway — identical semantics to get_current_user's decode
             # (Codex R6 #3092 P2): an expired token is never a principal.
-            return jwt.decode(
+            payload = jwt.decode(
                 token.strip(),
                 settings.SECRET_KEY,
                 algorithms=[getattr(settings, "ALGORITHM", "HS256")],
             )
+            from app.core.user_token_claims import is_user_access_claims
+
+            return payload if is_user_access_claims(payload) else None
         except Exception as exc:
             logger.debug("Idempotency: no verifiable principal (%s)", type(exc).__name__)
             return None
@@ -3950,14 +3975,30 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         user_id, username = _user_id_from_principal(principal_payload)
         jti = principal_payload.get("jti")
         try:
-            return await asyncio.to_thread(
+            scope_kwargs = (
+                {"patient_scope_id": principal_payload["patient_id"]}
+                if principal_payload.get("scope") == "patient_portal"
+                else {}
+            )
+            authorized, role, is_superuser = await asyncio.to_thread(
                 _check_principal_authorized_sync,
                 request,
                 user_id,
                 username,
                 jti,
                 require_active_doctor_profile,
+                **scope_kwargs,
             )
+            from app.core.user_token_claims import is_user_allowed_for_claims
+
+            if not is_user_allowed_for_claims(
+                principal_payload,
+                role=role,
+                is_active=authorized,
+                is_superuser=is_superuser,
+            ):
+                return False, role, is_superuser
+            return authorized, role, is_superuser
         except Exception:  # pragma: no cover - to_thread failure is fail-closed
             logger.warning("Idempotency principal check crashed; refusing replay", exc_info=True)
             return False, None, False

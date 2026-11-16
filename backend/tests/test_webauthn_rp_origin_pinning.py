@@ -197,11 +197,11 @@ class TestWebAuthnBE001ServerPinnedRp:
     ):
         """RED: verify_authentication_response got expected_origin=evil.example
         for the unauthenticated login plane. GREEN: server-pinned values."""
-        from app.core.cache import cache_manager
         from app.models.passkey_credential import PasskeyCredential
 
         ws = webauthn_stub
-        cache_manager.set("webauthn_auth_challenge:7", "challenge-bytes", ttl=300)
+        ceremony_id = "a" * 43
+        ws._store_ceremony(None, ceremony_id, 7, b"challenge-bytes")
         db_session.add(
             PasskeyCredential(
                 patient_id=7,
@@ -226,7 +226,8 @@ class TestWebAuthnBE001ServerPinnedRp:
             ws.finish_passkey_authentication(
                 db_session,
                 7,
-                assertion_response={"id": "x"},
+                assertion_response={"id": "Y3JlZC1pZA"},
+                ceremony_id=ceremony_id,
                 rp_id=EVIL_RP,
                 origin=EVIL_ORIGIN,
             )

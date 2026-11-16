@@ -11371,6 +11371,7 @@ const uzCyrl = {
     pat_web_err_cancelled: 'Регистрация отменена',
     pat_web_err_failed: 'Ошибка регистрации. Попробуйте снова.',
     pat_web_loading: 'Загрузка списка ключей…',
+    pat_web_unavailable: 'Кириш калитларини бошқариш ҳозир мавжуд эмас. Қайта уриниб кўринг.',
     pat_web_empty: 'У вас нет зарегистрированных ключей доступа. Добавьте passkey для входа без Telegram.',
     pat_web_no_name: 'Без названия',
     pat_web_device_default: 'Устройство',

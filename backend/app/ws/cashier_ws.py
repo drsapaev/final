@@ -106,6 +106,11 @@ async def cashier_websocket(
             _settings.SECRET_KEY,
             algorithms=[_settings.ALGORITHM],
         )
+        from app.core.user_token_claims import is_user_access_claims
+
+        if not is_user_access_claims(payload) or payload.get("scope") == "patient_portal":
+            await websocket.close(code=4401)
+            return
         sub = payload.get("sub")
         # sub может быть числовым user_id или username
         user_id: int | None = None

@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.telegram_webhook._helpers import get_db, logger, Request
@@ -32,7 +33,25 @@ def _check_webauthn_available():
         )
 
 
-@router.post("/register/begin", operation_id="webauthn_register_begin")
+def _require_safe_passkey_management():
+    """Fail closed until management supports replay-safe step-up."""
+    raise HTTPException(status_code=503, detail={"reason": "passkey_management_unavailable"})
+
+
+def _patient_id_from_body(body: Any) -> int | None:
+    if not isinstance(body, dict):
+        return None
+    value = body.get("patient_id")
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str) and value.isascii() and value.isdigit() and len(value) <= 10:
+        value = int(value)
+    if not isinstance(value, int) or not 0 < value <= 2147483647:
+        return None
+    return value
+
+
+@router.post("/register/begin", operation_id="webauthn_register_begin", dependencies=[Depends(_require_safe_passkey_management)])
 async def webauthn_register_begin(
     request: Request,
     db: Session = Depends(get_db),
@@ -81,7 +100,7 @@ async def webauthn_register_begin(
         raise HTTPException(status_code=500, detail={"reason": "registration_begin_failed"}) from exc
 
 
-@router.post("/register/finish", operation_id="webauthn_register_finish")
+@router.post("/register/finish", operation_id="webauthn_register_finish", dependencies=[Depends(_require_safe_passkey_management)])
 async def webauthn_register_finish(
     request: Request,
     db: Session = Depends(get_db),
@@ -151,21 +170,26 @@ async def webauthn_login_begin(
     """
     _check_webauthn_available()
 
-    from app.services.webauthn_service import begin_passkey_authentication
+    from app.services.webauthn_service import (
+        WebAuthnStoreUnavailable,
+        begin_passkey_authentication,
+    )
 
     try:
         body = await request.json()
     except Exception:
         body = {}
 
-    patient_id = body.get("patient_id")
-    if not patient_id:
+    patient_id = _patient_id_from_body(body)
+    if patient_id is None:
         raise HTTPException(status_code=400, detail={"reason": "patient_id_required"})
 
     try:
         # WEBAUTHN-BE-001 (#4063): RP ID is server-pinned, body value ignored.
-        options = begin_passkey_authentication(db, int(patient_id))
+        options = await run_in_threadpool(begin_passkey_authentication, db, patient_id)
         return {"options": options}
+    except WebAuthnStoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail={"reason": "auth_temporarily_unavailable"}) from exc
     except Exception as exc:
         logger.error("WebAuthn auth begin failed: %s", exc)
         raise HTTPException(status_code=500, detail={"reason": "auth_begin_failed"}) from exc
@@ -183,29 +207,38 @@ async def webauthn_login_finish(
     """
     _check_webauthn_available()
 
-    from app.services.webauthn_service import finish_passkey_authentication
+    from app.services.webauthn_service import (
+        WebAuthnStoreUnavailable,
+        finish_passkey_authentication,
+    )
 
     try:
         body = await request.json()
     except Exception:
         body = {}
 
-    patient_id = body.get("patient_id")
-    if not patient_id:
-        raise HTTPException(status_code=400, detail={"reason": "patient_id_required"})
+    patient_id = _patient_id_from_body(body)
+    if patient_id is None:
+        raise HTTPException(status_code=403, detail={"reason": "auth_finish_failed"})
 
     assertion_response = body.get("assertion_response")
-    if not assertion_response:
+    ceremony_id = body.get("ceremony_id")
+    if not isinstance(assertion_response, dict) or not assertion_response:
         raise HTTPException(status_code=400, detail={"reason": "assertion_response_required"})
+    if not isinstance(ceremony_id, str) or not ceremony_id:
+        raise HTTPException(status_code=400, detail={"reason": "ceremony_id_required"})
 
     try:
         # WEBAUTHN-BE-001 (#4063): expected RP ID/origin are server-pinned —
         # never taken from the request body (anti-phishing origin binding).
-        result = finish_passkey_authentication(
-            db, int(patient_id),
+        result = await run_in_threadpool(
+            finish_passkey_authentication, db, patient_id,
             assertion_response=assertion_response,
+            ceremony_id=ceremony_id,
         )
         return result
+    except WebAuthnStoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail={"reason": "auth_temporarily_unavailable"}) from exc
     except ValueError as exc:
         # WEBAUTHN-BE-002: every pre-verification failure (non-numeric id,
         # unknown patient, no challenge, no active credential) shares ONE
@@ -220,7 +253,7 @@ async def webauthn_login_finish(
         raise HTTPException(status_code=403, detail={"reason": "auth_finish_failed"}) from exc
 
 
-@router.post("/credentials/list", operation_id="webauthn_list_credentials")
+@router.post("/credentials/list", operation_id="webauthn_list_credentials", dependencies=[Depends(_require_safe_passkey_management)])
 async def webauthn_list_credentials(
     request: Request,
     db: Session = Depends(get_db),
@@ -263,7 +296,7 @@ async def webauthn_list_credentials(
     }
 
 
-@router.post("/credentials/{credential_id}/deactivate", operation_id="webauthn_deactivate_credential")
+@router.post("/credentials/{credential_id}/deactivate", operation_id="webauthn_deactivate_credential", dependencies=[Depends(_require_safe_passkey_management)])
 async def webauthn_deactivate_credential(
     credential_id: int,
     request: Request,

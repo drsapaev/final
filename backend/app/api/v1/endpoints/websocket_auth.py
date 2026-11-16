@@ -17,6 +17,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import ObjectDeletedError
 
 from app.core.config import settings
+from app.core.user_token_claims import (
+    has_patient_binding,
+    is_user_access_claims,
+    is_user_allowed_for_claims,
+)
 from app.core.roles import (
     ADMIN_ROLES,
     DOCTOR_ROLE_SPELLINGS,
@@ -121,8 +126,21 @@ def resolve_websocket_token_user(token: str | None, db: Session) -> User | None:
     except JWTError:
         return None
 
+    if not is_user_access_claims(payload):
+        return None
+
     user = _resolve_websocket_user(payload, db)
     if user is None:
+        return None
+
+    if not is_user_allowed_for_claims(
+        payload,
+        role=getattr(user, "role", None),
+        is_active=getattr(user, "is_active", None),
+        is_superuser=getattr(user, "is_superuser", None),
+    ):
+        return None
+    if not has_patient_binding(db, payload, user.id):
         return None
 
     # The subject may be a username instead of a numeric ID. Resolve the

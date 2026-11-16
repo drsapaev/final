@@ -44,8 +44,12 @@ def webauthn_enabled(monkeypatch):
     """
     from types import SimpleNamespace
 
+    from app.core.config import settings
     from app.services import webauthn_service as ws
 
+    monkeypatch.setattr(settings, "FRONTEND_URL", "https://clinic.example")
+    with ws._test_ceremonies_lock:
+        ws._test_ceremonies.clear()
     monkeypatch.setattr(ws, "WEBAUTHN_AVAILABLE", True, raising=False)
     if not hasattr(ws, "generate_authentication_options"):
         monkeypatch.setattr(
@@ -81,28 +85,25 @@ class TestWebAuthnBE002NoEnumeration:
         """RED: begin cached a challenge for ANY caller-supplied id.
         GREEN: identical 200 shape, but the cache stays empty — the dummy
         challenge can never complete a ceremony."""
-        cache = _cache_manager()
-        cache.delete("webauthn_auth_challenge:999999")
+        from app.services import webauthn_service as ws
 
         r = client.post(BEGIN_PATH, json={"patient_id": 999999})
         assert r.status_code == 200
         body = r.json()["options"]
         assert body["challenge"]
-        assert (
-            cache.get("webauthn_auth_challenge:999999") is None
-        ), "challenge must not be cached for a patient without an active passkey"
+        assert f"webauthn:login:{body['ceremony_id']}" not in ws._test_ceremonies
 
     def test_begin_caches_challenge_when_active_passkey_exists(
         self, client, db_session, patient_with_passkey, webauthn_enabled
     ):
         """GREEN side of the cache rule: with an active credential the
         challenge IS cached (otherwise no login could ever complete)."""
-        cache = _cache_manager()
-        cache.delete(f"webauthn_auth_challenge:{patient_with_passkey}")
+        from app.services import webauthn_service as ws
 
         r = client.post(BEGIN_PATH, json={"patient_id": patient_with_passkey})
         assert r.status_code == 200
-        assert cache.get(f"webauthn_auth_challenge:{patient_with_passkey}")
+        ceremony_id = r.json()["options"]["ceremony_id"]
+        assert f"webauthn:login:{ceremony_id}" in ws._test_ceremonies
 
     def test_begin_uniform_shape_known_vs_unknown(
         self, client, patient_with_passkey, webauthn_enabled
@@ -127,11 +128,20 @@ class TestWebAuthnBE002NoEnumeration:
         with another message. GREEN: every pre-verify failure is the same
         opaque 403 {"reason": "auth_finish_failed"}."""
         cases = [
-            {"patient_id": "not-a-number", "assertion_response": {"id": "x"}},
-            {"patient_id": 777777, "assertion_response": {"id": "x"}},
+            {
+                "patient_id": "not-a-number",
+                "assertion_response": {"id": "x"},
+                "ceremony_id": "a",
+            },
+            {
+                "patient_id": 777777,
+                "assertion_response": {"id": "x"},
+                "ceremony_id": "a",
+            },
             {
                 "patient_id": patient_with_passkey,
                 "assertion_response": {"id": "x"},
+                "ceremony_id": "a",
             },
         ]
         for payload in cases:
@@ -164,7 +174,52 @@ class TestWebAuthnBE002RateLimit:
         assert 429 in statuses, statuses
 
 
-def _cache_manager():
-    from app.core.cache import cache_manager
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/webauthn/register/begin",
+        "/api/v1/webauthn/register/finish",
+        "/api/v1/webauthn/credentials/list",
+        "/api/v1/webauthn/credentials/1/deactivate",
+    ],
+)
+def test_management_stays_unavailable_without_safe_step_up(client, path):
+    response = client.post(path, json={"init_data": "replayed-payload"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"reason": "passkey_management_unavailable"}}
 
-    return cache_manager
+
+@pytest.mark.parametrize(
+    "payload", [[], None, {"patient_id": True}, {"patient_id": -1}]
+)
+def test_login_begin_rejects_malformed_body_without_server_error(
+    client, webauthn_enabled, payload
+):
+    response = client.post(BEGIN_PATH, json=payload)
+    assert response.status_code == 400
+
+
+def test_login_reports_store_unavailable_without_fallback(
+    client, webauthn_enabled, monkeypatch
+):
+    from app.services import webauthn_service as ws
+
+    def unavailable():
+        raise ws.WebAuthnStoreUnavailable("offline")
+
+    monkeypatch.setattr(ws, "_ceremony_store", unavailable)
+    begin = client.post(BEGIN_PATH, json={"patient_id": 123})
+    finish = client.post(
+        FINISH_PATH,
+        json={
+            "patient_id": 123,
+            "ceremony_id": "a" * 43,
+            "assertion_response": {"id": "x"},
+        },
+    )
+    assert begin.status_code == finish.status_code == 503
+    assert (
+        begin.json()
+        == finish.json()
+        == {"detail": {"reason": "auth_temporarily_unavailable"}}
+    )
