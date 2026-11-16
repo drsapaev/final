@@ -78650,6 +78650,7 @@
             "title": "Patient Name"
           }
         },
+        "type": "object",
         "required": [
           "success",
           "message",
@@ -78657,7 +78658,6 @@
           "status",
           "patient_name"
         ],
-        "type": "object",
         "title": "CancelVisitResponse"
       },
       "CanonicalVisitResponse": {
@@ -116987,10 +116987,10 @@
             "title": "Telegram User Id"
           }
         },
+        "type": "object",
         "required": [
           "token"
         ],
-        "type": "object",
         "title": "TelegramCancelRequest"
       },
       "TelegramConfirmRequest": {
