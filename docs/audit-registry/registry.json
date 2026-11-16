@@ -4314,10 +4314,14 @@
    "priority": "P1/P2",
    "source": "#3892 follow-up review comments, rounds 6–28",
    "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6726838798",
-   "status": "CONFIRMED_OPEN",
-   "fix_pr": null,
-   "merge_sha": null,
-   "root_cause": "VERIFIED latent behind TGCONFIRM-BE-001: bot.py:501 formats q['queue_name'] but visit_confirmation_service.py builds queue_numbers entries with only queue_tag/number/queue_id → KeyError while rendering a nonempty same-day queue list AFTER the confirmation has committed; outer handler shows a generic error for an already-committed operation"
+   "status": "FIXED_VERIFIED_ON_MAIN",
+   "fix_pr": "#4096",
+   "merge_sha": "b93ea7117",
+   "root_cause": "VERIFIED latent behind TGCONFIRM-BE-001: bot.py:501 formats q['queue_name'] but visit_confirmation_service.py builds queue_numbers entries with only queue_tag/number/queue_id → KeyError while rendering a nonempty same-day queue list AFTER the confirmation has committed; outer handler shows a generic error for an already-committed operation | FIXED by owner PR #4096 (merge b93ea7117, in main b93ea7117): the patient confirm callback formatted the authoritative VisitConfirmationService queue_numbers payload (entries carry queue_tag/number/queue_id, no queue_name) with direct queue_name access — a successful same-day confirmation raised KeyError AFTER the server operation had committed, and the outer handler showed the generic «Произошла ошибка при подтверждении» for an already-committed success. Fix: safe label rendering (queue_name -> queue_tag -> honest «Очередь #<id>» fallback; number via .get; non-dict entries skipped; empty list renders without the tickets section) + a committed flag — if the UI edit fails after the confirmation committed, the confirm call is NOT repeated and the patient is told the confirmation itself succeeded (services/telegram/bot.py, +39 lines) | FIXED by owner PR #4096 (merge b93ea7117, in main b93ea7117): the patient confirm callback formatted the authoritative VisitConfirmationService queue_numbers payload (entries carry queue_tag/number/queue_id, no queue_name) with direct queue_name access — a successful same-day confirmation raised KeyError AFTER the server operation had committed, and the outer handler showed the generic «Произошла ошибка при подтверждении» for an already-committed success. Fix: safe label rendering (queue_name -> queue_tag -> honest «Очередь #<id>» fallback; number via .get; non-dict entries skipped; empty list renders without the tickets section) + a committed flag — if the UI edit fails after the confirmation committed, the confirm call is NOT repeated and the patient is told the confirmation itself succeeded (services/telegram/bot.py, +39 lines)",
+   "test_after": "owner tests/unit/test_tgconfirm_queue_render.py (+126 lines, PR #4096): RED 2/2 on pre-fix main (KeyError -> generic error; committed-success buried) -> GREEN 2/2; independent fixing-agent verification on main b93ea7117: diff read + 2/2 green; CI on #4096 green",
+   "reviewer": "owner PR #4096 (group 20 downstream) + fixing-agent registry v39 independent verification (diff + 2/2 run on main b93ea7117)",
+   "date": "2026-11-16",
+   "test_before": "RED on the pre-fix base (owner fail-first #4096, branch off 1583e1ed7-era main): same-day confirmation formatting of the authoritative queue_numbers payload raised KeyError('queue_name') AFTER the server operation had committed — the outer handler showed the generic «Произошла ошибка при подтверждении» for an already-committed success; the two owner render tests (KeyError -> generic error; committed-success buried by generic message) fail on that base"
   },
   {
    "checked": true,
@@ -4608,6 +4612,36 @@
    "test_after": null,
    "reviewer": "owner group97 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v37 sync",
    "date": "2026-11-15"
+  },
+  {
+   "checked": false,
+   "id": "REGWELCOME-FE-001",
+   "priority": "P2",
+   "source": "#4063 group98 independent Registrar Welcome code review (owner, 2026-11-16, main 1583e1ed7)",
+   "evidence": "https://github.com/drsapaev/final/blob/8adbd2fbbfdb9bc4740b345dd5c7359f7af847bf/docs/audits/2026-11-16-registrar-welcome-group98-review.md",
+   "status": "CONFIRMED_OPEN",
+   "fix_pr": null,
+   "merge_sha": null,
+   "title": "WelcomeView «Утренний статус приёма» builds cards only from existing appointments rows — no queue open/closed SSOT; zero-entry doctors absent; waiting patients shown regardless of reception openness",
+   "root_cause": "WelcomeView.tsx:277-395 labels a section «Утренний статус приёма» (comment promises whether the doctor has opened service), but builds cards ONLY from existing appointments queue-entry rows and displays just doctor/resource name and Пациентов/Записей counts: no DailyQueue.active, session/check-in/open/closed status or timing is read; a doctor/queue with zero entries is entirely absent, and a doctor with waiting patients appears irrespective of whether reception is open. Distinct from the already-fixed REG-FE-027 (owner grouping, unique patient counts, today-only gating only). Owner acceptance: define the authoritative readiness SSOT with the business owner (queue active vs doctor check-in), show opened/closed/unknown and include configured zero-entry owners; tests for zero-entry active, queued-but-unopened, historically loaded date, missing state; no inference of closed from absence. OWNER-POLICY INPUT REQUIRED (SSOT choice) — not agent-fixable alone",
+   "test_after": null,
+   "reviewer": "owner group98 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v39 sync",
+   "date": "2026-11-16"
+  },
+  {
+   "checked": false,
+   "id": "REGWELCOME-FE-002",
+   "priority": "P2",
+   "source": "#4063 group98 independent Registrar Welcome code review (owner, 2026-11-16, main 1583e1ed7)",
+   "evidence": "https://github.com/drsapaev/final/blob/8adbd2fbbfdb9bc4740b345dd5c7359f7af847bf/docs/audits/2026-11-16-registrar-welcome-group98-review.md",
+   "status": "CONFIRMED_OPEN",
+   "fix_pr": null,
+   "merge_sha": null,
+   "title": "WelcomeView «Экспорт CSV» exports all loaded rows instead of the filtered view and always names the file with today's date — scope mismatch and misidentified historical exports",
+   "root_cause": "WelcomeView.tsx:433-454 «Экспорт CSV» calls generateCSV(appointments) — ALL loaded queue rows — while the visible table uses filteredAppointments scoped by department/doctor/status/search: with a filtered view the download includes patient names outside the displayed scope without a label confirming it is a full-day export (a UI/report scope mismatch, not role access to unseen data). The file name is always appointments_${getLocalDateString()}.csv (clinic today) even when the request loaded another target_date — date-labeled historical exports misidentify their own contents. registrarCsv.ts serializes precisely its input; REG-FE-045/046 cover cell semantics, not export scope/date. Owner acceptance: export visible filtered rows by default OR honestly label/confirm «all records for loaded day», use the verified loadedDate for filenames, test a filtered department sample + historical date + default phone masking. OWNER-POLICY CHOICE REQUIRED before changing exports — not agent-fixable alone",
+   "test_after": null,
+   "reviewer": "owner group98 (source-backed, not fixed; checkbox [ ]) + fixing-agent registry v39 sync",
+   "date": "2026-11-16"
   }
  ]
 }
