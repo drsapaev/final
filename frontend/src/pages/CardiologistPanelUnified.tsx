@@ -1477,18 +1477,6 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       // branch additionally reconciles the visible queue with the canonical
       // server snapshot instead of blindly retrying.
       const completionAck = await queueService.completeVisit(completionIdentity.queueEntryId, visitPayload);
-      if (completionAck?.success !== true) {
-        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
-        notify.error(
-          (typeof ackMessage === 'string' && ackMessage) || tI18n('cardio.cardio_panel_action_failed')
-        );
-        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
-          // Ambiguous outcome — refresh the visible queue from the server.
-          void loadMacOSCardiologyAppointments(true);
-        }
-        return;
-      }
-
       // DOCFLOW-FE-004 (post-merge review of PR 3902, P1): the completion
       // POST is itself an async boundary — the selection may have moved to
       // another patient while the request was in flight (row click, deep
@@ -1505,6 +1493,16 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         logger.warn('[Cardiology] Stale completion response ignored for a changed selection — the newer patient\'s state is preserved');
         return;
       }
+
+      if (completionAck?.success !== true) {
+        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
+        notify.error(
+          (typeof ackMessage === 'string' && ackMessage) || tI18n('cardio.cardio_panel_action_failed')
+        );
+        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
+          // Ambiguous outcome — refresh the visible queue from the server.
+          void loadMacOSCardiologyAppointments(true);
+        }
       notify.success(tI18n('cardio.visit_completed'));
 
       // Очищаем форму и возвращаемся в очередь
