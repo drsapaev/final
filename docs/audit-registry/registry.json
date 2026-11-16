@@ -1462,7 +1462,7 @@
       "merge_sha": "2329735d4580b00621d6803d1854ab1e8ffd76a3",
       "root_cause": "VERIFIED on a8531540c: phone invitation helper only wrote a log line and returned success:true unconditionally; schedule-next mapped it into confirmation.notification_sent — false claim with no persistent work item",
       "test_before": "audit: helper always returned success:true / 'Создана задача для регистратуры' with no persisted task (https://github.com/drsapaev/final/pull/3892#issuecomment-6726622686)",
-      "test_after": "2026-11-16 source verification on exact main a8531540c: _send_phone_invitation fans out canonical appointment_confirmation_task to the registrar role and returns success=created with honest failures (notifications_pkg/_formatting.py:257-294); schedule-next maps notification_sent from the real persistence result (_visits.py:513); fix commit 2329735d4 (#4060) is ancestor of main (merge-base check); contract test pinned by open owner-PR #4100 (merge pending)",
+      "test_after": "2026-11-16 source verification on exact main a8531540c: _send_phone_invitation fans out canonical appointment_confirmation_task to the registrar role and returns success=created with honest failures (notifications_pkg/_formatting.py:257-294); schedule-next maps notification_sent from the real persistence result (_visits.py:513); fix commit 2329735d4 (#4060) is ancestor of main (merge-base check); contract test MERGED to main as 186e59800 (owner #4100): tests/unit/test_docinvite_phone_task.py 3/3 GREEN on exact main 2026-11-16",
       "reviewer": "registry agent independent verification 2026-11-16",
       "date": "2026-11-16"
     },
@@ -4694,11 +4694,14 @@
       "priority": "P2",
       "source": "#4063 group99 independent Registrar worklist refresh code review (owner, 2026-11-16, main b93ea7117)",
       "evidence": "https://github.com/drsapaev/final/blob/f0de60a5d07d9cd1af829617afc636ad63351d2e/docs/audits/2026-11-16-registrar-worklist-refresh-group99-review.md",
-      "status": "CONFIRMED_OPEN",
-      "fix_pr": null,
+      "status": "FIX_IN_PROGRESS",
+      "fix_pr": 4101,
       "merge_sha": null,
       "title": "Delayed queueUpdated critical-event timer can start an obsolete-date fetch AFTER a calendar-date switch and acquire the newest requestSeqRef ID, overriding the newer selected date's rows/loadedDate (late-starting stale closure)",
-      "root_cause": "VERIFIED by owner: useRegistrarWorklistData.ts:493-523 schedules 300/500ms setTimeout without cleanup; callback closes over old date (L284-288). Scope distinct from REG-FE-020 (late response) — this is a late-STARTING stale closure. Fail-first: event on A -> switch B before 500ms -> B reload -> timer must not start A; unmount -> no GET. Mandatory agent gate (queue behavior)."
+      "root_cause": "VERIFIED by owner: useRegistrarWorklistData.ts:493-523 schedules 300/500ms setTimeout without cleanup; callback closes over old date (L284-288). Scope distinct from REG-FE-020 (late response) — this is a late-STARTING stale closure. Fail-first: event on A -> switch B before 500ms -> B reload -> timer must not start A; unmount -> no GET. Mandatory agent gate (queue behavior). | Fix (PR #4101, head 2c76a2bbd on main 186e59800): queueUpdateTimerRef added: cleared on re-schedule (newer event supersedes the older delayed reload) and on effect cleanup (calendar-date switch/unmount); timer id nulled when it fires",
+      "test_after": "2026-11-16 RED 3 failed / 1 passed (test-only apply on unfixed source) -> GREEN 53/53 on the full useRegistrarWorklistData.test.ts (incl. owner fail-first scenarios: event on A -> switch B before 500ms -> B reload -> timer must not start A; unmount -> no GET; token B intact after stale 401); tsc 0; scoped eslint 0 errors; build OK 34.91s; gate narrow_override/execute exit 0 (fail-closed stop without --known-root-cause honored first). FIXED claim pending merge + independent main recheck",
+      "reviewer": "registry agent fix-wave 2026-11-16 (gate + RED/GREEN evidence)",
+      "date": "2026-11-16"
     },
     {
       "checked": false,
@@ -4706,11 +4709,14 @@
       "priority": "P2",
       "source": "#4063 group99 independent Registrar worklist refresh code review (owner, 2026-11-16, main b93ea7117)",
       "evidence": "https://github.com/drsapaev/final/blob/f0de60a5d07d9cd1af829617afc636ad63351d2e/docs/audits/2026-11-16-registrar-worklist-refresh-group99-review.md",
-      "status": "CONFIRMED_OPEN",
-      "fix_pr": null,
+      "status": "FIX_IN_PROGRESS",
+      "fix_pr": 4101,
       "merge_sha": null,
       "title": "Older queue request returning HTTP 401 runs direct sessionStorage.removeItem('auth_token') BEFORE the isSuperseded() check — may clear the token of a new live session even though the shared API interceptor protects newer token identity",
-      "root_cause": "VERIFIED by owner: useRegistrarWorklistData.ts:422-432 removes the auth token before the supersession check; tokenManager.ts:16-30 verifies the same sessionStorage key. Fail-first: start A under synthetic token A -> token/session replacement B and success -> A fails 401 -> token B must remain, auth state consistent; genuine invalid-current-session 401 still handled. Not proven production incident. Mandatory agent gate (auth)."
+      "root_cause": "VERIFIED by owner: useRegistrarWorklistData.ts:422-432 removes the auth token before the supersession check; tokenManager.ts:16-30 verifies the same sessionStorage key. Fail-first: start A under synthetic token A -> token/session replacement B and success -> A fails 401 -> token B must remain, auth state consistent; genuine invalid-current-session 401 still handled. Not proven production incident. Mandatory agent gate (auth). | Fix (PR #4101, head 2c76a2bbd on main 186e59800): 401 branch checks isSuperseded() FIRST and returns 'superseded' without touching the token; a 401 of the CURRENT session still clears the token and surfaces failure (positive-control test pinned)",
+      "test_after": "2026-11-16 RED 3 failed / 1 passed (test-only apply on unfixed source) -> GREEN 53/53 on the full useRegistrarWorklistData.test.ts (incl. owner fail-first scenarios: event on A -> switch B before 500ms -> B reload -> timer must not start A; unmount -> no GET; token B intact after stale 401); tsc 0; scoped eslint 0 errors; build OK 34.91s; gate narrow_override/execute exit 0 (fail-closed stop without --known-root-cause honored first). FIXED claim pending merge + independent main recheck",
+      "reviewer": "registry agent fix-wave 2026-11-16 (gate + RED/GREEN evidence)",
+      "date": "2026-11-16"
     }
   ]
 }
