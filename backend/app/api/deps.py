@@ -34,6 +34,10 @@ from sqlalchemy.orm import Session
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 from app.core.config import settings  # type: ignore
 from app.core.roles import is_login_blocked_role  # QD-1.1 sentinel guard
+from app.core.user_token_claims import (
+    is_user_access_claims,
+    is_user_allowed_for_claims,
+)
 
 # import authentication service
 from app.services.authentication_service import get_authentication_service
@@ -234,6 +238,8 @@ async def _get_user_with_blacklist(
     jti: str | None,
     user_id: int | None = None,
     username: str | None = None,
+    refresh_user: bool = False,
+    patient_scope_id: int | None = None,
 ) -> tuple[User | None, bool]:
     """
     Load the user and check the token blacklist in ONE SQL roundtrip.
@@ -272,6 +278,23 @@ async def _get_user_with_blacklist(
         jti_bl.label("jti_bl"),
         sentinel_bl.label("sentinel_bl"),
     ).where(subject_filter)
+    if patient_scope_id is not None:
+        from app.models.patient import Patient
+
+        patient_binding = (
+            select(Patient.id)
+            .where(
+                Patient.id == patient_scope_id,
+                Patient.user_id == User.id,
+                Patient.is_deleted.is_not(True),
+            )
+            .exists()
+        )
+        stmt = stmt.add_columns(patient_binding.label("patient_binding"))
+    if refresh_user:
+        # Patient-scoped tokens must observe role/active changes even if a
+        # request's Session already has a stale User in its identity map.
+        stmt = stmt.execution_options(populate_existing=True)
 
     execute_callable = getattr(db, "execute", None)
     if inspect.iscoroutinefunction(execute_callable):
@@ -282,7 +305,9 @@ async def _get_user_with_blacklist(
     if row is None:
         return None, False
 
-    found_user, jti_hit, sentinel_hit = row
+    found_user, jti_hit, sentinel_hit = row[:3]
+    if patient_scope_id is not None and not row[3]:
+        return None, False
     return found_user, bool(jti_hit or sentinel_hit)
 
 
@@ -312,10 +337,22 @@ async def get_current_user(
         )
         payload = {}
 
+    if not is_user_access_claims(payload):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Пытаемся поддержать оба варианта: username или числовой sub (user_id)
     username = _subject_from_payload(payload)
     sub = payload.get("sub")
     jti = payload.get("jti")
+    scoped_kwargs = (
+        {"refresh_user": True, "patient_scope_id": payload["patient_id"]}
+        if payload.get("scope") == "patient_portal"
+        else {}
+    )
     user: User | None = None
     blacklisted = False
 
@@ -329,12 +366,12 @@ async def get_current_user(
             if username.isdigit():
                 logger.debug("get_current_user: primary subject is numeric")
                 user, blacklisted = await _get_user_with_blacklist(
-                    db, jti=jti, user_id=int(username)
+                    db, jti=jti, user_id=int(username), **scoped_kwargs
                 )
             else:
                 logger.debug("get_current_user: primary subject is text")
                 user, blacklisted = await _get_user_with_blacklist(
-                    db, jti=jti, username=username
+                    db, jti=jti, username=username, **scoped_kwargs
                 )
             logger.debug(
                 "get_current_user: primary lookup found_user=%s",
@@ -349,17 +386,17 @@ async def get_current_user(
             if isinstance(sub, str) and sub.isdigit():
                 logger.debug("get_current_user: fallback sub is numeric")
                 user, blacklisted = await _get_user_with_blacklist(
-                    db, jti=jti, user_id=int(sub)
+                    db, jti=jti, user_id=int(sub), **scoped_kwargs
                 )
             elif isinstance(sub, int):
                 logger.debug("get_current_user: fallback sub is numeric")
                 user, blacklisted = await _get_user_with_blacklist(
-                    db, jti=jti, user_id=sub
+                    db, jti=jti, user_id=sub, **scoped_kwargs
                 )
             elif isinstance(sub, str):
                 logger.debug("get_current_user: fallback sub is text")
                 user, blacklisted = await _get_user_with_blacklist(
-                    db, jti=jti, username=sub
+                    db, jti=jti, username=sub, **scoped_kwargs
                 )
     except Exception as e:
         logger.warning(
@@ -391,6 +428,18 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not is_user_allowed_for_claims(
+        payload,
+        role=getattr(user, "role", None),
+        is_active=getattr(user, "is_active", None),
+        is_superuser=getattr(user, "is_superuser", None),
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -566,7 +615,7 @@ def validate_token(token: str, db: Session) -> dict | None:
     try:
         auth_service = get_authentication_service()
         payload = auth_service.verify_token(token, "access")
-        return payload
+        return payload if payload and is_user_access_claims(payload) else None
     except Exception:
         return None
 
@@ -582,6 +631,21 @@ def get_user_from_token(token: str, db: Session) -> User | None:
         return None
 
     try:
-        return db.query(User).filter(User.id == int(user_id)).first()
+        query = db.query(User).filter(User.id == int(user_id))
+        if payload.get("scope") == "patient_portal":
+            from app.models.patient import Patient
+
+            query = query.join(Patient, Patient.user_id == User.id).filter(
+                Patient.id == payload["patient_id"], Patient.is_deleted.is_not(True)
+            ).populate_existing()
+        user = query.first()
+        if user and is_user_allowed_for_claims(
+            payload,
+            role=getattr(user, "role", None),
+            is_active=getattr(user, "is_active", None),
+            is_superuser=getattr(user, "is_superuser", None),
+        ):
+            return user
+        return None
     except (ValueError, TypeError):
         return None

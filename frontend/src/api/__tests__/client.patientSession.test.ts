@@ -328,6 +328,42 @@ describe('access-only patient session replacement (P1)', () => {
     expect(consumeResponse).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['/api/v1/webauthn/login/begin', '/api/v1/webauthn/login/finish'])(
+    'does not refresh or clear an existing session when %s rejects',
+    async (url) => {
+      tokenState.access = createJwt(120);
+      const priorAccess = tokenState.access;
+      const refreshSpy = vi.spyOn(axios, 'post');
+      vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+      api.defaults.adapter = async (config) => { throw make401FromRealConfig(config); };
+
+      await expect(api.post(url, { patient_id: 42 })).rejects.toMatchObject({
+        response: { status: 401 },
+      });
+
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(tokenState.access).toBe(priorAccess);
+      expect(tokenState.refresh).toBe('staff-refresh-token');
+      expect(tokenState.cleared).toBe(0);
+    },
+  );
+
+  it('scopes a passkey 429 without Retry-After to the login request', async () => {
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    api.defaults.adapter = async (config) => {
+      if (config.url === '/api/v1/webauthn/login/begin') {
+        throw makeStatusErrorFromRealConfig(config, 429);
+      }
+      return { ...make200({ ok: true }), config };
+    };
+
+    await expect(api.post('/api/v1/webauthn/login/begin', { patient_id: 42 }))
+      .rejects.toMatchObject({ response: { status: 429 } });
+    await expect(api.get('/api/v1/patients/summary')).resolves.toMatchObject({
+      data: { ok: true },
+    });
+  });
+
   it('does NOT wipe the replaced patient session in the reactive 401 cleanup (round-2 P1 race)', async () => {
     // Deterministic interleaving prescribed by the owner review:
     //   staff access + staff refresh

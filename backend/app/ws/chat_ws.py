@@ -255,13 +255,21 @@ async def _authenticate_by_token(token: str, db: Session) -> User | None:
             settings.SECRET_KEY,
             algorithms=[getattr(settings, "ALGORITHM", "HS256")],
         )
+        from app.core.user_token_claims import is_user_access_claims
+
+        # This socket has no live reauthorization after the handshake. A
+        # patient-scoped token must not survive a role/card change here.
+        if not is_user_access_claims(payload) or payload.get("scope") == "patient_portal":
+            return None
         user_id = payload.get("sub")
         if not user_id:
             return None
+        query = db.query(User)
         if isinstance(user_id, str) and not user_id.isdigit():
-            user = db.query(User).filter(User.username == user_id).first()
+            query = query.filter(User.username == user_id)
         else:
-            user = db.query(User).filter(User.id == int(user_id)).first()
+            query = query.filter(User.id == int(user_id))
+        user = query.first()
         # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
         # sentinel roles are structural non-logins — the chat WebSocket must
         # reject their tokens like every HTTP surface.

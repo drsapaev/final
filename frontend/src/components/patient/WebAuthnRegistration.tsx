@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Alert, Input } from '../ui/macos';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -26,15 +26,30 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
   const [credentials, setCredentials] = useState<WebAuthnCredential[]>([]);
   const [credentialName, setCredentialName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const loadVersion = useRef(0);
 
   const loadCredentials = useCallback(async () => {
+    const version = ++loadVersion.current;
     setLoading(true);
-    const creds = await listCredentials();
-    setCredentials(creds as WebAuthnCredential[]);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const creds = await listCredentials();
+      if (version === loadVersion.current) setCredentials(creds as WebAuthnCredential[]);
+    } catch {
+      if (version === loadVersion.current) {
+        setCredentials([]);
+        setLoadError(true);
+      }
+    } finally {
+      if (version === loadVersion.current) setLoading(false);
+    }
   }, [listCredentials]);
 
-  useEffect(() => { loadCredentials(); }, [loadCredentials]);
+  useEffect(() => {
+    void loadCredentials();
+    return () => { loadVersion.current += 1; };
+  }, [loadCredentials]);
 
   const handleRegister = async () => {
     const success = await register({
@@ -77,7 +92,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
       </CardHeader>
       <CardContent style={{ padding: '16px', display: 'grid', gap: '16px' }}>
         {/* Registration form */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+        {!loading && !loadError && <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
           <div style={{ flex: 1 }}>
             <Input
               label={t('patient.pat_web_device_name')}
@@ -96,7 +111,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
             <Plus size={16} aria-hidden="true" />
             {isRegistering ? t('patient.pat_web_registering') : t('patient.pat_web_add_passkey')}
           </Button>
-        </div>
+        </div>}
 
         {error && (
           <Alert severity="error">
@@ -111,6 +126,13 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
         {/* Credentials list */}
         {loading ? (
           <Alert severity="info">{t('patient.pat_web_loading')}</Alert>
+        ) : loadError ? (
+          <Alert severity="error">
+            {t('patient.pat_web_unavailable')}
+            <Button variant="outline" size="small" onClick={loadCredentials}>
+              {t('common.refresh')}
+            </Button>
+          </Alert>
         ) : credentials.length === 0 ? (
           <Alert severity="info">
             {t('patient.pat_web_empty')}

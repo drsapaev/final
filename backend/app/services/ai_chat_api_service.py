@@ -11,6 +11,7 @@ from jwt import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
 from app.core.roles import is_login_blocked_role
+from app.core.user_token_claims import is_user_access_claims
 from app.models.user import User
 from app.repositories.ai_chat_api_repository import AIChatApiRepository
 from app.services.ai.chat_service import AIChatService, get_chat_service
@@ -140,6 +141,11 @@ class AIChatApiService:
         try:
             payload = jwt.decode(token, secret_key, algorithms=[algorithm])
         except JWTError:
+            return None
+
+        # The AI socket does not reauthorize after handshake; a scoped
+        # patient token could otherwise survive a role/card change.
+        if not is_user_access_claims(payload) or payload.get("scope") == "patient_portal":
             return None
 
         user_id = payload.get("sub")

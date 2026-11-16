@@ -11365,6 +11365,7 @@ const en = {
     pat_web_err_cancelled: 'Регистрация отменена',
     pat_web_err_failed: 'Ошибка регистрации. Попробуйте снова.',
     pat_web_loading: 'Загрузка списка ключей…',
+    pat_web_unavailable: 'Passkey management is currently unavailable. Please try again.',
     pat_web_empty: 'У вас нет зарегистрированных ключей доступа. Добавьте passkey для входа без Telegram.',
     pat_web_no_name: 'Без названия',
     pat_web_device_default: 'Устройство',

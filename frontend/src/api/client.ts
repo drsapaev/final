@@ -55,9 +55,9 @@ function isAuthenticationRateLimitedRequest(url?: string): boolean {
 
   try {
     const requestUrl = new URL(url, API_BASE || window.location.origin);
-    return /\/(?:auth|authentication|2fa)(?:\/|$)/i.test(requestUrl.pathname);
+    return /\/(?:auth|authentication|2fa|webauthn\/login)(?:\/|$)/i.test(requestUrl.pathname);
   } catch {
-    return /\/(?:auth|authentication|2fa)(?:\/|$)/i.test(url.split(/[?#]/, 1)[0]);
+    return /\/(?:auth|authentication|2fa|webauthn\/login)(?:\/|$)/i.test(url.split(/[?#]/, 1)[0]);
   }
 }
 
@@ -466,6 +466,8 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/patient-access/request-otp',
   '/patient-access/verify-otp',
   '/patient-access/login',
+  '/webauthn/login/begin',
+  '/webauthn/login/finish',
   '/patient-access/activate/request-otp',
   '/patient-access/activate/confirm'
 ];

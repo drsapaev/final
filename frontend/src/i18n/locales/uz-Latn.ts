@@ -11360,6 +11360,7 @@ const uzLatn = {
     pat_web_err_cancelled: 'Roʻyxatdan oʻtish bekor qilindi',
     pat_web_err_failed: 'Roʻyxatdan oʻtish xatosi. Qaytadan urinib koʻring.',
     pat_web_loading: 'Kalitlar roʻyxati yuklanmoqda…',
+    pat_web_unavailable: 'Kirish kalitlarini boshqarish hozir mavjud emas. Qayta urinib ko‘ring.',
     pat_web_empty: 'Sizda roʻyxatdan oʻtgan kirish kalitlari yoʻq. Telegramsiz kirish uchun passkey qoʻshing.',
     pat_web_no_name: 'Nomsiz',
     pat_web_device_default: 'Qurilma',

@@ -6,7 +6,7 @@ and the passkey management functions (list, deactivate).
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -20,11 +20,17 @@ class TestWebAuthnAvailability:
         result = is_webauthn_available()
         assert isinstance(result, bool)
 
-    def test_webauthn_not_available_in_cloud_env(self):
-        """In cloud dev env, webauthn library is not installed."""
-        from app.services.webauthn_service import is_webauthn_available
-        # In this environment, webauthn is not installed
-        assert is_webauthn_available() is False
+    def test_unavailable_library_has_explicit_503(self, monkeypatch):
+        """A broken installation must fail closed, even in non-login routes."""
+        from fastapi import HTTPException
+
+        from app.api.v1.endpoints.webauthn import _check_webauthn_available
+        from app.services import webauthn_service
+
+        monkeypatch.setattr(webauthn_service, "WEBAUTHN_AVAILABLE", False)
+        with pytest.raises(HTTPException) as caught:
+            _check_webauthn_available()
+        assert caught.value.status_code == 503
 
 
 class TestPasskeyManagement:
