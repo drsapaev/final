@@ -1377,6 +1377,16 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       return;
     }
 
+    // A transport-level failure or a finally block is also an async
+    // completion of A's command. Never attribute its UI side effects to B.
+    const completionStillOwned = (): boolean => {
+      const live = selectedPatientRef.current;
+      return (
+        String(resolveDoctorQueueEntryId(live)) === String(completionIdentity.queueEntryId) &&
+        String(live?.patient?.id ?? live?.patient_id ?? live?.id ?? null) === String(completionIdentity.patientId)
+      );
+    };
+
     const complaint = emrTextValue(savedEMRData.complaints);
     const diagnosis = emrTextValue(savedEMRData.diagnosis);
     const legacyDiagnosis = savedEMRData.diagnosis && typeof savedEMRData.diagnosis === 'object'
@@ -1530,9 +1540,16 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       }
 
     } catch (error: unknown) {
+      // The request may have failed after selecting a DIFFERENT patient.
+      // A's network failure must not toast over B's clinical workspace.
+      if (!completionStillOwned()) {
+        logger.warn('[Cardiology] Stale completion network failure ignored for a changed selection');
+        return;
+      }
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_action_failed')));
     } finally {
-      setLoading(false);
+      // A no longer owns B's global visit busy state once B was selected.
+      if (completionStillOwned()) setLoading(false);
     }
   };
 
