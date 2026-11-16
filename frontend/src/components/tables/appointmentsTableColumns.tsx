@@ -256,7 +256,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
         color: 'var(--mac-accent-purple, rgb(175 82 222))',
         bg: withOpacity('var(--mac-accent-purple, rgb(175 82 222))', 0.12),
         icon: Layers,
-        text: t('misc.eat_status_mixed', 'Смешанный'),
+        text: t('misc.eat_status_mixed'),
         emoji: '🧩'
       }
     };

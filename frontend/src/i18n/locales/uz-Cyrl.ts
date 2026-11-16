@@ -7082,6 +7082,7 @@ const uzCyrl = {
     eat_status_diagnostics: 'Ташхис',
     eat_status_incomplete: 'Қабул тугалланмади',
     eat_status_rescheduled: 'Кўчирилган',
+    eat_status_mixed: 'Аралаш',
     eat_q_status_waiting: 'Ожидает',
     eat_q_status_unknown: 'Неизвестно',
     eat_service_label: 'Услуга {service}',

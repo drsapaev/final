@@ -7071,6 +7071,7 @@ const kk = {
     eat_status_diagnostics: 'Диагностика',
     eat_status_incomplete: 'Қабылдау аяқталмады',
     eat_status_rescheduled: 'Қайта белгіленді',
+    eat_status_mixed: 'Аралас',
     eat_q_status_waiting: 'Ожидает',
     eat_q_status_unknown: 'Неизвестно',
     eat_service_label: 'Услуга {service}',
