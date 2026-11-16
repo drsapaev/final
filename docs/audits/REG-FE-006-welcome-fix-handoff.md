@@ -58,3 +58,7 @@ The candidate diff is stored **in this same handoff branch** at [`docs/audits/pa
 **Fixing agent next action:** fresh isolated worktree from current origin/main → run gate exactly and read execution prompt → first tests (RED), then source patch (GREEN) → checks, separate source PR → follow-up review → merge only when allowed → update audit and old ID after independent main recheck. Branch owner must reconcile moving main and preserve user changes.
 
 **Rollback:** revert the minimal source change of the future fix PR; no migration/data operation required.
+
+## Documentation CI reconciliation (2026-11-16)
+
+Initial handoff Draft PR #4097 `PR Review Quality Gate` failed **solely on PR-description template sections**, not on application tests. Logs of run `43805953344` identified missing `Summary`, `Cyclic Execution Evidence`, `Contract Impact`, `RBAC / Permissions`, `Notification / Realtime`, `Frontend Resilience`, `Scope Gate`, and `Validation`. The reviewer corrected the existing Draft PR **body** using the canonical required eight headings; this docs-only follow-up commit triggers fresh pull-request checks against that metadata. `Unified CI`, `Security Scan`, `Gitleaks`, `Agent Workflow Guards`, and `PR Lifecycle Recommendation` had already passed on the initial docs-only head. None of those checks counts as actual `run_agent_gate.ps1` output or source-fix test evidence. The fixing agent must inspect the latest HEAD-specific CI result and treat any red check as open.
