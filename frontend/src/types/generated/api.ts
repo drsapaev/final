@@ -27995,6 +27995,8 @@ export type components = {
             distribution?: string | null;
             /** Symptoms */
             symptoms?: string | null;
+            /** Localization */
+            localization?: string | null;
             /** Diagnosis */
             diagnosis?: string | null;
             /** Treatment Plan */
@@ -28048,6 +28050,8 @@ export type components = {
             distribution?: string | null;
             /** Symptoms */
             symptoms?: string | null;
+            /** Localization */
+            localization?: string | null;
             /** Diagnosis */
             diagnosis?: string | null;
             /** Treatment Plan */
