@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 from typing import Any, Literal, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -103,8 +103,8 @@ class PasswordResetConfirmRequest(BaseModel):
     @field_validator('new_password')
     @classmethod
     def validate_password(cls, v: str) -> str:
-        if len(v) < 6:
-            raise ValueError('Пароль должен содержать минимум 6 символов')
+        if len(v) < 8:
+            raise ValueError('Пароль должен содержать минимум 8 символов')
         return v
 
 
@@ -130,6 +130,10 @@ class PhoneResetValidationResponse(BaseModel):
     error: str
     message: str
     detail: list[dict[str, Any]]
+
+
+class ResetTokenErrorResponse(BaseModel):
+    detail: str
 
 
 @router.post("/initiate", response_model=dict[str, Any])  # P1-1: rate limit deferred (request param conflict)
@@ -282,16 +286,42 @@ async def confirm_password_reset(
         raise_password_reset_internal_error("confirm_password_reset", e)
 
 
-@router.get("/validate-token", response_model=dict[str, Any])
+@router.get(
+    "/validate-token",
+    response_model=dict[str, Any],
+    responses={
+        200: {"headers": {"Cache-Control": {"description": "Sensitive response is not cacheable", "schema": {"type": "string"}}}},
+        400: {"model": ResetTokenErrorResponse, "description": "Missing or ambiguous token"},
+        404: {"model": ResetTokenErrorResponse, "description": "Token not found"},
+        409: {"model": ResetTokenErrorResponse, "description": "Token already used"},
+        410: {"model": ResetTokenErrorResponse, "description": "Token expired"},
+        500: {"model": ResetTokenErrorResponse, "description": "Internal server error"},
+        503: {"model": ResetTokenErrorResponse, "description": "Validation temporarily unavailable"},
+    },
+)
 async def validate_reset_token(
-    token: str = Query(..., description="Токен сброса пароля"),
+    request: Request,
+    response: Response,
+    token: str | None = Query(None, description="Legacy reset token transport", deprecated=True),
+    x_reset_token: str | None = Header(None, alias="X-Reset-Token", description="Reset token"),
     db: Session = Depends(get_db),
 ):
-    """Проверка валидности токена сброса пароля"""
+    """Validate a reset token; query transport is retained for older clients."""
+    no_store = {"Cache-Control": "no-store"}
+    response.headers.update(no_store)
+    # Reject ambiguity rather than picking an attacker-controlled duplicate or
+    # silently preferring a query credential over the secure header.
+    query_values = request.query_params.getlist("token")
+    header_values = request.headers.getlist("x-reset-token")
+    if len(query_values) + len(header_values) != 1:
+        raise HTTPException(status_code=400, detail="Provide one reset token", headers=no_store)
+    reset_token = x_reset_token if header_values else token
+    if not reset_token:
+        raise HTTPException(status_code=400, detail="Provide one reset token", headers=no_store)
     try:
         password_reset_service = get_password_reset_service()
 
-        result = password_reset_service.validate_reset_token(db, token)
+        result = password_reset_service.validate_reset_token(db, reset_token)
 
         if result["valid"]:
             return {
@@ -307,13 +337,15 @@ async def validate_reset_token(
                 status_code = status.HTTP_410_GONE
             elif result.get("error_code") == "TOKEN_ALREADY_USED":
                 status_code = status.HTTP_409_CONFLICT
+            elif result.get("error_code") == "INTERNAL_ERROR":
+                status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
-            raise HTTPException(status_code=status_code, detail=result["error"])
+            raise HTTPException(status_code=status_code, detail=result["error"], headers=no_store)
 
     except HTTPException:
         raise
     except Exception as e:
-        raise_password_reset_internal_error("validate_reset_token", e)
+        raise_password_reset_internal_error("validate_reset_token", e, headers=no_store)
 
 
 @router.get("/statistics", response_model=dict[str, Any])

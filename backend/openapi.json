@@ -50157,19 +50157,46 @@
           "password-reset"
         ],
         "summary": "Validate Reset Token",
-        "description": "Проверка валидности токена сброса пароля",
+        "description": "Validate a reset token; query transport is retained for older clients.",
         "operationId": "validate_reset_token_api_v1_password_reset_validate_token_get",
         "parameters": [
           {
             "name": "token",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "description": "Токен сброса пароля",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Legacy reset token transport",
+              "deprecated": true,
               "title": "Token"
             },
-            "description": "Токен сброса пароля"
+            "description": "Legacy reset token transport",
+            "deprecated": true
+          },
+          {
+            "name": "X-Reset-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reset token",
+              "title": "X-Reset-Token"
+            },
+            "description": "Reset token"
           }
         ],
         "responses": {
@@ -50181,6 +50208,74 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Validate Reset Token Api V1 Password Reset Validate Token Get"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetTokenErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetTokenErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Token already used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetTokenErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Token expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetTokenErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetTokenErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Validation temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetTokenErrorResponse"
                 }
               }
             }
@@ -61792,6 +61887,50 @@
               }
             }
           },
+          "429": {
+            "description": "Activation attempt budget exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until retry",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Activation temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -62086,6 +62225,50 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SetupInitializeOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Activation attempt budget exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until retry",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Activation temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -115573,6 +115756,19 @@
         ],
         "title": "ReportResponse",
         "description": "Ответ с отчетом"
+      },
+      "ResetTokenErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ResetTokenErrorResponse"
       },
       "RestoreRequest": {
         "properties": {
