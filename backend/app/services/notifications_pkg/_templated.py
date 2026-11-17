@@ -18,6 +18,7 @@ from app.services.notifications_pkg._base import (
     logger,
 )
 from app.services.notifications_pkg._helpers import (
+    _is_private_telegram_chat_id,
     _normalize_notification_event_type,  # noqa: F401
 )
 
@@ -86,7 +87,7 @@ class TemplatedMixin(NotificationSenderMixinBase):
                     .order_by(TelegramUser.id.desc())
                     .first()
                 )
-                if telegram_user is None:
+                if telegram_user is None or not _is_private_telegram_chat_id(telegram_user.chat_id):
                     return None
                 from app.services.notifications_pkg._helpers import (
                     _patient_telegram_preferences_enabled,

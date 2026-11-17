@@ -47,6 +47,15 @@ from app.services.telegram.bot import telegram_bot  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
+def _is_private_telegram_chat_id(chat_id: Any) -> bool:
+    """Telegram private chat IDs are positive; groups and channels are not.
+
+    A positive ID alone does not prove how a historical link was created.
+    Callers must also enforce the patient ownership and consent checks.
+    """
+    return isinstance(chat_id, int) and not isinstance(chat_id, bool) and chat_id > 0
+
+
 def _fresh_db():
     """NOTIF-REAUDIT-28 P0-5: create a fresh DB session for background tasks.
 
@@ -168,8 +177,8 @@ PATIENT_TELEGRAM_EVENT_PREFERENCES = {
     "all_free_rejected": "notifications_enabled",
     "public_booking_request_submitted": "notifications_enabled",
     "public_booking_request_resubmitted": "notifications_enabled",
-    **{event: "appointment_reminders" for event in QUEUE_NOTIFICATION_EVENT_TYPES},
-    **{event: "lab_notifications" for event in LAB_NOTIFICATION_EVENT_TYPES},
+    **dict.fromkeys(QUEUE_NOTIFICATION_EVENT_TYPES, "appointment_reminders"),
+    **dict.fromkeys(LAB_NOTIFICATION_EVENT_TYPES, "lab_notifications"),
 }
 
 

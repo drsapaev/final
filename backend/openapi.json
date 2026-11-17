@@ -6024,7 +6024,7 @@
           "visit-confirmation"
         ],
         "summary": "Confirm Visit By Telegram",
-        "description": "Подтверждение визита через Telegram бот по токену.",
+        "description": "A claimed Telegram user ID in an unauthenticated request is untrusted.\n\nTelegram updates are handled by the authenticated webhook or polling\ntransport and invoke the service directly with the verified actor.",
         "operationId": "confirm_visit_by_telegram_api_v1_telegram_visits_confirm_post",
         "requestBody": {
           "content": {
@@ -6037,12 +6037,19 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "403": {
+            "description": "Telegram actions require an authenticated bot update.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConfirmationResponse"
+                  "$ref": "#/components/schemas/TelegramVisitActionDenied"
                 }
               }
             }
@@ -6057,7 +6064,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/v1/telegram/visits/cancel": {
@@ -6066,7 +6074,7 @@
           "visit-confirmation"
         ],
         "summary": "Cancel Visit By Telegram",
-        "description": "Отмена визита пациентом через Telegram бот по токену.\n\nTGCONFIRM-BE-003 (audit #3892, group 20): the ``cancel_visit:<token>``\ncallback must persist a real cancellation through the authorized\nlifecycle state machine and invalidate the token — the token is the\ncapability, mirroring the confirm route's trust model.",
+        "description": "Reject caller-asserted Telegram identities on the public API.",
         "operationId": "cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post",
         "requestBody": {
           "content": {
@@ -6079,12 +6087,19 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "403": {
+            "description": "Telegram actions require an authenticated bot update.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CancelVisitResponse"
+                  "$ref": "#/components/schemas/TelegramVisitActionDenied"
                 }
               }
             }
@@ -6099,7 +6114,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/v1/patient/visits/confirm": {
@@ -28343,6 +28359,66 @@
               }
             }
           },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -28392,6 +28468,66 @@
               }
             }
           },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -28437,6 +28573,66 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Send Lab Results Notification Api V1 Telegram Bot Send Lab Notification Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -28494,7 +28690,7 @@
           "telegram-integration"
         ],
         "summary": "Send Notification",
-        "description": "Отправка уведомления пациенту",
+        "description": "Send a supported appointment or lab event to its verified patient chat.\n\n``data`` must contain the matching canonical appointment or lab result ID.\nCaller-supplied clinical content is ignored.",
         "operationId": "send_notification_api_v1_telegram_send_notification_post",
         "requestBody": {
           "content": {
@@ -28515,6 +28711,66 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Send Notification Api V1 Telegram Send Notification Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource changed or is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -28543,22 +28799,13 @@
           "telegram-integration"
         ],
         "summary": "Send Appointment Reminder",
-        "description": "Отправка напоминания о записи",
+        "description": "Send the canonical appointment; an unambiguous appointment ID is required.",
         "operationId": "send_appointment_reminder_api_v1_telegram_appointment_reminder_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/SendAppointmentReminderIntegrationRequest"
-                  },
-                  {
-                    "additionalProperties": true,
-                    "type": "object"
-                  }
-                ],
-                "title": "Request"
+                "$ref": "#/components/schemas/SendAppointmentReminderIntegrationRequest"
               }
             }
           },
@@ -28573,6 +28820,66 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Send Appointment Reminder Api V1 Telegram Appointment Reminder Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource changed or is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -28601,22 +28908,13 @@
           "telegram-integration"
         ],
         "summary": "Send Lab Results Notification",
-        "description": "Уведомление о готовности результатов анализов",
+        "description": "Send a readiness notification; a finalized lab result ID is required.",
         "operationId": "send_lab_results_notification_api_v1_telegram_lab_results_notification_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/SendLabResultsNotificationRequest"
-                  },
-                  {
-                    "additionalProperties": true,
-                    "type": "object"
-                  }
-                ],
-                "title": "Request"
+                "$ref": "#/components/schemas/SendLabResultsNotificationRequest"
               }
             }
           },
@@ -28631,6 +28929,66 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Send Lab Results Notification Api V1 Telegram Lab Results Notification Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource changed or is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -28680,6 +29038,66 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Send Qr Code Api V1 Telegram Send Qr Code Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource changed or is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -28861,6 +29279,22 @@
               "default": "Уточните в регистратуре",
               "title": "Cabinet"
             }
+          },
+          {
+            "name": "appointment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Appointment Id"
+            }
           }
         ],
         "responses": {
@@ -28872,6 +29306,66 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Quick Appointment Reminder Api V1 Telegram Quick Appointment Reminder Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource changed or is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -28968,6 +29462,66 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Quick Qr Notification Api V1 Telegram Quick Qr Notification Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or authorized resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The clinical resource changed or is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -47907,7 +48461,7 @@
           "telegram-notifications"
         ],
         "summary": "Send Appointment Reminder",
-        "description": "Отправить напоминание о записи на прием",
+        "description": "Send only to the current consenting, patient-linked private chat.",
         "operationId": "send_appointment_reminder_api_v1_telegram_send_appointment_reminder_post",
         "security": [
           {
@@ -47950,6 +48504,76 @@
               }
             }
           },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The resource or recipient changed or is not eligible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Notification processing or report delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -47969,7 +48593,7 @@
           "telegram-notifications"
         ],
         "summary": "Send Lab Results",
-        "description": "Отправить результаты анализов пациенту",
+        "description": "Notify only when every result belongs to the patient and is finalized.\n\nHTTP 200 with ``success: false`` means that no eligible chat was available.",
         "operationId": "send_lab_results_api_v1_telegram_send_lab_results_post",
         "security": [
           {
@@ -48010,6 +48634,76 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Send Lab Results Api V1 Telegram Send Lab Results Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The resource or recipient changed or is not eligible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Notification processing or report delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -48058,6 +48752,66 @@
               }
             }
           },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The resource or recipient changed or is not eligible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Notification processing or report delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -48082,7 +48836,7 @@
           "telegram-notifications"
         ],
         "summary": "Send Payment Confirmation",
-        "description": "Отправить подтверждение платежа.\n\nP0-6b FIX: ``payment_data`` is now typed as ``PaymentData`` (Pydantic\nmodel with ``extra='allow'`` so unknown keys like ``transaction_id``\nand ``receipt_link`` are preserved). The model validates field types\nand sizes at the framework boundary, preventing mass-assignment of\narbitrary keys. Internally the model is converted back to a dict\nvia ``.model_dump()`` so existing helpers (``_safe_payment_template_data``,\n``_ensure_payment_confirmation_belongs_to_patient``) continue to work\nunchanged.",
+        "description": "Use a verified paid record; caller-supplied amounts are ignored.\n\nHTTP 200 with ``success: false`` means that no eligible chat was available.",
         "operationId": "send_payment_confirmation_api_v1_telegram_send_payment_confirmation_post",
         "security": [
           {
@@ -48119,6 +48873,76 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Send Payment Confirmation Api V1 Telegram Send Payment Confirmation Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or ambiguous resource identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role is not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient or resource is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The resource or recipient changed or is not eligible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Notification processing or report delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram did not confirm delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Telegram is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramDeliveryError"
                 }
               }
             }
@@ -50891,7 +51715,7 @@
           "email-sms-enhanced"
         ],
         "summary": "Send Appointment Reminder Enhanced",
-        "description": "Расширенное напоминание о записи.\n\nP0-6a FIX: ``template_data`` is now typed as ``TemplateDataBase`` so\nPydantic validates field sizes (strings ≤ 100KB) and shape at the\nframework boundary, preventing template-injection via oversized\npayloads.",
+        "description": "Расширенное напоминание о записи.\n\nHTTP 200 reports the attempt. Check ``success`` and per-channel details;\nmissing contacts, unsupported channels and provider failures are not sent.\n\n``template_data`` is accepted for compatibility but ignored; resource\nnotification content comes from the database.",
         "operationId": "send_appointment_reminder_enhanced_api_v1_email_sms_send_appointment_reminder_enhanced_post",
         "security": [
           {
@@ -50957,6 +51781,46 @@
               }
             }
           },
+          "403": {
+            "description": "Visit is not assigned to the doctor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Appointment or patient not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Appointment is not eligible for a reminder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Notification processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -50976,7 +51840,7 @@
           "email-sms-enhanced"
         ],
         "summary": "Send Lab Results Enhanced",
-        "description": "Расширенная отправка результатов анализов.\n\nP0-6a FIX: ``template_data`` is now typed as ``TemplateDataBase``\nfor framework-level validation.",
+        "description": "Расширенная отправка результатов анализов.\n\nHTTP 200 reports the attempt; ``success`` is false unless every requested\nchannel has an available contact and reports successful delivery.\n\n``template_data`` is accepted for compatibility but ignored; resource\nnotification content comes from the database.",
         "operationId": "send_lab_results_enhanced_api_v1_email_sms_send_lab_results_enhanced_post",
         "security": [
           {
@@ -51051,6 +51915,46 @@
               }
             }
           },
+          "403": {
+            "description": "Result is not assigned to the requested patient or doctor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Patient or result not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Lab result is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Notification processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -51070,7 +51974,7 @@
           "email-sms-enhanced"
         ],
         "summary": "Send Payment Confirmation Enhanced",
-        "description": "Расширенное подтверждение платежа.\n\nP0-6a FIX: ``payment_data`` is now typed as ``PaymentData`` and\n``template_data`` as ``TemplateDataBase`` so Pydantic validates\nfield types and sizes at the framework boundary. ``PaymentData``\nuses ``model_config = {\"extra\": \"allow\"}`` so unknown keys\n(e.g. ``transaction_id``, ``receipt_link``) are preserved.",
+        "description": "Расширенное подтверждение платежа.\n\nA payment ID is required. Amount, currency, method and receipt details\nare loaded from the matching paid payment, not from the request body.\nHTTP 200 reports the attempt; inspect ``success`` and per-channel details.\n``template_data`` is accepted for compatibility but ignored.",
         "operationId": "send_payment_confirmation_enhanced_api_v1_email_sms_send_payment_confirmation_enhanced_post",
         "security": [
           {
@@ -51125,6 +52029,56 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Send Payment Confirmation Enhanced Api V1 Email Sms Send Payment Confirmation Enhanced Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or conflicting payment ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Payment belongs to another patient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Patient or payment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Payment is not paid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Notification processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
                 }
               }
             }
@@ -51342,6 +52296,16 @@
               }
             }
           },
+          "403": {
+            "description": "Unscoped doctor destination is forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -51401,6 +52365,16 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Send Custom Sms Api V1 Email Sms Send Custom Sms Post"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unscoped doctor destination is forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryError"
                 }
               }
             }
@@ -77138,6 +78112,18 @@
             ],
             "title": "Updated At"
           },
+          "patient_confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Confirmed At"
+          },
           "patient_name": {
             "anyOf": [
               {
@@ -81281,39 +82267,6 @@
         ],
         "title": "CancelServiceResponse",
         "description": "Ответ на отмену услуги"
-      },
-      "CancelVisitResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "visit_id": {
-            "type": "integer",
-            "title": "Visit Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "patient_name": {
-            "type": "string",
-            "title": "Patient Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "message",
-          "visit_id",
-          "status",
-          "patient_name"
-        ],
-        "title": "CancelVisitResponse"
       },
       "CanonicalVisitResponse": {
         "properties": {
@@ -100578,6 +101531,19 @@
         ],
         "title": "NonDoctorUserCreateRequest",
         "description": "Every non-canonical-Doctor role variant (POST /users).\n\nIncludes legacy lowercase doctor-role spellings (cardio/derma/dentist/\ndoctor/…): they keep the compatibility auto-map and must NOT carry a\ndoctor_profile — the block is rejected here instead of being silently\ndropped."
+      },
+      "NotificationDeliveryError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "NotificationDeliveryError"
       },
       "NotificationInboxItem": {
         "properties": {
@@ -120328,6 +121294,19 @@
         ],
         "title": "TelegramConfirmRequest"
       },
+      "TelegramDeliveryError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "TelegramDeliveryError"
+      },
       "TelegramMiniAppAppointmentPreviewRequest": {
         "properties": {
           "initData": {
@@ -120841,6 +121820,19 @@
         ],
         "title": "TelegramNotificationRequest",
         "description": "Запрос на отправку Telegram уведомления"
+      },
+      "TelegramVisitActionDenied": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "TelegramVisitActionDenied"
       },
       "TelegramWebhookRequest": {
         "properties": {

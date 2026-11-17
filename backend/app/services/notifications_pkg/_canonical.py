@@ -17,6 +17,7 @@ from app.services.notifications_pkg._helpers import (  # noqa: F401
     PATIENT_TELEGRAM_EVENT_PREFERENCES,
     QUEUE_NOTIFICATION_EVENT_TYPES,
     REGISTRAR_NOTIFICATION_EVENT_TYPES,
+    _is_private_telegram_chat_id,
     _normalize_notification_event_type,
     _patient_telegram_event_message,
     _patient_telegram_preferences_enabled,
@@ -58,7 +59,7 @@ class CanonicalMixin(NotificationSenderMixinBase):
             .first()
         )
 
-        if telegram_user is None or not _patient_telegram_preferences_enabled(
+        if telegram_user is None or not _is_private_telegram_chat_id(telegram_user.chat_id) or not _patient_telegram_preferences_enabled(
             telegram_user, normalized_event_type
         ):
             return False
@@ -98,7 +99,7 @@ class CanonicalMixin(NotificationSenderMixinBase):
             .order_by(TelegramUser.id.desc())
             .first()
         )
-        if not telegram_user:
+        if not telegram_user or not _is_private_telegram_chat_id(telegram_user.chat_id):
             logger.info(
                 "Patient Telegram event skipped: linked chat not found",
                 extra={"event_type": normalized_event_type},

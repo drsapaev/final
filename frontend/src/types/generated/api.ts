@@ -1804,7 +1804,11 @@ export type paths = {
         put?: never;
         /**
          * Confirm Visit By Telegram
-         * @description Подтверждение визита через Telegram бот по токену.
+         * @deprecated
+         * @description A claimed Telegram user ID in an unauthenticated request is untrusted.
+         *
+         *     Telegram updates are handled by the authenticated webhook or polling
+         *     transport and invoke the service directly with the verified actor.
          */
         post: operations["confirm_visit_by_telegram_api_v1_telegram_visits_confirm_post"];
         delete?: never;
@@ -1824,12 +1828,8 @@ export type paths = {
         put?: never;
         /**
          * Cancel Visit By Telegram
-         * @description Отмена визита пациентом через Telegram бот по токену.
-         *
-         *     TGCONFIRM-BE-003 (audit #3892, group 20): the ``cancel_visit:<token>``
-         *     callback must persist a real cancellation through the authorized
-         *     lifecycle state machine and invalidate the token — the token is the
-         *     capability, mirroring the confirm route's trust model.
+         * @deprecated
+         * @description Reject caller-asserted Telegram identities on the public API.
          */
         post: operations["cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post"];
         delete?: never;
@@ -9434,7 +9434,10 @@ export type paths = {
         put?: never;
         /**
          * Send Notification
-         * @description Отправка уведомления пациенту
+         * @description Send a supported appointment or lab event to its verified patient chat.
+         *
+         *     ``data`` must contain the matching canonical appointment or lab result ID.
+         *     Caller-supplied clinical content is ignored.
          */
         post: operations["send_notification_api_v1_telegram_send_notification_post"];
         delete?: never;
@@ -9454,7 +9457,7 @@ export type paths = {
         put?: never;
         /**
          * Send Appointment Reminder
-         * @description Отправка напоминания о записи
+         * @description Send the canonical appointment; an unambiguous appointment ID is required.
          */
         post: operations["send_appointment_reminder_api_v1_telegram_appointment_reminder_post"];
         delete?: never;
@@ -9474,7 +9477,7 @@ export type paths = {
         put?: never;
         /**
          * Send Lab Results Notification
-         * @description Уведомление о готовности результатов анализов
+         * @description Send a readiness notification; a finalized lab result ID is required.
          */
         post: operations["send_lab_results_notification_api_v1_telegram_lab_results_notification_post"];
         delete?: never;
@@ -15702,7 +15705,7 @@ export type paths = {
         put?: never;
         /**
          * Send Appointment Reminder
-         * @description Отправить напоминание о записи на прием
+         * @description Send only to the current consenting, patient-linked private chat.
          */
         post: operations["send_appointment_reminder_api_v1_telegram_send_appointment_reminder_post"];
         delete?: never;
@@ -15722,7 +15725,9 @@ export type paths = {
         put?: never;
         /**
          * Send Lab Results
-         * @description Отправить результаты анализов пациенту
+         * @description Notify only when every result belongs to the patient and is finalized.
+         *
+         *     HTTP 200 with ``success: false`` means that no eligible chat was available.
          */
         post: operations["send_lab_results_api_v1_telegram_send_lab_results_post"];
         delete?: never;
@@ -15768,16 +15773,9 @@ export type paths = {
         put?: never;
         /**
          * Send Payment Confirmation
-         * @description Отправить подтверждение платежа.
+         * @description Use a verified paid record; caller-supplied amounts are ignored.
          *
-         *     P0-6b FIX: ``payment_data`` is now typed as ``PaymentData`` (Pydantic
-         *     model with ``extra='allow'`` so unknown keys like ``transaction_id``
-         *     and ``receipt_link`` are preserved). The model validates field types
-         *     and sizes at the framework boundary, preventing mass-assignment of
-         *     arbitrary keys. Internally the model is converted back to a dict
-         *     via ``.model_dump()`` so existing helpers (``_safe_payment_template_data``,
-         *     ``_ensure_payment_confirmation_belongs_to_patient``) continue to work
-         *     unchanged.
+         *     HTTP 200 with ``success: false`` means that no eligible chat was available.
          */
         post: operations["send_payment_confirmation_api_v1_telegram_send_payment_confirmation_post"];
         delete?: never;
@@ -16696,10 +16694,11 @@ export type paths = {
          * Send Appointment Reminder Enhanced
          * @description Расширенное напоминание о записи.
          *
-         *     P0-6a FIX: ``template_data`` is now typed as ``TemplateDataBase`` so
-         *     Pydantic validates field sizes (strings ≤ 100KB) and shape at the
-         *     framework boundary, preventing template-injection via oversized
-         *     payloads.
+         *     HTTP 200 reports the attempt. Check ``success`` and per-channel details;
+         *     missing contacts, unsupported channels and provider failures are not sent.
+         *
+         *     ``template_data`` is accepted for compatibility but ignored; resource
+         *     notification content comes from the database.
          */
         post: operations["send_appointment_reminder_enhanced_api_v1_email_sms_send_appointment_reminder_enhanced_post"];
         delete?: never;
@@ -16721,8 +16720,11 @@ export type paths = {
          * Send Lab Results Enhanced
          * @description Расширенная отправка результатов анализов.
          *
-         *     P0-6a FIX: ``template_data`` is now typed as ``TemplateDataBase``
-         *     for framework-level validation.
+         *     HTTP 200 reports the attempt; ``success`` is false unless every requested
+         *     channel has an available contact and reports successful delivery.
+         *
+         *     ``template_data`` is accepted for compatibility but ignored; resource
+         *     notification content comes from the database.
          */
         post: operations["send_lab_results_enhanced_api_v1_email_sms_send_lab_results_enhanced_post"];
         delete?: never;
@@ -16744,11 +16746,10 @@ export type paths = {
          * Send Payment Confirmation Enhanced
          * @description Расширенное подтверждение платежа.
          *
-         *     P0-6a FIX: ``payment_data`` is now typed as ``PaymentData`` and
-         *     ``template_data`` as ``TemplateDataBase`` so Pydantic validates
-         *     field types and sizes at the framework boundary. ``PaymentData``
-         *     uses ``model_config = {"extra": "allow"}`` so unknown keys
-         *     (e.g. ``transaction_id``, ``receipt_link``) are preserved.
+         *     A payment ID is required. Amount, currency, method and receipt details
+         *     are loaded from the matching paid payment, not from the request body.
+         *     HTTP 200 reports the attempt; inspect ``success`` and per-channel details.
+         *     ``template_data`` is accepted for compatibility but ignored.
          */
         post: operations["send_payment_confirmation_enhanced_api_v1_email_sms_send_payment_confirmation_enhanced_post"];
         delete?: never;
@@ -25261,6 +25262,8 @@ export type components = {
             created_at: string;
             /** Updated At */
             updated_at?: string | null;
+            /** Patient Confirmed At */
+            patient_confirmed_at?: string | null;
             /** Patient Name */
             patient_name?: string | null;
             /** Department Id */
@@ -26675,19 +26678,6 @@ export type components = {
             };
             /** New Total Amount */
             new_total_amount: number;
-        };
-        /** CancelVisitResponse */
-        CancelVisitResponse: {
-            /** Success */
-            success: boolean;
-            /** Message */
-            message: string;
-            /** Visit Id */
-            visit_id: number;
-            /** Status */
-            status: string;
-            /** Patient Name */
-            patient_name: string;
         };
         /** CanonicalVisitResponse */
         CanonicalVisitResponse: {
@@ -33795,6 +33785,11 @@ export type components = {
             role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
             /** Doctor Profile */
             doctor_profile?: null;
+        };
+        /** NotificationDeliveryError */
+        NotificationDeliveryError: {
+            /** Detail */
+            detail: string;
         };
         /** NotificationInboxItem */
         NotificationInboxItem: {
@@ -41362,6 +41357,11 @@ export type components = {
             /** Telegram Username */
             telegram_username?: string | null;
         };
+        /** TelegramDeliveryError */
+        TelegramDeliveryError: {
+            /** Detail */
+            detail: string;
+        };
         /** TelegramMiniAppAppointmentPreviewRequest */
         TelegramMiniAppAppointmentPreviewRequest: {
             /** Initdata */
@@ -41508,6 +41508,11 @@ export type components = {
              * @default false
              */
             send_to_all_users: boolean;
+        };
+        /** TelegramVisitActionDenied */
+        TelegramVisitActionDenied: {
+            /** Detail */
+            detail: string;
         };
         /** TelegramWebhookRequest */
         TelegramWebhookRequest: {
@@ -48521,13 +48526,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Telegram actions require an authenticated bot update. */
+            403: {
                 headers: {
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConfirmationResponse"];
+                    "application/json": components["schemas"]["TelegramVisitActionDenied"];
                 };
             };
             /** @description Validation Error */
@@ -48554,13 +48560,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Telegram actions require an authenticated bot update. */
+            403: {
                 headers: {
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CancelVisitResponse"];
+                    "application/json": components["schemas"]["TelegramVisitActionDenied"];
                 };
             };
             /** @description Validation Error */
@@ -62038,6 +62045,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62045,6 +62088,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -62073,6 +62134,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62080,6 +62177,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -62108,6 +62223,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62115,6 +62266,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -62165,6 +62334,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62172,6 +62377,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -62185,9 +62408,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SendAppointmentReminderIntegrationRequest"] | {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["SendAppointmentReminderIntegrationRequest"];
             };
         };
         responses: {
@@ -62202,6 +62423,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62209,6 +62466,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -62222,9 +62497,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SendLabResultsNotificationRequest"] | {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["SendLabResultsNotificationRequest"];
             };
         };
         responses: {
@@ -62239,6 +62512,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62246,6 +62555,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -62274,6 +62601,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62281,6 +62644,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -62350,6 +62731,7 @@ export interface operations {
                 appointment_time: string;
                 specialty?: string;
                 cabinet?: string;
+                appointment_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -62368,6 +62750,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62375,6 +62793,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -62406,6 +62842,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62413,6 +62885,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -73995,6 +74485,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The resource or recipient changed or is not eligible */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74002,6 +74528,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing or report delivery failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -74032,6 +74585,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The resource or recipient changed or is not eligible */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74039,6 +74628,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing or report delivery failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -74067,6 +74683,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The resource or recipient changed or is not eligible */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74074,6 +74726,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing or report delivery failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -74104,6 +74774,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The resource or recipient changed or is not eligible */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74111,6 +74817,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing or report delivery failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -76045,6 +76778,33 @@ export interface operations {
                     };
                 };
             };
+            /** @description Visit is not assigned to the doctor */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Appointment or patient not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Appointment is not eligible for a reminder */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76052,6 +76812,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
                 };
             };
         };
@@ -76085,6 +76854,33 @@ export interface operations {
                     };
                 };
             };
+            /** @description Result is not assigned to the requested patient or doctor */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Patient or result not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Lab result is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76092,6 +76888,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
                 };
             };
         };
@@ -76124,6 +76929,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or conflicting payment ID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Payment belongs to another patient */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Patient or payment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Payment is not paid */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76131,6 +76972,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
                 };
             };
         };
@@ -76242,6 +77092,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description Unscoped doctor destination is forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76278,6 +77137,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Unscoped doctor destination is forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
                 };
             };
             /** @description Validation Error */
