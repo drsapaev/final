@@ -7,7 +7,16 @@ import re
 from datetime import datetime
 from typing import Any, Literal, NoReturn
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -16,7 +25,12 @@ from app.api.deps import require_roles
 from app.core.rate_limiter import get_client_ip, limiter
 from app.db.session import get_db
 from app.models.user import User
-from app.services.password_reset_service import get_password_reset_service
+from app.services.password_reset_service import (
+    _EMAIL_RESET_GENERIC_MESSAGE,
+    EmailResetUnavailable,
+    get_password_reset_service,
+    schedule_email_reset,
+)
 from app.services.phone_verification_store import PhoneStoreUnavailable
 
 router = APIRouter()
@@ -136,8 +150,8 @@ class ResetTokenErrorResponse(BaseModel):
     detail: str
 
 
-@router.post("/initiate", response_model=dict[str, Any])  # P1-1: rate limit deferred (request param conflict)
-@limiter.limit("3/minute")  # P1-1: rate limit
+@router.post("/initiate", response_model=dict[str, Any], responses={503: {"model": ResetTokenErrorResponse, "description": "Password reset temporarily unavailable", "headers": {"Retry-After": {"schema": {"type": "string"}}}}})
+@limiter.shared_limit("3/minute", scope="password_reset_initiate")
 async def initiate_password_reset(request: Request,
     request_data: PasswordResetInitiateRequest, db: Session = Depends(get_db)
 ):
@@ -150,9 +164,16 @@ async def initiate_password_reset(request: Request,
                 db=db, phone=request_data.phone
             )
         else:
-            result = await password_reset_service.initiate_email_reset(
-                db=db, email=request_data.email
+            binding = await run_in_threadpool(
+                password_reset_service.snapshot_email_binding, db, request_data.email
             )
+            if not schedule_email_reset(request_data.email, binding):
+                raise EmailResetUnavailable
+            result = {
+                "success": True,
+                "message": _EMAIL_RESET_GENERIC_MESSAGE,
+                "expires_in_hours": password_reset_service.token_ttl_hours,
+            }
 
         if result["success"]:
             response_data = {"success": True, "message": result["message"]}
@@ -173,6 +194,8 @@ async def initiate_password_reset(request: Request,
 
             raise HTTPException(status_code=status_code, detail=result["error"])
 
+    except EmailResetUnavailable as exc:
+        raise HTTPException(status_code=503, detail="Password reset temporarily unavailable", headers={"Retry-After": "60"}) from exc
     except HTTPException:
         raise
     except Exception as e:

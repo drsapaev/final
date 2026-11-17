@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -155,7 +156,7 @@ async def test_password_change_endpoint_rejects_invalid_bearer_signature(db_sess
 def test_reset_token_is_consumed_with_password_and_revocations(db_session, kind):
     user = _user(db_session)
     session, refresh = _credentials(db_session, user)
-    raw_token = f"synthetic-reset-{uuid4().hex}"
+    raw_token = secrets.token_urlsafe(32)
     service = PasswordResetService()
     stored_token = service._hash_token(raw_token) if kind == "mounted" else raw_token
     reset = PasswordResetToken(
@@ -186,7 +187,7 @@ def test_reset_rolls_back_everything_on_revocation_failure(db_session, monkeypat
 
     user = _user(db_session)
     session, refresh = _credentials(db_session, user)
-    raw_token = f"synthetic-reset-{uuid4().hex}"
+    raw_token = secrets.token_urlsafe(32)
     service = PasswordResetService()
     stored_token = service._hash_token(raw_token) if kind == "mounted" else raw_token
     reset = PasswordResetToken(user_id=user.id, token=stored_token, expires_at=datetime.now(UTC) + timedelta(hours=1), used=False)
@@ -224,7 +225,7 @@ def test_reset_rolls_back_everything_on_revocation_failure(db_session, monkeypat
 def test_reset_expiring_during_hash_rolls_back(db_session, monkeypatch, kind):
     user = _user(db_session)
     session, refresh = _credentials(db_session, user)
-    raw = f"synthetic-reset-{uuid4().hex}"
+    raw = secrets.token_urlsafe(32)
     service = PasswordResetService()
     reset = PasswordResetToken(
         user_id=user.id, token=service._hash_token(raw) if kind == "mounted" else raw,
@@ -309,7 +310,7 @@ def test_non_deactivation_user_update_does_not_revoke(db_session):
 def test_deactivation_invalidates_reset_before_reactivation(db_session, kind):
     user, actor = _user(db_session), _user(db_session)
     service = PasswordResetService()
-    raw = f"synthetic-reset-{uuid4().hex}"
+    raw = secrets.token_urlsafe(32)
     reset = PasswordResetToken(
         user_id=user.id, token=service._hash_token(raw) if kind == "mounted" else raw,
         expires_at=datetime.now(UTC) + timedelta(hours=1), used=False,
@@ -333,7 +334,7 @@ def test_deactivation_invalidates_reset_before_reactivation(db_session, kind):
 def test_inactive_user_cannot_consume_existing_reset_token(db_session, kind):
     user = _user(db_session, active=False)
     service = PasswordResetService()
-    raw = f"synthetic-reset-{uuid4().hex}"
+    raw = secrets.token_urlsafe(32)
     reset = PasswordResetToken(
         user_id=user.id, token=service._hash_token(raw) if kind == "mounted" else raw,
         expires_at=datetime.now(UTC) + timedelta(hours=1), used=False,

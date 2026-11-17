@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -151,7 +152,7 @@ def test_deactivation_serializes_with_inflight_session_mint(epoch_pg_engine):
 def test_two_concurrent_password_resets_consume_one_token(epoch_pg_engine, kind):
     from app.services.authentication_service import AuthenticationService
 
-    raw = f"synthetic-reset-{uuid4().hex}"
+    raw = secrets.token_urlsafe(32)
     reset_service = PasswordResetService()
     with Session(epoch_pg_engine, expire_on_commit=False) as db:
         user = _seed_user(db)
@@ -309,7 +310,7 @@ def test_security_revoke_resets_and_rollback_are_atomic_on_postgres(epoch_pg_eng
         user = _seed_user(db)
         _seed_credentials(db, user.id)
         reset = PasswordResetToken(
-            user_id=user.id, token=f"synthetic-reset-{uuid4().hex}",
+            user_id=user.id, token=secrets.token_urlsafe(32),
             expires_at=datetime.now(UTC) + timedelta(hours=1), used=False,
         )
         db.add(reset)
@@ -331,7 +332,7 @@ def test_security_revoke_resets_and_rollback_are_atomic_on_postgres(epoch_pg_eng
 
 
 def test_reset_waiting_on_hard_delete_cannot_change_another_account(epoch_pg_engine):
-    raw = f"synthetic-reset-{uuid4().hex}"
+    raw = secrets.token_urlsafe(32)
     reset_service = PasswordResetService()
     with Session(epoch_pg_engine, expire_on_commit=False) as db:
         user, actor = _seed_user(db), _seed_user(db)

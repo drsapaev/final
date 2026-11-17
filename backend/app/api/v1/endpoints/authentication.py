@@ -60,7 +60,12 @@ from app.services.email_verification_delivery import (
 
 # AUTH-BE-002 (#4063): SSOT for the enumeration-resistant generic message —
 # the same text /password-reset/initiate returns for every outcome.
-from app.services.password_reset_service import _EMAIL_RESET_GENERIC_MESSAGE
+from app.services.password_reset_service import (
+    _EMAIL_RESET_GENERIC_MESSAGE,
+    EmailResetUnavailable,
+    get_password_reset_service,
+    schedule_email_reset,
+)
 from app.services.patient_phone_scope import PatientPhoneScopeConflict
 from app.services.profile_contact_security import (
     ProfileBearerInvalid,
@@ -281,32 +286,20 @@ async def logout(
         raise_authentication_internal_error("logout", e)
 
 
-@router.post("/password-reset", response_model=AuthSuccessResponse)
+@router.post("/password-reset", response_model=AuthSuccessResponse,
+    responses={503: {"model": ServiceUnavailableDetail, "description": "Password reset temporarily unavailable", "headers": {"Retry-After": {"schema": {"type": "string"}}}}})
+@limiter.shared_limit("3/minute", scope="password_reset_initiate")
 async def request_password_reset(
     request_data: PasswordResetRequest, request: Request, db: Session = Depends(get_db)
 ):
     """Запрос сброса пароля"""
     try:
-        ip_address, user_agent = get_client_info(request)
-
-        service = get_authentication_service()
-        result = service.create_password_reset_token(
-            db=db,
-            email=request_data.email,
-            ip_address=ip_address,
-            user_agent=user_agent,
+        # Snapshot identity before queueing, but never wait for delivery.
+        binding = await run_in_threadpool(
+            get_password_reset_service().snapshot_email_binding, db, request_data.email
         )
-
-        # AUTH-BE-002 (#4063): enumeration-resistant uniform response — the
-        # public contract is identical whether or not the email exists,
-        # mirroring the uniform service contract of /password-reset/initiate
-        # (password_reset_service._EMAIL_RESET_GENERIC_MESSAGE). The previous
-        # shape was an active oracle: unknown emails got 400 + "Пользователь
-        # с таким email не найден" while registered ones returned
-        # 200 + machine-readable expires_at. The service result is
-        # deliberately not inspected for the response; database token
-        # creation still happens only for known emails.
-        del result
+        if not schedule_email_reset(request_data.email, binding):
+            raise EmailResetUnavailable
 
         return AuthSuccessResponse(
             success=True,
@@ -314,6 +307,8 @@ async def request_password_reset(
             data=None,
         )
 
+    except EmailResetUnavailable as exc:
+        raise HTTPException(status_code=503, detail="Password reset temporarily unavailable", headers={"Retry-After": "60"}) from exc
     except HTTPException:
         raise
     except Exception as e:
@@ -326,14 +321,20 @@ async def confirm_password_reset(
 ):
     """Подтверждение сброса пароля"""
     try:
-        service = get_authentication_service()
-        result = service.reset_password(
+        result = get_password_reset_service().reset_password_with_token(
             db=db, token=request_data.token, new_password=request_data.new_password
         )
+        if not result["success"] and result.get("error_code") == "TOKEN_NOT_FOUND":
+            # In-flight legacy credentials are stored raw; the service only
+            # accepts the precise format previously issued by this route.
+            result = get_authentication_service().reset_password(
+                db=db, token=request_data.token, new_password=request_data.new_password
+            )
 
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("message") or result.get("error") or "Недействительный или истекший токен",
             )
 
         return AuthSuccessResponse(success=True, message=result["message"])
