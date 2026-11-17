@@ -46,6 +46,7 @@ import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
+import { hasMedicalAiSafety } from '../../utils/aiSafety';
 import './DermaVisitGallery.css';
 
 export type DermaPhotoCategory = 'examination' | 'before' | 'after';
@@ -400,6 +401,7 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
       if (
         payload.status !== 'success' ||
         !suggestion ||
+        !hasMedicalAiSafety(payload) ||
         payload.requires_doctor_confirmation !== true ||
         payload.decision_boundary !== 'suggestion_only' ||
         !aiNotice.trim()

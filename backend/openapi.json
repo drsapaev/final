@@ -24677,9 +24677,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Analyze Patient Complaints Api V1 Ai Analyze Complaints Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -24726,9 +24724,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Suggest Icd10 Codes Api V1 Ai Suggest Icd10 Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -24775,9 +24771,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Analyze Medical Document Api V1 Ai Analyze Document Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -24824,9 +24818,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Interpret Lab Results Api V1 Ai Interpret Lab Results Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -24873,9 +24865,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Check Symptoms Api V1 Ai Symptom Checker Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -24973,9 +24963,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Quick Diagnosis Help Api V1 Ai Quick Diagnosis Help Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -25090,9 +25078,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Analyze Complaint Api V1 Ai Complaint To Plan Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -25139,14 +25125,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "type": "object"
-                  },
-                  "type": "array",
-                  "title": "Response Suggest Icd10 Codes Api V1 Ai Icd Suggest Post"
+                  "$ref": "#/components/schemas/MedicalAIListResponse"
                 }
               }
             }
@@ -25193,9 +25172,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Interpret Lab Results Api V1 Ai Lab Interpret Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -25242,9 +25219,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Analyze Skin Api V1 Ai Skin Analyze Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -25291,9 +25266,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Interpret Ecg Api V1 Ai Ecg Interpret Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -27448,9 +27421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Mcp Analyze Complaint Api V1 Mcp Complaint Analyze Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -27503,9 +27474,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Mcp Validate Complaint Api V1 Mcp Complaint Validate Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -27604,9 +27573,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Mcp Suggest Icd10 Api V1 Mcp Icd10 Suggest Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -27695,9 +27662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Mcp Validate Icd10 Api V1 Mcp Icd10 Validate Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -27815,9 +27780,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Mcp Interpret Lab Results Api V1 Mcp Lab Interpret Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -27869,9 +27832,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Mcp Check Critical Values Api V1 Mcp Lab Check Critical Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -27991,9 +27952,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Mcp Analyze Image Api V1 Mcp Imaging Analyze Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -28040,9 +27999,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Mcp Analyze Skin Lesion Api V1 Mcp Imaging Skin Lesion Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -28146,12 +28103,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  "type": "array",
-                  "title": "Response Mcp Batch Process Api V1 Mcp Batch Post"
+                  "$ref": "#/components/schemas/MedicalAIListResponse"
                 }
               }
             }
@@ -40708,9 +40660,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Diagnosis Suggestions Api V1 Emr Ai Suggestions Diagnosis Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -40770,9 +40720,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Treatment Suggestions Api V1 Emr Ai Suggestions Treatment Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -40820,9 +40768,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Icd10 Suggestions Api V1 Emr Ai Suggestions Icd10 Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -40883,9 +40829,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Auto Fill Emr Fields Api V1 Emr Ai Auto Fill Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -40927,9 +40871,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Validate Emr Data Api V1 Emr Ai Validate Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -40995,9 +40937,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Ai Suggestions Api V1 Emr Ai Suggestions Ai Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -41265,7 +41205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Auto Fill Emr Fields Api V1 Emr Ai Enhanced Auto Fill Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -41326,7 +41266,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Validate Emr Data Api V1 Emr Ai Enhanced Validate Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -41388,7 +41328,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Get Icd10 Suggestions Api V1 Emr Ai Enhanced Icd10 Suggestions Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -41430,7 +41370,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Analyze Patient Data Api V1 Emr Ai Enhanced Analyze Patient Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -41542,7 +41482,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Enhance Emr With Ai Api V1 Emr Ai Enhanced Emr  Emr Id  Ai Enhance Post"
+                  "$ref": "#/components/schemas/MedicalAIResultResponse"
                 }
               }
             }
@@ -74557,6 +74497,10 @@
             "title": "Warnings",
             "description": "Предупреждения"
           },
+          "ai_safety_meta": {
+            "$ref": "#/components/schemas/MedicalAISafetyMeta",
+            "description": "Server-owned safety boundary for medical AI suggestions"
+          },
           "requires_doctor_confirmation": {
             "type": "boolean",
             "const": true,
@@ -74620,6 +74564,7 @@
           "provider",
           "model",
           "latency_ms",
+          "ai_safety_meta",
           "requires_doctor_confirmation",
           "decision_boundary",
           "ai_notice"
@@ -74746,6 +74691,7 @@
           },
           "requiresDoctorConfirmation": {
             "type": "boolean",
+            "const": true,
             "title": "Requiresdoctorconfirmation",
             "default": true
           }
@@ -99384,6 +99330,57 @@
         "title": "MeasurementResponse",
         "description": "Ответ с данными измерения"
       },
+      "MedicalAIListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "ai_safety_meta": {
+            "$ref": "#/components/schemas/MedicalAISafetyMeta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "ai_safety_meta"
+        ],
+        "title": "MedicalAIListResponse",
+        "description": "Envelope collections, including empty lists, with explicit safety metadata."
+      },
+      "MedicalAIResultResponse": {
+        "properties": {
+          "ai_safety_meta": {
+            "$ref": "#/components/schemas/MedicalAISafetyMeta"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "ai_safety_meta"
+        ],
+        "title": "MedicalAIResultResponse",
+        "description": "Preserve existing response fields while requiring server-owned safety metadata."
+      },
+      "MedicalAISafetyMeta": {
+        "properties": {
+          "requires_doctor_confirmation": {
+            "type": "boolean",
+            "const": true,
+            "title": "Requires Doctor Confirmation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requires_doctor_confirmation"
+        ],
+        "title": "MedicalAISafetyMeta",
+        "description": "A medical suggestion always requires an explicit doctor's review."
+      },
       "MedicalDocumentRequest": {
         "properties": {
           "provider_name": {
@@ -119858,6 +119855,9 @@
             "type": "array",
             "title": "Suggestions"
           },
+          "ai_safety_meta": {
+            "$ref": "#/components/schemas/MedicalAISafetyMeta"
+          },
           "model": {
             "type": "string",
             "title": "Model",
@@ -119886,6 +119886,7 @@
         "type": "object",
         "required": [
           "suggestions",
+          "ai_safety_meta",
           "specialty"
         ],
         "title": "SuggestResponseV2",

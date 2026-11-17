@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { api as apiClient } from '../api/client';
 import { mcpAPI } from '../api/mcpClient';
 import {
@@ -10,6 +10,7 @@ import {
 
 import logger from '../utils/logger';
 import { getErrorMessage } from '../utils/type-guards';
+import { assertMedicalAiSafety } from '../utils/aiSafety';
 /**
  * Кастомный хук для AI функций в EMR системе через MCP
  * Поддерживает все медицинские AI функции
@@ -19,9 +20,16 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   const [error, setError] = useState('');
   const [icd10Suggestions, setIcd10Suggestions] = useState<Record<string, unknown>[]>([]);
   const [clinicalRecommendations, setClinicalRecommendations] = useState<Record<string, unknown> | null>(null);
+  const icdRequestGeneration = useRef(0);
+  useEffect(() => () => { icdRequestGeneration.current += 1; }, []);
 
   // Получение AI подсказок для МКБ-10 через MCP
   const getICD10Suggestions = useCallback(async (symptoms: string, diagnosis: string, specialty: string | null = null) => {
+    const generation = ++icdRequestGeneration.current;
+    const isCurrent = () => icdRequestGeneration.current === generation;
+    setClinicalRecommendations(null);
+    setIcd10Suggestions([]);
+    setLoading(false);
     // Prompt injection check
     const inputText = (symptoms || '') + ' ' + (diagnosis || '');
     if (detectPromptInjection(inputText)) {
@@ -36,7 +44,6 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
 
     setLoading(true);
     setError('');
-    setClinicalRecommendations(null);
 
     try {
       if (useMCP) {
@@ -47,6 +54,8 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
           provider: provider,
           maxSuggestions: 5
         });
+        if (!isCurrent()) return [];
+        assertMedicalAiSafety(mcpResult);
 
         if ((mcpResult as Record<string, unknown>).status === 'success') {
           const data = (mcpResult as Record<string, unknown>).data;
@@ -78,17 +87,24 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
           provider: provider
         });
 
-        const suggestions = response.data as Record<string, unknown>[];
-        setIcd10Suggestions(suggestions);
-        return suggestions;
+        if (!isCurrent()) return [];
+        assertMedicalAiSafety(response.data);
+        const suggestions = (response.data as { data?: unknown }).data;
+        if (!Array.isArray(suggestions) || !suggestions.every(
+          (item) => item !== null && typeof item === 'object' && !Array.isArray(item),
+        )) throw new Error('Invalid AI response');
+        const records = suggestions as Record<string, unknown>[];
+        setIcd10Suggestions(records);
+        return records;
       }
     } catch (err) {
+      if (!isCurrent()) return [];
       logger.error('AI error:', err);
       const errorMessage = getErrorMessage(err) || 'Ошибка получения AI подсказок';
       setError(String(errorMessage));
       return [];
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [useMCP, provider]);
 
@@ -113,6 +129,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
           provider: provider,
           urgencyAssessment: true
         });
+        assertMedicalAiSafety(mcpResult);
 
         if ((mcpResult as Record<string, unknown>).status === 'success') {
           // Validate AI response
@@ -130,6 +147,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
           ...complaintsData,
           provider: provider
         });
+        assertMedicalAiSafety(response.data);
         return response.data;
       }
     } catch (err) {
@@ -149,6 +167,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
 
     try {
       const response = await apiClient.post('/ai/treatment-recommendations', patientData);
+      assertMedicalAiSafety(response.data);
       return response.data;
     } catch (err) {
       logger.error('AI recommendations error:', err);
@@ -174,6 +193,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
           provider: provider,
           includeRecommendations: true
         });
+        assertMedicalAiSafety(mcpResult);
 
         if ((mcpResult as Record<string, unknown>).status === 'success') {
           // Validate AI response
@@ -193,6 +213,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
           patient_gender: patientGender,
           provider: provider
         });
+        assertMedicalAiSafety(response.data);
         return response.data;
       }
     } catch (err) {
@@ -216,6 +237,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         diagnosis,
         provider: provider
       });
+      assertMedicalAiSafety(response.data);
       return response.data;
     } catch (err) {
       logger.error('AI lab suggestions error:', err);
@@ -247,6 +269,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
           ...options,
           provider: provider
         });
+        assertMedicalAiSafety(mcpResult);
 
         if ((mcpResult as Record<string, unknown>).status === 'success') {
           // Validate AI response
@@ -280,6 +303,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     try {
       if (useMCP) {
         const mcpResult = await mcpAPI.analyzeSkinLesion(imageFile as File | Blob, lesionInfo, patientHistory, provider);
+        assertMedicalAiSafety(mcpResult);
 
         if ((mcpResult as Record<string, unknown>).status === 'success') {
           // Validate AI response
