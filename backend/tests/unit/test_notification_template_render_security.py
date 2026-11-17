@@ -6,11 +6,27 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from sqlalchemy import create_engine, func
+from sqlalchemy.orm import Session
 
+from app.db.base_class import Base
 from app.models.notification import NotificationHistory, NotificationTemplate
+from app.models.patient import Patient
 from app.models.telegram_config import TelegramUser
 from app.services.notifications_pkg import NotificationSenderService
 from app.services.notifications_pkg._templated import crud_notification_history
+
+
+@pytest.fixture
+def db_session():
+    """Keep consent scenarios independent of links left in the shared test DB."""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(bind=engine)
+    try:
+        with Session(engine) as session:
+            yield session
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture
@@ -143,6 +159,109 @@ async def test_telegram_requires_linked_consenting_patient(
     assert history is None
     sender.send_telegram.assert_not_awaited()
     assert db_session.query(NotificationHistory).count() == 0
+
+
+def test_consent_database_does_not_inherit_an_existing_shared_link(
+    test_db, db_session, test_patient
+):
+    # Reproduce an earlier test leaving a link with the same numeric patient ID.
+    # The test's private database must still contain no link for this patient.
+    with test_db.connect() as connection:
+        transaction = connection.begin()
+        try:
+            if connection.execute(
+                Patient.__table__.select().where(Patient.id == test_patient.id)
+            ).first() is None:
+                connection.execute(
+                    Patient.__table__.insert().values(
+                        id=test_patient.id, first_name="Synthetic", last_name="Patient"
+                    )
+                )
+            max_chat_id = connection.execute(
+                func.max(TelegramUser.chat_id).select()
+            ).scalar_one_or_none() or 0
+            connection.execute(
+                TelegramUser.__table__.insert().values(
+                    patient_id=test_patient.id,
+                    chat_id=max_chat_id + 1,
+                    active=True,
+                    blocked=False,
+                    notifications_enabled=True,
+                    appointment_reminders=True,
+                )
+            )
+            assert connection.execute(
+                TelegramUser.__table__.select().where(
+                    TelegramUser.patient_id == test_patient.id,
+                    TelegramUser.chat_id == max_chat_id + 1,
+                    TelegramUser.active.is_(True),
+                    TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
+                )
+            ).first() is not None
+            assert db_session.query(TelegramUser).filter_by(
+                patient_id=test_patient.id
+            ).first() is None
+        finally:
+            transaction.rollback()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("settings", [
+    {"active": False},
+    {"blocked": True},
+    {"notifications_enabled": False},
+])
+async def test_telegram_skips_ineligible_link_when_another_link_is_consented(
+    db_session, test_patient, sender, settings
+):
+    link_patient(db_session, test_patient)
+    db_session.add(TelegramUser(
+        patient_id=test_patient.id,
+        chat_id=987654321,
+        active=settings.get("active", True),
+        blocked=settings.get("blocked", False),
+        notifications_enabled=settings.get("notifications_enabled", True),
+        appointment_reminders=True,
+    ))
+    db_session.commit()
+
+    result = await sender.send_templated_notification(
+        db=db_session,
+        notification_type="appointment_reminder",
+        channel="telegram",
+        recipient_contact="untrusted-contact",
+        template_data={"message": "SYNTHETIC"},
+        recipient_id=test_patient.id,
+    )
+
+    assert result.status == "sent"
+    sender.send_telegram.assert_awaited_once_with("SYNTHETIC", "123456789")
+
+
+@pytest.mark.asyncio
+async def test_telegram_selected_link_category_opt_out_does_not_fallback(
+    db_session, test_patient, sender
+):
+    link_patient(db_session, test_patient)
+    db_session.add(TelegramUser(
+        patient_id=test_patient.id, chat_id=987654321,
+        active=True, blocked=False, notifications_enabled=True,
+        appointment_reminders=False,
+    ))
+    db_session.commit()
+
+    result = await sender.send_templated_notification(
+        db=db_session,
+        notification_type="appointment_reminder",
+        channel="telegram",
+        recipient_contact="untrusted-contact",
+        template_data={"message": "SYNTHETIC"},
+        recipient_id=test_patient.id,
+    )
+
+    assert result is None
+    sender.send_telegram.assert_not_awaited()
 
 
 @pytest.mark.asyncio
