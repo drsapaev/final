@@ -6,18 +6,35 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from sqlalchemy import create_engine
 
 from app.api.v1.endpoints import telegram_notifications as api
+from app.db.base_class import Base
 from app.models.lab import (
     LabReportInstance,
     LabReportTemplate,
     LabReportTemplateVersion,
 )
 from app.models.payment import Payment
-from app.models.telegram_config import TelegramConfig
+from app.models.telegram_config import TelegramConfig, TelegramUser
 from app.services.lab_report_pdf_service import lab_report_pdf_service
 from app.services.lab_reporting import LabReportingService
+from app.services.medical_specialty_seed import seed_medical_specialties
 from tests.integration.test_telegram_delivery_authorization import telegram_case  # noqa: F401
+
+
+@pytest.fixture(scope='module')
+def test_db(tmp_path_factory):
+    """Keep link/consent scenarios independent of the session's shared database."""
+    path = tmp_path_factory.mktemp('telegram-private') / 'test.db'
+    engine = create_engine(f'sqlite:///{path}', connect_args={'check_same_thread': False})
+    Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        seed_medical_specialties(connection)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture
@@ -105,6 +122,30 @@ def test_category_opt_out_prevents_delivery(client, db_session, delivery, kind):
     if response.status_code == 200:
         assert response.json()['success'] is False
     assert_not_sent(delivery)
+
+
+@pytest.mark.parametrize('kind', ['appointment', 'lab', 'pdf', 'payment'])
+def test_newest_link_consent_and_fallback_are_evaluated_per_chat(client, db_session, delivery, kind):
+    d = delivery
+    newer = TelegramUser(patient_id=d.c.patient.id, chat_id=d.c.link.chat_id + 1_000_000_000,
+                         active=True, blocked=False, notifications_enabled=False,
+                         appointment_reminders=True, lab_notifications=True)
+    db_session.add(newer)
+    db_session.commit()
+
+    refused = send(client, d, kind)
+    assert refused.status_code in (200, 404), refused.text
+    if refused.status_code == 200:
+        assert refused.json()['success'] is False
+    assert_not_sent(d)
+
+    newer.active = False
+    db_session.commit()
+    allowed = send(client, d, kind)
+    assert allowed.status_code == 200 and allowed.json()['success'] is True, allowed.text
+    transport = d.bot._send_document if kind == 'pdf' else d.bot._send_message
+    transport.assert_awaited_once()
+    assert transport.await_args.kwargs['chat_id'] == d.c.link.chat_id
 
 
 @pytest.mark.parametrize('kind', ['appointment', 'lab', 'pdf'])
