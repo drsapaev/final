@@ -235,7 +235,7 @@ class AIManager:
         """
         provider = self.get_provider(provider_type)
         if not provider:
-            return []
+            raise RuntimeError("AI provider unavailable")
 
         # PII anonymization
         symptoms = [self._anonymize_text(s) for s in symptoms]

@@ -21,6 +21,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   const [icd10Suggestions, setIcd10Suggestions] = useState<Record<string, unknown>[]>([]);
   const [clinicalRecommendations, setClinicalRecommendations] = useState<Record<string, unknown> | null>(null);
   const icdRequestGeneration = useRef(0);
+  const icdInFlight = useRef(false);
   useEffect(() => () => { icdRequestGeneration.current += 1; }, []);
 
   // Получение AI подсказок для МКБ-10 через MCP
@@ -29,7 +30,10 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     const isCurrent = () => icdRequestGeneration.current === generation;
     setClinicalRecommendations(null);
     setIcd10Suggestions([]);
-    setLoading(false);
+    if (icdInFlight.current) {
+      icdInFlight.current = false;
+      setLoading(false);
+    }
     // Prompt injection check
     const inputText = (symptoms || '') + ' ' + (diagnosis || '');
     if (detectPromptInjection(inputText)) {
@@ -42,6 +46,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       return [];
     }
 
+    icdInFlight.current = true;
     setLoading(true);
     setError('');
 
@@ -104,7 +109,10 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       setError(String(errorMessage));
       return [];
     } finally {
-      if (isCurrent()) setLoading(false);
+      if (isCurrent()) {
+        icdInFlight.current = false;
+        setLoading(false);
+      }
     }
   }, [useMCP, provider]);
 
@@ -255,7 +263,13 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   }, []);
 
   const clearSuggestions = useCallback(() => {
+    icdRequestGeneration.current += 1;
+    if (icdInFlight.current) {
+      icdInFlight.current = false;
+      setLoading(false);
+    }
     setIcd10Suggestions([]);
+    setClinicalRecommendations(null);
   }, []);
 
   // Анализ медицинских изображений через MCP
@@ -347,9 +361,8 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     clearError,
     clearSuggestions,
 
-    // Сеттеры
-    setIcd10Suggestions,
-    setClinicalRecommendations,
+    // Error state remains manually clearable; clinical results are only
+    // published after validating the server-owned envelope above.
     setError
   };
 };
