@@ -1,5 +1,8 @@
 """Reset credentials stay out of URLs and observable errors for new clients."""
 
+import os
+import subprocess
+import sys
 from unittest.mock import Mock
 
 import pytest
@@ -86,11 +89,46 @@ def test_raw_credentials_are_scrubbed_in_string_representations(value):
     assert "SYNTHETIC_SECRET" not in mask_pii(value)
 
 
-def test_cors_preflight_allows_reset_header(client):
-    response = client.options("/api/v1/password-reset/validate-token", headers={
-        "Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET",
-        "Access-Control-Request-Headers": "x-reset-token",
-    })
-    assert response.status_code == 200
-    assert "x-reset-token" in response.headers["access-control-allow-headers"].lower()
-    assert response.headers["cache-control"] == "no-store"
+def test_cors_preflight_allows_reset_header():
+    # CORS configuration is fixed when app.main is imported. The full CI suite
+    # intentionally sets CORS_DISABLE=1, so use a fresh interpreter configured
+    # with the real application's CORS middleware enabled instead of relying on
+    # the already-imported session app or duplicating its middleware settings.
+    script = """
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+path = '/api/v1/password-reset/validate-token'
+preflight = {
+    'Origin': 'http://localhost:5173',
+    'Access-Control-Request-Method': 'GET',
+    'Access-Control-Request-Headers': 'x-reset-token',
+}
+response = client.options(path, headers=preflight)
+assert response.status_code == 200, response.text
+assert 'x-reset-token' in response.headers['access-control-allow-headers'].lower()
+assert response.headers['access-control-allow-origin'] == preflight['Origin']
+assert response.headers['cache-control'] == 'no-store'
+
+denied = client.options(path, headers={**preflight, 'Origin': 'https://not-allowed.example'})
+assert denied.status_code == 400
+assert 'access-control-allow-origin' not in denied.headers
+assert denied.headers['cache-control'] == 'no-store'
+"""
+    env = {
+        **os.environ,
+        "CORS_DISABLE": "0",
+        "CORS_ALLOW_ALL": "0",
+        "BACKEND_CORS_ORIGINS": '["http://localhost:5173"]',
+        "API_V1_STR": "/api/v1",
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
