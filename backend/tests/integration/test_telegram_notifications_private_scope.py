@@ -232,3 +232,129 @@ def test_unassigned_doctor_cannot_probe_report_link_state(client, db_session, de
     response = send(client, delivery, 'pdf')
     assert response.status_code == 403, response.text
     assert_not_sent(delivery)
+
+
+@pytest.mark.parametrize('payment_status,refunded_amount', [
+    ('pending', None), ('failed', None), ('refunded', None), ('paid', Decimal('0.01')),
+])
+def test_payment_ineligible_state_never_sends(client, db_session, delivery, payment_status, refunded_amount):
+    delivery.payment.status = payment_status
+    delivery.payment.refunded_amount = refunded_amount
+    db_session.commit()
+    response = send(client, delivery, 'payment')
+    assert response.status_code == 409, response.text
+    assert_not_sent(delivery)
+
+
+@pytest.mark.parametrize('payment_status', ['paid', 'completed'])
+def test_paid_or_completed_payment_sends(client, db_session, delivery, payment_status):
+    delivery.payment.status = payment_status
+    db_session.commit()
+    response = send(client, delivery, 'payment')
+    assert response.status_code == 200, response.text
+    assert response.json()['success'] is True
+    delivery.bot._send_message.assert_awaited_once()
+
+
+def test_selected_report_and_template_are_rendered_and_delivered(client, db_session, delivery, monkeypatch):
+    d = delivery
+    other_template = LabReportTemplate(code='SYN-' + secrets.token_hex(8), name='Selected template', family='lab')
+    db_session.add(other_template)
+    db_session.flush()
+    other_version = LabReportTemplateVersion(template_id=other_template.id, version_no=1,
+                                             layout_preset='selected-layout', page_settings={'size': 'A4'})
+    db_session.add(other_version)
+    db_session.flush()
+    selected = LabReportInstance(order_id=d.c.result.order_id, visit_id=d.c.visit.id,
+        patient_id=d.c.patient.id, template_id=other_template.id, template_version_id=other_version.id,
+        patient_snapshot={'name': 'SYNTHETIC SELECTED'}, status='FINALIZED')
+    assert d.report.patient_snapshot != selected.patient_snapshot
+    db_session.add(selected)
+    db_session.commit()
+    rendered = []
+    materialized = []
+    def materialize(_service, instance):
+        materialized.append(instance.id)
+        return [{'key': 'selected-section' if instance.id == selected.id else 'other-section'}]
+    def render(payload):
+        rendered.append(payload)
+        return b'%PDF-selected' if payload['template_name'] == 'Selected template' else b'%PDF-other'
+    monkeypatch.setattr(LabReportingService, 'materialize_instance', materialize)
+    monkeypatch.setattr(lab_report_pdf_service, 'render_report', render)
+    response = client.post('/api/v1/telegram/send-lab-report-instance', headers=d.c.headers,
+        json={'patient_id': d.c.patient.id, 'report_instance_id': selected.id})
+    assert response.status_code == 200 and response.json()['success'], response.text
+    assert materialized == [selected.id]
+    assert len(rendered) == 1
+    assert rendered[0]['template_name'] == 'Selected template'
+    assert rendered[0]['layout_preset'] == 'selected-layout'
+    assert rendered[0]['page_settings'] == {'size': 'A4'}
+    assert rendered[0]['patient'] == {'name': 'SYNTHETIC SELECTED'}
+    assert rendered[0]['sections'] == [{'key': 'selected-section'}]
+    sent = d.bot._send_document.await_args.kwargs
+    assert sent['filename'] == f'lab-report-{selected.id}.pdf'
+    assert sent['document_bytes'] == b'%PDF-selected'
+    assert sent['chat_id'] == d.c.link.chat_id
+
+
+def test_lab_text_and_markup_do_not_disclose_resource_or_actor_ids(client, db_session, delivery):
+    from app.models.clinic import Doctor
+    from app.models.lab import LabOrder, LabResult
+    from app.models.patient import Patient
+    from app.models.telegram_config import TelegramUser
+    from app.models.user import User
+    from app.models.visit import Visit
+    from tests.conftest import mint_access_token
+
+    patient = Patient(id=782341, first_name='SYNTHETIC', last_name='SCOPED', phone='+998900001111')
+    user = User(id=654321, username='synthetic-lab-scope', hashed_password='synthetic',
+                role='Doctor', is_active=True, is_superuser=False)
+    db_session.add_all([patient, user])
+    db_session.flush()
+    doctor = Doctor(id=398721, user_id=user.id, specialty='cardiology', active=True)
+    db_session.add(doctor)
+    db_session.flush()
+    visit = Visit(patient_id=patient.id, doctor_id=doctor.id)
+    link = TelegramUser(patient_id=patient.id, chat_id=892345600, active=True, blocked=False,
+                        notifications_enabled=True, appointment_reminders=True, lab_notifications=True)
+    db_session.add_all([visit, link])
+    db_session.flush()
+    order = LabOrder(patient_id=patient.id, visit_id=visit.id, status='done')
+    db_session.add(order)
+    db_session.flush()
+    result = LabResult(id=913572, order_id=order.id, test_name='SYNTHETIC PRIVATE RESULT')
+    db_session.add(result)
+    db_session.commit()
+    response = client.post('/api/v1/telegram/send-lab-results',
+        headers={'Authorization': f'Bearer {mint_access_token(user)}'},
+        params={'patient_id': patient.id}, json=[result.id])
+    assert response.status_code == 200 and response.json()['success'], response.text
+    sent = delivery.bot._send_message.await_args.kwargs
+    payload = repr((sent['text'], sent.get('reply_markup')))
+    assert all(str(value) not in payload for value in (patient.id, result.id, doctor.id, user.id))
+    assert 'SYNTHETIC PRIVATE RESULT' not in payload
+    assert sent['chat_id'] == link.chat_id
+
+
+@pytest.mark.parametrize('kind', ['lab', 'pdf'])
+@pytest.mark.parametrize('state', ['unlinked', 'category_optout', 'global_optout'])
+def test_lab_delivery_unavailable_is_200_false(client, db_session, delivery, kind, state):
+    if state == 'unlinked':
+        db_session.delete(delivery.c.link)
+    elif state == 'category_optout':
+        delivery.c.link.lab_notifications = False
+    else:
+        delivery.c.link.notifications_enabled = False
+    db_session.commit()
+    response = send(client, delivery, kind)
+    assert response.status_code == 200, response.text
+    assert response.json()['success'] is False
+    assert_not_sent(delivery)
+
+
+def test_appointment_unlinked_has_404_contract(client, db_session, delivery):
+    db_session.delete(delivery.c.link)
+    db_session.commit()
+    response = send(client, delivery, 'appointment')
+    assert response.status_code == 404, response.text
+    assert_not_sent(delivery)
