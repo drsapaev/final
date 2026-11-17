@@ -6,6 +6,9 @@ import {
   Alert, Badge, Button, Card, CardContent, Input, Select, Textarea,
   Checkbox } from '../components/ui/macos';
 import { api } from '../api/client';
+import { telegramMiniAppApi } from '../api/telegramMiniAppSession';
+import TelegramMiniAppSessions from './TelegramMiniAppSessions';
+import { loadTelegramWebApp } from '../utils/telegramWebApp';
 
 const MINI_APP_LANGUAGE_RU = 'ru';
 const MINI_APP_LANGUAGE_UZ = 'uz-Latn';
@@ -42,7 +45,10 @@ const MINI_APP_SECTION_ALIASES: Record<string, string> = {
   documents: 'results',
 };
 
-const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set(['entry_token_invalid', 'entry_token_expired']);
+const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set([
+  'entry_token_invalid', 'entry_token_expired', 'session_invalid',
+  'init_data_replayed', 'auth_date_expired',
+]);
 const MINI_APP_HANDLED_ERROR_REQUEST_CONFIG = {
   silent: true,
   expectedErrorStatuses: [400, 403, 503],
@@ -517,6 +523,8 @@ function TelegramMiniAppPatientShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const selectedSection = getTelegramMiniAppSelectedSection(location.search);
+  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
+  const manifestReadyRef = useRef(false);
   const [state, setState] = useState<{
     status: string;
     manifest: Record<string, any> | null;
@@ -612,6 +620,19 @@ function TelegramMiniAppPatientShell() {
   const languageCode = normalizeMiniAppLanguage(
     state.manifest?.language?.code || getTelegramMiniAppClientLanguage()
   );
+  const [, setLocaleRevision] = useState(0);
+  useEffect(() => {
+    let mounted = true;
+    // Always rerender after the loader settles: another consumer can finish
+    // loading between our render and this effect (including StrictMode replay).
+    // Loading an already bundled locale is a no-op and keeps staff language.
+    void i18n.loadLanguages(languageCode).then(() => {
+      if (mounted) setLocaleRevision((revision) => revision + 1);
+    }).catch(() => {
+      // The existing Russian fallback remains available on a locale outage.
+    });
+    return () => { mounted = false; };
+  }, [languageCode]);
   const t = (key: string, params?: Record<string, unknown>) => translateMiniAppText(languageCode, key, params);
   const manifestOnboardingRequest = state.manifest?.onboarding?.request || null;
   const onboardingRequest = onboardingSubmit.payload?.request || manifestOnboardingRequest || null;
@@ -634,179 +655,191 @@ function TelegramMiniAppPatientShell() {
 
   useEffect(() => {
     let isMounted = true;
-    const effectLanguageCode = getTelegramMiniAppClientLanguage();
-    notifyTelegramMiniAppReady();
+    manifestReadyRef.current = false;
+    setState({ status: 'checking', manifest: null, error: null });
 
-    const authPayload = getTelegramMiniAppAuthPayload(location.search, selectedSection);
-    const usesCabinetSummary = selectedSection === 'cabinet'
-      || selectedSection === 'payments'
-      || selectedSection === 'visits'
-      || selectedSection === 'queue';
-    setCabinetSummary({
-      status: usesCabinetSummary && authPayload ? 'loading' : 'idle',
-      payload: null,
-      error: null,
-    });
-    setFormsPreview({
-      status: selectedSection === 'forms' && authPayload ? 'loading' : 'idle',
-      payload: null,
-      error: null,
-    });
-    setFormSubmit({
-      status: 'idle',
-      formId: null,
-      error: null,
-    });
-    setResultsSummary({
-      status: selectedSection === 'results' && authPayload ? 'loading' : 'idle',
-      payload: null,
-      error: null,
-    });
-    setAppointmentPreview({
-      status: 'idle',
-      payload: null,
-      error: null,
-    });
-    setAppointmentCreate({
-      status: 'idle',
-      payload: null,
-      error: null,
-    });
-    setOnboardingSubmit({
-      status: 'idle',
-      payload: null,
-      error: null,
-    });
-    setReportDownload({
-      status: 'idle',
-      reportId: null,
-      error: null,
-    });
+    const initializeMiniApp = async () => {
+      // Plain scoped entry links also work outside Telegram without its SDK.
+      // Genuine WebView launches must initialize the SDK before reading initData.
+      const hasTelegramLaunchData = new URLSearchParams(location.hash.slice(1)).has('tgWebAppData');
+      if (!getTelegramMiniAppEntryToken(location.search) || hasTelegramLaunchData) {
+        await loadTelegramWebApp();
+      }
+      if (!isMounted) return;
+      const effectLanguageCode = getTelegramMiniAppClientLanguage();
+      notifyTelegramMiniAppReady();
 
-    if (!authPayload) {
-      setState({
-        status: 'unavailable',
-        manifest: null,
+      const authPayload = getTelegramMiniAppAuthPayload(location.search, selectedSection);
+      const usesCabinetSummary = selectedSection === 'cabinet'
+        || selectedSection === 'payments'
+        || selectedSection === 'visits'
+        || selectedSection === 'queue';
+      setCabinetSummary({
+        status: usesCabinetSummary && authPayload ? 'loading' : 'idle',
+        payload: null,
         error: null,
       });
-      return () => {
-        isMounted = false;
-      };
-    }
+      setFormsPreview({
+        status: selectedSection === 'forms' && authPayload ? 'loading' : 'idle',
+        payload: null,
+        error: null,
+      });
+      setFormSubmit({
+        status: 'idle',
+        formId: null,
+        error: null,
+      });
+      setResultsSummary({
+        status: selectedSection === 'results' && authPayload ? 'loading' : 'idle',
+        payload: null,
+        error: null,
+      });
+      setAppointmentPreview({
+        status: 'idle',
+        payload: null,
+        error: null,
+      });
+      setAppointmentCreate({
+        status: 'idle',
+        payload: null,
+        error: null,
+      });
+      setOnboardingSubmit({
+        status: 'idle',
+        payload: null,
+        error: null,
+      });
+      setReportDownload({
+        status: 'idle',
+        reportId: null,
+        error: null,
+      });
 
-    api.post('/telegram/mini-app/patient/manifest', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
-      .then((response) => {
-        if (!isMounted) return;
-        const manifest = response.data;
-        const isOnboardingManifest = manifest?.scope?.type === 'onboarding';
+      if (!authPayload) {
         setState({
-          status: 'ready',
-          manifest,
+          status: 'unavailable',
+          manifest: null,
           error: null,
         });
-        if (isOnboardingManifest) {
-          const telemetryMeta = {
-            section: selectedSection || 'appointments',
-            language: manifest?.language?.code || effectLanguageCode,
-            success: true,
-          };
-          const onboardingStatus = manifest?.onboarding?.request?.status || 'not_found';
-          emitMiniAppOnboardingTelemetry('patient_onboarding_opened', telemetryMeta);
-          if (onboardingStatus === 'not_found') {
-            emitMiniAppOnboardingTelemetry('patient_onboarding_started', telemetryMeta);
-          } else {
-            emitMiniAppOnboardingStatusTelemetry(onboardingStatus, telemetryMeta);
-          }
-          setCabinetSummary({
-            status: 'idle',
-            payload: null,
+        return;
+      }
+
+      telegramMiniAppApi.post('/telegram/mini-app/patient/manifest', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+        .then((response) => {
+          if (!isMounted) return;
+          const manifest = response.data;
+          const isOnboardingManifest = manifest?.scope?.type === 'onboarding';
+          manifestReadyRef.current = true;
+          setState({
+            status: 'ready',
+            manifest,
             error: null,
+          });
+          if (isOnboardingManifest) {
+            const telemetryMeta = {
+              section: selectedSection || 'appointments',
+              language: manifest?.language?.code || effectLanguageCode,
+              success: true,
+            };
+            const onboardingStatus = manifest?.onboarding?.request?.status || 'not_found';
+            emitMiniAppOnboardingTelemetry('patient_onboarding_opened', telemetryMeta);
+            if (onboardingStatus === 'not_found') {
+              emitMiniAppOnboardingTelemetry('patient_onboarding_started', telemetryMeta);
+            } else {
+              emitMiniAppOnboardingStatusTelemetry(onboardingStatus, telemetryMeta);
+            }
+            setCabinetSummary({
+              status: 'idle',
+              payload: null,
+              error: null,
+            });
+            setFormsPreview({
+              status: 'idle',
+              payload: null,
+              error: null,
+            });
+            setResultsSummary({
+              status: 'idle',
+              payload: null,
+              error: null,
+            });
+            return null;
+          }
+          if (usesCabinetSummary) {
+            return telegramMiniAppApi.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+              .then((summaryResponse) => {
+                if (!isMounted) return;
+                setCabinetSummary({
+                  status: 'ready',
+                  payload: summaryResponse.data,
+                  error: null,
+                });
+              });
+          }
+          if (selectedSection === 'forms') {
+            return telegramMiniAppApi.post('/telegram/mini-app/forms/preview', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+              .then((formsResponse) => {
+                if (!isMounted) return;
+                setFormsPreview({
+                  status: 'ready',
+                  payload: formsResponse.data,
+                  error: null,
+                });
+                setFormAnswers(getMiniAppFormsInitialAnswers(formsResponse.data?.forms || []));
+              });
+          }
+          if (selectedSection === 'results') {
+            return telegramMiniAppApi.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+              .then((summaryResponse) => {
+                if (!isMounted) return;
+                setResultsSummary({
+                  status: 'ready',
+                  payload: summaryResponse.data,
+                  error: null,
+                });
+              });
+          }
+          return null;
+        })
+        .catch((error) => {
+          if (!isMounted) return;
+          setCabinetSummary({
+            status: usesCabinetSummary ? 'error' : 'idle',
+            payload: null,
+            error: translateMiniAppText(
+              effectLanguageCode,
+              selectedSection === 'payments'
+                ? 'paymentsLoadFailed'
+                : selectedSection === 'queue'
+                  ? 'queueLoadFailed'
+                : selectedSection === 'visits'
+                  ? 'visitsLoadFailed'
+                  : 'cabinetLoadFailed'
+            ),
           });
           setFormsPreview({
-            status: 'idle',
+            status: selectedSection === 'forms' ? 'error' : 'idle',
             payload: null,
-            error: null,
+            error: translateMiniAppText(effectLanguageCode, 'formsLoadFailed'),
           });
           setResultsSummary({
-            status: 'idle',
+            status: selectedSection === 'results' ? 'error' : 'idle',
             payload: null,
-            error: null,
+            error: translateMiniAppText(effectLanguageCode, 'documentsLoadFailed'),
           });
-          return null;
-        }
-        if (usesCabinetSummary) {
-          return api.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
-            .then((summaryResponse) => {
-              if (!isMounted) return;
-              setCabinetSummary({
-                status: 'ready',
-                payload: summaryResponse.data,
-                error: null,
-              });
-            });
-        }
-        if (selectedSection === 'forms') {
-          return api.post('/telegram/mini-app/forms/preview', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
-            .then((formsResponse) => {
-              if (!isMounted) return;
-              setFormsPreview({
-                status: 'ready',
-                payload: formsResponse.data,
-                error: null,
-              });
-              setFormAnswers(getMiniAppFormsInitialAnswers(formsResponse.data?.forms || []));
-            });
-        }
-        if (selectedSection === 'results') {
-          return api.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
-            .then((summaryResponse) => {
-              if (!isMounted) return;
-              setResultsSummary({
-                status: 'ready',
-                payload: summaryResponse.data,
-                error: null,
-              });
-            });
-        }
-        return null;
-      })
-      .catch((error) => {
-        if (!isMounted) return;
-        setCabinetSummary({
-          status: usesCabinetSummary ? 'error' : 'idle',
-          payload: null,
-          error: translateMiniAppText(
-            effectLanguageCode,
-            selectedSection === 'payments'
-              ? 'paymentsLoadFailed'
-              : selectedSection === 'queue'
-                ? 'queueLoadFailed'
-              : selectedSection === 'visits'
-                ? 'visitsLoadFailed'
-                : 'cabinetLoadFailed'
-          ),
+          setState({
+            status: 'error',
+            manifest: null,
+            error: getMiniAppPatientSessionErrorMessage(error, effectLanguageCode),
+          });
         });
-        setFormsPreview({
-          status: selectedSection === 'forms' ? 'error' : 'idle',
-          payload: null,
-          error: translateMiniAppText(effectLanguageCode, 'formsLoadFailed'),
-        });
-        setResultsSummary({
-          status: selectedSection === 'results' ? 'error' : 'idle',
-          payload: null,
-          error: translateMiniAppText(effectLanguageCode, 'documentsLoadFailed'),
-        });
-        setState({
-          status: 'error',
-          manifest: null,
-          error: getMiniAppPatientSessionErrorMessage(error, effectLanguageCode),
-        });
-      });
+    };
+    void initializeMiniApp();
 
     return () => {
       isMounted = false;
     };
-  }, [location.search, selectedSection]);
+  }, [location.search, location.hash, selectedSection, bootstrapAttempt]);
 
   // Round-14 (owner P1, PR-3386 merge review): the booking form on THIS
   // shell submits canonical Department.key values, so it loads the same
@@ -816,6 +849,7 @@ function TelegramMiniAppPatientShell() {
   // entryToken (second allowed mode). On failure the selector degrades to
   // the "без отделения" escape hatch; it never falls back to free text.
   useEffect(() => {
+    if (!manifestReadyRef.current) return;
     if (selectedSection !== 'appointments') {
       return;
     }
@@ -828,7 +862,7 @@ function TelegramMiniAppPatientShell() {
     }
     let isMounted = true;
     setBookingDepartmentsUnavailable(false);
-    api.post('/telegram/mini-app/booking/departments', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+    telegramMiniAppApi.post('/telegram/mini-app/booking/departments', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         if (!isMounted) return;
         const rows = response.data?.departments;
@@ -886,6 +920,7 @@ function TelegramMiniAppPatientShell() {
   }, [location.search, selectedSection, state.manifest]);
 
   useEffect(() => {
+    if (!manifestReadyRef.current) return;
     if (selectedSection !== 'appointments') return;
     if (!state.manifest?.capabilities?.appointments?.preview_enabled) return;
     const authPayload = getTelegramMiniAppAuthPayload(location.search, 'appointments');
@@ -899,7 +934,7 @@ function TelegramMiniAppPatientShell() {
     setBookingServicesUnavailable(false);
     Promise.all([
       api.get('/services?active=true&limit=1000'),
-      api.post(
+      telegramMiniAppApi.post(
         '/telegram/mini-app/booking/services',
         authPayload,
         MINI_APP_HANDLED_ERROR_REQUEST_CONFIG,
@@ -991,9 +1026,7 @@ function TelegramMiniAppPatientShell() {
   };
 
   const handleMiniAppRetry = () => {
-    if (typeof window !== 'undefined') {
-      window.location.reload();
-    }
+    setBootstrapAttempt((attempt) => attempt + 1);
   };
 
   const handleMiniAppSupportClick = () => {
@@ -1094,7 +1127,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/appointments/preview', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+    telegramMiniAppApi.post('/telegram/mini-app/appointments/preview', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         setAppointmentPreview({
           status: 'ready',
@@ -1133,7 +1166,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/appointments', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+    telegramMiniAppApi.post('/telegram/mini-app/appointments', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         setAppointmentCreate({
           status: 'ready',
@@ -1185,7 +1218,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/onboarding/requests', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+    telegramMiniAppApi.post('/telegram/mini-app/onboarding/requests', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         setOnboardingSubmit({
           status: 'ready',
@@ -1250,7 +1283,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
       error: null,
     });
 
-    api.post('/telegram/mini-app/forms/submissions', {
+    telegramMiniAppApi.post('/telegram/mini-app/forms/submissions', {
       ...authPayload,
       formId: form.id,
       answers: formAnswers[form.id] || {},
@@ -1300,7 +1333,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
       error: null,
     });
 
-    api.post(
+    telegramMiniAppApi.post(
       '/telegram/mini-app/reports/download',
       {
         ...authPayload,
@@ -1363,7 +1396,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
 
   return (
     <div style={miniAppPageStyle}>
-      <main style={miniAppMainStyle}>
+      <main style={miniAppMainStyle} lang={languageCode}>
         <section style={miniAppHeroStyle}>
           <div style={miniAppHeroTitleGroupStyle}>
             <p style={miniAppKickerStyle}>Kosmed Clinic</p>
@@ -1465,6 +1498,21 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {!isOnboardingScope && selectedSection === 'cabinet' && (
+              <TelegramMiniAppSessions
+                initData={getTelegramMiniAppInitData()}
+                languageCode={languageCode}
+                t={t}
+                onLoggedOut={() => {
+                  setState({ status: 'unavailable', manifest: null, error: null });
+                  setCabinetSummary({ status: 'idle', payload: null, error: null });
+                  setFormsPreview({ status: 'idle', payload: null, error: null });
+                  setResultsSummary({ status: 'idle', payload: null, error: null });
+                  setFormAnswers({});
+                }}
+              />
             )}
 
             {isOnboardingScope && selectedSection && selectedSection !== 'appointments' && (

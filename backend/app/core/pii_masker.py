@@ -34,22 +34,54 @@ from urllib.parse import parse_qsl, unquote, unquote_plus, urlsplit
 
 PII_FIELD_PATTERNS = [
     # Patient identifiers
-    "iin", "passport_number", "passport_series", "ssn", "national_id",
-    "doc_number", "doc_series",
+    "iin",
+    "passport_number",
+    "passport_series",
+    "ssn",
+    "national_id",
+    "doc_number",
+    "doc_series",
     # Contact info
-    "phone", "phone_number", "mobile", "email",
+    "phone",
+    "phone_number",
+    "mobile",
+    "email",
     # Medical
-    "diagnosis", "diagnoses", "icd10", "icd10_code", "icd10_codes",
-    "complaints", "complaint", "examination", "prescription", "prescriptions",
-    "medications", "medication", "allergies", "allergy",
+    "diagnosis",
+    "diagnoses",
+    "icd10",
+    "icd10_code",
+    "icd10_codes",
+    "complaints",
+    "complaint",
+    "examination",
+    "prescription",
+    "prescriptions",
+    "medications",
+    "medication",
+    "allergies",
+    "allergy",
     # Visit
-    "visit_reason", "patient_name", "patient_full_name", "doctor_notes",
-    "notes", "anamnesis", "anamnesis_morbida",
+    "visit_reason",
+    "patient_name",
+    "patient_full_name",
+    "doctor_notes",
+    "notes",
+    "anamnesis",
+    "anamnesis_morbida",
     # Names
-    "first_name", "last_name", "middle_name", "full_name", "name",
-    "birth_date", "date_of_birth", "dob",
+    "first_name",
+    "last_name",
+    "middle_name",
+    "full_name",
+    "name",
+    "birth_date",
+    "date_of_birth",
+    "dob",
     # Address
-    "address", "street_address", "home_address",
+    "address",
+    "street_address",
+    "home_address",
 ]
 
 PII_KEY_REGEX = re.compile(
@@ -123,7 +155,7 @@ IIN_REGEX = re.compile(r"\b(\d{4})\d{6}(\d{4})\b")
 # non-backslash vs backslash), so the scan stays linear (no ReDoS).
 JSON_CREDENTIAL_REGEX = re.compile(
     r'("(?:token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key|verification[_-]?code'
+    r"|web_push_subscription|vapid_private_key|init_data|initData|verification[_-]?code"
     r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)"\s*:\s*")((?:[^"\\]|\\.)*)(")',
     re.IGNORECASE,
 )
@@ -133,9 +165,9 @@ JSON_CREDENTIAL_REGEX = re.compile(
 # arrive as "token=<credential>&..." with NO quotes, so the JSON regex above
 # cannot see them. Conservative: only credential-looking keys, never prose.
 FORM_CREDENTIAL_REGEX = re.compile(
-    r'\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key|verification[_-]?code'
-    r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=([^\s&]+)',
+    r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
+    r"|web_push_subscription|vapid_private_key|init_data|initData|verification[_-]?code"
+    r"|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=([^\s&]+)",
     re.IGNORECASE,
 )
 
@@ -176,9 +208,26 @@ FORM_CREDENTIAL_REGEX = re.compile(
 #     unsupported shape is safer to redact entirely than to let a
 #     credential whose '=' sits beyond the window slip through.
 _CREDENTIAL_KEYWORDS = (
-    "token", "password", "web_push_subscription", "vapid", "verification_code", "verification-code",
-    "verificationcode", "otp_code", "otp-code", "otpcode", "totp_code", "totp-code", "totpcode",
-    "backup_code", "backup-code", "backupcode", "otp", "totp",
+    "token",
+    "password",
+    "web_push_subscription",
+    "vapid",
+    "verification_code",
+    "verification-code",
+    "verificationcode",
+    "otp_code",
+    "otp-code",
+    "otpcode",
+    "totp_code",
+    "totp-code",
+    "totpcode",
+    "backup_code",
+    "backup-code",
+    "backupcode",
+    "otp",
+    "totp",
+    "init_data",
+    "initdata",
 )
 _CREDENTIAL_FIELD_WINDOW = 130  # keyword→'=' distance cap (≈6× the longest key)
 
@@ -200,8 +249,10 @@ def _form_gate_state(decoded: str) -> str:
             i = lowered.find(kw, start)
             if i == -1:
                 break
-            if kw in ("otp", "totp") and i > 0 and (
-                lowered[i - 1].isalnum() or lowered[i - 1] == "_"
+            if (
+                kw in ("otp", "totp")
+                and i > 0
+                and (lowered[i - 1].isalnum() or lowered[i - 1] == "_")
             ):
                 start = i + 1
                 continue
@@ -249,6 +300,7 @@ def _credential_tail_state(text: str, j: int) -> str:
         return "unknown"  # post-'=' whitespace run reaches the cut
     return "match"  # non-space char right after the (optional) spaces
 
+
 # PR-6 round 13 (codex P1): Python repr forms of captured Pydantic frame
 # locals — Sentry can serialize a model as
 # PushDeviceRegisterRequest(token='{"endpoint": ...}') where the quoted
@@ -257,13 +309,13 @@ def _credential_tail_state(text: str, j: int) -> str:
 # consume the whole quoted value (disjoint alternation branches — linear).
 _PYREPR_SQ_CREDENTIAL_REGEX = re.compile(
     r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
-    r'|web_push_subscription|vapid_private_key|verification[_-]?code'
-    r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=\'((?:[^\'\\]|\\.)*)\'',
+    r"|web_push_subscription|vapid_private_key|verification[_-]?code"
+    r"|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=\'((?:[^\'\\]|\\.)*)\'",
     re.IGNORECASE,
 )
 _PYREPR_DQ_CREDENTIAL_REGEX = re.compile(
-    r'\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key|verification[_-]?code'
+    r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
+    r"|web_push_subscription|vapid_private_key|verification[_-]?code"
     r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)="((?:[^"\\]|\\.)*)"',
     re.IGNORECASE,
 )
@@ -274,6 +326,8 @@ _PYREPR_DQ_CREDENTIAL_REGEX = re.compile(
 # key redaction, same style as full_redact_patterns in _mask_key_value.
 # ---------------------------------------------------------------------------
 SECRET_FIELD_PATTERNS = (
+    "init_data",
+    "initdata",
     # push device registry credentials (PR-6) — request bodies of
     # /api/v1/push/devices/* attach to Sentry events on unhandled 5xx
     "token",
@@ -312,17 +366,20 @@ def is_sensitive_verification_path(value: object) -> bool:
         path = unquote(urlsplit(value).path).lower().rstrip("/")
     except ValueError:
         return False
-    return bool(re.search(
-        r"(?:^|/)(?:phone-verification|2fa)(?:/|$)"
-        r"|(?:^|/)password-reset/verify-phone(?:/|$)"
-        r"|(?:^|/)patient-access/(?:verify-otp|activate/confirm)(?:/|$)",
-        path,
-    ))
+    return bool(
+        re.search(
+            r"(?:^|/)(?:phone-verification|2fa)(?:/|$)"
+            r"|(?:^|/)password-reset/verify-phone(?:/|$)"
+            r"|(?:^|/)patient-access/(?:verify-otp|activate/confirm)(?:/|$)",
+            path,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
 # Per-field maskers
 # ---------------------------------------------------------------------------
+
 
 def mask_phone(phone: str | None) -> str | None:
     if not phone:
@@ -412,6 +469,7 @@ def mask_birth_date(d: Any) -> str | None:
 # Recursive object masker
 # ---------------------------------------------------------------------------
 
+
 def mask_pii(obj: Any) -> Any:
     """Recursively mask PII fields in a dict/list structure.
 
@@ -445,13 +503,35 @@ def _mask_key_value(key: str, value: Any) -> Any:
 
     # Full-redact fields (identifiers, medical content)
     full_redact_patterns = {
-        "iin", "passport_number", "passport_series", "ssn", "national_id",
-        "doc_number", "doc_series",
-        "diagnosis", "diagnoses", "icd10", "icd10_code", "icd10_codes",
-        "complaints", "complaint", "examination", "prescription", "prescriptions",
-        "medications", "medication", "allergies", "allergy",
-        "visit_reason", "doctor_notes", "notes", "anamnesis", "anamnesis_morbida",
-        "address", "street_address", "home_address",
+        "iin",
+        "passport_number",
+        "passport_series",
+        "ssn",
+        "national_id",
+        "doc_number",
+        "doc_series",
+        "diagnosis",
+        "diagnoses",
+        "icd10",
+        "icd10_code",
+        "icd10_codes",
+        "complaints",
+        "complaint",
+        "examination",
+        "prescription",
+        "prescriptions",
+        "medications",
+        "medication",
+        "allergies",
+        "allergy",
+        "visit_reason",
+        "doctor_notes",
+        "notes",
+        "anamnesis",
+        "anamnesis_morbida",
+        "address",
+        "street_address",
+        "home_address",
     }
     if key_lower in full_redact_patterns:
         return "[REDACTED]"
@@ -461,13 +541,21 @@ def _mask_key_value(key: str, value: Any) -> Any:
         return mask_phone(value) if isinstance(value, str) else "[REDACTED]"
     if key_lower in ("email",):
         return mask_email(value) if isinstance(value, str) else "[REDACTED]"
-    if key_lower in ("first_name", "last_name", "middle_name", "full_name", "name", "patient_name", "patient_full_name"):
+    if key_lower in (
+        "first_name",
+        "last_name",
+        "middle_name",
+        "full_name",
+        "name",
+        "patient_name",
+        "patient_full_name",
+    ):
         return mask_name(value) if isinstance(value, str) else "[REDACTED]"
     if key_lower in ("birth_date", "date_of_birth", "dob"):
         return mask_birth_date(value)
 
     # Recurse into nested structures
-    if isinstance(value, (dict, list)):
+    if isinstance(value, dict | list):
         return mask_pii(value)
     if isinstance(value, str):
         # PR-6 round 4 (codex P1): a string under an ordinary dict key
@@ -495,7 +583,7 @@ def _mask_string_inplace(s: str) -> str:
             parsed = json.loads(s)
         except Exception:
             parsed = None
-        if isinstance(parsed, (dict, list)):
+        if isinstance(parsed, dict | list):
             try:
                 return json.dumps(
                     mask_pii(parsed), ensure_ascii=False, separators=(",", ":")
@@ -581,6 +669,7 @@ def mask_pii_text(s: str) -> str:
 # Convenience: structured logging filter
 # ---------------------------------------------------------------------------
 
+
 class PIIMaskingFilter:
     """logging.Filter that masks PII in record.msg and record.args.
 
@@ -606,11 +695,11 @@ class PIIMaskingFilter:
         # must handle both shapes.
         if record.args:
             try:
-                if isinstance(record.args, (dict, list)):
+                if isinstance(record.args, dict | list):
                     record.args = (mask_pii(record.args),)
                 else:
                     record.args = tuple(
-                        mask_pii(a) if isinstance(a, (dict, list, str)) else a
+                        mask_pii(a) if isinstance(a, dict | list | str) else a
                         for a in record.args
                     )
             except Exception:

@@ -615,6 +615,53 @@ def test_non_compose_failure_does_not_add_compose_category(monkeypatch):
     assert "category" not in str(error.value)
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16-le"])
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "category"),
+    [
+        ("failed to solve: token=synthetic-secret", "", "image_build"),
+        ("", "port is already allocated: synthetic-secret", "network_or_port_setup"),
+        (
+            "dependency failed to start: container synthetic-backend-1 is unhealthy",
+            "synthetic-secret",
+            "container_startup",
+        ),
+        ("", "container synthetic-backend-1 exited (1)", "container_startup"),
+        (
+            'service "synthetic-backend" didn\'t complete successfully: exit 1',
+            "",
+            "container_startup",
+        ),
+        ("synthetic-secret private-path", "unrecognized secret output", "unclassified"),
+    ],
+)
+def test_compose_failure_decodes_both_streams_without_exposing_them(
+    monkeypatch, encoding, stdout, stderr, category
+):
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(
+            returncode=1,
+            stdout=stdout.encode(encoding),
+            stderr=stderr.encode(encoding),
+        ),
+    )
+
+    with pytest.raises(guard.GuardError, match=rf"category {category}") as error:
+        guard.native(
+            ["docker", "compose", "--env-file", "private-path"],
+            operation="compose-up",
+        )
+
+    message = str(error.value)
+    assert "synthetic-secret" not in message
+    assert "private-path" not in message
+    assert "synthetic-backend" not in message
+    assert "failed to solve" not in message
+    assert "unrecognized secret output" not in message
+
+
 @pytest.mark.parametrize(
     "failure", [OSError("private path"), subprocess.TimeoutExpired("secret", 30)]
 )
@@ -2629,3 +2676,21 @@ def test_staging_artifact_workflow_uses_per_run_compose_credentials():
     assert "SECRET_KEY=$ci_secret" in workflow
     assert "ADMIN_USERNAME=$ci_identity" in workflow
     assert "ADMIN_PASSWORD=$ci_secret" in workflow
+
+
+def test_staging_csrf_acceptance_opt_in_preserves_default_and_backend_boundary():
+    compose = (Path(__file__).parents[2] / "ops" / "compose.staging.yml").read_text(
+        encoding="utf-8"
+    )
+    backend = compose.split("\n  backend:", 1)[1].split("\n  frontend:", 1)[0]
+    frontend = compose.split("\n  frontend:", 1)[1].split("\n  redis:", 1)[0]
+    worker = compose.split("\n  worker:", 1)[1]
+    assert "CSRF_ENABLED: ${CSRF_ENABLED:-0}" in backend
+    assert "ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}" in backend
+    assert "CSRF_ENABLED" not in frontend
+    assert "ENCRYPTION_KEY" not in frontend
+    assert "CSRF_ENABLED" not in worker
+    assert "ENCRYPTION_KEY" not in worker
+    assert "ENV: staging" in backend
+    assert "CORS_ALLOW_ALL: 0" in backend
+    assert "CORS_DISABLE: 0" in backend

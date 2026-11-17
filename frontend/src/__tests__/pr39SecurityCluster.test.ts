@@ -56,7 +56,7 @@ describe('P0-5: Sanitizers wired to production forms', () => {
   it('at least one production form uses useSafeInput or useSafeForm', () => {
     const srcDir = path.join(ROOT, 'src');
     const files = collectSourceFiles(srcDir);
-    const filesUsingSafeInput: string[] = []
+    const filesUsingSafeInput: string[] = [];
     for (const file of files) {
       if (file.includes('/examples/') || file.includes('/__tests__/')) continue;
       const src = fs.readFileSync(file, 'utf-8');
@@ -87,6 +87,63 @@ describe('P0-6: CSP script-src without unsafe-inline', () => {
   });
 });
 
+const SDK_SOURCE = 'https://telegram.org/js/telegram-web-app.js';
+const NGINX_CONFIGS = [
+  ['prod', NGINX_PROD],
+  ['staging', path.join(ROOT, 'docker/nginx.staging.conf')],
+] as const;
+
+describe.each(NGINX_CONFIGS)('%s Mini App SDK CSP boundary', (_name, configPath) => {
+  const src = fs.readFileSync(configPath, 'utf-8');
+  const map = src.match(/map\s+\$request_uri\s+\$telegram_web_app_sdk_source\s*\{([^}]+)\}/);
+  const scriptSrc = src.match(/Content-Security-Policy\s+"[^"]*script-src\s+([^;]+)/)?.[1].trim();
+  const rules = [...(map?.[1] || '').matchAll(/^\s*~(\S+)\s+(\S+);/gm)];
+  const sdkSourceFor = (requestUri: string) =>
+    rules.find((rule) => new RegExp(rule[1]).test(requestUri))?.[2] || '';
+
+  it('keeps self-only script policy by default and permits only the fixed official SDK', () => {
+    expect(map).not.toBeNull();
+    expect(map?.[1]).toMatch(/\bdefault\s+""\s*;/);
+    expect(rules).toHaveLength(1);
+    expect(rules[0][2]).toBe(SDK_SOURCE);
+    expect(scriptSrc?.split(/\s+/)).toEqual(['\'self\'', '$telegram_web_app_sdk_source']);
+    expect(src).toContain('add_header Cross-Origin-Embedder-Policy "require-corp" always;');
+    expect(src).toContain('add_header Cross-Origin-Opener-Policy "same-origin" always;');
+    expect(src).toContain('add_header Cross-Origin-Resource-Policy "same-origin" always;');
+    // The map must be in conf.d's HTTP context and must survive try_files.
+    expect(src.indexOf(map?.[0] || '')).toBeLessThan(src.search(/^\s*server\s*\{/m));
+    expect(src).not.toMatch(/map\s+\$uri\s+\$telegram_web_app_sdk_source/);
+    expect(src).toContain('try_files $uri $uri/ /index.html;');
+  });
+
+  it.each([
+    '/telegram/mini-app/patient',
+    '/telegram/mini-app/patient?',
+    '/telegram/mini-app/patient?section=cabinet',
+    '/telegram/mini-app/patient?section=cabinet&mode=SYNTHETIC',
+  ])('allows the SDK for the canonical patient request %s', (uri) => {
+    expect(sdkSourceFor(uri)).toBe(SDK_SOURCE);
+  });
+
+  it.each([
+    '/',
+    '/login',
+    '/admin/telegram-settings',
+    '/index.html',
+    '/telegram/mini-app/patient/',
+    '/telegram/mini-app/patient/results',
+    '/telegram/mini-app/patient-invalid',
+    '/telegram/mini-app/patient;extra',
+    '/TELEGRAM/mini-app/patient',
+    '/login?next=/telegram/mini-app/patient',
+    '/telegram/mini-app/patient%2Fresults',
+    '/telegram/mini-app/%70atient',
+  ])('keeps the SDK unavailable on other original requests %s', (uri) => {
+    expect(sdkSourceFor(uri)).toBe('');
+  });
+});
+
+
 // ---------- 5. P0-2: tokenManager does not use localStorage for tokens ----------
 
 describe('P0-2: tokenManager storage', () => {
@@ -108,7 +165,7 @@ describe('P0-2: tokenManager storage', () => {
 
 function collectSourceFiles(dir: string) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files: string[] = []
+  const files: string[] = [];
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {

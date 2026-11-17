@@ -744,12 +744,13 @@ def _build_mini_app_appointment_booking_preview_from_request(
     from app.services.patient_access_audit import log_patient_access
 
     try:
-        if allow_entry_token:
+        if allow_entry_token or (request and request.headers.get("authorization")):
             scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
                 db,
                 init_data_payload=request_body.init_data,
                 entry_token=request_body.entry_token,
                 expected_section=request_body.section or "appointments",
+                request=request,
             )
         else:
             if not request_body.init_data:
@@ -948,10 +949,18 @@ def _resolve_mini_app_patient_scope_from_init_data(
         # M4-P0-2: Legacy mode for per-request initData callers.
         # max_age=24h (backward compat), replay_check=False (same initData
         # is sent with every request). New /auth/exchange endpoint uses
-        # the secure defaults: max_age=5min, replay_check=True.
+        # max_age=5min and an atomic DB-backed replay guard.
         max_age_seconds=LEGACY_MAX_AUTH_AGE_SECONDS,
         replay_check=False,
     )
+    from app.services.telegram_mini_app_jwt import init_data_already_exchanged
+
+    if init_data_already_exchanged(db, init_data_payload):
+        raise HTTPException(
+            status_code=401,
+            detail={"reason": "session_invalid"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return resolve_telegram_mini_app_session_scope(
         db,
         init_data,
@@ -999,7 +1008,29 @@ def _resolve_mini_app_patient_scope_from_auth(
     init_data_payload: str | None = None,
     entry_token: str | None = None,
     expected_section: str | None = None,
+    request: Request | None = None,
 ) -> tuple[TelegramMiniAppSessionScope, str]:
+    authorization = request.headers.get("authorization", "") if request else ""
+    if authorization:
+        from app.services.telegram_mini_app_jwt import (
+            TelegramMiniAppAuthExchangeError,
+            authenticate_patient_session,
+        )
+
+        scheme, _, token = authorization.partition(" ")
+        try:
+            if scheme.lower() != "bearer" or not token.strip():
+                raise TelegramMiniAppAuthExchangeError("session_invalid")
+            auth = authenticate_patient_session(db, token.strip())
+        except TelegramMiniAppAuthExchangeError as exc:
+            # An invalid session must not fall back to initData/entry authority.
+            raise HTTPException(
+                status_code=401,
+                detail={"reason": "session_invalid"},
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+        return auth.scope, "jwt"
+
     normalized_init_data = str(init_data_payload or "").strip()
     if normalized_init_data:
         return (
@@ -1289,6 +1320,7 @@ def _build_mini_app_patient_manifest_from_request(
             init_data_payload=request_body.init_data,
             entry_token=request_body.entry_token,
             expected_section=request_body.section,
+            request=request,
         )
         # M4-P0-1: Log successful manifest access
         log_patient_access(
@@ -1489,6 +1521,7 @@ def _build_mini_app_patient_cabinet_summary_from_request(
             init_data_payload=request_body.init_data,
             entry_token=request_body.entry_token,
             expected_section=request_body.section or "cabinet",
+            request=request,
         )
         # M4-P1-1: Use centralized authorization instead of inline patient_id check
         subject_patient_id = (
@@ -1565,12 +1598,14 @@ def _resolve_mini_app_patient_scope_for_optional_patient(
     patient_id: int | None,
     *,
     expected_section: str | None = None,
+    request: Request | None = None,
 ):
     scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
         db,
         init_data_payload=init_data_payload,
         entry_token=entry_token,
         expected_section=expected_section,
+        request=request,
     )
     if patient_id is not None and int(scope.patient_id) != int(patient_id):
         raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
@@ -1594,6 +1629,7 @@ def _build_mini_app_patient_report_download_response(
             request_body.entry_token,
             request_body.patient_id,
             expected_section=request_body.section or "results",
+            request=request,
         )
         # M4-P1-1: Use centralized authorization
         subject_patient_id = (
@@ -1739,6 +1775,7 @@ def _build_mini_app_patient_forms_preview_from_request(
             init_data_payload=request_body.init_data,
             entry_token=request_body.entry_token,
             expected_section=request_body.section or "forms",
+            request=request,
         )
         preview = build_telegram_mini_app_patient_forms_preview(
             db,
@@ -1804,6 +1841,7 @@ def _save_mini_app_patient_form_submission_from_request(
             init_data_payload=request_body.init_data,
             entry_token=request_body.entry_token,
             expected_section=request_body.section or "forms",
+            request=request,
         )
         result = save_telegram_mini_app_patient_form_submission(
             db,

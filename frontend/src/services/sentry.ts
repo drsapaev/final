@@ -50,6 +50,7 @@ const MEDICAL_PII_KEYS = [
   'token', 'access_token', 'refresh_token', 'secret', 'api_key', 'password',
   'verification_code', 'verificationcode', 'otp_code', 'otpcode', 'totp_code',
   'totpcode', 'backup_code', 'backupcode',
+  'init_data', 'initdata', 'entrytoken', 'authorization',
 ];
 
 // AI content can include clinical notes and tool arguments under generic keys.
@@ -116,6 +117,7 @@ type MutableSentryEvent = Record<string, unknown> & {
 // MEDICAL_PII_KEYS — non-credential params (sort, q, lang, name…) must
 // stay readable for debugging.
 const CREDENTIAL_QUERY_KEYS = [
+  'init_data', 'initdata', 'entrytoken',
   'token', // also matches *_token via the suffix rule (access_token, refresh_token, activation_token, …)
   'apikey', 'api_key', 'secret', 'password', 'sig', 'signature', 'authorization',
   'verification_code', 'verificationcode', 'otp_code', 'otpcode', 'totp_code',

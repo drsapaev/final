@@ -7,6 +7,9 @@ Split from telegram_webhook.py (5647 LOC → modular).
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
+
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
@@ -56,6 +59,13 @@ from app.schemas.public_booking_settings import (
     PublicBookingServiceIdsOut,
     PublicBookingValidationErrorOut,
 )
+from app.schemas.telegram_mini_app_session import (
+    TelegramMiniAppExchangeRequest,
+    TelegramMiniAppRefreshRequest,
+    TelegramMiniAppRevokeResponse,
+    TelegramMiniAppSessionListResponse,
+    TelegramMiniAppTokenResponse,
+)
 
 # PR-3: referenced via module namespace (not from-imported) so tests can
 # monkeypatch telegram_webhook_dedup.* the same way they patch
@@ -72,6 +82,14 @@ from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.public_booking_settings import (
     PublicBookingSettingsError,
     PublicBookingSettingsService,
+)
+from app.services.telegram_mini_app_jwt import (
+    TelegramMiniAppAuthExchangeError,
+    authenticate_patient_session,
+    exchange_init_data_for_jwt,
+    list_patient_sessions,
+    refresh_patient_session,
+    revoke_patient_sessions,
 )
 
 _MINI_APP_BOOKING_SELECTION_422 = {
@@ -318,226 +336,191 @@ def reject_patient_onboarding_request(
     )
 
 
-# M4-P0-2: Telegram Mini App JWT Exchange endpoint.
-# Replaces per-request initData-replay with short-lived JWT.
+# Patient session authentication is independent of staff auth/2FA.
+_patient_session_bearer = HTTPBearer(
+    auto_error=False,
+    scheme_name="TelegramMiniAppPatientBearer",
+)
+
+
+def _require_patient_session_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_patient_session_bearer),
+) -> str:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=401,
+            detail={"reason": "session_required"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return credentials.credentials
+
+
+def _session_error(exc: TelegramMiniAppAuthExchangeError) -> HTTPException:
+    code = {
+        "session_not_found": 404,
+        "current_session_requires_logout": 400,
+    }.get(exc.reason, 401)
+    return HTTPException(
+        status_code=code,
+        detail={"reason": exc.reason},
+        headers={"WWW-Authenticate": "Bearer"} if code == 401 else None,
+    )
+
+
+def _audit_patient_session(db, auth, request, action, count=None):
+    from app.services.patient_access_audit import log_patient_access
+
+    log_patient_access(
+        db=db,
+        scope=auth.scope,
+        resource_type="session_management",
+        action=action,
+        outcome="success",
+        request=request,
+        session_id=auth.session.id,
+        extra_data={"revoked_count": count} if count is not None else None,
+    )
+
+
 @router.post(
     "/mini-app/auth/exchange",
     operation_id="telegram_mini_app_auth_exchange",
-    response_model=dict[str, Any],
+    response_model=TelegramMiniAppTokenResponse,
 )
 def exchange_mini_app_auth(
+    request_body: TelegramMiniAppExchangeRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
-    """Exchange Telegram Mini App initData for short-lived JWT.
-
-    M4-P0-2: Secure alternative to per-request initData replay.
-    - initData validated ONCE (max_age=5min, replay protection)
-    - Returns JWT access_token (15 min) + refresh_token (7 days)
-    - Subsequent requests should use Authorization: Bearer <access_token>
-
-    Request body: { "init_data": "<Telegram.WebApp.initData>" }
-    """
+    """Consume signed Telegram initData once and create a patient-only session."""
     from app.api.v1.endpoints.admin_telegram import _get_configured_bot_token
-    from app.services.telegram_mini_app_jwt import (
-        TelegramMiniAppAuthExchangeError,
-        exchange_init_data_for_jwt,
-    )
 
-    try:
-        body = request.json()
-    except Exception:
-        body = {}
-
-    init_data_payload = body.get("init_data") if isinstance(body, dict) else None
-    if not init_data_payload:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "init_data_required"},
-        )
-
+    response.headers["Cache-Control"] = "no-store"
     bot_token = _get_configured_bot_token(db)
     if not bot_token:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"reason": "bot_token_required"},
-        )
-
-    client_ip = request.client.host if request.client else None
-    user_agent = request.headers.get("user-agent")
-
+        raise HTTPException(status_code=503, detail={"reason": "bot_token_required"})
     try:
         result = exchange_init_data_for_jwt(
             db,
-            init_data_payload,
+            request_body.init_data.get_secret_value(),
             bot_token=bot_token,
-            request_ip=client_ip,
-            request_user_agent=user_agent,
+            request_user_agent=request.headers.get("user-agent"),
         )
+        auth = authenticate_patient_session(db, result["access_token"])
     except TelegramMiniAppAuthExchangeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"reason": exc.reason},
-        ) from exc
-
+        raise HTTPException(status_code=403, detail={"reason": exc.reason}) from exc
+    _audit_patient_session(db, auth, request, "login")
     return result
 
 
-# M4-P0-3: Patient session management endpoints.
-# Allow patients to view active sessions and revoke all (e.g. if phone is stolen).
+@router.post(
+    "/mini-app/auth/refresh",
+    operation_id="telegram_mini_app_auth_refresh",
+    response_model=TelegramMiniAppTokenResponse,
+)
+def refresh_mini_app_auth(
+    request_body: TelegramMiniAppRefreshRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Rotate a signed refresh credential without extending the session lifetime."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        result = refresh_patient_session(
+            db, request_body.refresh_token.get_secret_value()
+        )
+        auth = authenticate_patient_session(db, result["access_token"])
+    except TelegramMiniAppAuthExchangeError as exc:
+        raise _session_error(exc) from exc
+    _audit_patient_session(db, auth, request, "refresh")
+    return result
+
+
 @router.post(
     "/mini-app/sessions/list",
     operation_id="telegram_mini_app_patient_sessions_list",
-    response_model=dict[str, Any],
+    response_model=TelegramMiniAppSessionListResponse,
 )
 def list_mini_app_patient_sessions(
     request: Request,
+    response: Response,
+    token: str = Depends(_require_patient_session_token),
     db: Session = Depends(get_db),
 ):
-    """List active patient sessions (M4-P0-3).
-
-    Returns active sessions for the authenticated patient, including
-    IP, user-agent, and creation timestamp. Uses initData for auth
-    (backward compat — will be replaced by JWT in future).
-
-    Request body: { "init_data": "<Telegram.WebApp.initData>" }
-    """
-    from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
-        _resolve_mini_app_patient_scope_from_auth,
-    )
-    from app.models.authentication import UserSession
-
+    """List this patient's active devices and identify the current JWT session."""
+    response.headers["Cache-Control"] = "no-store"
     try:
-        body = request.json()
-    except Exception:
-        body = {}
-
-    init_data = body.get("init_data") if isinstance(body, dict) else None
-    if not init_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "init_data_required"},
-        )
-
-    try:
-        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
-            db,
-            init_data_payload=init_data,
-            entry_token=None,
-            expected_section="cabinet",
-        )
-    except Exception as exc:
-        reason = getattr(exc, "reason", "auth_failed")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"reason": reason},
-        ) from exc
-
-    # Patient sessions use negative user_id (see telegram_mini_app_jwt.py)
-    patient_session_user_id = -int(scope.patient_id)
-    sessions = (
-        db.query(UserSession)
-        .filter(
-            UserSession.user_id == patient_session_user_id,
-            UserSession.revoked == False,
-        )
-        .order_by(UserSession.created_at.desc())
-        .all()
-    )
-
-    return {
-        "sessions": [
-            {
-                "id": s.id,
-                "ip": s.ip,
-                "user_agent": s.user_agent,
-                "created_at": s.created_at.isoformat() if s.created_at else None,
-                "expires_at": s.expires_at.isoformat() if s.expires_at else None,
-                "is_current": False,  # TODO: compare with current session's refresh_token
-            }
-            for s in sessions
-        ],
-        "total": len(sessions),
-    }
+        auth, result = list_patient_sessions(db, token)
+    except TelegramMiniAppAuthExchangeError as exc:
+        raise _session_error(exc) from exc
+    _audit_patient_session(db, auth, request, "view")
+    return result
 
 
 @router.post(
     "/mini-app/sessions/revoke-all",
     operation_id="telegram_mini_app_patient_sessions_revoke_all",
-    response_model=dict[str, Any],
+    response_model=TelegramMiniAppRevokeResponse,
 )
 def revoke_all_mini_app_patient_sessions(
     request: Request,
+    response: Response,
+    token: str = Depends(_require_patient_session_token),
     db: Session = Depends(get_db),
 ):
-    """Revoke all patient sessions except the current one (M4-P0-3).
-
-    Used when patient suspects their phone is stolen or wants to
-    log out from all other devices.
-
-    Request body: { "init_data": "<Telegram.WebApp.initData>" }
-    """
-
-    from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
-        _resolve_mini_app_patient_scope_from_auth,
-    )
-    from app.models.authentication import UserSession
-
+    """Revoke all OTHER sessions; the calling JWT session remains active."""
+    response.headers["Cache-Control"] = "no-store"
     try:
-        body = request.json()
-    except Exception:
-        body = {}
+        auth, count = revoke_patient_sessions(db, token)
+    except TelegramMiniAppAuthExchangeError as exc:
+        raise _session_error(exc) from exc
+    _audit_patient_session(db, auth, request, "revoke_others", count)
+    return {"revoked": True, "revoked_count": count}
 
-    init_data = body.get("init_data") if isinstance(body, dict) else None
-    if not init_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "init_data_required"},
-        )
 
+@router.post(
+    "/mini-app/sessions/{session_id}/revoke",
+    operation_id="telegram_mini_app_patient_session_revoke",
+    response_model=TelegramMiniAppRevokeResponse,
+)
+def revoke_mini_app_patient_session(
+    session_id: UUID,
+    request: Request,
+    response: Response,
+    token: str = Depends(_require_patient_session_token),
+    db: Session = Depends(get_db),
+):
+    """Revoke one other device owned by this patient."""
+    response.headers["Cache-Control"] = "no-store"
     try:
-        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
-            db,
-            init_data_payload=init_data,
-            entry_token=None,
-            expected_section="cabinet",
-        )
-    except Exception as exc:
-        reason = getattr(exc, "reason", "auth_failed")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"reason": reason},
-        ) from exc
+        auth, count = revoke_patient_sessions(db, token, target_id=str(session_id))
+    except TelegramMiniAppAuthExchangeError as exc:
+        raise _session_error(exc) from exc
+    _audit_patient_session(db, auth, request, "revoke", count)
+    return {"revoked": True, "revoked_count": count}
 
-    # Revoke all patient sessions (patient sessions use negative user_id)
-    patient_session_user_id = -int(scope.patient_id)
-    patient_sessions = db.query(UserSession).filter(
-        UserSession.user_id == patient_session_user_id,
-        UserSession.revoked == False,
-    )
-    # UserSession has no revoked_at column (#2924) — writing it here
-    # raises UnconsumedColumnError and the revocation silently fails.
-    revoked_count = patient_sessions.update({"revoked": True})
-    db.commit()
 
-    # M4-P0-1: Audit log the session revocation
-    from app.services.patient_access_audit import log_patient_access
-
-    log_patient_access(
-        db=db,
-        scope=scope,
-        resource_type="session_management",
-        action="revoke_all",
-        outcome="success",
-        request=request,
-        extra_data={"revoked_count": revoked_count},
-    )
-
-    return {
-        "revoked": True,
-        "revoked_count": revoked_count,
-        "message": f"Отозвано сессий: {revoked_count}",
-    }
+@router.post(
+    "/mini-app/auth/logout",
+    operation_id="telegram_mini_app_auth_logout",
+    response_model=TelegramMiniAppRevokeResponse,
+)
+def logout_mini_app_patient_session(
+    request: Request,
+    response: Response,
+    token: str = Depends(_require_patient_session_token),
+    db: Session = Depends(get_db),
+):
+    """Explicitly terminate the current access and refresh credentials."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        auth, count = revoke_patient_sessions(db, token, logout=True)
+    except TelegramMiniAppAuthExchangeError as exc:
+        raise _session_error(exc) from exc
+    _audit_patient_session(db, auth, request, "logout", count)
+    return {"revoked": True, "revoked_count": count}
 
 
 @router.post(
@@ -566,6 +549,7 @@ def list_mini_app_booking_departments(
             init_data_payload=request_body.init_data,
             entry_token=request_body.entry_token,
             expected_section=request_body.section or "appointments",
+            request=request,
         )
     except TelegramMiniAppInitDataError as exc:
         raise HTTPException(
@@ -602,6 +586,7 @@ def list_mini_app_booking_departments(
 )
 def list_mini_app_booking_services(
     request_body: TelegramMiniAppBookingServicesRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> PublicBookingServiceIdsOut:
     """Return the current eligible Admin allowlist to an authenticated patient."""
@@ -611,6 +596,7 @@ def list_mini_app_booking_services(
             init_data_payload=request_body.init_data,
             entry_token=request_body.entry_token,
             expected_section=request_body.section or "appointments",
+            request=request,
         )
         service_ids = PublicBookingSettingsService(db).get_patient_booking_service_ids()
     except TelegramMiniAppInitDataError as exc:

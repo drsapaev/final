@@ -47,11 +47,11 @@ describe('Telegram Mini App expired link guardrails', () => {
     expect(handledConfig).toContain('expectedErrorStatuses: [400, 403, 503]');
 
     [
-      'api.post(\'/telegram/mini-app/patient/manifest\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
-      'api.post(\'/telegram/mini-app/cabinet/summary\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
-      'api.post(\'/telegram/mini-app/forms/preview\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
-      'api.post(\'/telegram/mini-app/appointments/preview\', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
-      'api.post(\'/telegram/mini-app/appointments\', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
+      'telegramMiniAppApi.post(\'/telegram/mini-app/patient/manifest\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
+      'telegramMiniAppApi.post(\'/telegram/mini-app/cabinet/summary\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
+      'telegramMiniAppApi.post(\'/telegram/mini-app/forms/preview\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
+      'telegramMiniAppApi.post(\'/telegram/mini-app/appointments/preview\', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
+      'telegramMiniAppApi.post(\'/telegram/mini-app/appointments\', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
       'MINI_APP_HANDLED_ERROR_REQUEST_CONFIG',
     ].forEach((expectedSnippet) => {
       expect(miniAppShell).toContain(expectedSnippet);

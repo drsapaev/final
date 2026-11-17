@@ -15309,16 +15309,29 @@ export type paths = {
         put?: never;
         /**
          * Exchange Mini App Auth
-         * @description Exchange Telegram Mini App initData for short-lived JWT.
-         *
-         *     M4-P0-2: Secure alternative to per-request initData replay.
-         *     - initData validated ONCE (max_age=5min, replay protection)
-         *     - Returns JWT access_token (15 min) + refresh_token (7 days)
-         *     - Subsequent requests should use Authorization: Bearer <access_token>
-         *
-         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         * @description Consume signed Telegram initData once and create a patient-only session.
          */
         post: operations["telegram_mini_app_auth_exchange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/mini-app/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Mini App Auth
+         * @description Rotate a signed refresh credential without extending the session lifetime.
+         */
+        post: operations["telegram_mini_app_auth_refresh"];
         delete?: never;
         options?: never;
         head?: never;
@@ -15336,13 +15349,7 @@ export type paths = {
         put?: never;
         /**
          * List Mini App Patient Sessions
-         * @description List active patient sessions (M4-P0-3).
-         *
-         *     Returns active sessions for the authenticated patient, including
-         *     IP, user-agent, and creation timestamp. Uses initData for auth
-         *     (backward compat — will be replaced by JWT in future).
-         *
-         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         * @description List this patient's active devices and identify the current JWT session.
          */
         post: operations["telegram_mini_app_patient_sessions_list"];
         delete?: never;
@@ -15362,14 +15369,49 @@ export type paths = {
         put?: never;
         /**
          * Revoke All Mini App Patient Sessions
-         * @description Revoke all patient sessions except the current one (M4-P0-3).
-         *
-         *     Used when patient suspects their phone is stolen or wants to
-         *     log out from all other devices.
-         *
-         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         * @description Revoke all OTHER sessions; the calling JWT session remains active.
          */
         post: operations["telegram_mini_app_patient_sessions_revoke_all"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/mini-app/sessions/{session_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Mini App Patient Session
+         * @description Revoke one other device owned by this patient.
+         */
+        post: operations["telegram_mini_app_patient_session_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/mini-app/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout Mini App Patient Session
+         * @description Explicitly terminate the current access and refresh credentials.
+         */
+        post: operations["telegram_mini_app_auth_logout"];
         delete?: never;
         options?: never;
         head?: never;
@@ -41423,6 +41465,14 @@ export type components = {
             /** Section */
             section?: string | null;
         };
+        /** TelegramMiniAppExchangeRequest */
+        TelegramMiniAppExchangeRequest: {
+            /**
+             * Init Data
+             * Format: password
+             */
+            init_data: string;
+        };
         /** TelegramMiniAppPatientCabinetSummaryRequest */
         TelegramMiniAppPatientCabinetSummaryRequest: {
             /** Initdata */
@@ -41488,6 +41538,73 @@ export type components = {
             section?: string | null;
             /** Reportid */
             reportId: number;
+        };
+        /** TelegramMiniAppRefreshRequest */
+        TelegramMiniAppRefreshRequest: {
+            /**
+             * Refresh Token
+             * Format: password
+             */
+            refresh_token: string;
+        };
+        /** TelegramMiniAppRevokeResponse */
+        TelegramMiniAppRevokeResponse: {
+            /**
+             * Revoked
+             * @default true
+             */
+            revoked: boolean;
+            /** Revoked Count */
+            revoked_count: number;
+        };
+        /** TelegramMiniAppSessionItem */
+        TelegramMiniAppSessionItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Device Label */
+            device_label: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Last Active At
+             * Format: date-time
+             */
+            last_active_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Is Current */
+            is_current: boolean;
+        };
+        /** TelegramMiniAppSessionListResponse */
+        TelegramMiniAppSessionListResponse: {
+            /** Sessions */
+            sessions: components["schemas"]["TelegramMiniAppSessionItem"][];
+            /** Total */
+            total: number;
+        };
+        /** TelegramMiniAppTokenResponse */
+        TelegramMiniAppTokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             * @constant
+             */
+            token_type: "bearer";
+            /** Expires In */
+            expires_in: number;
         };
         /**
          * TelegramNotificationRequest
@@ -73829,7 +73946,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramMiniAppExchangeRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -73837,9 +73958,49 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TelegramMiniAppTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    telegram_mini_app_auth_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramMiniAppRefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramMiniAppTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -73859,9 +74020,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TelegramMiniAppSessionListResponse"];
                 };
             };
         };
@@ -73881,9 +74040,58 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TelegramMiniAppRevokeResponse"];
+                };
+            };
+        };
+    };
+    telegram_mini_app_patient_session_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramMiniAppRevokeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    telegram_mini_app_auth_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramMiniAppRevokeResponse"];
                 };
             };
         };
