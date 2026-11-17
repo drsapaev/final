@@ -1,15 +1,54 @@
 """
 Интеграционные тесты для API подтверждения визитов
 """
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.models.online_queue import OnlineQueueEntry
+from app.models.telegram_config import TelegramUser
 from app.services.visit_confirmation_service import (
     VisitConfirmationDomainError,
     VisitConfirmationService,
+    build_telegram_visit_action_token,
 )
+
+
+@pytest.fixture(autouse=True)
+def _future_telegram_start(monkeypatch):
+    monkeypatch.setattr("app.tasks.worker._appointment_start_utc", lambda visit: datetime.now(UTC) + timedelta(days=1))
+
+
+def _link_patient_chat(db, visit):
+    link = db.query(TelegramUser).filter_by(chat_id=123456789).first()
+    if link is None:
+        link = TelegramUser(chat_id=123456789)
+        db.add(link)
+    link.patient_id = visit.patient_id
+    link.active = True
+    link.blocked = False
+    link.notifications_enabled = True
+    link.appointment_reminders = True
+    visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
+    db.commit()
+    return link
+
+
+def _trusted_confirm(db, token, user_agent="telegram"):
+    from app.models.visit import Visit
+
+    visit = db.query(Visit).filter(Visit.confirmation_token == token).first()
+    link = db.query(TelegramUser).filter_by(chat_id=123456789).first()
+    if visit is not None and link is not None:
+        token = build_telegram_visit_action_token(
+            visit_id=visit.id, confirmation_token=token, link_id=link.id,
+            chat_id=link.chat_id, patient_id=visit.patient_id,
+            link_epoch=link.patient_link_epoch, visit_context_epoch=visit.confirmation_context_epoch,
+        )
+    return VisitConfirmationService(db).confirm_by_telegram(
+        token=token, telegram_user_id="123456789", source_ip=None,
+        user_agent=user_agent,
+    )
 
 
 @pytest.mark.integration
@@ -248,45 +287,52 @@ class TestVisitConfirmationAPI:
         assert get_response.headers["cache-control"] == "private, no-store"
         assert post_response.headers["cache-control"] == "private, no-store"
 
-    def test_confirm_visit_telegram_success(self, client, test_visit, test_daily_queue):
-        """Тест успешного подтверждения визита через Telegram"""
-        response = client.post("/api/v1/telegram/visits/confirm", json={
-            "token": test_visit.confirmation_token,
-            "telegram_user_id": "123456789",
-            "telegram_username": "testuser"
-        })
-
-        assert response.status_code == 200
-        data = response.json()
+    def test_confirm_visit_telegram_success(self, db_session, test_visit, test_daily_queue):
+        """A trusted callback can confirm only for the linked patient."""
+        _link_patient_chat(db_session, test_visit)
+        data = _trusted_confirm(db_session, test_visit.confirmation_token)
 
         assert data["success"] is True
         assert data["visit_id"] == test_visit.id
         assert data["status"] in ["confirmed", "open"]
         assert "подтвержден" in data["message"]
 
-    def test_confirm_visit_telegram_invalid_token(self, client):
+    def test_confirm_visit_telegram_invalid_token(self, db_session):
         """Тест подтверждения с недействительным токеном"""
-        response = client.post("/api/v1/telegram/visits/confirm", json={
-            "token": "invalid-token-123",
-            "telegram_user_id": "123456789"
-        })
+        with pytest.raises(VisitConfirmationDomainError) as exc:
+            _trusted_confirm(db_session, "invalid-token-123")
+        assert exc.value.status_code == 404
 
-        assert response.status_code == 404
-        data = response.json()
-        assert "не найден" in data["detail"]
-
-    def test_confirm_visit_telegram_wrong_channel(self, client, test_visit):
+    def test_confirm_visit_telegram_wrong_channel(self, db_session, test_visit):
         """Тест подтверждения через неправильный канал"""
         test_visit.confirmation_channel = "phone"
 
-        response = client.post("/api/v1/telegram/visits/confirm", json={
-            "token": test_visit.confirmation_token,
-            "telegram_user_id": "123456789"
-        })
+        _link_patient_chat(db_session, test_visit)
+        with pytest.raises(VisitConfirmationDomainError) as exc:
+            _trusted_confirm(db_session, test_visit.confirmation_token)
+        assert exc.value.status_code == 400
 
-        assert response.status_code == 400
-        data = response.json()
-        assert "Telegram" in data["detail"]
+    @pytest.mark.parametrize("action", ["confirm", "cancel"])
+    def test_public_telegram_endpoint_rejects_claimed_identity(
+        self, client, db_session, test_visit, action
+    ):
+        link = _link_patient_chat(db_session, test_visit)
+        token = test_visit.confirmation_token
+        capability = build_telegram_visit_action_token(
+            visit_id=test_visit.id, confirmation_token=token, link_id=link.id,
+            chat_id=link.chat_id, patient_id=test_visit.patient_id,
+            link_epoch=link.patient_link_epoch, visit_context_epoch=test_visit.confirmation_context_epoch,
+        )
+        response = client.post(
+            f"/api/v1/telegram/visits/{action}",
+            json={"token": capability, "telegram_user_id": "123456789"},
+        )
+        assert response.status_code == 403
+        assert "no-store" in response.headers["cache-control"]
+        assert test_visit.patient.short_name() not in response.text
+        db_session.refresh(test_visit)
+        assert test_visit.status == "pending_confirmation"
+        assert test_visit.confirmation_token == token
 
     def test_confirm_visit_pwa_success(self, client, test_visit, test_daily_queue):
         """Тест успешного подтверждения визита через PWA"""
@@ -411,13 +457,8 @@ class TestVisitConfirmationAPI:
         test_visit.visit_date = _clinic_today(db_session)
         db_session.commit()
 
-        response = client.post("/api/v1/telegram/visits/confirm", json={
-            "token": test_visit.confirmation_token,
-            "telegram_user_id": "123456789"
-        })
-
-        assert response.status_code == 200
-        data = response.json()
+        _link_patient_chat(db_session, test_visit)
+        data = _trusted_confirm(db_session, test_visit.confirmation_token)
 
         # Проверяем что создалась запись в очереди
         queue_entry = db_session.query(OnlineQueueEntry).filter(
@@ -441,13 +482,8 @@ class TestVisitConfirmationAPI:
         test_visit.visit_date = _clinic_today(db_session) + timedelta(days=1)
         db_session.commit()
 
-        response = client.post("/api/v1/telegram/visits/confirm", json={
-            "token": test_visit.confirmation_token,
-            "telegram_user_id": "123456789"
-        })
-
-        assert response.status_code == 200
-        data = response.json()
+        _link_patient_chat(db_session, test_visit)
+        data = _trusted_confirm(db_session, test_visit.confirmation_token)
 
         # Проверяем что НЕ создалась запись в очереди
         queue_entry = db_session.query(OnlineQueueEntry).filter(
@@ -463,12 +499,8 @@ class TestVisitConfirmationAPI:
         """Тест обновления статуса визита при подтверждении"""
         original_status = test_visit.status
 
-        response = client.post("/api/v1/telegram/visits/confirm", json={
-            "token": test_visit.confirmation_token,
-            "telegram_user_id": "123456789"
-        })
-
-        assert response.status_code == 200
+        _link_patient_chat(db_session, test_visit)
+        assert _trusted_confirm(db_session, test_visit.confirmation_token)["success"] is True
 
         # Обновляем объект из БД
         db_session.refresh(test_visit)
@@ -479,37 +511,22 @@ class TestVisitConfirmationAPI:
         assert test_visit.confirmed_by is not None
         assert "telegram_" in test_visit.confirmed_by
 
-    def test_confirm_visit_rate_limiting(self, client, test_visit):
-        """Тест rate limiting при множественных попытках подтверждения"""
+    def test_confirm_visit_replay_rejected(self, db_session, test_visit):
+        """A consumed visit cannot be confirmed twice."""
         # Первое подтверждение должно пройти
-        response1 = client.post("/api/v1/telegram/visits/confirm", json={
-            "token": test_visit.confirmation_token,
-            "telegram_user_id": "123456789"
-        })
-
-        assert response1.status_code == 200
+        _link_patient_chat(db_session, test_visit)
+        token = test_visit.confirmation_token
+        assert _trusted_confirm(db_session, token)["success"] is True
 
         # Повторное подтверждение того же визита должно вернуть ошибку
-        response2 = client.post("/api/v1/telegram/visits/confirm", json={
-            "token": test_visit.confirmation_token,
-            "telegram_user_id": "123456789"
-        })
+        with pytest.raises(VisitConfirmationDomainError) as exc:
+            _trusted_confirm(db_session, token)
+        assert 400 <= exc.value.status_code < 500
 
-        assert response2.status_code == 400
-        data = response2.json()
-        assert "уже" in data["detail"]
-
-    def test_confirm_visit_security_validation(self, client, test_visit):
+    def test_confirm_visit_security_validation(self, db_session, test_visit):
         """Тест валидации безопасности при подтверждении"""
         # Тест с подозрительным User-Agent
-        response = client.post(
-            "/api/v1/telegram/visits/confirm",
-            json={
-                "token": test_visit.confirmation_token,
-                "telegram_user_id": "123456789"
-            },
-            headers={"User-Agent": "Googlebot/2.1"}
-        )
-
-        # Должна сработать защита от ботов
-        assert response.status_code in [400, 429]
+        _link_patient_chat(db_session, test_visit)
+        with pytest.raises(VisitConfirmationDomainError) as exc:
+            _trusted_confirm(db_session, test_visit.confirmation_token, "Googlebot/2.1")
+        assert exc.value.status_code in [400, 429]

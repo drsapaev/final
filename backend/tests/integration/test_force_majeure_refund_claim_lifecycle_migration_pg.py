@@ -330,7 +330,7 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
                 # Head pin follows the notification template uniqueness migration.
-                assert version == "0099_activation_rate_budget", version
+                assert version == "0102_visit_confirm_context", version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(

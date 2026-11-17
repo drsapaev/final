@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -23,9 +23,14 @@ class TestPatientAppointmentsApiService:
 
     def test_cancel_appointment_marks_status_and_commits(self):
         state = {"committed": False}
-        appointment = SimpleNamespace(status="scheduled", updated_at=None)
+        appointment = SimpleNamespace(id=7, patient_id=9, status="scheduled", updated_at=None,
+                                      appointment_date=date.today() + timedelta(days=4), appointment_time="12:00")
 
         class Repository:
+            def get_locked_appointment_for_patient(self, *, appointment_id, patient_id):
+                assert (appointment_id, patient_id) == (7, 9)
+                return appointment
+
             def commit(self):
                 state["committed"] = True
 

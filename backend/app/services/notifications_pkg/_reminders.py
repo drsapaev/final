@@ -22,17 +22,40 @@ class RemindersMixin(NotificationSenderMixinBase):
         visit_id: int,
         hours_before: int = 24,
         channel: str | None = None,
+        expected_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Отправляет напоминание о необходимости подтверждения"""
         from app.models.patient import Patient
         from app.models.visit import Visit
 
         try:
-            visit = db.query(Visit).filter(Visit.id == visit_id).first()
+            # Never reuse the worker's potentially stale identity-map row:
+            # a transfer may have changed both owner and bearer token.
+            visit = db.query(Visit).filter(Visit.id == visit_id).populate_existing().first()
             if not visit:
                 return {"success": False, "error": "Визит не найден"}
 
-            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+            def matches_expected(current: Any) -> bool:
+                if expected_context is None:
+                    return True
+                keys = ("patient_id", "confirmation_context_epoch", "reminder_generation",
+                        "reminder_claimed_at", "confirmation_token")
+                if set(expected_context) != set(keys):
+                    return False
+                for key in keys:
+                    actual = getattr(current, key)
+                    expected = expected_context[key]
+                    if key == "reminder_claimed_at" and actual is not None and expected is not None:
+                        actual, expected = actual.replace(tzinfo=None), expected.replace(tzinfo=None)
+                    if actual != expected:
+                        return False
+                return True
+
+            if not matches_expected(visit):
+                db.rollback()
+                return {"success": False, "error": "Контекст визита изменился"}
+
+            patient = db.query(Patient).filter(Patient.id == visit.patient_id).populate_existing().first()
             if not patient:
                 return {"success": False, "error": "Пациент не найден"}
 
@@ -43,6 +66,9 @@ class RemindersMixin(NotificationSenderMixinBase):
             notification_data = self._prepare_notification_data(db, visit, patient)
             notification_data["is_reminder"] = True
             notification_data["hours_before"] = hours_before
+            snapshot = (visit.patient_id, visit.confirmation_context_epoch,
+                        visit.confirmation_token, visit.reminder_generation,
+                        visit.confirmation_channel, visit.status, visit.reminder_claimed_at)
             sms_opted_in = True
 
             # Resolve patient preferences while the read transaction is
@@ -74,6 +100,7 @@ class RemindersMixin(NotificationSenderMixinBase):
                     db.query(TelegramUser)
                     .filter(
                         TelegramUser.patient_id == visit.patient_id,
+                        TelegramUser.chat_id > 0,
                         TelegramUser.active.is_(True),
                         TelegramUser.blocked.is_(False),
                         TelegramUser.notifications_enabled.is_(True),
@@ -88,19 +115,60 @@ class RemindersMixin(NotificationSenderMixinBase):
                         "error": "Пациент не привязал Telegram",
                     }
                 chat_id = link.chat_id
+                link_id = link.id
+                link_epoch = link.patient_link_epoch
+                linked_patient_id = visit.patient_id
+                from app.services.visit_confirmation_service import (
+                    build_telegram_visit_action_token,
+                )
+
+                telegram_capability = build_telegram_visit_action_token(
+                    visit_id=visit.id, confirmation_token=visit.confirmation_token,
+                    link_id=link_id, chat_id=chat_id, patient_id=patient.id,
+                    link_epoch=link_epoch, visit_context_epoch=visit.confirmation_context_epoch,
+                    purpose="view",
+                )
             db.commit()
 
+            current = db.query(
+                Visit.patient_id, Visit.confirmation_context_epoch,
+                Visit.confirmation_token, Visit.reminder_generation,
+                Visit.confirmation_channel, Visit.status, Visit.reminder_claimed_at,
+            ).filter(Visit.id == visit_id).first()
+            if current is None or tuple(current) != snapshot or not matches_expected(current):
+                db.rollback()
+                return {"success": False, "error": "Контекст визита изменился"}
+
             if channel == "telegram":
-                # Упрощенная версия напоминания для Telegram (можно расширить)
-                message = f"🔔 Напоминание! Пожалуйста, подтвердите визит к врачу {notification_data['doctor_name']} на {notification_data['visit_date']} {notification_data['visit_time']}."
+                # Recheck immediately before dispatch. A provider call cannot
+                # be recalled, so its text contains no patient or visit data.
+                current_link = (
+                    db.query(TelegramUser).filter(
+                        TelegramUser.id == link_id, TelegramUser.patient_id == linked_patient_id,
+                        TelegramUser.chat_id == chat_id,
+                        TelegramUser.patient_link_epoch == link_epoch,
+                        TelegramUser.active.is_(True), TelegramUser.blocked.is_(False),
+                        TelegramUser.notifications_enabled.is_(True),
+                        TelegramUser.appointment_reminders.is_(True),
+                    ).populate_existing().first()
+                )
+                db.commit()
+                if current_link is None:
+                    return {"success": False, "error": "Пациент не привязал Telegram"}
+                message = "У вас новое уведомление."
                 keyboard = self._create_telegram_keyboard(
-                    notification_data["confirmation_token"]
+                    telegram_capability
                 )
                 result = await self.telegram_bot.send_confirmation_invitation(
                     chat_id=chat_id, message=message, keyboard=keyboard
                 )
-                return {"success": result.get("success"), "error": result.get("error")}
+                return {"success": result.get("success"), "error": None if result.get("success") else "Ошибка отправки Telegram"}
             elif channel == "pwa":
+                sms_opted_in = self._patient_channel_opted_in(
+                    db=db, patient_id=snapshot[0], channel="sms",
+                    event_type="appointment_confirmation",
+                )
+                db.commit()
                 if not sms_opted_in:
                     return {
                         "success": False,
@@ -112,13 +180,14 @@ class RemindersMixin(NotificationSenderMixinBase):
                     sms_opted_in=sms_opted_in,
                 )
             else:
+                db.commit()
                 return await self._send_phone_invitation(
                     patient, notification_data, db=db
                 )
 
         except Exception as e:
-            logger.error(f"Ошибка отправки напоминания: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error("Ошибка отправки напоминания (%s)", type(e).__name__)
+            return {"success": False, "error": "Ошибка отправки напоминания"}
 
     async def send_telegram_message(
         self,
