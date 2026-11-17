@@ -140,9 +140,13 @@ QUEUE_NOTIFICATION_EVENT_TYPES = {
 PATIENT_TELEGRAM_EVENT_PREFERENCES = {
     "appointment_reminder": "appointment_reminders",
     "appointment_confirmation": "appointment_reminders",
+    "appointment_confirmation_task": "appointment_reminders",
+    "appointment_cancellation": "appointment_reminders",
+    "new_appointment": "appointment_reminders",
     "visit_confirmation": "appointment_reminders",
     "schedule_change": "appointment_reminders",
-    "prescription_ready": "notifications_enabled",
+    "prescription_ready": "lab_notifications",
+    "lab_results_ready": "lab_notifications",
     "visit_created": "appointment_reminders",
     "queue_ticket_issued": "appointment_reminders",
     "queue_status_changed": "appointment_reminders",
@@ -150,8 +154,40 @@ PATIENT_TELEGRAM_EVENT_PREFERENCES = {
     "payment_created": "notifications_enabled",
     "payment_notification": "notifications_enabled",
     "payment_paid": "notifications_enabled",
-    "lab_results": "lab_notifications",
+    "payment_reminder": "notifications_enabled",
+    "notification": "notifications_enabled",
+    "message_received": "notifications_enabled",
+    "patient_registered": "notifications_enabled",
+    "system_alert": "notifications_enabled",
+    "registrar_system_alert": "notifications_enabled",
+    "security_alert": "notifications_enabled",
+    "billing_alert": "notifications_enabled",
+    "price_change": "notifications_enabled",
+    "all_free_requested": "notifications_enabled",
+    "all_free_approved": "notifications_enabled",
+    "all_free_rejected": "notifications_enabled",
+    "public_booking_request_submitted": "notifications_enabled",
+    "public_booking_request_resubmitted": "notifications_enabled",
+    **{event: "appointment_reminders" for event in QUEUE_NOTIFICATION_EVENT_TYPES},
+    **{event: "lab_notifications" for event in LAB_NOTIFICATION_EVENT_TYPES},
 }
+
+
+def _patient_telegram_preferences_enabled(telegram_user: Any, event_type: str) -> bool:
+    """Honor global and all applicable category preferences for a linked patient."""
+    event_type = _normalize_notification_event_type(event_type, fallback="notification")
+    if not bool(getattr(telegram_user, "notifications_enabled", False)):
+        return False
+
+    preference = PATIENT_TELEGRAM_EVENT_PREFERENCES.get(event_type)
+    # An unclassified event could belong to either category. Require both opt-ins
+    # until it is explicitly classified, while preserving general notifications.
+    required = {preference} if preference else {"appointment_reminders", "lab_notifications"}
+    if event_type in QUEUE_NOTIFICATION_EVENT_TYPES:
+        required.add("appointment_reminders")
+    if event_type in LAB_NOTIFICATION_EVENT_TYPES:
+        required.add("lab_notifications")
+    return all(bool(getattr(telegram_user, field, False)) for field in required)
 
 PATIENT_TELEGRAM_EVENT_MESSAGES = {
     "appointment_reminder": {

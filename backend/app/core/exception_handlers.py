@@ -195,12 +195,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         """
         Обработка ошибок целостности БД (UNIQUE, FOREIGN KEY и т.д.)
         """
-        logger.error(
-            "IntegrityError: %s (path: %s)",
-            str(exc),
-            request.url.path,
-            exc_info=True,
-        )
+        # Database exceptions may contain SQL, bind values, and driver details.
+        logger.error("IntegrityError")
 
         # Пытаемся извлечь понятное сообщение из ошибки
         error_msg = str(exc.orig) if hasattr(exc, 'orig') else str(exc)
@@ -216,7 +212,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "integrity_error",
                 "message": detail,
-                "detail": error_msg,
+                "detail": detail,
             },
         )
 
@@ -227,12 +223,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         """
         Обработка операционных ошибок БД (соединение, таймауты и т.д.)
         """
-        logger.error(
-            "OperationalError: %s (path: %s)",
-            str(exc),
-            request.url.path,
-            exc_info=True,
-        )
+        # Database exceptions may contain SQL, bind values, and driver details.
+        logger.error("OperationalError")
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
@@ -249,18 +241,14 @@ def register_exception_handlers(app: FastAPI) -> None:
         """
         Обработка общих ошибок SQLAlchemy
         """
-        logger.error(
-            "SQLAlchemyError: %s (path: %s)",
-            str(exc),
-            request.url.path,
-            exc_info=True,
-        )
+        # Database exceptions may contain SQL, bind values, and driver details.
+        logger.error("SQLAlchemyError")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error": "database_error",
                 "message": "Ошибка базы данных",
-                "detail": str(exc),
+                "detail": "Ошибка базы данных",
             },
         )
 
