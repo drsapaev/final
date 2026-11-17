@@ -13,7 +13,7 @@ from app.models.user import User
 from app.repositories.patient_appointments_api_repository import (
     PatientAppointmentsApiRepository,
 )
-from app.services.appointment_rsvp import can_patient_cancel
+from app.services.context_facades.scheduling_facade import SchedulingContextFacade
 
 
 class PatientAppointmentsApiService:
@@ -171,7 +171,7 @@ class PatientAppointmentsApiService:
         )
         if not locked:
             raise HTTPException(status_code=404, detail="Запись не найдена")
-        if not can_patient_cancel(locked):
+        if not SchedulingContextFacade.can_patient_cancel(locked):
             raise HTTPException(status_code=409, detail="Отмена записи недоступна")
         locked.status = "cancelled"
         locked.updated_at = datetime.now()

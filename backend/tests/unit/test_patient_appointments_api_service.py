@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from app.services.patient_appointments_api_service import PatientAppointmentsApiService
 
@@ -40,6 +41,26 @@ class TestPatientAppointmentsApiService:
         assert appointment.status == "cancelled"
         assert appointment.updated_at is not None
         assert state["committed"] is True
+
+    @pytest.mark.parametrize("status", ["no_show", "completed", "cancelled"])
+    def test_cancel_appointment_rejects_terminal_status_under_lock(self, status):
+        appointment = SimpleNamespace(
+            id=7, patient_id=9, status=status, updated_at=None,
+            appointment_date=date.today() + timedelta(days=4), appointment_time="12:00",
+        )
+
+        class Repository:
+            def get_locked_appointment_for_patient(self, *, appointment_id, patient_id):
+                return appointment
+
+            def commit(self):
+                pytest.fail("terminal appointment must not be committed")
+
+        service = PatientAppointmentsApiService(db=None, repository=Repository())
+        with pytest.raises(HTTPException) as exc:
+            service.cancel_appointment(appointment)
+        assert exc.value.status_code == 409
+        assert appointment.status == status
 
     def test_list_available_slots_skips_booked_slot(self):
         start_day = date(2026, 1, 5)
