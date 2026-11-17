@@ -540,6 +540,10 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
       WebApp: { initData: 'test-init-data-payload' },
     };
     let departmentsCalls = 0;
+    let resolveDepartmentRefetch!: (value: { data: { departments: typeof departmentRows } }) => void;
+    const departmentRefetch = new Promise<{ data: { departments: typeof departmentRows } }>((resolve) => {
+      resolveDepartmentRefetch = resolve;
+    });
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
       if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
@@ -548,7 +552,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
         if (departmentsCalls >= 2) {
           // The refetch SUCCEEDS, but cardio was deactivated in the
           // meantime: the ACTIVE reference now lists only derma.
-          return Promise.resolve({ data: { departments: [departmentRows[1]] } });
+          return departmentRefetch;
         }
         return Promise.resolve({ data: { departments: departmentRows } });
       }
@@ -568,6 +572,13 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     fireEvent.click(screen.getByLabelText('Открытый раздел: Визиты'));
     fireEvent.click(await screen.findByLabelText('Открытый раздел: Запись'));
     await waitFor(() => expect(departmentsCalls).toBe(2));
+    // A request count proves invocation, not that React applied its response.
+    // Settle the reference update before checking the resulting submit payload.
+    await act(async () => {
+      resolveDepartmentRefetch({ data: { departments: [departmentRows[1]] } });
+      await departmentRefetch;
+    });
+    expect(screen.getByLabelText('Отделение')).not.toHaveTextContent('Кардиология');
 
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
     await waitFor(() => {
