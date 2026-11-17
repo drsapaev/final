@@ -432,14 +432,17 @@ def test_legacy_and_rotated_key_email_verification_tokens_fail_closed(db_session
 
 @pytest.mark.asyncio
 async def test_phone_reset_code_is_bound_to_account_epoch(db_session, monkeypatch):
+    import asyncio
     from types import SimpleNamespace
 
     from app.models.user_profile import UserProfile
+    from app.services.password_reset_service import _PHONE_RESET_TASKS
     from app.services.phone_verification_service import PhoneVerificationService
+    from app.services.phone_verification_store import MemoryPhoneStore
 
     user, actor = _user(db_session), _user(db_session)
     phone = "+998900000123"
-    db_session.add(UserProfile(user_id=user.id, phone=phone))
+    db_session.add(UserProfile(user_id=user.id, phone=phone, phone_verified=True))
     db_session.commit()
     service = PasswordResetService()
     service.phone_verification = PhoneVerificationService()
@@ -450,6 +453,7 @@ async def test_phone_reset_code_is_bound_to_account_epoch(db_session, monkeypatc
 
     monkeypatch.setattr(service.phone_verification.sms_manager, "send_sms", send_sms)
     assert (await service.initiate_phone_reset(db_session, phone))["success"]
+    await asyncio.gather(*tuple(_PHONE_RESET_TASKS))
     management = UserManagementService()
     assert management.update_user(db_session, user.id, UserUpdateRequest(is_active=False), actor.id)[0]
     assert management.update_user(db_session, user.id, UserUpdateRequest(is_active=True), actor.id)[0]
@@ -459,26 +463,34 @@ async def test_phone_reset_code_is_bound_to_account_epoch(db_session, monkeypatc
     assert db_session.query(PasswordResetToken).filter_by(user_id=user.id, used=False).count() == 0
 
     # A newly issued code for the live epoch still works once.
-    service.phone_verification.verification_codes.clear()
+    service.phone_verification._store = MemoryPhoneStore()
     assert (await service.initiate_phone_reset(db_session, phone))["success"]
+    await asyncio.gather(*tuple(_PHONE_RESET_TASKS))
     result = await service.verify_phone_and_get_token(db_session, phone, "123456")
     assert result["success"] is True and result["reset_token"]
     assert (await service.verify_phone_and_get_token(db_session, phone, "123456"))["success"] is False
 
 
 def test_phone_code_can_be_consumed_only_once_across_threads():
+    import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
+    from types import SimpleNamespace
 
     from app.services.phone_verification_service import PhoneVerificationService
+    from app.services.phone_verification_store import MemoryPhoneStore
 
-    service = PhoneVerificationService()
+    service = PhoneVerificationService(MemoryPhoneStore())
     phone = "+998900000124"
-    key = service._get_code_key(phone, "password_reset")
-    service.verification_codes[key] = {
-        "code": "123456", "expires_at": datetime.now() + timedelta(minutes=5),
-        "attempts": 0, "account_binding": (42, 1),
-    }
+    service.generate_verification_code = lambda: "123456"
+
+    async def send_sms(**_kwargs):
+        return SimpleNamespace(success=True, message_id="synthetic", provider="synthetic")
+
+    service.sms_manager = SimpleNamespace(send_sms=send_sms)
+    assert asyncio.run(service.send_verification_code(
+        phone, purpose="password_reset", account_binding=(42, 1)
+    ))["success"]
     barrier = Barrier(2)
 
     def verify():

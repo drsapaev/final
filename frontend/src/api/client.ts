@@ -197,6 +197,15 @@ function getCurrentAuthSession(): AuthSessionSnapshot {
   return { ...credentials, generation: authSessionGeneration };
 }
 
+/**
+ * Identify a login lifecycle without exposing its credentials. Refresh keeps
+ * the same generation; replacement login or logout changes it. Callers can
+ * avoid clearing a newer session after an older mutation resolves.
+ */
+export function getAuthSessionGeneration(): number {
+  return getCurrentAuthSession().generation;
+}
+
 function sameCredentials(left: AuthSessionSnapshot, right: AuthSessionSnapshot): boolean {
   return left.accessToken === right.accessToken && left.refreshToken === right.refreshToken;
 }

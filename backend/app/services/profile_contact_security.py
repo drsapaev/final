@@ -23,6 +23,7 @@ from app.models.user_profile import UserProfile
 from app.services.patient_otp_service import normalize_phone
 from app.services.patient_phone_scope import (
     acquire_phone_scope_lock,
+    canonical_phone_identity,
     ensure_phone_scope_free,
 )
 from app.services.token_blacklist_service import token_blacklist_service
@@ -152,7 +153,8 @@ def prepare_phone_change(db: Session, profile: UserProfile, update_data: dict) -
         update_data["phone"] = new_normalized
     if old_key == new_key:
         return False
-    for phone in sorted({value for value in (old_normalized, new_normalized) if value}):
+    lock_phones = {canonical_phone_identity(value) for value in (old_normalized, new_normalized) if value}
+    for phone in sorted(value for value in lock_phones if value):
         acquire_phone_scope_lock(db, phone)
     return True
 

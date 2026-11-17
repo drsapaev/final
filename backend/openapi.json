@@ -49187,22 +49187,96 @@
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Send Verification Code Api V1 Phone Verification Send Code Post"
+                  "$ref": "#/components/schemas/PhoneVerificationSendResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PhoneVerificationRateLimitResponse"
+                    }
+                  ],
+                  "title": "Response 429 Send Verification Code Api V1 Phone Verification Send Code Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Invalid verification request",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PhoneVerificationValidationResponse"
                 }
               }
             }
@@ -49236,22 +49310,106 @@
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Verify Code Api V1 Phone Verification Verify Code Post"
+                  "$ref": "#/components/schemas/PhoneVerificationProofResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PhoneVerificationRateLimitResponse"
+                    }
+                  ],
+                  "title": "Response 429 Verify Code Api V1 Phone Verification Verify Code Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Invalid verification request",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PhoneVerificationValidationResponse"
                 }
               }
             }
@@ -49265,131 +49423,183 @@
       }
     },
     "/api/v1/phone-verification/status": {
-      "get": {
+      "post": {
         "tags": [
           "phone-verification"
         ],
         "summary": "Get Verification Status",
         "description": "Получение статуса верификации",
-        "operationId": "get_verification_status_api_v1_phone_verification_status_get",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "phone",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Номер телефона в формате +998XXXXXXXXX",
-              "title": "Phone"
-            },
-            "description": "Номер телефона в формате +998XXXXXXXXX"
+        "operationId": "get_verification_status_api_v1_phone_verification_status_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneVerificationScope"
+              }
+            }
           },
-          {
-            "name": "purpose",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Цель верификации",
-              "default": "verification",
-              "title": "Purpose"
-            },
-            "description": "Цель верификации"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Verification Status Api V1 Phone Verification Status Get"
+                  "$ref": "#/components/schemas/PhoneVerificationStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Invalid verification request",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PhoneVerificationValidationResponse"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/phone-verification/cancel": {
-      "delete": {
+      "post": {
         "tags": [
           "phone-verification"
         ],
         "summary": "Cancel Verification",
         "description": "Отмена верификации",
-        "operationId": "cancel_verification_api_v1_phone_verification_cancel_delete",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "phone",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Номер телефона в формате +998XXXXXXXXX",
-              "title": "Phone"
-            },
-            "description": "Номер телефона в формате +998XXXXXXXXX"
+        "operationId": "cancel_verification_api_v1_phone_verification_cancel_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneVerificationScope"
+              }
+            }
           },
-          {
-            "name": "purpose",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Цель верификации",
-              "default": "verification",
-              "title": "Purpose"
-            },
-            "description": "Цель верификации"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Cancel Verification Api V1 Phone Verification Cancel Delete"
+                  "$ref": "#/components/schemas/PhoneVerificationCancelResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Invalid verification request",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PhoneVerificationValidationResponse"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/phone-verification/update-phone": {
@@ -49413,22 +49623,106 @@
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Update User Phone Api V1 Phone Verification Update Phone Put"
+                  "$ref": "#/components/schemas/PhoneVerificationUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PhoneVerificationRateLimitResponse"
+                    }
+                  ],
+                  "title": "Response 429 Update User Phone Api V1 Phone Verification Update Phone Put"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Invalid verification request",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PhoneVerificationValidationResponse"
                 }
               }
             }
@@ -49452,12 +49746,68 @@
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Get Verification Statistics Api V1 Phone Verification Statistics Get"
+                  "$ref": "#/components/schemas/PhoneVerificationStatisticsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid verification request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationValidationResponse"
                 }
               }
             }
@@ -49478,96 +49828,129 @@
         "summary": "Admin Send Verification Code",
         "description": "Отправка кода верификации администратором",
         "operationId": "admin_send_verification_code_api_v1_phone_verification_admin_send_code_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "phone",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Номер телефона в формате +998XXXXXXXXX",
-              "title": "Phone"
-            },
-            "description": "Номер телефона в формате +998XXXXXXXXX"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSendCodeRequest"
+              }
+            }
           },
-          {
-            "name": "purpose",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Цель верификации",
-              "default": "verification",
-              "title": "Purpose"
-            },
-            "description": "Цель верификации"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "SMS провайдер",
-              "title": "Provider"
-            },
-            "description": "SMS провайдер"
-          },
-          {
-            "name": "message",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Кастомное сообщение с {code}",
-              "title": "Message"
-            },
-            "description": "Кастомное сообщение с {code}"
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Admin Send Verification Code Api V1 Phone Verification Admin Send Code Post"
+                  "$ref": "#/components/schemas/AdminPhoneVerificationSendResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PhoneVerificationRateLimitResponse"
+                    }
+                  ],
+                  "title": "Response 429 Admin Send Verification Code Api V1 Phone Verification Admin Send Code Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneVerificationErrorResponse"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Invalid verification request",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PhoneVerificationValidationResponse"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/password-reset/initiate": {
@@ -49635,22 +50018,88 @@
         "responses": {
           "200": {
             "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive response is not cacheable",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Verify Phone For Reset Api V1 Password Reset Verify Phone Post"
+                  "$ref": "#/components/schemas/PhoneResetVerificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Verification rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResetErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Verification rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResetErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Verification rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResetErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Verification rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResetErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Verification rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResetErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Verification rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResetErrorResponse"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Invalid verification request",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PhoneResetValidationResponse"
                 }
               }
             }
@@ -75195,6 +75644,62 @@
         ],
         "title": "AdminDirectionReason"
       },
+      "AdminPhoneVerificationSendResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "expires_in_minutes": {
+            "type": "integer",
+            "title": "Expires In Minutes"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "sent_by_admin": {
+            "type": "string",
+            "title": "Sent By Admin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "expires_in_minutes",
+          "expires_in_seconds",
+          "provider",
+          "phone",
+          "purpose",
+          "sent_by_admin"
+        ],
+        "title": "AdminPhoneVerificationSendResponse"
+      },
       "AdminQueueDirection": {
         "properties": {
           "profile": {
@@ -75316,6 +75821,50 @@
           "unattached"
         ],
         "title": "AdminQueueDirectionsResponse"
+      },
+      "AdminSendCodeRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "verification",
+              "phone_change"
+            ],
+            "title": "Purpose",
+            "default": "verification"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "title": "AdminSendCodeRequest"
       },
       "AdminUnattachedCatalog": {
         "properties": {
@@ -105820,6 +106369,245 @@
         ],
         "title": "PermissionResponse"
       },
+      "PhoneResetErrorResponse": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/PhoneResetVerificationFailure"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PhoneResetErrorResponse"
+      },
+      "PhoneResetValidationResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "detail": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "message",
+          "detail"
+        ],
+        "title": "PhoneResetValidationResponse"
+      },
+      "PhoneResetVerificationFailure": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false,
+            "title": "Success"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "attempts_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempts Left"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "error"
+        ],
+        "title": "PhoneResetVerificationFailure"
+      },
+      "PhoneResetVerificationResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "reset_token": {
+            "type": "string",
+            "title": "Reset Token"
+          },
+          "expires_in_hours": {
+            "type": "integer",
+            "title": "Expires In Hours"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "reset_token",
+          "expires_in_hours"
+        ],
+        "title": "PhoneResetVerificationResponse"
+      },
+      "PhoneVerificationCancelResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "PhoneVerificationCancelResponse"
+      },
+      "PhoneVerificationErrorResponse": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/PhoneVerificationFailure"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PhoneVerificationErrorResponse"
+      },
+      "PhoneVerificationFailure": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false,
+            "title": "Success"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "attempts_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempts Left"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "error"
+        ],
+        "title": "PhoneVerificationFailure"
+      },
+      "PhoneVerificationProofResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "verified_at": {
+            "type": "string",
+            "title": "Verified At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "phone",
+          "verified_at"
+        ],
+        "title": "PhoneVerificationProofResponse"
+      },
+      "PhoneVerificationRateLimitResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "PhoneVerificationRateLimitResponse"
+      },
       "PhoneVerificationRequest": {
         "properties": {
           "phone": {
@@ -105838,6 +106626,319 @@
         ],
         "title": "PhoneVerificationRequest",
         "description": "Запрос на верификацию телефона для сброса пароля"
+      },
+      "PhoneVerificationScope": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "verification",
+              "phone_change"
+            ],
+            "title": "Purpose",
+            "default": "verification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "title": "PhoneVerificationScope",
+        "description": "Phone and purpose belong in the request body, never in a URL."
+      },
+      "PhoneVerificationSendResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "expires_in_minutes": {
+            "type": "integer",
+            "title": "Expires In Minutes"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "expires_in_minutes",
+          "expires_in_seconds",
+          "provider"
+        ],
+        "title": "PhoneVerificationSendResponse"
+      },
+      "PhoneVerificationSettings": {
+        "properties": {
+          "code_length": {
+            "type": "integer",
+            "title": "Code Length"
+          },
+          "ttl_minutes": {
+            "type": "integer",
+            "title": "Ttl Minutes"
+          },
+          "max_attempts": {
+            "type": "integer",
+            "title": "Max Attempts"
+          },
+          "rate_limit_minutes": {
+            "type": "integer",
+            "title": "Rate Limit Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code_length",
+          "ttl_minutes",
+          "max_attempts",
+          "rate_limit_minutes"
+        ],
+        "title": "PhoneVerificationSettings"
+      },
+      "PhoneVerificationStatistics": {
+        "properties": {
+          "total_active_codes": {
+            "type": "integer",
+            "title": "Total Active Codes"
+          },
+          "verified_codes": {
+            "type": "integer",
+            "title": "Verified Codes"
+          },
+          "pending_codes": {
+            "type": "integer",
+            "title": "Pending Codes"
+          },
+          "expiring_soon": {
+            "type": "integer",
+            "title": "Expiring Soon"
+          },
+          "by_purpose": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Purpose"
+          },
+          "by_provider": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Provider"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PhoneVerificationSettings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_active_codes",
+          "verified_codes",
+          "pending_codes",
+          "expiring_soon",
+          "by_purpose",
+          "by_provider",
+          "settings"
+        ],
+        "title": "PhoneVerificationStatistics"
+      },
+      "PhoneVerificationStatisticsResponse": {
+        "properties": {
+          "statistics": {
+            "$ref": "#/components/schemas/PhoneVerificationStatistics"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "statistics",
+          "timestamp"
+        ],
+        "title": "PhoneVerificationStatisticsResponse"
+      },
+      "PhoneVerificationStatusResponse": {
+        "properties": {
+          "exists": {
+            "type": "boolean",
+            "title": "Exists"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "attempts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempts"
+          },
+          "max_attempts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Attempts"
+          },
+          "time_left_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Left Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "exists",
+          "verified"
+        ],
+        "title": "PhoneVerificationStatusResponse"
+      },
+      "PhoneVerificationUpdateResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "verified_at": {
+            "type": "string",
+            "title": "Verified At"
+          },
+          "sessions_revoked": {
+            "type": "boolean",
+            "title": "Sessions Revoked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "phone",
+          "verified_at",
+          "sessions_revoked"
+        ],
+        "title": "PhoneVerificationUpdateResponse"
+      },
+      "PhoneVerificationValidationResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "detail": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "message",
+          "detail"
+        ],
+        "title": "PhoneVerificationValidationResponse"
       },
       "PhraseSuggestRequest": {
         "properties": {
@@ -115991,6 +117092,10 @@
           },
           "purpose": {
             "type": "string",
+            "enum": [
+              "verification",
+              "phone_change"
+            ],
             "title": "Purpose",
             "default": "verification"
           },
@@ -116014,7 +117119,8 @@
                 "type": "null"
               }
             ],
-            "title": "Custom Message"
+            "title": "Custom Message",
+            "description": "Must be omitted or null for self-service; use the admin endpoint for custom text."
           }
         },
         "type": "object",
@@ -127012,6 +128118,10 @@
           },
           "purpose": {
             "type": "string",
+            "enum": [
+              "verification",
+              "phone_change"
+            ],
             "title": "Purpose",
             "default": "verification"
           }

@@ -8054,6 +8054,8 @@ const uzLatn = {
     ev_request_success: "Xat yuborildi. Pochtangizni tekshiring.",
     ev_request_rate_limit: "So‘rovlar juda ko‘p. Kutib, qayta urinib ko‘ring.",
     ev_request_login: "Seans muddati tugadi. Qayta kiring.",
+    pv_phone_changed_relogin: "Telefon raqami yangilandi. Qayta kiring.",
+    pv_phone_change_uncertain_relogin: "Natijani tasdiqlab bo'lmadi. Qayta kirib, profilingizni tekshiring.",
     ev_request_error: "Xatni yuborib bo‘lmadi. Keyinroq urinib ko‘ring.",
     up_email_not_verified: 'Email tasdiqlanmagan',
     up_phone_verified: 'Telefon tasdiqlangan',

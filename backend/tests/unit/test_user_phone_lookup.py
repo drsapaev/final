@@ -27,7 +27,7 @@ def _user_with_profile(db_session, *, username: str, phone: str | None) -> User:
     )
     db_session.add(user)
     db_session.flush()
-    db_session.add(UserProfile(user_id=user.id, phone=phone))
+    db_session.add(UserProfile(user_id=user.id, phone=phone, phone_verified=phone is not None))
     db_session.commit()
     db_session.refresh(user)
     return user
@@ -47,23 +47,34 @@ async def test_get_user_by_phone_finds_via_profile(db_session):
 @pytest.mark.asyncio
 async def test_password_reset_phone_branch_reaches_dispatch(db_session, monkeypatch):
     """Ветка initiate_phone_reset больше не падает 500 на lookup."""
-    from app.services.password_reset_service import get_password_reset_service
+    import asyncio
+
+    from app.services.password_reset_service import (
+        _PHONE_RESET_TASKS,
+        get_password_reset_service,
+    )
 
     _user_with_profile(db_session, username="phone_reset", phone="+998902345678")
     svc = get_password_reset_service()
     svc.reset_tokens = {}
 
+    calls = []
+
     async def fake_code(phone, purpose, custom_message=None, account_binding=None):
+        calls.append((purpose, account_binding))
         return {"success": True, "expires_in_minutes": 5}
 
     monkeypatch.setattr(svc.phone_verification, "send_verification_code", fake_code)
 
     result = await svc.initiate_phone_reset(db_session, phone="+998902345678")
+    if _PHONE_RESET_TASKS:
+        await asyncio.gather(*tuple(_PHONE_RESET_TASKS))
 
     assert result["success"] is True
     assert result["message"] == (
         "Если пользователь с таким номером существует, код для сброса отправлен"
     )
+    assert len(calls) == 1 and calls[0][0] == "password_reset"
 
 
 @pytest.mark.asyncio

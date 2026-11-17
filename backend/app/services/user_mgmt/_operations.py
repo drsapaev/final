@@ -6,10 +6,10 @@ from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
     MedicalSpecialtyCatalogService,
 )
-from app.services.patient_otp_service import normalize_phone
 from app.services.patient_phone_scope import (
     ERR_PHONE_SCOPE_CONFLICT,
     acquire_phone_scope_lock,
+    canonical_phone_identity,
     ensure_phone_scope_free,
     lock_candidate_state_rows,
 )
@@ -375,7 +375,7 @@ class OperationsMixin(UserManagementServiceMixinBase):
                     entering_rows = []
                 batch_order = {uid: i for i, uid in enumerate(action_data.user_ids)}
                 for row in entering_rows:
-                    normalized = normalize_phone(row.phone or "")
+                    normalized = canonical_phone_identity(row.phone or "")
                     if normalized:
                         entering.append((row.id, normalized))
                 entering.sort(key=lambda item: batch_order.get(item[0], len(batch_order)))

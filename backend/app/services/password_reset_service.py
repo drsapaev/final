@@ -2,13 +2,17 @@
 Сервис восстановления паролей
 """
 
+import asyncio
 import hashlib
 import logging
+import math
 import secrets
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.pii_masker import mask_pii_text
@@ -16,7 +20,14 @@ from app.core.security import get_password_hash, verify_password
 from app.crud import user as crud_user
 from app.models.authentication import PasswordResetToken
 from app.models.user import User
+from app.models.user_profile import UserProfile
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
+from app.services.patient_otp_service import normalize_phone
+from app.services.patient_phone_scope import (
+    acquire_phone_scope_lock,
+    canonical_phone_identity,
+    verified_phone_candidates,
+)
 from app.services.phone_verification_service import get_phone_verification_service
 from app.services.token_blacklist_service import revoke_account_sessions_locked
 
@@ -34,6 +45,8 @@ _PHONE_RESET_GENERIC_MESSAGE = (
 # Срок жизни SMS-кода; синхронизирован с текстом сообщения
 # ("Код действителен 5 минут") в initiate_phone_reset.
 _PHONE_CODE_TTL_MINUTES = 5
+_PHONE_RESET_MAX_PENDING = 128
+_PHONE_RESET_TASKS: set[asyncio.Task] = set()
 
 
 class PasswordResetService:
@@ -63,9 +76,66 @@ class PasswordResetService:
         # Normalize before python-side comparisons.
         return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
+    @staticmethod
+    def _accepted_reset_phone(raw: str) -> str | None:
+        """Accept only the ASCII +998 form used by SMS/reset clients."""
+        normalized = normalize_phone(raw)
+        return normalized if normalized and normalized.isascii() else None
+
+    @staticmethod
+    def _unique_verified_phone_binding(db: Session, phone: str) -> tuple[int, int] | None:
+        """Resolve only an unambiguous verified phone owned by an active user.
+
+        Count verified profiles of *inactive* accounts too. Their activation
+        does not necessarily acquire the phone advisory lock for staff roles;
+        counting them prevents a concurrent activation from creating a second
+        reset identity after this check.
+        """
+        candidates = verified_phone_candidates(db, phone)
+        if candidates is None or len(candidates) != 1:
+            return None
+        user_id, epoch, active = candidates[0]
+        if active is not True:
+            return None
+        return user_id, epoch
+
+    def _snapshot_phone_binding(self, db: Session, phone: str) -> tuple[int, int] | None:
+        """Finish the read transaction before any external SMS operation."""
+        try:
+            return self._unique_verified_phone_binding(db, phone)
+        finally:
+            db.rollback()
+
+    async def _dispatch_phone_reset(self, phone: str | None, binding: tuple[int, int] | None) -> None:
+        """Deliver after the generic response without retaining a DB session."""
+        if phone is None or binding is None:
+            return
+        try:
+            result = await self.phone_verification.send_verification_code(
+                phone=phone,
+                purpose="password_reset",
+                custom_message="Код для сброса пароля: {code}. Код действителен 5 минут.",
+                account_binding=binding,
+            )
+            if not result.get("success"):
+                logger.warning("Password reset SMS send failed")
+        except Exception as exc:
+            # Providers may include the phone or code in exception text.
+            logger.warning("Password reset SMS send failed: %s", type(exc).__name__)
+
+    def _schedule_phone_reset(self, phone: str | None, binding: tuple[int, int] | None) -> None:
+        """Bound retained tasks while keeping known/unknown response behavior equal."""
+        if len(_PHONE_RESET_TASKS) >= _PHONE_RESET_MAX_PENDING:
+            logger.warning("Password reset dispatch queue is full")
+            return
+        task = asyncio.create_task(self._dispatch_phone_reset(phone, binding))
+        _PHONE_RESET_TASKS.add(task)
+        task.add_done_callback(_PHONE_RESET_TASKS.discard)
+
     def _store_reset_token(
         self, db: Session, raw_token: str, user_id: int, *, expected_email: str | None = None,
         expected_epoch: int | None = None, expected_phone: str | None = None,
+        proof_expires_monotonic: float | None = None,
     ) -> bool:
         # Cleanup is a separate transaction: never lock other accounts' reset
         # rows while holding this account's User lock.
@@ -83,13 +153,22 @@ class PasswordResetService:
             db.rollback()
             return False
         if expected_phone is not None:
-            from app.models.user_profile import UserProfile
-
             profile = (
                 db.query(UserProfile).filter(UserProfile.user_id == user_id)
                 .with_for_update().populate_existing().first()
             )
-            if not profile or profile.phone != expected_phone:
+            # Every verified-phone writer shares this advisory lock. Recheck
+            # ownership and uniqueness after it is held; a prior lookup or OTP
+            # binding is only a hint and cannot authorize issuance by itself.
+            acquire_phone_scope_lock(db, expected_phone)
+            if (
+                not profile
+                or canonical_phone_identity(profile.phone or "") != expected_phone
+                or profile.phone_verified is not True
+                or self._unique_verified_phone_binding(db, expected_phone)
+                != (user_id, user.auth_epoch)
+                or not self._proof_live(proof_expires_monotonic)
+            ):
                 db.rollback()
                 return False
         db.add(
@@ -100,8 +179,28 @@ class PasswordResetService:
                 used=False,
             )
         )
+        if expected_phone is not None:
+            # Flush may itself block. Recheck after all database work and just
+            # before committing the bearer credential, not just at OTP consume.
+            db.flush()
+            if not self._proof_live(proof_expires_monotonic):
+                db.rollback()
+                return False
         db.commit()
+        # A delayed commit must not return a usable bearer after the proof's
+        # deadline; the token hash alone cannot be used by a client.
+        if expected_phone is not None and not self._proof_live(proof_expires_monotonic):
+            return False
         return True
+
+    @staticmethod
+    def _proof_live(expires_at: object) -> bool:
+        if type(expires_at) not in (int, float):
+            return False
+        try:
+            return math.isfinite(expires_at) and time.monotonic() < expires_at
+        except OverflowError:
+            return False
 
     def _find_token_row(self, db: Session, raw_token: str) -> PasswordResetToken | None:
         return (
@@ -113,56 +212,20 @@ class PasswordResetService:
     async def initiate_phone_reset(self, db: Session, phone: str) -> dict[str, Any]:
         """Инициация сброса пароля по телефону"""
         try:
-            # Проверяем, существует ли пользователь с таким номером
-            user = crud_user.get_user_by_phone(db, phone=phone)
-            if not user or not user.is_active:
-                # Одинаковая форма ответа для всех исходов.
-                return {
-                    "success": True,
-                    "message": _PHONE_RESET_GENERIC_MESSAGE,
-                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
-                }
-
-            # Отправляем код верификации
-            verification_result = await self.phone_verification.send_verification_code(
-                phone=phone,
-                purpose="password_reset",
-                custom_message="Код для сброса пароля: {code}. Код действителен 5 минут.",
-                account_binding=(user.id, user.auth_epoch),
-            )
-
-            if verification_result["success"]:
-                # PII: номер не пишем в лог — только факт отправки.
-                logger.info("Password reset code sent", extra={"has_recipient": True})
-                return {
-                    "success": True,
-                    "message": _PHONE_RESET_GENERIC_MESSAGE,
-                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
-                }
-            else:
-                # Сбой доставки SMS — та же форма ответа, что и для
-                # успеха (анти-enumeration); причина логируется.
-                logger.warning(
-                    "Password reset SMS send failed: %s",
-                    mask_pii_text(str(verification_result.get("error", ""))),
-                )
-                return {
-                    "success": True,
-                    "message": _PHONE_RESET_GENERIC_MESSAGE,
-                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
-                }
-
+            normalized = self._accepted_reset_phone(phone)
+            # The session is used sequentially, never concurrently: perform
+            # the potentially large query and rollback in the worker before
+            # awaiting SMS, keeping both DB locks and blocking I/O off the loop.
+            binding = await run_in_threadpool(self._snapshot_phone_binding, db, normalized) if normalized else None
+            self._schedule_phone_reset(normalized, binding)
         except Exception as e:
-            logger.error(
-                "Error initiating phone reset: %s",
-                mask_pii_text(str(e)),
-                extra={"has_recipient": True},
-            )
-            return {
-                "success": False,
-                "error": "Внутренняя ошибка, попробуйте позже",
-                "error_code": "INTERNAL_ERROR",
-            }
+            await run_in_threadpool(db.rollback)
+            logger.error("Error initiating phone reset: %s", type(e).__name__)
+        return {
+            "success": True,
+            "message": _PHONE_RESET_GENERIC_MESSAGE,
+            "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
+        }
 
     async def initiate_email_reset(self, db: Session, email: str) -> dict[str, Any]:
         """Инициация сброса пароля по email"""
@@ -299,41 +362,40 @@ class PasswordResetService:
     ) -> dict[str, Any]:
         """Верификация телефона и получение токена сброса"""
         try:
+            normalized = self._accepted_reset_phone(phone)
+            if not normalized:
+                return {"success": False, "error": "Код не найден или истек", "error_code": "CODE_NOT_FOUND"}
             # Проверяем код верификации
-            verification_result = self.phone_verification.verify_code(
-                phone=phone, code=verification_code, purpose="password_reset",
+            verification_result = await run_in_threadpool(
+                self.phone_verification.verify_code,
+                phone=normalized, code=verification_code, purpose="password_reset",
                 include_account_binding=True,
             )
 
             if not verification_result["success"]:
-                return verification_result
+                # A missing, wrong, expired or exhausted proof must not reveal
+                # whether a verification was ever issued for this number.
+                return {"success": False, "error": "Код не найден или истек", "error_code": "CODE_NOT_FOUND"}
 
             binding = verification_result.get("account_binding")
             if (not isinstance(binding, tuple) or len(binding) != 2
-                or type(binding[0]) is not int or type(binding[1]) is not int):
+                or type(binding[0]) is not int or type(binding[1]) is not int
+                or not self._proof_live(verification_result.get("expires_monotonic"))):
                 return {"success": False, "error": "Код не найден или истек", "error_code": "CODE_NOT_FOUND"}
-
-            # Проверяем, существует ли пользователь
-            user = crud_user.get_user_by_phone(db, phone=phone)
-            if not user or user.id != binding[0]:
-                return {
-                    "success": False,
-                    "error": "Пользователь не найден",
-                    "error_code": "USER_NOT_FOUND",
-                }
 
             # Генерируем токен сброса
             reset_token = self.generate_reset_token()
-            expires_at = datetime.now() + timedelta(hours=self.token_ttl_hours)
 
             # Сохраняем токен в БД (переживает рестарты/деплои)
-            if not self._store_reset_token(
-                db, reset_token, user.id, expected_epoch=binding[1], expected_phone=phone
+            if not await run_in_threadpool(
+                self._store_reset_token, db, reset_token, binding[0],
+                expected_epoch=binding[1], expected_phone=normalized,
+                proof_expires_monotonic=verification_result["expires_monotonic"],
             ):
                 return {
                     "success": False,
-                    "error": "Пользователь не найден",
-                    "error_code": "USER_NOT_FOUND",
+                    "error": "Код не найден или истек",
+                    "error_code": "CODE_NOT_FOUND",
                 }
 
             logger.info("Reset token generated after phone verification")
@@ -346,7 +408,7 @@ class PasswordResetService:
             }
 
         except Exception as e:
-            db.rollback()
+            await run_in_threadpool(db.rollback)
             logger.error("Error verifying phone and getting token: %s", type(e).__name__)
             return {"success": False, "error": "Внутренняя ошибка", "error_code": "INTERNAL_ERROR"}
 

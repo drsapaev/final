@@ -178,7 +178,10 @@ def upsert_demo_users(db: Session) -> dict[str, Any]:
         UserStatus,
     )
     from app.services.patient_otp_service import normalize_phone
-    from app.services.patient_phone_scope import acquire_phone_scope_lock
+    from app.services.patient_phone_scope import (
+        acquire_phone_scope_lock,
+        canonical_phone_identity,
+    )
     from app.services.token_blacklist_service import revoke_account_sessions_locked
 
     users: dict[str, Any] = {}
@@ -223,7 +226,7 @@ def upsert_demo_users(db: Session) -> dict[str, Any]:
         phone_changed = not is_new and (normalize_phone(old_phone or "") or old_phone) != (normalize_phone(spec.phone) or spec.phone)
         password_changed = not is_new and not verify_password(password, user.hashed_password)
         if phone_changed:
-            for phone in sorted({p for p in (normalize_phone(old_phone or ""), normalize_phone(spec.phone)) if p}):
+            for phone in sorted({p for p in (canonical_phone_identity(old_phone or ""), canonical_phone_identity(spec.phone)) if p}):
                 acquire_phone_scope_lock(db, phone)
         if not is_new and (
             user.username != spec.email or email_changed or phone_changed or password_changed

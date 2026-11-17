@@ -13,7 +13,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
-from app.core.pii_masker import SECRET_FIELD_PATTERNS, mask_pii
+from app.core.pii_masker import (
+    SECRET_FIELD_PATTERNS,
+    is_sensitive_verification_path,
+    mask_pii,
+)
 from app.services.queue_service import (
     QueueConflictError,
     QueueError,
@@ -29,7 +33,7 @@ logger = logging.getLogger(__name__)
 _VALIDATION_INPUT_PREVIEW_LEN = 256
 
 
-def _sanitize_validation_errors(errors: list) -> list:
+def _sanitize_validation_errors(errors: list, *, sensitive_verification: bool = False) -> list:
     """Scrub rejected raw inputs out of RequestValidationError details.
 
     Pydantic v2 embeds the offending value under the "input" key of each
@@ -45,35 +49,48 @@ def _sanitize_validation_errors(errors: list) -> list:
             sanitized.append(err)
             continue
         item = dict(err)
-        loc = item.get("loc") or ()
-        loc_tail = str(loc[-1]).lower() if loc else ""
-        if "input" in item:
-            if loc_tail in SECRET_FIELD_PATTERNS:
+        if sensitive_verification:
+            # These bodies carry one-time proofs or arbitrary SMS content.
+            # A Pydantic error may attach a whole body or validator text.
+            if "input" in item:
                 item["input"] = "[REDACTED]"
-            else:
-                value = item["input"]
-                if isinstance(value, (bytes, bytearray)):
-                    # PR-6 round 10 (codex P1): non-JSON content types hand
-                    # Pydantic the raw body as BYTES - decode it and let it
-                    # flow through the same scrub-and-bound string path, so a
-                    # form-encoded credential cannot reach the 422 response or
-                    # the warning log.
-                    value = bytes(value).decode("utf-8", errors="replace")
-                if isinstance(value, str):
-                    # PR-6 round 9 (codex P2): scrub EVERY string input
-                    # before any length bound - a double-serialized body
-                    # arrives as a SHORT string whose embedded credential
-                    # would otherwise be echoed verbatim in the 422 (the
-                    # retained prefix of a long input could too).
-                    value = mask_pii(value)
-                    if len(value) > _VALIDATION_INPUT_PREVIEW_LEN:
-                        item["input"] = (
-                            value[:_VALIDATION_INPUT_PREVIEW_LEN] + "...[TRUNCATED]"
-                        )
-                    else:
-                        item["input"] = value
-                elif isinstance(value, (dict, list)):
-                    item["input"] = mask_pii(value)
+            item["msg"] = "Invalid verification request"
+            item.pop("ctx", None)
+            sanitized.append(item)
+            continue
+        loc = item.get("loc") or ()
+        loc_tail = str(loc[-1]).lower().replace("-", "_") if loc else ""
+        if loc_tail in SECRET_FIELD_PATTERNS:
+            if "input" in item:
+                item["input"] = "[REDACTED]"
+            item["msg"] = "Invalid sensitive value"
+            item.pop("ctx", None)
+            sanitized.append(item)
+            continue
+        if "input" in item:
+            value = item["input"]
+            if isinstance(value, (bytes, bytearray)):
+                # PR-6 round 10 (codex P1): non-JSON content types hand
+                # Pydantic the raw body as BYTES - decode it and let it
+                # flow through the same scrub-and-bound string path, so a
+                # form-encoded credential cannot reach the 422 response or
+                # the warning log.
+                value = bytes(value).decode("utf-8", errors="replace")
+            if isinstance(value, str):
+                # PR-6 round 9 (codex P2): scrub EVERY string input
+                # before any length bound - a double-serialized body
+                # arrives as a SHORT string whose embedded credential
+                # would otherwise be echoed verbatim in the 422 (the
+                # retained prefix of a long input could too).
+                value = mask_pii(value)
+                if len(value) > _VALIDATION_INPUT_PREVIEW_LEN:
+                    item["input"] = (
+                        value[:_VALIDATION_INPUT_PREVIEW_LEN] + "...[TRUNCATED]"
+                    )
+                else:
+                    item["input"] = value
+            elif isinstance(value, (dict, list)):
+                item["input"] = mask_pii(value)
         sanitized.append(item)
     return sanitized
 
@@ -277,7 +294,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         value under "input" - a credential field would leak its plaintext
         into logs and the 422 response. Sanitized before both uses.
         """
-        safe_errors = _sanitize_validation_errors(exc.errors())
+        safe_errors = _sanitize_validation_errors(
+            exc.errors(), sensitive_verification=is_sensitive_verification_path(request.url.path)
+        )
         logger.warning(
             "RequestValidationError: %s (path: %s)",
             str(safe_errors),
