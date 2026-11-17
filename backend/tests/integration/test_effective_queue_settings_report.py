@@ -549,8 +549,8 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    # Head pin follows the sensitive 2FA reauthentication migration.
-    assert revision == "0097_two_factor_sensitive_totp"
+    # Head pin follows the notification template uniqueness migration.
+    assert revision == "0098_notify_template_unique"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

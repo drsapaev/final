@@ -14,6 +14,7 @@ from app.services.notifications_pkg._base import (
     crud_notification_history,
     crud_notification_template,
     datetime,
+    escape,
     logger,
 )
 from app.services.notifications_pkg._helpers import (
@@ -45,6 +46,9 @@ class TemplatedMixin(NotificationSenderMixinBase):
             fallback="notification",
         )
 
+        if channel == "telegram" and (recipient_id is None or recipient_type != "patient"):
+            return None
+
         recipient_user = None
         if recipient_id is not None:
             from app.models.patient import Patient
@@ -59,25 +63,18 @@ class TemplatedMixin(NotificationSenderMixinBase):
             else:
                 recipient_user = db.query(User).filter(User.id == recipient_id).first()
 
-            if channel in {"email", "sms"} and not self._channel_opted_in(
+            if channel in {"email", "sms", "telegram"} and not self._channel_opted_in(
                 db=db,
                 user_id=recipient_user.id if recipient_user is not None else None,
                 channel=channel,
                 event_type=canonical_notification_type,
             ):
                 logger.info(
-                    "Templated notification skipped by recipient preference",
-                    extra={"channel": channel, "notification_type": canonical_notification_type},
+                    "Templated notification skipped by recipient preference"
                 )
                 return None
 
             if channel == "telegram":
-                if recipient_type != "patient":
-                    logger.info(
-                        "Templated Telegram notification requires a linked patient chat",
-                        extra={"notification_type": canonical_notification_type},
-                    )
-                    return None
                 telegram_user = (
                     db.query(TelegramUser)
                     .filter(
@@ -92,13 +89,12 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 if telegram_user is None:
                     return None
                 from app.services.notifications_pkg._helpers import (
-                    PATIENT_TELEGRAM_EVENT_PREFERENCES,
+                    _patient_telegram_preferences_enabled,
                 )
 
-                preference_field = PATIENT_TELEGRAM_EVENT_PREFERENCES.get(
-                    canonical_notification_type, "notifications_enabled"
-                )
-                if not bool(getattr(telegram_user, preference_field, False)):
+                if not _patient_telegram_preferences_enabled(
+                    telegram_user, canonical_notification_type
+                ):
                     return None
                 recipient_contact = str(telegram_user.chat_id)
         template_lookup_types = [canonical_notification_type]
@@ -115,19 +111,38 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 break
 
         if not template:
-            logger.warning(
-                f"Шаблон не найден: {canonical_notification_type}/{channel}"
-            )
+            logger.warning("Notification template not found")
             # Используем базовый шаблон
             subject = template_data.get("subject", "Уведомление")
             content = template_data.get("message", "Сообщение")
+            if channel == "telegram":
+                content = escape(str(content))
         else:
             subject = (
-                self.render_template(template.subject or "", template_data)
+                self.render_template(template.subject, template_data, html=False)
                 if template.subject
                 else None
             )
-            content = self.render_template(template.template, template_data)
+            content = self.render_template(
+                template.template, template_data, html=channel not in {"email", "sms"}
+            )
+            if content is None or (template.subject and subject is None):
+                # No source, recipient contact, template data or exception details
+                # are persisted when rendering fails.
+                failure = NotificationHistoryCreate(
+                    recipient_type=recipient_type,
+                    recipient_id=None,
+                    recipient_contact="",
+                    notification_type=canonical_notification_type,
+                    channel=channel,
+                    template_id=template.id,
+                    subject=None,
+                    content="",
+                    status="failed",
+                    error_message="Notification template rendering failed",
+                    notification_metadata={},
+                )
+                return crud_notification_history.create(db, obj_in=failure)
 
         # Создаем запись в истории
         history_data = NotificationHistoryCreate(
@@ -189,11 +204,11 @@ class TemplatedMixin(NotificationSenderMixinBase):
             elif channel == "telegram":
                 success = await self.send_telegram(content, recipient_contact)
             else:
-                error_message = f"Неподдерживаемый канал: {channel}"
+                error_message = "Unsupported notification channel"
 
-        except Exception as e:
-            error_message = str(e)
-            logger.error(f"Ошибка отправки уведомления: {e}")
+        except Exception:
+            error_message = "Notification delivery failed"
+            logger.error("Notification delivery failed")
 
         # Обновляем статус в истории
         status = "sent" if success else "failed"

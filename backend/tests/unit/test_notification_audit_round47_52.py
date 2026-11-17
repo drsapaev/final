@@ -905,8 +905,7 @@ def test_notification_template_rendering_uses_sandboxed_jinja():
     service = NotificationSenderService()
     output = service.render_template("{{ ''.__class__.__mro__ }}", {})
 
-    assert "object" not in output
-    assert "tuple" not in output
+    assert output is None
 
 
 @pytest.mark.asyncio

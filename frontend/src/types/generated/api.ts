@@ -19365,7 +19365,10 @@ export type paths = {
         put?: never;
         /**
          * Send Notification
-         * @description Отправка уведомления с использованием шаблона
+         * @description Поставить попытки отправки в фон; ответ не подтверждает доставку.
+         *
+         *     При ошибке рендеринга шаблона сообщение не отправляется, а попытка
+         *     отмечается как неудачная в истории уведомлений.
          */
         post: operations["send_notification_api_v1_notifications_send_post"];
         delete?: never;
@@ -34116,17 +34119,17 @@ export type components = {
         /** NotificationTemplateUpdate */
         NotificationTemplateUpdate: {
             /** Name */
-            name?: string | null;
+            name?: string;
             /** Type */
-            type?: string | null;
+            type?: string;
             /** Channel */
-            channel?: string | null;
+            channel?: string;
             /** Subject */
             subject?: string | null;
             /** Template */
-            template?: string | null;
+            template?: string;
             /** Is Active */
-            is_active?: boolean | null;
+            is_active?: boolean;
         };
         /** NotificationUnreadCountResponse */
         NotificationUnreadCountResponse: {
@@ -80432,14 +80435,43 @@ export interface operations {
                     "application/json": components["schemas"]["NotificationTemplate"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Конфликт шаблона */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Ошибка валидации запроса */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": {
+                        error: string;
+                        message: string;
+                        detail: Record<string, never>[];
+                    };
                 };
+            };
+            /** @description Ошибка обработки или базы данных */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Сервис базы данных недоступен */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -80467,14 +80499,56 @@ export interface operations {
                     "application/json": components["schemas"]["NotificationTemplate"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Шаблон не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Конфликт шаблона */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Ошибка валидации запроса или полей шаблона */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": {
+                        error: string;
+                        message: string;
+                        detail: Record<string, never>[];
+                    } | {
+                        detail: string;
+                    };
                 };
+            };
+            /** @description Ошибка обработки или базы данных */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Сервис базы данных недоступен */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
