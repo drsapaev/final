@@ -8,6 +8,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 
 from app.services.auth_svc._base import *  # noqa: F401, F403
 from app.services.auth_svc._base import AuthenticationServiceMixinBase
@@ -35,72 +36,15 @@ def _matches_email_verification_token(user: User, token: str) -> bool:
 class AuthMixin(AuthenticationServiceMixinBase):
     """Auth methods."""
 
-    def create_password_reset_token(
-        self, db: Session, email: str, ip_address: str = None, user_agent: str = None
-    ) -> dict[str, Any]:
-        """Создает токен для сброса пароля"""
-        try:
-            user = (
-                db.query(User).filter(User.email == email)
-                .with_for_update(key_share=True).populate_existing().first()
-            )
-            if not user or not user.is_active:
-                db.rollback()
-                return {
-                    "success": False,
-                    "message": "Пользователь с таким email не найден",
-                }
-
-            # Отзываем старые токены
-            db.query(PasswordResetToken).filter(
-                and_(
-                    PasswordResetToken.user_id == user.id,
-                    PasswordResetToken.used == False,
-                )
-            ).update({"used": True, "used_at": datetime.now(UTC)})
-
-            # Создаем новый токен
-            token = secrets.token_urlsafe(32)
-            expires_at = datetime.now(UTC) + timedelta(
-                hours=self.password_reset_expire_hours
-            )
-
-            reset_token = PasswordResetToken(
-                user_id=user.id,
-                token=token,
-                expires_at=expires_at,
-                ip_address=ip_address,
-                user_agent=user_agent,
-            )
-            db.add(reset_token)
-            db.commit()
-
-            self._log_user_activity(
-                db,
-                user.id,
-                "password_reset_requested",
-                "Запрос сброса пароля",
-                ip_address,
-                user_agent,
-            )
-
-            return {
-                "success": True,
-                "message": "Токен сброса пароля создан",
-                "token": token,
-                "expires_at": expires_at,
-            }
-
-        except Exception as e:
-            db.rollback()
-            logger.error("Error creating password reset token: %s", type(e).__name__)
-            return {"success": False, "message": "Ошибка создания токена сброса пароля"}
-
-
     def reset_password(
         self, db: Session, token: str, new_password: str
     ) -> dict[str, Any]:
         """Сбрасывает пароль пользователя"""
+        # This legacy issuer used token_urlsafe(32): exactly 43 base64url
+        # characters. Canonical rows store 64-character SHA-256 digests in
+        # the same table, which must never be accepted as bearer credentials.
+        if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", token):
+            return {"success": False, "message": "Недействительный или истекший токен"}
         try:
             # Проверяем токен
             reset_token = (

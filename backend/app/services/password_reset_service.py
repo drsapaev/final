@@ -8,7 +8,9 @@ import logging
 import math
 import secrets
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from threading import BoundedSemaphore
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -47,6 +49,47 @@ _PHONE_RESET_GENERIC_MESSAGE = (
 _PHONE_CODE_TTL_MINUTES = 5
 _PHONE_RESET_MAX_PENDING = 128
 _PHONE_RESET_TASKS: set[asyncio.Task] = set()
+_EMAIL_RESET_PENDING = BoundedSemaphore(32)
+_EMAIL_RESET_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="reset-email")
+_ANY_EMAIL_BINDING = object()
+
+
+def _dispatch_email_reset(email: str, binding: tuple[int, int] | None) -> None:
+    """Run delivery off the request loop with a private, short-lived session."""
+    from app.db.session import SessionLocal
+
+    try:
+        with SessionLocal() as db:
+            asyncio.run(get_password_reset_service().initiate_email_reset(
+                db, email, expected_binding=binding
+            ))
+    except Exception as exc:
+        # Neither the address nor the exception message belongs in logs.
+        logger.error("Password reset delivery failed: %s", type(exc).__name__)
+
+
+def schedule_email_reset(email: str, binding: tuple[int, int] | None) -> bool:
+    """Queue either kind of address without revealing account existence.
+
+    Slots include queued and running workers and are released only when the
+    underlying worker exits, including if the HTTP request is cancelled.
+    """
+    slots = _EMAIL_RESET_PENDING
+    if not slots.acquire(blocking=False):
+        logger.warning("Password reset delivery queue is full")
+        return False
+    try:
+        future = _EMAIL_RESET_EXECUTOR.submit(_dispatch_email_reset, email, binding)
+    except Exception as exc:
+        slots.release()
+        logger.error("Password reset delivery scheduling failed: %s", type(exc).__name__)
+        return False
+    future.add_done_callback(lambda _: slots.release())
+    return True
+
+
+class EmailResetUnavailable(Exception):
+    """Infrastructure could not accept an email reset request."""
 
 
 class PasswordResetService:
@@ -60,6 +103,22 @@ class PasswordResetService:
     def generate_reset_token(self) -> str:
         """Генерация токена сброса пароля"""
         return secrets.token_urlsafe(32)
+
+    @staticmethod
+    def snapshot_email_binding(db: Session, email: str) -> tuple[int, int] | None:
+        """Bind dispatch to the account state observed before acknowledgement."""
+        try:
+            user = crud_user.get_user_by_email(db, email=email)
+            return (user.id, user.auth_epoch) if user and user.is_active else None
+        except Exception as exc:
+            logger.error("Password reset lookup failed: %s", type(exc).__name__)
+            raise EmailResetUnavailable from exc
+        finally:
+            try:
+                db.rollback()
+            except Exception as exc:
+                logger.error("Password reset lookup cleanup failed: %s", type(exc).__name__)
+                raise EmailResetUnavailable from exc
 
     # Хранение в password_reset_tokens (было: dict в памяти процесса —
     # каждый рестарт/деплой убивал все высланные ссылки, TOKEN_NOT_FOUND).
@@ -227,12 +286,14 @@ class PasswordResetService:
             "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
         }
 
-    async def initiate_email_reset(self, db: Session, email: str) -> dict[str, Any]:
+    async def initiate_email_reset(
+        self, db: Session, email: str, *, expected_binding: object = _ANY_EMAIL_BINDING
+    ) -> dict[str, Any]:
         """Инициация сброса пароля по email"""
         try:
             # Проверяем, существует ли пользователь с таким email
-            user = crud_user.get_user_by_email(db, email=email)
-            if not user:
+            user = crud_user.get_user_by_email(db, email=email) if expected_binding is not None else None
+            if not user or (expected_binding is not _ANY_EMAIL_BINDING and (user.id, user.auth_epoch) != expected_binding):
                 # Не раскрываем информацию о существовании пользователя:
                 # одинаковая форма ответа для всех исходов.
                 return {
