@@ -24212,6 +24212,8 @@ export type components = {
              * @description Предупреждения
              */
             warnings?: string[];
+            /** @description Server-owned safety boundary for medical AI suggestions */
+            ai_safety_meta: components["schemas"]["MedicalAISafetyMeta"];
             /**
              * Requires Doctor Confirmation
              * @description Врач должен подтвердить предложение AI перед внесением в ЭМК
@@ -24326,8 +24328,9 @@ export type components = {
             /**
              * Requiresdoctorconfirmation
              * @default true
+             * @constant
              */
-            requiresDoctorConfirmation: boolean;
+            requiresDoctorConfirmation: true;
         };
         /**
          * AISystemSettings
@@ -33219,6 +33222,37 @@ export type components = {
             notes?: string | null;
         };
         /**
+         * MedicalAIListResponse
+         * @description Envelope collections, including empty lists, with explicit safety metadata.
+         */
+        MedicalAIListResponse: {
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            }[];
+            ai_safety_meta: components["schemas"]["MedicalAISafetyMeta"];
+        };
+        /**
+         * MedicalAIResultResponse
+         * @description Preserve existing response fields while requiring server-owned safety metadata.
+         */
+        MedicalAIResultResponse: {
+            ai_safety_meta: components["schemas"]["MedicalAISafetyMeta"];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * MedicalAISafetyMeta
+         * @description A medical suggestion always requires an explicit doctor's review.
+         */
+        MedicalAISafetyMeta: {
+            /**
+             * Requires Doctor Confirmation
+             * @constant
+             */
+            requires_doctor_confirmation: true;
+        };
+        /**
          * MedicalDocumentRequest
          * @description Запрос на печать медицинского документа
          */
@@ -41137,6 +41171,7 @@ export type components = {
         SuggestResponseV2: {
             /** Suggestions */
             suggestions: components["schemas"]["AISuggestionV2"][];
+            ai_safety_meta: components["schemas"]["MedicalAISafetyMeta"];
             /**
              * Model
              * @default mock
@@ -59679,9 +59714,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59714,9 +59747,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59749,9 +59780,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59784,9 +59813,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59819,9 +59846,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59887,9 +59912,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59958,9 +59981,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59993,9 +60014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    }[];
+                    "application/json": components["schemas"]["MedicalAIListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60028,9 +60047,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60063,9 +60080,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60098,9 +60113,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61451,9 +61464,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61484,9 +61495,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61552,9 +61561,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61590,9 +61597,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61660,9 +61665,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61697,9 +61700,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61766,9 +61767,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61801,9 +61800,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61869,9 +61866,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["MedicalAIListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69647,9 +69642,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69682,9 +69675,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69715,9 +69706,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69753,9 +69742,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69788,9 +69775,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69826,9 +69811,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69993,7 +69976,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -70029,7 +70012,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -70063,7 +70046,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -70096,7 +70079,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -70161,7 +70144,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
