@@ -16415,7 +16415,7 @@ export type paths = {
         };
         /**
          * Validate Reset Token
-         * @description Проверка валидности токена сброса пароля
+         * @description Validate a reset token; query transport is retained for older clients.
          */
         get: operations["validate_reset_token_api_v1_password_reset_validate_token_get"];
         put?: never;
@@ -39616,6 +39616,11 @@ export type components = {
             size?: number | null;
             /** Error */
             error?: string | null;
+        };
+        /** ResetTokenErrorResponse */
+        ResetTokenErrorResponse: {
+            /** Detail */
+            detail: string;
         };
         /**
          * RestoreRequest
@@ -75516,11 +75521,17 @@ export interface operations {
     };
     validate_reset_token_api_v1_password_reset_validate_token_get: {
         parameters: {
-            query: {
-                /** @description Токен сброса пароля */
-                token: string;
+            query?: {
+                /**
+                 * @deprecated
+                 * @description Legacy reset token transport
+                 */
+                token?: string | null;
             };
-            header?: never;
+            header?: {
+                /** @description Reset token */
+                "X-Reset-Token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -75529,12 +75540,50 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Missing or ambiguous token */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
+            /** @description Token not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
+            /** @description Token already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
+            /** @description Token expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -75544,6 +75593,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
+            /** @description Validation temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
                 };
             };
         };
@@ -81760,6 +81827,30 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Activation attempt budget exceeded */
+            429: {
+                headers: {
+                    /** @description Seconds until retry */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Activation temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
         };
     };
     activation_status_api_v1_activation_status_get: {
@@ -81938,6 +82029,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Activation attempt budget exceeded */
+            429: {
+                headers: {
+                    /** @description Seconds until retry */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Activation temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };

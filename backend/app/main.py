@@ -391,6 +391,7 @@ if not CORS_DISABLE:
             "X-Request-ID",
             "Idempotency-Key",
             "X-CSRF-Token",
+            "X-Reset-Token",
         ],
     }
     if CORS_ALLOW_ALL:
@@ -403,6 +404,16 @@ if not CORS_DISABLE:
         log.info("[FIX:CORS] CORS middleware enabled for origins: %s", CORS_ORIGINS)
 else:
     log.warning("[FIX:CORS] CORS middleware is disabled via CORS_DISABLE=1")
+
+
+@app.middleware("http")
+async def password_reset_no_store(request, call_next):
+    """Apply outside CORS/security short circuits as well as route handlers."""
+    response = await call_next(request)
+    reset_path = f"{API_V1_STR.rstrip('/')}/password-reset/".lower()
+    if request.url.path.lower().rstrip("/").startswith(reset_path):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 # -----------------------------------------------------------------------------
 # PR-30 / High-10: Real auth imports are mandatory in every environment.

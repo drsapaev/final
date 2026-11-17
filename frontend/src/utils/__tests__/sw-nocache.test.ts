@@ -20,6 +20,8 @@ type SWRequest = {
 
 type SWInternals = {
   handleRequest: (request: SWRequest) => Promise<Response>;
+  purgeSensitiveEntries: () => Promise<void>;
+  handlers: Map<string, (event: { data?: unknown; waitUntil: (value: Promise<unknown>) => void }) => void>;
   networkFirst: (
     request: SWRequest,
     cacheName: string,
@@ -35,13 +37,13 @@ const TEMPLATE_PATH = path.resolve(process.cwd(), 'sw.template.js');
 
 type CacheStubs = {
   put: ReturnType<typeof vi.fn>;
-  caches: { open: ReturnType<typeof vi.fn>; match: ReturnType<typeof vi.fn> };
+  caches: { open: ReturnType<typeof vi.fn>; match: ReturnType<typeof vi.fn>; keys: ReturnType<typeof vi.fn> };
 };
 
 function makeCacheStubs(): CacheStubs {
   const put = vi.fn();
-  const cache = { put, match: vi.fn(async () => undefined) };
-  return { put, caches: { open: vi.fn(async () => cache), match: vi.fn(async () => undefined) } };
+  const cache = { put, match: vi.fn(async () => undefined), delete: vi.fn(), keys: vi.fn(async () => []) };
+  return { put, caches: { open: vi.fn(async () => cache), match: vi.fn(async () => undefined), keys: vi.fn(async () => []) } };
 }
 
 function compileSW(
@@ -56,16 +58,18 @@ function compileSW(
     'clients',
     'console',
     'fetch',
-    `${code}\nreturn { handleRequest, networkFirst, isNoCachePath, syncClinicData, staticFiles: STATIC_FILES };`,
+    `${code}\nreturn { handleRequest, networkFirst, isNoCachePath, purgeSensitiveEntries, syncClinicData, staticFiles: STATIC_FILES };`,
   );
-  return factory(
-    { addEventListener: vi.fn(), skipWaiting: vi.fn(), registration: {} },
+  const handlers = new Map();
+  const result = factory(
+    { addEventListener: (name: string, handler: unknown) => { if (!handlers.has(name)) handlers.set(name, handler); }, skipWaiting: vi.fn(), registration: {}, clients: { claim: vi.fn() } },
     cachesStub,
     { origin: 'https://clinic.test' },
     {},
     { log: vi.fn(), warn: vi.fn(), error: vi.fn() },
     fetchImpl,
-  ) as SWInternals;
+  );
+  return { ...result, handlers } as SWInternals;
 }
 
 const okResponse = () => ({ ok: true, clone() { return this; } });
@@ -218,5 +222,202 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
       return typeof req === 'string' ? req : (req.url ?? '');
     });
     expect(putUrls).not.toContain('/api/v1/auth/me');
+  });
+
+  it.each([
+    '/reset-password?token=SYNTHETIC_SECRET',
+    '/RESET-PASSWORD/?token=SYNTHETIC_SECRET',
+    '/%72eset-password?token=SYNTHETIC_SECRET',
+    '/api/v1/password-reset/validate-token',
+    '/api/v1/password-reset/fake.js',
+    '/confirm-visit?%74oken=SYNTHETIC_SECRET',
+  ])('never persists or replays a sensitive request: %s', async (pathname) => {
+    const request = {
+      url: `https://clinic.test${pathname}`,
+      method: 'GET', mode: 'cors', headers: new Headers(),
+    };
+    const stubs = makeCacheStubs();
+    const online = compileSW(vi.fn(async () => new Response('network')), stubs.caches);
+    expect(await (await online.handleRequest(request)).text()).toBe('network');
+    expect(stubs.put).not.toHaveBeenCalled();
+
+    stubs.caches.match = vi.fn(async () => new Response('STALE_OTHER_PATIENT'));
+    const offline = compileSW(vi.fn(async () => { throw new Error('offline'); }), stubs.caches);
+    const response = await offline.handleRequest(request);
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain('STALE_OTHER_PATIENT');
+    expect(stubs.caches.match).not.toHaveBeenCalled();
+  });
+
+  it('never caches or replays an alternate endpoint carrying a reset-token header', async () => {
+    const stubs = makeCacheStubs();
+    stubs.caches.match = vi.fn(async () => new Response('OTHER_TOKEN_RESPONSE'));
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response('LIVE'))
+      .mockRejectedValueOnce(new Error('offline'));
+    const sw = compileSW(fetchImpl, stubs.caches);
+    const request = {
+      url: 'https://clinic.test/api/v1/alternate', method: 'GET', mode: 'cors',
+      headers: new Headers({ 'X-Reset-Token': 'SYNTHETIC_PROOF' }),
+    };
+    expect(await (await sw.handleRequest(request)).text()).toBe('LIVE');
+    expect((await sw.handleRequest(request)).status).toBe(503);
+    expect(stubs.put).not.toHaveBeenCalled();
+    expect(stubs.caches.match).not.toHaveBeenCalled();
+  });
+
+  it('uses only the generic offline page for a sensitive navigation', async () => {
+    const stubs = makeCacheStubs();
+    stubs.caches.match = vi.fn(async (key: unknown) =>
+      key === '/offline.html' ? new Response('OFFLINE_PAGE') : new Response('STALE_RESET_PAGE'));
+    const sw = compileSW(vi.fn(async () => { throw new Error('offline'); }), stubs.caches);
+    const response = await sw.handleRequest({
+      url: 'https://clinic.test/reset-password?token=SYNTHETIC_SECRET',
+      method: 'GET', mode: 'navigate', headers: new Headers({ accept: 'text/html' }),
+    });
+    expect(await response.text()).toBe('OFFLINE_PAGE');
+    expect(stubs.caches.match).toHaveBeenCalledTimes(1);
+    expect(stubs.caches.match).toHaveBeenCalledWith('/offline.html');
+  });
+
+  it('purges only previously stored credential-bearing entries from clinic caches', async () => {
+    const stubs = makeCacheStubs();
+    const entries = [
+      new Request('https://clinic.test/reset-password?token=SYNTHETIC_SECRET'),
+      new Request('https://clinic.test/api/v1/password-reset/validate-token'),
+      new Request('https://clinic.test/confirm-visit?%74oken=SYNTHETIC_SECRET'),
+      new Request('https://clinic.test/api/v1/patients'),
+    ];
+    const remove = vi.fn(async (_request: Request) => true);
+    stubs.caches.keys = vi.fn(async () => ['clinic-offline-queue', 'clinic-offline-data', 'other-app']);
+    stubs.caches.open = vi.fn(async () => ({ keys: async () => entries, delete: remove }));
+    const sw = compileSW(vi.fn(), stubs.caches);
+    let activation: Promise<unknown> | undefined;
+    sw.handlers.get('activate')?.({ waitUntil: (promise) => { activation = promise; } });
+    expect(activation).toBeDefined();
+    await activation;
+    expect(stubs.caches.open).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledTimes(6);
+    expect(remove.mock.calls.map(([request]) => request.url)).not.toContain(entries[3].url);
+  });
+
+  it('honors no-store responses and removes an older copy', async () => {
+    const stubs = makeCacheStubs();
+    const remove = vi.fn(async () => true);
+    stubs.caches.keys = vi.fn(async () => ['clinic-dynamic-current']);
+    stubs.caches.open = vi.fn(async () => ({ delete: remove, put: stubs.put }));
+    const sw = compileSW(vi.fn(async () => new Response('fresh', {
+      headers: { 'Cache-Control': 'private, no-store' },
+    })), stubs.caches);
+    const request = { url: 'https://clinic.test/api/v1/patients', headers: new Headers() };
+    const response = await sw.networkFirst(request, 'DYNAMIC_CACHE');
+    expect(response.ok).toBe(true);
+    expect(stubs.put).not.toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledWith(request, { ignoreVary: true });
+  });
+
+  it('returns a successful live response when writing the cache fails', async () => {
+    const stubs = makeCacheStubs();
+    stubs.put.mockRejectedValue(new Error('quota'));
+    stubs.caches.match = vi.fn(async () => new Response('STALE'));
+    const sw = compileSW(vi.fn(async () => new Response('LIVE')), stubs.caches);
+    const response = await sw.handleRequest({
+      url: 'https://clinic.test/api/v1/patients', mode: 'cors', headers: new Headers(),
+    });
+    expect(await response.text()).toBe('LIVE');
+  });
+
+  it('returns a successful live static response when writing the cache fails', async () => {
+    const stubs = makeCacheStubs();
+    stubs.put.mockRejectedValue(new Error('quota'));
+    const sw = compileSW(vi.fn(async () => new Response('LIVE_ASSET')), stubs.caches);
+    const response = await sw.handleRequest({
+      url: 'https://clinic.test/assets/app.js', mode: 'cors', headers: new Headers(),
+    });
+    expect(await response.text()).toBe('LIVE_ASSET');
+  });
+
+  it('returns a live no-store response when eviction fails and refuses later stale fallback', async () => {
+    const stubs = makeCacheStubs();
+    stubs.caches.keys = vi.fn(async () => ['clinic-dynamic-current']);
+    stubs.caches.open = vi.fn(async () => ({ delete: vi.fn(async () => { throw new Error('unavailable'); }) }));
+    stubs.caches.match = vi.fn(async () => new Response('STALE'));
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response('LIVE', { headers: { 'Cache-Control': 'no-store' } }))
+      .mockRejectedValueOnce(new Error('offline'));
+    const sw = compileSW(fetchImpl, stubs.caches);
+    const request = { url: 'https://clinic.test/api/v1/patients', mode: 'cors', headers: new Headers() };
+    expect(await (await sw.handleRequest(request)).text()).toBe('LIVE');
+    const offline = await sw.handleRequest(request);
+    expect(offline.status).toBe(503);
+    expect(stubs.caches.match).not.toHaveBeenCalled();
+  });
+
+  it('finishes activation with fallback disabled if old cache cleanup fails', async () => {
+    const stubs = makeCacheStubs();
+    stubs.caches.keys = vi.fn(async () => ['clinic-offline-data']);
+    stubs.caches.open = vi.fn(async () => { throw new Error('unavailable'); });
+    stubs.caches.match = vi.fn(async () => new Response('STALE'));
+    const sw = compileSW(vi.fn(async () => { throw new Error('offline'); }), stubs.caches);
+    let activation: Promise<unknown> | undefined;
+    sw.handlers.get('activate')?.({ waitUntil: (promise) => { activation = promise; } });
+    await expect(activation).resolves.toBeUndefined();
+    const offline = await sw.handleRequest({
+      url: 'https://clinic.test/api/v1/patients', mode: 'cors', headers: new Headers(),
+    });
+    expect(offline.status).toBe(503);
+    expect(stubs.caches.match).not.toHaveBeenCalled();
+  });
+
+  it('honors no-store while pre-caching installation assets', async () => {
+    const stubs = makeCacheStubs();
+    const remove = vi.fn(async () => true);
+    stubs.caches.keys = vi.fn(async () => ['clinic-static-current']);
+    stubs.caches.open = vi.fn(async () => ({ delete: remove, put: stubs.put }));
+    const sw = compileSW(vi.fn(async (url: string) => new Response('data', {
+      headers: url === '/dashboard' ? { 'Cache-Control': 'no-store' } : {},
+    })), stubs.caches);
+    let install: Promise<unknown> | undefined;
+    sw.handlers.get('install')?.({ waitUntil: (promise) => { install = promise; } });
+    await install;
+    expect(stubs.put.mock.calls.map(([url]) => url)).not.toContain('/dashboard');
+    expect(stubs.put.mock.calls.map(([url]) => url)).toContain('/offline.html');
+    expect(remove).toHaveBeenCalledWith('/dashboard', { ignoreVary: true });
+  });
+
+  it('evicts an old background sync response when the fresh response says no-store', async () => {
+    const stubs = makeCacheStubs();
+    const remove = vi.fn(async () => true);
+    stubs.caches.keys = vi.fn(async () => ['clinic-api-current']);
+    stubs.caches.open = vi.fn(async () => ({ delete: remove, put: stubs.put }));
+    const sw = compileSW(vi.fn(async (url: string) => new Response('data', {
+      headers: url.includes('/queue/') ? { 'Cache-Control': 'no-store' } : {},
+    })), stubs.caches);
+    await sw.syncClinicData();
+    expect(remove).toHaveBeenCalledWith('/api/v1/queue/today', { ignoreVary: true });
+    expect(stubs.put.mock.calls.map(([url]) => url)).not.toContain('/api/v1/queue/today');
+    expect(stubs.put.mock.calls.map(([url]) => url)).toContain('/api/v1/mobile/notifications');
+  });
+
+  it('filters sensitive CACHE_URLS messages and no-store responses', async () => {
+    const stubs = makeCacheStubs();
+    const fetched: string[] = [];
+    const sw = compileSW(vi.fn(async (url: string) => {
+      fetched.push(url);
+      return new Response('data', { headers: url.includes('private') ? { 'Cache-Control': 'no-store' } : {} });
+    }), stubs.caches);
+    let finished: Promise<unknown> | undefined;
+    sw.handlers.get('message')?.({
+      data: { type: 'CACHE_URLS', urls: [
+        '/reset-password?token=SYNTHETIC_SECRET',
+        '/api/v1/password-reset/validate-token',
+        '/api/v1/patients', '/api/v1/patients/private',
+      ] },
+      waitUntil: (promise) => { finished = promise; },
+    });
+    await finished;
+    expect(fetched).toEqual(['/api/v1/patients', '/api/v1/patients/private']);
+    expect(stubs.put).toHaveBeenCalledTimes(1);
+    expect(stubs.put.mock.calls[0][0]).toBe('/api/v1/patients');
   });
 });

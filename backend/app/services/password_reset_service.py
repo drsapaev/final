@@ -256,7 +256,7 @@ class PasswordResetService:
                 }
 
             # Формируем ссылку для сброса
-            reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+            reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password#token={reset_token}"
 
             # Отправляем email
             subject = "Сброс пароля"
@@ -477,11 +477,11 @@ class PasswordResetService:
                 return {"success": False, "error": "Токен истек", "error_code": "TOKEN_EXPIRED"}
 
             # Проверяем новый пароль
-            if len(new_password) < 6:
+            if len(new_password) < 8:
                 db.rollback()
                 return {
                     "success": False,
-                    "error": "Пароль должен содержать минимум 6 символов",
+                    "error": "Пароль должен содержать минимум 8 символов",
                     "error_code": "PASSWORD_TOO_SHORT",
                 }
 
@@ -561,8 +561,8 @@ class PasswordResetService:
             }
 
         except Exception as e:
-            logger.error(f"Error validating reset token: {e}")
-            return {"valid": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
+            logger.error("Error validating reset token: %s", type(e).__name__)
+            return {"valid": False, "error": "Внутренняя ошибка", "error_code": "INTERNAL_ERROR"}
 
     def get_statistics(self, db: Session) -> dict[str, Any]:
         """Статистика сброса паролей"""

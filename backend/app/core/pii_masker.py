@@ -122,7 +122,7 @@ IIN_REGEX = re.compile(r"\b(\d{4})\d{6}(\d{4})\b")
 # alternation branches start with disjoint character classes (non-quote-
 # non-backslash vs backslash), so the scan stays linear (no ReDoS).
 JSON_CREDENTIAL_REGEX = re.compile(
-    r'("(?:token|previous_token|device_token|fcm_token|push_token'
+    r'("(?:token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
     r'|web_push_subscription|vapid_private_key|verification[_-]?code'
     r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)"\s*:\s*")((?:[^"\\]|\\.)*)(")',
     re.IGNORECASE,
@@ -133,7 +133,7 @@ JSON_CREDENTIAL_REGEX = re.compile(
 # arrive as "token=<credential>&..." with NO quotes, so the JSON regex above
 # cannot see them. Conservative: only credential-looking keys, never prose.
 FORM_CREDENTIAL_REGEX = re.compile(
-    r'\b(token|previous_token|device_token|fcm_token|push_token'
+    r'\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
     r'|web_push_subscription|vapid_private_key|verification[_-]?code'
     r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=([^\s&]+)',
     re.IGNORECASE,
@@ -176,7 +176,7 @@ FORM_CREDENTIAL_REGEX = re.compile(
 #     unsupported shape is safer to redact entirely than to let a
 #     credential whose '=' sits beyond the window slip through.
 _CREDENTIAL_KEYWORDS = (
-    "token", "web_push_subscription", "vapid", "verification_code", "verification-code",
+    "token", "password", "web_push_subscription", "vapid", "verification_code", "verification-code",
     "verificationcode", "otp_code", "otp-code", "otpcode", "totp_code", "totp-code", "totpcode",
     "backup_code", "backup-code", "backupcode", "otp", "totp",
 )
@@ -256,13 +256,13 @@ def _credential_tail_state(text: str, j: int) -> str:
 # would stop at the first whitespace, so these escape-aware patterns
 # consume the whole quoted value (disjoint alternation branches — linear).
 _PYREPR_SQ_CREDENTIAL_REGEX = re.compile(
-    r"\b(token|previous_token|device_token|fcm_token|push_token"
+    r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
     r'|web_push_subscription|vapid_private_key|verification[_-]?code'
     r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=\'((?:[^\'\\]|\\.)*)\'',
     re.IGNORECASE,
 )
 _PYREPR_DQ_CREDENTIAL_REGEX = re.compile(
-    r'\b(token|previous_token|device_token|fcm_token|push_token'
+    r'\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
     r'|web_push_subscription|vapid_private_key|verification[_-]?code'
     r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)="((?:[^"\\]|\\.)*)"',
     re.IGNORECASE,
@@ -277,6 +277,10 @@ SECRET_FIELD_PATTERNS = (
     # push device registry credentials (PR-6) — request bodies of
     # /api/v1/push/devices/* attach to Sentry events on unhandled 5xx
     "token",
+    "reset_token",
+    "x_reset_token",
+    "password",
+    "new_password",
     "previous_token",
     "device_token",
     "fcm_token",
