@@ -8188,6 +8188,8 @@ const ru = {
     ev_request_success: "Письмо отправлено. Проверьте почту.",
     ev_request_rate_limit: "Слишком много запросов. Подождите и попробуйте снова.",
     ev_request_login: "Сеанс истёк. Войдите снова.",
+    pv_phone_changed_relogin: "Номер телефона обновлён. Войдите снова.",
+    pv_phone_change_uncertain_relogin: "Не удалось подтвердить результат. Войдите снова и проверьте профиль.",
     ev_request_error: "Не удалось отправить письмо. Попробуйте позже.",
     up_email_not_verified: 'Email не подтвержден',
     up_phone_verified: 'Телефон подтвержден',

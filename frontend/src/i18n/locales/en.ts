@@ -8058,6 +8058,8 @@ const en = {
     ev_request_success: "Verification email sent. Check your inbox.",
     ev_request_rate_limit: "Too many requests. Please wait and try again.",
     ev_request_login: "Your session has expired. Please sign in again.",
+    pv_phone_changed_relogin: "Your phone number was updated. Please sign in again.",
+    pv_phone_change_uncertain_relogin: "The result could not be confirmed. Please sign in again and check your profile.",
     ev_request_error: "We could not send the email. Please try again later.",
     up_email_not_verified: 'Email не подтвержден',
     up_phone_verified: 'Телефон подтвержден',

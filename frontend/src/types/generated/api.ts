@@ -16253,13 +16253,13 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
+        get?: never;
+        put?: never;
         /**
          * Get Verification Status
          * @description Получение статуса верификации
          */
-        get: operations["get_verification_status_api_v1_phone_verification_status_get"];
-        put?: never;
-        post?: never;
+        post: operations["get_verification_status_api_v1_phone_verification_status_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16275,12 +16275,12 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        post?: never;
         /**
          * Cancel Verification
          * @description Отмена верификации
          */
-        delete: operations["cancel_verification_api_v1_phone_verification_cancel_delete"];
+        post: operations["cancel_verification_api_v1_phone_verification_cancel_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -24772,6 +24772,28 @@ export type components = {
             /** Subject Key */
             subject_key?: string | null;
         };
+        /** AdminPhoneVerificationSendResponse */
+        AdminPhoneVerificationSendResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Expires In Minutes */
+            expires_in_minutes: number;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** Provider */
+            provider: string | null;
+            /** Phone */
+            phone: string;
+            /** Purpose */
+            purpose: string;
+            /** Sent By Admin */
+            sent_by_admin: string;
+        };
         /** AdminQueueDirection */
         AdminQueueDirection: {
             profile: components["schemas"]["AdminDirectionProfile"];
@@ -24817,6 +24839,21 @@ export type components = {
             /** Directions */
             directions?: components["schemas"]["AdminQueueDirection"][];
             unattached: components["schemas"]["AdminUnattachedCatalog"];
+        };
+        /** AdminSendCodeRequest */
+        AdminSendCodeRequest: {
+            /** Phone */
+            phone: string;
+            /**
+             * Purpose
+             * @default verification
+             * @enum {string}
+             */
+            purpose: "verification" | "phone_change";
+            /** Provider */
+            provider?: string | null;
+            /** Message */
+            message?: string | null;
         };
         /** AdminUnattachedCatalog */
         AdminUnattachedCatalog: {
@@ -36019,6 +36056,98 @@ export type components = {
             /** Is Active */
             is_active: boolean;
         };
+        /** PhoneResetErrorResponse */
+        PhoneResetErrorResponse: {
+            /** Detail */
+            detail: string | components["schemas"]["PhoneResetVerificationFailure"];
+        };
+        /** PhoneResetValidationResponse */
+        PhoneResetValidationResponse: {
+            /** Error */
+            error: string;
+            /** Message */
+            message: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** PhoneResetVerificationFailure */
+        PhoneResetVerificationFailure: {
+            /**
+             * Success
+             * @constant
+             */
+            success: false;
+            /** Error */
+            error: string;
+            /** Error Code */
+            error_code?: string | null;
+            /** Attempts Left */
+            attempts_left?: number | null;
+        };
+        /** PhoneResetVerificationResponse */
+        PhoneResetVerificationResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Reset Token */
+            reset_token: string;
+            /** Expires In Hours */
+            expires_in_hours: number;
+        };
+        /** PhoneVerificationCancelResponse */
+        PhoneVerificationCancelResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+        };
+        /** PhoneVerificationErrorResponse */
+        PhoneVerificationErrorResponse: {
+            /** Detail */
+            detail: string | components["schemas"]["PhoneVerificationFailure"];
+        };
+        /** PhoneVerificationFailure */
+        PhoneVerificationFailure: {
+            /**
+             * Success
+             * @constant
+             */
+            success: false;
+            /** Error */
+            error: string;
+            /** Error Code */
+            error_code?: string | null;
+            /** Attempts Left */
+            attempts_left?: number | null;
+        };
+        /** PhoneVerificationProofResponse */
+        PhoneVerificationProofResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Phone */
+            phone: string;
+            /** Verified At */
+            verified_at: string;
+        };
+        /** PhoneVerificationRateLimitResponse */
+        PhoneVerificationRateLimitResponse: {
+            /** Error */
+            error: string;
+        };
         /**
          * PhoneVerificationRequest
          * @description Запрос на верификацию телефона для сброса пароля
@@ -36028,6 +36157,121 @@ export type components = {
             phone: string;
             /** Verification Code */
             verification_code: string;
+        };
+        /**
+         * PhoneVerificationScope
+         * @description Phone and purpose belong in the request body, never in a URL.
+         */
+        PhoneVerificationScope: {
+            /** Phone */
+            phone: string;
+            /**
+             * Purpose
+             * @default verification
+             * @enum {string}
+             */
+            purpose: "verification" | "phone_change";
+        };
+        /** PhoneVerificationSendResponse */
+        PhoneVerificationSendResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Expires In Minutes */
+            expires_in_minutes: number;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** Provider */
+            provider: string | null;
+        };
+        /** PhoneVerificationSettings */
+        PhoneVerificationSettings: {
+            /** Code Length */
+            code_length: number;
+            /** Ttl Minutes */
+            ttl_minutes: number;
+            /** Max Attempts */
+            max_attempts: number;
+            /** Rate Limit Minutes */
+            rate_limit_minutes: number;
+        };
+        /** PhoneVerificationStatistics */
+        PhoneVerificationStatistics: {
+            /** Total Active Codes */
+            total_active_codes: number;
+            /** Verified Codes */
+            verified_codes: number;
+            /** Pending Codes */
+            pending_codes: number;
+            /** Expiring Soon */
+            expiring_soon: number;
+            /** By Purpose */
+            by_purpose: {
+                [key: string]: number;
+            };
+            /** By Provider */
+            by_provider: {
+                [key: string]: number;
+            };
+            settings: components["schemas"]["PhoneVerificationSettings"];
+        };
+        /** PhoneVerificationStatisticsResponse */
+        PhoneVerificationStatisticsResponse: {
+            statistics: components["schemas"]["PhoneVerificationStatistics"];
+            /** Timestamp */
+            timestamp: string;
+        };
+        /** PhoneVerificationStatusResponse */
+        PhoneVerificationStatusResponse: {
+            /** Exists */
+            exists: boolean;
+            /** Verified */
+            verified: boolean;
+            /** Phone */
+            phone?: string | null;
+            /** Purpose */
+            purpose?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Attempts */
+            attempts?: number | null;
+            /** Max Attempts */
+            max_attempts?: number | null;
+            /** Time Left Minutes */
+            time_left_minutes?: number | null;
+        };
+        /** PhoneVerificationUpdateResponse */
+        PhoneVerificationUpdateResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Phone */
+            phone: string;
+            /** Verified At */
+            verified_at: string;
+            /** Sessions Revoked */
+            sessions_revoked: boolean;
+        };
+        /** PhoneVerificationValidationResponse */
+        PhoneVerificationValidationResponse: {
+            /** Error */
+            error: string;
+            /** Message */
+            message: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * PhraseSuggestRequest
@@ -40076,11 +40320,15 @@ export type components = {
             /**
              * Purpose
              * @default verification
+             * @enum {string}
              */
-            purpose: string;
+            purpose: "verification" | "phone_change";
             /** Provider */
             provider?: string | null;
-            /** Custom Message */
+            /**
+             * Custom Message
+             * @description Must be omitted or null for self-service; use the admin endpoint for custom text.
+             */
             custom_message?: string | null;
         };
         /**
@@ -43854,8 +44102,9 @@ export type components = {
             /**
              * Purpose
              * @default verification
+             * @enum {string}
              */
-            purpose: string;
+            purpose: "verification" | "phone_change";
         };
         /**
          * TelemetryResponse
@@ -74536,21 +74785,75 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationSendResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"] | components["schemas"]["PhoneVerificationRateLimitResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
@@ -74571,93 +74874,217 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationProofResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"] | components["schemas"]["PhoneVerificationRateLimitResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
     };
-    get_verification_status_api_v1_phone_verification_status_get: {
+    get_verification_status_api_v1_phone_verification_status_post: {
         parameters: {
-            query: {
-                /** @description Номер телефона в формате +998XXXXXXXXX */
-                phone: string;
-                /** @description Цель верификации */
-                purpose?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneVerificationScope"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationStatusResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
     };
-    cancel_verification_api_v1_phone_verification_cancel_delete: {
+    cancel_verification_api_v1_phone_verification_cancel_post: {
         parameters: {
-            query: {
-                /** @description Номер телефона в формате +998XXXXXXXXX */
-                phone: string;
-                /** @description Цель верификации */
-                purpose?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneVerificationScope"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationCancelResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
@@ -74678,21 +75105,84 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationUpdateResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"] | components["schemas"]["PhoneVerificationRateLimitResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
@@ -74709,52 +75199,155 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationStatisticsResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
     };
     admin_send_verification_code_api_v1_phone_verification_admin_send_code_post: {
         parameters: {
-            query: {
-                /** @description Номер телефона в формате +998XXXXXXXXX */
-                phone: string;
-                /** @description Цель верификации */
-                purpose?: string;
-                /** @description SMS провайдер */
-                provider?: string | null;
-                /** @description Кастомное сообщение с {code} */
-                message?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSendCodeRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AdminPhoneVerificationSendResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"] | components["schemas"]["PhoneVerificationRateLimitResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
@@ -74810,21 +75403,75 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneResetVerificationResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Verification rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneResetValidationResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
                 };
             };
         };

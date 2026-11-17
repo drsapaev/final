@@ -8054,6 +8054,8 @@ const kk = {
     ev_request_success: "Хат жіберілді. Поштаңызды тексеріңіз.",
     ev_request_rate_limit: "Сұраулар тым көп. Күтіп, қайталап көріңіз.",
     ev_request_login: "Сеанс аяқталды. Қайта кіріңіз.",
+    pv_phone_changed_relogin: "Телефон нөмірі жаңартылды. Қайта кіріңіз.",
+    pv_phone_change_uncertain_relogin: "Нәтижені растау мүмкін болмады. Қайта кіріп, профиліңізді тексеріңіз.",
     ev_request_error: "Хатты жіберу мүмкін болмады. Кейінірек қайталаңыз.",
     up_email_not_verified: 'Email не подтвержден',
     up_phone_verified: 'Телефон подтвержден',

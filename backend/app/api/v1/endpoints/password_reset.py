@@ -5,23 +5,27 @@ API endpoints для восстановления паролей
 import logging
 import re
 from datetime import datetime
-from typing import Any, NoReturn
+from typing import Any, Literal, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import require_roles
-from app.core.rate_limiter import limiter
+from app.core.rate_limiter import get_client_ip, limiter
 from app.db.session import get_db
 from app.models.user import User
 from app.services.password_reset_service import get_password_reset_service
+from app.services.phone_verification_store import PhoneStoreUnavailable
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def raise_password_reset_internal_error(action: str, exc: Exception) -> NoReturn:
+def raise_password_reset_internal_error(
+    action: str, exc: Exception, *, headers: dict[str, str] | None = None
+) -> NoReturn:
     logger.error(
         "Password reset endpoint failed action=%s error_type=%s",
         action,
@@ -30,6 +34,7 @@ def raise_password_reset_internal_error(action: str, exc: Exception) -> NoReturn
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Internal server error",
+        headers=headers,
     ) from exc
 
 
@@ -45,7 +50,7 @@ class PasswordResetInitiateRequest(BaseModel):
         if v is None:
             return v
         phone = re.sub(r'[^\d+]', '', v)
-        if not re.match(r'^\+998\d{9}$', phone):
+        if not re.fullmatch(r'\+998[0-9]{9}', phone):
             raise ValueError('Номер телефона должен быть в формате +998XXXXXXXXX')
         return phone
 
@@ -77,14 +82,14 @@ class PhoneVerificationRequest(BaseModel):
     @classmethod
     def validate_phone(cls, v: str) -> str:
         phone = re.sub(r'[^\d+]', '', v)
-        if not re.match(r'^\+998\d{9}$', phone):
+        if not re.fullmatch(r'\+998[0-9]{9}', phone):
             raise ValueError('Номер телефона должен быть в формате +998XXXXXXXXX')
         return phone
 
     @field_validator('verification_code')
     @classmethod
     def validate_code(cls, v: str) -> str:
-        if not re.match(r'^\d{6}$', v):
+        if not re.fullmatch(r'[0-9]{6}', v):
             raise ValueError('Код должен состоять из 6 цифр')
         return v
 
@@ -101,6 +106,30 @@ class PasswordResetConfirmRequest(BaseModel):
         if len(v) < 6:
             raise ValueError('Пароль должен содержать минимум 6 символов')
         return v
+
+
+class PhoneResetVerificationResponse(BaseModel):
+    success: Literal[True]
+    message: str
+    reset_token: str
+    expires_in_hours: int
+
+
+class PhoneResetVerificationFailure(BaseModel):
+    success: Literal[False]
+    error: str
+    error_code: str | None = None
+    attempts_left: int | None = None
+
+
+class PhoneResetErrorResponse(BaseModel):
+    detail: str | PhoneResetVerificationFailure
+
+
+class PhoneResetValidationResponse(BaseModel):
+    error: str
+    message: str
+    detail: list[dict[str, Any]]
 
 
 @router.post("/initiate", response_model=dict[str, Any])  # P1-1: rate limit deferred (request param conflict)
@@ -146,19 +175,42 @@ async def initiate_password_reset(request: Request,
         raise_password_reset_internal_error("initiate_password_reset", e)
 
 
-@router.post("/verify-phone", response_model=dict[str, Any])
+@router.post(
+    "/verify-phone",
+    response_model=PhoneResetVerificationResponse,
+    responses={
+        200: {"headers": {"Cache-Control": {"description": "Sensitive response is not cacheable", "schema": {"type": "string"}}}},
+        **{code: {"model": PhoneResetErrorResponse, "description": "Verification rejected"}
+           for code in (400, 404, 410, 429, 500, 503)},
+        422: {"model": PhoneResetValidationResponse, "description": "Invalid verification request"},
+    },
+)
 async def verify_phone_for_reset(
-    request_data: PhoneVerificationRequest, db: Session = Depends(get_db)
+    request: Request, response: Response, request_data: PhoneVerificationRequest,
+    db: Session = Depends(get_db)
 ):
     """Верификация телефона для сброса пароля"""
     try:
         password_reset_service = get_password_reset_service()
+
+        # This shared budget is charged before looking up the supplied phone,
+        # so both unknown and known numbers have the same IP-level behavior.
+        try:
+            allowed = await run_in_threadpool(
+                password_reset_service.phone_verification.consume_ip_verify_budget,
+                get_client_ip(request),
+            )
+        except PhoneStoreUnavailable as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Verification temporarily unavailable", headers={"Cache-Control": "no-store"}) from exc
+        if not allowed:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many verification attempts", headers={"Cache-Control": "no-store"})
 
         result = await password_reset_service.verify_phone_and_get_token(
             db=db, phone=request_data.phone, verification_code=request_data.verification_code
         )
 
         if result["success"]:
+            response.headers["Cache-Control"] = "no-store"
             return {
                 "success": True,
                 "message": result["message"],
@@ -167,7 +219,9 @@ async def verify_phone_for_reset(
             }
         else:
             status_code = status.HTTP_400_BAD_REQUEST
-            if result.get("error_code") == "CODE_NOT_FOUND":
+            if result.get("error_code") == "INTERNAL_ERROR":
+                status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            elif result.get("error_code") == "CODE_NOT_FOUND":
                 status_code = status.HTTP_404_NOT_FOUND
             elif result.get("error_code") == "CODE_EXPIRED":
                 status_code = status.HTTP_410_GONE
@@ -185,12 +239,12 @@ async def verify_phone_for_reset(
             if "attempts_left" in result:
                 response_data["attempts_left"] = result["attempts_left"]
 
-            raise HTTPException(status_code=status_code, detail=response_data)
+            raise HTTPException(status_code=status_code, detail=response_data, headers={"Cache-Control": "no-store"})
 
     except HTTPException:
         raise
     except Exception as e:
-        raise_password_reset_internal_error("verify_phone_for_reset", e)
+        raise_password_reset_internal_error("verify_phone_for_reset", e, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/confirm", response_model=dict[str, Any])

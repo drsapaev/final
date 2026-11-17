@@ -8065,6 +8065,8 @@ const uzCyrl = {
     ev_request_success: "Хат юборилди. Почтангизни текширинг.",
     ev_request_rate_limit: "Сўровлар жуда кўп. Кутиб, қайта уриниб кўринг.",
     ev_request_login: "Сеанс муддати тугади. Қайта киринг.",
+    pv_phone_changed_relogin: "Телефон рақами янгиланди. Қайта киринг.",
+    pv_phone_change_uncertain_relogin: "Натижани тасдиқлаб бўлмади. Қайта кириб, профилингизни текширинг.",
     ev_request_error: "Хатни юбориб бўлмади. Кейинроқ уриниб кўринг.",
     up_email_not_verified: 'Email не подтвержден',
     up_phone_verified: 'Телефон подтвержден',

@@ -14,7 +14,7 @@ from uuid import uuid4
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.pii_masker import mask_pii  # PR-31: PII scrubber for query strings
+from app.core.pii_masker import is_sensitive_verification_path, mask_pii
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # Mask PII in query string — phones/emails are common in ?param=...
         # (e.g., /mobile/patients/lookup?phone=+998901234567)
         query_string = ""
-        if request.url.query:
+        if request.url.query and is_sensitive_verification_path(path):
+            # Legacy clients can still submit phone numbers, OTPs or arbitrary
+            # custom SMS text in query params, including on a 405 response.
+            query_string = "?[REDACTED]"
+        elif request.url.query:
             # Parse query params into a dict and mask recursively.
             # This catches both `phone=...` and `email=...` style params.
             try:
