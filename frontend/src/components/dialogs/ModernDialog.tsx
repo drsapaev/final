@@ -86,6 +86,8 @@ const ModernDialog = ({
   // (все стили перенесены в CSS с macos tokens + [data-theme="dark"] selectors).
   const dialogRef = useRef<HTMLDivElement>(null);
   const focusOriginRef = useRef<HTMLElement | null>(null);
+  const initialFocusSourceRef = useRef<HTMLElement | null>(null);
+  const hasFocusedInsideRef = useRef(false);
   const titleId = useId();
 
   const hasUnnamedCustomHeader = Boolean(customHeader) && typeof title !== 'string' && !ariaLabel;
@@ -113,6 +115,9 @@ const ModernDialog = ({
     const previouslyFocused = activeElement && dialog.contains(activeElement)
       ? focusOriginRef.current
       : activeElement;
+    if (!hasFocusedInsideRef.current) {
+      initialFocusSourceRef.current = activeElement;
+    }
 
     // REG-FE-077 (follow-up audit 2026-11-02): владелец стека. Скролл body
     // блокирует только ПЕРВЫЙ открытый диалог и возвращает только
@@ -158,6 +163,8 @@ const ModernDialog = ({
           previouslyFocused.focus();
         }
         focusOriginRef.current = null;
+        initialFocusSourceRef.current = null;
+        hasFocusedInsideRef.current = false;
       }
     };
   }, [isOpen]);
@@ -169,8 +176,14 @@ const ModernDialog = ({
     if (!isOpen || !dialog) return;
 
     const focusTimer = setTimeout(() => {
+      const activeElement = document.activeElement;
       if (dialogStack[dialogStack.length - 1] !== dialog
-        || dialog.contains(document.activeElement)) return;
+        || dialog.contains(activeElement)) return;
+      // A separate modal (such as the wizard's confirmation) can take focus
+      // without joining this stack. Do not pull focus back from another control.
+      // The element active at open is the exception for initial focus.
+      if (activeElement && activeElement !== document.body
+        && (hasFocusedInsideRef.current || activeElement !== initialFocusSourceRef.current)) return;
       getFocusableCandidates(dialog)[0]?.focus();
     }, 100);
 
@@ -185,6 +198,9 @@ const ModernDialog = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (dialogStack[dialogStack.length - 1] !== dialog) return;
+      const activeElement = document.activeElement;
+      const focusedModal = activeElement?.closest('[role="dialog"][aria-modal="true"]');
+      if (focusedModal && focusedModal !== dialog && !focusedModal.contains(dialog)) return;
 
       if (e.key === 'Escape' && closeOnEscape) {
         e.preventDefault();
@@ -254,6 +270,8 @@ const ModernDialog = ({
         role="dialog"
         aria-modal="true"
         onFocusCapture={(event) => {
+          if (!event.currentTarget.contains(event.target)) return;
+          hasFocusedInsideRef.current = true;
           if (event.relatedTarget instanceof HTMLElement
             && !event.currentTarget.contains(event.relatedTarget)) {
             focusOriginRef.current = event.relatedTarget;

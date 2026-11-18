@@ -375,6 +375,20 @@ test.describe('UX Audit Registrar — new interactions', () => {
     await patientName.pressSequentially('SYNTHETIC-FOCUS', { delay: 120 });
     await expect(patientName).toHaveValue('SYNTHETIC-FOCUS');
     await expect(patientName).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    const confirmation = page.getByRole('dialog', { name: 'Закрыть без сохранения?' });
+    await expect(confirmation).toBeVisible();
+    // The dialog's delayed focus recovery runs after 100 ms. It must not
+    // take focus from the separate unsaved-changes confirmation.
+    await page.waitForTimeout(200);
+    expect(await confirmation.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press('Tab');
+    expect(await confirmation.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(confirmation).toBeHidden();
+    await expect(patientName).toHaveValue('SYNTHETIC-FOCUS');
+    await expect(patientName).toBeFocused();
   });
 
   test('wizard step progress has aria-label', async ({ page }) => {

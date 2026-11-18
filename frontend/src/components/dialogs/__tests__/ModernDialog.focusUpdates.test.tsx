@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -136,6 +137,83 @@ describe('ModernDialog focus during form and prop updates', () => {
     expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
   });
 
+  it('keeps focus and Escape in a separate modal opened above the dialog', () => {
+    focusTrigger();
+    const closeEditor = vi.fn();
+    const editor = (version: number) => (
+      <>
+        <ModernDialog
+          isOpen
+          onClose={closeEditor}
+          ariaLabel="Synthetic editor"
+          customHeader={<button type="button">Synthetic header {version}</button>}
+        >
+          <input aria-label="Synthetic field" />
+        </ModernDialog>
+        {createPortal(
+          <div role="dialog" aria-modal="true" aria-label="Synthetic confirmation">
+            <button type="button">Cancel confirmation</button>
+          </div>,
+          document.body,
+        )}
+      </>
+    );
+    const { rerender } = render(editor(1));
+    finishInitialFocus();
+    const confirmationButton = screen.getByRole('button', { name: 'Cancel confirmation' });
+    confirmationButton.focus();
+
+    rerender(editor(2));
+    finishInitialFocus();
+    expect(confirmationButton).toHaveFocus();
+    fireEvent.keyDown(confirmationButton, { key: 'Escape' });
+    expect(closeEditor).not.toHaveBeenCalled();
+  });
+
+  it('moves initial focus into a dialog opened from a separate modal', () => {
+    render(
+      <div role="dialog" aria-modal="true" aria-label="Existing modal">
+        <button type="button">Open synthetic editor</button>
+      </div>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Open synthetic editor' });
+    trigger.focus();
+
+    const { unmount } = render(
+      <ModernDialog isOpen ariaLabel="Synthetic editor">
+        <input aria-label="Synthetic field" />
+      </ModernDialog>,
+    );
+    finishInitialFocus();
+    expect(screen.getByRole('dialog', { name: 'Synthetic editor' }))
+      .toContainElement(document.activeElement as HTMLElement);
+
+    unmount();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('does not take initial focus from another modal opened before the timer', () => {
+    focusTrigger();
+    render(
+      <>
+        <ModernDialog isOpen ariaLabel="Synthetic editor">
+          <input aria-label="Synthetic field" />
+        </ModernDialog>
+        {createPortal(
+          <div role="dialog" aria-modal="true" aria-label="Synthetic confirmation">
+            <button type="button">Cancel confirmation</button>
+          </div>,
+          document.body,
+        )}
+      </>,
+    );
+    const confirmationButton = screen.getByRole('button', { name: 'Cancel confirmation' });
+    confirmationButton.focus();
+
+    finishInitialFocus();
+    expect(confirmationButton).toHaveFocus();
+  });
+
   it('uses the latest Escape callback and option without disturbing focus', () => {
     focusTrigger();
     const oldClose = vi.fn();
@@ -262,6 +340,28 @@ describe('ModernDialog focus during form and prop updates', () => {
     const secondTrigger = focusTrigger();
     rerender(editor(true));
     expect(screen.getByRole('textbox', { name: 'Synthetic field' })).toHaveFocus();
+    rerender(editor(false));
+    expect(secondTrigger).toHaveFocus();
+  });
+
+  it('initializes focus again when a dialog without autoFocus is reopened', () => {
+    const firstTrigger = focusTrigger();
+    const editor = (isOpen: boolean) => (
+      <ModernDialog isOpen={isOpen} title="Synthetic editor">
+        <input aria-label="Synthetic field" />
+      </ModernDialog>
+    );
+    const { rerender } = render(editor(true));
+    finishInitialFocus();
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+
+    rerender(editor(false));
+    expect(firstTrigger).toHaveFocus();
+    const secondTrigger = focusTrigger();
+    rerender(editor(true));
+    finishInitialFocus();
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+
     rerender(editor(false));
     expect(secondTrigger).toHaveFocus();
   });
