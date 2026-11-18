@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import React, { useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import './ModernDialog.css';
 import logger from '../../utils/logger';
@@ -86,6 +86,7 @@ const ModernDialog = ({
   // (все стили перенесены в CSS с macos tokens + [data-theme="dark"] selectors).
   const dialogRef = useRef<HTMLDivElement>(null);
   const focusOriginRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
 
   const hasUnnamedCustomHeader = Boolean(customHeader) && typeof title !== 'string' && !ariaLabel;
   useEffect(() => {
@@ -229,7 +230,7 @@ const ModernDialog = ({
   const dialogLabelProps = customHeader
     ? { 'aria-label': typeof title === 'string' ? title : ariaLabel }
     : title
-      ? { 'aria-labelledby': 'dialog-title' }
+      ? { 'aria-labelledby': titleId }
       : { 'aria-label': ariaLabel };
 
   return (
@@ -270,7 +271,7 @@ const ModernDialog = ({
           <>
                 {title &&
             <h3
-              id="dialog-title"
+              id={titleId}
               className="modern-dialog-title modern-dialog-title--styled">
 
                     {title}

@@ -58,10 +58,25 @@ describe('REG-FE-075: dialog accessible name', () => {
     expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Изменение цены');
   });
 
-  it('plain title keeps aria-labelledby (unchanged legacy contract)', () => {
+  it('plain title names its dialog through aria-labelledby', () => {
     render(<ModernDialog isOpen onClose={vi.fn()} title="Обычный заголовок" />);
     const dialog = screen.getByRole('dialog');
-    expect(dialog.getAttribute('aria-labelledby')).toBe('dialog-title');
+    const heading = screen.getByRole('heading', { name: 'Обычный заголовок' });
+    expect(dialog).toHaveAccessibleName('Обычный заголовок');
+    expect(dialog.getAttribute('aria-labelledby')).toBe(heading.id);
+  });
+
+  it('gives simultaneously open dialogs their own accessible names', () => {
+    render(
+      <ModernDialog isOpen title="Outer synthetic dialog">
+        <ModernDialog isOpen title="Inner synthetic dialog" />
+      </ModernDialog>,
+    );
+
+    const dialogs = screen.getAllByRole('dialog');
+    expect(dialogs[0]).toHaveAccessibleName('Outer synthetic dialog');
+    expect(dialogs[1]).toHaveAccessibleName('Inner synthetic dialog');
+    expect(dialogs[0].getAttribute('aria-labelledby')).not.toBe(dialogs[1].getAttribute('aria-labelledby'));
   });
 });
 
