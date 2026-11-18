@@ -9,19 +9,71 @@ import type {
 type TokenPair = TelegramMiniAppTokenResponseDto;
 export type MiniAppSession = TelegramMiniAppSessionItemDto;
 type SessionList = TelegramMiniAppSessionListResponseDto;
+type SessionLease = {
+  session: TelegramMiniAppStoredSession;
+  generation: number;
+};
 
 // This client never reads staff tokens or runs staff refresh/logout interceptors.
 const transport = axios.create({ baseURL: getApiBaseUrl(), withCredentials: true, timeout: 20000 });
 let csrfToken = '';
 let csrfFlight: Promise<string> | null = null;
-let authFlight: { context: string; promise: Promise<TelegramMiniAppStoredSession> } | null = null;
-let refreshFlight: { token: string; promise: Promise<TelegramMiniAppStoredSession> } | null = null;
+let activeSessionContext: string | null = null;
+let sessionGeneration = 0;
+let authFlight: {
+  context: string;
+  generation: number;
+  promise: Promise<TelegramMiniAppStoredSession>;
+} | null = null;
+let refreshFlight: {
+  token: string;
+  generation: number;
+  promise: Promise<TelegramMiniAppStoredSession>;
+} | null = null;
 const terminatedContexts = new Set<string>();
 
 function sessionError() {
   return Object.assign(new Error('Mini App session expired'), {
     response: { status: 401, data: { detail: { reason: 'session_invalid' } } },
   });
+}
+
+function canceledSessionRequest() {
+  return new axios.CanceledError('Mini App request canceled because its session changed');
+}
+
+function activateSessionContext(context: string): number {
+  if (activeSessionContext !== context) {
+    activeSessionContext = context;
+    sessionGeneration += 1;
+  }
+  return sessionGeneration;
+}
+
+function beginSessionContext(context: string): number {
+  activeSessionContext = context;
+  sessionGeneration += 1;
+  return sessionGeneration;
+}
+
+function terminateSessionContext(context: string): void {
+  terminatedContexts.add(context);
+  if (activeSessionContext === context) {
+    activeSessionContext = null;
+    sessionGeneration += 1;
+  }
+}
+
+function isSessionLeaseCurrent(lease: SessionLease): boolean {
+  const context = lease.session.context;
+  return sessionGeneration === lease.generation
+    && activeSessionContext === context
+    && !terminatedContexts.has(context)
+    && miniAppTokenManager.get()?.context === context;
+}
+
+function assertSessionLeaseCurrent(lease: SessionLease): void {
+  if (!isSessionLeaseCurrent(lease)) throw canceledSessionRequest();
 }
 
 async function contextFor(initData: string): Promise<string> {
@@ -67,67 +119,118 @@ function install(pair: TokenPair, context: string): TelegramMiniAppStoredSession
   return session;
 }
 
-async function refresh(session: TelegramMiniAppStoredSession): Promise<TelegramMiniAppStoredSession> {
-  if (refreshFlight?.token === session.refresh_token) return refreshFlight.promise;
+async function refresh(
+  session: TelegramMiniAppStoredSession,
+  generation: number,
+): Promise<TelegramMiniAppStoredSession> {
+  if (refreshFlight?.token === session.refresh_token
+    && refreshFlight.generation === generation) return refreshFlight.promise;
   const promise = post<TokenPair>('/telegram/mini-app/auth/refresh', {
     refresh_token: session.refresh_token,
   }).then(({ data }) => {
     const current = miniAppTokenManager.get();
-    if (current?.refresh_token !== session.refresh_token || terminatedContexts.has(session.context)) {
-      throw sessionError();
+    if (current?.refresh_token !== session.refresh_token
+      || terminatedContexts.has(session.context)
+      || sessionGeneration !== generation
+      || activeSessionContext !== session.context) {
+      throw canceledSessionRequest();
     }
     return install(data, session.context);
   }).catch((error: unknown) => {
     // A late response from an older principal cannot clear a replacement.
-    if (miniAppTokenManager.get()?.refresh_token === session.refresh_token
+    const current = miniAppTokenManager.get();
+    const generationIsCurrent = sessionGeneration === generation
+      && activeSessionContext === session.context;
+    if (generationIsCurrent && current?.refresh_token === session.refresh_token
       && axios.isAxiosError(error) && [401, 403].includes(error.response?.status || 0)) {
       miniAppTokenManager.clear();
-      terminatedContexts.add(session.context);
+      terminateSessionContext(session.context);
+    } else if (!generationIsCurrent || current?.context !== session.context) {
+      throw canceledSessionRequest();
     }
     throw error;
   }).finally(() => {
-    if (refreshFlight?.token === session.refresh_token) refreshFlight = null;
+    if (refreshFlight?.token === session.refresh_token
+      && refreshFlight.generation === generation) refreshFlight = null;
   });
-  refreshFlight = { token: session.refresh_token, promise };
+  refreshFlight = { token: session.refresh_token, generation, promise };
   return promise;
 }
 
-async function ensureSession(initData: string): Promise<TelegramMiniAppStoredSession> {
+async function ensureSession(initData: string): Promise<SessionLease> {
   if (!initData) throw sessionError();
   const context = await contextFor(initData);
   if (terminatedContexts.has(context)) throw sessionError();
   const existing = miniAppTokenManager.get();
   if (existing?.context === context) {
-    return existing.expires_at > Date.now() + 30000 ? existing : refresh(existing);
+    const generation = activateSessionContext(context);
+    const session = existing.expires_at > Date.now() + 30000
+      ? existing
+      : await refresh(existing, generation);
+    const lease = { session, generation };
+    assertSessionLeaseCurrent(lease);
+    return lease;
   }
-  if (authFlight?.context === context) return authFlight.promise;
+  if (authFlight?.context === context
+    && authFlight.generation === sessionGeneration
+    && activeSessionContext === context) {
+    const lease = { session: await authFlight.promise, generation: authFlight.generation };
+    assertSessionLeaseCurrent(lease);
+    return lease;
+  }
   // A changed Telegram launch must not inherit the previous patient's session.
   miniAppTokenManager.clear();
+  const generation = beginSessionContext(context);
   const promise = post<TokenPair>('/telegram/mini-app/auth/exchange', { init_data: initData })
     .then(({ data }) => {
-      if (authFlight?.context !== context || terminatedContexts.has(context)) throw sessionError();
+      if (authFlight?.context !== context
+        || authFlight.generation !== generation
+        || activeSessionContext !== context
+        || sessionGeneration !== generation
+        || terminatedContexts.has(context)) throw canceledSessionRequest();
       return install(data, context);
     })
-    .finally(() => { if (authFlight?.context === context) authFlight = null; });
-  authFlight = { context, promise };
-  return promise;
+    .finally(() => {
+      if (authFlight?.context === context && authFlight.generation === generation) authFlight = null;
+    });
+  authFlight = { context, generation, promise };
+  const lease = { session: await promise, generation };
+  assertSessionLeaseCurrent(lease);
+  return lease;
 }
 
 async function authorizedPost<T>(
   url: string, body: unknown, initData: string, config: AxiosRequestConfig = {},
 ): Promise<AxiosResponse<T>> {
-  const session = await ensureSession(initData);
+  const lease = await ensureSession(initData);
+  const { session } = lease;
+  assertSessionLeaseCurrent(lease);
   const send = (token: string) => post<T>(url, body, {
     ...config, headers: { ...config.headers, Authorization: `Bearer ${token}` },
   });
   try {
-    return await send(session.access_token);
+    const response = await send(session.access_token);
+    assertSessionLeaseCurrent(lease);
+    return response;
   } catch (error) {
+    // A response from the previous patient/session is discarded regardless of
+    // status. This also keeps stale 403/500 errors from reaching old callers.
+    assertSessionLeaseCurrent(lease);
     if (!axios.isAxiosError(error) || error.response?.status !== 401) throw error;
     const live = miniAppTokenManager.get();
     if (live?.context !== session.context) throw sessionError();
-    const next = live.access_token === session.access_token ? await refresh(live) : live;
-    return send(next.access_token);
+    const next = live.access_token === session.access_token
+      ? await refresh(live, lease.generation)
+      : live;
+    assertSessionLeaseCurrent(lease);
+    try {
+      const response = await send(next.access_token);
+      assertSessionLeaseCurrent(lease);
+      return response;
+    } catch (retryError) {
+      assertSessionLeaseCurrent(lease);
+      throw retryError;
+    }
   }
 }
 
@@ -168,7 +271,7 @@ export const telegramMiniAppSessions = {
   async logout(initData: string): Promise<void> {
     const context = await contextFor(initData);
     await authorizedPost('/telegram/mini-app/auth/logout', {}, initData);
-    terminatedContexts.add(context);
+    terminateSessionContext(context);
     if (miniAppTokenManager.get()?.context === context) miniAppTokenManager.clear();
   },
 };

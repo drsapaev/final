@@ -6,6 +6,15 @@ vi.mock('axios', () => ({
   default: {
     create: mocks.create,
     isAxiosError: (error: { isAxiosError?: boolean }) => Boolean(error?.isAxiosError),
+    CanceledError: class MockCanceledError extends Error {
+      code = 'ERR_CANCELED';
+      __CANCEL__ = true;
+      isAxiosError = true;
+      constructor(message: string) {
+        super(message);
+        this.name = 'CanceledError';
+      }
+    },
   },
 }));
 vi.mock('../runtime', () => ({ getApiBaseUrl: () => 'https://api.example.test/api/v1' }));
@@ -183,7 +192,70 @@ describe('isolated Telegram patient session client', () => {
     await vi.waitFor(() => expect(finishLogout).toBeDefined());
     await telegramMiniAppSessions.list('launch-b');
     finishLogout({ data: {} });
-    await logout;
+    await expect(logout).rejects.toMatchObject({ code: 'ERR_CANCELED', name: 'CanceledError' });
     expect(store.get()?.access_token).toBe('access-b');
   });
+
+  it.each([200, 403, 500])(
+    'cancels a late HTTP %i protected response after logout',
+    async (status) => {
+      const { telegramMiniAppApi, telegramMiniAppSessions, store } = await client();
+      let finishProtected!: (response: { data: object }) => void;
+      let failProtected!: (error: unknown) => void;
+      mocks.post.mockImplementation((url: string) => {
+        if (url.endsWith('/telegram/mini-app/cabinet/summary')) {
+          return new Promise((resolve, reject) => {
+            finishProtected = resolve;
+            failProtected = reject;
+          });
+        }
+        if (url.endsWith('/auth/exchange')) return Promise.resolve({ data: pair() });
+        return Promise.resolve({ data: {} });
+      });
+
+      const request = telegramMiniAppApi.post('/telegram/mini-app/cabinet/summary', {
+        initData: 'launch-a',
+      });
+      await vi.waitFor(() => expect(finishProtected).toBeDefined());
+      await telegramMiniAppSessions.logout('launch-a');
+
+      if (status === 200) finishProtected({ data: { patient: 'synthetic-a' } });
+      else failProtected(failure(status, 'synthetic_failure'));
+
+      await expect(request).rejects.toMatchObject({ code: 'ERR_CANCELED', name: 'CanceledError' });
+      expect(store.get()).toBeNull();
+    },
+  );
+
+  it.each([200, 403, 500])(
+    'cancels a late HTTP %i protected response after switching patients',
+    async (status) => {
+      const { telegramMiniAppApi, telegramMiniAppSessions, store } = await client();
+      let finishProtected!: (response: { data: object }) => void;
+      let failProtected!: (error: unknown) => void;
+      mocks.post.mockImplementation((url: string, body?: { init_data?: string }) => {
+        if (url.endsWith('/telegram/mini-app/cabinet/summary')) {
+          return new Promise((resolve, reject) => {
+            finishProtected = resolve;
+            failProtected = reject;
+          });
+        }
+        return Promise.resolve({
+          data: url.endsWith('/auth/exchange') ? pair(body?.init_data === 'launch-b' ? 'b' : 'a') : {},
+        });
+      });
+
+      const request = telegramMiniAppApi.post('/telegram/mini-app/cabinet/summary', {
+        initData: 'launch-a',
+      });
+      await vi.waitFor(() => expect(finishProtected).toBeDefined());
+      await telegramMiniAppSessions.list('launch-b');
+
+      if (status === 200) finishProtected({ data: { patient: 'synthetic-a' } });
+      else failProtected(failure(status, 'synthetic_failure'));
+
+      await expect(request).rejects.toMatchObject({ code: 'ERR_CANCELED', name: 'CanceledError' });
+      expect(store.get()?.access_token).toBe('access-b');
+    },
+  );
 });
