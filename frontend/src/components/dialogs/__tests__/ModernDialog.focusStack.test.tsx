@@ -149,6 +149,45 @@ describe('REG-FE-077: dialog stack owns Escape and body scroll', () => {
     }
   }, 10000);
 
+  it.each([
+    ['normal mode', false],
+    ['StrictMode', true],
+  ])('keeps an inner dialog on top when both mount together in %s', async (_mode, strictMode) => {
+    const closeOuter = vi.fn();
+    const closeInner = vi.fn();
+    vi.useFakeTimers();
+    try {
+      const dialogs = (innerOpen: boolean) => (
+        <ModernDialog isOpen onClose={closeOuter} title="Outer synthetic dialog">
+          <ModernDialog isOpen={innerOpen} onClose={closeInner} title="Inner synthetic dialog" />
+        </ModernDialog>
+      );
+      const wrapped = (innerOpen: boolean) => strictMode
+        ? <React.StrictMode>{dialogs(innerOpen)}</React.StrictMode>
+        : dialogs(innerOpen);
+      const { rerender } = render(wrapped(true));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+
+      const innerDialog = screen.getByText('Inner synthetic dialog').closest('[role="dialog"]');
+      expect(innerDialog).toContainElement(document.activeElement as HTMLElement);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(closeInner).toHaveBeenCalledTimes(1);
+      expect(closeOuter).not.toHaveBeenCalled();
+
+      rerender(wrapped(false));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(closeOuter).toHaveBeenCalledTimes(1);
+      expect(closeInner).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 10000);
+
   it('body scroll is restored only when the LAST dialog closes', async () => {
     vi.useFakeTimers();
     try {

@@ -120,7 +120,14 @@ const ModernDialog = ({
     // (Escape/Tab) обрабатывает только ВЕРХНИЙ диалог — внутренние
     // экземпляры больше не соревнуются глобальными слушателями.
     const stackEntry = dialog;
-    dialogStack.push(stackEntry);
+    // React runs child effects before parent effects when both mount at once.
+    // Keep an enclosing dialog below any already registered descendants.
+    const firstDescendantIndex = dialogStack.findIndex((entry) => dialog.contains(entry));
+    if (firstDescendantIndex === -1) {
+      dialogStack.push(stackEntry);
+    } else {
+      dialogStack.splice(firstDescendantIndex, 0, stackEntry);
+    }
     if (dialogStack.length === 1) {
       document.body.style.overflow = 'hidden';
     }
