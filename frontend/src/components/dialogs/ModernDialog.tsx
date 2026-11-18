@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import './ModernDialog.css';
-import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
 
 // REG-FE-077 (follow-up audit 2026-11-02): стек открытых диалогов —
@@ -11,6 +10,22 @@ import logger from '../../utils/logger';
 // диалога — закрытие внутреннего разблокировало скролл за внешним,
 // а Escape закрывал оба сразу.
 const dialogStack: HTMLElement[] = [];
+
+// REG-FE-076: only available controls participate in the focus trap.
+const FOCUSABLE_SELECTOR =
+  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+const isFocusableCandidate = (el: Element): el is HTMLElement => {
+  const html = el as HTMLElement;
+  if ('disabled' in html && (html as { disabled?: boolean }).disabled) return false;
+  if (el.getAttribute('aria-hidden') === 'true') return false;
+  // jsdom does not implement checkVisibility.
+  if (typeof html.checkVisibility === 'function') {
+    return html.checkVisibility();
+  }
+  return true;
+};
+const getFocusableCandidates = (dialog: HTMLElement): HTMLElement[] =>
+  Array.from(dialog.querySelectorAll(FOCUSABLE_SELECTOR)).filter(isFocusableCandidate);
 
 interface DialogAction {
   label?: string;
@@ -71,33 +86,21 @@ const ModernDialog = ({
   // (все стили перенесены в CSS с macos tokens + [data-theme="dark"] selectors).
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // REG-FE-076 (follow-up audit 2026-11-02): ловушка фокуса считает только
-  // РЕАЛЬНО доступных кандидатов — прежде селектор включал disabled-кнопки
-  // и скрытые элементы: «последний tabbable» мог оказаться недостижимым, и
-  // Tab с последней живой кнопки выпадал из диалога (реальный кейс
-  // CancelDialog: действие disabled, а предшествующая кнопка — последняя
-  // «tabbable» по старому подсчёту).
-  const FOCUSABLE_SELECTOR =
-    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-  const isFocusableCandidate = (el: Element): el is HTMLElement => {
-    const html = el as HTMLElement;
-    if ('disabled' in html && (html as { disabled?: boolean }).disabled) return false;
-    if (el.getAttribute('aria-hidden') === 'true') return false;
-    // jsdom не реализует checkVisibility — там считаем видимым;
-    // в реальном браузере скрытые кандидаты отфильтровываются.
-    if (typeof html.checkVisibility === 'function') {
-      return html.checkVisibility();
-    }
-    return true;
-  };
-  const getFocusableCandidates = (): HTMLElement[] =>
-    Array.from(dialogRef.current?.querySelectorAll(FOCUSABLE_SELECTOR) ?? []).filter(
-      isFocusableCandidate,
-    );
-
-  // Фокус-ловушка, стек диалогов и возврат фокуса
+  const hasUnnamedCustomHeader = Boolean(customHeader) && typeof title !== 'string' && !ariaLabel;
   useEffect(() => {
-    if (!isOpen) return;
+    if (isOpen && process.env.NODE_ENV !== 'production' && hasUnnamedCustomHeader) {
+      logger.warn(
+        '[ModernDialog] customHeader без строкового title/ariaLabel: '
+          + 'у диалога нет доступного имени (REG-FE-075).',
+      );
+    }
+  }, [isOpen, hasUnnamedCustomHeader]);
+
+  // The stack and focus belong to an open/close session. A fresh header,
+  // callback, or title during typing must not close and reopen that session.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!isOpen || !dialog) return;
 
     // REG-FE-080 (follow-up audit 2026-11-02): запоминаем триггер — после
     // закрытия клавиатурный пользователь возвращается на место, а не
@@ -110,60 +113,13 @@ const ModernDialog = ({
     // разблокируя скролл за ещё открытым внешним диалогом. Клавиатуру
     // (Escape/Tab) обрабатывает только ВЕРХНИЙ диалог — внутренние
     // экземпляры больше не соревнуются глобальными слушателями.
-    const stackEntry: HTMLElement = dialogRef.current ?? document.createElement('div');
+    const stackEntry = dialog;
     dialogStack.push(stackEntry);
     if (dialogStack.length === 1) {
       document.body.style.overflow = 'hidden';
     }
-    if (process.env.NODE_ENV !== 'production'
-      && customHeader && typeof title !== 'string' && !ariaLabel) {
-      // REG-FE-075: композиция без доступного имени — заметно в разработке.
-      logger.warn(
-        '[ModernDialog] customHeader без строкового title/ariaLabel: '
-          + 'у диалога нет доступного имени (REG-FE-075).',
-      );
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // REG-FE-077: не верхний диалог клавиатуру не перехватывает.
-      if (dialogStack[dialogStack.length - 1] !== stackEntry) return;
-
-      if (e.key === 'Escape' && closeOnEscape) {
-        e.preventDefault();
-        onClose?.();
-      }
-
-      if (e.key === 'Tab') {
-        const focusableElements = getFocusableCandidates();
-
-        if (focusableElements.length > 0) {
-          const firstElement = focusableElements[0];
-          const lastElement = focusableElements[focusableElements.length - 1];
-
-          if (e.shiftKey && document.activeElement === firstElement) {
-            e.preventDefault();
-            lastElement.focus();
-          } else if (!e.shiftKey && document.activeElement === lastElement) {
-            e.preventDefault();
-            firstElement.focus();
-          }
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    // Фокус на первый доступный элемент (REG-FE-076: тоже отфильтрованный)
-    const focusTimer = setTimeout(() => {
-      const firstFocusable = getFocusableCandidates()[0];
-      if (firstFocusable) {
-        firstFocusable.focus();
-      }
-    }, 100);
 
     return () => {
-      clearTimeout(focusTimer);
-      document.removeEventListener('keydown', handleKeyDown);
       // REG-FE-077: снять только СВОЮ регистрацию; скролл возвращает
       // последний закрытый.
       const stackIndex = dialogStack.lastIndexOf(stackEntry);
@@ -181,12 +137,62 @@ const ModernDialog = ({
         && previouslyFocused.isConnected
         && (!currentActive
           || currentActive === document.body
-          || dialogRef.current?.contains(currentActive))
+          || dialog.contains(currentActive))
       ) {
         previouslyFocused.focus();
       }
     };
-  }, [isOpen, closeOnEscape, onClose, customHeader, title, ariaLabel]);
+  }, [isOpen]);
+
+  // Initialize focus, or recover it when a wizard step removes the active
+  // control. Header/content updates must preserve focus that is already inside.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!isOpen || !dialog) return;
+
+    const focusTimer = setTimeout(() => {
+      if (dialogStack[dialogStack.length - 1] !== dialog
+        || dialog.contains(document.activeElement)) return;
+      getFocusableCandidates(dialog)[0]?.focus();
+    }, 100);
+
+    return () => clearTimeout(focusTimer);
+  }, [isOpen, customHeader, title, ariaLabel, children]);
+
+  // Keyboard options may change while open; updating this listener must not
+  // reset focus or change which dialog is on top.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!isOpen || !dialog) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (dialogStack[dialogStack.length - 1] !== dialog) return;
+
+      if (e.key === 'Escape' && closeOnEscape) {
+        e.preventDefault();
+        onClose?.();
+      }
+
+      if (e.key === 'Tab') {
+        const focusableElements = getFocusableCandidates(dialog);
+        if (focusableElements.length > 0) {
+          const firstElement = focusableElements[0];
+          const lastElement = focusableElements[focusableElements.length - 1];
+
+          if (e.shiftKey && document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, closeOnEscape, onClose]);
 
   if (!isOpen) return null;
 
