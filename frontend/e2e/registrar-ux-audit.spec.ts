@@ -379,6 +379,9 @@ test.describe('UX Audit Registrar — new interactions', () => {
     await page.keyboard.press('Escape');
     const confirmation = page.getByRole('dialog', { name: 'Закрыть без сохранения?' });
     await expect(confirmation).toBeVisible();
+    // The confirmation moves focus in requestAnimationFrame, which may run
+    // later on a busy CI runner. Wait for it before checking it stays there.
+    await expect(confirmation.locator(':focus')).toHaveCount(1);
     // The dialog's delayed focus recovery runs after 100 ms. It must not
     // take focus from the separate unsaved-changes confirmation.
     await page.waitForTimeout(200);
