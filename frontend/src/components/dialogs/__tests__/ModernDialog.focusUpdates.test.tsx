@@ -231,4 +231,77 @@ describe('ModernDialog focus during form and prop updates', () => {
 
     expect(field).toHaveFocus();
   });
+
+  it('returns focus to the trigger after closing a dialog with an auto-focused field', () => {
+    const trigger = focusTrigger();
+    const { unmount } = render(
+      <ModernDialog isOpen title="Synthetic editor">
+        <input aria-label="Synthetic field" autoFocus />
+      </ModernDialog>,
+    );
+    expect(screen.getByRole('textbox', { name: 'Synthetic field' })).toHaveFocus();
+
+    unmount();
+
+    expect(trigger).toHaveFocus();
+  });
+
+  it('remembers the new trigger when an auto-focused dialog is reopened', () => {
+    const firstTrigger = focusTrigger();
+    const editor = (isOpen: boolean) => (
+      <ModernDialog isOpen={isOpen} title="Synthetic editor">
+        <input aria-label="Synthetic field" autoFocus />
+      </ModernDialog>
+    );
+    const { rerender } = render(editor(true));
+    expect(screen.getByRole('textbox', { name: 'Synthetic field' })).toHaveFocus();
+
+    rerender(editor(false));
+    expect(firstTrigger).toHaveFocus();
+
+    const secondTrigger = focusTrigger();
+    rerender(editor(true));
+    expect(screen.getByRole('textbox', { name: 'Synthetic field' })).toHaveFocus();
+    rerender(editor(false));
+    expect(secondTrigger).toHaveFocus();
+  });
+
+  it('preserves initial autoFocus and returns to the trigger in StrictMode', () => {
+    const trigger = focusTrigger();
+    const { unmount } = render(
+      <React.StrictMode>
+        <ModernDialog isOpen title="Synthetic editor">
+          <input aria-label="Synthetic field" autoFocus />
+        </ModernDialog>
+      </React.StrictMode>,
+    );
+    const field = screen.getByRole('textbox', { name: 'Synthetic field' });
+    expect(field).toHaveFocus();
+    finishInitialFocus();
+    expect(field).toHaveFocus();
+
+    unmount();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('returns focus to the outer dialog after closing an auto-focused inner dialog', () => {
+    focusTrigger();
+    const dialogs = (innerOpen: boolean) => (
+      <ModernDialog isOpen title="Outer synthetic editor">
+        <button type="button">Open inner editor</button>
+        <ModernDialog isOpen={innerOpen} title="Inner synthetic editor">
+          <input aria-label="Inner synthetic field" autoFocus />
+        </ModernDialog>
+      </ModernDialog>
+    );
+    const { rerender } = render(dialogs(false));
+    finishInitialFocus();
+    const innerTrigger = screen.getByRole('button', { name: 'Open inner editor' });
+    innerTrigger.focus();
+
+    rerender(dialogs(true));
+    expect(screen.getByRole('textbox', { name: 'Inner synthetic field' })).toHaveFocus();
+    rerender(dialogs(false));
+    expect(innerTrigger).toHaveFocus();
+  });
 });

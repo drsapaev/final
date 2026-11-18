@@ -85,6 +85,7 @@ const ModernDialog = ({
   // UX Audit Registrar #5: useTheme() удалён — getColor/theme больше не нужны
   // (все стили перенесены в CSS с macos tokens + [data-theme="dark"] selectors).
   const dialogRef = useRef<HTMLDivElement>(null);
+  const focusOriginRef = useRef<HTMLElement | null>(null);
 
   const hasUnnamedCustomHeader = Boolean(customHeader) && typeof title !== 'string' && !ariaLabel;
   useEffect(() => {
@@ -105,7 +106,12 @@ const ModernDialog = ({
     // REG-FE-080 (follow-up audit 2026-11-02): запоминаем триггер — после
     // закрытия клавиатурный пользователь возвращается на место, а не
     // «проваливается» в body.
-    const previouslyFocused = (document.activeElement as HTMLElement | null) ?? null;
+    // Child autoFocus can run before this effect. In that case focus capture
+    // retains the element that was active before focus entered the dialog.
+    const activeElement = document.activeElement as HTMLElement | null;
+    const previouslyFocused = activeElement && dialog.contains(activeElement)
+      ? focusOriginRef.current
+      : activeElement;
 
     // REG-FE-077 (follow-up audit 2026-11-02): владелец стека. Скролл body
     // блокирует только ПЕРВЫЙ открытый диалог и возвращает только
@@ -129,17 +135,21 @@ const ModernDialog = ({
       if (dialogStack.length === 0) {
         document.body.style.overflow = '';
       }
-      // REG-FE-080: вернуть фокус триггеру, если он ещё в документе и
-      // фокус сейчас внутри закрывающегося диалога (или потерян в body).
-      const currentActive = document.activeElement as HTMLElement | null;
-      if (
-        previouslyFocused
-        && previouslyFocused.isConnected
-        && (!currentActive
-          || currentActive === document.body
-          || dialog.contains(currentActive))
-      ) {
-        previouslyFocused.focus();
+      // React StrictMode can replay this effect while the dialog is still
+      // mounted. Restore and clear the origin only when it actually closes.
+      if (!dialog.isConnected) {
+        // REG-FE-080: return focus only if it has not moved elsewhere.
+        const currentActive = document.activeElement as HTMLElement | null;
+        if (
+          previouslyFocused
+          && previouslyFocused.isConnected
+          && (!currentActive
+            || currentActive === document.body
+            || dialog.contains(currentActive))
+        ) {
+          previouslyFocused.focus();
+        }
+        focusOriginRef.current = null;
       }
     };
   }, [isOpen]);
@@ -229,15 +239,21 @@ const ModernDialog = ({
         aria-label="Закрыть диалог" />
 
       }
-      
+
       <div
         ref={dialogRef}
         className={`modern-dialog-container modern-dialog-container--styled ${dialogClassName}`}
         role="dialog"
         aria-modal="true"
+        onFocusCapture={(event) => {
+          if (event.relatedTarget instanceof HTMLElement
+            && !event.currentTarget.contains(event.relatedTarget)) {
+            focusOriginRef.current = event.relatedTarget;
+          }
+        }}
         {...dialogLabelProps}
         style={dialogStyles}>
-        
+
         {/* Заголовок */}
         {(customHeader || title || showCloseButton) &&
         <div className="modern-dialog-header">
@@ -249,7 +265,7 @@ const ModernDialog = ({
             <h3
               id="dialog-title"
               className="modern-dialog-title modern-dialog-title--styled">
-              
+
                     {title}
                   </h3>
             }
@@ -259,7 +275,7 @@ const ModernDialog = ({
               className="modern-dialog-close modern-dialog-close--styled"
               onClick={onClose}
               aria-label="Закрыть диалог">
-              
+
                     <X size={20} />
                   </button>
             }
@@ -287,7 +303,7 @@ const ModernDialog = ({
             disabled={action.disabled}
             style={action.style}
             {...action.props}>
-            
+
                 {action.icon && <span className="action-icon">{action.icon}</span>}
                 {action.label}
               </button>
