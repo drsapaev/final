@@ -979,3 +979,23 @@ allowed chat identifier in protected environment secrets. Never put tokens,
 chat IDs, invite links, or patient data into source, logs, or artifacts. If the
 runtime resolves a database bot configuration before the environment token,
 verify the resolved identity before any send and fail closed on a mismatch.
+
+#### One-shot private Telegram patient reminder (manual)
+
+The workflow **Staging Telegram private reminder (manual)** must be on trusted
+`main` and uses only the protected `staging-integrations` environment. It
+does not run on pushes, PRs, or job retries. Obtain approval for exactly one
+synthetic message to the intended owner's private chat. Set a fresh random
+32–64 character lowercase hex value as the environment secret
+`STAGING_TELEGRAM_CHALLENGE`; share it only with that approved recipient.
+They send `/staging_check <value>` in the private chat with the staging bot.
+Dispatch the job promptly: the message must be no more than 20 minutes old
+when checked. Do not print the challenge or use it as a workflow input.
+
+The runner checks the bot identity and the private chat, consumes the
+challenge, then seeds a disposable synthetic visit and uses a one-job arq
+worker without retries. Confirm the resulting message in the recipient's
+chat separately from the provider acceptance in CI. If the result is
+uncertain, check the chat before considering another test. A new challenge
+requires fresh authorization for another message. Never publish chat IDs,
+use real patient data, or weaken the private-chat rule.

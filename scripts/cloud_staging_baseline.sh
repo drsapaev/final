@@ -9,6 +9,18 @@ set -Eeuo pipefail
 [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-}" =~ ^[0-9]+$ ]]
 [[ "${GITHUB_SHA:-}" =~ ^[a-f0-9]{40}$ && "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
 [[ -z "$(git status --porcelain)" ]]
+reminder=0
+if [[ "$#" == 1 && "$1" == --telegram-reminder ]]; then
+    [[ "${GITHUB_REF:-}" == refs/heads/main && "${GITHUB_EVENT_NAME:-}" == workflow_dispatch &&
+       "$GITHUB_RUN_ATTEMPT" == 1 && -n "${STAGING_TELEGRAM_BOT_TOKEN:-}" &&
+       -n "${STAGING_TELEGRAM_CHALLENGE:-}" ]] || {
+        echo "Private reminder requires a first manual main run and protected staging secrets." >&2
+        exit 64
+    }
+    reminder=1
+elif [[ "$#" != 0 ]]; then
+    exit 64
+fi
 unset DOCKER_HOST DOCKER_CONTEXT
 export DOCKER_HOST=unix:///var/run/docker.sock
 project="clinic-staging-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -20,6 +32,7 @@ docker_cmd=(env -i "PATH=$PATH" "HOME=$HOME" "DOCKER_HOST=$DOCKER_HOST" docker)
 compose=("${docker_cmd[@]}" compose --project-directory "$PWD/ops" --project-name "$project" --env-file "$env_file" -f ops/compose.staging.yml -f "$overlay")
 
 baseline=FAIL
+reminder_result=NOT_RUN
 cleanup() {
     local rc=$? teardown=FAIL containers networks volumes images
     trap - EXIT INT TERM
@@ -37,7 +50,8 @@ cleanup() {
         printf '| Check | Result |\n|---|---|\n'
         printf '| Isolated Compose, revision, migrations, synthetic data | %s |\n' "$baseline"
         printf '| Teardown | %s |\n' "$teardown"
-        printf '| Full staging smoke and external delivery | NOT_RUN |\n'
+        printf '| Staging private reminder accepted by Telegram | %s |\n' "$reminder_result"
+        printf '| Full staging smoke and other external delivery | NOT_RUN |\n'
         printf '| Release admission | NOT_RUN |\n'
         printf '\nGate D runs separately on pushes to main. This result does not authorize deployment.\n'
     } >> "${GITHUB_STEP_SUMMARY:?}"
@@ -77,7 +91,12 @@ services:
 YAML
 
 "${compose[@]}" config --quiet
-"${compose[@]}" up --build --wait --wait-timeout 240
+if [[ "$reminder" == 1 ]]; then
+    # The one-shot arq worker runs in the verifier, with no cron workers.
+    "${compose[@]}" up --build --wait --wait-timeout 240 postgres redis backend frontend
+else
+    "${compose[@]}" up --build --wait --wait-timeout 240
+fi
 "${compose[@]}" exec -T backend python -m app.synthetic_seed --count-patients 8 --count-visits 0 --confirm-synthetic-seed
 "${compose[@]}" exec -T backend python - <<'PY'
 from alembic.config import Config
@@ -114,3 +133,9 @@ assert b"const BUILD_VERSION = '" + sha.encode() + b"';" in get("http://127.0.0.
 assert json.loads(get("http://127.0.0.1:18080/api/v1/health"))["db"] == "ok"
 PY
 baseline=PASS
+
+if [[ "$reminder" == 1 ]]; then
+    reminder_result=FAIL_OR_UNCONFIRMED
+    python3 -c 'import json, os; print(json.dumps({"token": os.environ["STAGING_TELEGRAM_BOT_TOKEN"], "challenge": os.environ["STAGING_TELEGRAM_CHALLENGE"]}))'         | "${compose[@]}" exec -T backend python scripts/staging_telegram_reminder.py
+    reminder_result=PASS
+fi
