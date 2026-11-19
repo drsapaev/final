@@ -66,6 +66,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.visit import Visit
+from app.services.all_free_approval import (
+    ALL_FREE_DECISION_REQUIRED,
+    all_free_decision_required_clause,
+)
 from app.services.visit_state_checks import (
     ACCEPTED_VISIT_STATUSES,
     force_reopen_target_allowed,
@@ -114,6 +118,16 @@ class VisitLifecycleService:
         if not visit:
             raise VisitNotFoundError(f"Visit {visit_id} not found")
         return visit
+
+    def _require_confirmation_approval(self, visit_id: int) -> None:
+        # Read the approval after locking the visit without refreshing any
+        # staged ORM changes belonging to the caller's transaction.
+        if (
+            self.db.query(all_free_decision_required_clause())
+            .filter(Visit.id == visit_id)
+            .scalar()
+        ):
+            raise HTTPException(status.HTTP_409_CONFLICT, ALL_FREE_DECISION_REQUIRED)
 
     # ─── Core transition logic ────────────────────────────────────────
 
@@ -221,6 +235,11 @@ class VisitLifecycleService:
                         )
 
         visit = self._load_visit_for_update(visit_id)
+        if target_status == "confirmed" or (
+            visit.status == "pending_confirmation"
+            and target_status in ("open", "in_progress", "completed")
+        ):
+            self._require_confirmation_approval(visit_id)
 
         # PR-1 (Codex rounds 14+15, P2): a lifecycle transition out of
         # ``pending_confirmation`` must not commit while a reminder
@@ -560,6 +579,7 @@ class VisitLifecycleService:
                         )
 
         visit = self._load_visit_for_update(visit_id)
+        self._require_confirmation_approval(visit_id)
 
         # PR-1 (Codex round 14, P2): the patient-facing confirm is a
         # lifecycle transition out of ``pending_confirmation`` — see the

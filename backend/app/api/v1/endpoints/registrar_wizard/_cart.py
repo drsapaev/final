@@ -18,6 +18,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
 from app.crud import audit as crud_audit
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
+from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
 from app.services.price_override_approval import (
     PriceOverrideApprovalError,
     PriceOverrideApprovalService,
@@ -92,6 +93,10 @@ def create_cart_appointments(
         # re-read (an unlocked reload would see settings rows inserted by the
         # admin endpoint after revalidation, which FOR UPDATE cannot lock).
         registration_settings = validated_settings or _load_registration_discount_settings(db)
+        awaiting_decision = (
+            effective_discount_mode == "all_free"
+            and not registration_settings["all_free_auto_approve"]
+        )
 
         # RQ-05.a (server-side doctor eligibility): requires_doctor=true
         # услуги не должны сохраняться без врача, с неактивным врачом или
@@ -170,12 +175,9 @@ def create_cart_appointments(
                         detail=f"Повторный визит недоступен: нет консультации у этого врача за последние {repeat_visit_days} дней",
                     )
 
-            # [OK] ИСПРАВЛЕНО: Регистратор всегда создаёт подтверждённые записи
-            # Фича-флаг "confirmation_before_queue" применяется только для онлайн-записей (телеграм/PWA)
-            # Записи от регистратора сразу попадают в очередь
-            visit_status = "confirmed"
-            confirmed_at = datetime.now(UTC)
-            confirmed_by = f"registrar_{current_user.id}"
+            visit_status = "pending_confirmation" if awaiting_decision else "confirmed"
+            confirmed_at = None if awaiting_decision else datetime.now(UTC)
+            confirmed_by = None if awaiting_decision else f"registrar_{current_user.id}"
 
             # [OK] ИСПРАВЛЕНО: Добавляем микрозадержку для разных created_at
             # Это гарантирует, что визиты одного пациента будут иметь разные временные метки
@@ -235,12 +237,7 @@ def create_cart_appointments(
                 discount_mode=effective_discount_mode,
                 services=services_data,
                 status=visit_status,
-                approval_status=(
-                    "approved"
-                    if effective_discount_mode != "all_free"
-                    or registration_settings["all_free_auto_approve"]
-                    else "pending"
-                ),
+                approval_status="pending" if awaiting_decision else "approved",
                 confirmed_at=confirmed_at,
                 confirmed_by=confirmed_by,
                 auto_status=False,  # Статус уже установлен выше
@@ -375,6 +372,9 @@ def create_cart_appointments(
                         }
                     )
 
+                confirmation_available = (
+                    visit.status == "pending_confirmation" and not awaiting_decision
+                )
                 created_visits_info.append(
                     {
                         "visit_id": visit.id,
@@ -385,11 +385,9 @@ def create_cart_appointments(
                         "status": visit.status,
                         "department": visit.department,
                         "services": services_info,
-                        "confirmation_required": visit.status == "pending_confirmation",
+                        "confirmation_required": confirmation_available,
                         "confirmation_token": (
-                            visit.confirmation_token
-                            if visit.status == "pending_confirmation"
-                            else None
+                            visit.confirmation_token if confirmation_available else None
                         ),
                     }
                 )
@@ -402,7 +400,9 @@ def create_cart_appointments(
             # Визиты уже сохранены, поэтому не откатываем транзакцию
 
         # Определяем сообщение в зависимости от результата
-        if queue_numbers:
+        if awaiting_decision:
+            message = ALL_FREE_DECISION_REQUIRED
+        elif queue_numbers:
             message = f"Корзина создана успешно. Присвоено номеров в очередях: {sum(len(assignments) for assignments in queue_numbers.values())}"
         else:
             message = "Визиты созданы. Номера в очередях будут присвоены в день визита."

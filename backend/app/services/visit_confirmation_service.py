@@ -28,6 +28,10 @@ from app.models.service import Service
 from app.models.telegram_config import TelegramUser
 from app.models.visit import Visit, VisitService
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
+from app.services.all_free_approval import (
+    ALL_FREE_DECISION_REQUIRED,
+    all_free_decision_required_clause,
+)
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.context_facades.queue_facade import (
     QueueContextFacade,
@@ -271,6 +275,7 @@ class VisitConfirmationService:
             wait_for_reminder_lease_clear,
         )
 
+        approval_required = all_free_decision_required_clause()
         # The lease pre-read uses a bare COLUMN select (like
         # lease.wait_for_reminder_lease_clear itself): a column select
         # never returns the cached identity-map instance, so it sees the
@@ -281,6 +286,7 @@ class VisitConfirmationService:
             .filter(
                 Visit.confirmation_token == token,
                 Visit.status == "pending_confirmation",
+                ~approval_required,
             )
         )
         if expected_visit_id is not None:
@@ -319,6 +325,7 @@ class VisitConfirmationService:
         claim_filters = [
             Visit.confirmation_token == token,
             Visit.status == "pending_confirmation",
+            ~approval_required,
         ]
         if expected_visit_id is not None:
             claim_filters.append(Visit.id == expected_visit_id)
@@ -339,13 +346,22 @@ class VisitConfirmationService:
             # the identity map's possibly-stale copy.
             raced_query = (
                 self.repository.db.query(
-                    Visit.id, Visit.status, Visit.reminder_claimed_at
+                    Visit.id,
+                    Visit.status,
+                    Visit.reminder_claimed_at,
+                    approval_required.label("all_free_decision_required"),
                 )
                 .filter(Visit.confirmation_token == token)
             )
             if expected_visit_id is not None:
                 raced_query = raced_query.filter(Visit.id == expected_visit_id)
             raced_row = raced_query.first()
+            if (
+                raced_row is not None
+                and raced_row.status == "pending_confirmation"
+                and raced_row.all_free_decision_required
+            ):
+                raise VisitConfirmationDomainError(409, ALL_FREE_DECISION_REQUIRED)
             if (
                 raced_row is not None
                 and raced_row.status == "pending_confirmation"

@@ -10,6 +10,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _build_repeat_eligibility_preview_item,
     _load_registration_discount_settings,
 )  # noqa: F401
+from app.services.all_free_approval import awaits_all_free_decision
 from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.payment_invoice_service import PaymentInvoiceService
 
@@ -357,12 +358,13 @@ def check_invoice_status(
                                         visit.id,
                                     )
 
-                                VisitLifecycleService(db).confirm_visit(
-                                    visit_id=visit.id,
-                                    current_user=_InvoiceActor(invoice.id),
-                                    confirmed_by=f"invoice_{invoice.id}",
-                                    commit=False,
-                                )
+                                if not awaits_all_free_decision(visit):
+                                    VisitLifecycleService(db).confirm_visit(
+                                        visit_id=visit.id,
+                                        current_user=_InvoiceActor(invoice.id),
+                                        confirmed_by=f"invoice_{invoice.id}",
+                                        commit=False,
+                                    )
 
                         invoice.status = "paid"
                         invoice.paid_at = datetime.now(UTC)
