@@ -1,3 +1,97 @@
+## T19 — PR #4117 review fixes and Tier 2 deferral — 2026-11-19
+
+- Review at `7e332a5ef` found two P2 issues. The Admin editor refreshes its target catalog after profile changes, waits for an in-flight save to finish, and retains unsaved edits and their original expected version. The Registrar strip keeps its first visible tab keyboard reachable while a hidden historical filter remains selected.
+- Four regression cases failed on the previous behavior. After the fixes, 73 tests passed in five focused Admin, navigation and worklist suites. The PR links to the required CI for the final candidate.
+- Original requirement: backend-dependent browser acceptance under `docs/AGENTS_UI.md` §13, including `auth-flow.spec.ts`, `payment-system.spec.ts`, `queue-system.spec.ts`, `admin-navigation.spec.ts` and `panel-qa-admin-live.spec.ts` where applicable.
+- Reason and decision: the user explicitly authorized merge after the review fixes without a new staging run.
+- Evidence: the earlier synthetic T19 runs cover Admin TOTP, Registrar read/write boundaries, saved tab changes, history and audit checks on their recorded revisions. The review fixes have focused frontend test coverage. Their live staging checks remain NOT RUN.
+- Owner and resume condition: T19 Registrar tabs and integrated T18 acceptance. Run the remaining applicable live specs and the full staging checklist against the intended release revision in an owned synthetic environment before production rollout.
+- Headline impact: the deferral contributes zero completed coverage. Full Tier 2 and T18 stay PARTIAL.
+
+## T19 — recovery policy and existing evidence review — 2026-11-19
+
+- User decision: preserve an owned synthetic staging project after failure, diagnose and continue the remaining checks on the same verified project. Set `KEEP_STAGING=1` in the launcher process for both Start and Session; record ownership, lease and failure in the checkpoint. Successful Session still performs owned-project cleanup. See DECISIONS and `docs/runbooks/WSL_STAGING_SESSION.md`.
+- Existing launcher behavior verified offline: five focused `test_wsl_staging_guard.py` cases PASS, covering failed Start/Session with and without KEEP and successful Session cleanup with KEEP. No Docker or staging project was started for these tests.
+- The second project had already been removed before this decision. Its saved scratch contains one pre-change queue/entry snapshot but no post-change snapshot; the browser report contains only a console-error count, not messages or asset hashes. The frontend image is no longer available. These missing results cannot be reconstructed from that run.
+- Earlier PostgreSQL evidence recorded 12 passing integration cases; the service and schema fingerprints match the tested `5a209da6b` source. Those cases include audit rollback/projection and queue-count assertions, but they do not replace the missing nonempty before/after history fingerprint in this browser run. The scratch harness now classifies future console errors into fixed categories without storing raw text; offline classifier/comparator checks 4/4 PASS. Old seven errors remain NOT_CLASSIFIED.
+
+## T19 — PR #4117 second synthetic staging cycle — 2026-11-19
+
+- Exact tested commit: `5a209da6bbe016a9540dd231d85b48603ce7c0e1`. On that commit GitHub checks finished with 32 success and 11 skipped; skipped jobs are not passes.
+- Canonical Preflight and Start: PASS using owned synthetic project `clinic-t19-p4117-5a209-r2`, loopback frontend/backend/PostgreSQL ports `18194/18195/55494`, one backend worker and sequential image builds. Start reported `served_revision_verified=false`.
+- The actual browser report is preserved as [T19-PR4117-CYCLE2-REPORT.json](T19-PR4117-CYCLE2-REPORT.json). Original report SHA256: `ebd655d5b1e5738c5a6785dd81b0ef57c0939c02668196f37071bb469300dd6b`; tracked copy SHA256: `733179f11746e7c3593f3f8dd020a404967972ce4e8c243d8d66540a90f2b16f`. The standard end-of-file hook added one final newline; all preceding bytes are identical. It contains 19 PASS checks: normal Admin TOTP enrollment and subsequent password/TOTP login; legacy state and synthetic targets; mixed Admin edit/save/order/rename/hide/show; no automatic append of a newly created doctor; stale version refusal; Registrar API order, denied write and UI order; explicit empty registry and staff read; zero page errors. These results do not establish full Tier-2 or overall system health.
+- Canonical Session result: FAIL, child exit 1 at the wrapper's browser-assertion phase. The browser report itself is PARTIAL, with the final database snapshot comparison and verified frontend manifest comparison NOT_RUN. It records seven console errors without their contents, so their cause is NOT_CLASSIFIED; no inference is made about them. No history-preservation or audit-count PASS is claimed.
+- Likely wrapper root cause: Windows PowerShell 5.1 `Start-Process -PassThru` returned a null ExitCode for an independently launched successful Node child when its process handle had not been opened. The original failed run did not record its actual exit-code value. The scratch runner now acquires the process handle immediately; isolated probes returned the correct codes for both exit 0 and exit 1. No second staging run occurred after this fix.
+- Cleanup: Session reported `STAGING_TEARDOWN=PASS`; independent inventory found zero owned containers, volumes and networks, three free ports and no project-local images. The private synthetic env was deleted. No production data, queue or history was touched.
+- Remaining: run a fresh owned cycle for a post-change queue/history and audit comparison, classify console errors without logging sensitive data, and establish served-asset provenance. T19 Tier-2 and umbrella T18 remain PARTIAL; no reviewer deferral, merge or deployment.
+
+## T19 — PR #4117 synthetic staging attempt and CI repair — 2026-11-19
+
+- Candidate tested: `e31c4befe3073b8d4582ae97f4ec11415a6697fc`, merge of feature `644949d460eee2942447115ec32cafd86bd51927` with main `933b1fe1fe83fc60ee6ab5825e775dec84abfd35`. The two generated contract conflicts were regenerated from the merged app. Compared with main, OpenAPI adds only two Registrar tab paths and nine related schemas; no shared paths or schemas changed. Repeated generated type output was identical; 13 schema tests passed; Alembic reports one head. Standard commit hooks, including Gitleaks, passed.
+- One authorized owned synthetic cycle used project `clinic-t19-p4117-e31c4-20261119`, loopback frontend/backend/PostgreSQL ports `18184/18185/55484`, one backend worker and sequential Compose builds. Canonical Preflight PASS and Start PASS; all five services reached readiness. Start reported `served_revision_verified=false`.
+- Canonical Session FAIL: its child exited before seeding or browser launch because Windows backslashes were lost in the `wslpath` invocation. This is a harness failure; Admin login/TOTP, Registrar UI, RBAC, history comparisons and served-asset attestation are NOT_RUN. No application failure or successful functional scenario is inferred.
+- Canonical teardown reported PASS. Independent post-check: zero project containers, volumes and networks; all three ports free; project-local images absent. The private synthetic env was removed. The scratch harness now passes slash-normalized paths to `wslpath -u`; PowerShell parsing and three read-only path conversions passed. The corrected Session has not been rerun.
+- CI on `e31c4befe`: seven jobs failed at `actions/setup-python` before tests because pinned Python 3.11.10 is unavailable on GitHub Ubuntu 26. The official `actions/python-versions` manifest lists stable Python 3.11.18 for Ubuntu 22/24/26. Four affected workflow pins were updated without disabling checks or changing permissions. All four YAML files parse. Actionlint 1.7.12 exited 1 on both baseline and candidate with byte-identical existing diagnostics; no new actionlint diagnostic was introduced. Exact-head CI after this patch is pending.
+- Limits: full `STAGING_VALIDATION.md`, browser scenarios and served-frontend provenance remain incomplete; T19 Tier-2 is NOT_RUN for functionality and umbrella T18 remains PARTIAL. No accepted deferral, production deployment or merge.
+
+## T19 — PR #4117 reviewed visual baseline proof — 2026-11-16
+
+Corrected source/test HEAD: 82fb7f7cad967f5ab82951756450c7c6b423892c. [Hosted run](https://github.com/drsapaev/final/actions/runs/43919809748): full frontend unit 525 files / 4427 PASS; build, lint, quality, Gitleaks, OpenAPI freshness and metadata gates PASS. Backend was still running. Visual step: 134 PASS, four screenshot assertions failed after all new registry response/count/name/readiness assertions succeeded.
+
+Canonical Linux actual images came from playwright-failure-artifacts, artifact 14252484656, digest be89790137adf3e3f545eea02ec26ba8901355a0c4be343fbf5085231086bfac (expires 2026-11-30). All four expected/actual/diff triplets were visually reviewed. Only four approved PNG baselines were replaced, byte-identically from actual files; no thresholds, masks, skips or source changes.
+
+| Image | Different pixels before replacement | Reviewed cause |
+|---|---:|---|
+| registrar-eat-desktop | 25360 (3%) | One mixed profile/doctor strip, compact desktop padding; content rises 16px. |
+| registrar-eat-mobile-scroll | 7481 (3%) | Mobile labels retained and horizontal scroll; content moves 4px. |
+| pr18-registrar-light | 27202 (3%) | Same six labels/order/icons, compact strip and content offset 16px. |
+| pr18-registrar-dark | 30152 (4%) | Same light-theme structural delta in dark theme. |
+
+Inherited baseline drift is explicit: EAT desktop PNG predates main at f9a6eca0e, mobile at f0650f6d1; PR18 PNGs at d4dd0ac73 (#3068). Main header change 8041e9b72 (#3075) removed max-width:fit-content from icon controls, shortening available search width; source anchors frontend/src/styles/header-new.css:90 and frontend/src/components/layout/HeaderNew.tsx:498. Counter change 61232b20e (#3272) already renders patient-based labels; anchors frontend/src/pages/registrar/views/WorklistView.tsx:153 and frontend/src/pages/registrar/registrarWorklistRows.ts:441. All four source files are unchanged between base d7eaa2d24 and tested HEAD82fb7f7ca. This is classified as stale visual-baseline drift, not new application behavior. New strip delta follows removed inline 8px/16px padding in Tabs.tsx and current Tabs.css desktop/mobile padding. Review found no unexplained differences, error banners, missing blocks or new clipping.
+
+Committed PNG byte proof:
+
+| Baseline file | SHA256 of canonical actual / committed copy |
+|---|---|
+| registrar-eat-mobile-scroll-chromium-linux.png | af62113e43ff83cf910b3c7fc0d6ecec0b88bd36718f9a64b19b2143602cb522 |
+| registrar-eat-desktop-chromium-linux.png | c6ebf73ddbff58a7f9777d0001826975f52f6ee7a78a413b040db7ecf4521d74 |
+| pr18-registrar-light-chromium-linux.png | 36654095d3cdd821f3bbcbac9d53d78dc332f2be55f3bf484fd7e90666db7f3d |
+| pr18-registrar-dark-chromium-linux.png | 4629c8c1698feccb02906052a8c551264cf6a3ec66848f4bee27d3bcf577151b |
+
+Normal hook-enabled baseline commit/new exact-head CI follow. Full Tier-2/Admin2FA and system runbook remain NOT_RUN/PARTIAL; no production, merge or deploy.
+
+
+## T19 — PR #4117 full-suite fixture correction — 2026-11-16
+
+Hosted source HEAD c82a6cbde: Gitleaks and GitGuardian PASS; frontend build/lint, code quality, OpenAPI freshness, Regression Audit and metadata gates PASS. Full frontend unit reported 7 failed / 4420 passed in 2 suites: QueueProfilesManager.interactions used previous translated profile labels; WorklistView.tabpanel mocked the previous profiles endpoint/automatic doctor props. Both corrected with behavioral assertions retained; combined focused rerun 43/43 PASS. Prior runtime checks (68 focused tests, type-check/build) remain recorded above/below, not reclassified as full-suite proof.
+
+Hosted visual run: 4 failed / 134 passed. Actual Registrar images contained an error banner because visual-regression.spec.ts and authenticatedQa.ts omitted /registrar/tabs. Correction provides explicit synthetic typed registries with stable positive IDs and full DTO fields. Four affected visual cases now require successful registry response and expected tabs before capture. `tsc -p e2e/tsconfig.json --noEmit` PASS; Playwright collection finds exactly 4 targeted cases (collection only, zero executed after correction); scoped E2E ESLint PASS (0 errors, 23 existing/fixture warnings). Read-only bounded review found no actionable defects or weakened checks. No screenshot PNG, tolerance, skip or runtime change. Corrective commit and new hosted CI follow; integrated live Tier-2 remains NOT_RUN. Own artifacts stay in worktree scratch; no staging or live data used.
+
+## T19 — bounded final review fixes — 2026-11-16
+
+Source baseline: feature commit 28746c3b4, clean main synchronization 5bac9c1f9 including d7eaa2d24. Follow-up changes are limited to AdminServices, RegistrarTabsManager, Tabs and their three regression suites. No auth implementation, route registry, queue/history or schema changes. Mandatory exact-owner launcher returned narrow_override, gate_misroute=false, override_used=true; execution prompt and allowed paths were recorded before editing.
+
+Sequential commands on this candidate: `npm run type-check` PASS; `npm run test:run -- src/components/admin/__tests__/AdminServices.navigation.test.tsx src/components/admin/__tests__/RegistrarTabsManager.test.tsx src/components/navigation/__tests__/Tabs.a11y.test.tsx src/components/navigation/__tests__/Tabs.focusRefresh.test.tsx src/pages/__tests__/RegistrarPanel.contract.test.tsx` — 5 files, 68 PASS, zero skipped. New cases cover same-owner remount, original save version under server drift, failed authorized load, different user/clinic/unknown owner isolation, reload/discard/save cache clearing, and profile/doctor hidden-filter accessible IDREF resolution. In-memory draft data never enters browser storage. Final production frontend build PASS (1m17s); bounded follow-up read-only review found no new P0–P2. Hook-enabled follow-up commit/push and exact-head CI follow this checkpoint; integrated Tier-2 remains NOT_RUN, no deferral accepted.
+
+## T19 — штатное восстановление Gitleaks — 2026-11-16
+
+Gitleaks v8.21.2 local Go-build was denied by CodeIntegrity3077/3033. Official Windows x64 archive SHA256 f238c85e5f47e18fac779ce71ee11091cf70a0a8fb4415f165efba2800eef133 matched upstream checksums; binary SHA256 671591bd75e11fcd4a25732852afbbf0c3892b368181164ba19aa72e7513af8e ran normally. Generated cache binary replaced with identical verified official artifact; original backed up. Standard staged hook: PASS/no leaks. Full pre-commit: PASS (ESLint one ignored-generated-file warning); no SKIP/no-verify/policy change. Operational cache recovery is local and not an application source change.
+
+## T19 — единые вкладки — 2026-11-16
+
+T19 candidate is WORKTREE_ONLY (not a committed acceptance SHA), base0f593d291. QueueProfile inspection and plan preceded implementation. Backend launcher ran tests/unit/test_registrar_tabs_schema.py and tests/integration/test_registrar_tabs.py: 25 PASS, 0 skipped (13 schema +12 PG). PG was a task-owned postgres16-alpine on loopback55491; unique scratch DB migrated to Alembic head then dropped, container removed. Frontend targeted: RegistrarTabsManager, AdminServices.navigation, Tabs.a11y, Tabs.focusRefresh, RegistrarPanel.contract:59 PASS. type-check, scoped ESLint/Ruff and build PASS; existing build warnings remain. OpenAPI and generated API types refreshed.
+
+Mocked Chromium smoke: 6 assertions passed for mixed list/order/name/save/hide, no automatic extra doctor, mobile and desktop text visibility. Tested1280/375. All API/external requests intercepted and WebSockets closed, no live auth/2FA. Three parser errors were retained in report; source inspection plus offline parse reproduction strongly attributes them to JSON returned for SpeedInsights JavaScript by the harness; browser stacks absent, so this remains inference. Mobile shell overflow outside the scrollable tab strip remains a separate limitation. Own Vite5198 stopped and browser closed. No normal Admin2FA, integrated staging/runbook or production validation is claimed.
+
+Local source fingerprints after formatting (for handoff only):
+
+| File | SHA256 |
+|---|---|
+| backend/app/services/registrar_tabs.py | c1965c3e39fbc3be19161f67153ef3a696be4e4373fed7bdda086982878f09cf |
+| backend/app/schemas/registrar_tabs.py | 48af9ec9fee741eb355d1602410b7b761fa604038c9b411a43bf7bc614993be9 |
+| frontend/src/components/admin/RegistrarTabsManager.tsx | d9afe081959133e4dc499cc9e57828b6a208f0ac1eb92e3c0c71d7c579e7b2e9 |
+| frontend/src/components/navigation/Tabs.tsx | 30bef0db1ebe04efe73dd8ef46885d8a89b17ee8386b934cd90f299dc0a52730 |
+
 ## T18 — PR #4026 exact-head CI completed — 2026-11-12T02:12:26+05:00
 
 - Commit under test: 592d327d7053a1031cef157e1c34adbb2e0d978a; base 80a616d16e407362bac16b9b2092e83070676711 (#4031). This head includes the prior test-only synchronization changes at 9869a837 and an evidence-only commit; application/test source did not change after 9869a837.
