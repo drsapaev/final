@@ -2,7 +2,9 @@
 
 ## Уточнение T19 — единое управление вкладками регистратуры (2026-11-16)
 
-**Статус:** IMPLEMENTED / DRAFT PR #4117 / FRONTEND UNIT 4427 PASS ON 82fb7f7ca / CURRENT-HEAD CI PENDING / TIER-2 NOT_RUN. Дополнение касается внутренних вкладок; исторические статусы T00–T18 ниже сохраняются. База: origin/main 0f593d291 после merge #4073. Task memory: ad5eac7f-734f-4b24-8d57-437008bacdb8. Штатный Gitleaks hook восстановлен проверенным официальным бинарником той же версии; все pre-commit checks PASS. Реализация и CI fixture correction отправлены в Draft PR #4117; четыре reviewed baseline обновляются в том же PR. Обход проверок не применялся.
+**Статус на 19 ноября 2026:** T19 **MERGED** в [PR #4117](https://github.com/drsapaev/final/pull/4117), squash `e33adf5e949cdb5b6cad225aba36a200a8ebd44a`. Проверенный HEAD `4f95116c6`, CI 33 PASS / 12 SKIPPED после повтора Frontend E2E. Оба P2 закрыты. **Tier‑2 — PARTIAL**, новый live staging отложен по решению пользователя. Детали в [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
+
+**Текущий этап плана:** T00–T17 и T19 слиты. T18 остаётся **IN_PROGRESS / PARTIAL**. Текущий этап T18 продолжается в PR #4034. Сверить синхронизированный HEAD, проверить локальные тесты сборщика ресурсов и обязательный CI, затем передать PR пользователю для merge. Свидетельства synthetic RQ‑18 на `355d1a94` сохранены. Проверка service worker, оставшиеся live‑сценарии и полный предрелизный checklist остаются открытыми. Точка продолжения описана в [RESUME.md](admin-queue-simplification/RESUME.md).
 
 Пользователь отверг разделение на две группы «Направления»/«Врачи»: все вкладки должны настраиваться в одном месте. Незакоммиченный grouped patch сохранён отдельно и не является итоговой реализацией.
 
@@ -29,7 +31,7 @@
 1. T19.1 — typed DTO/service/routes, generic-settings guard, optimistic version, atomic audit. Проверки RBAC, duplicates/invalid target, empty, stale PUT, audit rollback и read-only legacy; отсутствие queue writes.
 2. T19.2 — одна Admin таблица: добавить цель, название, показать/скрыть, переместить, удалить вкладку, сохранить. Registrar читает единый endpoint без второго автоматического списка врачей. Старый редактор профилей остаётся раскрываемым блоком «Направления и QR».
 3. T19.3 — OpenAPI/generated types; focused tests mixed order, visibility, empty/error, deep links/back/forward. Пять локалей и видимые мобильные названия.
-4. Synthetic PostgreSQL/browser с обычным Admin 2FA, явным first-save и отсутствием новых автодобавлений. До фактического прогона NOT_RUN; полный T18/STAGING_VALIDATION остаётся PARTIAL.
+4. Synthetic PostgreSQL/browser с обычным Admin 2FA, явным first-save и отсутствием новых автодобавлений. Целевые результаты записаны для протестированных ревизий. Новый live staging и полный T18/STAGING_VALIDATION остаются открытыми.
 
 Откат сохраняет конфигурацию/audit и данные очередей. Production/deploy/merge отдельно. Stop: необходимость менять ownership/history/admission, неоднозначный target, повреждённая настройка или недоступная обязательная проверка/штатный security hook.
 
@@ -119,6 +121,7 @@
 | T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
 | T17 | MERGED | Bulk/CSV; PR #3721 merged after the user's confirmation |
 | T18 | IN_PROGRESS / PARTIAL | T18.10 and RQ-18 PASS on recorded app SHA; current-source T18.1–5 and T18.8–9, compatible legacy live-spec harness, final QA/runbook evidence remain |
+| T19 | MERGED / TIER-2 PARTIAL | PR #4117, merge `e33adf5e9`. Новый live staging отложен. |
 
 ### Неопределённости и условия их закрытия
 
