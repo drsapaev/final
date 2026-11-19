@@ -4,7 +4,7 @@
 
 **Статус на 19 ноября 2026:** T19 **MERGED** в [PR #4117](https://github.com/drsapaev/final/pull/4117), squash `e33adf5e949cdb5b6cad225aba36a200a8ebd44a`. Проверенный HEAD `4f95116c6`, CI 33 PASS / 12 SKIPPED после повтора Frontend E2E. Оба P2 закрыты. **Tier‑2 — PARTIAL**, новый live staging отложен по решению пользователя. Детали в [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
 
-**Текущий этап плана:** T00–T17 и T19 слиты. T18 остаётся **IN_PROGRESS / PARTIAL**. Текущий этап T18 продолжается в PR #4034. Сверить синхронизированный HEAD, проверить локальные тесты сборщика ресурсов и обязательный CI, затем передать PR пользователю для merge. Свидетельства synthetic RQ‑18 на `355d1a94` сохранены. Проверка service worker, оставшиеся live‑сценарии и полный предрелизный checklist остаются открытыми. Точка продолжения описана в [RESUME.md](admin-queue-simplification/RESUME.md).
+**Текущий этап плана:** T00–T17 и T19 слиты. T18 остаётся **IN_PROGRESS / PARTIAL**. Чекпоинт #4131 слит в `51f633fbc`. Локально подтверждены регистрационный ответ и активация SW на кэшируемых ответах. Вариант `no-store` с телом воспроизводит зависание установки. См. [RESUME.md](admin-queue-simplification/RESUME.md).
 
 Пользователь отверг разделение на две группы «Направления»/«Врачи»: все вкладки должны настраиваться в одном месте. Незакоммиченный grouped patch сохранён отдельно и не является итоговой реализацией.
 
@@ -120,7 +120,7 @@
 | T15 | MERGED | Восстанавливаемый URL-контекст; #3711, merge `ccbf519fdb0f9a32c3a71837202dfea296f13383` |
 | T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
 | T17 | MERGED | Bulk/CSV; PR #3721 merged after the user's confirmation |
-| T18 | IN_PROGRESS / PARTIAL | T18.10 and RQ-18 PASS on recorded app SHA; current-source T18.1–5 and T18.8–9, compatible legacy live-spec harness, final QA/runbook evidence remain |
+| T18 | IN_PROGRESS / PARTIAL | RQ-18 recorder #4034 и чекпоинт #4131 слиты. Локальная активация SW прошла на кэшируемых ответах; установка на no-store с телом зависла. Live-сценарии ожидают staging. |
 | T19 | MERGED / TIER-2 PARTIAL | PR #4117, merge `e33adf5e9`. Новый live staging отложен. |
 
 ### Неопределённости и условия их закрытия
