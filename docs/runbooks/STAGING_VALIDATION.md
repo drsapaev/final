@@ -560,7 +560,9 @@ except Exception:
 if not result.get("ok"):
     raise SystemExit("Telegram getMe failed; inspect staging bot configuration without sharing the token")
 bot = result["result"]
-print(f"OK: is_bot={bot.get('is_bot')} username=@{bot.get('username', '')}")
+if bot.get("is_bot") is not True or bot.get("username", "").lower() != "kosmed_staging_bot":
+    raise SystemExit("Wrong Telegram bot; no message sent")
+print("OK: verified dedicated staging bot")
 PY
 
 # 2. Send one test message only to the explicitly designated synthetic staging
@@ -574,6 +576,27 @@ import urllib.request
 
 token = os.environ.get("STAGING_TELEGRAM_TOKEN") or getpass.getpass("Staging bot token: ")
 chat_id = getpass.getpass("Synthetic staging test chat ID: ")
+if not chat_id.removeprefix("-").isascii() or not chat_id.removeprefix("-").isdigit() or not chat_id.startswith("-"):
+    raise SystemExit("Expected the dedicated staging group ID; no message sent")
+chat_request = urllib.request.Request(
+    f"https://api.telegram.org/bot{token}/getChat",
+    data=urllib.parse.urlencode({"chat_id": chat_id}).encode(),
+)
+try:
+    with urllib.request.urlopen(chat_request, timeout=15) as response:
+        chat_result = json.load(response)
+except Exception:
+    raise SystemExit("Cannot verify staging Telegram group; no message sent") from None
+group = chat_result.get("result", {})
+if (
+    chat_result.get("ok") is not True
+    or str(group.get("id")) != chat_id
+    or group.get("type") not in {"group", "supergroup"}
+    or group.get("title") != "KosMed Staging Alerts"
+    or group.get("username")
+    or group.get("active_usernames")
+):
+    raise SystemExit("Unexpected Telegram destination; no message sent")
 body = urllib.parse.urlencode({"chat_id": chat_id, "text": "Staging Telegram delivery check"}).encode()
 request = urllib.request.Request(
     f"https://api.telegram.org/bot{token}/sendMessage",
@@ -585,15 +608,25 @@ try:
         result = json.load(response)
 except Exception:
     raise SystemExit("Telegram test send failed; inspect staging configuration without sharing token or chat ID") from None
-if not result.get("ok"):
-    raise SystemExit("Telegram test send failed; inspect staging configuration without sharing token or chat ID")
-print("OK: Telegram accepted the staging test message")
+if result.get("ok") is not True or not result.get("result", {}).get("message_id"):
+    raise SystemExit("Telegram did not confirm a message ID for the staging transport check")
+print("OK: Telegram accepted the staging test message and returned a message ID")
 PY
 
-# 3. Trigger a reminder for the synthetic, staging-linked patient via arq
-# (Check 5 step 2); verify it arrives in that same synthetic test chat.
+# 3. Do not link the group as a patient. The separate patient-reminder
+# check below requires a consented private one-to-one chat.
 )
 ```
+
+**These are separate checks.** The group verifies Bot API transport only.
+For patient reminder delivery, the existing application requires an active,
+opted-in link to a positive Telegram chat ID (a private one-to-one chat).
+The operator must approve a dedicated test recipient who has started
+`@kosmed_staging_bot`. Verify that recipient with the test bot, link it only to
+a synthetic patient in the disposable DB, enqueue the versioned reminder
+through arq, and observe the actual message in the private conversation.
+Do not relax the private-chat guard or report group delivery as patient
+reminder proof. With no approved private recipient, record `NOT_RUN`.
 
 The staging DB must contain either no bot-token setting or the same dedicated
 staging bot token. If a token was configured through Admin → Telegram settings,
@@ -927,16 +960,17 @@ outside the test chat.
 |---|---|---|
 | Frontend Sentry (React) | [kosmed-staging-frontend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-frontend/) | Synthetic browser error retrieved by event ID in this project; `environment=staging`, release matches the tested SHA |
 | Backend Sentry (FastAPI) | [kosmed-staging-backend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-backend/) | Synthetic backend error retrieved by event ID in this project; same environment and SHA |
-| Telegram | `@kosmed_staging_bot`; private group **KosMed Staging Alerts** | Verify the bot identity and allowlisted group first; record the ID of a synthetic message accepted by Telegram through the application |
-| External reminder recipient | Same private Telegram group, staging only | arq processes the versioned synthetic reminder and its unique marker is observed in the group; report this separately from queue processing and do not claim SMS delivery |
+| Telegram transport | `@kosmed_staging_bot`; private group **KosMed Staging Alerts** | Verify the bot identity and the pinned group first; check that Telegram returns a message ID and the synthetic transport test appears in the group |
+| External patient reminder recipient | A separate approved one-to-one chat with the test bot. Not configured. | arq processes the versioned reminder for a linked synthetic patient and the message appears in the approved private chat; report separately from group transport and do not claim SMS delivery |
 
-The destinations exist, but CI credential wiring and delivery verification are
-not yet evidenced. Until both are verified, mark the corresponding checks
+The bot, group, and Sentry projects exist. The two Sentry DSNs and test bot
+token are stored in the protected environment. Recipient wiring, an isolated
+Sentry read credential, and end-to-end delivery are not yet evidenced. Until both are verified, mark the corresponding checks
 `NOT_RUN` or `BLOCKED`, not `PASS`. A Compose baseline PASS, a flushed SDK,
 or a `reminder_sent_at` timestamp does not prove external delivery.
 
-Use a separate protected GitHub Actions environment (suggested name:
-`staging-integrations`), restricted to trusted `main` runs. Do not make its
+Use the separate protected GitHub Actions environment `staging-integrations`,
+restricted to trusted `main` runs. Do not make its
 credentials available to pull-request jobs or Docker build arguments, except
 for the public, send-only frontend DSN used at build time. Map the staging DSNs
 to `VITE_SENTRY_DSN` and `SENTRY_DSN`; use a separate least-privilege Sentry
