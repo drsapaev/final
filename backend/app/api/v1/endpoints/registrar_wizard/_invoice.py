@@ -17,6 +17,8 @@ from app.services.payment_invoice_service import PaymentInvoiceService
 def _lock_invoice_settlement_context(
     db: Session,
     invoice_id: int,
+    *,
+    starting_payment: bool = False,
 ) -> tuple[PaymentInvoice, list[Visit], list[PaymentInvoiceVisit]]:
     """Lock invoice visits before the invoice and revalidate their linkage.
 
@@ -32,15 +34,15 @@ def _lock_invoice_settlement_context(
     if invoice_exists is None:
         raise HTTPException(status_code=404, detail="Invoice не найден")
 
+    link_filters = [PaymentInvoiceVisit.invoice_id == invoice_id]
+    if not starting_payment:
+        link_filters.append(PaymentInvoiceVisit.visit_amount > 0)
     initial_visit_ids = sorted(
         {
             int(row[0])
             for row in (
                 db.query(PaymentInvoiceVisit.visit_id)
-                .filter(
-                    PaymentInvoiceVisit.invoice_id == invoice_id,
-                    PaymentInvoiceVisit.visit_amount > 0,
-                )
+                .filter(*link_filters)
                 .all()
             )
         }
@@ -77,10 +79,7 @@ def _lock_invoice_settlement_context(
 
     invoice_visits = (
         db.query(PaymentInvoiceVisit)
-        .filter(
-            PaymentInvoiceVisit.invoice_id == invoice.id,
-            PaymentInvoiceVisit.visit_amount > 0,
-        )
+        .filter(*link_filters)
         .order_by(PaymentInvoiceVisit.visit_id, PaymentInvoiceVisit.id)
         .populate_existing()
         .all()
@@ -93,6 +92,15 @@ def _lock_invoice_settlement_context(
             status_code=409,
             detail="Состав счёта изменился. Обновите список счетов.",
         )
+
+    if starting_payment:
+        PaymentInvariantService.assert_all_free_decided(visits)
+        invoice_visits = [link for link in invoice_visits if link.visit_amount > 0]
+        if not invoice_visits:
+            raise HTTPException(
+                status_code=409,
+                detail="Счёт не связан с оплачиваемыми визитами",
+            )
     linked_amount = sum(
         (Decimal(str(link.visit_amount)) for link in invoice_visits),
         Decimal("0"),
@@ -111,7 +119,7 @@ def _lock_invoice_settlement_context(
     visits = (
         db.query(Visit)
         .options(selectinload(Visit.services))
-        .filter(Visit.id.in_(initial_visit_ids))
+        .filter(Visit.id.in_({link.visit_id for link in invoice_visits}))
         .order_by(Visit.id)
         .populate_existing()
         .all()
@@ -132,6 +140,7 @@ def init_invoice_payment(
         invoice, visits, invoice_visits = _lock_invoice_settlement_context(
             db,
             payment_req.invoice_id,
+            starting_payment=True,
         )
 
         if invoice.status != "pending":

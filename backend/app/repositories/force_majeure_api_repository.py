@@ -261,7 +261,14 @@ class ForceMajeureApiRepository:
         return created, True
 
     def get_visit(self, visit_id: int) -> Visit | None:
-        return self.db.query(Visit).filter(Visit.id == visit_id).first()
+        """Load the deposit debit target under its canonical visit lock."""
+        return (
+            self.db.query(Visit)
+            .filter(Visit.id == visit_id)
+            .with_for_update(of=Visit)
+            .populate_existing()
+            .first()
+        )
 
     def list_deposit_transactions(
         self,

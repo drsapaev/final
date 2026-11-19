@@ -88,6 +88,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -105,6 +106,10 @@ from app.models.refund_deposit import (
     RefundRequestStatus,
 )
 from app.models.visit import Visit
+from app.services.all_free_approval import (
+    ALL_FREE_DECISION_REQUIRED,
+    awaits_all_free_decision,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +161,15 @@ class PaymentInvariantService:
         visit = self._load_visit_for_update(visit_id)
         self.assert_no_processing_invoice_reservation([visit_id])
         return visit
+
+    @staticmethod
+    def assert_all_free_decided(visits: Iterable[Visit]) -> None:
+        """Check approval while the payment caller holds the visit locks."""
+        if any(awaits_all_free_decision(visit) for visit in visits):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=ALL_FREE_DECISION_REQUIRED,
+            )
 
     def assert_no_processing_invoice_reservation(
         self,
@@ -493,6 +507,7 @@ class PaymentInvariantService:
             raise HTTPException(404, "Visits not found")
         if len({visit.patient_id for visit in visits}) != 1:
             raise HTTPException(400, "Payment requires visits from exactly one patient")
+        self.assert_all_free_decided(visits)
         before = self.summarize_visits(visits)
         if snapshot is not None and snapshot != before["snapshot"]:
             raise HTTPException(
@@ -550,6 +565,7 @@ class PaymentInvariantService:
                 visit already fully paid and overpayment not allowed).
         """
         visit = self._load_visit_for_update(visit_id)
+        self.assert_all_free_decided((visit,))
         self.assert_no_processing_invoice_reservation([visit_id])
         total_cost = self.compute_total_cost(visit)
         paid_amount = self.compute_paid_amount(visit_id)
@@ -656,6 +672,8 @@ class PaymentInvariantService:
         # that calls create_payment_for_visit on the same visit will
         # block here until this transaction commits.
         visit = self._load_visit_for_update(visit_id)
+        if settling_invoice_id is None:
+            self.assert_all_free_decided((visit,))
         self.assert_no_processing_invoice_reservation(
             [visit_id],
             exclude_invoice_id=settling_invoice_id,
@@ -844,6 +862,7 @@ class PaymentInvariantService:
 
         # Acquire row lock — serializes concurrent pending payment attempts.
         visit = self._load_visit_for_update(visit_id)
+        self.assert_all_free_decided((visit,))
         self.assert_no_processing_invoice_reservation([visit_id])
 
         # B1/B4 coordination: check for existing pending payment with

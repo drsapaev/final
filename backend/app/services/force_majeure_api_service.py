@@ -22,6 +22,10 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
+from app.services.all_free_approval import (
+    ALL_FREE_DECISION_REQUIRED,
+    awaits_all_free_decision,
+)
 from app.services.force_majeure_service import (
     ForceMajeureError,
     get_force_majeure_service,
@@ -551,6 +555,18 @@ class ForceMajeureApiService:
 
     def use_deposit_for_payment(self, *, request, current_user_id: int) -> dict[str, Any]:
         amount = Decimal(str(request.amount))
+        if request.visit_id is not None:
+            visit = self.repository.get_visit(request.visit_id)
+            if not visit:
+                raise ForceMajeureApiDomainError(404, "Visit not found")
+            if visit.patient_id != request.patient_id:
+                raise ForceMajeureApiDomainError(
+                    400,
+                    "Visit does not belong to deposit patient",
+                )
+            if awaits_all_free_decision(visit):
+                raise ForceMajeureApiDomainError(409, ALL_FREE_DECISION_REQUIRED)
+
         # 3808 review round 13 (residual P1 deposit balance race): строка
         # берётся FOR UPDATE ДО проверок и списания. Прежний разомкнутый
         # check-then-act (``balance < amount`` на неблокированном чтении,
@@ -572,16 +588,6 @@ class ForceMajeureApiService:
             )
         if not deposit.is_active:
             raise ForceMajeureApiDomainError(400, "Депозит деактивирован")
-
-        if request.visit_id is not None:
-            visit = self.repository.get_visit(request.visit_id)
-            if not visit:
-                raise ForceMajeureApiDomainError(404, "Visit not found")
-            if visit.patient_id != request.patient_id:
-                raise ForceMajeureApiDomainError(
-                    400,
-                    "Visit does not belong to deposit patient",
-                )
 
         deposit.balance -= amount
         self.repository.flush()
