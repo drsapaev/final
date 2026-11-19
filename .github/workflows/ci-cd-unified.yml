@@ -2434,10 +2434,14 @@ jobs:
         # global-archive fallback: a mirror outage must degrade the install,
         # never kill the e2e job before any test runs.
         npx playwright install chromium
-        if ! npx playwright install-deps chromium; then
-          echo "WARN: apt mirror unreachable - retrying system deps from the global Ubuntu archive"
+        install_browser_deps() {
+          # Run the timeout with the same privileges as apt so it can stop the whole process group.
+          sudo timeout --kill-after=10s 90s "$(command -v node)" node_modules/playwright/cli.js install-deps chromium
+        }
+        if ! install_browser_deps; then
+          echo "WARN: apt dependency installation failed or timed out - retrying from the global Ubuntu archive"
           sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
-          npx playwright install-deps chromium || echo "WARN: extra font packages unavailable; continuing on the runner's preinstalled fonts"
+          install_browser_deps || echo "WARN: extra font packages unavailable; continuing on the runner's preinstalled fonts"
         fi
         # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
         npx playwright test e2e/telegram-miniapp-release-gate.spec.ts --project=chromium --workers=1 --reporter=line

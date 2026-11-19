@@ -1,3 +1,37 @@
+## T19 — правило восстановления staging — 2026-11-19
+
+По явному решению пользователя будущие собственные синтетические staging-запуски выполняются с `KEEP_STAGING=1`: при ошибке проект сохраняется для диагностики и продолжения оставшихся проверок; после успешной Session проект очищается. Проверены существующие механизмы: 5 focused unit cases PASS. Предыдущий проект уже был удалён до этого решения; восстановить его итоговый снимок или детали console events нельзя. См. DECISIONS и WSL_STAGING_SESSION.
+
+## T19 — PR #4117: частичная браузерная проверка — 2026-11-19
+
+На `5a209da6b` один новый synthetic staging-цикл: Preflight/Start PASS; браузерный отчёт содержит 19 PASS, включая обычную настройку и вход Admin с 2FA, редактирование смешанного списка, отображение в регистратуре, 403 для её записи и отказ устаревшей версии. Session в целом FAIL при обработке завершения браузерного процесса; итоговое сравнение истории и подтверждение обслуживаемого frontend — NOT_RUN. Ноль page errors, семь console errors не классифицированы. Вероятная причина ошибки Session воспроизведена отдельно: Windows PowerShell возвращает пустой ExitCode без открытого handle; исправленный scratch runner проверен на кодах 0 и 1, но повторно в staging не запускался. Собственные контейнеры, тома, сеть и env удалены; порты свободны. CI для проверенного commit: 32 success, 11 skipped. T19 Tier-2 и T18 остаются PARTIAL; deferral не принят. Подробности и неизменённый обезличенный отчёт — в EVIDENCE.
+
+## T19 — PR #4117: синхронизация и staging-попытка — 2026-11-19
+
+Ветка синхронизирована с main `933b1fe`; два конфликта сгенерированных API-файлов разрешены генерацией из исходников. На `e31c4be` выполнен один синтетический цикл: Preflight и Start PASS, но Session завершился FAIL до запуска browser и фикстур из-за неверного преобразования Windows-пути в WSL. Исправлен только временный harness; преобразование трёх путей проверено отдельно. Очистка проекта PASS: контейнеры, тома и сети отсутствуют, порты свободны, синтетический env удалён. Admin 2FA, функциональные сценарии и подтверждение обслуживаемого frontend остаются NOT_RUN; Tier-2/T18 не завершён.
+
+На новом CI несколько заданий не дошли до тестов: GitHub Ubuntu 26 не предоставляет закреплённый Python 3.11.10. Четыре затронутых workflow переключены на поддерживаемый Python 3.11.18; проверки и права не отключались. Проверки после исправления ожидаются на новом HEAD. Подробности — в EVIDENCE. PR остаётся Draft; merge/deploy не выполнялись.
+
+## T19 — PR #4117: full unit PASS, четыре проверенных baseline — 2026-11-16
+
+На 82fb7f7ca полный frontend unit: 525 файлов / 4427 PASS. Build/lint/quality/OpenAPI/Gitleaks/metadata PASS; backend ещё выполнялся. Четыре visual assertions отличаются только намеренной compact mixed strip/mobile labels и явно разобранными старыми дельтами main. Все 12 expected/actual/diff просмотрены; обновлены ровно четыре PNG из canonical Linux artifact с проверкой byte identity/SHA256. Ошибочный error-state из первого прогона не принят. Подробная причинность, исторические commits, counts и hashes сохранены в EVIDENCE. Новый hosted CI нужен на baseline commit. Draft #4117; Tier-2/Admin2FA NOT_RUN, T18 PARTIAL, без deferral/merge/deploy.
+
+## T19 — PR #4117: исправление CI fixtures — 2026-11-16
+
+Draft PR #4117 опубликован на c82a6cbde. Gitleaks, build, lint, code quality, OpenAPI freshness и metadata checks PASS. Full unit: 7 failures / 4420 PASS из-за старых подписей и mocks в двух прежних suites; ожидания приведены к новому контракту без ослабления assertions, 43/43 focused PASS. Четыре visual failures показали missing /registrar/tabs mock и error banner. Исправлены два E2E fixture-файла; снимки требуют GET200, configured version, точное число/имена вкладок и отсутствие error/loading. E2E TypeScript PASS, collection 4 targeted tests PASS; эти четыре browser-сценария после исправления пока НЕ выполнены. PNG и thresholds не изменены. Повторный CI нужен на corrective commit; normal Admin2FA/Tier-2 NOT_RUN, T18 PARTIAL. Production/очереди/история не затрагиваются.
+
+## T19 — финальный review follow-up и публикация — 2026-11-16
+
+Основная реализация закоммичена в 28746c3b4. В отдельном worktree выполнен clean merge origin/main d7eaa2d24 (merge commit 5bac9c1f9). При финальном read-only review найдены и закрыты два P2: потеря черновика при sidebar/Back/Forward и отсутствующий accessible label для скрытого выбранного фильтра. Черновик хранится только в памяти SPA, привязан к clinic/user, восстанавливается после успешного авторизованного GET и сохраняет исходный expected_version; явный discard/reload/save очищает его. Новые focused UI checks: 68/68 PASS; type-check PASS. Финальная production frontend build PASS (1m17s), bounded follow-up review без новых P0–P2. Обычный hook-enabled commit/push и exact-head hosted CI следуют после этого checkpoint. Gitleaks восстановлен штатно; hook, pin и Windows policy не менялись. Tier-2 NOT_RUN; очереди/история/production не изменены.
+
+## T19 — штатное восстановление Gitleaks — 2026-11-16
+
+Gitleaks recovery PASS. The pinned official v8.21.2 Windows release passed its published archive checksum and Windows execution policy. Replaced only the generated hook-cache executable after backing it up; hook/config/policy unchanged. Standard Gitleaks and the full pre-commit suite passed. Commit/push/Draft PR preparation continues; Tier-2 remains NOT_RUN.
+
+## T19 — единые вкладки — 2026-11-16
+
+T19 implementation prepared in isolated worktree registrar-tabs-unified from main 0f593d291 (#4073 merged). Unified registry/service/API/admin editor/strip implemented. Backend 25/25 (12 PG on disposable migrated DB), frontend 59/59, type-check/lint/build passed. OpenAPI/types regenerated. Mocked browser 6 assertions passed with recorded limitations. Normal Admin 2FA/Tier-2 NOT_RUN; no production/deploy/merge. Standard pre-commit Gitleaks Windows block remains pending.
+
 ## Current checkpoint — PR #4026 exact-head CI passed — 2026-11-12T02:12:26+05:00
 
 - Umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80: T00–T17 are MERGED; T18/Tier-2 is still PARTIAL. User owns merge/deployment.

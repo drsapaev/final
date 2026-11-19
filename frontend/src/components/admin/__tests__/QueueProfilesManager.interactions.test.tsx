@@ -159,9 +159,9 @@ describe('QueueProfilesManager interactions', () => {
   });
 
   it.each([
-    ['en', 'Queue profiles', 'Add'],
-    ['kk', 'Кезек профильдері', 'Қосу'],
-    ['uz-Cyrl', 'Навбат профиллари', 'Қўшиш'],
+    ['en', 'Direction and QR profiles', 'Add'],
+    ['kk', 'Бағыттар мен QR профильдері', 'Қосу'],
+    ['uz-Cyrl', 'Йўналишлар ва QR профиллари', 'Қўшиш'],
   ])('shows a localized title and add action for %s', async (locale, title, addAction) => {
     await i18n.changeLanguage(locale);
     render(
@@ -225,7 +225,7 @@ describe('QueueProfilesManager interactions', () => {
     const profileName = screen.getByText('Синтетическое неопубликованное направление');
     const row = profileName.closest('tr')!;
 
-    expect(within(row).getByText('Активен в регистратуре')).toBeInTheDocument();
+    expect(within(row).getByText('Профиль активен')).toBeInTheDocument();
     expect(within(row).getByText('Не опубликован на QR')).toBeInTheDocument();
 
     await user.click(within(row).getByRole('button', {
@@ -245,7 +245,7 @@ describe('QueueProfilesManager interactions', () => {
       .getByText('Синтетическая архивная очередь с настройкой QR')
       .closest('tr')!;
 
-    expect(within(row).getByText('В архиве регистратуры')).toBeInTheDocument();
+    expect(within(row).getByText('Профиль в архиве')).toBeInTheDocument();
     expect(within(row).getByText('Настроен для QR')).toBeInTheDocument();
     expect(within(row).getByText('Доступность профиля: недоступна')).toBeInTheDocument();
     expect(within(row).queryByText('Опубликован на QR')).not.toBeInTheDocument();

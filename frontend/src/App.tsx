@@ -505,7 +505,9 @@ export default function App() {
           draggable
           theme="colored"
         />
-        <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
+        {import.meta.env.VITE_DISABLE_SPEED_INSIGHTS !== '1' && (
+          <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
+        )}
       </AppProviders>
     </ThemeProvider>
   );
