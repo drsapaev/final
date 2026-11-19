@@ -1,13 +1,19 @@
 """Real JSON/Bearer contracts for the patient devices screen."""
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.api.v1.endpoints import admin_telegram
+from app.api.v1.endpoints.telegram_webhook._helpers import (
+    _build_patient_mini_app_entry_token,
+)
 from app.main import app
+from app.models.authentication import TokenBlacklist
 from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.telegram_config import TelegramConfig
+from app.services.authentication_service import authentication_service
 from app.services.telegram_mini_app_jwt import (
     exchange_init_data_for_jwt,
     revoke_patient_sessions,
@@ -68,6 +74,162 @@ def test_session_management_requires_jwt_not_init_data(client, linked):
     )
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_legacy_telegram_launch_with_live_user_bearer_still_requires_patient_proof(
+    client, linked, db_session, auth_headers
+):
+    staff_token = auth_headers["Authorization"].removeprefix("Bearer ")
+    staff_is_live = (
+        authentication_service.verify_token_with_blacklist(db_session, staff_token)
+        is not None
+    )
+    assert staff_is_live
+
+    launch = signed_init_data()
+    response = client.post(
+        PREFIX + "/patient/manifest",
+        json={"initData": launch},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    without_patient_proof = client.post(
+        PREFIX + "/patient/manifest", json={}, headers=auth_headers
+    )
+    assert without_patient_proof.status_code == 401
+
+    invalid_patient_proof = client.post(
+        PREFIX + "/patient/manifest",
+        json={"initData": "SYNTHETIC-INVALID"},
+        headers=auth_headers,
+    )
+    assert invalid_patient_proof.status_code == 403
+
+
+def test_legacy_entry_token_with_live_user_bearer_preserves_section_scope(
+    client, linked, auth_headers
+):
+    entry_token = _build_patient_mini_app_entry_token(linked.chat_id, "cabinet")
+    response = client.post(
+        PREFIX + "/patient/manifest",
+        json={"entryToken": entry_token, "section": "cabinet"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    wrong_section = client.post(
+        PREFIX + "/patient/manifest",
+        json={"entryToken": entry_token, "section": "results"},
+        headers=auth_headers,
+    )
+    assert wrong_section.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/sessions/list",
+        "/sessions/revoke-all",
+        f"/sessions/{uuid.UUID(int=1)}/revoke",
+        "/auth/logout",
+    ],
+)
+def test_user_bearer_cannot_manage_patient_sessions(client, linked, auth_headers, path):
+    response = client.post(
+        PREFIX + path,
+        json={"init_data": signed_init_data()},
+        headers=auth_headers,
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize("invalidation", ["epoch", "disabled"])
+def test_revoked_user_bearer_cannot_fall_back_to_legacy_telegram_launch(
+    client, linked, db_session, admin_user, auth_headers, invalidation
+):
+    if invalidation == "epoch":
+        admin_user.auth_epoch += 1
+    else:
+        admin_user.is_active = False
+    db_session.commit()
+    response = client.post(
+        PREFIX + "/patient/manifest",
+        json={"initData": signed_init_data()},
+        headers=auth_headers,
+    )
+    assert response.status_code == 401
+
+
+def test_expired_user_bearer_cannot_fall_back_to_legacy_telegram_launch(
+    client, linked, admin_user
+):
+    expired = authentication_service.create_access_token(
+        {"sub": str(admin_user.id), "username": "SYNTHETIC-STAFF"},
+        expires_delta=timedelta(seconds=-1),
+    )
+    response = client.post(
+        PREFIX + "/patient/manifest",
+        json={"initData": signed_init_data()},
+        headers={"Authorization": f"Bearer {expired}"},
+    )
+    assert response.status_code == 401
+
+
+def test_blacklisted_user_bearer_cannot_fall_back_to_legacy_telegram_launch(
+    client, linked, db_session, admin_user, auth_headers
+):
+    token = auth_headers["Authorization"].removeprefix("Bearer ")
+    claims = authentication_service.verify_token(token)
+    assert claims is not None
+    db_session.add(
+        TokenBlacklist(
+            jti=claims["jti"],
+            user_id=admin_user.id,
+            expires_at=datetime.now(UTC) + timedelta(minutes=5),
+            reason="SYNTHETIC-TEST",
+        )
+    )
+    db_session.commit()
+    response = client.post(
+        PREFIX + "/patient/manifest",
+        json={"initData": signed_init_data()},
+        headers=auth_headers,
+    )
+    assert response.status_code == 401
+
+
+def test_oversized_bearer_is_rejected_before_user_token_verification(
+    client, linked, monkeypatch
+):
+    verification_calls = []
+    monkeypatch.setattr(
+        authentication_service,
+        "verify_token_with_blacklist",
+        lambda *args: verification_calls.append(True),
+    )
+    response = client.post(
+        PREFIX + "/patient/manifest",
+        json={"initData": signed_init_data()},
+        headers={"Authorization": "Bearer " + "S" * 4097},
+    )
+    assert response.status_code == 401
+    assert verification_calls == []
+
+
+def test_live_user_bearer_cannot_reuse_consumed_telegram_launch(
+    client, linked, db_session, auth_headers
+):
+    launch = signed_init_data()
+    pair = exchange_init_data_for_jwt(db_session, launch, bot_token=BOT_TOKEN)
+    revoke_patient_sessions(db_session, pair["access_token"], logout=True)
+
+    response = client.post(
+        PREFIX + "/patient/manifest",
+        json={"initData": launch},
+        headers=auth_headers,
+    )
+    assert response.status_code == 401
 
 
 @pytest.mark.parametrize(

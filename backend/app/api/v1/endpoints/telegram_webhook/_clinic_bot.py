@@ -1010,6 +1010,8 @@ def _resolve_mini_app_patient_scope_from_auth(
     expected_section: str | None = None,
     request: Request | None = None,
 ) -> tuple[TelegramMiniAppSessionScope, str]:
+    normalized_init_data = str(init_data_payload or "").strip()
+    normalized_entry_token = str(entry_token or "").strip()
     authorization = request.headers.get("authorization", "") if request else ""
     if authorization:
         from app.services.telegram_mini_app_jwt import (
@@ -1018,20 +1020,37 @@ def _resolve_mini_app_patient_scope_from_auth(
         )
 
         scheme, _, token = authorization.partition(" ")
+        token = token.strip()
         try:
-            if scheme.lower() != "bearer" or not token.strip():
+            if scheme.lower() != "bearer" or not token:
                 raise TelegramMiniAppAuthExchangeError("session_invalid")
-            auth = authenticate_patient_session(db, token.strip())
+            auth = authenticate_patient_session(db, token)
         except TelegramMiniAppAuthExchangeError as exc:
-            # An invalid session must not fall back to initData/entry authority.
-            raise HTTPException(
-                status_code=401,
-                detail={"reason": "session_invalid"},
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from exc
-        return auth.scope, "jwt"
+            # Older Mini App clients used the shared API client, which can add
+            # an unrelated application User bearer. Ignore it only after the
+            # canonical User checks succeed and only when separate Telegram
+            # proof is present. It never grants patient authority by itself.
+            from app.services.authentication_service import authentication_service
 
-    normalized_init_data = str(init_data_payload or "").strip()
+            valid_user_bearer = (
+                scheme.lower() == "bearer"
+                and 0 < len(token) <= 4096
+                and bool(normalized_init_data or normalized_entry_token)
+                and authentication_service.verify_token_with_blacklist(
+                    db, token, "access"
+                )
+                is not None
+            )
+            if not valid_user_bearer:
+                # Invalid/revoked patient or User bearers never fall back.
+                raise HTTPException(
+                    status_code=401,
+                    detail={"reason": "session_invalid"},
+                    headers={"WWW-Authenticate": "Bearer"},
+                ) from exc
+        else:
+            return auth.scope, "jwt"
+
     if normalized_init_data:
         return (
             _resolve_mini_app_patient_scope_from_init_data(
@@ -1041,7 +1060,6 @@ def _resolve_mini_app_patient_scope_from_auth(
             "init_data",
         )
 
-    normalized_entry_token = str(entry_token or "").strip()
     if normalized_entry_token:
         return (
             _resolve_mini_app_patient_scope_from_entry_token(
