@@ -33,10 +33,6 @@ interface ModalTitleProps extends Omit<React.HTMLAttributes<HTMLHeadingElement>,
   style?: CSSProperties;
 }
 
-interface FocusableElement extends HTMLElement {
-  focus: () => void;
-}
-
 interface StyleWithBackdrop extends CSSProperties {
   WebkitBackdropFilter?: string;
 }
@@ -72,18 +68,36 @@ const Modal = ({
   // PR-37 / P0-B: unique id for aria-labelledby — avoids collisions when
   // multiple modals are rendered simultaneously.
   const titleId = useId();
-  // PR-37 / P0-A: track the previously-focused element to restore focus on close.
-  const previouslyFocusedRef: RefObject<FocusableElement | null> = useRef<FocusableElement | null>(null);
+  // Keep focus scoped to an open session. Replacing the caller's callback
+  // while the dialog is visible should only update keyboard handling.
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!isOpen || !modal) return;
 
-  // PR-37 / P0-A: Focus trap implementation.
-  // On open: save document.activeElement, move focus into the modal.
-  // On Tab: cycle focus within the modal (first ↔ last focusable element).
-  // On close: restore focus to the trigger element.
+    const previouslyFocused = document.activeElement;
+    const focusFrame = requestAnimationFrame(() => {
+      if (modal.contains(document.activeElement)) return;
+      const firstControl = modal.querySelector<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      (firstControl ?? modal).focus();
+    });
+
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      const activeElement = document.activeElement;
+      if (!modal.isConnected
+        && previouslyFocused instanceof HTMLElement
+        && previouslyFocused.isConnected
+        && (!activeElement || activeElement === document.body || modal.contains(activeElement))) {
+        previouslyFocused.focus();
+      }
+    };
+  }, [isOpen]);
+
+  // PR-37 / P0-A: cycle Tab inside the dialog using the latest keyboard options.
   useEffect(() => {
     if (!isOpen) return;
-
-    // Save the trigger element so we can restore focus on close.
-    previouslyFocusedRef.current = document.activeElement as FocusableElement | null;
 
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape' && closeOnEscape) {
@@ -121,27 +135,7 @@ const Modal = ({
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    // Move focus into the modal on open
-    requestAnimationFrame(() => {
-      if (modalRef.current) {
-        const focusables = modalRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusables.length > 0) {
-          focusables[0].focus();
-        } else {
-          modalRef.current.focus();
-        }
-      }
-    });
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      // PR-37 / P0-A: restore focus to the trigger element on close.
-      if (previouslyFocusedRef.current && typeof previouslyFocusedRef.current.focus === 'function') {
-        previouslyFocusedRef.current.focus();
-      }
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, closeOnEscape, onClose]);
 
   // Handle backdrop click
