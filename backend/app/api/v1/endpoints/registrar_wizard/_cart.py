@@ -4,6 +4,8 @@ import hashlib
 import json
 from typing import Any
 
+from sqlalchemy import func
+
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import (
     _apply_service_discount,
@@ -13,6 +15,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _resolve_effective_discount_mode,
     _revalidate_cart_doctor_eligibility_locked,
 )  # noqa: F401
+from app.crud import audit as crud_audit
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
 from app.services.price_override_approval import (
@@ -1559,21 +1562,42 @@ def approve_all_free_request(
                 detail=f"Заявка уже обработана (статус: {visit.approval_status})",
             )
 
-        # Обновляем статус
         if approval_data.action == "approve":
-            visit.approval_status = "approved"
+            new_status = "approved"
             message = "Заявка All Free одобрена"
-
-        elif approval_data.action == "reject":
-            visit.approval_status = "rejected"
-            # Можно добавить поле для причины отклонения в модель Visit
-            if approval_data.rejection_reason:
-                visit.notes = (
-                    visit.notes or ""
-                ) + f"\nОтклонено: {approval_data.rejection_reason}"
-
+        else:
+            new_status = "rejected"
             message = "Заявка All Free отклонена"
 
+        changes: dict[str, Any] = {"approval_status": new_status}
+        if new_status == "rejected" and approval_data.rejection_reason:
+            changes["notes"] = func.coalesce(Visit.notes, "") + (
+                f"\nОтклонено: {approval_data.rejection_reason}"
+            )
+
+        updated = (
+            db.query(Visit)
+            .filter(
+                Visit.id == visit.id,
+                Visit.discount_mode == "all_free",
+                Visit.approval_status == "pending",
+            )
+            .update(changes, synchronize_session=False)
+        )
+        if updated != 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Заявка уже обработана или изменилась",
+            )
+
+        crud_audit.log(
+            db,
+            action="all_free_decision",
+            entity_type="visit",
+            entity_id=visit.id,
+            actor_user_id=current_user.id,
+            payload={"previous_status": "pending", "new_status": new_status},
+        )
         db.commit()
         db.refresh(visit)
 
@@ -1605,6 +1629,7 @@ def approve_all_free_request(
         }
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
         db.rollback()
