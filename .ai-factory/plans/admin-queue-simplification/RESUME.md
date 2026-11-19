@@ -1,3 +1,9 @@
+## T19 — PR #4117 staging и CI checkpoint — 2026-11-19
+
+Task `ad5eac7f-734f-4b24-8d57-437008bacdb8`, worktree `registrar-tabs-unified`, PR #4117. Синхронизация с main `933b1fe` дала commit `e31c4befe`; OpenAPI и типы восстановлены генерацией, 13 schema tests PASS, Alembic имеет один head. На этом commit один owned synthetic staging cycle: Preflight/Start PASS, Session FAIL до browser из-за преобразования пути, canonical teardown PASS; независимая проверка показала ноль контейнеров, томов, сетей и занятых портов, env удалён. Scratch harness для следующего нового проекта исправлен и три преобразования путей проверены. Admin 2FA и UI/DB сценарии NOT_RUN; `served_revision_verified=false`.
+
+CI `e31c4befe` остановился в нескольких jobs до тестирования из-за отсутствия Python 3.11.10 на Ubuntu 26. В четырёх соответствующих workflow подготовлена замена только версии на 3.11.18; нужно проверить их итоговый commit и CI. Actionlint выдаёт одинаковые прежние замечания на исходной и изменённой версии. Следующий шаг: проверить новый HEAD/CI и отдельным новым синтетическим циклом выполнить Session с исправленным harness, зафиксировав реальные результаты и provenance. T18/Tier-2 остаётся PARTIAL; deferral/merge/deploy не подтверждены.
+
 ## T19 — PR #4117 baseline checkpoint — 2026-11-16
 
 Task ad5eac7f-734f-4b24-8d57-437008bacdb8, registrar-tabs-unified. Corrected tested HEAD82fb7f7ca has full unit4427 PASS and build/lint/quality/docs/Gitleaks PASS. Four reviewed Linux actual PNGs copied to four allowed baselines; exact source/hash/visual causality in EVIDENCE. Finish ordinary hook-enabled baseline/journal commit, push, refresh PR body and inspect new exact-head CI. No runtime change after82fb7f7ca. If known failures remain, fix within current PR; never weaken thresholds. Keep Draft and Tier-2/Admin2FA NOT_RUN; no merge/deploy. Worktree retained for PR review and pending validation, production tree untouched.

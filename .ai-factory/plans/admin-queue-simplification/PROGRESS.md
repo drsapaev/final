@@ -1,3 +1,9 @@
+## T19 — PR #4117: синхронизация и staging-попытка — 2026-11-19
+
+Ветка синхронизирована с main `933b1fe`; два конфликта сгенерированных API-файлов разрешены генерацией из исходников. На `e31c4be` выполнен один синтетический цикл: Preflight и Start PASS, но Session завершился FAIL до запуска browser и фикстур из-за неверного преобразования Windows-пути в WSL. Исправлен только временный harness; преобразование трёх путей проверено отдельно. Очистка проекта PASS: контейнеры, тома и сети отсутствуют, порты свободны, синтетический env удалён. Admin 2FA, функциональные сценарии и подтверждение обслуживаемого frontend остаются NOT_RUN; Tier-2/T18 не завершён.
+
+На новом CI несколько заданий не дошли до тестов: GitHub Ubuntu 26 не предоставляет закреплённый Python 3.11.10. Четыре затронутых workflow переключены на поддерживаемый Python 3.11.18; проверки и права не отключались. Проверки после исправления ожидаются на новом HEAD. Подробности — в EVIDENCE. PR остаётся Draft; merge/deploy не выполнялись.
+
 ## T19 — PR #4117: full unit PASS, четыре проверенных baseline — 2026-11-16
 
 На 82fb7f7ca полный frontend unit: 525 файлов / 4427 PASS. Build/lint/quality/OpenAPI/Gitleaks/metadata PASS; backend ещё выполнялся. Четыре visual assertions отличаются только намеренной compact mixed strip/mobile labels и явно разобранными старыми дельтами main. Все 12 expected/actual/diff просмотрены; обновлены ровно четыре PNG из canonical Linux artifact с проверкой byte identity/SHA256. Ошибочный error-state из первого прогона не принят. Подробная причинность, исторические commits, counts и hashes сохранены в EVIDENCE. Новый hosted CI нужен на baseline commit. Draft #4117; Tier-2/Admin2FA NOT_RUN, T18 PARTIAL, без deferral/merge/deploy.

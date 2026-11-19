@@ -18,22 +18,22 @@ jobs:
   format-backend:
     name: Python formatting report
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 🐍 Установка Python
       uses: actions/setup-python@v7
       with:
-        python-version: '3.11.10'
+        python-version: '3.11.18'
         cache: 'pip'
-    
+
     - name: 📦 Установка зависимостей
       run: |
         cd backend
         pip install --upgrade pip
         pip install black isort
-    
+
     - name: 🎨 Отчет о форматировании кода
       run: |
         cd backend
@@ -48,22 +48,22 @@ jobs:
   format-frontend:
     name: Frontend lint report
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 📦 Установка Node.js
       uses: actions/setup-node@v7
       with:
         node-version: '20'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
-    
+
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
         npm ci --legacy-peer-deps
-    
+
     - name: 🔍 Отчет frontend lint
       run: |
         cd frontend
