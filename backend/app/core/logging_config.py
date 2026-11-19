@@ -79,8 +79,12 @@ class PIIMaskingFilter(logging.Filter):
         try:
             # Mask args (dict/list only — strings handled via message regex)
             if record.args:
-                if isinstance(record.args, (dict, list, tuple)):
-                    record.args = mask_pii(list(record.args) if isinstance(record.args, tuple) else record.args)
+                if isinstance(record.args, dict | list | tuple):
+                    record.args = mask_pii(
+                        list(record.args)
+                        if isinstance(record.args, tuple)
+                        else record.args
+                    )
                     if isinstance(record.args, list):
                         record.args = tuple(record.args)
                 elif isinstance(record.args, str):
@@ -89,8 +93,13 @@ class PIIMaskingFilter(logging.Filter):
             # Mask the formatted message too (catches f-strings + %-strings)
             # We can't reformat safely, so we scrub the msg field if it's a string.
             if isinstance(record.msg, str):
-                # Only scrub if there's likely PII — quick check via presence of digits/+998
-                if "+998" in record.msg or "@" in record.msg or "patient" in record.msg.lower():
+                # Local/formatted numbers may lack the country prefix or any
+                # patient-related words, so digits must also trigger masking.
+                if (
+                    any(char.isdigit() for char in record.msg)
+                    or "@" in record.msg
+                    or "patient" in record.msg.lower()
+                ):
                     record.msg = _mask_string_inplace(record.msg)
         except Exception:
             # Never let masking break logging
