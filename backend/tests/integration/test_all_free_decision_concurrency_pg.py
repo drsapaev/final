@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
-from threading import Barrier
+from threading import Barrier, Event
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
@@ -15,7 +15,6 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
-from sqlalchemy.sql.dml import Update
 
 from app.api.v1.endpoints.registrar_wizard import _cart
 from app.db.base_class import Base
@@ -89,13 +88,13 @@ def test_one_concurrent_decision_commits_one_audit_and_notification(
     monkeypatch.setattr(
         _cart.notification_sender_service, "send_all_free_decision_notification", notify
     )
-    updates_ready = Barrier(2, timeout=8)
+    aligned = Event()
+    locks_ready = Barrier(2, action=aligned.set, timeout=8)
 
     @event.listens_for(engine, "before_cursor_execute")
-    def align_updates(_conn, _cursor, _statement, _params, context, _executemany):
-        update = context.compiled.statement if context.compiled else None
-        if isinstance(update, Update) and update.table.name == "visits":
-            updates_ready.wait()
+    def align_locks(_conn, _cursor, statement, _params, _context, _executemany):
+        if statement.rstrip().endswith("FOR UPDATE OF visits"):
+            locks_ready.wait()
 
     def decide(action, actor_id):
         with Session(engine) as db:
@@ -119,6 +118,7 @@ def test_one_concurrent_decision_commits_one_audit_and_notification(
             [approve.result(timeout=15), reject.result(timeout=15)]
         )
 
+    assert aligned.is_set()
     assert winner[0] == 200
     assert conflict[0] == 409
     with Session(engine) as db:
@@ -140,7 +140,13 @@ def test_failed_audit_rolls_back_decision_and_notes(approval_case, monkeypatch):
         _cart.notification_sender_service, "send_all_free_decision_notification", notify
     )
 
-    audit_write = Mock(side_effect=RuntimeError("Synthetic audit failure"))
+    log = _cart.crud_audit.log
+
+    def fail_after_flush(*args, **kwargs):
+        log(*args, **kwargs)
+        raise RuntimeError("Synthetic audit failure")
+
+    audit_write = Mock(side_effect=fail_after_flush)
     monkeypatch.setattr(_cart.crud_audit, "log", audit_write)
     with Session(engine) as db:
         request = _cart.AllFreeApprovalRequest(

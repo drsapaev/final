@@ -4,8 +4,6 @@ import hashlib
 import json
 from typing import Any
 
-from sqlalchemy import func
-
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import (
     _apply_service_discount,
@@ -1569,25 +1567,30 @@ def approve_all_free_request(
             new_status = "rejected"
             message = "Заявка All Free отклонена"
 
-        changes: dict[str, Any] = {"approval_status": new_status}
-        if new_status == "rejected" and approval_data.rejection_reason:
-            changes["notes"] = func.coalesce(Visit.notes, "") + (
-                f"\nОтклонено: {approval_data.rejection_reason}"
-            )
-
-        updated = (
+        # Recheck eligibility under the same row lock used by payment and
+        # confirmation. ORM writes also reach the visit history projection.
+        locked_visit = (
             db.query(Visit)
             .filter(
                 Visit.id == visit.id,
                 Visit.discount_mode == "all_free",
                 Visit.approval_status == "pending",
             )
-            .update(changes, synchronize_session=False)
+            .with_for_update(of=Visit)
+            .populate_existing()
+            .first()
         )
-        if updated != 1:
+        if locked_visit is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Заявка уже обработана или изменилась",
+            )
+
+        visit = locked_visit
+        visit.approval_status = new_status
+        if new_status == "rejected" and approval_data.rejection_reason:
+            visit.notes = (visit.notes or "") + (
+                f"\nОтклонено: {approval_data.rejection_reason}"
             )
 
         crud_audit.log(
