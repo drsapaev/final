@@ -916,3 +916,32 @@ the checked-out SHA through the backend and service worker, migrations,
 isolated synthetic PostgreSQL data, Nginx API routing, and Compose cleanup.
 The existing Gate D workflow is independent. A baseline PASS is not a release
 admission: full smoke and external delivery remain explicitly NOT_RUN.
+
+### Dedicated cloud staging destinations
+
+Use these destinations for synthetic staging checks only. Never substitute
+production Sentry projects, the patient bot, real patient data, or a recipient
+outside the test chat.
+
+| Resource | Dedicated destination | Required proof |
+|---|---|---|
+| Frontend Sentry (React) | [kosmed-staging-frontend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-frontend/) | Synthetic browser error retrieved by event ID in this project; `environment=staging`, release matches the tested SHA |
+| Backend Sentry (FastAPI) | [kosmed-staging-backend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-backend/) | Synthetic backend error retrieved by event ID in this project; same environment and SHA |
+| Telegram | `@kosmed_staging_bot`; private group **KosMed Staging Alerts** | Verify the bot identity and allowlisted group first; record the ID of a synthetic message accepted by Telegram through the application |
+| External reminder recipient | Same private Telegram group, staging only | arq processes the versioned synthetic reminder and its unique marker is observed in the group; report this separately from queue processing and do not claim SMS delivery |
+
+The destinations exist, but CI credential wiring and delivery verification are
+not yet evidenced. Until both are verified, mark the corresponding checks
+`NOT_RUN` or `BLOCKED`, not `PASS`. A Compose baseline PASS, a flushed SDK,
+or a `reminder_sent_at` timestamp does not prove external delivery.
+
+Use a separate protected GitHub Actions environment (suggested name:
+`staging-integrations`), restricted to trusted `main` runs. Do not make its
+credentials available to pull-request jobs or Docker build arguments, except
+for the public, send-only frontend DSN used at build time. Map the staging DSNs
+to `VITE_SENTRY_DSN` and `SENTRY_DSN`; use a separate least-privilege Sentry
+event-read credential only in the verifier. Keep the Telegram bot token and
+allowed chat identifier in protected environment secrets. Never put tokens,
+chat IDs, invite links, or patient data into source, logs, or artifacts. If the
+runtime resolves a database bot configuration before the environment token,
+verify the resolved identity before any send and fail closed on a mismatch.
