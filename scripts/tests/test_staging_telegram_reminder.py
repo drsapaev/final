@@ -69,6 +69,23 @@ class TelegramReminderGuards(unittest.TestCase):
                 asyncio.run(check.run(TOKEN, CHALLENGE))
             api.assert_called_once_with(TOKEN, "getMe")
 
+    def test_verification_transport_does_not_follow_redirects(self):
+        with patch.object(check, "HTTPSConnection") as https:
+            conn = https.return_value
+            conn.getresponse.return_value.status = 302
+            with self.assertRaises(check.Refused):
+                check.api(TOKEN, "getMe")
+            https.assert_called_once_with("api.telegram.org", timeout=12)
+            conn.request.assert_called_once()
+            conn.getresponse.return_value.read.assert_not_called()
+            conn.close.assert_called_once()
+
+    def test_verification_transport_has_no_send_method(self):
+        with patch.object(check, "HTTPSConnection") as https:
+            with self.assertRaises(check.Refused):
+                check.api(TOKEN, "sendMessage")
+            https.assert_not_called()
+
     def test_wrong_chat_fails_before_application_import_or_send(self):
         with patch.dict(os.environ, ISOLATED, clear=True), patch.object(
             check, "api", side_effect=[

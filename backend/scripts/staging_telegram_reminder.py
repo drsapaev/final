@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+from http.client import HTTPSConnection
 import json
 import os
 import re
@@ -10,7 +11,6 @@ import sys
 import time
 from typing import Any
 from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
 
 BOT_USERNAME = "kosmed_staging_bot"
 MAX_AGE = 1200
@@ -49,17 +49,25 @@ def select_recipient(updates: list, challenge: str, now: int) -> tuple[int, int]
 
 
 def api(token: str, method: str, **data: Any) -> Any:
-    req = Request(
-        f"https://api.telegram.org/bot{token}/{method}",
-        data=urlencode(data).encode(),
-    )
+    if method not in {"getMe", "getUpdates", "getChat"}:
+        raise Refused("Unexpected Telegram verification operation")
+    connection = HTTPSConnection("api.telegram.org", timeout=12)
     try:
-        with urlopen(req, timeout=12) as response:
-            value = json.load(response)
-        if value.get("ok") is True:
-            return value["result"]
+        connection.request(
+            "POST",
+            f"/bot{token}/{method}",
+            body=urlencode(data).encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        response = connection.getresponse()
+        if response.status == 200:
+            value = json.loads(response.read(2_000_000))
+            if value.get("ok") is True:
+                return value["result"]
     except Exception:
         pass
+    finally:
+        connection.close()
     raise Refused(f"Telegram {method} not confirmed; do not retry a possible send")
 
 
