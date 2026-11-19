@@ -29,7 +29,9 @@ from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.services.patient_otp_service import get_patient_otp_service
 from tests.conftest import mint_access_token
-from tests.integration.test_patient_activation_pg_phone_scope import pg_engine  # noqa: F401
+from tests.integration.test_patient_activation_pg_phone_scope import (
+    pg_engine,
+)  # noqa: F401
 
 pytestmark = pytest.mark.asyncio
 
@@ -93,7 +95,7 @@ async def test_full_activation_flow_over_http(
     issue_body = r_issue.json()
     token = issue_body["activation_token"]
     assert issue_body["expires_in_hours"] == 72
-    assert issue_body["phone_masked"] == "+998900•••001"  # canonical 3-digit mask
+    assert issue_body["phone_masked"] == "•••001"  # canonical 3-digit mask
     assert PHONE not in issue_body["phone_masked"]
 
     # 2) activation OTP: NO client phone field exists; goes to the card phone

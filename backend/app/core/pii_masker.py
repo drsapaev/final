@@ -89,8 +89,16 @@ PII_KEY_REGEX = re.compile(
     re.IGNORECASE,
 )
 
-# Phone: +998901234567 → +998901•••567
-PHONE_REGEX = re.compile(r"(\+\d{6})\d{3}(\d{3})")
+# A digit and its following separators cannot overlap, so this scan does not
+# backtrack exponentially on long diagnostic messages. Restrict separators
+# to a single line and require at least nine digits to avoid short dates/times.
+PHONE_REGEX = re.compile(r"(?<!\d)\+?\d(?:[ \t\u00a0\u202f\u2010-\u2015().*•-]*\d){8,}")
+_LABELED_PHONE_REGEX = re.compile(
+    r"(?<![^\W_])((?:phone(?:[_-]?number)?|mobile|tel(?:ephone)?|телефон)"
+    r"[\"']?[ \t]*[:=][ \t]*[\"']?[ \t]*)(\(?\+?\d(?:[ \t\u00a0\u202f\u2010-\u2015().*•-]*\d)*)",
+    re.IGNORECASE,
+)
+_MASKED_PHONE_REGEX = re.compile(r"•{3}\d{3}\Z")
 
 # Email: john.doe@example.com → j•••@example.com
 #
@@ -382,9 +390,28 @@ def is_sensitive_verification_path(value: object) -> bool:
 
 
 def mask_phone(phone: str | None) -> str | None:
+    """Hide a phone field, preserving at most its final three digits."""
     if not phone:
         return phone
-    return PHONE_REGEX.sub(r"\1•••\2", phone)
+    if _MASKED_PHONE_REGEX.fullmatch(phone):
+        return phone
+    digits = "".join(char for char in phone if char.isdecimal())
+    if len(digits) <= 3:
+        return "***"
+    return "•••" + digits[-3:]
+
+
+def _mask_phone_in_text(match: re.Match[str]) -> str:
+    digits = "".join(char for char in match.group() if char.isdecimal())
+    # A 14-digit value may be a document identifier. Unknown oversized
+    # sequences are also safer to hide entirely than partially reveal.
+    if len(digits) == 14 or len(digits) > 15:
+        return "[REDACTED]"
+    return "•••" + digits[-3:]
+
+
+def _mask_labeled_phone(match: re.Match[str]) -> str:
+    return match.group(1) + (mask_phone(match.group(2)) or "***")
 
 
 def mask_email(email: str | None) -> str | None:
@@ -419,7 +446,7 @@ def mask_identifier(value: str | None) -> str | None:
     """Auto-detect phone/email/username format and apply appropriate masking.
 
     Used for auth_svc logs where the same `username` field can be:
-    - A phone number (mobile login): "+998901234567" → "+998901•••567"
+    - A phone number (mobile login): only its last three digits remain.
     - An email (web admin login): "john.doe@example.com" → "j•••@example.com"
     - A plain username: "admin" → "a•••n"
 
@@ -435,13 +462,19 @@ def mask_identifier(value: str | None) -> str | None:
     if not s:
         return value
 
-    # Phone: starts with + and digits (use existing PHONE_REGEX)
-    if s.startswith("+") and any(c.isdigit() for c in s):
-        return mask_phone(s)
-
     # Email: contains @
     if "@" in s:
         return mask_email(s)
+
+    # Mobile logins can be stored without a country prefix or with separators.
+    digits = sum(char.isdecimal() for char in s)
+    if s.startswith("+") or (
+        digits >= 7
+        and all(
+            char.isdecimal() or char.isspace() or char in "()-+.*•‐‑‒–—―" for char in s
+        )
+    ):
+        return mask_phone(s)
 
     # Plain username: partial mask preserving first + last char
     if len(s) == 1:
@@ -491,6 +524,21 @@ def mask_pii(obj: Any) -> Any:
     return obj
 
 
+def _is_phone_field(key: str) -> bool:
+    """Recognize existing snake_case and camelCase phone field names."""
+    normalized = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    normalized = normalized.lower().replace("-", "_")
+    return normalized in {
+        "phone",
+        "phone_number",
+        "phone_masked",
+        "phone_e164",
+        "mobile",
+        "mobile_number",
+        "telephone",
+    } or normalized.endswith(("_phone", "_phone_number", "_mobile", "_mobile_number"))
+
+
 def _mask_key_value(key: str, value: Any) -> Any:
     if value is None:
         return None
@@ -537,7 +585,7 @@ def _mask_key_value(key: str, value: Any) -> Any:
         return "[REDACTED]"
 
     # Partial-mask fields (preserve structure for debug)
-    if key_lower in ("phone", "phone_number", "mobile"):
+    if _is_phone_field(key):
         return mask_phone(value) if isinstance(value, str) else "[REDACTED]"
     if key_lower in ("email",):
         return mask_email(value) if isinstance(value, str) else "[REDACTED]"
@@ -603,7 +651,7 @@ def _mask_string_inplace(s: str) -> str:
     # bounded scan (see _form_gate_state) — the previous unanchored
     # regex search was quadratic on long credential-free bodies and
     # starved the event loop from the shared 422 handler.
-    if "%" in s:
+    if "%" in s or ("+" in s and "=" in s):
         try:
             decoded = unquote_plus(s)
         except Exception:
@@ -641,8 +689,13 @@ def _mask_string_inplace(s: str) -> str:
                     s = "&".join(rebuilt)
                 else:
                     s = decoded
-    s = PHONE_REGEX.sub(r"\1•••\2", s)
+            elif PHONE_REGEX.search(decoded) or _LABELED_PHONE_REGEX.search(decoded):
+                # Encoded separators can split a phone into short fragments
+                # that the free-text scanner cannot recognize until decoded.
+                s = decoded
     s = EMAIL_REGEX.sub(r"\1•••@\2", s)
+    s = _LABELED_PHONE_REGEX.sub(_mask_labeled_phone, s)
+    s = PHONE_REGEX.sub(_mask_phone_in_text, s)
     s = PASSPORT_REGEX.sub(r"\1••••••", s)
     s = IIN_REGEX.sub(r"\1••••••\2", s)
     # PR-6: credential-shaped JSON keys inside raw bodies / log lines
