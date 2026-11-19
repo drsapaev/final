@@ -692,17 +692,31 @@ def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
     """Codex P2 (раунд 5): успешный joinQueue broadcast-ит queue.created
     на TV-табло и entry_added в админский /ws/queue — как канонический
     REST /queue/join."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
     import app.ws.queue_ws as queue_ws_module
     from app.db import session as db_session_module
     from app.graphql import mutations as gql_mutations
 
-    # Time-of-day gotcha (#2992): фиксируем окно онлайн-набора.
+    timezone = ZoneInfo("Asia/Tashkent")
+    fixed_now = datetime(2026, 11, 19, 12, tzinfo=timezone)
+    queue_day = fixed_now.date()
+
+    class FixedClinicClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now.replace(tzinfo=None) if tz is None else fixed_now.astimezone(tz)
+
+    # The v1 admission window ends before midnight. Keep the successful
+    # broadcast scenario inside that window regardless of the runner clock.
+    monkeypatch.setattr(gql_mutations, "datetime", FixedClinicClock)
     monkeypatch.setattr(
         gql_mutations,
         "get_queue_settings",
         lambda db: {
             "queue_start_hour": 0,
-            "timezone": "Asia/Tashkent",
+            "timezone": timezone.key,
             "auto_close_time": "23:59",
         },
     )
@@ -728,7 +742,7 @@ def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
     queue_tag = f"gql-v1-quota-{suffix}"
     with db_session_module.SessionLocal() as queue_session:
         v1_queue = DailyQueue(
-            day=_queue_day(),
+            day=queue_day,
             specialist_id=d["doctor"].id,
             queue_tag=queue_tag,
             active=True,
@@ -761,7 +775,7 @@ def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
     data = _execute(
         """
         mutation($input: QueueEntryInput!) {
-          joinQueue(input: $input) { success queueEntry { id number } }
+          joinQueue(input: $input) { success errors queueEntry { id number } }
         }
         """,
         {
@@ -786,7 +800,7 @@ def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
     assert len(ws_calls) == 1, ws_calls
     ws = ws_calls[0]
     assert ws["department"] == f"specialist_{d['doctor'].id}"
-    assert ws["date"] == _queue_day().strftime("%Y-%m-%d")
+    assert ws["date"] == queue_day.isoformat()
     assert ws["event_type"] == "queue_update"
     assert ws["data"]["action"] == "entry_added"
     assert ws["data"]["entry_id"] == entry_id
