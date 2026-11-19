@@ -88,6 +88,9 @@ self.addEventListener('install', (event) => {
           STATIC_FILES.map(url =>
             fetch(url).then(async (response) => {
               if (hasNoStore(response.headers)) {
+                // Release the unused stream so the remaining precache requests can start.
+                // A failed cancellation must not prevent stale-cache eviction.
+                await response.body?.cancel().catch(() => undefined);
                 try {
                   await deleteCachedRequest(url);
                 } catch {
