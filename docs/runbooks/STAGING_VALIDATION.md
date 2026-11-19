@@ -625,7 +625,7 @@ python -c "
 from app.core.pii_masker import mask_pii, mask_phone, mask_email, mask_name
 
 # Test per-field maskers
-assert mask_phone('+998901234567') == '+998901•••567', mask_phone('+998901234567')
+assert mask_phone('+998901234567') == '•••567', mask_phone('+998901234567')
 assert mask_email('john@example.com').startswith('j'), mask_email('john@example.com')
 assert mask_name('Иван Иванов') == 'И.И.', mask_name('Иван Иванов')
 
@@ -642,7 +642,7 @@ masked = mask_pii(patient)
 print('Masked patient:', masked)
 assert masked['first_name'] == 'A.'
 assert masked['last_name'] == 'K.'
-assert masked['phone'] == '+998901•••567'
+assert masked['phone'] == '•••567'
 assert masked['iin'] == '[REDACTED]'
 assert masked['diagnosis'] == '[REDACTED]'
 assert masked['id'] == 42  # untouched
@@ -654,7 +654,7 @@ print('✅ All PII scrubbing tests passed.')
 ### Expected
 
 ```
-Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '+998901•••567', 'iin': '[REDACTED]', 'diagnosis': '[REDACTED]', 'id': 42}
+Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '•••567', 'iin': '[REDACTED]', 'diagnosis': '[REDACTED]', 'id': 42}
 ✅ All PII scrubbing tests passed.
 ```
 
@@ -821,12 +821,19 @@ each such check prints a NOTE stating exactly what it does **not** prove):
 
 ```bash
 bash scripts/smoke_test_staging.sh
+# CI: also fail when an automated check cannot run
+bash scripts/smoke_test_staging.sh --strict
 ```
 
 This script:
 - Reads prerequisites from the shell environment (export `SENTRY_DSN` and
   `DATABASE_URL` first; it does **not** load `backend/.env` itself)
-- Runs each check; missing prerequisites are counted as **skipped**, not failed
+- Runs each check; missing prerequisites are counted as **skipped**. In
+  `--strict` mode any skipped check returns exit code 2 if no check failed;
+  any failed check returns exit code 1. A successful strict run only verifies
+  the script’s stated coverage, not the unautomated runbook checks or a release.
+  Strict mode also requires live scratch-queue processing and a runnable
+  pre-commit command.
 - Prints ✓ / ✗ / ⊘ next to each check
 - Exits 0 if all runnable checks pass, 1 if any check fails
 - Outputs a summary listing failed and skipped checks (incomplete coverage
