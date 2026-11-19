@@ -57,4 +57,4 @@ Do **not** mark `DISPLAYBOOT-FE-001` fixed on the sole basis of merged source te
 
 Separate open source fix [#4076](https://github.com/drsapaev/final/pull/4076) is unchanged and remains open/unmerged with the group88–89 blockers; it is not related to this group90 main-merge change.
 
-**Fixing-agent handoff:** new narrowly scoped fix for public-board initial connectivity warning and disabled flag policy, using mandatory `ai/langgraph/scripts/run_agent_gate.ps1` due public clinical display/route state. No protected-source or runtime edits by this auditor; no gate or new tests executed. After every fixing action, post a fresh top-level progress comment in existing #4059 and reconcile #4063 and #4064 truthfully. 
+**Fixing-agent handoff:** new narrowly scoped fix for public-board initial connectivity warning and disabled flag policy, using mandatory `ai/langgraph/scripts/run_agent_gate.ps1` due public clinical display/route state. No protected-source or runtime edits by this auditor; no gate or new tests executed. After every fixing action, post a fresh top-level progress comment in existing #4059 and reconcile #4063 and #4064 truthfully.

@@ -549,9 +549,8 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    # Head pin follows the latest migration (0092 —
-    # DERMAPRICE-BE-002 price override visit_price_before).
-    assert revision == "0092_price_override_visit_price"
+    # Head pin follows the notification template uniqueness migration.
+    assert revision == "0102_visit_confirm_context"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

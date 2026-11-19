@@ -53,9 +53,13 @@ class TestAppointmentFlowApiService:
 
     def test_promote_appointment_to_in_visit_commits_and_refreshes(self):
         state = {"committed": False, "refreshed": False}
-        appointment = SimpleNamespace(status="called")
+        appointment = SimpleNamespace(id=7, status="called")
 
         class Repository:
+            def get_locked_appointment(self, appointment_id):
+                assert appointment_id == 7
+                return appointment
+
             def commit(self):
                 state["committed"] = True
 

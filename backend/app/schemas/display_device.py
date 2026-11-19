@@ -1,0 +1,62 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+class DisplayBoardDeviceCreateRequest(BaseModel):
+    device_name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("device_name")
+    @classmethod
+    def device_name_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Device name must not be blank")
+        return value
+
+
+class DisplayBoardDeviceTokenRequest(BaseModel):
+    board_name: str = Field(min_length=1, max_length=120)
+    device_id: int | None = Field(default=None, gt=0)
+    secret: str | None = Field(default=None, min_length=32, max_length=128)
+
+    @field_validator("board_name")
+    @classmethod
+    def board_name_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Board name must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def device_id_and_secret_must_be_paired(self):
+        if (self.device_id is None) != (self.secret is None):
+            raise ValueError("Device ID and secret must be provided together")
+        return self
+
+
+class DisplayBoardDeviceTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    board_name: str
+
+
+class DisplayBoardDeviceCreatedResponse(BaseModel):
+    id: int
+    board_id: int
+    device_name: str
+    status: str
+    secret: str
+
+
+class DisplayBoardDeviceResponse(BaseModel):
+    id: int
+    board_id: int
+    device_name: str
+    status: str
+    last_connected_at: datetime | None = None
+    created_at: datetime | None = None
+    rotated_at: datetime | None = None

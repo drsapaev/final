@@ -18,6 +18,8 @@ import {
 import PanelEmptyState from '../components/patient/PanelEmptyState';
 import PatientBookingPanel from '../components/patient/PatientBookingPanel';
 import PatientCabinetSummary from '../components/patient/PatientCabinetSummary';
+import WebAuthnRegistration from '../components/patient/WebAuthnRegistration';
+import { subscribe as subscribeAuth } from '../stores/auth';
 import PatientFormsPreview from '../components/patient/PatientFormsPreview';
 import PublicBookingRequestsPanel from '../components/patient/PublicBookingRequestsPanel';
 import './patient.css';
@@ -68,6 +70,10 @@ const PatientPanel = () => {
   useBreakpoint();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const [isPatient, setIsPatient] = useState(false);
+  useEffect(() => subscribeAuth(({ token, profile }) => {
+    setIsPatient(Boolean(token) && String(profile?.role ?? '').toLowerCase() === 'patient');
+  }), []);
 
   // L-H-6 fix: activeSection вычисляется из URL (path или ?tab=).
   const activeSection = (() => {
@@ -293,7 +299,10 @@ const PatientPanel = () => {
                 ) : activeSection === 'booking' ? (
                   <PatientBookingPanel />
                 ) : activeSection === 'cabinet' ? (
-                  <PatientCabinetSummary />
+                  <>
+                    <PatientCabinetSummary />
+                    {isPatient && <WebAuthnRegistration />}
+                  </>
                 ) : activeSection === 'payments' ? (
                   <PatientCabinetSummary mode="payments" />
                 ) : activeSection === 'documents' ? (

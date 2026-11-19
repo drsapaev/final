@@ -9,12 +9,16 @@ tolerates legacy duplicate emails (no DB uniqueness on users.email).
 """
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.core.security import get_password_hash
-from app.crud import user as crud_user
 from app.models.user import User
-from app.services.password_reset_service import get_password_reset_service
+from app.services.password_reset_service import (
+    _PHONE_RESET_TASKS,
+    get_password_reset_service,
+)
 
 GENERIC_EMAIL = (
     "Если пользователь с таким email существует, ссылка для сброса отправлена"
@@ -22,9 +26,6 @@ GENERIC_EMAIL = (
 GENERIC_PHONE = (
     "Если пользователь с таким номером существует, код для сброса отправлен"
 )
-
-_KNOWN_PHONE_USER: User | None = None
-
 
 def _make_user(db_session, *, username: str, email: str | None = None) -> User:
     user = User(
@@ -53,27 +54,18 @@ def _email_svc(monkeypatch, ok: bool):
     return svc
 
 
-def _phone_svc(monkeypatch, ok: bool, known_phone: str | None = None):
-    """Служба с моком phone-канала.
-
-    User.phone как колонки модели не существует (латентный баг phone-ветки,
-    отмечен в #2775) — поиск по номеру мокаем на уровне crud-функции.
-    """
-    from app.crud import user as crud_user  # noqa: PLC0415 — изоляция мока
-
+def _phone_svc(monkeypatch, ok: bool, sent: list):
+    """Mock only the SMS transport; retain the real verified-owner lookup."""
     svc = get_password_reset_service()
     svc.reset_tokens = {}
 
-    async def fake_code(phone, purpose, custom_message=None):
+    async def fake_code(phone, purpose, custom_message=None, account_binding=None):
+        sent.append((purpose, account_binding))
         if ok:
             return {"success": True, "expires_in_minutes": 5}
         return {"success": False, "error": "sms provider down"}
 
-    def fake_get_by_phone(db, phone):
-        return _KNOWN_PHONE_USER if phone == known_phone else None
-
     monkeypatch.setattr(svc.phone_verification, "send_verification_code", fake_code)
-    monkeypatch.setattr(crud_user, "get_user_by_phone", fake_get_by_phone)
     return svc
 
 
@@ -103,26 +95,34 @@ async def test_email_outcomes_share_identical_response_shape(db_session, monkeyp
 
 @pytest.mark.asyncio
 async def test_phone_outcomes_share_identical_response_shape(db_session, monkeypatch):
-    global _KNOWN_PHONE_USER
-    _KNOWN_PHONE_USER = _make_user(db_session, username="antienum_phone")
-    try:
-        unknown = await _phone_svc(
-            monkeypatch, ok=True, known_phone=None
-        ).initiate_phone_reset(db_session, phone="+998909876543")
-        delivered = await _phone_svc(
-            monkeypatch, ok=True, known_phone="+998901234567"
-        ).initiate_phone_reset(db_session, phone="+998901234567")
-        failed = await _phone_svc(
-            monkeypatch, ok=False, known_phone="+998901234567"
-        ).initiate_phone_reset(db_session, phone="+998901234567")
-    finally:
-        _KNOWN_PHONE_USER = None
+    from app.models.user_profile import UserProfile
+
+    user = _make_user(db_session, username="antienum_phone")
+    db_session.add(UserProfile(user_id=user.id, phone="+998901234567", phone_verified=True))
+    db_session.commit()
+    sent = []
+    unknown = await _phone_svc(monkeypatch, ok=True, sent=sent).initiate_phone_reset(
+        db_session, phone="+998909876543"
+    )
+    if _PHONE_RESET_TASKS:
+        await asyncio.gather(*tuple(_PHONE_RESET_TASKS))
+    delivered = await _phone_svc(monkeypatch, ok=True, sent=sent).initiate_phone_reset(
+        db_session, phone="+998901234567"
+    )
+    if _PHONE_RESET_TASKS:
+        await asyncio.gather(*tuple(_PHONE_RESET_TASKS))
+    failed = await _phone_svc(monkeypatch, ok=False, sent=sent).initiate_phone_reset(
+        db_session, phone="+998901234567"
+    )
+    if _PHONE_RESET_TASKS:
+        await asyncio.gather(*tuple(_PHONE_RESET_TASKS))
 
     for outcome in (unknown, delivered, failed):
         assert outcome["success"] is True
         assert outcome["message"] == GENERIC_PHONE
         assert outcome["expires_in_minutes"] == 5
     assert set(unknown) == set(delivered) == set(failed)
+    assert len(sent) == 2
 
 
 def test_duplicate_emails_are_rejected_by_schema(db_session):

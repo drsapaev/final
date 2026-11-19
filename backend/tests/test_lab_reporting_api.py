@@ -543,17 +543,14 @@ def test_lab_report_create_new_idempotency_key_creates_new_blank(
 def test_lab_report_create_idempotency_key_survives_token_refresh_same_user(
     client, auth_headers, db_session, admin_user, test_patient, test_visit
 ) -> None:
-    """Reload/reconcile-ретрай может прийти с другой формой токена того же
-    пользователя (sub=username после login-флоу против sub=user.id у
-    refresh-ротации). Namespace ключа каноничен по user id (Codex R11
-    #3092): тот же ключ продолжает получать закоммиченный ответ."""
+    """A retry after refresh replays the response for the same user ID."""
     from app.services.authentication_service import authentication_service
 
     payload = _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
     key = "pr3351-r9-create-key-4"
 
     login_shaped_token = authentication_service.create_access_token(
-        {"sub": admin_user.username}
+        {"sub": str(admin_user.id), "auth_epoch": admin_user.auth_epoch}
     )
     first = client.post(
         "/api/v1/lab/report-instances",

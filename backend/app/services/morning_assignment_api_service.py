@@ -95,6 +95,7 @@ class MorningAssignmentApiService:
                         "message": "Визит не найден",
                     }
                 )
+                self.repository.commit()
                 continue
 
             # Codex P1 fix: reject non-activatable statuses BEFORE staging
@@ -114,6 +115,7 @@ class MorningAssignmentApiService:
                         ),
                     }
                 )
+                self.repository.commit()
                 continue
 
             if visit.status == "pending_confirmation":
@@ -127,6 +129,7 @@ class MorningAssignmentApiService:
                         ),
                     }
                 )
+                self.repository.commit()
                 continue
 
             if visit.status not in ["confirmed", "open"] and not force:
@@ -140,8 +143,29 @@ class MorningAssignmentApiService:
                         ),
                     }
                 )
+                self.repository.commit()
                 continue
 
+            # MORNINGMAN-BE-001 (audit #3892, group 22) fix: per-visit
+            # SAVEPOINT plus per-visit commit. The historical loop staged
+            # every visit's queue entries in ONE shared transaction and
+            # committed once at the end:
+            #   * a QueueOwnerConfigurationError was re-raised by the
+            #     lower-level service WITHOUT rollback (its contract says
+            #     "the calling surface rolls back") — the caller caught it,
+            #     reported success:false and the single final commit
+            #     PERSISTED the failed visit's partially staged entries
+            #     (false failure + partial queue on disk);
+            #   * a later visit's generic tag failure made the lower-level
+            #     service roll back the ROOT transaction on the shared
+            #     session — silently destroying earlier visits' staged
+            #     writes that were ALREADY reported as success:true (false
+            #     success + lost ticket).
+            # Now each visit is staged inside its own savepoint (a failure
+            # rolls back only that visit's partial staging) and committed
+            # durably before the next visit runs, so the reported outcome
+            # and the committed queue state cannot diverge.
+            nested = self.repository.db.begin_nested()
             try:
                 queue_assignments = service._assign_queues_for_visit(
                     visit,
@@ -186,6 +210,9 @@ class MorningAssignmentApiService:
                             f"(визит уже активен: {visit.status})"
                         )
 
+                    # Release the savepoint: this visit's staging and
+                    # activation joined the outer transaction cleanly.
+                    nested.commit()
                     results.append(
                         {
                             "visit_id": visit_id,
@@ -195,6 +222,11 @@ class MorningAssignmentApiService:
                         }
                     )
                 else:
+                    # No assignment (no tags, or a generic tag failure whose
+                    # lower-level recovery already rolled back the root
+                    # transaction — the savepoint is dead in that case).
+                    if nested.is_active:
+                        nested.rollback()
                     results.append(
                         {
                             "visit_id": visit_id,
@@ -203,6 +235,11 @@ class MorningAssignmentApiService:
                         }
                     )
             except Exception:  # noqa: BLE001
+                # Roll back THIS visit's partial staging only. If the lower
+                # level already performed its root-rollback recovery, the
+                # savepoint is no longer active and must not be touched.
+                if nested.is_active:
+                    nested.rollback()
                 results.append(
                     {
                         "visit_id": visit_id,
@@ -211,7 +248,11 @@ class MorningAssignmentApiService:
                     }
                 )
 
-        self.repository.commit()
+            # Per-visit durable boundary: persist this visit BEFORE the next
+            # iteration, so a later visit's lower-level root rollback cannot
+            # destroy an earlier visit's reported success (audit Case B).
+            self.repository.commit()
+
         return {
             "success": True,
             "message": f"Обработано {len(visit_ids)} визитов",

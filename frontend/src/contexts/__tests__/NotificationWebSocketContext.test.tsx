@@ -381,6 +381,41 @@ describe('NotificationWebSocketContext', () => {
     expect(notificationCenterMockTyped.appendNotification).not.toHaveBeenCalled();
   });
 
+  it('refreshes inbox state for mutation frames without creating a toast or new notification', async () => {
+    renderProvider('/doctor/cardiology');
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    const socket = MockWebSocket.instances[0];
+    await act(async () => {
+      socket.triggerOpen();
+      socket.triggerMessage({
+        type: 'notification_update',
+        event_type: 'lab_results',
+        delivery_id: 'synthetic-update-1',
+        status: 'read',
+        unread_count: 0,
+      });
+    });
+
+    expect(notificationCenterMockTyped.appendNotification).not.toHaveBeenCalled();
+    expect(notificationCenterMockTyped.replaceNotifications).not.toHaveBeenCalled();
+    expect(cacheMock.clearNotificationQueryCache).toHaveBeenCalledTimes(1);
+    expect(notificationCenterMockTyped.updateUnreadSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ total: 0 }),
+      { replace: false },
+    );
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({
+      type: 'notification_sync',
+      limit: 50,
+    }));
+    expect(notifyMock.info).not.toHaveBeenCalled();
+    expect(notifyMock.warning).not.toHaveBeenCalled();
+    expect(notifyMock.error).not.toHaveBeenCalled();
+    expect(notifyMock.success).not.toHaveBeenCalled();
+  });
+
   it('reconciles replayed persisted delivery without a second toast', async () => {
     renderProvider('/doctor/cardiology');
     await act(async () => {

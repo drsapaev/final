@@ -4,6 +4,8 @@
 
 **Execution boundary:** `direct_execute`, narrowly scoped documentation-only review with source and prior-report nonduplication checks. This report originally recorded four source-backed candidates; a cross-PR reconciliation in group 48 discovered one overlapping finding in parallel PR #4054. No runtime changes. `ai/langgraph/scripts/run_agent_gate.ps1` was **not run** and remains mandatory for subsequent auth/DB/realtime or frontend-backend contract repair. No project tests, Postgres, Redis, browser QA, staging or production run for this report.
 
+**Remediation status.** The dated group reports describe what was verified at their source commits. The current finding-by-finding status is tracked in [the remediation register (#4063)](https://github.com/drsapaev/final/issues/4063). Closing a finding requires evidence from its own source fix and verification.
+
 ## Group 47 ledger
 
 | Candidate | Priority | Scope | Defect mechanism |

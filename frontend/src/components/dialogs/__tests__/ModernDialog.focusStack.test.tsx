@@ -58,10 +58,25 @@ describe('REG-FE-075: dialog accessible name', () => {
     expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Изменение цены');
   });
 
-  it('plain title keeps aria-labelledby (unchanged legacy contract)', () => {
+  it('plain title names its dialog through aria-labelledby', () => {
     render(<ModernDialog isOpen onClose={vi.fn()} title="Обычный заголовок" />);
     const dialog = screen.getByRole('dialog');
-    expect(dialog.getAttribute('aria-labelledby')).toBe('dialog-title');
+    const heading = screen.getByRole('heading', { name: 'Обычный заголовок' });
+    expect(dialog).toHaveAccessibleName('Обычный заголовок');
+    expect(dialog.getAttribute('aria-labelledby')).toBe(heading.id);
+  });
+
+  it('gives simultaneously open dialogs their own accessible names', () => {
+    render(
+      <ModernDialog isOpen title="Outer synthetic dialog">
+        <ModernDialog isOpen title="Inner synthetic dialog" />
+      </ModernDialog>,
+    );
+
+    const dialogs = screen.getAllByRole('dialog');
+    expect(dialogs[0]).toHaveAccessibleName('Outer synthetic dialog');
+    expect(dialogs[1]).toHaveAccessibleName('Inner synthetic dialog');
+    expect(dialogs[0].getAttribute('aria-labelledby')).not.toBe(dialogs[1].getAttribute('aria-labelledby'));
   });
 });
 
@@ -144,6 +159,45 @@ describe('REG-FE-077: dialog stack owns Escape and body scroll', () => {
 
       expect(closeInner).toHaveBeenCalledTimes(1);
       expect(closeOuter).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 10000);
+
+  it.each([
+    ['normal mode', false],
+    ['StrictMode', true],
+  ])('keeps an inner dialog on top when both mount together in %s', async (_mode, strictMode) => {
+    const closeOuter = vi.fn();
+    const closeInner = vi.fn();
+    vi.useFakeTimers();
+    try {
+      const dialogs = (innerOpen: boolean) => (
+        <ModernDialog isOpen onClose={closeOuter} title="Outer synthetic dialog">
+          <ModernDialog isOpen={innerOpen} onClose={closeInner} title="Inner synthetic dialog" />
+        </ModernDialog>
+      );
+      const wrapped = (innerOpen: boolean) => strictMode
+        ? <React.StrictMode>{dialogs(innerOpen)}</React.StrictMode>
+        : dialogs(innerOpen);
+      const { rerender } = render(wrapped(true));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+
+      const innerDialog = screen.getByText('Inner synthetic dialog').closest('[role="dialog"]');
+      expect(innerDialog).toContainElement(document.activeElement as HTMLElement);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(closeInner).toHaveBeenCalledTimes(1);
+      expect(closeOuter).not.toHaveBeenCalled();
+
+      rerender(wrapped(false));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(closeOuter).toHaveBeenCalledTimes(1);
+      expect(closeInner).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

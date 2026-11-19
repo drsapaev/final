@@ -33,6 +33,7 @@ from app.schemas.doctor_queue import (
     DoctorQueueStartVisitResponse,
     DoctorQueueTodayResponse,
 )
+from app.models.enums import AppointmentStatus, can_transition_status, normalize_appointment_status
 from app.services.emr_completion_policy import (
     EMR_REQUIRED_DETAIL,
     requires_saved_emr,
@@ -40,6 +41,28 @@ from app.services.emr_completion_policy import (
 from app.services.emr_completion_policy import (
     saved_emr_pairs as get_saved_emr_pairs,
 )
+
+
+def _stage_locked_appointment_completion(appointment) -> None:
+    """Validate the legacy paid-to-completed shortcut without reopening terminals.
+
+    Existing queue flows complete paid appointments directly. Validate both
+    canonical legs in memory in the same transaction, without emitting a
+    separate in-visit commit or its side effects.
+    """
+    raw = appointment.status
+    if raw not in {"paid", "confirmed", "in_visit", "completed"}:
+        raise HTTPException(status_code=409, detail="Завершение записи недоступно")
+    current = normalize_appointment_status(raw)
+    if current == AppointmentStatus.COMPLETED:
+        return
+    if current == AppointmentStatus.PAID:
+        if not can_transition_status(current, AppointmentStatus.IN_VISIT):
+            raise HTTPException(status_code=409, detail="Завершение записи недоступно")
+        current = AppointmentStatus.IN_VISIT
+    if not can_transition_status(current, AppointmentStatus.COMPLETED):
+        raise HTTPException(status_code=409, detail="Завершение записи недоступно")
+    appointment.status = AppointmentStatus.COMPLETED.value
 
 
 @router.get(
@@ -337,6 +360,28 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
     if queue_entry.visit_id:
         visit = db.query(Visit).filter(Visit.id == queue_entry.visit_id).first()
         if visit is not None:
+            # DOCSTART-BE-001 (audit #3892 group 24): the visit_id-first
+            # branch trusted queue_entry.visit_id without checking the
+            # visit belongs to the QUEUE PATIENT. An inconsistent
+            # historic/imported link would let a doctor put ANOTHER
+            # patient's visit in progress from this entry. The registrar
+            # start route already rejects this with 409 — mirror the
+            # patient-binding invariant here, before any date logic or
+            # mutation.
+            if visit.patient_id != queue_entry.patient_id:
+                # CodeQL py/clear-text-logging-sensitive-data: patient IDs
+                # are PHI and must not be logged; entry_id + visit_id are
+                # enough for operators to locate the inconsistent link.
+                logger.warning(
+                    "start_patient_visit: entry visit patient mismatch "
+                    "entry_id=%d visit_id=%d",
+                    queue_entry.id,
+                    visit.id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Queue entry visit does not belong to the queue patient",
+                )
             # Codex round-40 P2 + round-41 P2: форс-мажор перенос
             # копирует visit_id на завтрашнюю запись — валидируем
             # удержанный визит против НОВОГО дня очереди записи на
@@ -959,7 +1004,11 @@ def complete_patient_visit(
         appointment = None
         if not queue_entry:
             appointment = (
-                db.query(Appointment).filter(Appointment.id == entry_id).first()
+                db.query(Appointment)
+                .filter(Appointment.id == entry_id)
+                .with_for_update(of=Appointment)
+                .populate_existing()
+                .first()
             )
             if (
                 appointment
@@ -1011,8 +1060,13 @@ def complete_patient_visit(
                         status_code=status.HTTP_409_CONFLICT,
                         detail=EMR_REQUIRED_DETAIL,
                     )
-            # Обновляем статус appointment
-            appointment.status = "completed"
+            # Validate the refreshed locked state, not an earlier identity-map
+            # snapshot that may predate a patient's cancellation.
+            try:
+                _stage_locked_appointment_completion(appointment)
+            except HTTPException:
+                db.rollback()
+                raise
 
             db.commit()
             db.refresh(appointment)
@@ -1131,6 +1185,43 @@ def complete_patient_visit(
             )
             resolved_visit.updated_at = changed_at
 
+            # The pairing path above may have staged an appointment date move.
+            # Flush it before refreshing under the lock, so populate_existing
+            # cannot silently discard the staged move. Nothing is committed yet.
+            db.flush()
+            appointment = (
+                db.query(Appointment)
+                .filter(
+                    Appointment.patient_id == queue_entry.patient_id,
+                    Appointment.appointment_date == (resolved_visit.visit_date or date.today()),
+                    Appointment.doctor_id == resolved_visit.doctor_id,
+                )
+                .with_for_update(of=Appointment)
+                .populate_existing()
+                .first()
+            )
+            if appointment is not None:
+                try:
+                    _stage_locked_appointment_completion(appointment)
+                except HTTPException:
+                    db.rollback()
+                    raise
+
+                from app.models.payment import Payment
+
+                payment = (
+                    db.query(Payment)
+                    .filter(Payment.visit_id == resolved_visit.id)
+                    .order_by(Payment.created_at.desc())
+                    .first()
+                )
+                if (
+                    payment
+                    and ((payment.status and payment.status.lower() == "paid") or payment.paid_at)
+                    and not appointment.payment_processed_at
+                ):
+                    appointment.payment_processed_at = payment.paid_at or changed_at
+
             # Stage the queue transition only after the EMR check
             # and visit lifecycle validation have both succeeded.
             queue_entry.status = "served"
@@ -1179,33 +1270,6 @@ def complete_patient_visit(
                         visit.payment_processed_at = payment.paid_at or datetime.now(
                             UTC
                         )
-                # ✅ Также обновляем соответствующий Appointment, если он существует
-                from app.models.appointment import Appointment
-
-                appointment = (
-                    db.query(Appointment)
-                    .filter(
-                        and_(
-                            Appointment.patient_id == queue_entry.patient_id,
-                            (
-                                Appointment.appointment_date == visit.visit_date
-                                if visit.visit_date
-                                else date.today()
-                            ),
-                            Appointment.doctor_id == visit.doctor_id,
-                        )
-                    )
-                    .first()
-                )
-
-                if appointment:
-                    appointment.status = "completed"
-                    # Appointment has no discount_mode; use its explicit payment marker.
-                    if payment_is_paid and not appointment.payment_processed_at:
-                        appointment.payment_processed_at = (
-                            payment.paid_at or datetime.now(UTC)
-                        )
-
                 if visit_data:
                     # Сохраняем медицинские данные, если переданы
                     crud_visit.complete_visit(

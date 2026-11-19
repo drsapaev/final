@@ -26,6 +26,7 @@ import {
 import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
+import { hasRecoveryPasswordMinimum } from '../../utils/passwordLength';
 import { Input } from '../ui/macos';
 import {
   UZ_PHONE_PREFIX,
@@ -39,8 +40,8 @@ import {
 function getPasswordStrength(password: string, t: (key: string) => string) {
   if (!password) return { score: 0, label: '', color: 'transparent', percent: 0 };
   let score = 0;
-  if (password.length >= 8) score += 1;
-  if (password.length >= 12) score += 1;
+  if (hasRecoveryPasswordMinimum(password)) score += 1;
+  if (Array.from(password).length >= 12) score += 1;
   if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1;
   if (/\d/.test(password)) score += 1;
   if (/[^a-zA-Z0-9]/.test(password)) score += 1;
@@ -129,8 +130,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
         setStep('phone-verify');
         startResendCountdown();
       }
-    } catch (error) {
-      logger.error('Error sending phone reset:', error);
+    } catch {
+      logger.error('Error sending phone reset');
       setInlineError(t('final.fp_sms_error'));
       toast.error(t('final.fp_sms_error'));
     } finally {
@@ -147,8 +148,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
         toast.success(t('final.fp_email_sent_to') + ' ' + contact);
         setStep('email-verify');
       }
-    } catch (error) {
-      logger.error('Error sending email reset:', error);
+    } catch {
+      logger.error('Error sending email reset');
       setInlineError(t('final.fp_email_error'));
       toast.error(t('final.fp_email_error'));
     } finally {
@@ -194,8 +195,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
         setStep('reset-password');
         toast.success(t('final.fp_phone_confirmed'));
       }
-    } catch (error) {
-      logger.error('Error verifying phone code:', error);
+    } catch {
+      logger.error('Error verifying phone code');
       setInlineError(t('final.fp_invalid_code'));
     } finally {
       setLoading(false);
@@ -212,8 +213,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
         toast.success(t('final.fp_sms_sent'));
         startResendCountdown();
       }
-    } catch (error) {
-      logger.error('Error resending phone reset:', error);
+    } catch {
+      logger.error('Error resending phone reset');
       setInlineError(t('final.fp_sms_error'));
     } finally {
       setLoading(false);
@@ -223,7 +224,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
   const handlePasswordReset = async () => {
     setInlineError('');
     // UX Audit #5: minimum 8 characters (was 6)
-    if (!newPassword || newPassword.length < 8) {
+    if (!hasRecoveryPasswordMinimum(newPassword)) {
       setInlineError(t('final.fp_password_too_short'));
       return;
     }
@@ -243,8 +244,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
         // UX Audit #10: removed 3s auto-return setTimeout.
         // User clicks "Back to Login" explicitly.
       }
-    } catch (error) {
-      logger.error('Error resetting password:', error);
+    } catch {
+      logger.error('Error resetting password');
       setInlineError(t('final.fp_reset_error'));
     } finally {
       setLoading(false);

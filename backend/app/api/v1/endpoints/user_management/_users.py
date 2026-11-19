@@ -14,8 +14,85 @@ from app.schemas.clinic import ServiceUnavailableDetail
 from app.schemas.user_management import UserPhoneScopeConflictDetail
 from app.services.patient_phone_scope import (
     PatientPhoneScopeConflict,
-    lock_user_candidate_state,
 )
+from app.services.profile_contact_security import (
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+    check_bearer_expiry,
+    check_patient_scope,
+    check_profile_bearer,
+    enforce_phone_scope,
+    lock_profile,
+    lock_profile_users,
+    prepare_phone_change,
+)
+from app.services.token_blacklist_service import revoke_account_sessions_locked
+
+
+def _lock_admin_user_mutation_rows(
+    db: Session,
+    request: Request,
+    current_user: User,
+    *related_user_ids: int | None,
+):
+    """Lock the live admin and every user touched by one CRUD operation.
+
+    Acquire one User row at a time in ascending ID order. Besides preventing
+    cross-admin deadlocks, separate statements give a row that was updated
+    while this request waited a fresh READ COMMITTED snapshot before the
+    bearer and role checks run.
+    """
+    bearer = capture_profile_bearer(request, current_user)
+    if not isinstance(bearer.jti, str) or not bearer.jti:
+        raise ProfileBearerInvalid("Bearer session unavailable")
+
+    user_ids = sorted(
+        {current_user.id, *(value for value in related_user_ids if value is not None)}
+    )
+    locked_users: dict[int, User] = {}
+    for user_id in user_ids:
+        user = (
+            db.query(User)
+            .filter(User.id == user_id)
+            .with_for_update(key_share=True)
+            .populate_existing()
+            .first()
+        )
+        if user is not None:
+            locked_users[user_id] = user
+
+    actor = locked_users.get(current_user.id)
+    if actor is None:
+        raise ProfileBearerInvalid("Bearer session unavailable")
+    check_profile_bearer(db, actor, bearer)
+    # Preserve require_roles("Admin") semantics, including its case-insensitive
+    # Admin role check and superuser bypass.
+    actor_role = str(actor.role or "").strip().casefold()
+    if actor_role != "admin" and not actor.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для управления пользователями",
+        )
+    return locked_users, bearer
+
+
+def _before_commit_expiry_guard(bearer):
+    """Return a commit hook and flag for a bearer expiring mid-operation."""
+    state = {"expired": False}
+
+    def check_expiry() -> None:
+        try:
+            check_bearer_expiry(bearer)
+        except ProfileBearerInvalid:
+            state["expired"] = True
+            raise
+
+    return check_expiry, state
+
+
+def _raise_if_bearer_expired(state) -> None:
+    if state["expired"]:
+        raise HTTPException(status_code=401, detail="Bearer session unavailable")
 
 
 @router.post(
@@ -42,59 +119,68 @@ async def create_user(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Создать нового пользователя"""
-    # Canonical doctor onboarding (owner decision 2026-09-01): the medical
-    # specialty catalog (migration 0051) is the runtime SSOT — the schema
-    # layer checks only the payload shape; membership + active status are
-    # enforced here, at the write boundary, BEFORE any row is created.
-    if getattr(user_data, "role", None) == "Doctor":
-        from fastapi import HTTPException as _HTTPException
-
-        from app.services.medical_specialty_catalog import (
-            MedicalSpecialtyCatalogError,
-            MedicalSpecialtyCatalogService,
+    try:
+        _locked_users, bearer = _lock_admin_user_mutation_rows(
+            db, request, current_user
         )
+        before_commit, expiry_state = _before_commit_expiry_guard(bearer)
 
-        requested_specialty = (
-            user_data.doctor_profile.specialty.strip()
-            if user_data.doctor_profile is not None
-            else ""
-        )
-        try:
-            selectable = MedicalSpecialtyCatalogService(
-                db
-            ).is_selectable_for_onboarding(requested_specialty)
-        except MedicalSpecialtyCatalogError as catalog_error:
-            raise _HTTPException(
-                status_code=503,
-                detail=(
-                    "Каталог медицинских специальностей не настроен: "
-                    "выполните миграции БД (baseline seed 0051)."
-                ),
-            ) from catalog_error
-        if not selectable:
-            # Codex round-9 P2: the operation's declared 422 body is
-            # HTTPValidationError (detail = array of {loc, msg, type}) — a
-            # plain-string detail would break generated clients decoding the
-            # documented schema, so return the standard validation-error
-            # array shape instead.
-            raise _HTTPException(
-                status_code=422,
-                detail=[
-                    {
-                        "loc": ["body", "doctor_profile", "specialty"],
-                        "msg": (
-                            f"Специальность '{requested_specialty}' должна "
-                            "быть активным кодом из каталога специальностей "
-                            "(/admin/doctors/specialty-vocabulary)."
-                        ),
-                        "type": "value_error",
-                    }
-                ],
+        # Canonical doctor onboarding (owner decision 2026-09-01): the medical
+        # specialty catalog (migration 0051) is the runtime SSOT — the schema
+        # layer checks only the payload shape; membership + active status are
+        # enforced here, at the write boundary, BEFORE any row is created.
+        if getattr(user_data, "role", None) == "Doctor":
+            from app.services.medical_specialty_catalog import (
+                MedicalSpecialtyCatalogError,
+                MedicalSpecialtyCatalogService,
             )
 
-    try:
+            requested_specialty = (
+                user_data.doctor_profile.specialty.strip()
+                if user_data.doctor_profile is not None
+                else ""
+            )
+            try:
+                selectable = MedicalSpecialtyCatalogService(
+                    db
+                ).is_selectable_for_onboarding(requested_specialty)
+            except MedicalSpecialtyCatalogError as catalog_error:
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Каталог медицинских специальностей не настроен: "
+                        "выполните миграции БД (baseline seed 0051)."
+                    ),
+                ) from catalog_error
+            if not selectable:
+                # Codex round-9 P2: the operation's declared 422 body is
+                # HTTPValidationError (detail = array of {loc, msg, type}) — a
+                # plain-string detail would break generated clients decoding
+                # the documented schema, so return the standard shape.
+                raise HTTPException(
+                    status_code=422,
+                    detail=[
+                        {
+                            "loc": ["body", "doctor_profile", "specialty"],
+                            "msg": (
+                                f"Специальность '{requested_specialty}' должна "
+                                "быть активным кодом из каталога специальностей "
+                                "(/admin/doctors/specialty-vocabulary)."
+                            ),
+                            "type": "value_error",
+                        }
+                    ],
+                )
+
         service = get_user_management_service()
-        success, message, user = service.create_user(db, user_data, current_user.id)
+        success, message, user = service.create_user(
+            db,
+            user_data,
+            current_user.id,
+            before_commit=before_commit,
+        )
+
+        _raise_if_bearer_expired(expiry_state)
 
         if not success:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
@@ -109,9 +195,14 @@ async def create_user(
 
         return UserResponse(**profile_data)
 
+    except ProfileBearerInvalid as exc:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from exc
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -204,8 +295,21 @@ async def update_user(
 ):
     """Обновить пользователя"""
     try:
+        _locked_users, bearer = _lock_admin_user_mutation_rows(
+            db, request, current_user, user_id
+        )
+        before_commit, expiry_state = _before_commit_expiry_guard(bearer)
+
         service = get_user_management_service()
-        success, message = service.update_user(db, user_id, user_data, current_user.id)
+        success, message = service.update_user(
+            db,
+            user_id,
+            user_data,
+            current_user.id,
+            before_commit=before_commit,
+        )
+
+        _raise_if_bearer_expired(expiry_state)
 
         if not success:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
@@ -224,9 +328,14 @@ async def update_user(
         # service rolled back, nothing changed, the other account keeps the
         # phone and the resolver predicate stays single-candidate.
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.detail) from exc
+    except ProfileBearerInvalid as exc:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from exc
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -236,6 +345,7 @@ async def update_user(
 @router.delete("/users/{user_id}", response_model=dict[str, Any])
 async def delete_user(
     user_id: int,
+    request: Request,
     transfer_to: int | None = Query(
         None, description="ID пользователя для передачи данных"
     ),
@@ -244,19 +354,35 @@ async def delete_user(
 ):
     """Удалить пользователя"""
     try:
+        _locked_users, bearer = _lock_admin_user_mutation_rows(
+            db, request, current_user, user_id, transfer_to
+        )
+        before_commit, expiry_state = _before_commit_expiry_guard(bearer)
+
         service = get_user_management_service()
         success, message = service.delete_user(
-            db, user_id, current_user.id, transfer_to
+            db,
+            user_id,
+            current_user.id,
+            transfer_to,
+            before_commit=before_commit,
         )
+
+        _raise_if_bearer_expired(expiry_state)
 
         if not success:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
         return {"success": True, "message": message}
 
+    except ProfileBearerInvalid as exc:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from exc
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -356,7 +482,7 @@ async def get_user_profile(
         }
     },
 )
-async def update_user_profile(
+def update_user_profile(
     user_id: int,
     profile_data: UserProfileUpdate,
     request: Request,
@@ -365,9 +491,12 @@ async def update_user_profile(
 ):
     """Обновить профиль пользователя"""
     try:
-        # Проверяем права доступа
+        bearer_context = capture_profile_bearer(request, current_user)
+        actor, target_user = lock_profile_users(db, current_user.id, user_id)
+        check_profile_bearer(db, actor, bearer_context)
+        # Re-evaluate staff authorization with the live locked principal.
         from app.services.authorization.staff import staff_authorization_service
-        if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
+        if not staff_authorization_service.can_manage_users(actor, target_user_id=user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для обновления профиля",
@@ -381,8 +510,8 @@ async def update_user_profile(
         # map), so no unlocked re-read can re-enter between guard and
         # mutation. Global lock order: users row -> user_profiles row ->
         # phone advisory lock.
-        target_user, profile = lock_user_candidate_state(db, user_id)
-        if not profile:
+        profile = lock_profile(db, user_id)
+        if target_user is None or profile is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Профиль пользователя не найден",
@@ -397,31 +526,17 @@ async def update_user_profile(
         # another ACTIVE patient portal account (409), and ANY changed phone
         # loses its verified flag — possession is not proven for an entered
         # number (same convention as the self-service phone change).
-        if "phone" in update_data:
-            from app.core.roles import Roles
-            from app.services.patient_otp_service import normalize_phone
-            from app.services.patient_phone_scope import ensure_phone_scope_free
-
-            old_normalized = normalize_phone(profile.phone or "")
-            new_normalized = normalize_phone(update_data.get("phone") or "")
-            if new_normalized:
-                # Round-3 P2: persist the CANONICAL normalized value, not
-                # the admin-entered representation — the login resolver and
-                # the phone-scope count compare SQL equality against the
-                # normalized phone, so a reformatted duplicate would keep
-                # phone_verified=True while silently dropping the record
-                # out of the resolver predicate (generic login 401).
-                update_data["phone"] = new_normalized
-            if new_normalized != old_normalized:
-                if target_user is not None and target_user.role == Roles.PATIENT:
-                    ensure_phone_scope_free(
-                        db, new_normalized, exclude_user_id=user_id
-                    )
-                profile.phone_verified = False
+        phone_changed = prepare_phone_change(db, profile, update_data)
+        check_patient_scope(db, actor, bearer_context)
+        if phone_changed:
+            enforce_phone_scope(db, target_user, update_data)
+            revoke_account_sessions_locked(db, target_user, revoke_password_resets=True)
+            profile.phone_verified = False
 
         profile = UserManagementApiService(db).apply_profile_update(
             profile=profile,
             update_data=update_data,
+            before_commit=lambda: check_bearer_expiry(bearer_context),
         )
 
         return UserProfileResponse(
@@ -465,12 +580,17 @@ async def update_user_profile(
             updated_at=profile.updated_at,
         )
 
+    except ProfileBearerInvalid as exc:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from exc
     except PatientPhoneScopeConflict as exc:
         db.rollback()  # release the phone-scope advisory lock; nothing changed
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.detail) from exc
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
