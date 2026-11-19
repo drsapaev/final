@@ -118,10 +118,26 @@ class TestWebAuthnBE001ServerPinnedRp:
         GREEN: the options generator receives only the server RP ID."""
         ws = webauthn_stub
         captured: dict = {}
+        real_generate = ws.generate_registration_options
+        from app.models.patient import Patient
+        from app.models.user import User
+
+        user = User(
+            username="synthetic-origin-registration",
+            hashed_password="synthetic",
+            role="Patient",
+            is_active=True,
+            is_superuser=False,
+        )
+        db_session.add(user)
+        db_session.flush()
+        patient = Patient(user_id=user.id, first_name="Synthetic", last_name="Patient")
+        db_session.add(patient)
+        db_session.commit()
 
         def fake_generate_registration_options(**kwargs):
             captured.update(kwargs)
-            return SimpleNamespace(challenge=b"challenge-bytes")
+            return real_generate(**kwargs)
 
         monkeypatch.setattr(
             ws, "generate_registration_options", fake_generate_registration_options
@@ -129,7 +145,9 @@ class TestWebAuthnBE001ServerPinnedRp:
 
         options = ws.begin_passkey_registration(
             db_session,
-            1,
+            patient.id,
+            user.id,
+            "synthetic-session",
             rp_id=EVIL_RP,
             rp_name="Evil RP",
         )
@@ -143,10 +161,11 @@ class TestWebAuthnBE001ServerPinnedRp:
     ):
         """RED: verify_registration_response got expected_origin=evil.example.
         GREEN: expected values are server-pinned regardless of body input."""
-        from app.core.cache import cache_manager
-
         ws = webauthn_stub
-        cache_manager.set("webauthn_reg_challenge:1", "challenge-bytes", ttl=300)
+        ceremony_id = "a" * 43
+        ws._store_registration_ceremony(
+            None, ceremony_id, 1, 2, "synthetic-session", b"challenge-bytes"
+        )
         captured: dict = {}
 
         def fake_verify_registration_response(**kwargs):
@@ -161,6 +180,9 @@ class TestWebAuthnBE001ServerPinnedRp:
             ws.finish_passkey_registration(
                 db_session,
                 1,
+                2,
+                "synthetic-session",
+                ceremony_id=ceremony_id,
                 credential_response={"id": "x"},
                 rp_id=EVIL_RP,
                 origin=EVIL_ORIGIN,
@@ -198,13 +220,28 @@ class TestWebAuthnBE001ServerPinnedRp:
         """RED: verify_authentication_response got expected_origin=evil.example
         for the unauthenticated login plane. GREEN: server-pinned values."""
         from app.models.passkey_credential import PasskeyCredential
+        from app.models.patient import Patient
+        from app.models.user import User
 
         ws = webauthn_stub
         ceremony_id = "a" * 43
-        ws._store_ceremony(None, ceremony_id, 7, b"challenge-bytes")
+        user = User(
+            username="synthetic-origin-patient",
+            hashed_password="synthetic",
+            role="Patient",
+            is_active=True,
+            is_superuser=False,
+        )
+        db_session.add(user)
+        db_session.flush()
+        db_session.add(
+            Patient(id=7, user_id=user.id, first_name="Synthetic", last_name="Patient")
+        )
+        db_session.flush()
         db_session.add(
             PasskeyCredential(
                 patient_id=7,
+                owner_user_id=user.id,
                 credential_id="Y3JlZC1pZA==",  # urlsafe b64 of 'cred-id'
                 public_key="cHVia2V5",  # urlsafe b64 of 'pubkey'
                 sign_count=0,
@@ -212,6 +249,14 @@ class TestWebAuthnBE001ServerPinnedRp:
             )
         )
         db_session.commit()
+        ws._store_ceremony(
+            None,
+            ceremony_id,
+            7,
+            b"challenge-bytes",
+            owner_id=user.id,
+            auth_epoch=user.auth_epoch,
+        )
         captured: dict = {}
 
         def fake_verify_authentication_response(**kwargs):

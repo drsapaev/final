@@ -30,6 +30,41 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_openapi_notification_templates_document_error_and_update_contract(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = schema["paths"]
+    create = paths["/api/v1/notifications/templates"]["post"]
+    update = paths["/api/v1/notifications/templates/{template_id}"]["put"]
+    for operation in (create, update):
+        responses = operation["responses"]
+        assert {"200", "409", "422", "500", "503"} <= responses.keys()
+        conflict = responses["409"]["content"]["application/json"]["schema"]
+        assert conflict["properties"]["detail"]["type"] == "string"
+
+    assert "404" in update["responses"]
+    create_validation = create["responses"]["422"]["content"]["application/json"]["schema"]
+    assert create_validation["properties"]["detail"]["type"] == "array"
+    update_validation = update["responses"]["422"]["content"]["application/json"]["schema"]
+    assert len(update_validation["oneOf"]) == 2
+
+    update_schema = schema["components"]["schemas"]["NotificationTemplateUpdate"]
+    assert not update_schema.get("required")
+    for field in ("name", "type", "channel", "template", "is_active"):
+        assert update_schema["properties"][field]["type"] != "null"
+        assert "anyOf" not in update_schema["properties"][field]
+        assert "default" not in update_schema["properties"][field]
+    assert {option["type"] for option in update_schema["properties"]["subject"]["anyOf"]} == {
+        "string",
+        "null",
+    }
+
+    send_description = paths["/api/v1/notifications/send"]["post"]["description"]
+    assert "не подтверждает доставку" in send_description
+    assert "не отправляется" in send_description
+
+
 def test_openapi_admin_public_booking_settings_contract(client: TestClient) -> None:
     schema = _get_openapi_schema(client)
     path = "/api/v1/admin/public-booking-settings"

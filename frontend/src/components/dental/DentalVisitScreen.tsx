@@ -893,10 +893,18 @@ const DentalVisitScreen = ({
   const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: Record<string, unknown>; suggestedStatus?: string } | null>(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
+  const [aiDialogVisitId, setAIDialogVisitId] = useState<string | number | null>(null);
+  const [aiDialogGeneration, setAIDialogGeneration] = useState(0);
   const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const visitId = patient?.visit_id;
+  // Update during render, before visit-change effects can clear the old
+  // editor, so a late AI callback cannot write into the newly selected visit.
+  const currentVisitIdRef = useRef(visitId);
+  const aiDialogGenerationRef = useRef(0);
+  if (currentVisitIdRef.current !== visitId && !isSameVisit(currentVisitIdRef.current, visitId)) aiDialogGenerationRef.current += 1;
+  currentVisitIdRef.current = visitId;
   const patientId =
     patient?.patient?.id ||
     patient?.patient_id ||
@@ -1008,6 +1016,8 @@ const DentalVisitScreen = ({
     // patient must not keep writing after the selected visit changes.
     setToothModalOpen(false);
     setSelectedTooth(null);
+    setShowAIDialog(false);
+    setAIDialogVisitId(null);
 
     if (visitId === null || visitId === undefined || visitId === '') {
       setLoadError('missing_visit');
@@ -1582,10 +1592,14 @@ const DentalVisitScreen = ({
 
   // AI suggestion apply → writes to icd10_code field
   const handleAISuggestion = useCallback(() => {
+    if (!isSameVisit(loadedVisitIdRef.current, visitId)) return;
+    setAIDialogGeneration(++aiDialogGenerationRef.current);
+    setAIDialogVisitId(visitId ?? null);
     setShowAIDialog(true);
-  }, []);
+  }, [visitId]);
 
-  const applyAISuggestion = useCallback((icd10Code: string) => {
+  const applyAISuggestion = useCallback((icd10Code: string, originVisitId: string | number | null, generation: number) => {
+    if (aiDialogGenerationRef.current !== generation || !isSameVisit(currentVisitIdRef.current, originVisitId) || !isSameVisit(loadedVisitIdRef.current, originVisitId)) return;
     updateField('icd10_code', icd10Code);
     notify.success(t('dental.dental_dvs_icd10_added', { code: icd10Code }));
   }, [updateField, t]);
@@ -1808,12 +1822,21 @@ const DentalVisitScreen = ({
       )}
 
       {/* AI Suggestion Dialog */}
-      <AISuggestionDialog
-        open={showAIDialog}
-        onClose={() => setShowAIDialog(false)}
-        onApply={applyAISuggestion}
-        anamnesis={emrData.anamnesis_morbi || emrData.complaints || ''}
-      />
+      {showAIDialog && isSameVisit(aiDialogVisitId, visitId) && (
+        <AISuggestionDialog
+          key={String(aiDialogVisitId)}
+          open
+          onClose={() => {
+            if (aiDialogGenerationRef.current === aiDialogGeneration && isSameVisit(currentVisitIdRef.current, aiDialogVisitId)) {
+              aiDialogGenerationRef.current += 1;
+              setShowAIDialog(false);
+              setAIDialogVisitId(null);
+            }
+          }}
+          onApply={(code) => applyAISuggestion(code, aiDialogVisitId, aiDialogGeneration)}
+          anamnesis={emrData.anamnesis_morbi || emrData.complaints || ''}
+        />
+      )}
     </div>
   );
 };

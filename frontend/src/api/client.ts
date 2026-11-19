@@ -197,6 +197,15 @@ function getCurrentAuthSession(): AuthSessionSnapshot {
   return { ...credentials, generation: authSessionGeneration };
 }
 
+/**
+ * Identify a login lifecycle without exposing its credentials. Refresh keeps
+ * the same generation; replacement login or logout changes it. Callers can
+ * avoid clearing a newer session after an older mutation resolves.
+ */
+export function getAuthSessionGeneration(): number {
+  return getCurrentAuthSession().generation;
+}
+
 function sameCredentials(left: AuthSessionSnapshot, right: AuthSessionSnapshot): boolean {
   return left.accessToken === right.accessToken && left.refreshToken === right.refreshToken;
 }
@@ -251,8 +260,13 @@ async function performTokenRefresh(attemptedSession: AuthSessionSnapshot): Promi
 
   try {
     logger.log('🔄 Refreshing access token...');
+    const csrfToken = await ensureCSRFToken();
+    if (!isCurrentAuthSession(attemptedSession)) return result(null, { sessionChanged: true });
     const response = await axios.post(buildApiUrl('/authentication/refresh'), {
       refresh_token: refreshToken
+    }, {
+      withCredentials: true,
+      ...(csrfToken ? { headers: { 'X-CSRF-Token': csrfToken } } : {}),
     });
 
     if (response.data && response.data.access_token) {
@@ -273,7 +287,6 @@ async function performTokenRefresh(attemptedSession: AuthSessionSnapshot): Promi
       // This credential rotation belongs to the same login session; update
       // the observed pair without advancing its generation.
       observedCredentials = { accessToken: newToken, refreshToken: newRefreshToken };
-      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       logger.log('✅ Token refreshed successfully');
 
       return result(newToken, { resultingRefreshToken: newRefreshToken });
@@ -454,6 +467,7 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/auth/csrf-token',
   '/auth/password-reset',
   '/authentication/password-reset',
+  '/authentication/email-verification/confirm',
   '/password-reset',
   '/password-reset/confirm',
   '/auth/logout',
@@ -468,12 +482,39 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/patient-access/login',
   '/webauthn/login/begin',
   '/webauthn/login/finish',
+  '/webauthn/login/discoverable/begin',
+  '/webauthn/login/discoverable/finish',
   '/patient-access/activate/request-otp',
   '/patient-access/activate/confirm'
 ];
 
-function isAuthBootstrapEndpoint(url: string | undefined): boolean {
+// Attach session credentials only to relative requests whose actual Axios URL
+// remains inside the configured API. Absolute URLs and caller base overrides
+// are intentionally left to the caller's own authentication policy.
+function isTrustedApiTarget(config: InternalAxiosRequestConfig): boolean {
+  if (config.baseURL !== API_BASE) return false;
+  const url = config.url;
+  if (!url || url.includes('\\') || Array.from(url).some((c) => c.charCodeAt(0) <= 32 || c.charCodeAt(0) === 127) ||
+      /^(?:\/\/|[a-z][a-z\d+.-]*:)/i.test(url)) return false;
+  const path = url.split(/[?#]/, 1)[0];
+  if (/%(?:2f|5c|0[0-9a-f]|1[0-9a-f]|20|7f)/i.test(path)) return false;
+  try {
+    const base = new URL(API_BASE);
+    const target = new URL(api.getUri({ baseURL: config.baseURL, url, allowAbsoluteUrls: config.allowAbsoluteUrls }));
+    const basePath = base.pathname.replace(/\/+$/, '');
+    return target.origin === base.origin && (target.pathname === basePath || target.pathname.startsWith(`${basePath}/`));
+  } catch {
+    return false;
+  }
+}
+
+function isTrustedApiMutation(config: InternalAxiosRequestConfig): boolean {
+  return isTrustedApiTarget(config) && ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() ?? '');
+}
+
+function isAuthBootstrapEndpoint(url: string | undefined, baseURL?: string, method?: string): boolean {
   const path = String(url || '').split(/[?#]/, 1)[0];
+  if (/^\/(?:api\/v1\/)?webauthn\/login\/discoverable\/complete$/.test(path)) return baseURL === API_BASE && method?.toLowerCase() === 'post';
   return AUTH_BOOTSTRAP_SUFFIXES.some((suffix) => path.endsWith(suffix));
 }
 
@@ -494,10 +535,29 @@ function isPendingTwoFactorChallenge(url: string | undefined, data: unknown): bo
   return typeof pendingToken === 'string' && pendingToken.trim().length > 0;
 }
 
+function isTwoFactorEnrollmentBootstrap(url: string | undefined, data: unknown, method: string | undefined): boolean {
+  const path = String(url || '').split(/[?#]/, 1)[0];
+  if (method?.toLowerCase() !== 'post' || !/^\/(?:api\/v1\/)?2fa\/(?:setup|verify-setup)$/.test(path)) return false;
+
+  let body = data;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body) as unknown;
+    } catch {
+      return false;
+    }
+  }
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return false;
+  const enrollmentToken = (body as Record<string, unknown>).enrollment_token;
+  return typeof enrollmentToken === 'string' && enrollmentToken.trim().length > 0;
+}
+
 function belongsToReplacedAuthSession(config: InternalAxiosRequestConfig | undefined): boolean {
   if (!config
-    || isAuthBootstrapEndpoint(config.url)
-    || isPendingTwoFactorChallenge(config.url, config.data)) {
+    || !isTrustedApiTarget(config)
+    || isAuthBootstrapEndpoint(config.url, config.baseURL, config.method)
+    || isPendingTwoFactorChallenge(config.url, config.data)
+    || isTwoFactorEnrollmentBootstrap(config.url, config.data, config.method)) {
     return false;
   }
 
@@ -561,8 +621,10 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const boundConfig = config as SessionBoundRequestConfig;
   const now = Date.now();
   const requestUrl = String(config.url || '');
-  const shouldBindSession = !isAuthBootstrapEndpoint(requestUrl)
-    && !isPendingTwoFactorChallenge(requestUrl, config.data);
+  const trustedTarget = isTrustedApiTarget(config);
+  const shouldBindSession = trustedTarget && !isAuthBootstrapEndpoint(requestUrl, config.baseURL, config.method)
+    && !isPendingTwoFactorChallenge(requestUrl, config.data)
+    && !isTwoFactorEnrollmentBootstrap(requestUrl, config.data, config.method);
   let requestSession = boundConfig._authSessionSnapshot;
   if (!requestSession) {
     requestSession = getCurrentAuthSession();
@@ -601,8 +663,9 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     boundConfig._authSessionSnapshot = requestSession;
     token = prepared.accessToken;
   } else {
-    // Auth bootstrap and pending 2FA keep their existing request semantics.
-    token = tokenManager.getAccessToken();
+    // Bootstrap requests can carry the existing principal only on our API.
+    const emailConfirmation = config.method?.toLowerCase() === 'post' && /^\/(?:api\/v1\/)?authentication\/email-verification\/confirm$/.test(requestUrl.split(/[?#]/, 1)[0]);
+    token = trustedTarget && !emailConfirmation ? tokenManager.getAccessToken() : null;
   }
 
   if (shouldBindSession && !isCurrentAuthSession(requestSession)) {
@@ -621,9 +684,14 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     }
   }
 
-  // ✅ CSRF: Add X-CSRF-Token for state-changing requests
+  const trustedMutation = isTrustedApiMutation(config);
+  if (trustedMutation && config.withCredentials !== false) {
+    config.withCredentials = true;
+  }
+
+  // CSRF tokens are bound to the configured API and must not leak to other origins.
   const method = config.method?.toLowerCase() ?? '';
-  if (['post', 'put', 'patch', 'delete'].includes(method)) {
+  if (trustedMutation) {
     const csrfToken = await ensureCSRFToken();
     if (csrfToken) {
       config.headers.set('X-CSRF-Token', csrfToken);
@@ -754,8 +822,10 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       error.config &&
-      !isAuthBootstrapEndpoint(error.config.url) &&
-      !isPendingTwoFactorChallenge(error.config.url, error.config.data)
+      isTrustedApiTarget(error.config) &&
+      !isAuthBootstrapEndpoint(error.config.url, error.config.baseURL, error.config.method) &&
+      !isPendingTwoFactorChallenge(error.config.url, error.config.data) &&
+      !isTwoFactorEnrollmentBootstrap(error.config.url, error.config.data, error.config.method)
     ) {
       const config = error.config as SessionBoundRequestConfig;
       const hadAuthHeader = !!config.headers?.Authorization;
@@ -870,7 +940,7 @@ api.interceptors.response.use(
     // #05 Tier 1: CSRF 403 recovery — refresh token and retry exactly once.
     // This handles CSRF cookie drift (8h expiry, multi-tab, subdomain mixup).
     // The backend provides "recovery": "GET /auth/csrf-token" hint.
-    if (isCSRFRejection(error) && error.config) {
+    if (isCSRFRejection(error) && error.config && isTrustedApiMutation(error.config)) {
       const config = error.config as InternalAxiosRequestConfig & { _csrfRetried?: boolean };
       if (!config._csrfRetried) {
         config._csrfRetried = true;
@@ -906,7 +976,6 @@ function setToken(token: string | null | undefined): void {
     const t = typeof token === 'string' ? token.trim() : token;
     if (t) {
       tokenManager.setAccessToken(t);
-      api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
     }
   } else {
     tokenManager.clearAll();
@@ -1080,11 +1149,6 @@ async function login(username: string, password: string): Promise<LoginResult> {
 // were removed 2026-07-25 — zero importers across the codebase.
 const apiClient = api;
 
-// Инициализируем токен при загрузке модуля
-const existingToken = tokenManager.getAccessToken();
-if (existingToken) {
-  api.defaults.headers.common['Authorization'] = `Bearer ${existingToken}`;
-}
 
 export {
   api,

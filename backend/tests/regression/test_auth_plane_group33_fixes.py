@@ -23,7 +23,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
+
 from app.api.v1.endpoints import authentication as auth_module
+
+
+@pytest.fixture(autouse=True)
+def no_delivery(monkeypatch):
+    monkeypatch.setattr(auth_module, "schedule_email_reset", lambda email, binding: True)
 
 
 def _fake_session(expires_at: datetime) -> SimpleNamespace:
@@ -41,6 +48,33 @@ def _fake_session(expires_at: datetime) -> SimpleNamespace:
 
 
 class TestAuthBE001TimezoneAwareExpiry:
+    def test_sqlite_roundtrip_session_expiry_on_both_routes(
+        self, client, auth_headers, admin_user, db_session
+    ):
+        from app.models.authentication import UserSession
+
+        now = datetime.now(UTC)
+        rows = [
+            UserSession(user_id=admin_user.id, expires_at=now + timedelta(hours=1), revoked=False),
+            UserSession(user_id=admin_user.id, expires_at=now - timedelta(hours=1), revoked=False),
+            UserSession(user_id=admin_user.id, expires_at=now + timedelta(hours=1), revoked=True),
+        ]
+        db_session.add_all(rows)
+        db_session.commit()
+        ids = [row.id for row in rows]
+        db_session.expire_all()
+        assert db_session.get(UserSession, ids[0]).expires_at.tzinfo is None
+
+        response = client.get("/api/v1/authentication/sessions", headers=auth_headers)
+        assert response.status_code == 200, response.text
+        states = {item["id"]: item["is_active"] for item in response.json()["sessions"]}
+        assert [states[id_] for id_ in ids] == [True, False, False]
+
+        status = client.get("/api/v1/authentication/status", headers=auth_headers)
+        assert status.status_code == 200, status.text
+        assert status.json()["session"]["id"] == ids[0]
+        assert status.json()["session"]["is_active"] is True
+
     def test_sessions_list_survives_timezone_aware_expiry(
         self, client, auth_headers, admin_user, db_session, monkeypatch
     ):
@@ -127,20 +161,7 @@ class TestAuthBE002PasswordResetUniformResponse:
         # The old success shape leaked expires_at only for known emails.
         assert not (known_body.get("data") or {}).get("expires_at")
 
-    def test_service_failure_result_keeps_uniform_success_response(
-        self, client, admin_user, monkeypatch
-    ):
-        monkeypatch.setattr(
-            auth_module,
-            "get_authentication_service",
-            lambda: SimpleNamespace(
-                create_password_reset_token=lambda **kwargs: {
-                    "success": False,
-                    "message": "internal service failure",
-                }
-            ),
-        )
-
+    def test_scheduled_request_keeps_uniform_success_response(self, client, admin_user):
         response = client.post(
             "/api/v1/authentication/password-reset",
             json={"email": admin_user.email},

@@ -53,6 +53,17 @@ class PatientAppointmentsApiRepository:
             .first()
         )
 
+    def get_locked_appointment_for_patient(
+        self, *, appointment_id: int, patient_id: int
+    ) -> Appointment | None:
+        return (
+            self.db.query(Appointment)
+            .filter(Appointment.id == appointment_id, Appointment.patient_id == patient_id)
+            .with_for_update(of=Appointment)
+            .populate_existing()
+            .first()
+        )
+
     def get_doctor(self, doctor_id: int) -> Doctor | None:
         return self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
 

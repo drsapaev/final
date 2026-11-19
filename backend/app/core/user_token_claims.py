@@ -7,9 +7,47 @@ subject is not a User ID even if their numeric values happen to coincide.
 
 from typing import Any
 
+_MAX_AUTH_EPOCH = (1 << 63) - 1
+
+
+def parse_user_auth_epoch(payload: dict[str, Any]) -> int | None:
+    """Return the signed user generation, or None for malformed claims.
+
+    Tokens issued before generation binding have an implicit generation zero.
+    Booleans, strings and out-of-range values must not alias a valid integer.
+    """
+    epoch = payload.get("auth_epoch", 0)
+    if type(epoch) is not int or not 0 <= epoch <= _MAX_AUTH_EPOCH:
+        return None
+    return epoch
+
+
+def user_auth_epoch_matches(payload: dict[str, Any], live_epoch: object) -> bool:
+    """Compare a validated user token with the current database generation."""
+    epoch = parse_user_auth_epoch(payload)
+    return (
+        epoch is not None
+        and type(live_epoch) is int
+        and 0 <= live_epoch <= _MAX_AUTH_EPOCH
+        and epoch == live_epoch
+    )
+
 
 def is_user_access_claims(payload: dict[str, Any]) -> bool:
     """Accept canonical User access tokens, including untyped legacy tokens."""
+    if parse_user_auth_epoch(payload) is None:
+        return False
+    # Usernames can be renamed and reused by another account. Only a signed,
+    # stable database ID can identify a User across that lifecycle.
+    subject = payload.get("sub")
+    if (
+        not isinstance(subject, str)
+        or not subject.isascii()
+        or not subject.isdigit()
+        or len(subject) > 19
+        or not 0 < int(subject) <= _MAX_AUTH_EPOCH
+    ):
+        return False
     # Legacy Mini App scopes identify a patient card, not a User. The
     # patient_portal scope identifies a User and additionally binds the token
     # to a currently active, non-superuser Patient role after lookup.
@@ -17,15 +55,9 @@ def is_user_access_claims(payload: dict[str, Any]) -> bool:
         return False
     if payload.get("scope") == "patient_portal":
         patient_id = payload.get("patient_id")
-        subject = payload.get("sub")
         if (
             type(patient_id) is not int
             or patient_id <= 0
-            or not isinstance(subject, str)
-            or not subject.isascii()
-            or not subject.isdigit()
-            or len(subject) > 20
-            or int(subject) <= 0
             or "username" in payload
         ):
             return False

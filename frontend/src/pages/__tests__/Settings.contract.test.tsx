@@ -33,4 +33,9 @@ describe('Settings generic key/value route contract', () => {
     expect(source).toContain('response?.data ?? response');
     expect(source).not.toContain('api.post(\'/activation/activate\', { body: { key } })');
   });
+
+  it('requests profile phone changes through the phone-change flow', () => {
+    const source = normalizeSource(fs.readFileSync(settingsPath, 'utf8'));
+    expect(source).toContain('purpose="phone_change"');
+  });
 });

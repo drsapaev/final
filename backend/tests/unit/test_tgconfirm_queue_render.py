@@ -36,6 +36,7 @@ from app.services.telegram.bot import ClinicTelegramBot
 class FakeMessage:
     def __init__(self, text: str = "Визит 12.11, кардиология", *, edit_raises=None):
         self.text = text
+        self.chat = type("Chat", (), {"id": 777, "type": "private"})()
         self.edited: list[str] = []
         self._edit_raises = edit_raises
 

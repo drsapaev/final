@@ -3,7 +3,7 @@ API endpoints для AI функций EMR
 """
 
 import logging
-from typing import Any, NoReturn
+from typing import Any, Literal, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -11,11 +11,13 @@ from sqlalchemy.orm import Session
 from app.core.rbac import AIPermission, require_any_ai_permission
 from app.db.session import get_db
 from app.models.user import User
+from app.schemas.medical_ai_safety import MedicalAIResultResponse
 from app.schemas.misc_endpoints import (
     EmrAiEmrDataRequest,
     EmrAiPatientDataRequest,
     EmrAiTemplateDataRequest,
 )
+from app.services.ai.medical_safety import MedicalAISafetyMeta, medical_ai_safety_meta
 from app.services.emr_ai_service import get_emr_ai_service
 
 router = APIRouter()
@@ -42,6 +44,7 @@ def _raise_emr_ai_internal_error(operation: str, exc: Exception) -> NoReturn:
 
 def ai_safety_meta() -> dict[str, Any]:
     return {
+        "ai_safety_meta": medical_ai_safety_meta(),
         "decision_boundary": "suggestion_only",
         "requires_doctor_confirmation": True,
         "ai_notice": (
@@ -51,7 +54,7 @@ def ai_safety_meta() -> dict[str, Any]:
     }
 
 
-@router.post("/suggestions/diagnosis", response_model=dict[str, Any])
+@router.post("/suggestions/diagnosis", response_model=MedicalAIResultResponse)
 async def get_diagnosis_suggestions(
     symptoms: list[str],
     specialty: str = Query("general", description="Специализация врача"),
@@ -73,7 +76,7 @@ async def get_diagnosis_suggestions(
         _raise_emr_ai_internal_error("get_diagnosis_suggestions", e)
 
 
-@router.post("/suggestions/treatment", response_model=dict[str, Any])
+@router.post("/suggestions/treatment", response_model=MedicalAIResultResponse)
 async def get_treatment_suggestions(
     diagnosis: str,
     specialty: str = Query("general", description="Специализация врача"),
@@ -96,7 +99,7 @@ async def get_treatment_suggestions(
         _raise_emr_ai_internal_error("get_treatment_suggestions", e)
 
 
-@router.post("/suggestions/icd10", response_model=dict[str, Any])
+@router.post("/suggestions/icd10", response_model=MedicalAIResultResponse)
 async def get_icd10_suggestions(
     diagnosis_text: str,
     db: Session = Depends(get_db),
@@ -117,7 +120,7 @@ async def get_icd10_suggestions(
         _raise_emr_ai_internal_error("get_icd10_suggestions", e)
 
 
-@router.post("/auto-fill", response_model=dict[str, Any])
+@router.post("/auto-fill", response_model=MedicalAIResultResponse)
 async def auto_fill_emr_fields(
     template_structure: EmrAiTemplateDataRequest,
     patient_data: EmrAiPatientDataRequest,
@@ -142,7 +145,7 @@ async def auto_fill_emr_fields(
         _raise_emr_ai_internal_error("auto_fill_emr_fields", e)
 
 
-@router.post("/validate", response_model=dict[str, Any])
+@router.post("/validate", response_model=MedicalAIResultResponse)
 async def validate_emr_data(
     emr_data: EmrAiEmrDataRequest,
     template_structure: EmrAiTemplateDataRequest,
@@ -163,7 +166,7 @@ async def validate_emr_data(
         _raise_emr_ai_internal_error("validate_emr_data", e)
 
 
-@router.post("/suggestions/ai", response_model=dict[str, Any])
+@router.post("/suggestions/ai", response_model=MedicalAIResultResponse)
 async def get_ai_suggestions(
     emr_data: EmrAiEmrDataRequest,
     specialty: str = Query("general", description="Специализация врача"),
@@ -211,11 +214,15 @@ import uuid  # noqa: E402  # manual-review: conditional import after config — 
 
 from pydantic import (  # noqa: E402  # manual-review: conditional import after config — intentional
     BaseModel,  # noqa: E402  # manual-review: conditional import after config — intentional
+    ConfigDict,
+    field_validator,
 )
 
 
 class AISuggestionV2(BaseModel):
     """EMR v2 compatible suggestion format"""
+    model_config = ConfigDict(revalidate_instances="always")
+
     id: str
     targetField: str
     content: str
@@ -223,7 +230,14 @@ class AISuggestionV2(BaseModel):
     source: str = "AI"
     explanation: str | None = None
     model: str = "mock"
-    requiresDoctorConfirmation: bool = True
+    requiresDoctorConfirmation: Literal[True] = True
+
+    @field_validator("requiresDoctorConfirmation", mode="before")
+    @classmethod
+    def doctor_confirmation_required(cls, value: Any) -> bool:
+        if value is not True:
+            raise ValueError("Doctor confirmation is required")
+        return True
 
 
 class DoctorContextEntry(BaseModel):
@@ -253,6 +267,7 @@ class SuggestRequestV2(BaseModel):
 class SuggestResponseV2(BaseModel):
     """EMR v2 suggest response"""
     suggestions: list[AISuggestionV2]
+    ai_safety_meta: MedicalAISafetyMeta
     model: str = "mock"
     specialty: str
     used_doctor_context: bool = False
@@ -365,6 +380,7 @@ async def suggest_v2(
 
     return SuggestResponseV2(
         suggestions=suggestions,
+        ai_safety_meta=MedicalAISafetyMeta(**medical_ai_safety_meta()),
         model="mock",
         specialty=request.specialty,
         used_doctor_context=request.doctor_context is not None,

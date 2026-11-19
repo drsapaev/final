@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -63,6 +64,18 @@ class TwoFactorAuth(Base):
         Integer, nullable=False, default=0, server_default=sa_text("0")
     )
     locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # Last TOTP time step accepted for a sensitive operation; NULL means unused.
+    last_sensitive_totp_step: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True
+    )
+    # Sensitive reauthentication attempts are separate from normal 2FA login.
+    sensitive_failed_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sa_text("0")
+    )
+    sensitive_locked_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 

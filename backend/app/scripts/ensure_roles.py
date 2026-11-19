@@ -42,9 +42,13 @@ def _role_password(username: str, *, required: bool) -> str | None:
 def upsert_users():
     _require_ensure_roles_confirmation()
 
-    from app.core.security import get_password_hash
+    from sqlalchemy.orm import object_session
+
+    from app.core.security import get_password_hash, verify_password
     from app.db.session import SessionLocal
     from app.models.user import User
+    from app.models.user_profile import UserProfile
+    from app.services.token_blacklist_service import revoke_account_sessions_locked
     from app.services.user_mgmt._base import (
         DOCTOR_PROFILE_ROLES,
         DOCTOR_ROLE_DEFAULT_SPECIALTY,
@@ -64,7 +68,7 @@ def upsert_users():
     db = SessionLocal()
     try:
         for username, role, email in USERS:
-            u = db.query(User).filter(User.username == username).first()
+            u = db.query(User).filter(User.username == username).with_for_update(key_share=True).populate_existing().first()
             if not u:
                 u = User(
                     username=username,
@@ -76,10 +80,19 @@ def upsert_users():
                 )
                 db.add(u)
             else:
+                password = _role_password(username, required=False)
+                password_changed = bool(password and not verify_password(password, u.hashed_password))
+                email_changed = u.email != email
+                profile = None
+                if email_changed:
+                    profile = db.query(UserProfile).filter_by(user_id=u.id).with_for_update().populate_existing().first()
+                if password_changed or email_changed or u.role != role or not u.is_active:
+                    revoke_account_sessions_locked(object_session(u), u, revoke_password_resets=True)
+                if profile is not None:
+                    profile.email_verified = False
                 u.role = role
                 u.email = email
-                password = _role_password(username, required=False)
-                if password:
+                if password_changed:
                     u.hashed_password = get_password_hash(password)
                 u.is_active = True
             db.commit()

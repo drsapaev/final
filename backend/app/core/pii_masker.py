@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
-from urllib.parse import parse_qsl, unquote_plus
+from urllib.parse import parse_qsl, unquote, unquote_plus, urlsplit
 
 # ---------------------------------------------------------------------------
 # Field-name list — backend source of truth.
@@ -122,8 +122,10 @@ IIN_REGEX = re.compile(r"\b(\d{4})\d{6}(\d{4})\b")
 # alternation branches start with disjoint character classes (non-quote-
 # non-backslash vs backslash), so the scan stays linear (no ReDoS).
 JSON_CREDENTIAL_REGEX = re.compile(
-    r'("(?:token|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key)"\s*:\s*")((?:[^"\\]|\\.)*)(")'
+    r'("(?:token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
+    r'|web_push_subscription|vapid_private_key|verification[_-]?code'
+    r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)"\s*:\s*")((?:[^"\\]|\\.)*)(")',
+    re.IGNORECASE,
 )
 
 # PR-6 round 10 (codex P1): FORM / urlencoded credential assignments —
@@ -131,8 +133,10 @@ JSON_CREDENTIAL_REGEX = re.compile(
 # arrive as "token=<credential>&..." with NO quotes, so the JSON regex above
 # cannot see them. Conservative: only credential-looking keys, never prose.
 FORM_CREDENTIAL_REGEX = re.compile(
-    r'\b(token|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key)=([^\s&]+)'
+    r'\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
+    r'|web_push_subscription|vapid_private_key|verification[_-]?code'
+    r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=([^\s&]+)',
+    re.IGNORECASE,
 )
 
 # Round 14 (codex P2): gate for the percent-decoding form path — only
@@ -171,7 +175,11 @@ FORM_CREDENTIAL_REGEX = re.compile(
 #     fails CLOSED and redacts the whole string: an oversized
 #     unsupported shape is safer to redact entirely than to let a
 #     credential whose '=' sits beyond the window slip through.
-_CREDENTIAL_KEYWORDS = ("token", "web_push_subscription", "vapid")
+_CREDENTIAL_KEYWORDS = (
+    "token", "password", "web_push_subscription", "vapid", "verification_code", "verification-code",
+    "verificationcode", "otp_code", "otp-code", "otpcode", "totp_code", "totp-code", "totpcode",
+    "backup_code", "backup-code", "backupcode", "otp", "totp",
+)
 _CREDENTIAL_FIELD_WINDOW = 130  # keyword→'=' distance cap (≈6× the longest key)
 
 
@@ -192,6 +200,11 @@ def _form_gate_state(decoded: str) -> str:
             i = lowered.find(kw, start)
             if i == -1:
                 break
+            if kw in ("otp", "totp") and i > 0 and (
+                lowered[i - 1].isalnum() or lowered[i - 1] == "_"
+            ):
+                start = i + 1
+                continue
             state = _credential_tail_state(decoded, i + len(kw))
             if state == "unknown":
                 # One inconclusive tail is enough to fail closed for the
@@ -243,12 +256,16 @@ def _credential_tail_state(text: str, j: int) -> str:
 # would stop at the first whitespace, so these escape-aware patterns
 # consume the whole quoted value (disjoint alternation branches — linear).
 _PYREPR_SQ_CREDENTIAL_REGEX = re.compile(
-    r"\b(token|previous_token|device_token|fcm_token|push_token"
-    r'|web_push_subscription|vapid_private_key)=\'((?:[^\'\\]|\\.)*)\''
+    r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
+    r'|web_push_subscription|vapid_private_key|verification[_-]?code'
+    r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=\'((?:[^\'\\]|\\.)*)\'',
+    re.IGNORECASE,
 )
 _PYREPR_DQ_CREDENTIAL_REGEX = re.compile(
-    r'\b(token|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key)="((?:[^"\\]|\\.)*)"'
+    r'\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
+    r'|web_push_subscription|vapid_private_key|verification[_-]?code'
+    r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)="((?:[^"\\]|\\.)*)"',
+    re.IGNORECASE,
 )
 
 # ---------------------------------------------------------------------------
@@ -260,13 +277,47 @@ SECRET_FIELD_PATTERNS = (
     # push device registry credentials (PR-6) — request bodies of
     # /api/v1/push/devices/* attach to Sentry events on unhandled 5xx
     "token",
+    "reset_token",
+    "x_reset_token",
+    "password",
+    "new_password",
     "previous_token",
     "device_token",
     "fcm_token",
     "push_token",
     "web_push_subscription",
     "vapid_private_key",
+    "verification_code",
+    "verificationcode",
+    "otp_code",
+    "otpcode",
+    "totp_code",
+    "totpcode",
+    "backup_code",
+    "backupcode",
+    "otp",
+    "totp",
 )
+
+
+def is_sensitive_verification_path(value: object) -> bool:
+    """Identify code-bearing authentication routes without masking ICD `code`.
+
+    `value` may be an ASGI path, a Sentry transaction, or an absolute URL.
+    Ignore query/fragment before matching and require complete path segments.
+    """
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        path = unquote(urlsplit(value).path).lower().rstrip("/")
+    except ValueError:
+        return False
+    return bool(re.search(
+        r"(?:^|/)(?:phone-verification|2fa)(?:/|$)"
+        r"|(?:^|/)password-reset/verify-phone(?:/|$)"
+        r"|(?:^|/)patient-access/(?:verify-otp|activate/confirm)(?:/|$)",
+        path,
+    ))
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +440,7 @@ def _mask_key_value(key: str, value: Any) -> Any:
 
     # Secret credentials first (PR-6): never partially masked, never
     # recursed into — a credential is a credential in any shape.
-    if key_lower in SECRET_FIELD_PATTERNS:
+    if key_lower.replace("-", "_") in SECRET_FIELD_PATTERNS:
         return "[REDACTED]"
 
     # Full-redact fields (identifiers, medical content)
@@ -487,12 +538,12 @@ def _mask_string_inplace(s: str) -> str:
                 if pairs:
                     rebuilt = []
                     for k, v in pairs:
-                        dk = unquote_plus(k).lower()
+                        dk = unquote_plus(k).lower().replace("-", "_")
                         if (
                             dk in SECRET_FIELD_PATTERNS
                             or dk.endswith("token")
                             or "token=" in dk
-                            or any(p in dk for p in SECRET_FIELD_PATTERNS)
+                            or any(p in dk for p in SECRET_FIELD_PATTERNS if len(p) > 4)
                         ):
                             # the credential may sit in the KEY itself (e.g.
                             # "%74oken%3Dsecret") — drop the whole field

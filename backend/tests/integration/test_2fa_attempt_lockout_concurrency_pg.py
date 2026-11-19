@@ -136,7 +136,6 @@ def test_concurrent_wrong_codes_increment_one_account_counter_serially(
         if is_auth_read(statement):
             with observed_selects_lock:
                 observed_selects += 1
-            all_selects_started.wait(timeout=10)
 
     def after_cursor_execute(
         _connection, _cursor, statement, _parameters, _context, _executemany
@@ -153,6 +152,10 @@ def test_concurrent_wrong_codes_increment_one_account_counter_serially(
 
     def attempt() -> tuple[bool, str]:
         with session_factory() as db:
+            # All workers start together before the shared User lock. Waiting
+            # at the later 2FA query would deadlock the correctly serialized
+            # implementation, which now locks User before TwoFactorAuth.
+            all_selects_started.wait(timeout=10)
             success, message, _ = service.verify_two_factor(
                 db, user_id, **invalid_code_arguments[code_kind]
             )

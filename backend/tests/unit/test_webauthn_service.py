@@ -4,6 +4,7 @@ Unit tests for WebAuthn/Passkey Service (M4-P1-4).
 Tests the graceful fallback when webauthn library is not installed,
 and the passkey management functions (list, deactivate).
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -17,6 +18,7 @@ class TestWebAuthnAvailability:
     def test_is_webauthn_available_returns_bool(self):
         """is_webauthn_available returns a boolean."""
         from app.services.webauthn_service import is_webauthn_available
+
         result = is_webauthn_available()
         assert isinstance(result, bool)
 
@@ -36,16 +38,24 @@ class TestWebAuthnAvailability:
 class TestPasskeyManagement:
     """Tests for passkey list/deactivate (no webauthn library needed)."""
 
+    @pytest.fixture(autouse=True)
+    def valid_identity(self, monkeypatch):
+        from app.services import webauthn_service
+
+        monkeypatch.setattr(
+            webauthn_service, "_lock_patient_identity", lambda *args, **kwargs: True
+        )
+
     def test_list_patient_passkeys_returns_empty_list(self):
         """Returns empty list when patient has no passkeys."""
         from app.services.webauthn_service import list_patient_passkeys
 
         db = MagicMock()
         query = MagicMock()
-        query.filter.return_value.order_by.return_value.all.return_value = []
+        query.join.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = []
         db.query.return_value = query
 
-        result = list_patient_passkeys(db, patient_id=42)
+        result = list_patient_passkeys(db, patient_id=42, user_id=7)
         assert result == []
 
     def test_list_patient_passkeys_returns_active_only(self):
@@ -59,15 +69,18 @@ class TestPasskeyManagement:
         mock_passkey.active = True
 
         query = MagicMock()
-        query.filter.return_value.order_by.return_value.all.return_value = [mock_passkey]
+        query.join.return_value.join.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            mock_passkey
+        ]
         db.query.return_value = query
 
-        result = list_patient_passkeys(db, patient_id=42)
+        result = list_patient_passkeys(db, patient_id=42, user_id=7)
         assert len(result) == 1
         assert result[0].name == "iPhone 15"
 
     def test_deactivate_passkey_returns_true_on_success(self):
-        """Deactivate returns True when passkey exists."""
+        """Deactivate returns True when passkey exists (and is not the last
+        active one — WEBAUTHN-BE-003 last-credential guard)."""
         from app.services.webauthn_service import deactivate_passkey
 
         db = MagicMock()
@@ -78,9 +91,12 @@ class TestPasskeyManagement:
 
         query = MagicMock()
         query.filter.return_value.first.return_value = mock_passkey
+        query.filter.return_value.count.return_value = (
+            2  # another active passkey exists
+        )
         db.query.return_value = query
 
-        result = deactivate_passkey(db, patient_id=42, credential_id=1)
+        result = deactivate_passkey(db, patient_id=42, credential_id=1, user_id=7)
         assert result is True
         assert mock_passkey.active is False
         assert db.commit.called
@@ -94,8 +110,43 @@ class TestPasskeyManagement:
         query.filter.return_value.first.return_value = None
         db.query.return_value = query
 
-        result = deactivate_passkey(db, patient_id=42, credential_id=999)
+        result = deactivate_passkey(db, patient_id=42, credential_id=999, user_id=7)
         assert result is False
+
+    def test_deactivate_passkey_returns_false_when_already_inactive(self):
+        """WEBAUTHN-BE-003: already-inactive credentials behave like missing
+        ones (endpoint answers one opaque 404, no state disclosure)."""
+        from app.services.webauthn_service import deactivate_passkey
+
+        db = MagicMock()
+        mock_passkey = MagicMock()
+        mock_passkey.active = False
+
+        query = MagicMock()
+        query.filter.return_value.first.return_value = mock_passkey
+        db.query.return_value = query
+
+        result = deactivate_passkey(db, patient_id=42, credential_id=1, user_id=7)
+        assert result is False
+        assert not db.commit.called
+
+    def test_deactivate_passkey_rejects_last_active_credential(self):
+        """WEBAUTHN-BE-003: deactivating the ONLY active passkey raises
+        ValueError("last_active_credential") — endpoint maps it to 409."""
+        from app.services.webauthn_service import deactivate_passkey
+
+        db = MagicMock()
+        mock_passkey = MagicMock()
+        mock_passkey.active = True
+
+        query = MagicMock()
+        query.filter.return_value.first.return_value = mock_passkey
+        query.filter.return_value.count.return_value = 1  # this IS the last one
+        db.query.return_value = query
+
+        with pytest.raises(ValueError, match="last_active_credential"):
+            deactivate_passkey(db, patient_id=42, credential_id=1, user_id=7)
+        assert not db.commit.called
 
 
 class TestPasskeyCredentialModel:
@@ -112,8 +163,16 @@ class TestPasskeyCredentialModel:
         mapper = PasskeyCredential.__mapper__
         column_keys = set(mapper.columns.keys())
         expected = {
-            "id", "patient_id", "credential_id", "public_key",
-            "sign_count", "transports", "device_type", "name",
-            "active", "created_at", "last_used_at",
+            "id",
+            "patient_id",
+            "credential_id",
+            "public_key",
+            "sign_count",
+            "transports",
+            "device_type",
+            "name",
+            "active",
+            "created_at",
+            "last_used_at",
         }
         assert expected.issubset(column_keys), f"Missing: {expected - column_keys}"
