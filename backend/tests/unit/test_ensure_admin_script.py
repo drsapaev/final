@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from secrets import token_urlsafe
+from unittest.mock import Mock
+from uuid import uuid4
+
 import pytest
 
+from app.core.security import verify_password
+from app.models.authentication import UserSession
 from app.models.clinic import Branch, ClinicSettings
+from app.models.user import User
+from app.scripts import ensure_admin as script
 
 
 class _SessionContext:
@@ -14,6 +23,81 @@ class _SessionContext:
 
     def __exit__(self, exc_type, exc, tb):
         return False
+
+
+@pytest.fixture
+def bootstrap_password(monkeypatch, db_session):
+    password = token_urlsafe(24)
+    monkeypatch.setattr(script, "SessionLocal", lambda: _SessionContext(db_session))
+    monkeypatch.setenv("ADMIN_USERNAME", "SYNTHETIC-bootstrap-admin")
+    monkeypatch.setenv("ADMIN_EMAIL", "synthetic-bootstrap@example.invalid")
+    monkeypatch.setenv("ADMIN_FULL_NAME", "SYNTHETIC-bootstrap-admin")
+    monkeypatch.setenv("ADMIN_PASSWORD", password)
+    monkeypatch.delenv("ADMIN_RESET_PASSWORD", raising=False)
+    monkeypatch.delenv("ENSURE_ADMIN_ALLOW_INITIALIZED", raising=False)
+    monkeypatch.delenv("ENSURE_ADMIN_CONFIRM_INITIALIZED_OVERRIDE", raising=False)
+    return password
+
+
+def test_bootstrap_stores_a_verifiable_argon2_hash(db_session, bootstrap_password):
+    result = script.ensure_admin()
+
+    assert result["created"] is True
+    admin = db_session.get(User, result["id"])
+    assert admin.hashed_password.startswith("$argon2")
+    assert verify_password(bootstrap_password, admin.hashed_password)
+
+
+def test_bootstrap_hash_failure_creates_no_account(
+    db_session,
+    bootstrap_password,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        script,
+        "get_password_hash",
+        Mock(side_effect=RuntimeError("synthetic hashing failure")),
+    )
+
+    with pytest.raises(RuntimeError, match="synthetic hashing failure"):
+        script.ensure_admin()
+
+    assert db_session.query(User).count() == 0
+
+
+def test_recovery_hash_failure_preserves_password_and_session(
+    db_session,
+    admin_user,
+    bootstrap_password,
+    monkeypatch,
+):
+    session = UserSession(
+        user_id=admin_user.id,
+        refresh_token=uuid4().hex,
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+        revoked=False,
+    )
+    db_session.add(session)
+    db_session.commit()
+    old_hash, old_epoch = admin_user.hashed_password, admin_user.auth_epoch
+    monkeypatch.setenv("ADMIN_USERNAME", admin_user.username)
+    monkeypatch.setenv("ADMIN_EMAIL", admin_user.email)
+    monkeypatch.setenv("ADMIN_RESET_PASSWORD", "1")
+    monkeypatch.setenv("ENSURE_ADMIN_ALLOW_INITIALIZED", "1")
+    monkeypatch.setenv("ENSURE_ADMIN_CONFIRM_INITIALIZED_OVERRIDE", "1")
+    monkeypatch.setattr(
+        script,
+        "get_password_hash",
+        Mock(side_effect=RuntimeError("synthetic hashing failure")),
+    )
+
+    with pytest.raises(RuntimeError, match="synthetic hashing failure"):
+        script.ensure_admin()
+
+    db_session.expire_all()
+    assert admin_user.hashed_password == old_hash
+    assert admin_user.auth_epoch == old_epoch
+    assert session.revoked is False
 
 
 def test_ensure_admin_skips_initialized_instance_without_override(
@@ -65,18 +149,29 @@ def test_ensure_admin_requires_explicit_admin_username(monkeypatch):
         ensure_admin_module._required_admin_username()
 
 
-def test_recovery_revokes_existing_credentials_only_for_security_changes(db_session, admin_user, monkeypatch):
-    from datetime import UTC, datetime, timedelta
-    from uuid import uuid4
-
-    from app.models.authentication import PasswordResetToken, RefreshToken, UserSession
+def test_recovery_revokes_existing_credentials_only_for_security_changes(
+    db_session, admin_user, monkeypatch
+):
+    from app.models.authentication import PasswordResetToken, RefreshToken
     from app.models.user_profile import UserProfile
-    from app.scripts import ensure_admin as script
 
     expiry = datetime.now(UTC) + timedelta(hours=1)
-    session = UserSession(user_id=admin_user.id, refresh_token=uuid4().hex, expires_at=expiry, revoked=False)
-    refresh = RefreshToken(user_id=admin_user.id, token=uuid4().hex, jti=uuid4().hex, expires_at=expiry, revoked=False)
-    reset = PasswordResetToken(user_id=admin_user.id, token=uuid4().hex, expires_at=expiry, used=False)
+    session = UserSession(
+        user_id=admin_user.id,
+        refresh_token=uuid4().hex,
+        expires_at=expiry,
+        revoked=False,
+    )
+    refresh = RefreshToken(
+        user_id=admin_user.id,
+        token=uuid4().hex,
+        jti=uuid4().hex,
+        expires_at=expiry,
+        revoked=False,
+    )
+    reset = PasswordResetToken(
+        user_id=admin_user.id, token=uuid4().hex, expires_at=expiry, used=False
+    )
     profile = db_session.query(UserProfile).filter_by(user_id=admin_user.id).first()
     if profile is None:
         profile = UserProfile(user_id=admin_user.id)
@@ -108,8 +203,6 @@ def test_recovery_revokes_existing_credentials_only_for_security_changes(db_sess
 
 
 def test_recovery_failure_rolls_back_revocation(db_session, admin_user, monkeypatch):
-    from app.scripts import ensure_admin as script
-
     old_email = admin_user.email
     monkeypatch.setattr(script, "SessionLocal", lambda: _SessionContext(db_session))
     monkeypatch.setenv("ADMIN_USERNAME", admin_user.username)
@@ -117,9 +210,11 @@ def test_recovery_failure_rolls_back_revocation(db_session, admin_user, monkeypa
     monkeypatch.setenv("ENSURE_ADMIN_ALLOW_INITIALIZED", "1")
     monkeypatch.setenv("ENSURE_ADMIN_CONFIRM_INITIALIZED_OVERRIDE", "1")
     original = script.revoke_account_sessions_locked
+
     def fail_after_revoke(*args, **kwargs):
         original(*args, **kwargs)
         raise RuntimeError("synthetic failure")
+
     monkeypatch.setattr(script, "revoke_account_sessions_locked", fail_after_revoke)
     with pytest.raises(RuntimeError):
         script.ensure_admin()
