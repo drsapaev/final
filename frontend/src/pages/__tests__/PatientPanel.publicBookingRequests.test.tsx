@@ -3,10 +3,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type { MouseEventHandler, PropsWithChildren } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
-const { listRequests, withdrawRequest, confirmAction } = vi.hoisted(() => ({
+const { listRequests, withdrawRequest, confirmAction, authState } = vi.hoisted(() => ({
   listRequests: vi.fn(),
   withdrawRequest: vi.fn(),
   confirmAction: vi.fn(),
+  authState: { token: 'patient-token' as string | null, profile: { role: 'Patient' } as { role: string } | null },
 }));
 
 vi.mock('../../api/publicBooking', () => ({
@@ -40,7 +41,16 @@ vi.mock('../../components/patient/PanelEmptyState', () => ({
   ),
 }));
 
+vi.mock('../../stores/auth', () => ({
+  subscribe: (callback: (state: typeof authState) => void) => { callback(authState); return () => {}; },
+}));
+vi.mock('../../api/client', () => ({ api: { get: vi.fn().mockResolvedValue({ data: [] }), post: vi.fn() } }));
+vi.mock('../../hooks/useEnhancedMediaQuery', () => ({ useBreakpoint: vi.fn() }));
+vi.mock('../../components/patient/PatientCabinetSummary', () => ({ default: () => <div>cabinet summary</div> }));
+vi.mock('../../components/patient/WebAuthnRegistration', () => ({ default: () => <div>passkey management</div> }));
+
 import PublicBookingRequestsPanel from '../../components/patient/PublicBookingRequestsPanel';
+import PatientPanel from '../PatientPanel';
 
 const pendingRequest = {
   id: '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab',
@@ -192,4 +202,17 @@ describe('patient panel public booking requests', () => {
     fireEvent.click(screen.getByRole('button', { name: 'publicBookingRequests.retry' }));
     expect(await screen.findByText('publicBookingRequests.empty')).toBeInTheDocument();
   });
+});
+
+
+describe('passkey management placement', () => {
+  it.each([['Patient', true], ['Admin', false], ['Doctor', false], ['Registrar', false]])(
+    'shows management in the cabinet only for a %s principal', async (role, visible) => {
+      authState.token = 'synthetic-token';
+      authState.profile = { role };
+      render(<MemoryRouter initialEntries={['/patient?tab=cabinet']}><PatientPanel /></MemoryRouter>);
+      expect(await screen.findByText('cabinet summary')).toBeInTheDocument();
+      expect(Boolean(screen.queryByText('passkey management'))).toBe(visible);
+    },
+  );
 });

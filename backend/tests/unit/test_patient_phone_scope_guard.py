@@ -602,3 +602,38 @@ async def test_phone_change_stores_canonical_normalized_value(db_session, ums):
         db_session, FAMILY_PHONE
     )
     assert resolved is not None and resolved.id == user.id
+
+
+async def test_phone_scope_canonicalizes_legacy_unicode_and_keeps_patient_role(db_session):
+    from app.services.patient_phone_scope import phone_lock_key
+
+    patient = _patient_user(db_session, username="syn_unicode_scope", phone="+998٩٠٠٠٠٠٠٠٢")
+    assert phone_lock_key(FAMILY_PHONE) == phone_lock_key("+ 9 9 8 ٩٠٠٠٠٠٠٠٢")
+    assert count_active_verified_patient_users(db_session, FAMILY_PHONE) == 1
+    assert count_active_verified_patient_users(db_session, FAMILY_PHONE, exclude_user_id=patient.id) == 0
+    patient.role = "Doctor"
+    db_session.commit()
+    assert count_active_verified_patient_users(db_session, FAMILY_PHONE) == 0
+
+
+async def test_phone_scope_scan_limit_denies_even_without_match(db_session, monkeypatch):
+    from app.services import patient_phone_scope
+
+    _patient_user(db_session, username="syn_cap_1", phone="+998٩٠٠٠٠٠٠٠٣")
+    _patient_user(db_session, username="syn_cap_2", phone="+998٩٠٠٠٠٠٠٠٤")
+    monkeypatch.setattr(patient_phone_scope, "_VERIFIED_PHONE_SCAN_LIMIT", 1)
+    assert count_active_verified_patient_users(db_session, FAMILY_PHONE) > 0
+
+
+async def test_bulk_activation_same_phone_unicode_and_ascii_single_winner(db_session, ums):
+    admin = _admin(db_session)
+    first = _patient_user(db_session, username="syn_bulk_unicode_1", phone=FAMILY_PHONE)
+    second = _patient_user(db_session, username="syn_bulk_unicode_2", phone="+998٩٠٠٠٠٠٠٠٢")
+    first.is_active = second.is_active = False
+    db_session.commit()
+    ok, msg, result = ums.bulk_action_users(
+        db_session, UserBulkActionRequest(user_ids=[first.id, second.id], action="activate"), admin.id
+    )
+    assert ok, msg
+    assert result["processed_count"] == result["failed_count"] == 1
+    assert count_active_verified_patient_users(db_session, FAMILY_PHONE) == 1

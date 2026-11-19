@@ -94,6 +94,9 @@ export function DermaHistoryTab({
                         </span>
                       </div>
                       {exam.diagnosis && <p className="derma-p-14-secondary">{exam.diagnosis}</p>}
+                      {exam.localization && (
+                        <p className="derma-p-14-secondary">{exam.localization}</p>
+                      )}
                     </article>
                   ))}
                 </div>

@@ -45,6 +45,38 @@ async def restore_entry_to_next(
             detail=f"Можно восстановить только записи со статусом no_show или cancelled, текущий: {entry.status}"
         )
 
+    # QRRESTORE-BE-001 (audit #3892 group 26): the canonical
+    # OnlineQueueNewService.cancel_entry cancels the entry AND its linked
+    # Visit (cascade _cascade_linked_visit_cancel: visit -> "canceled")
+    # and releases the pending invoice in one transaction. Restoring just
+    # the queue row would leave entry.status="waiting" anchored to
+    # Visit.status="canceled" — a state the irreversible visit lifecycle
+    # cannot start — while the operator has already been told the ticket
+    # is restored. Deny with an actionable 409: create a new appointment
+    # instead. no_show tickets and cancelled tickets without a
+    # cascade-cancelled visit keep restoring as before.
+    if entry.status == "cancelled" and entry.visit_id:
+        from app.models.visit import Visit as _Visit
+
+        linked_visit = (
+            db.query(_Visit).filter(_Visit.id == entry.visit_id).first()
+        )
+        if linked_visit is not None and linked_visit.status == "canceled":
+            logger.warning(
+                "[restore_entry_to_next] Отказано: запись %d отменена вместе "
+                "с визитом (visit_id=%d), восстановление разорвало бы "
+                "инвариант жизненного цикла",
+                entry_id,
+                entry.visit_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Запись была отменена вместе с визитом — восстановление "
+                    "недоступно; создайте новую запись пациента"
+                ),
+            )
+
     # Восстанавливаем с приоритетом "следующий"
     entry.status = "waiting"
     entry.priority = 1  # Следующий в очереди

@@ -3,14 +3,19 @@ API endpoints для двухфакторной аутентификации (2F
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.security.utils import get_authorization_scheme_param
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.core.rate_limiter import limiter
+from app.core.user_token_claims import is_user_access_claims, parse_user_auth_epoch
 from app.crud.two_factor_auth import (
     two_factor_auth,
     two_factor_backup_code,
@@ -35,10 +40,48 @@ from app.schemas.two_factor_auth import (
 )
 from app.services.authentication_service import get_authentication_service
 from app.services.two_factor_auth_api_service import TwoFactorAuthApiService
-from app.services.two_factor_service import get_two_factor_service
+from app.services.two_factor_service import (
+    BearerSessionInvalid,
+    EnrollmentSessionInvalid,
+    PendingSessionInvalid,
+    TwoFactorAlreadyEnabled,
+    get_two_factor_service,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_TWO_FACTOR_ERROR_CONTENT = {
+    "application/json": {
+        "schema": {
+            "type": "object",
+            "required": ["detail"],
+            "properties": {"detail": {"type": "string"}},
+        }
+    }
+}
+_NO_STORE_HEADER = {
+    "Cache-Control": {
+        "required": True,
+        "schema": {"type": "string", "const": "no-store"},
+        "description": "Sensitive response must not be cached",
+    }
+}
+_RATE_LIMIT_RESPONSE = {
+    "description": "Too many requests from this client",
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "required": ["detail", "retry_after"],
+                "properties": {
+                    "detail": {"type": "string"},
+                    "retry_after": {"type": ["integer", "null"]},
+                },
+            }
+        }
+    },
+    "headers": {"Retry-After": {"schema": {"type": "string"}}},
+}
 
 
 def raise_two_factor_internal_error(action: str, exc: Exception) -> NoReturn:
@@ -58,6 +101,34 @@ def get_client_info(request: Request) -> tuple[str, str]:
     ip_address = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
     return ip_address, user_agent
+
+
+def _capture_bearer_context(request: Request, user: User) -> dict[str, Any]:
+    """Capture signed bearer claims for a second check under the User lock."""
+    scheme, token = get_authorization_scheme_param(request.headers.get("Authorization"))
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(status_code=401, detail="Bearer session unavailable")
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        epoch = parse_user_auth_epoch(payload)
+        if not is_user_access_claims(payload) or epoch is None or epoch != user.auth_epoch:
+            raise ValueError("Invalid bearer claims")
+        jti = payload.get("jti")
+        if jti is not None and not isinstance(jti, str):
+            raise ValueError("Invalid bearer identifier")
+        raw_exp = payload.get("exp")
+        if isinstance(raw_exp, bool):
+            raise ValueError("Invalid bearer expiry")
+        exp = int(raw_exp) if raw_exp is not None else None
+        patient_id = payload.get("patient_id") if payload.get("scope") == "patient_portal" else None
+        return {
+            "expected_auth_epoch": epoch,
+            "expected_jti": jti,
+            "expected_exp": exp,
+            "expected_patient_id": patient_id,
+        }
+    except (jwt.PyJWTError, ValueError, TypeError, OverflowError) as exc:
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from exc
 
 
 @router.get("/status", response_model=TwoFactorStatusResponse)
@@ -86,7 +157,17 @@ async def _resolve_user_bearer_or_enrollment(
     so the enrollment token can never reach them by construction.
     Returns (user, enrollment_token_or_None); (None, None) if unauthorized.
     """
-    # 1) Bearer JWT — уже вошедший пользователь управляет своей 2FA
+    # An explicitly supplied enrollment token is authoritative, like the
+    # pending token on /verify. Never fall back to a different bearer user.
+    if enrollment_token is not None:
+        user = TwoFactorAuthApiService(db).get_user_from_enrollment_token(
+            enrollment_token
+        )
+        if user and user.is_active:
+            return user, enrollment_token
+        return None, None
+
+    # Bearer JWT — уже вошедший пользователь управляет своей 2FA
     try:
         from fastapi.security import HTTPBearer
 
@@ -100,20 +181,26 @@ async def _resolve_user_bearer_or_enrollment(
     except Exception:
         pass
 
-    # 2) enrollment-токен из двухстадийного логина
-    if enrollment_token:
-        user = TwoFactorAuthApiService(db).get_user_from_enrollment_token(
-            enrollment_token
-        )
-        if user:
-            return user, enrollment_token
     return None, None
 
 
-@router.post("/setup", response_model=TwoFactorSetupResponse)
+@router.post(
+    "/setup",
+    response_model=TwoFactorSetupResponse,
+    responses={
+        200: {"description": "2FA setup artifacts", "headers": _NO_STORE_HEADER},
+        400: {"description": "2FA is already enabled", "content": _TWO_FACTOR_ERROR_CONTENT},
+        401: {
+            "description": "Authentication or enrollment session invalid",
+            "content": _TWO_FACTOR_ERROR_CONTENT,
+        },
+        500: {"description": "Internal error", "content": _TWO_FACTOR_ERROR_CONTENT},
+    },
+)
 async def setup_two_factor_auth(
     request_data: TwoFactorSetupRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """Настроить 2FA для текущего пользователя.
@@ -123,7 +210,7 @@ async def setup_two_factor_auth(
     для критичных ролей без 2FA).
     """
     try:
-        current_user, _ = await _resolve_user_bearer_or_enrollment(
+        current_user, enrollment_token = await _resolve_user_bearer_or_enrollment(
             request, request_data.enrollment_token, db
         )
         if not current_user:
@@ -133,34 +220,57 @@ async def setup_two_factor_auth(
             )
 
         service = get_two_factor_service()
-
-        # Проверяем, не настроена ли уже 2FA
-        if service.get_two_factor_status(db, current_user.id)["enabled"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="2FA is already enabled for this user",
-            )
+        bearer_context = _capture_bearer_context(request, current_user) if enrollment_token is None else {}
 
         # Настраиваем 2FA
-        setup_data = service.setup_two_factor_auth(
+        setup_data = await run_in_threadpool(
+            service.setup_two_factor_auth,
             db=db,
             user_id=current_user.id,
             recovery_email=request_data.recovery_email,
             recovery_phone=request_data.recovery_phone,
+            enrollment_token=enrollment_token,
+            **bearer_context,
         )
 
+        response.headers["Cache-Control"] = "no-store"
         return TwoFactorSetupResponse(**setup_data)
 
+    except (EnrollmentSessionInvalid, BearerSessionInvalid) as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=401, detail="Enrollment session unavailable"
+        ) from e
+    except TwoFactorAlreadyEnabled as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="2FA is already enabled for this user") from e
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise_two_factor_internal_error("setting up 2FA", e)
 
 
-@router.post("/verify-setup", response_model=TwoFactorVerifyResponse)
+@router.post(
+    "/verify-setup",
+    response_model=TwoFactorVerifyResponse,
+    responses={
+        200: {
+            "description": "Verification result and optional session tokens",
+            "headers": _NO_STORE_HEADER,
+        },
+        400: {"description": "Invalid TOTP code format", "content": _TWO_FACTOR_ERROR_CONTENT},
+        401: {
+            "description": "Authentication or enrollment session invalid",
+            "content": _TWO_FACTOR_ERROR_CONTENT,
+        },
+        500: {"description": "Internal error", "content": _TWO_FACTOR_ERROR_CONTENT},
+    },
+)
 async def verify_totp_setup(
     request_data: TwoFactorVerifySetupRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """Верифицировать настройку TOTP.
@@ -182,6 +292,7 @@ async def verify_totp_setup(
             )
 
         service = get_two_factor_service()
+        bearer_context = _capture_bearer_context(request, current_user) if enrollment_token is None else {}
         totp_code = request_data.totp_code
 
         if len(totp_code) != 6 or not totp_code.isdigit():
@@ -190,11 +301,17 @@ async def verify_totp_setup(
                 detail="Invalid TOTP code format",
             )
 
-        success = service.verify_totp_setup(db, current_user.id, totp_code)
-
-        if success:
+        def verify_and_exchange():
+            success = service.verify_totp_setup(
+                db,
+                current_user.id,
+                totp_code,
+                enrollment_token=enrollment_token,
+                commit=enrollment_token is None,
+                **bearer_context,
+            )
             tokens_payload = None
-            if enrollment_token:
+            if success and enrollment_token is not None:
                 auth = get_authentication_service()
                 tokens_payload = TwoFactorAuthApiService(
                     db
@@ -203,6 +320,17 @@ async def verify_totp_setup(
                     enrollment_token=enrollment_token,
                     auth_service=auth,
                 )
+                if tokens_payload is None:
+                    db.rollback()
+                    raise EnrollmentSessionInvalid("Enrollment session unavailable")
+            return success, tokens_payload
+
+        # Both verification and exchange must share one session and transaction
+        # in the same worker; row-lock waits must not block the event loop.
+        success, tokens_payload = await run_in_threadpool(verify_and_exchange)
+        response.headers["Cache-Control"] = "no-store"
+
+        if success:
             return TwoFactorVerifyResponse(
                 success=True,
                 message="TOTP setup verified successfully",
@@ -214,16 +342,31 @@ async def verify_totp_setup(
         else:
             return TwoFactorVerifyResponse(success=False, message="Invalid TOTP code")
 
+    except (EnrollmentSessionInvalid, BearerSessionInvalid) as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=401, detail="Enrollment session unavailable"
+        ) from e
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise_two_factor_internal_error("verifying TOTP setup", e)
 
 
-@router.post("/verify", response_model=TwoFactorVerifyResponse)
+@router.post(
+    "/verify", response_model=TwoFactorVerifyResponse,
+    responses={
+        200: {"description": "2FA verification and optional session tokens", "headers": _NO_STORE_HEADER},
+        400: {"description": "A verification factor is required", "content": _TWO_FACTOR_ERROR_CONTENT},
+        401: {"description": "Authentication or pending session invalid", "content": _TWO_FACTOR_ERROR_CONTENT},
+        500: {"description": "Internal error", "content": _TWO_FACTOR_ERROR_CONTENT},
+    },
+)
 async def verify_two_factor(
     request_data: TwoFactorVerifyRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """Верифицировать 2FA код"""
@@ -254,13 +397,14 @@ async def verify_two_factor(
         # already-authenticated settings flow (no pending token in that case).
         user: User | None = None
 
-        if request_data.pending_2fa_token:
+        pending = request_data.pending_2fa_token
+        if pending is not None:
             user = TwoFactorAuthApiService(db).get_user_from_pending_token(
-                request_data.pending_2fa_token
+                pending
             )
 
         # Fallback for the authenticated settings flow: access_token header.
-        if not user:
+        if pending is None:
             try:
                 from fastapi.security import HTTPBearer
 
@@ -274,47 +418,47 @@ async def verify_two_factor(
             except Exception:
                 pass
 
-        if not user:
+        if not user or not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required. Provide either access_token or valid pending_2fa_token",
             )
 
-        # Верифицируем 2FA
-        success, message, session_token = service.verify_two_factor(
-            db=db,
-            user_id=user.id,
-            totp_code=request_data.totp_code,
-            backup_code=request_data.backup_code,
-            recovery_token=request_data.recovery_token,
-            device_fingerprint=request_data.device_fingerprint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-        )
+        bearer_context = _capture_bearer_context(request, user) if pending is None else {}
+
+        def verify_and_exchange():
+            success, message, session_token = service.verify_two_factor(
+                db=db,
+                user_id=user.id,
+                totp_code=request_data.totp_code,
+                backup_code=request_data.backup_code,
+                recovery_token=request_data.recovery_token,
+                device_fingerprint=(request_data.device_fingerprint if request_data.remember_device else None),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                pending_token=pending,
+                commit=pending is None,
+                **bearer_context,
+            )
+            backup_codes_remaining = None
+            tokens_payload = None
+            if success and request_data.backup_code:
+                auth_record = two_factor_auth.get_by_user_id(db, user.id)
+                if auth_record:
+                    backup_codes_remaining = two_factor_backup_code.get_unused_count(db, auth_record.id)
+            if success and pending is not None:
+                tokens_payload = TwoFactorAuthApiService(db).exchange_pending_token_for_tokens(
+                    user=user, pending_token=pending, auth_service=get_authentication_service(),
+                )
+                if tokens_payload is None:
+                    db.rollback()
+                    raise PendingSessionInvalid("Pending 2FA session unavailable")
+            return success, message, session_token, backup_codes_remaining, tokens_payload
+
+        success, message, session_token, backup_codes_remaining, tokens_payload = await run_in_threadpool(verify_and_exchange)
+        response.headers["Cache-Control"] = "no-store"
 
         if success:
-            # Получаем количество оставшихся backup кодов
-            backup_codes_remaining = None
-            if request_data.backup_code:
-                two_factor_auth_obj = two_factor_auth.get_by_user_id(db, user.id)
-                if two_factor_auth_obj:
-                    backup_codes_remaining = two_factor_backup_code.get_unused_count(
-                        db, two_factor_auth_obj.id
-                    )
-
-            # Если пришёл pending_2fa_token, обменять на полноценные токены
-            pending = request_data.pending_2fa_token
-            tokens_payload = None
-            if pending:
-                auth = get_authentication_service()
-                tokens_payload = TwoFactorAuthApiService(
-                    db
-                ).exchange_pending_token_for_tokens(
-                    user=user,
-                    pending_token=pending,
-                    auth_service=auth,
-                )
-
             # Возвращаем успех 2FA (фронт, при наличии tokens_payload, может завершить логин)
             return TwoFactorVerifyResponse(
                 success=True,
@@ -330,15 +474,25 @@ async def verify_two_factor(
         else:
             return TwoFactorVerifyResponse(success=False, message=message)
 
+    except (PendingSessionInvalid, BearerSessionInvalid) as e:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Pending 2FA session unavailable") from e
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise_two_factor_internal_error("verifying 2FA", e)
 
 
-@router.post("/disable", response_model=TwoFactorSuccessResponse)
+@router.post(
+    "/disable",
+    response_model=TwoFactorSuccessResponse,
+    responses={429: _RATE_LIMIT_RESPONSE},
+)
+@limiter.limit("20/minute")
 async def disable_two_factor_auth(
     request_data: TwoFactorDisableRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -348,6 +502,7 @@ async def disable_two_factor_auth(
     """
     try:
         service = get_two_factor_service()
+        bearer_context = _capture_bearer_context(request, current_user)
 
         # SECURITY: 2FA-код обязателен.
         if not request_data.totp_code and not request_data.backup_code:
@@ -356,12 +511,14 @@ async def disable_two_factor_auth(
                 detail="Отключение 2FA требует подтверждения текущим TOTP-кодом или backup-кодом.",
             )
 
-        success = service.disable_two_factor_auth(
+        success = await run_in_threadpool(
+            service.disable_two_factor_auth,
             db=db,
             user_id=current_user.id,
             password=request_data.password,
             totp_code=request_data.totp_code,
             backup_code=request_data.backup_code,
+            **bearer_context,
         )
 
         if success:
@@ -374,6 +531,9 @@ async def disable_two_factor_auth(
                 detail="Invalid password or 2FA code",
             )
 
+    except BearerSessionInvalid as e:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from e
     except HTTPException:
         raise
     except Exception as e:
@@ -400,6 +560,7 @@ async def request_two_factor_recovery(
     try:
         service = get_two_factor_service()
         ip_address, user_agent = get_client_info(request)
+        bearer_context = _capture_bearer_context(request, current_user)
 
         # Проверяем, что 2FA включена
         status_data = service.get_two_factor_status(db, current_user.id)
@@ -422,6 +583,7 @@ async def request_two_factor_recovery(
             recovery_type=request_data.recovery_type,
             ip_address=ip_address,
             user_agent=user_agent,
+            **bearer_context,
         )
         if not result.get("success"):
             error_code = result.get("error_code", "RECOVERY_FAILED")
@@ -451,6 +613,9 @@ async def request_two_factor_recovery(
             ),
         )
 
+    except BearerSessionInvalid as e:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from e
     except HTTPException:
         raise
     except Exception as e:
@@ -495,61 +660,130 @@ async def verify_two_factor_recovery(
         raise_two_factor_internal_error("verifying 2FA recovery", e)
 
 
-@router.get("/backup-codes", response_model=TwoFactorBackupCodesResponse)
+@router.get(
+    "/backup-codes",
+    response_model=TwoFactorBackupCodesResponse,
+    responses={
+        200: {
+            "description": "Remaining count; backup values are not returned",
+            "headers": _NO_STORE_HEADER,
+        },
+        401: {
+            "description": "Authentication required",
+            "content": _TWO_FACTOR_ERROR_CONTENT,
+        },
+        404: {
+            "description": "2FA not configured",
+            "content": _TWO_FACTOR_ERROR_CONTENT,
+        },
+        500: {"description": "Internal error", "content": _TWO_FACTOR_ERROR_CONTENT},
+    },
+)
 async def get_backup_codes(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Получить backup коды для текущего пользователя"""
     try:
-        two_factor_auth_obj = two_factor_auth.get_by_user_id(db, current_user.id)
-        if not two_factor_auth_obj:
+        bearer_context = _capture_bearer_context(request, current_user)
+        result = await run_in_threadpool(
+            get_two_factor_service().get_backup_codes_count,
+            db, current_user.id, **bearer_context,
+        )
+        if result is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="2FA not configured for this user",
             )
 
-        backup_codes = two_factor_backup_code.get_unused_codes(
-            db, two_factor_auth_obj.id
-        )
-        codes = [code.code for code in backup_codes]
+        remaining, generated_at = result
+        response.headers["Cache-Control"] = "no-store"
 
         return TwoFactorBackupCodesResponse(
-            backup_codes=codes,
-            total=len(codes),
-            generated_at=two_factor_auth_obj.created_at,
+            backup_codes=[],
+            total=remaining,
+            generated_at=generated_at,
         )
 
+    except BearerSessionInvalid as e:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from e
     except HTTPException:
         raise
     except Exception as e:
         raise_two_factor_internal_error("getting backup codes", e)
 
 
-@router.post("/backup-codes/regenerate", response_model=TwoFactorBackupCodesResponse)
+@router.post(
+    "/backup-codes/regenerate",
+    response_model=TwoFactorBackupCodesResponse,
+    responses={
+        200: {
+            "description": "New codes, disclosed only in this response",
+            "headers": _NO_STORE_HEADER,
+        },
+        400: {
+            "description": "A second factor is required",
+            "content": _TWO_FACTOR_ERROR_CONTENT,
+        },
+        401: {
+            "description": "Authentication required",
+            "content": _TWO_FACTOR_ERROR_CONTENT,
+        },
+        403: {
+            "description": "Reauthentication failed or is temporarily locked",
+            "content": _TWO_FACTOR_ERROR_CONTENT,
+        },
+        429: _RATE_LIMIT_RESPONSE,
+        500: {"description": "Internal error", "content": _TWO_FACTOR_ERROR_CONTENT},
+    },
+)
+@limiter.limit("20/minute")
 async def regenerate_backup_codes(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    request_data: TwoFactorDisableRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Перегенерировать backup коды"""
+    """Rotate backup codes after password and second-factor verification."""
     try:
         service = get_two_factor_service()
+        bearer_context = _capture_bearer_context(request, current_user)
 
-        # Проверяем, что 2FA включена
-        status_data = service.get_two_factor_status(db, current_user.id)
-        if not status_data["enabled"]:
+        if not request_data.totp_code and not request_data.backup_code:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="2FA is not enabled for this user",
+                detail="A TOTP or backup code is required",
             )
 
-        # Перегенерируем коды
-        backup_codes = service.regenerate_backup_codes(db, current_user.id)
+        backup_codes = await run_in_threadpool(
+            service.regenerate_backup_codes,
+            db,
+            current_user.id,
+            request_data.password,
+            totp_code=request_data.totp_code,
+            backup_code=request_data.backup_code,
+            **bearer_context,
+        )
+        if backup_codes is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid password or 2FA code, or temporarily unavailable",
+            )
 
+        response.headers["Cache-Control"] = "no-store"
         return TwoFactorBackupCodesResponse(
             backup_codes=backup_codes,
             total=len(backup_codes),
             generated_at=datetime.now(UTC),
         )
 
+    except BearerSessionInvalid as e:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from e
     except HTTPException:
         raise
     except Exception as e:
@@ -597,22 +831,16 @@ async def untrust_device(
     The duplicate has been removed from two_factor_devices.py.
     """
     try:
-        # Проверяем, что устройство принадлежит пользователю
-        device = two_factor_device.get(device_id)
-        if not device or device.user_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
-            )
-
-        success = two_factor_device.untrust_device(db, device_id)
+        # TWOFACTOR-BE-003 (#4063): enforce ownership in the update query so
+        # ownership cannot race between a separate check and the write.
+        success = two_factor_device.untrust_device(db, device_id, current_user.id)
         if success:
             return TwoFactorSuccessResponse(
                 success=True, message="Device untrusted successfully"
             )
         else:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to untrust device",
+                status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
             )
 
     except HTTPException:

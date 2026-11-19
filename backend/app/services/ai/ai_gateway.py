@@ -25,6 +25,7 @@ from .ai_interfaces import (
     AITaskType,
     IAIGateway,
 )
+from .medical_safety import medical_ai_safety_meta
 from .pii_anonymizer import get_anonymizer
 from .rate_limiter import get_rate_limiter
 
@@ -233,6 +234,7 @@ class AIGateway(IAIGateway):
                     latency_ms=0,
                     error=f"Rate limit exceeded. Retry after {retry_after} seconds.",
                     request_id=request_id,
+                    ai_safety_meta=medical_ai_safety_meta(),
                     requires_doctor_confirmation=True,
                     decision_boundary="suggestion_only",
                     ai_notice=AI_NOTICE,
@@ -257,6 +259,10 @@ class AIGateway(IAIGateway):
             response = await self._execute_with_fallback(
                 task_type, clean_payload, specialty, request_id
             )
+
+            # model_copy/model_construct can bypass Pydantic validation. Never
+            # expose an internally malformed result as a medical suggestion.
+            response = AIResponse.model_validate(response.model_dump())
 
             # Calculate latency
             latency_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
@@ -312,6 +318,7 @@ class AIGateway(IAIGateway):
                 latency_ms=latency_ms,
                 error="AI service temporarily unavailable",  # sanitized
                 request_id=request_id,
+                ai_safety_meta=medical_ai_safety_meta(),
                 requires_doctor_confirmation=True,
                 decision_boundary="suggestion_only",
                 ai_notice=AI_NOTICE,
@@ -423,6 +430,7 @@ class AIGateway(IAIGateway):
                     tokens_used=(
                         result.get("tokens_used") if isinstance(result, dict) else None
                     ),
+                    ai_safety_meta=medical_ai_safety_meta(),
                     requires_doctor_confirmation=True,
                     decision_boundary="suggestion_only",
                     ai_notice=AI_NOTICE,
@@ -451,6 +459,7 @@ class AIGateway(IAIGateway):
             model="none",
             latency_ms=0,
             error="All AI providers failed",  # sanitized
+            ai_safety_meta=medical_ai_safety_meta(),
             requires_doctor_confirmation=True,
             decision_boundary="suggestion_only",
             ai_notice=AI_NOTICE,
@@ -548,6 +557,13 @@ class AIGateway(IAIGateway):
             request = AIRequest(prompt=json.dumps(payload))
             result = await provider.generate(request)
 
+        # Providers can return an error object/dict alongside partial content.
+        # Treat it as a provider failure so the fallback chain can try another
+        # provider; never label or cache its partial content as a success.
+        error = result.get("error") if isinstance(result, dict) else getattr(result, "error", None)
+        if error is not None and error != "":
+            raise RuntimeError("AI provider returned an error")
+
         # Normalize result to dict
         if isinstance(result, str):
             return {"content": result}
@@ -594,8 +610,13 @@ class AIGateway(IAIGateway):
             del self._cache[cache_key]
             return None
 
-        # Return a copy to avoid mutations
-        return response.model_copy()
+        # Legacy or corrupted entries must not acquire a safety marker merely
+        # because they were cached by an older process. Revalidate a deep copy.
+        try:
+            return AIResponse.model_validate(response.model_dump()).model_copy(deep=True)
+        except (AttributeError, TypeError, ValueError):
+            del self._cache[cache_key]
+            return None
 
     def _save_to_cache(self, cache_key: str, response: AIResponse, task_type=None):
         """FA-009: save with per-task TTL."""
@@ -610,7 +631,7 @@ class AIGateway(IAIGateway):
         else:
             ttl = self._cache_ttl
         expires_at = datetime.now(UTC) + ttl
-        self._cache[cache_key] = (response.model_copy(), expires_at)
+        self._cache[cache_key] = (response.model_copy(deep=True), expires_at)
 
     def clear_cache(self):
         """Clear all cached responses"""

@@ -4,10 +4,12 @@ API endpoints для системы аутентификации
 
 import json
 import logging
+from datetime import UTC, datetime
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_current_user
 from app.core.rate_limiter import limiter
@@ -37,6 +39,7 @@ from app.schemas.authentication import (
     UserProfileUpdateRequest,
     UserSessionResponse,
 )
+from app.schemas.clinic import ServiceUnavailableDetail
 from app.services.authentication_api_service import (
     AuthenticationApiDomainError,
     AuthenticationApiService,
@@ -44,10 +47,38 @@ from app.services.authentication_api_service import (
 from app.services.authentication_service import (
     get_authentication_service,
 )
+from app.services.email_sms_enhanced import get_email_sms_enhanced_service
+from app.services.email_verification_delivery import (
+    VerificationConfigurationError,
+    VerificationExpired,
+    VerificationRateLimited,
+    activate_verification,
+    reserve_verification,
+    verification_email,
+    verification_url,
+)
+
+# AUTH-BE-002 (#4063): SSOT for the enumeration-resistant generic message —
+# the same text /password-reset/initiate returns for every outcome.
+from app.services.password_reset_service import (
+    _EMAIL_RESET_GENERIC_MESSAGE,
+    EmailResetUnavailable,
+    get_password_reset_service,
+    schedule_email_reset,
+)
+from app.services.patient_phone_scope import PatientPhoneScopeConflict
+from app.services.profile_contact_security import (
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+)
 from app.services.user_management_service import get_user_management_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_SESSION_BINDING_UNAVAILABLE = (
+    "Невозможно определить отдельную сессию для отзыва. "
+    "Выйдите со всех устройств."
+)
 
 
 def get_client_info(request: Request) -> tuple[str, str]:
@@ -67,6 +98,21 @@ def raise_authentication_internal_error(action: str, exc: Exception) -> NoReturn
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Internal server error",
     ) from exc
+
+
+def _as_utc_aware(value: datetime) -> datetime:
+    """AUTH-BE-001 (#4063): normalize a possibly-naive datetime to UTC-aware.
+
+    ``UserSession.expires_at`` is ``DateTime(timezone=True)``: PostgreSQL
+    (production) returns timezone-aware values while SQLite (tests/dev)
+    returns naive ones. Comparing a naive ``utcnow()`` against an aware
+    column raises ``TypeError`` — the exact production break documented in
+    the logout-path docstring (Sentry 3E, follow-up to #3122). Normalize
+    before every session-expiry comparison.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -192,8 +238,7 @@ def _extract_access_token_meta(
     exp = payload.get("exp")
     if not exp:
         return jti, None
-    from datetime import datetime as _dt, timezone as _tz
-    return jti, _dt.fromtimestamp(exp, tz=_tz.utc)
+    return jti, datetime.fromtimestamp(exp, tz=UTC)
 
 
 @router.post("/logout", response_model=LogoutResponse)
@@ -207,6 +252,12 @@ async def logout(
     try:
         service = get_authentication_service()
 
+        authorization = request.headers.get("authorization", "")
+        scheme, separator, access_token = authorization.partition(" ")
+        if not separator or scheme.lower() != "bearer" or not access_token.strip():
+            raise HTTPException(status_code=401, detail="Требуется аутентификация")
+        access_token = access_token.strip()
+
         # Извлекаем jti + expiry из access-токена, чтобы отозвать его индивидуально.
         access_jti, access_exp = _extract_access_token_meta(
             request.headers.get("authorization")
@@ -219,6 +270,7 @@ async def logout(
             logout_all=request_data.logout_all_devices,
             access_token_jti=access_jti,
             access_token_exp=access_exp,
+            access_token=access_token,
         )
 
         if not result["success"]:
@@ -234,33 +286,29 @@ async def logout(
         raise_authentication_internal_error("logout", e)
 
 
-@router.post("/password-reset", response_model=AuthSuccessResponse)
+@router.post("/password-reset", response_model=AuthSuccessResponse,
+    responses={503: {"model": ServiceUnavailableDetail, "description": "Password reset temporarily unavailable", "headers": {"Retry-After": {"schema": {"type": "string"}}}}})
+@limiter.shared_limit("3/minute", scope="password_reset_initiate")
 async def request_password_reset(
     request_data: PasswordResetRequest, request: Request, db: Session = Depends(get_db)
 ):
     """Запрос сброса пароля"""
     try:
-        ip_address, user_agent = get_client_info(request)
-
-        service = get_authentication_service()
-        result = service.create_password_reset_token(
-            db=db,
-            email=request_data.email,
-            ip_address=ip_address,
-            user_agent=user_agent,
+        # Snapshot identity before queueing, but never wait for delivery.
+        binding = await run_in_threadpool(
+            get_password_reset_service().snapshot_email_binding, db, request_data.email
         )
-
-        if not result["success"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
-            )
+        if not schedule_email_reset(request_data.email, binding):
+            raise EmailResetUnavailable
 
         return AuthSuccessResponse(
             success=True,
-            message="Инструкции по сбросу пароля отправлены на email",
-            data={"expires_at": result["expires_at"].isoformat()},
+            message=_EMAIL_RESET_GENERIC_MESSAGE,
+            data=None,
         )
 
+    except EmailResetUnavailable as exc:
+        raise HTTPException(status_code=503, detail="Password reset temporarily unavailable", headers={"Retry-After": "60"}) from exc
     except HTTPException:
         raise
     except Exception as e:
@@ -273,14 +321,20 @@ async def confirm_password_reset(
 ):
     """Подтверждение сброса пароля"""
     try:
-        service = get_authentication_service()
-        result = service.reset_password(
+        result = get_password_reset_service().reset_password_with_token(
             db=db, token=request_data.token, new_password=request_data.new_password
         )
+        if not result["success"] and result.get("error_code") == "TOKEN_NOT_FOUND":
+            # In-flight legacy credentials are stored raw; the service only
+            # accepts the precise format previously issued by this route.
+            result = get_authentication_service().reset_password(
+                db=db, token=request_data.token, new_password=request_data.new_password
+            )
 
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("message") or result.get("error") or "Недействительный или истекший токен",
             )
 
         return AuthSuccessResponse(success=True, message=result["message"])
@@ -293,18 +347,21 @@ async def confirm_password_reset(
 
 @router.post("/password-change", response_model=AuthSuccessResponse)
 async def change_password(
+    request: Request,
     request_data: PasswordChangeRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Смена пароля"""
     try:
+        bearer_context = capture_profile_bearer(request, current_user)
         service = get_authentication_service()
         result = service.change_password(
             db=db,
             user_id=current_user.id,
             current_password=request_data.current_password,
             new_password=request_data.new_password,
+            bearer_context=bearer_context,
         )
 
         if not result["success"]:
@@ -314,13 +371,26 @@ async def change_password(
 
         return AuthSuccessResponse(success=True, message=result["message"])
 
+    except ProfileBearerInvalid as exc:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from exc
     except HTTPException:
         raise
     except Exception as e:
         raise_authentication_internal_error("change_password", e)
 
 
-@router.post("/email-verification", response_model=AuthSuccessResponse)
+@router.post(
+    "/email-verification",
+    response_model=AuthSuccessResponse,
+    responses={
+        401: {"model": ServiceUnavailableDetail, "description": "Bearer session unavailable"},
+        429: {"model": ServiceUnavailableDetail, "description": "Verification request limit reached"},
+        502: {"model": ServiceUnavailableDetail, "description": "Email delivery failed"},
+        503: {"model": ServiceUnavailableDetail, "description": "Verification unavailable"},
+    },
+)
+@limiter.limit("30/hour")
 async def request_email_verification(
     request: Request,
     db: Session = Depends(get_db),
@@ -330,29 +400,58 @@ async def request_email_verification(
     try:
         ip_address, user_agent = get_client_info(request)
 
-        service = get_authentication_service()
-        result = service.create_email_verification_token(
-            db=db, user_id=current_user.id, ip_address=ip_address, user_agent=user_agent
+        context = capture_profile_bearer(request, current_user)
+        if not context.jti or context.expires_at is None:
+            raise ProfileBearerInvalid("Bearer session unavailable")
+        # Validate configuration before reserving an attempt or sending mail.
+        verification_url("check")
+        reservation = await run_in_threadpool(
+            reserve_verification, db, context, ip_address, user_agent
         )
-
-        if not result["success"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
+        html, plain = verification_email(verification_url(reservation.token))
+        try:
+            sent, _ = await get_email_sms_enhanced_service().send_email_enhanced(
+                to_email=reservation.email,
+                subject="Подтверждение email",
+                html_content=html,
+                text_content=plain,
             )
+        except Exception as exc:
+            logger.error("Email delivery failed error_type=%s", type(exc).__name__)
+            raise HTTPException(status_code=502, detail="Не удалось отправить письмо подтверждения") from exc
+        if not sent:
+            raise HTTPException(status_code=502, detail="Не удалось отправить письмо подтверждения")
+        await run_in_threadpool(activate_verification, db, context, reservation)
 
         return AuthSuccessResponse(
             success=True,
             message="Ссылка для верификации email отправлена",
-            data={"expires_at": result["expires_at"].isoformat()},
+            data={"expires_at": reservation.expires_at.isoformat()},
         )
 
+    except ProfileBearerInvalid as exc:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from exc
+    except VerificationRateLimited as exc:
+        db.rollback()
+        raise HTTPException(status_code=429, detail="Слишком много запросов подтверждения") from exc
+    except (VerificationConfigurationError, VerificationExpired) as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Подтверждение email временно недоступно") from exc
     except HTTPException:
         raise
     except Exception as e:
         raise_authentication_internal_error("request_email_verification", e)
 
 
-@router.post("/email-verification/confirm", response_model=AuthSuccessResponse)
+@router.post(
+    "/email-verification/confirm",
+    response_model=AuthSuccessResponse,
+    responses={
+        400: {"model": ServiceUnavailableDetail, "description": "Invalid or expired verification token"},
+        500: {"model": ServiceUnavailableDetail, "description": "Internal error"},
+    },
+)
 async def confirm_email_verification(
     request_data: EmailVerificationConfirmRequest, db: Session = Depends(get_db)
 ):
@@ -398,27 +497,37 @@ async def get_user_profile(
 
 
 @router.put("/profile", response_model=UserProfileResponse)
-async def update_user_profile(
+def update_user_profile(
     request_data: UserProfileUpdateRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Обновить профиль пользователя"""
     api_service = AuthenticationApiService(db)
     try:
+        bearer_context = capture_profile_bearer(request, current_user)
         service = get_authentication_service()
         profile = api_service.update_user_profile(
             current_user=current_user,
             update_data=request_data.model_dump(exclude_unset=True),
             profile_loader=lambda user_id: service.get_user_profile(db, user_id),
-            support_records_loader=lambda: get_user_management_service().ensure_user_support_records(
-                db, current_user
+            bearer_context=bearer_context,
+            support_records_loader=lambda user: get_user_management_service().ensure_user_support_records(
+                db, user, commit=False
             ),
         )
 
         return UserProfileResponse(**profile)
 
+    except ProfileBearerInvalid as exc:
+        api_service.rollback()
+        raise HTTPException(status_code=401, detail="Bearer session unavailable") from exc
+    except PatientPhoneScopeConflict as exc:
+        api_service.rollback()
+        raise HTTPException(status_code=409, detail=exc.detail) from exc
     except AuthenticationApiDomainError as exc:
+        api_service.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         api_service.rollback()
@@ -442,8 +551,8 @@ async def get_paginated_user_sessions(
         sessions = sessions[skip : skip + per_page]
 
         # Конвертируем в ответы (поля соответствуют модели UserSession).
-        from datetime import datetime as _dt
-        now = _dt.utcnow()
+        # AUTH-BE-001: aware-normalized comparison — see _as_utc_aware.
+        now = datetime.now(UTC)
         session_responses = []
         for session in sessions:
             session_responses.append(
@@ -452,7 +561,9 @@ async def get_paginated_user_sessions(
                     user_id=session.user_id,
                     created_at=session.created_at,
                     expires_at=session.expires_at,
-                    is_active=(not session.revoked and session.expires_at > now),
+                    is_active=(
+                        not session.revoked and _as_utc_aware(session.expires_at) > now
+                    ),
                     revoked=session.revoked,
                     revoked_at=getattr(session, "revoked_at", None),
                     ip_address=session.ip,  # alias
@@ -474,7 +585,10 @@ async def get_paginated_user_sessions(
         raise_authentication_internal_error("get_user_sessions", e)
 
 
-@router.delete("/sessions/{session_id}", response_model=dict[str, Any])
+@router.delete(
+    "/sessions/{session_id}", response_model=dict[str, Any],
+    responses={409: {"description": "Отзыв отдельной сессии пока недоступен"}},
+)
 async def delete_user_session(
     session_id: int,
     request_data: SessionRevokeRequest,
@@ -482,26 +596,7 @@ async def delete_user_session(
     current_user: User = Depends(get_current_user),
 ):
     """Отозвать сессию"""
-    try:
-        # Проверяем, что сессия принадлежит пользователю
-        session = user_session.get_by_session_id(db, str(session_id))
-        if not session or session.user_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Сессия не найдена"
-            )
-
-        success = user_session.deactivate_session(db, str(session_id))
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Ошибка отзыва сессии"
-            )
-
-        return AuthSuccessResponse(success=True, message="Сессия успешно отозвана")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise_authentication_internal_error("revoke_session", e)
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_SESSION_BINDING_UNAVAILABLE)
 
 
 @router.get("/activity", response_model=list[UserActivityResponse])
@@ -557,8 +652,8 @@ async def get_auth_status(
         sessions = user_session.get_active_sessions(db, current_user.id)
         current_session = sessions[0] if sessions else None
 
-        from datetime import datetime as _dt
-        now = _dt.utcnow()
+        # AUTH-BE-001: aware-normalized comparison — see _as_utc_aware.
+        now = datetime.now(UTC)
         return AuthStatusResponse(
             authenticated=True,
             user=UserProfileResponse(**profile),
@@ -568,7 +663,10 @@ async def get_auth_status(
                     user_id=current_session.user_id,
                     created_at=current_session.created_at,
                     expires_at=current_session.expires_at,
-                    is_active=(not current_session.revoked and current_session.expires_at > now),
+                    is_active=(
+                        not current_session.revoked
+                        and _as_utc_aware(current_session.expires_at) > now
+                    ),
                     revoked=current_session.revoked,
                     revoked_at=getattr(current_session, "revoked_at", None),
                     ip_address=current_session.ip,
@@ -615,47 +713,17 @@ async def auth_health_check():
 # ===================== УПРАВЛЕНИЕ СЕССИЯМИ =====================
 
 
-@router.get("/sessions/current", response_model=dict[str, Any])
+@router.get(
+    "/sessions/current", response_model=dict[str, Any],
+    responses={409: {"description": "Текущая сессия не может быть определена"}},
+)
 async def get_current_session(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Получить текущую сессию пользователя"""
-    try:
-        auth_service = get_authentication_service()
-        ip_address, user_agent = get_client_info(request)
-
-        session = auth_service.get_current_session(
-            db, current_user.id, ip_address, user_agent
-        )
-
-        if not session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Активная сессия не найдена",
-            )
-
-        session_info = auth_service.get_session_info(db, session.id)
-
-        return {
-            "success": True,
-            "message": "Текущая сессия получена",
-            "session": session_info,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            "Authentication endpoint failed action=%s error_type=%s",
-            "get current session",
-            type(e).__name__,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка получения текущей сессии",
-        )
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_SESSION_BINDING_UNAVAILABLE)
 
 
 # AUTH-REAUDIT-28: удалён дублирующий GET /sessions (include_in_schema=False),
@@ -663,7 +731,10 @@ async def get_current_session(
 # регистрирует маршруты в порядке объявления, и второй shadowed первый.
 
 
-@router.post("/sessions/{session_id}/revoke", response_model=dict[str, Any])
+@router.post(
+    "/sessions/{session_id}/revoke", response_model=dict[str, Any],
+    responses={409: {"description": "Отзыв отдельной сессии пока недоступен"}},
+)
 async def revoke_user_session(
     session_id: int,
     reason: str = Query("manual", description="Причина отзыва сессии"),
@@ -671,45 +742,13 @@ async def revoke_user_session(
     db: Session = Depends(get_db),
 ):
     """Отозвать сессию"""
-    try:
-        auth_service = get_authentication_service()
-        AuthenticationApiService(db).ensure_session_access(
-            session_id=session_id,
-            current_user_id=current_user.id,
-            allow_admin_access=False,
-        )
-
-        success = auth_service.revoke_session(db, session_id, reason)
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не удалось отозвать сессию",
-            )
-
-        return {
-            "success": True,
-            "message": f"Сессия {session_id} отозвана",
-            "reason": reason,
-        }
-
-    except AuthenticationApiDomainError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            "Authentication endpoint failed action=%s error_type=%s",
-            "revoke session",
-            type(e).__name__,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка отзыва сессии",
-        )
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_SESSION_BINDING_UNAVAILABLE)
 
 
-@router.post("/sessions/revoke-all", response_model=dict[str, Any])
+@router.post(
+    "/sessions/revoke-all", response_model=dict[str, Any],
+    responses={409: {"description": "Сохранение текущей сессии пока недоступно"}},
+)
 async def revoke_all_sessions(
     request: Request,
     except_current: bool = Query(True, description="Исключить текущую сессию"),
@@ -719,28 +758,27 @@ async def revoke_all_sessions(
 ):
     """Отозвать все сессии пользователя"""
     try:
-        auth_service = get_authentication_service()
-
-        current_session_id = None
         if except_current:
-            ip_address, user_agent = get_client_info(request)
-            current_session = auth_service.get_current_session(
-                db, current_user.id, ip_address, user_agent
-            )
-            if current_session:
-                current_session_id = current_session.id
-
-        revoked_count = auth_service.revoke_all_user_sessions(
-            db, current_user.id, current_session_id, reason
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_SESSION_BINDING_UNAVAILABLE)
+        authorization = request.headers.get("authorization", "")
+        scheme, separator, access_token = authorization.partition(" ")
+        if not separator or scheme.lower() != "bearer" or not access_token.strip():
+            raise HTTPException(status_code=401, detail="Требуется аутентификация")
+        result = get_authentication_service().logout_user(
+            db=db, user_id=current_user.id, logout_all=True, access_token=access_token.strip()
         )
+        if not result["success"]:
+            raise HTTPException(status_code=401, detail="Требуется аутентификация")
 
         return {
             "success": True,
-            "message": f"Отозвано {revoked_count} сессий",
-            "revoked_count": revoked_count,
+            "message": "Выполнен выход со всех устройств",
+            "revoked_count": None,
             "reason": reason,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(
             "Authentication endpoint failed action=%s error_type=%s",

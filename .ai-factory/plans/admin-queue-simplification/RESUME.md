@@ -1,3 +1,45 @@
+## Текущая точка — PR #4117 merged, продолжение #4034 — 2026-11-19
+
+PR #4117 слит 19 ноября 2026 в `main` коммитом `e33adf5e949cdb5b6cad225aba36a200a8ebd44a`. **T19: MERGED. Tier‑2 и T18: PARTIAL.** Пользователь отложил новый live staging. Прежние результаты действуют для записанных ревизий.
+
+Задача `bd2f7564-bd3d-449d-8d85-5a9325722a80`, ветка `codex/aqs-t18-rq18-failure-20261112`. Ветка PR #4034 синхронизирована с `main` на `e33adf5e9`; обе истории журналов сохранены. Предыдущий HEAD `c48ca31a1` имел зелёный Unified CI. Текущий этап T18 продолжается в PR #4034. Сверить синхронизированный HEAD, проверить локальные тесты сборщика ресурсов и обязательный CI, затем передать PR пользователю для merge. Свидетельства synthetic RQ‑18 на `355d1a94` сохранены. Проверка service worker, оставшиеся live‑сценарии и полный предрелизный checklist остаются открытыми.
+
+## T19 — восстановление после staging-ошибки — 2026-11-19
+
+Пользователь установил правило: при ошибке не удалять собственный synthetic staging, диагностировать и продолжать оставшиеся проверки в том же проекте. Для `Start` и `Session` заранее задать process env `KEEP_STAGING=1`, записать идентификатор/владельца/срок/причину в checkpoint; успешная Session всё равно удаляет проект. Существующие пять unit cases сохранения при ошибке и очистки при успехе PASS. Новый runner в scratch должен передавать это значение до вызова launcher; повторная проверка не должна заново засевать существующую базу. Предыдущий проект уже удалён, его missing snapshot, frontend hashes и детали семи console events не восстановлены. 19 зафиксированных browser PASS сохраняются как evidence протестированного commit; повторять их без причины не требуется. Отдельный следующий запуск должен закрыть только оставшиеся проверки с учётом необходимых зависимостей авторизации.
+
+## T19 — PR #4117 browser checkpoint — 2026-11-19
+
+Один новый synthetic cycle на `5a209da6bbe016a9540dd231d85b48603ce7c0e1`: Preflight/Start PASS; 19 browser assertions PASS, включая обычный Admin TOTP enrollment и login, смешанный порядок, переименование, скрытие/показ, отсутствие автоматического добавления нового врача, 409 stale и 403 для Registrar. Browser report: 0 page errors, 7 console errors NOT_CLASSIFIED. Session FAIL в обработке выхода browser, до сравнения истории; история и frontend provenance NOT_RUN. Отчёт сохранён как `T19-PR4117-CYCLE2-REPORT.json`; EVIDENCE содержит SHA256 и cleanup. На Windows PowerShell отдельно воспроизведён пустой ExitCode без заранее открытого handle; исправленный scratch runner корректно различает exit 0/1 в offline probes, но в staging после исправления не проверялся. Проект удалён, порты свободны, env удалён. Проверенный commit имел CI 32 success / 11 skipped.
+
+Следующий шаг: в новом проекте проверить оставшиеся history/audit snapshot, frontend provenance и причины console errors; исправленный runner не считать runtime-проверенным заранее. T19 Tier-2 и T18 остаются PARTIAL, deferral не принят. PR Draft; merge/deploy остаются вне текущего цикла.
+
+## T19 — PR #4117 staging и CI checkpoint — 2026-11-19
+
+Task `ad5eac7f-734f-4b24-8d57-437008bacdb8`, worktree `registrar-tabs-unified`, PR #4117. Синхронизация с main `933b1fe` дала commit `e31c4befe`; OpenAPI и типы восстановлены генерацией, 13 schema tests PASS, Alembic имеет один head. На этом commit один owned synthetic staging cycle: Preflight/Start PASS, Session FAIL до browser из-за преобразования пути, canonical teardown PASS; независимая проверка показала ноль контейнеров, томов, сетей и занятых портов, env удалён. Scratch harness для следующего нового проекта исправлен и три преобразования путей проверены. Admin 2FA и UI/DB сценарии NOT_RUN; `served_revision_verified=false`.
+
+CI `e31c4befe` остановился в нескольких jobs до тестирования из-за отсутствия Python 3.11.10 на Ubuntu 26. В четырёх соответствующих workflow подготовлена замена только версии на 3.11.18; нужно проверить их итоговый commit и CI. Actionlint выдаёт одинаковые прежние замечания на исходной и изменённой версии. Следующий шаг: проверить новый HEAD/CI и отдельным новым синтетическим циклом выполнить Session с исправленным harness, зафиксировав реальные результаты и provenance. T18/Tier-2 остаётся PARTIAL; deferral/merge/deploy не подтверждены.
+
+## T19 — PR #4117 baseline checkpoint — 2026-11-16
+
+Task ad5eac7f-734f-4b24-8d57-437008bacdb8, registrar-tabs-unified. Corrected tested HEAD82fb7f7ca has full unit4427 PASS and build/lint/quality/docs/Gitleaks PASS. Four reviewed Linux actual PNGs copied to four allowed baselines; exact source/hash/visual causality in EVIDENCE. Finish ordinary hook-enabled baseline/journal commit, push, refresh PR body and inspect new exact-head CI. No runtime change after82fb7f7ca. If known failures remain, fix within current PR; never weaken thresholds. Keep Draft and Tier-2/Admin2FA NOT_RUN; no merge/deploy. Worktree retained for PR review and pending validation, production tree untouched.
+
+## T19 — resume PR #4117 CI correction — 2026-11-16
+
+Task ad5eac7f-734f-4b24-8d57-437008bacdb8, registrar-tabs-unified / codex/registrar-tabs-unified. Draft PR #4117 source HEAD c82a6cbde exists. Gitleaks recovered and hosted scan PASS. Full CI revealed old unit mocks/labels (now 43 focused tests PASS) and missing registry visual fixture (fixed in 2 E2E files; E2E tsc, scoped lint and exact4 collection PASS). No PNG accepted yet. Finish ordinary hook-enabled test/journal commit, push and monitor ordinary exact-head CI. If only intentional visual deltas remain, inspect corrected Linux actual/diff artifacts before changing ONLY 4 allowed PNGs; do not bless error-state screenshots or alter thresholds. Current source/runtime unchanged; Tier-2/Admin2FA NOT_RUN, no deferral/merge/deploy.
+
+## T19 — final publication checkpoint — 2026-11-16
+
+Continue task ad5eac7f-734f-4b24-8d57-437008bacdb8 in registrar-tabs-unified / codex/registrar-tabs-unified. Gitleaks recovered with verified official pinned release, standard full pre-commit PASS. Feature commit 28746c3b4 and main sync 5bac9c1f9 exist. Two final review P2 fixed locally: owner-scoped in-memory draft recovery and hidden-filter accessible name. Final 68 focused UI tests and type-check PASS. Final build PASS and bounded review no new P0–P2. Complete ordinary hook-enabled follow-up commit, push and Draft PR; monitor actual exact-head CI. Tier-2/normal Admin2FA NOT_RUN. No merge/deploy. All earlier journal entries below are historical; this checkpoint supersedes their pending Gitleaks/commit steps.
+
+## T19 — штатное восстановление Gitleaks — 2026-11-16
+
+Standard Gitleaks recovery succeeded without changing policy or hook configuration. Full pre-commit PASS. Next: conventional commit of the staged unified-tab implementation, merge current origin/main in this isolated worktree, push and prepare Draft PR, monitor exact-head CI. Keep live Admin2FA/staging NOT_RUN and preserve previous evidence.
+
+## T19 — единые вкладки — 2026-11-16
+
+Continue task ad5eac7f-734f-4b24-8d57-437008bacdb8 in registrar-tabs-unified, branch codex/registrar-tabs-unified, base0f593d291. Runtime implementation and targeted checks complete; full Tier-2/normal Admin2FA NOT_RUN. Own PG and Vite/browser cleaned. Next: resolve standard Gitleaks Windows application-control block without bypass; commit final reviewed candidate, then push/CI/PR. Old grouped patch remains separately retained and must not be published.
+
 ## Resume — exact-base RQ-18 live evidence — 2026-11-13T07:32:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq18-recorder-fix-20261111\final`, branch `codex/aqs-t18-rq18-failure-20261112`. T00–T17 remain merged; T18/Tier-2 is PARTIAL with no deferral. User owns merge/deployment.

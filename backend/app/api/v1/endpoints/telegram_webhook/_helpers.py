@@ -285,11 +285,11 @@ STAFF_COMMAND_DOMAIN_ITEM_KEYS = {
 }
 TELEGRAM_SHARE_CONTACT_MESSAGE = (
     "Чтобы привязать Telegram к карте пациента, нажмите кнопку "
-    "\"Поделиться номером\". Номер должен совпадать с номером в регистратуре."
+    '"Поделиться номером". Номер должен совпадать с номером в регистратуре.'
 )
 TELEGRAM_CONTACT_REJECTED_MESSAGE = (
     "Можно отправить только свой номер Telegram. "
-    "Нажмите кнопку \"Поделиться номером\" в меню бота."
+    'Нажмите кнопку "Поделиться номером" в меню бота.'
 )
 TELEGRAM_PATIENT_NOT_FOUND_MESSAGE = (
     "Пациент с этим номером не найден. Проверьте номер в регистратуре "
@@ -466,14 +466,14 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: TELEGRAM_SHARE_CONTACT_MESSAGE,
         TELEGRAM_LANGUAGE_UZ: (
             "Telegramni bemor kartasi bilan bog'lash uchun "
-            "\"Telefon raqamni ulashish\" tugmasini bosing. Raqam registraturadagi raqam bilan mos bo'lishi kerak."
+            '"Telefon raqamni ulashish" tugmasini bosing. Raqam registraturadagi raqam bilan mos bo\'lishi kerak.'
         ),
     },
     "contact_rejected": {
         TELEGRAM_LANGUAGE_RU: TELEGRAM_CONTACT_REJECTED_MESSAGE,
         TELEGRAM_LANGUAGE_UZ: (
             "Faqat o'zingizning Telegram raqamingizni yuborish mumkin. "
-            "Bot menyusidagi \"Telefon raqamni ulashish\" tugmasini bosing."
+            'Bot menyusidagi "Telefon raqamni ulashish" tugmasini bosing.'
         ),
     },
     "patient_not_found": {
@@ -559,9 +559,9 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "☎️ Связаться с клиникой - безопасная подсказка, куда обращаться по записи, кассе и срочным вопросам.\n\n"
             "Команды: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
             "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
-            "Для записи откройте Mini App из кнопки под сообщением \"Записаться на приём\". "
+            'Для записи откройте Mini App из кнопки под сообщением "Записаться на приём". '
             "Для привязки отсканируйте QR с чека или нажмите "
-            "\"Поделиться номером\".\n\n"
+            '"Поделиться номером".\n\n'
             "Для сотрудников: доступ отдельно через персональную ссылку администратора "
             "или /staff после привязки. В Telegram режим сотрудника только для просмотра; "
             "действия выполняются в приложении клиники."
@@ -585,9 +585,9 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "☎️ Klinikaga bog'lanish - yozilish, kassa va shoshilinch savollar bo'yicha xavfsiz yo'l-yo'riq.\n\n"
             "Buyruqlar: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
             "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
-            "Yozilish uchun \"Qabulga yozilish\" xabari ostidagi Mini App tugmasini oching. "
+            'Yozilish uchun "Qabulga yozilish" xabari ostidagi Mini App tugmasini oching. '
             "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
-            "\"Telefon raqamni ulashish\" tugmasini bosing.\n\n"
+            '"Telefon raqamni ulashish" tugmasini bosing.\n\n'
             "Xodimlar uchun: kirish administrator bergan shaxsiy havola orqali "
             "yoki bog'langandan keyin /staff orqali. Telegramdagi xodim rejimi faqat "
             "ko'rish uchun; amallar klinika ilovasida bajariladi."
@@ -634,8 +634,8 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_UZ: "Anketani ochish",
     },
     "patient_documents_entry_button": {
-        TELEGRAM_LANGUAGE_RU: "Открыть документы",
-        TELEGRAM_LANGUAGE_UZ: "Hujjatlarni ochish",
+        TELEGRAM_LANGUAGE_RU: "Открыть результаты",
+        TELEGRAM_LANGUAGE_UZ: "Natijalarni ochish",
     },
     "patient_doctors_entry_button": {
         TELEGRAM_LANGUAGE_RU: "Открыть расписание врачей",
@@ -662,57 +662,66 @@ TELEGRAM_LOCALIZED_TEXTS = {
     "patient_forms": {
         TELEGRAM_LANGUAGE_RU: (
             "Анкеты пациента\n\n"
-            "Анкеты пока не заполняются в Telegram. Этот раздел будет подключён через "
-            "защищённый кабинет или Mini App, чтобы не принимать паспортные, медицинские "
-            "и согласительные данные в обычном чате."
+            "Откройте анкету по защищённой ссылке и заполните её в Mini App. "
+            "Не отправляйте паспортные, медицинские или согласительные данные обычным "
+            "сообщением в Telegram. Если кнопка Mini App не отображается, обратитесь "
+            "в регистратуру."
         ),
         TELEGRAM_LANGUAGE_UZ: (
             "Bemor anketalari\n\n"
-            "Anketalar hozircha Telegramda to'ldirilmaydi. Bu bo'lim keyin himoyalangan "
-            "kabinet yoki Mini App orqali ulanadi, shunda pasport, tibbiy va rozilik "
-            "ma'lumotlari oddiy chatda qabul qilinmaydi."
+            "Anketani himoyalangan havola orqali ochib, Mini App ichida to'ldiring. "
+            "Pasport, tibbiy yoki rozilik ma'lumotlarini Telegram chatiga oddiy xabar "
+            "sifatida yubormang. Himoyalangan Mini App tugmasi ko'rinmasa, "
+            "registraturaga murojaat qiling."
         ),
     },
     "patient_documents": {
         TELEGRAM_LANGUAGE_RU: (
-            "Документы и чеки\n\n"
-            "Чеки, направления и медицинские документы будут открываться только через "
-            "защищённый кабинет. В Telegram остаются короткие уведомления и безопасные "
-            "сводки без внутренних номеров."
+            "Результаты и документы\n\n"
+            "Готовые результаты можно открыть по защищённой ссылке; PDF лабораторного "
+            "результата бот отправляет только по запросу. Полный архив документов и чеков "
+            "пока не подключён. Не отправляйте медицинские документы в обычный чат. "
+            "Если кнопка защищённого раздела не отображается, обратитесь в регистратуру."
         ),
         TELEGRAM_LANGUAGE_UZ: (
-            "Hujjatlar va cheklar\n\n"
-            "Cheklar, yo'llanmalar va tibbiy hujjatlar faqat himoyalangan kabinet orqali "
-            "ochiladi. Telegramda ichki raqamlarsiz qisqa xabarnomalar va xavfsiz "
-            "xulosalar qoladi."
+            "Natijalar va hujjatlar\n\n"
+            "Tayyor natijalarni himoyalangan havola orqali ochish mumkin; laboratoriya "
+            "natijasi PDF faylini bot faqat so'rov bo'yicha yuboradi. Hujjatlar va cheklar "
+            "to'liq arxivi hali ulanmagan. Tibbiy hujjatlarni oddiy chatga yubormang. "
+            "Himoyalangan bo'lim tugmasi ko'rinmasa, registraturaga murojaat qiling."
         ),
     },
     "doctor_schedule": {
         TELEGRAM_LANGUAGE_RU: (
             "Врачи и расписание\n\n"
-            "Просмотр врачей и свободного времени пока не подключён к Telegram. "
-            "Запись и изменение расписания выполняются через регистратуру или защищённое "
-            "приложение клиники."
+            "Откройте защищённую запись, выберите врача и свободное время, затем отправьте "
+            "заявку. Регистратура подтвердит запись. Бот не меняет расписание и не создаёт "
+            "запись по свободному сообщению в чате. Если кнопка записи не отображается, "
+            "обратитесь в регистратуру."
         ),
         TELEGRAM_LANGUAGE_UZ: (
             "Shifokorlar jadvali\n\n"
-            "Shifokorlar va bo'sh vaqtlarni ko'rish hozircha Telegramga ulanmagan. "
-            "Yozilish va jadvalni o'zgartirish registratura yoki klinikaning himoyalangan "
-            "ilovasi orqali bajariladi."
+            "Himoyalangan yozilish bo'limini oching, shifokor va bo'sh vaqtni tanlab, "
+            "so'rov yuboring. Registratura yozilishni tasdiqlaydi. Bot chatdagi erkin "
+            "xabar orqali jadvalni o'zgartirmaydi yoki yozuv yaratmaydi. Yozilish tugmasi "
+            "ko'rinmasa, registraturaga murojaat qiling."
         ),
     },
     "patient_cabinet": {
         TELEGRAM_LANGUAGE_RU: (
             "Кабинет пациента\n\n"
-            "Общий вход в кабинет пациента для Telegram ещё не включён. Сейчас безопасно "
-            "доступны отдельные разделы меню: очередь, визиты, оплаты и готовые результаты. "
-            "Кнопка оплаты откроет защищённый путь, когда он настроен для клиники."
+            "Откройте кабинет по защищённой ссылке. После входа и привязки аккаунта "
+            "доступна сводка пациента; медицинские документы открываются в защищённых "
+            "разделах. В обычном чате бот показывает только безопасные сводки. Если "
+            "кнопка кабинета не отображается, обратитесь в регистратуру."
         ),
         TELEGRAM_LANGUAGE_UZ: (
             "Bemor kabineti\n\n"
-            "Telegram uchun umumiy bemor kabineti kirishi hali yoqilmagan. Hozir menyuda "
-            "navbat, tashriflar, to'lovlar va tayyor natijalar xavfsiz ko'rsatiladi. "
-            "To'lov tugmasi klinikada sozlanganda himoyalangan yo'lni ochadi."
+            "Kabinetni himoyalangan havola orqali oching. Tizimga kirib, akkauntni "
+            "bog'laganingizdan so'ng bemor xulosasi ko'rsatiladi; tibbiy hujjatlar "
+            "himoyalangan bo'limlarda ochiladi. Oddiy chatda bot faqat xavfsiz "
+            "xulosalarni ko'rsatadi. Kabinet tugmasi ko'rinmasa, registraturaga "
+            "murojaat qiling."
         ),
     },
     "staff_entry": {

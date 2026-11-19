@@ -46,6 +46,7 @@ interface DraftControl {
   dirty: { current: boolean };
   save: ReturnType<typeof vi.fn>;
   discard: ReturnType<typeof vi.fn>;
+  cancelVisit: () => void;
 }
 
 function LocationProbe() {
@@ -91,6 +92,7 @@ function PanelHarness({
       <button type="button" onClick={() => goToTab('queue')}>tab-queue</button>
       <button type="button" onClick={() => goToTab('patients')}>tab-patients</button>
       <button type="button" onClick={() => goToTab('visit')}>tab-visit</button>
+      <button type="button" onClick={() => goToTab('queue', control.cancelVisit)}>cancel-visit</button>
     </div>
   );
 }
@@ -146,6 +148,7 @@ async function openDirtyPanel(panel: 'cardiology' | 'dermatology' = 'cardiology'
     dirty: { current: dirty },
     save: vi.fn(async () => ({ status: 'in_progress', row_version: 3 })),
     discard: vi.fn(),
+    cancelVisit: vi.fn(),
   };
   const panelUrl = panel === 'cardiology'
     ? '/doctor/cardiology?tab=visit'
@@ -170,6 +173,30 @@ function pressHotkey(key: string) {
 }
 
 describe('Same-route doctor tab switching through the shared leave guard (RETRO-3971-04 P1)', () => {
+  it('the visit cancel side effect waits for the shared leave decision', async () => {
+    const { control } = await openDirtyPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'cancel-visit' }));
+    const dialog = await screen.findByRole('dialog');
+
+    expect(screen.getByTestId('editor')).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/doctor/cardiology?tab=visit');
+    expect(control.cancelVisit).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    await settleRouter('/doctor/cardiology?tab=visit');
+    expect(control.cancelVisit).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'cancel-visit' }));
+    const discardDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(discardDialog).getByRole('button', { name: 'Выйти без сохранения' }));
+    await settleRouter('/doctor/cardiology?tab=queue');
+
+    expect(control.cancelVisit).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('editor')).not.toBeInTheDocument();
+    expect(screen.getByTestId('other-tab')).toHaveTextContent('queue view');
+  });
+
   beforeEach(async () => {
     await act(async () => {
       await i18n.changeLanguage('ru');

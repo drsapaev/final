@@ -36,18 +36,31 @@ const readSource = (relative: string) =>
 
 describe('DERMACOMPLETE-FE-002 — post-POST completion context guard (source contract)', () => {
   const source = readSource('../DermatologistPanelUnified.tsx');
+  // DERMACOMPLETE-FE-001: the completion POST lives in `runCompletionFlow`;
+  // the entry handler routes it through the shared dirty-source registry
+  // scoped to this visit's EMR draft (`emr-visit-<id>`).
+  const completionFlow =
+    source.match(/const runCompletionFlow = async[\s\S]*?\n {2}\};/)?.[0] ?? '';
   const completionHandler =
     source.match(/const handleSaveVisit = async[\s\S]*?\n {2}\};/)?.[0] ?? '';
 
   it('pins the handler block that owns completion', () => {
+    expect(completionFlow).not.toBe('');
+    expect(completionFlow).toContain('queueService.completeVisit');
+    // DERMACOMPLETE-FE-001: the entry handler defers to the shared
+    // dirty-source registry; a registered dirty draft gates the POST behind
+    // the canonical Save/Discard dialog.
     expect(completionHandler).not.toBe('');
-    expect(completionHandler).toContain('queueService.completeVisit');
+    expect(completionHandler).toContain('guardTransition(');
+    expect(completionHandler).toContain('emr-visit-${completionContext.visitId}');
+    expect(completionHandler).toContain("intentPolicy: 'leave'");
+    expect(completionHandler).toContain('runCompletionFlow(completionContext, entryId)');
   });
 
   it('rechecks the completion context AFTER the POST resolves, before any reset or auto-call', () => {
-    const postIndex = completionHandler.indexOf('await queueService.completeVisit');
+    const postIndex = completionFlow.indexOf('await queueService.completeVisit');
     expect(postIndex).toBeGreaterThan(-1);
-    const afterPost = completionHandler.slice(postIndex);
+    const afterPost = completionFlow.slice(postIndex);
     // The post-await guard must precede every effectful consequence.
     const guardIndex = afterPost.indexOf('isSameDermatologyVisit(completionContext, currentVisitContextRef.current)');
     expect(guardIndex).toBeGreaterThan(-1);
@@ -57,9 +70,10 @@ describe('DERMACOMPLETE-FE-002 — post-POST completion context guard (source co
   });
 
   it('keeps the pre-existing pre-POST identity recheck and ack guard (DOCFLOW pins stay green)', () => {
-    const prePost = completionHandler.slice(0, completionHandler.indexOf('await queueService.completeVisit'));
-    expect(prePost).toContain('isSameDermatologyVisit(completionContext, currentVisitContextRef.current)');
-    expect(completionHandler).toMatch(/completionAck\?\.success !== true/);
+    // The pre-POST identity recheck stays in the entry handler (pre-dialog);
+    // the ack guard stays in the flow body.
+    expect(completionHandler).toContain('isSameDermatologyVisit(completionContext, currentVisitContextRef.current)');
+    expect(completionFlow).toMatch(/completionAck\?\.success !== true/);
   });
 });
 
@@ -149,15 +163,20 @@ describe('DERMAHOTKEY-FE-001 — dirty-guarded panel exits (source contract)', (
     expect(hotkeys).toMatch(/aria-modal="true"/);
   });
 
-  it('the panel tracks the EMR dirty state and confirms before discarding it', () => {
-    expect(source).toContain('emrDirtyRef');
-    expect(source).toContain('derma_panel_discard_draft_title');
+  it('Escape delegates the current visit to the shared dirty-source guard', () => {
+    expect(source).not.toContain('emrDirtyRef');
+    expect(source).not.toContain('handleEmrDirtyChange');
+    expect(source).toContain('hasPendingOperations');
+    expect(source).toContain('guardTransition(() =>');
+    expect(source).toContain('{ sourceIds, intentPolicy: \'leave\' }');
+    expect(source).toContain('dialogVisitContext');
+    expect(source).toContain('isSameDermatologyVisit(dialogVisitContext, currentVisitContextRef.current)');
     const visitBranch = source.slice(
       source.indexOf('{activeTab === \'visit\' && currentAppointment'),
       source.indexOf('{' + 'activeTab === \'visit\' && !currentAppointment'),
     );
     const emrMount = visitBranch.slice(visitBranch.indexOf('<EMRContainerV2'));
-    expect(emrMount).toContain('onDirtyChange');
+    expect(emrMount).not.toContain('onDirtyChange');
   });
 
   it('EMRContainerV2 exposes its dirty flag through an optional callback prop', () => {

@@ -58,6 +58,19 @@ const sectionTemplateCacheTokens = new Map<string, number>();
 // its own payload while a newer generation's failure is the last known
 // event. Pending-read chaining and newer-data adoption keep precedence.
 const sectionTemplateCacheFailures = new Map<string, { token: number; error: string }>();
+// RETRO-4014-01 sibling convergence (ledger PR 4000, comment 19): per-key
+// listener registry for ALREADY-PAINTED mounted instances. A successful
+// shared-map install fans out to every same-key subscriber so a quiet
+// sibling converges on the newer truth without its own request; FAILURE
+// outcomes fan out NOTHING (the tombstone governs reads; a painted sibling
+// keeps its last known good list). Cleared on principal swap like every
+// other module map.
+const sectionTemplateCacheListeners = new Map<string, Set<() => void>>();
+const notifySectionTemplateKey = (cacheKey: string): void => {
+    const listeners = sectionTemplateCacheListeners.get(cacheKey);
+    if (!listeners || listeners.size === 0) return;
+    for (const listener of [...listeners]) listener();
+};
 
 const acquireCacheToken = (cacheKey: string): number => {
     const next = (sectionTemplateCacheTokens.get(cacheKey) ?? 0) + 1;
@@ -84,6 +97,7 @@ const syncSectionTemplateCacheOwner = (): void => {
         sectionTemplateCache.clear();
         sectionTemplateCacheTokens.clear();
         sectionTemplateCacheFailures.clear();
+        sectionTemplateCacheListeners.clear();
         sectionTemplateCacheOwner = owner;
     }
 };
@@ -150,6 +164,12 @@ export function useDoctorSectionTemplates({
     // slow response for the previous diagnosis must never overwrite the
     // results of the current one.
     const requestEpochRef = useRef(0);
+    // RETRO-4014-01 sibling convergence: the window in which THIS instance's
+    // own request owns the paint (a fan-out repaint must never interleave
+    // with an in-flight own request) and the shared install generation this
+    // instance last painted (a repaint fires only for a NEWER truth).
+    const ownFetchPendingRef = useRef(0);
+    const lastPaintedSharedTokenRef = useRef(0);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -207,6 +227,7 @@ export function useDoctorSectionTemplates({
         setRenderedContext(contextKey);
         const seed = canUseCache ? sectionTemplateCache.get(cacheKey) : undefined;
         setTemplates(seed?.data ?? []);
+        lastPaintedSharedTokenRef.current = seed?.token ?? 0;
         setError(null);
     }
 
@@ -235,14 +256,48 @@ export function useDoctorSectionTemplates({
                 setTemplates([]);
             }
             setLoading(false);
+            // The joiner painted the shared truth — record its generation so
+            // a later repaint only fires for something NEWER.
+            if (outcome.ok) {
+                lastPaintedSharedTokenRef.current =
+                    sectionTemplateCache.get(contextKey)?.token ?? lastPaintedSharedTokenRef.current;
+            }
         });
         return promise;
     }, []);
 
+    // RETRO-4014-01 sibling convergence: the fan-out repaint. Another
+    // instance's successful install moved the shared truth past what THIS
+    // instance last painted — converge without a new request. Gates: the
+    // instance is mounted, its live context is still this key, it owns NO
+    // in-flight request, and the shared token is strictly newer.
+    const repaintFromSharedCache = useCallback(() => {
+        if (!isMountedRef.current) return;
+        if (ownFetchPendingRef.current > 0) return;
+        if (liveCacheKeyRef.current !== cacheKey) return;
+        const entry = canUseCache ? sectionTemplateCache.get(cacheKey) : undefined;
+        if (!entry?.data) return;
+        if (entry.token <= lastPaintedSharedTokenRef.current) return;
+        lastPaintedSharedTokenRef.current = entry.token;
+        setTemplates(entry.data);
+        setError(null);
+        setLoading(false);
+    }, [cacheKey, canUseCache]);
+
+    useEffect(() => {
+        if (!canUseCache) return undefined;
+        const set = sectionTemplateCacheListeners.get(cacheKey) ?? new Set<() => void>();
+        sectionTemplateCacheListeners.set(cacheKey, set);
+        set.add(repaintFromSharedCache);
+        return () => {
+            set.delete(repaintFromSharedCache);
+        };
+    }, [cacheKey, canUseCache, repaintFromSharedCache]);
+
     /**
      * Fetch templates from API
      */
-    const fetchTemplates = useCallback(async (forceRefresh: boolean = false): Promise<TemplateFetchOutcome> => {
+    const fetchTemplatesInner = useCallback(async (forceRefresh: boolean = false): Promise<TemplateFetchOutcome> => {
         if (!section) {
             // RETRO-3953-02: no section → no query, and the previous
             // context's request epoch is invalidated so its late response can
@@ -266,6 +321,7 @@ export function useDoctorSectionTemplates({
             if (cachedEntry?.data) {
                 if (isMountedRef.current && epoch === requestEpochRef.current && liveCacheKeyRef.current === cacheKey) {
                     setTemplates(cachedEntry.data);
+                    lastPaintedSharedTokenRef.current = cachedEntry.token;
                     setError(null);
                     setLoading(false);
                 }
@@ -334,6 +390,11 @@ export function useDoctorSectionTemplates({
                     // RETRO-4014-01: a newer SUCCESS supersedes any older
                     // failure tombstone for this key.
                     sectionTemplateCacheFailures.delete(cacheKey);
+                    lastPaintedSharedTokenRef.current = myCacheToken;
+                    // RETRO-4014-01 sibling convergence: THE fan-out point —
+                    // every mounted same-key sibling repaints the newer
+                    // truth; failure installs never notify.
+                    notifySectionTemplateKey(cacheKey);
                 } else if (canUseCache) {
                     const newerEntry = sectionTemplateCache.get(cacheKey);
                     if (newerEntry?.promise && newerEntry.token !== myCacheToken) {
@@ -356,6 +417,7 @@ export function useDoctorSectionTemplates({
                         // A newer same-key read already committed successful
                         // data: prefer it over this stale payload.
                         committedData = newerEntry.data;
+                        lastPaintedSharedTokenRef.current = newerEntry.token;
                     }
                     // RETRO-4014-01: no newer entry at all, but a NEWER
                     // generation's failure is the last shared event (its
@@ -459,6 +521,22 @@ export function useDoctorSectionTemplates({
             }
         }
     }, [cacheKey, canUseCache, icd10Code, joinInFlightRequest, limit, section]);
+
+    // RETRO-4014-01 sibling convergence: every fetchTemplates invocation —
+    // cache hits, joins and fresh reads alike — opens the window in which
+    // this instance's own request owns the paint.
+    const fetchTemplates = useCallback(
+        async (forceRefresh: boolean = false): Promise<TemplateFetchOutcome> => {
+            ownFetchPendingRef.current += 1;
+            try {
+                return await fetchTemplatesInner(forceRefresh);
+            } finally {
+                ownFetchPendingRef.current -= 1;
+            }
+        },
+        [fetchTemplatesInner],
+    );
+
 
     // RETRO-3995-01: mutations must refresh the LIVE context. The mutation
     // callbacks below used to call their captured fetchTemplates(true); when

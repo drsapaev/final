@@ -93,6 +93,7 @@ describe('LABAI-FE-001 — the AI dialog is reset by report identity', () => {
     interpretLabResultsMock.mockImplementation(() => new Promise((resolve) => {
       releaseInterpretation = () => resolve({
         status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
         data: {
           summary: 'SYNTHETIC A INTERPRETATION',
           results: [],
@@ -141,6 +142,7 @@ describe('LABAI-FE-001 — the AI dialog is reset by report identity', () => {
   it('control: a current-input analysis publishes its result', async () => {
     interpretLabResultsMock.mockResolvedValue({
       status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
       data: { summary: 'SYNTHETIC CURRENT', results: [] },
     });
 
@@ -184,6 +186,7 @@ describe('LABAI-FE-003 — the loading flag and staleness follow the input CONTE
     interpretLabResultsMock.mockImplementation(() => new Promise((resolve) => {
       releaseInterpretation = () => resolve({
         status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
         data: {
           summary: 'SYNTHETIC SAME-CONTENT INTERPRETATION',
           results: [],
@@ -233,6 +236,7 @@ describe('LABAI-FE-003 — the loading flag and staleness follow the input CONTE
     interpretLabResultsMock.mockImplementation(() => new Promise((resolve) => {
       releaseInterpretation = () => resolve({
         status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
         data: { summary: 'SYNTHETIC A INTERPRETATION', results: [] },
       });
     }));

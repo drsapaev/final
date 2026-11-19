@@ -88,9 +88,11 @@ class UserManagementApiService:
             self.repository.rollback()
             raise
 
-    def apply_profile_update(self, *, profile, update_data: dict):
+    def apply_profile_update(self, *, profile, update_data: dict, before_commit=None):
         try:
             self.repository.apply_profile_fields(profile=profile, update_data=update_data)
+            if before_commit is not None:
+                before_commit()
             self.repository.commit()
             self.repository.refresh(profile)
             return profile

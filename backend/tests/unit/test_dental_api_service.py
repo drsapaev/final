@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -254,3 +256,122 @@ class TestDentalApiService:
                 user=SimpleNamespace(id=9, username="admin", full_name="Admin"),
             )
         assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_price_override_pending_uses_protected_inbox_and_tracks_delivery(
+        self, monkeypatch
+    ):
+        import app.services.dental_api_service as dental_module
+
+        registrars = [
+            SimpleNamespace(id=31, username="registrar-one", is_active=True),
+            SimpleNamespace(id=32, username="registrar-two", is_active=True),
+        ]
+
+        class Repository:
+            commits = 0
+
+            def list_registrars(self):
+                return registrars
+
+            def commit(self):
+                self.commits += 1
+
+        repository = Repository()
+        service = DentalApiService(db=object(), repository=repository)
+        notification = AsyncMock(side_effect=[False, True])
+        monkeypatch.setattr(
+            dental_module.notification_sender_service,
+            "send_canonical_notification_to_user",
+            notification,
+        )
+        override = SimpleNamespace(
+            id=90,
+            visit_id=7,
+            service_id=4,
+            original_price=Decimal("120"),
+            new_price=Decimal("100"),
+            reason="synthetic test",
+            details=None,
+            created_at=datetime(2026, 11, 14, 10, 0),
+            notification_sent=False,
+            notification_sent_at=None,
+        )
+
+        await service.send_price_override_notification(
+            price_override=override,
+            doctor=SimpleNamespace(
+                id=12,
+                user=SimpleNamespace(full_name="Synthetic Doctor"),
+            ),
+            service=SimpleNamespace(name="Synthetic service", service_code="SVC-4"),
+            visit=SimpleNamespace(patient_id=22),
+        )
+
+        assert notification.await_count == 2
+        assert [call.kwargs["recipient"] for call in notification.await_args_list] == (
+            registrars
+        )
+        assert all(
+            call.kwargs["source_module"] == "dental"
+            for call in notification.await_args_list
+        )
+        assert override.notification_sent is True
+        assert override.notification_sent_at is not None
+        assert repository.commits == 1
+
+    @pytest.mark.asyncio
+    async def test_price_override_result_uses_doctor_protected_inbox(
+        self, monkeypatch
+    ):
+        import app.services.dental_api_service as dental_module
+
+        doctor_user = SimpleNamespace(
+            id=12,
+            username="synthetic-doctor",
+            full_name="Synthetic Doctor",
+            is_active=True,
+        )
+
+        class Repository:
+            def get_doctor(self, doctor_id):
+                return SimpleNamespace(user=doctor_user)
+
+            def get_service(self, service_id):
+                return SimpleNamespace(name="Synthetic service")
+
+        service = DentalApiService(db=object(), repository=Repository())
+        notification = AsyncMock(return_value=True)
+        telegram = AsyncMock()
+        monkeypatch.setattr(
+            dental_module.notification_sender_service,
+            "send_canonical_notification_to_user",
+            notification,
+        )
+        monkeypatch.setattr(
+            dental_module.notification_sender_service,
+            "send_telegram_message",
+            telegram,
+        )
+
+        await service.send_price_override_result_notification(
+            price_override=SimpleNamespace(
+                id=90,
+                doctor_id=12,
+                service_id=4,
+                visit_id=7,
+                status="approved",
+                original_price=Decimal("120"),
+                new_price=Decimal("100"),
+                reason="synthetic test",
+                approved_at=datetime(2026, 11, 14, 10, 0),
+                rejection_reason=None,
+            ),
+            approved_by=SimpleNamespace(username="admin", full_name="Synthetic Admin"),
+        )
+
+        notification.assert_awaited_once()
+        assert notification.await_args.kwargs["recipient"] is doctor_user
+        assert notification.await_args.kwargs["event_type"] == "dental_price_override_result"
+        assert notification.await_args.kwargs["source_module"] == "dental"
+        telegram.assert_not_awaited()

@@ -37,6 +37,7 @@ class NotificationPlatformServiceMixinBase:
 
     INBOX_CHANNEL = "in_app_inbox"
     TRANSPORT_NOTIFICATION = "notification"
+    TRANSPORT_NOTIFICATION_UPDATE = "notification_update"
     TRANSPORT_QUEUE_UPDATE = "queue_update"
     TRANSPORT_SYSTEM_ALERT = "system_alert"
     DEFAULT_TIMEZONE = "Asia/Tashkent"
@@ -90,6 +91,12 @@ class NotificationPlatformServiceMixinBase:
         "diagnostics_return_needed": "push_system_updates",
         "queue_status_changed": "push_system_updates",
         "patient_registered": "push_system_updates",
+        "lab_results": "push_system_updates",
+        "lab_new_study": "push_system_updates",
+        "lab_result_sent_confirmation": "push_system_updates",
+        "lab_critical_finding": "push_system_updates",
+        "dental_price_override_pending": "push_system_updates",
+        "dental_price_override_result": "push_system_updates",
     }
 
     ROLE_ALIASES = {

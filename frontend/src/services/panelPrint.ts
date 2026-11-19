@@ -175,21 +175,30 @@ function extractQueueNumberCandidate(value: unknown): string | null {
 
   if (typeof value === 'object' && value !== null) {
     const obj = value as Record<string, unknown>;
+    // QUEUEPRINT-FE-003: a generic `obj.id` is the record's PK (the backend
+    // contract keeps a distinct pair OnlineQueueEntry.id vs .number) — a
+    // missing issued number cannot be derived from it.
     const direct = getFirstDefined(
       obj.queue_number,
       obj.number,
       obj.ticket_number,
       obj.queue_position,
       obj.queue_no,
-      obj.display_number,
-      obj.id
+      obj.display_number
     );
 
     if (direct !== null && direct !== undefined && direct !== '') {
       return String(direct);
     }
 
-    for (const nestedValue of Object.values(value)) {
+    for (const [nestedKey, nestedValue] of Object.entries(value)) {
+      // QUEUEPRINT-FE-003: identifier-keyed values (`id`, `queue_id`,
+      // `appointment_id`, `visit_id`, …) are never issued per-queue
+      // numbers — printing them as «Очередь №…» fabricates ticket identity
+      // from unrelated internal PKs.
+      if (nestedKey === 'id' || nestedKey.endsWith('_id')) {
+        continue;
+      }
       const nestedCandidate = extractQueueNumberCandidate(nestedValue);
       if (nestedCandidate !== null && nestedCandidate !== undefined && nestedCandidate !== '') {
         return String(nestedCandidate);
@@ -585,12 +594,14 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
   const queueNumber = resolveQueueNumber(row);
   if (!queueNumber) {
     // Desk/laboratory visits never join the queue machinery (prod:
-    // queue_entries is empty by workflow — visits carry their own id), so
-    // a missing queue number is EXPECTED there. Fall back to the visit
-    // identifier instead of failing the print: "В-<id>" identifies the
-    // talon just as well for these flows. Only rows with no identifier at
-    // all still fail.
-    const visitFallback = getFirstDefined(row?.visit_id, row?.id);
+    // queue_entries is empty by workflow), so a missing queue number is
+    // EXPECTED there. QUEUEPRINT-FE-003: only an EXPLICIT `visit_id` proves
+    // the row is a queue-less VISIT — the visit identifier falls back to
+    // "В-<visit_id>" just as well for these flows. A generic `row.id` is
+    // NOT proven to be a Visit PK (appointment / payment / aggregate rows)
+    // and must never be fabricated into a visit talon; such rows fail
+    // honestly with a recoverable lookup instead.
+    const visitFallback = getFirstDefined(row?.visit_id);
     if (visitFallback === null || visitFallback === undefined || visitFallback === '') {
       logger.warn('[PanelPrint] Queue number missing in row payload', {
         rowKeys: row && typeof row === 'object' ? Object.keys(row) : [],
