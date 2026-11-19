@@ -124,3 +124,13 @@ describe('DERMSCHED-FE-002 — schedule-next preselects the canonical patient_id
     });
   });
 });
+
+it('offers the physician the paid and repeat visit types', async () => {
+  render(<ScheduleNextModal isOpen patient={QUEUE_ROW_PATIENT} />);
+
+  await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/services'));
+  const visitType = screen.getByRole('combobox', { name: 'Schedule next visit type' });
+  expect(visitType).toHaveValue('none');
+  expect(screen.getByRole('option', { name: 'misc.snm_visit_type_repeat' })).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'misc.snm_visit_type_benefit' })).toBeNull();
+});

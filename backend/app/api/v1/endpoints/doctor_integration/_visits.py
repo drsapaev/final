@@ -363,6 +363,12 @@ async def schedule_next_visit(
             current_user=current_user,
         )
 
+        if request.discount_mode == "benefit":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Льготу оформляет регистратура после одобрения администратора",
+            )
+
         service_ids = [s.service_id for s in request.services]
         services = (
             db.query(Service)
@@ -398,13 +404,9 @@ async def schedule_next_visit(
 
             service_price = float(_catalogue_price_for_assignment(service, service_req.custom_price))
 
-            # Применяем скидки для консультаций
-            if service.is_consultation:
-                if request.discount_mode in ["repeat", "benefit"] or effective_all_free:
-                    service_price = 0
-
-            # All Free делает всё бесплатным
-            if effective_all_free:
+            if effective_all_free or (
+                service.is_consultation and request.discount_mode == "repeat"
+            ):
                 service_price = 0
 
             intended_lines.append((service.id, service_req.quantity, service_price))

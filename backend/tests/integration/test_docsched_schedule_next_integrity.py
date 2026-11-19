@@ -479,7 +479,7 @@ class TestDOCSCHEDBE002AllFreeCanonicalPricing:
     def test_repeat_discount_zeroes_consultation_only(
         self, client, db_session, cardio_auth_headers, test_doctor, test_service
     ):
-        """Позитивный контроль: repeat/benefit обнуляет только консультации."""
+        """Позитивный контроль: режим repeat применяется только к консультациям."""
         patient = _make_patient(db_session)
         _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
         paid_service = _make_service(db_session, price=150000.0)
@@ -510,6 +510,33 @@ class TestDOCSCHEDBE002AllFreeCanonicalPricing:
         assert prices[test_service.id] == 0
         assert prices[paid_service.id] == 150000.0
         assert data["confirmation"]["total_amount"] == 150000.0
+
+
+@pytest.mark.integration
+@pytest.mark.confirmation
+@pytest.mark.parametrize("all_free", [False, True])
+def test_schedule_next_routes_encounter_benefits_to_registration(
+    client, db_session, cardio_auth_headers, test_doctor, all_free
+):
+    patient = _make_patient(db_session)
+    prior_visit = _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
+    consultation = _make_service(db_session, is_consultation=True)
+    payload = _schedule_payload(
+        patient,
+        consultation,
+        visit_date=_clinic_today(db_session) + timedelta(days=1),
+        discount_mode="benefit",
+        all_free=all_free,
+    )
+
+    response = client.post(
+        "/api/v1/doctor/visits/schedule-next", json=payload, headers=cardio_auth_headers
+    )
+
+    assert response.status_code == 403, response.text
+    assert "регистратура" in response.json()["detail"]
+    visit_ids = db_session.query(Visit.id).filter(Visit.patient_id == patient.id).all()
+    assert visit_ids == [(prior_visit.id,)]
 
 
 @pytest.mark.integration

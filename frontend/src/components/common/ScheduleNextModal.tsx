@@ -594,7 +594,6 @@ const ScheduleNextModal = ({
               
               <option value="none">{t('misc.snm_visit_type_paid')}</option>
               <option value="repeat">{t('misc.snm_visit_type_repeat')}</option>
-              <option value="benefit">{t('misc.snm_visit_type_benefit')}</option>
             </select>
           </div>
 
