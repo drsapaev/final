@@ -369,17 +369,20 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     expect(stubs.caches.match).not.toHaveBeenCalled();
   });
 
-  it('honors no-store while pre-caching installation assets', async () => {
+  it.each(['resolves', 'rejects'])('honors install no-store when body cancellation %s', async (outcome) => {
     const stubs = makeCacheStubs();
     const remove = vi.fn(async () => true);
     stubs.caches.keys = vi.fn(async () => ['clinic-static-current']);
     stubs.caches.open = vi.fn(async () => ({ delete: remove, put: stubs.put }));
-    const sw = compileSW(vi.fn(async (url: string) => new Response('data', {
-      headers: url === '/dashboard' ? { 'Cache-Control': 'no-store' } : {},
-    })), stubs.caches);
+    const cancel = vi.fn();
+    if (outcome === 'rejects') cancel.mockRejectedValue(new Error('cancellation failed'));
+    const sw = compileSW(vi.fn(async (url: string) => url === '/dashboard'
+      ? new Response(new ReadableStream({ cancel }), { headers: { 'Cache-Control': 'no-store' } })
+      : new Response('data')), stubs.caches);
     let install: Promise<unknown> | undefined;
     sw.handlers.get('install')?.({ waitUntil: (promise) => { install = promise; } });
     await install;
+    expect(cancel).toHaveBeenCalledOnce();
     expect(stubs.put.mock.calls.map(([url]) => url)).not.toContain('/dashboard');
     expect(stubs.put.mock.calls.map(([url]) => url)).toContain('/offline.html');
     expect(remove).toHaveBeenCalledWith('/dashboard', { ignoreVary: true });
