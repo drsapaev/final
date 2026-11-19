@@ -5,6 +5,8 @@ Split from doctor_integration.py (1900 LOC god file → modular).
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import math  # noqa: F401 — DOCVISIT-BE-002 finite-price validation
 
 from sqlalchemy import text
@@ -223,13 +225,46 @@ def _validate_add_service_inputs(
             detail="Количество услуги должно быть не меньше 1",
         )
     if custom_price is not None:
-        if not math.isfinite(custom_price) or custom_price < 0:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Цена услуги должна быть неотрицательным конечным числом"
-                ),
-            )
+        _validate_catalogue_amount(custom_price)
+
+
+_SERVICE_PRICE_CENT = Decimal("0.01")
+_SERVICE_PRICE_MAX = Decimal("9999999999.99")
+
+
+def _validate_catalogue_amount(value: Decimal | float) -> Decimal:
+    amount = Decimal(str(value))
+    if (
+        not amount.is_finite()
+        or amount < 0
+        or amount > _SERVICE_PRICE_MAX
+        or amount != amount.quantize(_SERVICE_PRICE_CENT)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Цена услуги должна быть неотрицательной суммой с точностью до сотых",
+        )
+    return amount
+
+
+def _catalogue_price_for_assignment(
+    service: Service, custom_price: float | None
+) -> Decimal:
+    if not service.active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Услуга недоступна для новых назначений",
+        )
+    catalogue = _validate_catalogue_amount(service.price or Decimal("0"))
+    if custom_price is None:
+        return catalogue
+    requested = _validate_catalogue_amount(custom_price)
+    if requested != catalogue and not service.allow_doctor_price_override:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Данная услуга не разрешает изменение цены врачом",
+        )
+    return requested
 
 
 def _find_recent_identical_add(
@@ -329,7 +364,14 @@ async def schedule_next_visit(
         )
 
         service_ids = [s.service_id for s in request.services]
-        services = db.query(Service).filter(Service.id.in_(service_ids)).all()
+        services = (
+            db.query(Service)
+            .filter(Service.id.in_(service_ids))
+            .order_by(Service.id)
+            .with_for_update(read=True, of=Service)
+            .populate_existing()
+            .all()
+        )
 
         if len(services) != len(service_ids):
             raise HTTPException(
@@ -354,12 +396,7 @@ async def schedule_next_visit(
         for service_req in request.services:
             service = services_by_id[service_req.service_id]
 
-            # DOCSCHED-BE-002 follow-up: явный custom_price=0 — осознанная
-            # бесплатная цена, а не falsy-fallback на каталог.
-            if service_req.custom_price is not None:
-                service_price = float(service_req.custom_price)
-            else:
-                service_price = float(service.price) if service.price else 0
+            service_price = float(_catalogue_price_for_assignment(service, service_req.custom_price))
 
             # Применяем скидки для консультаций
             if service.is_consultation:
@@ -801,22 +838,24 @@ def add_service_to_visit(
         # Проверяем права доступа
         _ensure_visit_doctor_access(visit, current_user)
 
-        # Проверяем, что услуга существует
-        service = db.query(Service).filter(Service.id == service_id).first()
+        # Match the visit-lock order used by payment and line mutations.
+        _assert_visit_services_mutable(db, visit_id)
+        service = (
+            db.query(Service)
+            .filter(Service.id == service_id)
+            .with_for_update(read=True, of=Service)
+            .populate_existing()
+            .first()
+        )
         if not service:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Услуга не найдена"
             )
-
-        # DOCVISIT-BE-003: the mutation must respect the payment ledger.
-        _assert_visit_services_mutable(db, visit_id)
+        effective_price = _catalogue_price_for_assignment(service, custom_price)
 
         # DOCVISIT-BE-001 retry-idempotency: an exact repeat of the
         # immediately preceding add is a replay of a lost response, not a
         # second clinical line.
-        effective_price = (
-            custom_price if custom_price is not None else (service.price or 0)
-        )
         replayed = _find_recent_identical_add(
             db,
             visit_id=visit_id,
@@ -845,7 +884,7 @@ def add_service_to_visit(
             visit_id=visit_id,
             service_id=service_id,
             quantity=quantity,
-            custom_price=custom_price,
+            custom_price=float(effective_price),
         )
 
         return {

@@ -790,7 +790,10 @@ class TestDOCSCHEDServiceInputValidation:
         self, client, db_session, cardio_auth_headers, test_doctor
     ):
         """``custom_price or catalogue`` превращал явный ноль в цену каталога."""
-        paid_service = _make_service(db_session, price=150000.0)
+        override_service = _make_service(db_session, price=150000.0)
+        override_service.allow_doctor_price_override = True
+        db_session.commit()
+        paid_service = _make_service(db_session, price=80000.0)
         patient = _make_patient(db_session)
         _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
         visit_date = _clinic_today(db_session) + timedelta(days=1)
@@ -802,7 +805,8 @@ class TestDOCSCHEDServiceInputValidation:
                 paid_service,
                 visit_date=visit_date,
                 services=[
-                    {"service_id": paid_service.id, "quantity": 1, "custom_price": 0}
+                    {"service_id": override_service.id, "quantity": 1, "custom_price": 0},
+                    {"service_id": paid_service.id, "quantity": 1},
                 ],
             ),
             headers=cardio_auth_headers,
@@ -812,14 +816,14 @@ class TestDOCSCHEDServiceInputValidation:
         visit_id = response.json()["visit_id"]
         line = (
             db_session.query(VisitService)
-            .filter(VisitService.visit_id == visit_id)
+            .filter(VisitService.visit_id == visit_id, VisitService.service_id == override_service.id)
             .one()
         )
         assert line.price == 0, (
             "явный custom_price=0 заменён ценой каталога (0 — falsy в `or`)"
         )
         assert math.isclose(
-            response.json()["confirmation"]["total_amount"], 0.0
+            response.json()["confirmation"]["total_amount"], 80000.0
         )
 
 
