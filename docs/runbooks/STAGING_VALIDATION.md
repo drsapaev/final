@@ -148,12 +148,14 @@ or flushing the SDK is not evidence of receipt.
 Build and serve the isolated frontend with the frontend project's
 `VITE_SENTRY_DSN`, `VITE_SENTRY_ENV=staging`, and `VITE_APP_VERSION` set to
 the full tested SHA in the **Vite build environment**. Do not deploy to Vercel.
-`VERCEL_GIT_COMMIT_SHA` sets build provenance for the service worker; it is
-not the Sentry release setting. The stock staging Compose Dockerfile does
-not forward `VITE_APP_VERSION` as a build argument. Use a staged artifact
-built with these Vite variables or an isolated test-only build that explicitly
-passes them through. If that isn't available, report release verification as
-`BLOCKED`; don't treat an event with release `unknown` as a PASS.
+For a staging Compose build, set both `VITE_APP_VERSION` and
+`VERCEL_GIT_COMMIT_SHA` to the same full, lowercase checked-out commit SHA
+in the staging env file. These settings identify the Sentry release and the
+service worker build, respectively. The staging builder rejects a supplied
+release that is not a full SHA or does not match the build SHA. For a
+prebuilt artifact, verify both values were set when it was built; setting
+them on the Nginx container cannot change the embedded release. If the
+release is missing or differs, report verification as `BLOCKED`, not PASS.
 
 1. Open the isolated loopback frontend in a fresh browser context with no
    real patient or user data. Confirm the service-worker SHA.
