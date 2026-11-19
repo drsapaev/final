@@ -1,3 +1,9 @@
+## T19 — PR #4117 browser checkpoint — 2026-11-19
+
+Один новый synthetic cycle на `5a209da6bbe016a9540dd231d85b48603ce7c0e1`: Preflight/Start PASS; 19 browser assertions PASS, включая обычный Admin TOTP enrollment и login, смешанный порядок, переименование, скрытие/показ, отсутствие автоматического добавления нового врача, 409 stale и 403 для Registrar. Browser report: 0 page errors, 7 console errors NOT_CLASSIFIED. Session FAIL в обработке выхода browser, до сравнения истории; история и frontend provenance NOT_RUN. Отчёт сохранён как `T19-PR4117-CYCLE2-REPORT.json`; EVIDENCE содержит SHA256 и cleanup. На Windows PowerShell отдельно воспроизведён пустой ExitCode без заранее открытого handle; исправленный scratch runner корректно различает exit 0/1 в offline probes, но в staging после исправления не проверялся. Проект удалён, порты свободны, env удалён. Проверенный commit имел CI 32 success / 11 skipped.
+
+Следующий шаг: в новом проекте проверить оставшиеся history/audit snapshot, frontend provenance и причины console errors; исправленный runner не считать runtime-проверенным заранее. T19 Tier-2 и T18 остаются PARTIAL, deferral не принят. PR Draft; merge/deploy остаются вне текущего цикла.
+
 ## T19 — PR #4117 staging и CI checkpoint — 2026-11-19
 
 Task `ad5eac7f-734f-4b24-8d57-437008bacdb8`, worktree `registrar-tabs-unified`, PR #4117. Синхронизация с main `933b1fe` дала commit `e31c4befe`; OpenAPI и типы восстановлены генерацией, 13 schema tests PASS, Alembic имеет один head. На этом commit один owned synthetic staging cycle: Preflight/Start PASS, Session FAIL до browser из-за преобразования пути, canonical teardown PASS; независимая проверка показала ноль контейнеров, томов, сетей и занятых портов, env удалён. Scratch harness для следующего нового проекта исправлен и три преобразования путей проверены. Admin 2FA и UI/DB сценарии NOT_RUN; `served_revision_verified=false`.
