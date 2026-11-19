@@ -115,7 +115,7 @@ class ActivationError(Exception):
 
 def mask_phone(phone: str) -> str:
     """Canonical repo-wide PII mask (AGENTS.md / app.core.pii_masker):
-    +998901112233 -> +998900•••001 — only the LAST THREE digits survive.
+    Only the final three digits survive, without the country prefix.
 
     Codex P1 (PR #3320 round 1): the previous local 4-digit mask emitted
     more of the number than the repository policy allows. Non-maskable

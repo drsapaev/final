@@ -7,6 +7,7 @@ leaving ``record.exc_info`` untouched.
 These tests do not require a running application — they exercise the
 formatter in isolation against synthetic exceptions.
 """
+
 from __future__ import annotations
 
 import json
@@ -51,7 +52,7 @@ class TestJsonLogFormatterFormatException:
         payload = json.loads(JsonLogFormatter().format(record))
 
         assert "+998901234567" not in payload["exception"]
-        assert "+998901•••567" in payload["exception"]
+        assert "•••567" in payload["exception"]
 
     def test_format_exception_masks_email_in_traceback(self) -> None:
         """Email in ``str(exc)`` is scrubbed."""
@@ -75,7 +76,7 @@ class TestJsonLogFormatterFormatException:
         payload = json.loads(JsonLogFormatter().format(record))
 
         assert "12345678901234" not in payload["exception"]
-        assert "1234••••••1234" in payload["exception"]
+        assert "[REDACTED]" in payload["exception"]
 
     def test_format_exception_preserves_exc_info_tuple(self) -> None:
         """``record.exc_info`` remains a ``(type, value, tb)`` tuple after
@@ -123,7 +124,7 @@ class TestJsonLogFormatterFormatException:
         assert "test_format_exception_preserves_traceback_structure" in tb
         # And the PII is scrubbed.
         assert "+998901234567" not in tb
-        assert "+998901•••567" in tb
+        assert "•••567" in tb
 
     def test_format_exception_without_pii_is_unchanged(self) -> None:
         """When ``str(exc)`` has no PII patterns, the patched
@@ -175,7 +176,7 @@ class TestJsonLogFormatterFormatException:
 
         # PII scrubbed.
         assert "+998900000001" not in tb
-        assert "+998900•••001" in tb
+        assert "•••001" in tb
         # Cyrillic word preserved verbatim (no mojibake, no truncation).
         assert "PHI_TEST_MARKER" in tb
         assert "обратился" in tb
