@@ -401,7 +401,7 @@ jobs:
   # --- Проверка качества кода ---
   code-quality:
     name: 🔍 Качество кода
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: [ci-scope]
     if: |
@@ -1074,7 +1074,7 @@ jobs:
   # --- Backend тесты ---
   backend-tests:
     name: 🐍 Backend тесты
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Round-5 (PR #3362): the suite fits in ~9 min on a warm runner, but
     # shared-hosted variance (uniform 2x slowdown observed on a contended
     # run) cancels the job at 20 and fails the required gate. Other heavy
@@ -1249,7 +1249,7 @@ jobs:
   # --- Архитектурные boundary тесты ---
   architecture-boundary:
     name: 🧱 Context Boundary Integrity
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [ci-scope]
     # Required for PRs into `main` when application/workflow code changes.
@@ -1315,7 +1315,7 @@ jobs:
   # --- Frontend ↔ Backend parity gate ---
   frontend-backend-parity:
     name: 🔄 Frontend-Backend Parity
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [ci-scope, frontend-lint, frontend-unit-tests, frontend-build, backend-tests, architecture-boundary]
     # Required for PRs into `main` after the core test jobs pass.
@@ -1401,7 +1401,7 @@ jobs:
   # --- Security сканирование ---
   security:
     name: 🔒 Security сканирование
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [code-quality, frontend-lint, frontend-unit-tests, frontend-build, backend-tests]
     # Security scanning stays GitHub-native, but is not part of the lightweight
@@ -1545,7 +1545,7 @@ jobs:
   # --- Интеграционные тесты ---
   integration:
     name: 🔗 Интеграционные тесты
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [backend-tests, frontend-lint, frontend-unit-tests, frontend-build, frontend-e2e, architecture-boundary, frontend-backend-parity]
     # Integration remains a heavier gate: manual runs and push-to-main only.
@@ -1854,7 +1854,7 @@ jobs:
   # --- Load Tests (Nightly/Manual) ---
   load-tests-nightly:
     name: ⚡ Load Tests (k6)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     needs: [security, integration]
     if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
@@ -2012,7 +2012,7 @@ jobs:
   # --- DAST (Nightly) ---
   dast-zap-nightly:
     name: 🛡️ DAST ZAP (Nightly)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     services:
@@ -2178,7 +2178,7 @@ jobs:
   # --- Документация ---
   docs:
     name: 📚 Генерация документации
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [ci-scope]
     if: |
@@ -2352,7 +2352,7 @@ jobs:
 
   telegram-miniapp-release-gate:
     name: Telegram Mini App Release Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     needs: [ci-scope]
     if: |
