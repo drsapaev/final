@@ -907,3 +907,12 @@ depends on honest reporting.
 | `.github/workflows/dr-drill.yml` | Weekly DR drill CI |
 | `.github/workflows/ai-safety-guardrails.yml` | Nightly AI safety CI |
 | `AGENTS.md` | AI agent rules (references this runbook) |
+
+### GitHub-hosted staging baseline
+
+The **Isolated cloud staging baseline** workflow runs on PRs and pushes to
+main on a disposable Ubuntu runner, with no integration secrets. It validates
+the checked-out SHA through the backend and service worker, migrations,
+isolated synthetic PostgreSQL data, Nginx API routing, and Compose cleanup.
+The existing Gate D workflow is independent. A baseline PASS is not a release
+admission: full smoke and external delivery remain explicitly NOT_RUN.
