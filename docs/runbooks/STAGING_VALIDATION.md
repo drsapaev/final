@@ -963,22 +963,53 @@ outside the test chat.
 | Telegram transport | `@kosmed_staging_bot`; private group **KosMed Staging Alerts** | Verify the bot identity and the pinned group first; check that Telegram returns a message ID and the synthetic transport test appears in the group |
 | External patient reminder recipient | A separate approved one-to-one chat with the test bot. Not configured. | arq processes the versioned reminder for a linked synthetic patient and the message appears in the approved private chat; report separately from group transport and do not claim SMS delivery |
 
-The bot, group, and Sentry projects exist. The two Sentry DSNs and test bot
-token are stored in the protected environment. Recipient wiring, an isolated
-Sentry read credential, and end-to-end delivery are not yet evidenced. Until both are verified, mark the corresponding checks
-`NOT_RUN` or `BLOCKED`, not `PASS`. A Compose baseline PASS, a flushed SDK,
-or a `reminder_sent_at` timestamp does not prove external delivery.
+### Staging credentials and network access
 
-Use the separate protected GitHub Actions environment `staging-integrations`,
-restricted to trusted `main` runs. Do not make its
-credentials available to pull-request jobs or Docker build arguments, except
-for the public, send-only frontend DSN used at build time. Map the staging DSNs
-to `VITE_SENTRY_DSN` and `SENTRY_DSN`; use a separate least-privilege Sentry
-event-read credential only in the verifier. Keep the Telegram bot token and
-allowed chat identifier in protected environment secrets. Never put tokens,
-chat IDs, invite links, or patient data into source, logs, or artifacts. If the
-runtime resolves a database bot configuration before the environment token,
-verify the resolved identity before any send and fail closed on a mismatch.
+**GitHub Actions and Codex Cloud are separate.** The protected GitHub
+environment [`staging-integrations`](https://github.com/drsapaev/final/settings/environments/27887087023/edit)
+is restricted to trusted `main` runs. Its variables and secrets are not
+available in a Codex Cloud task, and the Compose baseline deliberately
+uses neither. The protected environment has the two staging DSNs and the
+test bot token. That does not prove delivery or mean a Codex Cloud agent has
+access.
+
+| Check | Where the value belongs | Status / use |
+|---|---|---|
+| Sentry frontend, project ID `4512459389730816` | CI variable `STAGING_VITE_SENTRY_DSN` maps to `VITE_SENTRY_DSN` at the isolated frontend build | Send only; the frontend DSN is public in the bundle. |
+| Sentry backend, project ID `4512459393335296` | CI variable `STAGING_SENTRY_DSN` maps to `SENTRY_DSN` at isolated backend runtime | Send only; neither DSN permits event retrieval. |
+| Sentry event retrieval | Proposed verifier-only secret `STAGING_SENTRY_EVENT_READ_TOKEN`; not provisioned or wired into a workflow | Use an identity whose effective read access is limited to these two staging projects, or verify event IDs manually in the two dashboards. Do not use an organization-wide production-readable token or the release workflow's `SENTRY_AUTH_TOKEN`. |
+| Telegram bot | Protected CI secret `STAGING_TELEGRAM_BOT_TOKEN`; the isolated app uses `TELEGRAM_BOT_TOKEN` | Must resolve to `@kosmed_staging_bot`. A token stored in the isolated DB can override the app variable; stop on mismatch. |
+| Telegram group transport | `STAGING_TELEGRAM_CHAT_ID` is the operator label for the ID of **KosMed Staging Alerts**; use it in the confirmed manual group check | Not a configured CI secret or a private reminder recipient. Verify the group identity before sending; don't commit or log its ID or invite link. |
+| Private patient reminder | Protected `STAGING_TELEGRAM_CHALLENGE` for an authorized one-shot run | No static chat ID. The workflow derives a positive ID only from the fresh approved private challenge. Do not use the group ID here. |
+
+Use [`ops/staging.env.sample`](../../ops/staging.env.sample) as the canonical
+template for the git-ignored `ops/staging.env`. The template contains
+only empty integration fields and names. Keep actual integration values in
+the approved secret store and inject them only into the authorized run. Do
+not pass tokens, verifier inputs or private IDs to Docker builds or ordinary
+agent jobs; do not persist them in setup scripts, shell history, logs,
+artifacts or cached containers.
+
+**Recommended split:** use Codex Cloud for isolated synthetic baseline work and
+protected GitHub Actions for tests requiring external credentials. If a
+separately authorized Codex Cloud staging environment must test a live
+integration, review its [environment and network settings](https://learn.chatgpt.com/docs/environments/cloud-environments)
+independently. Allow only the exact HTTPS ingest hostname from each staging
+DSN (host portion only, no URL credentials or path), the correct regional
+Sentry API hostname used by the verifier for event reads, and
+`api.telegram.org` for Telegram. The service must also be reachable by the
+actual SDK or test process through the configured network policy;
+Sentry ingestion and Telegram sending require POST. Do not enable unrestricted
+internet, disable TLS verification or repurpose legacy setup-only secrets by
+copying them into a persistent file. Where supported, bind HTTPS-only tokens
+to the specific service with network secrets rather than exposing raw values.
+Verify compatibility in that environment before claiming access.
+
+With missing access or egress, mark the affected check `BLOCKED` or
+`NOT_RUN`. Record the provider-side event ID(s) verified in both staging
+projects and Telegram acceptance plus recipient observation separately from
+the baseline. A flushed SDK, a timestamp in the database, or a baseline PASS
+does not prove delivery.
 
 #### One-shot private Telegram patient reminder (manual)
 
