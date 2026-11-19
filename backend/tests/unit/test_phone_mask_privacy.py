@@ -43,6 +43,40 @@ def test_unrecognized_phone_field_fails_closed(phone: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "field",
+    [
+        "patient_phone",
+        "contact_phone",
+        "contactPhone",
+        "doctor_phone",
+        "recovery_phone",
+        "emergency_phone",
+        "company_phone",
+        "new_phone",
+        "phoneNumber",
+        "phone_masked",
+        "phone_e164",
+        "mobile",
+        "mobileNumber",
+        "maskedPhone",
+    ],
+)
+def test_existing_phone_field_aliases_fail_closed(field: str) -> None:
+    data = {field: "0000000"}
+    expected = {field: "•••000"}
+    assert mask_pii(data) == expected
+    assert json.loads(mask_pii(json.dumps(data))) == expected
+    assert mask_pii({field: "00"}) == {field: "***"}
+    assert mask_pii({field: 0}) == {field: "[REDACTED]"}
+    assert mask_pii(expected) == expected
+
+
+def test_nonphone_fields_are_not_classified_as_phone_aliases() -> None:
+    data = {"phone_verified": True, "microphone": False}
+    assert mask_pii(data) == data
+
+
+@pytest.mark.parametrize(
     "phone",
     [
         "000000000",

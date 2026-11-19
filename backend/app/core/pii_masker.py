@@ -520,6 +520,21 @@ def mask_pii(obj: Any) -> Any:
     return obj
 
 
+def _is_phone_field(key: str) -> bool:
+    """Recognize existing snake_case and camelCase phone field names."""
+    normalized = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    normalized = normalized.lower().replace("-", "_")
+    return normalized in {
+        "phone",
+        "phone_number",
+        "phone_masked",
+        "phone_e164",
+        "mobile",
+        "mobile_number",
+        "telephone",
+    } or normalized.endswith(("_phone", "_phone_number", "_mobile", "_mobile_number"))
+
+
 def _mask_key_value(key: str, value: Any) -> Any:
     if value is None:
         return None
@@ -566,7 +581,7 @@ def _mask_key_value(key: str, value: Any) -> Any:
         return "[REDACTED]"
 
     # Partial-mask fields (preserve structure for debug)
-    if key_lower in ("phone", "phone_number", "mobile"):
+    if _is_phone_field(key):
         return mask_phone(value) if isinstance(value, str) else "[REDACTED]"
     if key_lower in ("email",):
         return mask_email(value) if isinstance(value, str) else "[REDACTED]"
