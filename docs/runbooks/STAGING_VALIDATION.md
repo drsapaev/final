@@ -111,41 +111,62 @@ errors. Patients see white screens, you see nothing.
 
 ### Backend
 
+Run from the root of the isolated staging checkout. The environment supplying
+the DSN must be authorized for synthetic sends to the staging backend project.
+
 ```bash
-cd backend
 (
- : "${STAGING_SENTRY_DSN:?Set a dedicated staging-only Sentry DSN in this shell}"
+ set -eu
+ : "${STAGING_SENTRY_DSN:?Set a dedicated staging-only backend Sentry DSN}"
  export SENTRY_DSN="$STAGING_SENTRY_DSN"
- export SENTRY_ENV=staging-validation-test
- python -c "
-from app.core.sentry import init_sentry, capture_exception
+ export SENTRY_ENV=staging
+ export APP_VERSION="$(git rev-parse HEAD)"
+ cd backend
+ python - <<'PYTHON'
+import sentry_sdk
+from app.core.sentry import init_sentry
+
 init_sentry()
-try:
-    raise RuntimeError('staging validation smoke test - backend')
-except RuntimeError as e:
-    capture_exception(e)
-print('Sent. Check Sentry dashboard in 10 seconds.')
-"
+event_id = sentry_sdk.capture_exception(
+    RuntimeError("SYNTHETIC staging validation smoke - backend")
+)
+if not event_id:
+    raise SystemExit("No backend event ID; check the staging Sentry SDK config")
+sentry_sdk.get_client().flush(timeout=15)
+print(f"Backend event ID: {event_id}; verify receipt in the staging project")
+PYTHON
 )
 ```
 
-`STAGING_SENTRY_DSN` must belong to the dedicated staging Sentry project. Do
-not copy a production DSN into this variable or commit it to the repository.
-
-**Expected**: console prints `Sent. Check Sentry dashboard in 10 seconds.`
-Within 10 seconds, Sentry dashboard (https://sentry.io) → Issues should
-show a new `RuntimeError: staging validation smoke test - backend`.
+Find the exact event ID (not just the issue title) in
+[kosmed-staging-backend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-backend/).
+Verify `environment=staging` and `release=<tested full SHA>`. Printing an ID
+or flushing the SDK is not evidence of receipt.
 
 ### Frontend
 
-Build and serve the isolated staging frontend with `VITE_SENTRY_DSN` set to
-the dedicated staging Sentry project. Do not deploy to Vercel for this check.
+Build and serve the isolated frontend with the frontend project's
+`VITE_SENTRY_DSN`, `VITE_SENTRY_ENV=staging`, and `VITE_APP_VERSION` set to
+the full tested SHA in the **Vite build environment**. Do not deploy to Vercel.
+`VERCEL_GIT_COMMIT_SHA` sets build provenance for the service worker; it is
+not the Sentry release setting. The stock staging Compose Dockerfile does
+not forward `VITE_APP_VERSION` as a build argument. Use a staged artifact
+built with these Vite variables or an isolated test-only build that explicitly
+passes them through. If that isn't available, report release verification as
+`BLOCKED`; don't treat an event with release `unknown` as a PASS.
 
-1. Open `http://127.0.0.1:<STAGING_FRONTEND_PORT>` in the browser, using the
-   frontend port from this worktree's `ops/staging.env`
-2. Open DevTools Console (F12)
-3. Run: `setTimeout(() => { throw new Error("staging validation smoke test - frontend") }, 1000)`
-4. Within 10 seconds, Sentry dashboard should show the new error
+1. Open the isolated loopback frontend in a fresh browser context with no
+   real patient or user data. Confirm the service-worker SHA.
+2. In DevTools Network, watch the Sentry envelope request for the error. In
+   Console, run: `setTimeout(() => { throw new Error("SYNTHETIC staging validation smoke - frontend") }, 1000)`.
+3. Record only the error event's `event_id` from its envelope, not the URL,
+   full payload, screenshot or HAR. Distinguish the error from telemetry
+   such as pageload or trace events.
+4. Find the exact ID in
+   [kosmed-staging-frontend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-frontend/)
+   and verify `environment=staging` and `release=<tested full SHA>`. Record
+   the outcome for each project separately. Only mark receipt PASS when the
+   event is present with the expected values.
 
 ### If it fails
 
