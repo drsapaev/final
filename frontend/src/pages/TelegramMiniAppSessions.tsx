@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, CardContent } from '../components/ui/macos';
 import { telegramMiniAppSessions, type MiniAppSession } from '../api/telegramMiniAppSession';
 import './TelegramMiniAppSessions.css';
@@ -14,7 +14,9 @@ export default function TelegramMiniAppSessions({
   t: Translate;
   onLoggedOut: () => void;
 }) {
-  const [sessions, setSessions] = useState<MiniAppSession[]>([]);
+  const [sessionView, setSessionView] = useState<{ initData: string; sessions: MiniAppSession[] }>(
+    () => ({ initData, sessions: [] }),
+  );
   const [loading, setLoading] = useState(Boolean(initData));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -22,54 +24,86 @@ export default function TelegramMiniAppSessions({
   const [pending, setPending] = useState<PendingAction | null>(null);
   const confirmation = useRef<HTMLElement>(null);
   const generation = useRef(0);
+  const listGeneration = useRef(0);
+  const isCurrentView = sessionView.initData === initData;
+  const sessions = isCurrentView ? sessionView.sessions : [];
+
+  // Invalidate old continuations as soon as the new launch is committed,
+  // before the browser can paint or an old action can schedule a follow-up.
+  useLayoutEffect(() => {
+    generation.current += 1;
+    listGeneration.current += 1;
+    return () => {
+      generation.current += 1;
+      listGeneration.current += 1;
+    };
+  }, [initData]);
 
   useEffect(() => {
+    const ownGeneration = generation.current;
+    const ownListGeneration = ++listGeneration.current;
+    const isCurrent = () => generation.current === ownGeneration
+      && listGeneration.current === ownListGeneration;
+    setSessionView({ initData, sessions: [] });
+    setLoading(Boolean(initData));
+    setBusy(false);
+    setError(false);
+    setDone(false);
+    setPending(null);
     if (!initData) return;
-    const ownGeneration = ++generation.current;
-    setLoading(true);
     telegramMiniAppSessions.list(initData)
       .then((data) => {
-        if (generation.current === ownGeneration) setSessions(data.sessions);
+        if (isCurrent()) {
+          setSessionView({ initData, sessions: data.sessions });
+        }
       })
-      .catch(() => { if (generation.current === ownGeneration) setError(true); })
-      .finally(() => { if (generation.current === ownGeneration) setLoading(false); });
-    return () => { generation.current += 1; };
+      .catch(() => { if (isCurrent()) setError(true); })
+      .finally(() => { if (isCurrent()) setLoading(false); });
   }, [initData]);
 
   useEffect(() => { if (pending) confirmation.current?.focus(); }, [pending]);
 
   const reload = async () => {
+    const ownGeneration = generation.current;
+    const ownListGeneration = ++listGeneration.current;
+    const isCurrent = () => generation.current === ownGeneration
+      && listGeneration.current === ownListGeneration;
     setLoading(true);
     setError(false);
     try {
-      setSessions((await telegramMiniAppSessions.list(initData)).sessions);
+      const data = await telegramMiniAppSessions.list(initData);
+      if (isCurrent()) {
+        setSessionView({ initData, sessions: data.sessions });
+      }
     } catch {
-      setError(true);
+      if (isCurrent()) setError(true);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
   const confirm = async () => {
     if (!pending || busy) return;
+    const ownGeneration = generation.current;
     setBusy(true);
     setError(false);
     setDone(false);
     try {
       if (pending.type === 'logout') {
         await telegramMiniAppSessions.logout(initData);
-        onLoggedOut();
+        if (generation.current === ownGeneration) onLoggedOut();
         return;
       }
       if (pending.type === 'others') await telegramMiniAppSessions.revokeOthers(initData);
       else await telegramMiniAppSessions.revoke(pending.id, initData);
+      if (generation.current !== ownGeneration) return;
       setPending(null);
       setDone(true);
       await reload();
     } catch {
-      setError(true);
+      if (generation.current === ownGeneration) setError(true);
     } finally {
-      setBusy(false);
+      if (generation.current === ownGeneration) setBusy(false);
     }
   };
 
@@ -83,7 +117,9 @@ export default function TelegramMiniAppSessions({
       <CardContent>
         <h2>{t('sessionsTitle')}</h2>
         <p>{t('sessionsDescription')}</p>
-        {!initData ? <Alert severity="info">{t('sessionsUnavailable')}</Alert> : (
+        {!initData ? <Alert severity="info">{t('sessionsUnavailable')}</Alert> : !isCurrentView ? (
+          <p role="status">{t('sessionsLoading')}</p>
+        ) : (
           <>
             {loading && <p role="status">{t('sessionsLoading')}</p>}
             {error && <Alert severity="error" role="alert">{t('sessionsFailed')}</Alert>}
