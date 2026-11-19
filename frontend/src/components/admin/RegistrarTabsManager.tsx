@@ -19,15 +19,15 @@ interface DraftTab extends RegistrarTabInput {
   target: ResolvedRegistrarTab;
 }
 
-interface CachedDraft {
-  ownerId: string;
+interface DraftSnapshot {
+  ownerId: string | null;
   baseConfig: AdminRegistrarTabsResponse;
   draft: DraftTab[];
 }
 
 // One owner-scoped draft per SPA lifetime. Staff labels never enter browser
 // storage, and a different/unknown owner clears the prior owner's draft.
-let cachedDraft: CachedDraft | null = null;
+let cachedDraft: DraftSnapshot | null = null;
 
 const draftOwnerId = (): string | null => {
   const profile = getProfileFromStorage();
@@ -80,16 +80,21 @@ const RegistrarTabsManager = React.forwardRef<RegistrarTabsManagerHandle, Regist
   const [saved, setSaved] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState('');
   const [profilesOpen, setProfilesOpen] = useState(defaultOpenProfiles);
+  const [profileRefreshPending, setProfileRefreshPending] = useState(false);
   const requestGeneration = useRef(0);
+  const loadingRef = useRef(false);
   const savingRef = useRef(false);
   const loadedOwner = useRef<string | null | undefined>(undefined);
 
-  const load = useCallback(async (discard = false) => {
+  const load = useCallback(async (
+    intent: 'restore' | 'discard' | 'profile-update' = 'restore',
+    activeDraft?: DraftSnapshot,
+  ) => {
     const requestOwner = draftOwnerId();
-    if (!requestOwner || cachedDraft?.ownerId !== requestOwner) cachedDraft = null;
-    if (discard && cachedDraft?.ownerId === requestOwner) cachedDraft = null;
-    const restore = !discard && requestOwner ? cachedDraft : null;
+    if (intent === 'discard' || !requestOwner || cachedDraft?.ownerId !== requestOwner) cachedDraft = null;
+    const restore = activeDraft ?? (intent === 'restore' ? cachedDraft : null);
     const generation = ++requestGeneration.current;
+    loadingRef.current = true;
     setLoading(true);
     setLoadError(false);
     try {
@@ -105,18 +110,22 @@ const RegistrarTabsManager = React.forwardRef<RegistrarTabsManagerHandle, Regist
           ...row,
           target: targets.get(registrarTabIdentity(row)) || { ...row.target, available: false },
         })));
-        setSaveError(response.version === restore.baseConfig.version ? null : 'conflict');
+        if (response.version !== restore.baseConfig.version) setSaveError('conflict');
+        else if (intent !== 'profile-update') setSaveError(null);
       } else {
         setConfig(response);
         setDraft(response.tabs.map(toDraft));
-        setSaveError(null);
+        if (intent !== 'profile-update') setSaveError(null);
       }
       setSelectedTarget('');
-      setSaved(false);
+      if (intent !== 'profile-update') setSaved(false);
     } catch {
       if (requestGeneration.current === generation) setLoadError(true);
     } finally {
-      if (requestGeneration.current === generation) setLoading(false);
+      if (requestGeneration.current === generation) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -140,6 +149,23 @@ const RegistrarTabsManager = React.forwardRef<RegistrarTabsManagerHandle, Regist
   const inputs = draft.map(toInput);
   const dirty = currentConfig !== null
     && JSON.stringify(inputs) !== JSON.stringify(currentConfig.tabs.map(toDraft).map(toInput));
+  const snapshotDraft = useCallback((): DraftSnapshot | undefined => (
+    dirty && currentConfig ? { ownerId, baseConfig: currentConfig, draft } : undefined
+  ), [currentConfig, dirty, draft, ownerId]);
+
+  useEffect(() => {
+    const requestProfileRefresh = () => setProfileRefreshPending(true);
+    window.addEventListener('queue-profiles:updated', requestProfileRefresh);
+    return () => window.removeEventListener('queue-profiles:updated', requestProfileRefresh);
+  }, []);
+
+  useEffect(() => {
+    // A profile edit can finish while the registry save is in flight.
+    if (!profileRefreshPending || !currentConfig || loading || saving || savingRef.current) return;
+    setProfileRefreshPending(false);
+    void load('profile-update', snapshotDraft());
+  }, [profileRefreshPending, currentConfig, loading, saving, load, snapshotDraft]);
+
   useEffect(() => {
     if (!ownerId) { cachedDraft = null; return; }
     if (!currentConfig || loading) return;
@@ -181,7 +207,7 @@ const RegistrarTabsManager = React.forwardRef<RegistrarTabsManagerHandle, Regist
   };
 
   const save = async () => {
-    if (!currentConfig || savingRef.current || loading || draftOwnerId() !== ownerId) return;
+    if (!currentConfig || savingRef.current || loadingRef.current || draftOwnerId() !== ownerId) return;
     savingRef.current = true;
     setSaving(true);
     setSaveError(null);
@@ -217,7 +243,7 @@ const RegistrarTabsManager = React.forwardRef<RegistrarTabsManagerHandle, Regist
       <div className="admin-qp-header">
         <h2 id="registrar-tabs-title" className="admin-qp-title">{t('registrarPanel.rt_title')}</h2>
         <div className="admin-qp-toolbar">
-          <Button variant="secondary" disabled={saving || loading} onClick={() => { discardDraft(); void load(true); }}>
+          <Button variant="secondary" disabled={saving || loading} onClick={() => { discardDraft(); void load('discard'); }}>
             {t(dirty ? 'registrarPanel.rt_discard_reload' : 'registrarPanel.rt_reload')}
           </Button>
           <Button disabled={!currentConfig || saving || loading || (currentConfig.mode === 'configured' && !dirty)} loading={saving} onClick={() => { void save(); }}>
@@ -230,7 +256,9 @@ const RegistrarTabsManager = React.forwardRef<RegistrarTabsManagerHandle, Regist
       {loading && <p role="status">{t('common.loading')}</p>}
       {loadError && <div role="alert">
         <p>{t('registrarPanel.rt_load_error')}</p>
-        <Button variant="secondary" disabled={saving || loading} onClick={() => { void load(); }}>{t('registrarPanel.rt_retry')}</Button>
+        <Button variant="secondary" disabled={saving || loading} onClick={() => { void load('restore', snapshotDraft()); }}>
+          {t('registrarPanel.rt_retry')}
+        </Button>
       </div>}
       {saveError && <p role="alert">{t(saveError === 'conflict' ? 'registrarPanel.rt_conflict' : 'registrarPanel.rt_save_error')}</p>}
       {saved && <p role="status">{t('registrarPanel.rt_saved')}</p>}

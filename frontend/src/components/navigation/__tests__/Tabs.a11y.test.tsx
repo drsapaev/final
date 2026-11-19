@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResolvedRegistrarTab, RegistrarTabsResponse } from '../../../api/registrarTabs';
 import { toDoctorId } from '../../../types/domain/branded';
@@ -135,6 +136,26 @@ describe('unified configured registrar strip', () => {
     render(<Tabs />);
     await screen.findByRole('tab', { name: 'SYNTHETIC ECG' });
     screen.getAllByRole('tab').forEach((tab) => expect(tab).toHaveAttribute('tabindex', '0'));
+  });
+
+  it.each(['profile', 'doctor'] as const)('offers a keyboard entry point with a hidden %s filter', async (kind) => {
+    const user = userEvent.setup();
+    const onTabChange = vi.fn();
+    const onDoctorChange = vi.fn();
+    render(<Tabs activeTab={kind === 'profile' ? 'hidden' : null} activeDoctorId={kind === 'doctor' ? 42 : null}
+      onTabChange={onTabChange} onDoctorChange={onDoctorChange} />);
+
+    expect(await screen.findByText('registrarPanel.rt_hidden_filter')).toBeVisible();
+    const tabs = within(screen.getByRole('tablist')).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['0', '-1']);
+    tabs.forEach((tab) => expect(tab).toHaveAttribute('aria-selected', 'false'));
+    screen.getByRole('button', { name: 'queue.all_departments' }).focus();
+    await user.tab();
+    expect(tabs[0]).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    expect(tabs[1]).toHaveFocus();
+    expect(onTabChange).not.toHaveBeenCalled();
+    expect(onDoctorChange).not.toHaveBeenCalled();
   });
 
   it('notifies the parent with metadata for hidden profile deep links without rendering it', async () => {

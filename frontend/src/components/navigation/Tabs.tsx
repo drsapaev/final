@@ -125,7 +125,8 @@ const Tabs = ({ activeTab, activeDoctorId = null, onTabChange, onDoctorChange, o
   const isSelected = (tab: TabItem) => tab.target_kind === 'doctor'
     ? activeDoctorId === tab.target_id : activeDoctorId == null && activeTab === tab.key;
   const selected = tabs.find(isSelected);
-  const hiddenFilter = hasLoaded && !selected && (Boolean(activeTab) || activeDoctorId != null);
+  const isOverview = !activeTab && activeDoctorId == null;
+  const hiddenFilter = hasLoaded && !selected && !isOverview;
   useEffect(() => {
     const button = tabsRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
     if (!button || !tabsRef.current) { setIndicatorStyle({ opacity: 0 }); return; }
@@ -188,7 +189,7 @@ const Tabs = ({ activeTab, activeDoctorId = null, onTabChange, onDoctorChange, o
       <button type="button" onClick={() => { void loadTabs(); }}>{t('registrarPanel.rt_retry')}</button>
     </div>}
     <div className="tabs-container">
-      <button type="button" className={`tab-button all-departments ${!activeTab && activeDoctorId == null ? 'active' : ''}`}
+      <button type="button" className={`tab-button all-departments ${isOverview ? 'active' : ''}`}
         onClick={() => onTabChange?.(null)} aria-label={t('queue.all_departments')}>
         <div className="tab-icon"><TrendingUp size={16} /></div>
         <span className="tab-label">{t('queue.all_departments')}</span>
@@ -206,7 +207,7 @@ const Tabs = ({ activeTab, activeDoctorId = null, onTabChange, onDoctorChange, o
             id={doctor ? doctorTabButtonIdFor(tab.target_id) : tabButtonIdFor(tab.key)}
             role="tab" aria-selected={active} aria-controls="main-content" aria-label={tab.label}
             aria-describedby={hasStatusFor(tab) ? statusIdFor(tab) : undefined} title={tab.label}
-            tabIndex={active || activeTab == null && activeDoctorId == null ? 0 : -1}
+            tabIndex={active || isOverview || (hiddenFilter && index === 0) ? 0 : -1}
             onKeyDown={(event) => onTabKeyDown(event, index)}
             onClick={() => doctor ? onDoctorChange?.(active ? null : tab.target_id) : onTabChange?.(active ? null : tab.key)}
             className={`tab-button department ${doctor ? 'doctor' : ''} ${active ? 'active' : ''}`}

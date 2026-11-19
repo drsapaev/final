@@ -43,6 +43,9 @@ const doctor: ResolvedRegistrarTab = {
   visible: true, available: true, reason_code: null,
 };
 const otherDoctor: ResolvedRegistrarTab = { ...doctor, target_id: 9, title: 'SYNTHETIC Other Doctor' };
+const newProfile: ResolvedRegistrarTab = {
+  ...direction, target_id: 8, profile_key: 'synthetic-new', title: 'SYNTHETIC New Profile',
+};
 
 const configuration = (tabs = [direction, doctor], mode: 'legacy' | 'configured' = 'legacy'): AdminRegistrarTabsResponse => ({
   mode, version: mode === 'legacy' ? 0 : 2, tabs: tabs.map((tab) => ({ ...tab })),
@@ -51,10 +54,9 @@ const configuration = (tabs = [direction, doctor], mode: 'legacy' | 'configured'
 });
 
 beforeEach(() => {
-  vi.clearAllMocks();
   ownerState.profile = { id: ++ownerState.sequence, clinic_id: 1 };
-  apiMocks.load.mockResolvedValue(configuration());
-  apiMocks.save.mockImplementation(async (request: { tabs: Array<{ target_kind: string; target_id: number; title: string | null; visible: boolean }> }) => {
+  apiMocks.load.mockReset().mockResolvedValue(configuration());
+  apiMocks.save.mockReset().mockImplementation(async (request: { tabs: Array<{ target_kind: string; target_id: number; title: string | null; visible: boolean }> }) => {
     const options = [direction, doctor, otherDoctor];
     return {
       ...configuration([], 'configured'),
@@ -132,6 +134,64 @@ describe('RegistrarTabsManager', () => {
     await user.click(screen.getByRole('button', { name: 'registrarPanel.rt_discard_reload' }));
     expect(await screen.findByDisplayValue('SYNTHETIC Other Doctor')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('SYNTHETIC Draft')).not.toBeInTheDocument();
+  });
+
+  it('refreshes profile targets without replacing the draft or its original save version', async () => {
+    const user = userEvent.setup();
+    const initial = { ...configuration([direction, doctor], 'configured'), options: [direction, doctor] };
+    apiMocks.load.mockResolvedValue(initial);
+    apiMocks.save.mockRejectedValueOnce({ response: { status: 409 } });
+    render(<RegistrarTabsManager />);
+
+    fireEvent.change(await screen.findByDisplayValue('SYNTHETIC Direction'), { target: { value: 'SYNTHETIC Draft' } });
+    const targetSelect = screen.getByRole('button', { name: 'registrarPanel.rt_add_target' });
+    expect(targetSelect).toBeDisabled();
+
+    apiMocks.load.mockResolvedValue({ ...initial, version: 3, options: [...initial.options, newProfile] });
+    act(() => window.dispatchEvent(new CustomEvent('queue-profiles:updated')));
+    await waitFor(() => expect(targetSelect).toBeEnabled());
+    expect(screen.getByDisplayValue('SYNTHETIC Draft')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('registrarPanel.rt_conflict');
+
+    await user.click(targetSelect);
+    await user.click(screen.getByRole('option', { name: 'SYNTHETIC New Profile · #8 — registrarPanel.rt_profile' }));
+    await user.click(screen.getByRole('button', { name: 'registrarPanel.rt_add' }));
+    await user.click(screen.getByRole('button', { name: 'registrarPanel.rt_save' }));
+
+    expect(apiMocks.save).toHaveBeenCalledWith({
+      expected_version: 2,
+      tabs: [
+        { target_kind: 'profile', target_id: 7, title: 'SYNTHETIC Draft', visible: true },
+        { target_kind: 'doctor', target_id: 7, title: null, visible: true },
+        { target_kind: 'profile', target_id: 8, title: null, visible: true },
+      ],
+      reason: 'configure_registrar_tabs',
+    });
+  });
+
+  it('waits for a save in flight before reloading profile targets', async () => {
+    const user = userEvent.setup();
+    const initial = { ...configuration([direction, doctor], 'configured'), options: [direction, doctor] };
+    const savedDirection = { ...direction, custom_title: 'SYNTHETIC Saved', title: 'SYNTHETIC Saved' };
+    const saved = { ...initial, version: 3, tabs: [savedDirection, doctor] };
+    let resolveSave!: (response: AdminRegistrarTabsResponse) => void;
+    apiMocks.load.mockResolvedValue(initial);
+    apiMocks.save.mockReturnValueOnce(new Promise<AdminRegistrarTabsResponse>((resolve) => { resolveSave = resolve; }));
+    render(<RegistrarTabsManager />);
+
+    fireEvent.change(await screen.findByDisplayValue('SYNTHETIC Direction'), { target: { value: 'SYNTHETIC Saved' } });
+    await user.click(screen.getByRole('button', { name: 'registrarPanel.rt_save' }));
+    act(() => window.dispatchEvent(new CustomEvent('queue-profiles:updated')));
+    expect(apiMocks.load).toHaveBeenCalledTimes(1);
+
+    apiMocks.load.mockResolvedValue({ ...saved, options: [...initial.options, newProfile] });
+    await act(async () => { resolveSave(saved); });
+
+    expect(await screen.findByText('registrarPanel.rt_saved')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'registrarPanel.rt_add_target' })).toBeEnabled());
+    expect(apiMocks.load).toHaveBeenCalledTimes(2);
+    expect(screen.getByDisplayValue('SYNTHETIC Saved')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'registrarPanel.rt_save' })).toBeDisabled();
   });
 
   it('distinguishes a failed read from an empty configuration and can retry', async () => {

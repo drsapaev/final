@@ -1,3 +1,13 @@
+## T19 — PR #4117 review fixes and Tier 2 deferral — 2026-11-19
+
+- Review at `7e332a5ef` found two P2 issues. The Admin editor refreshes its target catalog after profile changes, waits for an in-flight save to finish, and retains unsaved edits and their original expected version. The Registrar strip keeps its first visible tab keyboard reachable while a hidden historical filter remains selected.
+- Four regression cases failed on the previous behavior. After the fixes, 73 tests passed in five focused Admin, navigation and worklist suites. The PR links to the required CI for the final candidate.
+- Original requirement: backend-dependent browser acceptance under `docs/AGENTS_UI.md` §13, including `auth-flow.spec.ts`, `payment-system.spec.ts`, `queue-system.spec.ts`, `admin-navigation.spec.ts` and `panel-qa-admin-live.spec.ts` where applicable.
+- Reason and decision: the user explicitly authorized merge after the review fixes without a new staging run.
+- Evidence: the earlier synthetic T19 runs cover Admin TOTP, Registrar read/write boundaries, saved tab changes, history and audit checks on their recorded revisions. The review fixes have focused frontend test coverage. Their live staging checks remain NOT RUN.
+- Owner and resume condition: T19 Registrar tabs and integrated T18 acceptance. Run the remaining applicable live specs and the full staging checklist against the intended release revision in an owned synthetic environment before production rollout.
+- Headline impact: the deferral contributes zero completed coverage. Full Tier 2 and T18 stay PARTIAL.
+
 ## T19 — recovery policy and existing evidence review — 2026-11-19
 
 - User decision: preserve an owned synthetic staging project after failure, diagnose and continue the remaining checks on the same verified project. Set `KEEP_STAGING=1` in the launcher process for both Start and Session; record ownership, lease and failure in the checkpoint. Successful Session still performs owned-project cleanup. See DECISIONS and `docs/runbooks/WSL_STAGING_SESSION.md`.
