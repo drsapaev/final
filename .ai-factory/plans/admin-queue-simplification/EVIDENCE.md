@@ -1,3 +1,10 @@
+## T19 — recovery policy and existing evidence review — 2026-11-19
+
+- User decision: preserve an owned synthetic staging project after failure, diagnose and continue the remaining checks on the same verified project. Set `KEEP_STAGING=1` in the launcher process for both Start and Session; record ownership, lease and failure in the checkpoint. Successful Session still performs owned-project cleanup. See DECISIONS and `docs/runbooks/WSL_STAGING_SESSION.md`.
+- Existing launcher behavior verified offline: five focused `test_wsl_staging_guard.py` cases PASS, covering failed Start/Session with and without KEEP and successful Session cleanup with KEEP. No Docker or staging project was started for these tests.
+- The second project had already been removed before this decision. Its saved scratch contains one pre-change queue/entry snapshot but no post-change snapshot; the browser report contains only a console-error count, not messages or asset hashes. The frontend image is no longer available. These missing results cannot be reconstructed from that run.
+- Earlier PostgreSQL evidence recorded 12 passing integration cases; the service and schema fingerprints match the tested `5a209da6b` source. Those cases include audit rollback/projection and queue-count assertions, but they do not replace the missing nonempty before/after history fingerprint in this browser run. The scratch harness now classifies future console errors into fixed categories without storing raw text; offline classifier/comparator checks 4/4 PASS. Old seven errors remain NOT_CLASSIFIED.
+
 ## T19 — PR #4117 second synthetic staging cycle — 2026-11-19
 
 - Exact tested commit: `5a209da6bbe016a9540dd231d85b48603ce7c0e1`. On that commit GitHub checks finished with 32 success and 11 skipped; skipped jobs are not passes.
