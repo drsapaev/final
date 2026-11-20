@@ -381,7 +381,7 @@ def is_sensitive_verification_path(value: object) -> bool:
 
 
 def is_sensitive_payment_evidence_path(value: object) -> bool:
-    """Recognize only Click callback and admin evidence-review routes."""
+    """Recognize Click evidence and force-majeure refund routes."""
     if not isinstance(value, str) or not value:
         return False
     if re.match(r"^(?:GET|POST|PUT|PATCH|DELETE) ", value, flags=re.IGNORECASE):
@@ -390,6 +390,9 @@ def is_sensitive_payment_evidence_path(value: object) -> bool:
         path = unquote(urlsplit(value).path).lower().rstrip("/")
     except ValueError:
         return False
+    refund_path = "/api/v1/force-majeure/refund-requests"
+    if path == refund_path or path.startswith(refund_path + "/"):
+        return True
     return bool(re.fullmatch(
         r"/api/v1/payments/(?:webhook/click|reconcile/click/receipts/(?:[0-9]+|\{receipt_id(?::int)?\})/(?:review|attest))",
         path,
@@ -399,6 +402,16 @@ def is_sensitive_payment_evidence_path(value: object) -> bool:
 # ---------------------------------------------------------------------------
 # Per-field maskers
 # ---------------------------------------------------------------------------
+
+
+def mask_card_number(number: str | None) -> str | None:
+    """Return only a masked suffix for a stored payment card identifier."""
+    if not number:
+        return None
+    last_four = number.replace(" ", "").replace("-", "")[-4:]
+    if len(last_four) != 4 or not last_four.isascii() or not last_four.isdecimal():
+        return None
+    return "****" + last_four
 
 
 def mask_phone(phone: str | None) -> str | None:

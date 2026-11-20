@@ -13,6 +13,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
+from app.core.pii_masker import mask_card_number
 from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import (
     resolve_registry_tag_queue_for_specialist,
@@ -466,12 +467,10 @@ class ForceMajeureApiService:
             self.repository.rollback()
             raise ForceMajeureApiDomainError(409, "Для завершения возврата требуется сверка валюты")
         else:
-            raise ForceMajeureApiDomainError(400, f"Неизвестное действие: {action}")
+            raise ForceMajeureApiDomainError(400, "Неизвестное действие")
 
         req.processed_by = current_user.id
         req.processed_at = datetime.now(UTC)
-        if process_request.bank_card_number:
-            req.bank_card_number = process_request.bank_card_number
         if process_request.manager_notes:
             req.manager_notes = process_request.manager_notes
 
@@ -665,7 +664,7 @@ class ForceMajeureApiService:
             "status": req.status,
             "reason": req.reason,
             "is_automatic": req.is_automatic,
-            "bank_card_number": req.bank_card_number,
+            "bank_card_number": mask_card_number(req.bank_card_number),
             "created_at": req.created_at,
             "processed_at": req.processed_at,
             "processed_by_name": processed_by_name,
