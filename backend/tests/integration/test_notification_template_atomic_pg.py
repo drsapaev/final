@@ -300,7 +300,7 @@ def test_offline_sql_generation_enforces_uniqueness_on_apply(engine):
             "-m",
             "alembic",
             "upgrade",
-            "0097_two_factor_sensitive_totp:head",
+            "0097_two_factor_sensitive_totp:0098_notify_template_unique",
             "--sql",
         ],
         cwd=backend,
