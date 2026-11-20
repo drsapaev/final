@@ -287,7 +287,7 @@ def test_duplicate_billing_operation_replays_after_a_missed_lookup(legacy_invoic
         replay = record_payment(form, db=db, current_user=actor, exact_amount=amount)
         assert replay == first
         assert not db.scalar(text(
-            "SELECT has_table_privilege(CURRENT_USER,'payment_client_requests','UPDATE,DELETE')"
+            "SELECT has_table_privilege(CURRENT_USER,'payment_client_requests','UPDATE,DELETE,TRUNCATE')"
         ))
     assert reads == 2
 
@@ -304,6 +304,8 @@ def test_duplicate_billing_operation_replays_after_a_missed_lookup(legacy_invoic
                        {"key": key})
         with pytest.raises(DBAPIError, match="immutable billing payment receipt"), db.begin_nested():
             db.execute(text("DELETE FROM payment_client_requests WHERE client_request_id=:key"), {"key": key})
+        with pytest.raises(DBAPIError, match="payment receipt ledger cannot be truncated"), db.begin_nested():
+            db.execute(text("TRUNCATE payment_client_requests"))
         db.execute(text("DELETE FROM users WHERE id=:actor"), {"actor": actor.id})
         db.commit()
         assert anchor.created_by is None and anchor.response_payload["recorded_by"] == actor.id

@@ -1,4 +1,4 @@
-"""Keep committed legacy billing receipts immutable."""
+"""Keep committed legacy billing receipts immutable and block ledger truncation."""
 
 from alembic import op
 
@@ -24,6 +24,9 @@ def upgrade() -> None:
           CREATE FUNCTION {schema}.protect_billing_payment_receipt() RETURNS trigger
           LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog AS $billing_receipt$
           BEGIN
+            IF TG_OP='TRUNCATE' THEN
+              RAISE EXCEPTION 'payment receipt ledger cannot be truncated' USING ERRCODE='23514';
+            END IF;
             IF TG_OP='DELETE' THEN
               IF OLD.endpoint='billing' THEN
                 RAISE EXCEPTION 'immutable billing payment receipt' USING ERRCODE='23514';
@@ -51,6 +54,11 @@ def upgrade() -> None:
         op.execute(f"""
           CREATE TRIGGER trg_protect_billing_payment_receipt BEFORE INSERT OR UPDATE OR DELETE
           ON {schema}.payment_client_requests FOR EACH ROW
+          EXECUTE FUNCTION {schema}.protect_billing_payment_receipt()
+        """)
+        op.execute(f"""
+          CREATE TRIGGER trg_protect_payment_receipt_truncate BEFORE TRUNCATE
+          ON {schema}.payment_client_requests FOR EACH STATEMENT
           EXECUTE FUNCTION {schema}.protect_billing_payment_receipt()
         """)
     elif dialect == "sqlite":
@@ -92,17 +100,18 @@ def downgrade() -> None:
         while delimiter in schema:
             delimiter = delimiter[:-1] + "_x$"
         op.execute(f"""DO {delimiter} BEGIN
-          IF EXISTS (SELECT 1 FROM {schema}.payment_client_requests WHERE endpoint='billing') THEN
-            RAISE EXCEPTION 'billing payment receipts prevent downgrade';
+          IF EXISTS (SELECT 1 FROM {schema}.payment_client_requests) THEN
+            RAISE EXCEPTION 'payment receipts prevent downgrade';
           END IF;
         END {delimiter}""")
+        op.execute(f"DROP TRIGGER trg_protect_payment_receipt_truncate ON {schema}.payment_client_requests")
         op.execute(f"DROP TRIGGER trg_protect_billing_payment_receipt ON {schema}.payment_client_requests")
         op.execute(f"DROP FUNCTION {schema}.protect_billing_payment_receipt()")
     elif dialect == "sqlite":
         op.execute("UPDATE payment_client_requests SET id=id WHERE 0")
         op.execute("CREATE TEMP TABLE billing_payment_downgrade_guard (valid INTEGER NOT NULL CHECK(valid=1))")
         op.execute("""INSERT INTO billing_payment_downgrade_guard SELECT CASE WHEN EXISTS (
-          SELECT 1 FROM payment_client_requests WHERE endpoint='billing') THEN 0 ELSE 1 END""")
+          SELECT 1 FROM payment_client_requests) THEN 0 ELSE 1 END""")
         op.execute("DROP TABLE billing_payment_downgrade_guard")
         for event in ("insert", "update", "delete"):
             op.execute(f"DROP TRIGGER trg_billing_payment_receipt_{event}")

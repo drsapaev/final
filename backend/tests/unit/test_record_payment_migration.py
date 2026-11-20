@@ -513,6 +513,15 @@ def test_sqlite_billing_receipt_guard_preserves_committed_audit():
             migration.downgrade()
             migration.upgrade()
 
+            legacy_key = str(uuid4())
+            conn.execute(table.insert().values(
+                client_request_id=legacy_key, endpoint="single", response_payload={"id": 2}, created_by=1,
+            ))
+            with pytest.raises(DBAPIError), conn.begin_nested():
+                migration.downgrade()
+            assert conn.execute(table.select()).one().client_request_id == legacy_key
+            conn.execute(table.delete().where(table.c.client_request_id == legacy_key))
+
             receipt = {
                 "client_request_id": str(uuid4()),
                 "endpoint": "billing",
