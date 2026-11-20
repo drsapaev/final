@@ -10,6 +10,7 @@ import secrets
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -61,6 +62,13 @@ def guarded_pg(monkeypatch):
     url = make_url(os.getenv("DATABASE_URL", "sqlite://"))
     if url.get_backend_name() != "postgresql" or not (url.database or "").startswith("clinic_test"):
         pytest.skip("requires disposable clinic_test PostgreSQL")
+    with isolated_staff_guard_postgres(url, monkeypatch) as database:
+        yield database
+
+
+@contextmanager
+def isolated_staff_guard_postgres(url, monkeypatch):
+    """Set up migrated capabilities in a new schema of a disposable database."""
     suffix = uuid4().hex
     schema, runtime, subject_cap, financial_cap = ("staff_guard_" + suffix, "staff_runtime_" + suffix,
                                                      "staff_subject_" + suffix, "staff_finance_" + suffix)
