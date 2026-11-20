@@ -260,9 +260,18 @@ def manual_deposit_pg(guarded_pg):
 
 
 @pytest.fixture
-def visit_deposit_pg(pg_cashier):
-    owner, runtime, _ = pg_cashier
+def visit_deposit_pg(pg_cashier, request):
+    owner, runtime, ids = pg_cashier
     _install_manual_deposit_runtime(owner, runtime)
+    if getattr(request, "param", None) == "unpaired_debit":
+        # Preserve the shape that the pre-migration writer stored.
+        with Session(owner) as db:
+            deposit = PatientDeposit(patient_id=ids["patient"], balance=Decimal("20.00"), currency="UZS")
+            db.add(deposit)
+            db.flush()
+            db.add(DepositTransaction(deposit_id=deposit.id, visit_id=ids["visit"], performed_by=ids["stage"],
+                                      transaction_type="debit", amount=Decimal("5.00"), balance_after=deposit.balance))
+            db.commit()
     quote = owner.dialect.identifier_preparer.quote_identifier
     schema_name = owner.dialect.default_schema_name
     schema, role = quote(schema_name), quote(runtime.url.username)
@@ -270,6 +279,10 @@ def visit_deposit_pg(pg_cashier):
         revision = _migration("0142_deposit_visit_payment.py")
         revision.op = Operations(MigrationContext.configure(conn, opts={"version_table_schema": schema_name}))
         revision.upgrade()
+        conn.exec_driver_sql(f"ALTER TABLE {schema}.deposit_transactions ENABLE ROW LEVEL SECURITY")
+        conn.exec_driver_sql(f"ALTER TABLE {schema}.deposit_transactions FORCE ROW LEVEL SECURITY")
+        conn.exec_driver_sql(f"CREATE POLICY synthetic_debit_read ON {schema}.deposit_transactions FOR SELECT TO {role} USING (true)")
+        conn.exec_driver_sql(f"CREATE POLICY synthetic_debit_write ON {schema}.deposit_transactions FOR INSERT TO {role} WITH CHECK (true)")
         for table in ("refund_requests", "payment_refund_claims"):
             conn.exec_driver_sql(f"GRANT SELECT ON {schema}.{table} TO {role}")
         for table in ("payments", "payment_refund_claims"):
@@ -281,6 +294,31 @@ def visit_deposit_pg(pg_cashier):
         conn.exec_driver_sql(f"GRANT EXECUTE ON FUNCTION {schema}.protect_deposit_refund_evidence() TO {role}")
         conn.exec_driver_sql(f"CREATE POLICY synthetic_deposit_paid ON {schema}.payments FOR INSERT TO {role} WITH CHECK (true)")
     return pg_cashier
+
+
+@pytest.mark.parametrize("visit_deposit_pg", ["unpaired_debit"], indirect=True)
+@pytest.mark.parametrize("can_see_history", [True, False])
+def test_postgres_refuses_a_new_tender_with_unpaired_historical_debit(visit_deposit_pg, can_see_history):
+    owner, runtime, ids = visit_deposit_pg
+    patient_id, visit_id, actor_id = ids["patient"], ids["visit"], ids["stage"]
+    if not can_see_history:
+        with owner.begin() as conn:
+            conn.exec_driver_sql("ALTER POLICY synthetic_debit_read ON deposit_transactions USING (visit_id IS NULL)")
+    command = UseDepositRequest(**_body(patient_id, "10.00"), visit_id=visit_id)
+    with Session(runtime) as db:
+        api = ForceMajeureApiService(db)
+        if can_see_history:
+            with pytest.raises(ForceMajeureApiDomainError, match="Историческое списание") as error:
+                api.use_deposit_for_payment(request=command, current_user_id=actor_id)
+            assert error.value.status_code == 409
+        else:
+            with pytest.raises(DBAPIError, match="ledger visibility unavailable"):
+                api.use_deposit_for_payment(request=command, current_user_id=actor_id)
+    with Session(owner) as db:
+        assert db.scalar(select(PatientDeposit.balance).filter_by(patient_id=patient_id)) == Decimal("20.00")
+        assert db.scalar(select(func.count()).select_from(Payment)) == 0
+        [old_debit] = db.scalars(select(DepositTransaction).filter_by(visit_id=visit_id)).all()
+        assert old_debit.payment_id is None and old_debit.amount == Decimal("5.00")
 
 
 def test_linked_deposit_conserves_ledger_and_returns_to_same_deposit_on_postgres(visit_deposit_pg):

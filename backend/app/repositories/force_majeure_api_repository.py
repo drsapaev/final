@@ -15,6 +15,7 @@ from app.crud.queue_resource_routing import resolve_registry_tag_queue_for_speci
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.refund_deposit import (
     DepositTransaction,
+    DepositTransactionType,
     PatientDeposit,
     PaymentRefundClaim,
     RefundRequest,
@@ -276,6 +277,13 @@ class ForceMajeureApiRepository:
             .filter(DepositTransaction.client_request_id == client_request_id)
             .one_or_none()
         )
+
+    def visit_has_unpaired_deposit_debit(self, visit_id: int) -> bool:
+        return self.db.query(DepositTransaction.id).filter(
+            DepositTransaction.visit_id == visit_id,
+            DepositTransaction.transaction_type == DepositTransactionType.DEBIT.value,
+            DepositTransaction.payment_id.is_(None),
+        ).first() is not None
 
     def list_deposit_transactions(
         self,

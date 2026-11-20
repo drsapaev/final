@@ -78,6 +78,20 @@ def upgrade() -> None:
       DECLARE payment_method text; payment_key text; subject_id integer;
       BEGIN
         IF NEW.transaction_type='debit' THEN
+          -- A restricted SELECT can hide old unpaired debits. Prove that
+          -- the caller sees the entire receipt table before testing absence.
+          IF pg_catalog.row_security_active(TG_RELID) AND (
+            NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=TG_RELID
+              AND p.polpermissive AND p.polcmd IN ('r','*') AND pg_catalog.pg_get_expr(p.polqual,p.polrelid)='true'
+              AND (0=ANY(p.polroles) OR (SELECT oid FROM pg_catalog.pg_roles WHERE rolname=CURRENT_USER)=ANY(p.polroles)))
+            OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=TG_RELID
+              AND NOT p.polpermissive AND p.polcmd IN ('r','*') AND EXISTS (
+                SELECT 1 FROM pg_catalog.unnest(p.polroles) AS subject(role_id)
+                WHERE CASE WHEN subject.role_id=0 THEN true
+                  ELSE pg_catalog.pg_has_role(CURRENT_USER,subject.role_id,'MEMBER') END))
+          ) THEN
+            RAISE EXCEPTION 'visit deposit ledger visibility unavailable' USING ERRCODE='42501';
+          END IF;
           SELECT v.patient_id INTO subject_id FROM {schema}.payments p
           JOIN {schema}.visits v ON v.id=p.visit_id
           WHERE p.id=NEW.payment_id AND p.visit_id=NEW.visit_id AND p.amount=NEW.amount
@@ -88,6 +102,10 @@ def upgrade() -> None:
           IF subject_id IS NULL OR NEW.amount<=0 OR NEW.command_is_active IS NOT TRUE
               OR NEW.refund_request_id IS NOT NULL OR NEW.refund_currency_snapshot IS NOT NULL THEN
             RAISE EXCEPTION 'invalid visit deposit debit evidence' USING ERRCODE='23514';
+          END IF;
+          IF EXISTS (SELECT 1 FROM {schema}.deposit_transactions d WHERE d.visit_id=NEW.visit_id
+            AND d.transaction_type='debit' AND d.payment_id IS NULL) THEN
+            RAISE EXCEPTION 'unpaired historical visit deposit debit' USING ERRCODE='23514';
           END IF;
           UPDATE {schema}.patient_deposits SET balance=balance-NEW.amount,
             updated_at=pg_catalog.statement_timestamp()

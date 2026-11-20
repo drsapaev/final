@@ -620,6 +620,8 @@ class ForceMajeureApiService:
         stored = replay()
         if stored is not None:
             return stored
+        if visit_id is not None and self.repository.visit_has_unpaired_deposit_debit(visit_id):
+            raise ForceMajeureApiDomainError(409, "Историческое списание с депозита требует сверки")
         if not credit and deposit.balance < amount:
             raise ForceMajeureApiDomainError(
                 400,
