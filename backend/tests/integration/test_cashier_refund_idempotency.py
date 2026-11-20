@@ -118,3 +118,14 @@ def test_cashier_refund_guard_retains_receipt_and_preserves_legacy_purchase(
     assert db_session.query(PaymentClientRequest).filter_by(endpoint="single").count() == 1
     replay = client.post(route, headers=admin_auth_headers, json=body)
     assert replay.status_code == 200 and replay.json() == result.json()
+
+    # Migration 0132 preserves the receipt when the original account is removed.
+    db_session.execute(
+        text("UPDATE payment_client_requests SET created_by=NULL WHERE client_request_id=:key"),
+        {"key": body["client_request_id"]},
+    )
+    db_session.commit()
+    unverified = client.post(route, headers=admin_auth_headers, json=body)
+    assert unverified.status_code == 409, unverified.text
+    assert unverified.json()["detail"]["reason"] == "client_request_id_owner_unverified"
+    assert db_session.get(Payment, payment_id).refunded_amount == Decimal("1.25")

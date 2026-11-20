@@ -186,6 +186,26 @@ def test_replay_returns_stored_result_even_after_visit_fully_settled(
     assert len(_paid_rows(db_session, visit)) == 2
 
 
+def test_receipt_with_missing_owner_requires_reconciliation(client, db_session, admin_auth_headers):
+    patient = _make_patient(db_session)
+    visit = _make_visit(db_session, patient, 100000)
+    key = str(uuid4())
+    body = {"visit_id": visit.id, "amount": 40000, "method": "cash", "client_request_id": key}
+    first = client.post(SINGLE_URL, headers=admin_auth_headers, json=body)
+    assert first.status_code == 200, first.text
+
+    receipt = db_session.query(PaymentClientRequest).filter_by(client_request_id=key).one()
+    receipt.created_by = None
+    db_session.commit()
+
+    retry = client.post(SINGLE_URL, headers=admin_auth_headers, json=body)
+    assert retry.status_code == 409, retry.text
+    assert retry.json()["detail"]["reason"] == "client_request_id_owner_unverified"
+    assert db_session.query(PaymentClientRequest).filter_by(client_request_id=key).count() == 1
+    [payment] = _paid_rows(db_session, visit)
+    assert payment.id == first.json()["id"] and payment.amount == Decimal("40000")
+
+
 def test_grouped_same_client_request_id_replays_without_second_allocation(
     client, db_session, admin_auth_headers
 ):
@@ -329,6 +349,15 @@ def test_postgres_receipt_conflict_rolls_back_under_the_runtime_role(guarded_pg,
         [stored] = retry.query(PaymentClientRequest).all()
         assert stored.client_request_id == key
         assert stored.created_by == ids["stage"]
+
+    with Session(owner) as archive:
+        [stored] = archive.query(PaymentClientRequest).all()
+        stored.created_by = None
+        archive.commit()
+    with Session(runtime) as retry, pytest.raises(HTTPException) as unknown:
+        _payments._commit_with_client_request(retry, created_by=ids["stage"], **receipt)
+    assert unknown.value.status_code == 409
+    assert unknown.value.detail["reason"] == "client_request_id_owner_unverified"
 
 
 def test_non_uuid_client_request_id_is_rejected(

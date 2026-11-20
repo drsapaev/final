@@ -130,14 +130,39 @@ def _replay_payment_client_request(
     ``client_request_id_intent_mismatch`` — it must never replay the
     original success as if the new intent had been charged. Historical
     anchors (fingerprint NULL, minted before this guard) keep the
-    key+endpoint-only replay semantics. The replay is additionally bound
-    to the anchor owner: another authorized user replaying someone else's
-    key gets 409 instead of the stored payment metadata (``created_by``
-    NULL → unbound legacy anchor, replay allowed).
+    existing fingerprint compatibility for the verified anchor owner.
+    A receipt with an unknown owner requires reconciliation.
     """
     stored = _find_payment_client_request(db, client_request_id)
     if stored is None:
         return None
+    if current_user_id is None or stored.created_by is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "client_request_id_owner_unverified",
+                "message": "Владелец квитанции не подтверждён. Сверьте операцию перед повтором.",
+            },
+        )
+    if stored.created_by != current_user_id:
+        logger.warning(
+            "payment.client_request_owner_mismatch client_request_id=%s "
+            "endpoint=%s stored_owner=%s requesting_user=%s",
+            client_request_id,
+            endpoint,
+            stored.created_by,
+            current_user_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "client_request_id_owner_mismatch",
+                "message": (
+                    "Ключ идемпотентности принадлежит другой учётной записи. "
+                    "Сгенерируйте новый ключ для новой операции."
+                ),
+            },
+        )
     if stored.endpoint != endpoint:
         logger.warning(
             "payment.client_request_endpoint_mismatch client_request_id=%s "
@@ -177,29 +202,6 @@ def _replay_payment_client_request(
                     "Ключ идемпотентности использован с другим платёжным "
                     "назначением (пациент/визит/сумма/метод). Сгенерируйте "
                     "новый ключ для новой операции."
-                ),
-            },
-        )
-    if (
-        current_user_id is not None
-        and stored.created_by is not None
-        and stored.created_by != current_user_id
-    ):
-        logger.warning(
-            "payment.client_request_owner_mismatch client_request_id=%s "
-            "endpoint=%s stored_owner=%s requesting_user=%s",
-            client_request_id,
-            endpoint,
-            stored.created_by,
-            current_user_id,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "reason": "client_request_id_owner_mismatch",
-                "message": (
-                    "Ключ идемпотентности принадлежит другой учётной записи. "
-                    "Сгенерируйте новый ключ для новой операции."
                 ),
             },
         )
