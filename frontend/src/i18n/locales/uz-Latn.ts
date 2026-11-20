@@ -577,6 +577,7 @@ const uzLatn = {
     visit_postponed: 'Визит успешно перенесён на завтра',
     visit_postponed_date: 'Визит успешно перенесён',
     no_visit_for_postpone: 'Не удалось определить визит для переноса',
+    cancel_select_record: 'Bekor qilinadigan yozuvni tanlang',
     reschedule_select_visit_label: 'Qaysi tashrifni ko‘chirish kerak?',
     reschedule_select_visit_placeholder: '— tashrifni tanlang —',
     reschedule_visit_option: 'Tashrif №{id}',

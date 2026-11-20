@@ -276,6 +276,52 @@ def test_today_queues_exposes_actual_owner_for_each_entry(
     )
 
 
+def test_today_queues_projects_actions_from_the_linked_visit(
+    client, db_session, registrar_auth_headers, test_patient, test_doctor, test_service
+):
+    today = clinic_today(db_session)
+    visits = [
+        Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=today,
+            department="cardiology",
+            status=status,
+        )
+        for status in ("pending_confirmation", "confirmed", "completed", "closed", "in_progress")
+    ]
+    db_session.add_all(visits)
+    db_session.flush()
+    db_session.add_all([
+        VisitService(visit_id=visit.id, service_id=test_service.id, name="SYNTHETIC", price=0)
+        for visit in visits
+    ])
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/registrar/queues/today",
+        params={"target_date": today.isoformat()},
+        headers=registrar_auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    rows = {row["visit_id"]: row for queue in response.json()["queues"] for row in queue["entries"]}
+    for visit in visits[:2]:
+        assert rows[visit.id]["can_reschedule"] and rows[visit.id]["can_cancel"]
+        assert {"reschedule", "cancel"} <= set(rows[visit.id]["available_actions"])
+    for visit in visits[2:4]:
+        assert not rows[visit.id]["can_reschedule"]
+        assert not rows[visit.id]["can_cancel"]
+    assert not rows[visits[4].id]["can_reschedule"]
+
+    doctor_view = get_today_queues_page(
+        db=db_session, current_user=SimpleNamespace(role="Doctor"),
+        target_date=today.isoformat(), department=None, limit=100, offset=0,
+    )
+    doctor_rows = [row for queue in doctor_view["queues"] for row in queue["entries"]]
+    assert doctor_rows
+    assert all(not row["can_reschedule"] for row in doctor_rows)
+
+
 def test_owner_resolver_rejects_duplicate_service_names_and_inactive_resources(
     db_session,
 ):

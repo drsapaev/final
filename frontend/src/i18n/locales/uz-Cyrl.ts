@@ -582,6 +582,7 @@ const uzCyrl = {
     visit_postponed: 'Визит успешно перенесён на завтра',
     visit_postponed_date: 'Визит успешно перенесён',
     no_visit_for_postpone: 'Не удалось определить визит для переноса',
+    cancel_select_record: 'Бекор қилинадиган ёзувни танланг',
     reschedule_select_visit_label: 'Қайси ташрифни кўчириш керек?',
     reschedule_select_visit_placeholder: '— ташрифни танланг —',
     reschedule_visit_option: 'Ташриф №{id}',

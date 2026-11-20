@@ -578,6 +578,7 @@ const en = {
     visit_postponed: 'Визит успешно перенесён на завтра',
     visit_postponed_date: 'Визит успешно перенесён',
     no_visit_for_postpone: 'Не удалось определить визит для переноса',
+    cancel_select_record: 'Select the booking to cancel',
     reschedule_select_visit_label: 'Which visit should be rescheduled?',
     reschedule_select_visit_placeholder: '— select a visit —',
     reschedule_visit_option: 'Visit #{id}',

@@ -35,6 +35,7 @@ import { getRegistrarTimestampDisplay } from '../../utils/dateUtils';
 import type { RegistrarTimestampRecord } from '../../utils/dateUtils';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { getServiceDisplayName } from '../../utils/serviceCodeResolver';
+import { getRegistrarCancelTargets, getRegistrarRescheduleVisitIds } from '../../pages/registrar/registrarHelpers';
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
 import {
   type AppointmentRow,
@@ -1354,20 +1355,8 @@ export const buildAppointmentsTableColumns = ({
       const canComplete = isDoctorView && backendCanComplete === true;
       const canViewEmr = isDoctorView && backendCanViewEmr === true;
       const canScheduleNext = isDoctorView && backendCanScheduleNext === true;
-      // UX Audit Registrar #4: inline кнопки Cancel и Reschedule для registrar view.
-      // Раньше были доступны только через context menu (правый клик),
-      // что не работало на touch-устройствах (планшеты в регистратуре).
-      const canCancel = !isDoctorView && (
-        row?.status === 'waiting' ||
-        row?.status === 'called' ||
-        row?.status === 'pending' ||
-        row?.status === 'confirmed'
-      );
-      const canReschedule = !isDoctorView && (
-        row?.status === 'waiting' ||
-        row?.status === 'pending' ||
-        row?.status === 'confirmed'
-      );
+      const canCancel = !isDoctorView && getRegistrarCancelTargets(rowRecord).length > 0;
+      const canReschedule = !isDoctorView && getRegistrarRescheduleVisitIds(rowRecord).length > 0;
       return (
         <div
           className="eat-actions-cell"

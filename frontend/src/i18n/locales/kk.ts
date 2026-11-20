@@ -578,6 +578,7 @@ const kk = {
     visit_postponed: 'Визит успешно перенесён на завтра',
     visit_postponed_date: 'Визит успешно перенесён',
     no_visit_for_postpone: 'Не удалось определить визит для переноса',
+    cancel_select_record: 'Бас тартатын жазбаны таңдаңыз',
     reschedule_select_visit_label: 'Қандай кездесуді көшіру керек?',
     reschedule_select_visit_placeholder: '— кездесуді таңдаңыз —',
     reschedule_visit_option: 'Кездесу №{id}',

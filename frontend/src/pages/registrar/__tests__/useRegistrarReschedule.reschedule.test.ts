@@ -10,7 +10,7 @@
  * backend reschedule command addresses a single visit id.
  *
  * Contract (issue #3820):
- * - `getRescheduleVisitIds` exposes the full ordered visit list so the
+ * - `getRescheduleVisitIds` exposes eligible canonical visits so the
  *   dialog can require an explicit target-visit choice.
  * - After a successful move of visit 101 from `visit_ids=[101,102]`, the
  *   group row (visit 102) must REMAIN visible; the backend read model owns
@@ -39,18 +39,23 @@ const makeHook = () => {
 };
 
 describe('useRegistrarReschedule — REG-FE-041 grouped reschedule (fail-first)', () => {
-  it('exposes the full visit-id list of an aggregated row (getRescheduleVisitIds)', () => {
+  it('exposes eligible visit ids from an aggregated row', () => {
     const { hook } = makeHook();
     const ids = hook.result.current.getRescheduleVisitIds({
-      id: 101, visit_id: 101, visit_ids: [101, 102],
+      id: 101, visit_id: 101, visit_ids: [101, 102, 103],
+      grouped_records: [
+        { visit_id: 101, available_actions: ['reschedule'] },
+        { visit_id: 102, can_reschedule: true },
+        { visit_id: 103, can_reschedule: false, available_actions: ['reschedule'] },
+      ],
     });
     expect(ids).toEqual([101, 102]);
   });
 
   it('returns a single-element list for plain visit rows', () => {
     const { hook } = makeHook();
-    expect(hook.result.current.getRescheduleVisitIds({ id: 201, visit_id: 201 })).toEqual([201]);
-    expect(hook.result.current.getRescheduleVisitIds({ id: 202, visitId: 202 })).toEqual([202]);
+    expect(hook.result.current.getRescheduleVisitIds({ id: 201, visit_id: 201, can_reschedule: true })).toEqual([201]);
+    expect(hook.result.current.getRescheduleVisitIds({ id: 202, visitId: 202, can_reschedule: true })).toEqual([202]);
     expect(hook.result.current.getRescheduleVisitIds({ id: 203 })).toEqual([]);
   });
 
@@ -94,9 +99,10 @@ describe('useRegistrarReschedule — REG-FE-041 grouped reschedule (fail-first)'
 
   it('resolveRescheduleVisitId keeps its single-visit contract (regression pin)', () => {
     const { hook } = makeHook();
-    expect(hook.result.current.resolveRescheduleVisitId({ visit_ids: [7], visit_id: 7 })).toBe(7);
-    expect(hook.result.current.resolveRescheduleVisitId({ visit_id: 8 })).toBe(8);
-    expect(hook.result.current.resolveRescheduleVisitId({ visitId: 9 })).toBe(9);
+    expect(hook.result.current.resolveRescheduleVisitId({ visit_ids: [7], visit_id: 7, can_reschedule: true })).toBe(7);
+    expect(hook.result.current.resolveRescheduleVisitId({ visit_id: 8, can_reschedule: true })).toBe(8);
+    expect(hook.result.current.resolveRescheduleVisitId({ visitId: 9, can_reschedule: true })).toBe(9);
+    expect(hook.result.current.resolveRescheduleVisitId({ visit_id: 9 })).toBeNull();
     expect(hook.result.current.resolveRescheduleVisitId({})).toBeNull();
   });
 });

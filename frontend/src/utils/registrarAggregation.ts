@@ -491,10 +491,11 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       // visit_ids строки (выбор целевого визита при переносе), обязаны
       // использовать это поле, а не record_id.
       visit_id: pickCanonicalVisitId(appointment),
-      available_actions: Array.isArray(appointment.available_actions) ? [...appointment.available_actions] : [],
+      available_actions: Array.isArray(appointment.available_actions) ? [...appointment.available_actions] : undefined,
       can_mark_paid: Boolean(appointment.can_mark_paid),
       can_start_visit: Boolean(appointment.can_start_visit),
-      can_cancel: Boolean(appointment.can_cancel),
+      can_cancel: appointment.can_cancel,
+      can_reschedule: appointment.can_reschedule,
       can_print_ticket: Boolean(appointment.can_print_ticket),
       can_complete: Boolean(appointment.can_complete),
       discount_mode: normalizedDiscountMode,
