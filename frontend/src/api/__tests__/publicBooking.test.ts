@@ -188,6 +188,10 @@ describe('publicBooking API adapter', () => {
       response: { status: 409, data: { detail: { code: 'booking_time_unavailable' } } },
     };
     const ambiguous = { isAxiosError: true, request: {} };
+    const reconciliation = {
+      isAxiosError: true,
+      response: { status: 409, data: { code: 'idempotency_reconciliation_required' } },
+    };
     const rejected = {
       isAxiosError: true,
       response: { status: 422, data: { detail: { code: 'booking_time_unavailable' } } },
@@ -195,6 +199,7 @@ describe('publicBooking API adapter', () => {
 
     expect(getPublicBookingErrorCode(conflict)).toBe('booking_time_unavailable');
     expect(isUnknownPublicBookingOutcome(ambiguous)).toBe(true);
+    expect(isUnknownPublicBookingOutcome(reconciliation)).toBe(true);
     expect(isUnknownPublicBookingOutcome(rejected)).toBe(false);
     expect(getPublicBookingPath('ru')).toBe('/ru/booking');
     expect(getPublicBookingPath('uz-Latn')).toBe('/booking');
