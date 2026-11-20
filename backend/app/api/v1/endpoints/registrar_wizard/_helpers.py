@@ -721,14 +721,9 @@ def _resolve_payment_truth(
 
         visit = db.get(Visit, visit_id)
         if visit:
-            try:
-                row = PaymentInvariantService(db).summarize_recorded_visit_payment(visit)
-            except HTTPException as exc:
-                if exc.status_code != status.HTTP_409_CONFLICT:
-                    raise
-                return "reconciliation_required", None
-            if row is not None:
-                return row["payment_status"], row["payment_type"]
+            state = PaymentInvariantService(db).recorded_payment_states([visit]).get(visit_id)
+            if state is not None:
+                return state
     return ("paid", None) if legacy_paid_at else ("pending", None)
 
 

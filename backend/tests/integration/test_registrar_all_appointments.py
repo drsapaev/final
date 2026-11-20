@@ -14,6 +14,9 @@ from app.api.v1.endpoints.registrar_integration import (
     _registrar_available_actions,
     _serialize_registrar_datetime,
 )
+from app.api.v1.endpoints.registrar_integration._helpers import (
+    _resolve_payment_truth as _resolve_queue_payment_truth,
+)
 from app.api.v1.endpoints.registrar_wizard._helpers import _resolve_payment_truth
 from app.models.appointment import Appointment
 from app.models.lab import LabReportInstance
@@ -64,6 +67,7 @@ def test_legacy_payment_projection_uses_postgres_quote(guarded_pg, payment_curre
             "SELECT pg_catalog.has_column_privilege(CURRENT_USER,'payments','provider_data','SELECT')"
         )).scalar_one()
         assert _resolve_payment_truth(db, visit_id=ids["visit"]) == expected
+        assert _resolve_queue_payment_truth(db, visit_id=ids["visit"]) == expected
         invariant = PaymentInvariantService(db)
         if visible:
             assert invariant.compute_paid_amount(ids["visit"]) == Decimal("10.00")
@@ -78,6 +82,7 @@ def test_legacy_payment_projection_uses_postgres_quote(guarded_pg, payment_curre
 
 @pytest.mark.integration
 class TestRegistrarAllAppointments:
+    @pytest.mark.parametrize("with_receipts", [False, True], ids=["without-receipts", "with-receipts"])
     def test_today_queue_reference_reads_are_batched_for_multiple_visits(
         self,
         client,
@@ -86,6 +91,7 @@ class TestRegistrarAllAppointments:
         test_patient,
         test_doctor,
         test_service,
+        with_receipts,
     ):
         test_patient.sex = "M"
         db_session.commit()
@@ -113,13 +119,24 @@ class TestRegistrarAllAppointments:
                 name=test_service.name,
                 qty=1,
                 price=test_service.price,
-                currency="UZS",
+                currency="KZT" if visit is visits[3] else "UZS",
             )
             for visit in visits
         )
+        receipt_currencies = {0: "UZS", 1: "KZT", 3: "KZT"} if with_receipts else {}
+        db_session.add_all(
+            Payment(
+                visit_id=visits[index].id,
+                amount=Decimal(str(test_service.price)),
+                currency=currency,
+                status="paid",
+                method="cash",
+            )
+            for index, currency in receipt_currencies.items()
+        )
         db_session.commit()
 
-        query_counts = {"patients": 0, "visit_services": 0, "services": 0}
+        query_counts = {"patients": 0, "visit_services": 0, "services": 0, "payments": 0}
 
         def count_reference_reads(
             _conn, _cursor, statement, _parameters, _context, _many
@@ -159,8 +176,25 @@ class TestRegistrarAllAppointments:
             and entry.get("record_kind") == "visit"
         )
         assert query_counts["patients"] <= 3, query_counts
-        assert query_counts["visit_services"] <= 2, query_counts
+        # The queue loads its display references in bulk. Each recorded
+        # payment additionally uses the independent canonical quote on SQLite.
+        assert query_counts["visit_services"] <= 2 + len(receipt_currencies), query_counts
         assert query_counts["services"] <= 2, query_counts
+        assert query_counts["payments"] == 1, query_counts
+
+        visits_by_id = {row["id"]: row for row in rows if row.get("record_kind") == "visit"}
+        expected_payment_states = [
+            ("paid", "cash", False),
+            ("reconciliation_required", None, False),
+            ("pending", None, True),
+            ("paid", "cash", False),
+        ] if with_receipts else [("pending", None, True)] * len(visits)
+        for visit, (payment_status, payment_type, can_pay) in zip(visits, expected_payment_states, strict=True):
+            row = visits_by_id[visit.id]
+            assert (row["payment_status"], row["payment_type"], row["can_mark_paid"]) == (
+                payment_status, payment_type, can_pay,
+            )
+            assert ("mark_paid" in row["available_actions"]) is can_pay
 
     def test_date_filters_accept_iso_strings_for_appointments_and_visits(
         self,

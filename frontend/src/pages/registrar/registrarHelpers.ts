@@ -9,6 +9,7 @@
  */
 
 import { getApiOrigin } from '../../api/runtime';
+import { PAYMENT_RECONCILIATION_REQUIRED } from '../../utils/registrarAggregation';
 
 /**
  * Permissive shape for registrar record payloads received from the backend.
@@ -238,6 +239,10 @@ const hasOwn = (object: Record<string, unknown> | null | undefined, key: string)
 export const hasBackendAction = (record: RegistrarRecordLike | null | undefined, action: unknown): boolean => {
   if (!record) return false;
   const normalizedAction = String(action || '').trim();
+  const isPayment = normalizedAction.replace('-', '_') === 'mark_paid';
+  if (isPayment && record.payment_status === PAYMENT_RECONCILIATION_REQUIRED) {
+    return false;
+  }
   const equivalentActions = new Set([
     normalizedAction,
     normalizedAction.replace('_', '-'),
@@ -247,9 +252,11 @@ export const hasBackendAction = (record: RegistrarRecordLike | null | undefined,
     const exposesAction = (groupedRecord: RegistrarRecordLike) => hasBackendAction(groupedRecord, normalizedAction);
     // The grouped payment command skips settled visits and receives money only
     // against debt. Keep every record ref; the server validates the group/snapshot.
-    return normalizedAction.replace('-', '_') === 'mark_paid'
-      ? record.grouped_records.some(exposesAction)
-      : record.grouped_records.every(exposesAction);
+    if (isPayment) {
+      return !record.grouped_records.some((row) => row.payment_status === PAYMENT_RECONCILIATION_REQUIRED)
+        && record.grouped_records.some(exposesAction);
+    }
+    return record.grouped_records.every(exposesAction);
   }
   if (Array.isArray(record.available_actions)) {
     return record.available_actions.some((availableAction) =>

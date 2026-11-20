@@ -35,6 +35,7 @@ import { getRegistrarTimestampDisplay } from '../../utils/dateUtils';
 import type { RegistrarTimestampRecord } from '../../utils/dateUtils';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { getServiceDisplayName } from '../../utils/serviceCodeResolver';
+import { PAYMENT_RECONCILIATION_REQUIRED } from '../../utils/registrarAggregation';
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
 import {
   type AppointmentRow,
@@ -509,6 +510,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
       free: '🆓',
       approval_pending: '📝',
       pending_payment: '⌛',
+      [PAYMENT_RECONCILIATION_REQUIRED]: '⚠️',
       unknown_payment: '💰',
       mixed_payment: '🔀'
     };
@@ -520,6 +522,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
       free: 'var(--mac-warning)',
       approval_pending: 'var(--mac-warning)',
       pending_payment: 'var(--mac-warning)',
+      [PAYMENT_RECONCILIATION_REQUIRED]: 'var(--mac-warning)',
       unknown_payment: 'var(--mac-text-secondary)',
       mixed_payment: 'var(--mac-text-secondary)'
     };
@@ -534,6 +537,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
       free: t('misc.eat_payment_free'),
       approval_pending: t('misc.eat_approval_pending'),
       pending_payment: t('misc.eat_pending_payment'),
+      [PAYMENT_RECONCILIATION_REQUIRED]: t('misc.eat_payment_reconciliation_required'),
       unknown_payment: t('misc.eat_unknown_payment'),
       mixed_payment: t('misc.eat_mixed_payment')
     };
@@ -1106,6 +1110,10 @@ export const buildAppointmentsTableColumns = ({
       <div className="eat-cell eat-cell--center" style={{ minWidth: isDoctorView ? '8%' : '100px' }}>
         {renderPaymentType(
           String((() => {
+            const paymentStatus = String(row.payment_status || '').toLowerCase();
+            if (paymentStatus === PAYMENT_RECONCILIATION_REQUIRED) {
+              return PAYMENT_RECONCILIATION_REQUIRED;
+            }
             if (row.payment_type === 'mixed_payment') {
               return 'mixed_payment';
             }
@@ -1116,7 +1124,6 @@ export const buildAppointmentsTableColumns = ({
               return 'free';
             }
             const discountMode = row.discount_mode;
-            const paymentStatus = (String(row.payment_status || '')).toLowerCase();
             const amount = getDisplayAmount(row as unknown as Appointment);
             const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
             const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';

@@ -7049,6 +7049,7 @@ const en = {
     eat_online: 'Онлайн',
     eat_payment_free: 'Бесплатно',
     eat_approval_pending: 'Ожидает одобрения',
+    eat_payment_reconciliation_required: 'Payment requires reconciliation',
     eat_pending_payment: 'Ожидает оплаты',
     eat_unknown_payment: 'Не указан',
     eat_mixed_payment: 'Смешано',

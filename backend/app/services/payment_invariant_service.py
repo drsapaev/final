@@ -125,6 +125,7 @@ from app.services.encounter_financial_fence import (
 )
 
 logger = logging.getLogger(__name__)
+PAYMENT_RECONCILIATION_REQUIRED = "reconciliation_required"
 
 
 class PaymentInvariantError(Exception):
@@ -567,10 +568,33 @@ class PaymentInvariantService:
             .all()
         )
 
-    def summarize_recorded_visit_payment(self, visit: Visit) -> dict[str, Any] | None:
-        """Return the canonical row only when the visit has ledger records."""
-        payments = self._read_summary_payments([visit.id])
-        return self._summarize_visits([visit], payments)["visits"][0] if payments else None
+    def recorded_payment_states(self, visits: list[Visit]) -> dict[int, tuple[str, str | None]]:
+        """Project each visit's receipt status independently for registrar lists."""
+        reconciliation = (PAYMENT_RECONCILIATION_REQUIRED, None)
+        try:
+            payments = self._read_summary_payments([visit.id for visit in visits])
+        except HTTPException as exc:
+            if exc.status_code != status.HTTP_409_CONFLICT:
+                raise
+            return dict.fromkeys((visit.id for visit in visits), reconciliation)
+
+        payments_by_visit: dict[int, list[Row]] = {}
+        for payment in payments:
+            payments_by_visit.setdefault(payment.visit_id, []).append(payment)
+
+        states: dict[int, tuple[str, str | None]] = {}
+        for visit in visits:
+            visit_payments = payments_by_visit.get(visit.id)
+            if not visit_payments:
+                continue
+            try:
+                row = self._summarize_visits([visit], visit_payments)["visits"][0]
+                states[visit.id] = (row["payment_status"], row["payment_type"])
+            except HTTPException as exc:
+                if exc.status_code != status.HTTP_409_CONFLICT:
+                    raise
+                states[visit.id] = reconciliation
+        return states
 
     def summarize_visits(self, visits: list[Visit]) -> dict[str, Any]:
         """Read receipt-backed balances using the same totals as payment creation.

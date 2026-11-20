@@ -1,6 +1,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { hasBackendAction } from '../../pages/registrar/registrarHelpers';
 import {
   adaptTimeFields,
   aggregatePatientsForAllDepartments,
@@ -134,6 +135,23 @@ describe('aggregatePatientsForAllDepartments', () => {
     expect(result[0]).not.toHaveProperty('can_start_visit');
     expect(result[0]).not.toHaveProperty('can_cancel');
     expect(result[0]).not.toHaveProperty('can_print_ticket');
+  });
+
+  it('keeps reconciliation visible and prevents payment on an affected group only', () => {
+    const payable = { cost: 50000, payment_status: 'pending', available_actions: ['mark_paid'], can_mark_paid: true };
+    const [affected, unrelated] = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, payment_status: 'reconciliation_required', payment_type: null, cost: 100000 }),
+      makeAppointment({ id: 2, ...payable }),
+      makeAppointment({ id: 3, patient_id: 20, ...payable }),
+    ]);
+
+    expect(affected.payment_status).toBe('reconciliation_required');
+    expect(affected.payment_type).toBeNull();
+    expect(affected.grouped_records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ payment_status: 'reconciliation_required' }),
+    ]));
+    expect(hasBackendAction(affected, 'mark_paid')).toBe(false);
+    expect(hasBackendAction(unrelated, 'mark_paid')).toBe(true);
   });
 
   it('preserves backend command availability only inside grouped records', () => {

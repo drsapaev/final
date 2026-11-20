@@ -7048,6 +7048,7 @@ const uzLatn = {
     eat_online: 'Onlayn',
     eat_payment_free: 'Bepul',
     eat_approval_pending: 'Tasdiq kutilmoqda',
+    eat_payment_reconciliation_required: 'To‘lovni solishtirish kerak',
     eat_pending_payment: "To'lov kutilmoqda",
     eat_unknown_payment: 'Koʻrsatilmagan',
     eat_mixed_payment: 'Aralash',

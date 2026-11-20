@@ -32,7 +32,6 @@ def _prime_registrar_queue_read_cache(
     from app.models.clinic import Doctor
     from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
     from app.models.patient import Patient
-    from app.models.payment import Payment
     from app.models.service import Service
     from app.models.visit import Visit
     from app.services.payment_invariant_service import PaymentInvariantService
@@ -247,26 +246,10 @@ def _prime_registrar_queue_read_cache(
             if len(candidates) == 1 and appointments_per_key.get(key, 0) == 1:
                 appointment_queue_metadata[key] = candidates[0]
 
-    payment_truth_by_visit: dict[int, dict[str, Any]] = {}
     payment_checked_visit_ids = set(all_visits)
-    if all_visits:
-        payment_visit_ids = {
-            visit_id
-            for (visit_id,) in db.query(Payment.visit_id)
-            .filter(Payment.visit_id.in_(payment_checked_visit_ids))
-            .distinct()
-            .all()
-        }
-        if payment_visit_ids:
-            payment_visits = [
-                visit
-                for visit_id, visit in all_visits.items()
-                if visit_id in payment_visit_ids
-            ]
-            summary = PaymentInvariantService(db).summarize_visits(payment_visits)
-            payment_truth_by_visit = {
-                row["visit_id"]: row for row in summary["visits"]
-            }
+    payment_truth_by_visit = PaymentInvariantService(db).recorded_payment_states(
+        list(all_visits.values())
+    )
 
     return {
         "patients": patients_by_id,

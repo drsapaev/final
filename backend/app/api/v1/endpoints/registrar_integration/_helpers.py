@@ -28,6 +28,7 @@ from app.services.canonical_visit_service import (  # noqa: F401
     CanonicalVisitResolutionError,
     CanonicalVisitService,
 )
+from app.services.payment_invariant_service import PAYMENT_RECONCILIATION_REQUIRED
 from app.services.queue_service import queue_service  # noqa: F401
 from app.services.service_mapping import (  # noqa: F401
     get_service_code,
@@ -90,7 +91,7 @@ def _registrar_user_role_names(user: User | None) -> set[str]:
 
 
 def _registrar_can_mark_paid(user: User | None, payment_status: str | None) -> bool:
-    if str(payment_status or "").strip().lower() == "paid":
+    if str(payment_status or "").strip().lower() in {"paid", PAYMENT_RECONCILIATION_REQUIRED}:
         return False
     return bool(_registrar_user_role_names(user) & REGISTRAR_PAYMENT_ROLES)
 
@@ -335,20 +336,18 @@ def _resolve_payment_truth(
     """Resolve payment status/method from payments, with a narrow legacy fallback."""
     cache = db.info.get("_registrar_queue_read_cache")
     if cache is not None and visit_id in cache["payment_checked_visit_ids"]:
-        row = cache["payment_truth_by_visit"].get(visit_id)
-        if row is not None:
-            return row["payment_status"], row["payment_type"]
-        return ("paid", None) if legacy_paid_at else ("pending", None)
-
-    if visit_id:
-        from app.models.payment import Payment
+        state = cache["payment_truth_by_visit"].get(visit_id)
+    elif visit_id:
         from app.models.visit import Visit
         from app.services.payment_invariant_service import PaymentInvariantService
 
         visit = db.get(Visit, visit_id)
-        if visit and db.query(Payment.id).filter(Payment.visit_id == visit_id).first():
-            row = PaymentInvariantService(db).summarize_visits([visit])["visits"][0]
-            return row["payment_status"], row["payment_type"]
+        states = PaymentInvariantService(db).recorded_payment_states([visit]) if visit else {}
+        state = states.get(visit_id)
+    else:
+        state = None
+    if state is not None:
+        return state
     return ("paid", None) if legacy_paid_at else ("pending", None)
 
 

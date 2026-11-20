@@ -1,5 +1,7 @@
 import { parseRegistrarTimestamp } from './dateUtils';
 
+export const PAYMENT_RECONCILIATION_REQUIRED = 'reconciliation_required';
+
 export const normalizeRegistrationMode = (value: unknown) => {
   const normalized = String(value || 'none').toLowerCase();
   return ['none', 'repeat', 'benefit', 'all_free'].includes(normalized) ? normalized : 'none';
@@ -7,6 +9,7 @@ export const normalizeRegistrationMode = (value: unknown) => {
 
 export const normalizePaymentStatus = (value: unknown) => {
   const status = String(value || 'pending').toLowerCase();
+  if (status === PAYMENT_RECONCILIATION_REQUIRED) return status;
   return status === 'paid' || status === 'partial' ? status : 'pending';
 };
 
@@ -589,6 +592,7 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     const uniqueRegistrationModes = [...new Set(groupedDiscountModes.filter(Boolean))];
     const groupedPaymentStatuses: unknown[] = Array.isArray(group.grouped_payment_statuses) ? group.grouped_payment_statuses as unknown[] : [];
     const uniquePaymentStatuses = [...new Set(groupedPaymentStatuses.filter(Boolean))];
+    const needsPaymentReconciliation = uniquePaymentStatuses.includes(PAYMENT_RECONCILIATION_REQUIRED);
     const groupedPaymentTypes: unknown[] = Array.isArray(group.grouped_payment_types) ? group.grouped_payment_types as unknown[] : [];
     const uniquePaymentTypes = [...new Set(groupedPaymentTypes.filter(Boolean))];
 
@@ -634,8 +638,10 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       ...groupPublic,
       visit_type: uniqueRegistrationModes.length === 1 ? group.visit_type : 'mixed',
       discount_mode: uniqueRegistrationModes.length === 1 ? uniqueRegistrationModes[0] : 'mixed',
-      payment_type: aggregatePaymentType,
-      payment_status: uniquePaymentStatuses.length === 1 ? uniquePaymentStatuses[0] : 'mixed',
+      payment_type: needsPaymentReconciliation ? null : aggregatePaymentType,
+      payment_status: needsPaymentReconciliation
+        ? PAYMENT_RECONCILIATION_REQUIRED
+        : (uniquePaymentStatuses.length === 1 ? uniquePaymentStatuses[0] : 'mixed'),
       cost: Number(group.cost as number | string | undefined || 0),
       cost_display: Number(group.cost as number | string | undefined || 0) <= 0 ? 'free' : null,
     };
