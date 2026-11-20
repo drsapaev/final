@@ -182,7 +182,7 @@ def test_sibling_pending_is_visible_and_never_authorizes_payment(db_session, gro
 
 
 @pytest.mark.parametrize("recursive", [0, 1])
-def test_sqlite_generation_survives_downgrade_and_reused_id(recursive):
+def test_sqlite_generation_survives_rejected_downgrade_and_reused_id(recursive):
     engine = create_engine("sqlite:///:memory:")
     try:
         with engine.begin() as conn:
@@ -203,8 +203,11 @@ def test_sqlite_generation_survives_downgrade_and_reused_id(recursive):
             conn.execute(text("INSERT INTO encounters (id,patient_id) VALUES (2,1)"))
             first = conn.execute(text("SELECT generation FROM encounters WHERE id=2")).scalar_one()
             conn.execute(text("DELETE FROM encounters WHERE id=2"))
-            migration.downgrade()
-            migration.upgrade()
+            clock = text("SELECT value FROM encounter_financial_generation_clock WHERE id=1")
+            before_downgrade = conn.execute(clock).scalar_one()
+            with pytest.raises(RuntimeError, match="requires an audited rollback"):
+                migration.downgrade()
+            assert conn.execute(clock).scalar_one() == before_downgrade
             conn.execute(text("INSERT INTO encounters (id,patient_id) VALUES (2,1)"))
             assert conn.execute(text("SELECT generation FROM encounters WHERE id=2")).scalar_one() > first
     finally:

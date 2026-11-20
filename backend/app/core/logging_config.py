@@ -70,12 +70,12 @@ def _trusted_idempotency_fingerprint(
 ) -> tuple[int, str] | None:
     """Identify the HMAC argument from the canonical idempotency logger only.
 
-    The dispatch method computes this field with _idempotency_key_log_fingerprint;
+    The _dispatch method computes this field with _idempotency_key_log_fingerprint;
     arbitrary log records or unrecognized format strings must stay fully masked.
     """
     if (
         record.name != "app.middleware.idempotency_middleware"
-        or record.funcName != "dispatch"
+        or record.funcName != "_dispatch"
         or not isinstance(record.pathname, str)
         or not record.pathname.replace("\\", "/").endswith(
             "/app/middleware/idempotency_middleware.py"
