@@ -86,11 +86,13 @@ or runtime path.
    Confirm the returned event ID, project, `environment=staging`, and
    `release=<full tested SHA>` before declaring readback `PASS`.
 4. For an authorized hosted masking check, inspect the exact event's JSON
-   in place, if accessible. Confirm `user.email` and `extra.diagnosis` are
+   in place via its `JSON` link, if accessible. Confirm `user.email` and `extra.diagnosis` are
    absent and the synthetic exception value is `[REDACTED]`. Do not copy,
    export, screenshot, or paste payloads, raw field values, or headers.
    Report only field names and assertion outcomes. If only pre-transport
    masking can be inspected, report that separately; it is not hosted proof.
+   UI-only inspection without exact field visibility is `PARTIAL`, not a
+   hosted masking PASS.
 5. HTTP 200 at ingest is only send-side evidence. A mismatched event,
    project, environment, release, or masking assertion is `FAIL` for that
    check. A 404 for the exact ID is `NOT_VERIFIED (404)`, not proof of
