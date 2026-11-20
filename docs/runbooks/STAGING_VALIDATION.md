@@ -66,6 +66,28 @@ build the frontend with `VITE_SENTRY_ENV=staging` and
 and `APP_VERSION=<full SHA>`. Pass both values through the supported build
 or runtime path.
 
+### Mini App pre-merge preflight and live acceptance
+
+Use the manual **Mini App PR staging preflight** as a credential-free check
+of the reviewed SHA. For PR #4118, dispatch it from
+`codex/telegram-miniapp-sessions-20261116` with
+`33f35996a1f86726b17f8caa819d1ed99aa1729a`. GitHub must first recognize
+the workflow on the default branch and the selected branch must include
+the reviewed workflow. The preflight checks Compose configuration with a
+synthetic marker and does not start containers or use GitHub Environment
+secrets, HTTPS or the Telegram API. It cannot produce native acceptance.
+
+The separate GitHub Environment `staging-miniapp-pr` is for a future
+reviewed live job scoped to the explicitly allowed branch. Do not add or
+use a real token until the exact credential-consuming workflow, isolated
+runner and staging HTTPS endpoint have been reviewed. The host-only Codex
+Cloud Bot API secret cannot verify Mini App signatures locally. In a live
+run, supply the staging credential only to the isolated backend from the
+approved secret store. Do not start the worker: the base Compose file
+also maps `TELEGRAM_BOT_TOKEN` into that service. Use a fresh synthetic
+patient and record the exact tested SHA, native result and teardown.
+Do not reuse the reminder workflow or production credentials.
+
 ### Verify Sentry canaries without asking the owner
 
 1. Resolve the full tested Git SHA from the validated checkout, then take

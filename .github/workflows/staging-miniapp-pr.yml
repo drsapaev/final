@@ -1,0 +1,108 @@
+name: Mini App PR staging preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      source-sha:
+        description: Full reviewed source SHA for PR 4118
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  compose-preflight:
+    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/codex/telegram-miniapp-sessions-20261116'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      REQUESTED_SHA: ${{ inputs.source-sha }}
+      REVIEWED_SHA: 33f35996a1f86726b17f8caa819d1ed99aa1729a
+    steps:
+      - name: Check out the exact approved public source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$REQUESTED_SHA" != "$REVIEWED_SHA" ]]; then
+            echo "::error::The requested SHA is not the SHA reviewed for this preflight."
+            exit 1
+          fi
+          mkdir -p source
+          git -C source init --quiet
+          git -C source remote add origin https://github.com/drsapaev/final.git
+          git -C source fetch --no-tags --depth=1 origin "$REVIEWED_SHA"
+          git -C source checkout --quiet --detach FETCH_HEAD
+          test "$(git -C source rev-parse HEAD)" = "$REVIEWED_SHA"
+
+      - name: Verify the isolated backend-only token binding without a real secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          scratch="$(mktemp -d)"
+          trap 'rm -rf -- "$scratch"' EXIT
+
+          cat > "$scratch/synthetic.env" <<'ENV'
+          STAGING_PUBLIC_BASE_URL=http://127.0.0.1:18080
+          STAGING_PUBLIC_WS_URL=ws://127.0.0.1:18080
+          STAGING_PUBLIC_WS_HOST=127.0.0.1:18080
+          CORS_ORIGINS=http://127.0.0.1:18080
+          POSTGRES_USER=miniapp_synthetic
+          POSTGRES_PASSWORD=local-synthetic-password
+          POSTGRES_DB=miniapp_synthetic
+          SECRET_KEY=local-synthetic-secret-for-config-only
+          ADMIN_USERNAME=synthetic
+          ADMIN_PASSWORD=local-synthetic-admin
+          ADMIN_EMAIL=synthetic@example.invalid
+          ADMIN_FULL_NAME=Synthetic Staging
+          TELEGRAM_BOT_TOKEN=
+          MINIAPP_BACKEND_CREDENTIAL=synthetic-backend-marker-not-a-bot-token
+          ENV
+          cat > "$scratch/backend-only.yml" <<'YAML'
+          services:
+            backend:
+              environment:
+                TELEGRAM_BOT_TOKEN: ${MINIAPP_BACKEND_CREDENTIAL:?missing backend marker}
+          YAML
+
+          unset TELEGRAM_BOT_TOKEN MINIAPP_BACKEND_CREDENTIAL
+          docker compose --project-name miniapp-pr-preflight \
+            --env-file "$scratch/synthetic.env" \
+            -f source/ops/compose.staging.yml -f "$scratch/backend-only.yml" \
+            config --format json > "$scratch/compose.json"
+          python3 - "$scratch/compose.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as manifest:
+              services = json.load(manifest)["services"]
+
+          marker = "synthetic-backend-marker-not-a-bot-token"
+          if services["backend"].get("environment", {}).get("TELEGRAM_BOT_TOKEN") != marker:
+              sys.exit("Backend does not have the synthetic token binding.")
+          for name, service in services.items():
+              if name != "backend" and (
+                  service.get("environment", {}).get("TELEGRAM_BOT_TOKEN")
+                  or marker in json.dumps(service)
+              ):
+                  sys.exit("Token binding escaped the backend.")
+              if any(port.get("host_ip") != "127.0.0.1" for port in service.get("ports", [])):
+                  sys.exit("Staging stack publishes a non-loopback port.")
+
+          pending = ["frontend", "backend", "postgres", "redis"]
+          selected = set()
+          while pending:
+              name = pending.pop()
+              if name not in selected:
+                  selected.add(name)
+                  pending.extend(services[name].get("depends_on", {}))
+          if "worker" in selected:
+              sys.exit("Worker is in the Mini App service dependency chain.")
+          print("PASS: synthetic token is backend-only; ports are loopback; worker is not needed.")
+          PY
+          {
+            printf '### Mini App staging preflight\n\n'
+            printf 'Source SHA: `%s`\n\n' "$REVIEWED_SHA"
+            printf 'Compose wiring: PASS (synthetic marker only)\n\n'
+            printf 'Native Telegram acceptance: NOT_RUN. No containers, secrets or tunnel were used.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
