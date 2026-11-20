@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
+from json import dumps
 from threading import Barrier
 from uuid import uuid4
 
@@ -42,6 +43,27 @@ def test_manual_deposit_requires_exact_amount_and_uuid(client, auth_headers, tes
         assert client.post(path, headers=auth_headers, json=_body(patient_id, amount)).status_code == 422
     invalid = _body(patient_id, "1.00") | {"client_request_id": "synthetic-not-a-uuid"}
     assert client.post(path, headers=auth_headers, json=invalid).status_code == 422
+
+
+@pytest.mark.parametrize("action", ["add", "use"])
+def test_http_deposit_rejects_subcent_json_before_writing(
+    client, db_session, auth_headers, test_patient, action,
+):
+    patient_id = test_patient.id
+    funding = _body(patient_id, "20.25") | {"amount": 20.25}
+    assert client.post(f"{PREFIX}/add", headers=auth_headers, json=funding).status_code == 200
+    amount = "1.00000000000000000001"
+    raw_body = dumps(_body(patient_id, amount)).replace(dumps(amount), amount)
+    result = client.post(
+        f"{PREFIX}/{action}",
+        headers={**auth_headers, "Content-Type": "application/json"},
+        content=raw_body,
+    )
+    assert result.status_code == 422
+    db_session.expire_all()
+    balance = db_session.scalar(select(PatientDeposit.balance).filter_by(patient_id=patient_id))
+    assert balance == Decimal("20.25")
+    assert db_session.scalar(select(func.count()).select_from(DepositTransaction)) == 1
 
 
 def test_credit_and_debit_replay_original_balances(client, db_session, auth_headers, test_visit):
