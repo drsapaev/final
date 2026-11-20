@@ -1075,11 +1075,9 @@ jobs:
   backend-tests:
     name: 🐍 Backend тесты
     runs-on: ubuntu-24.04
-    # Round-5 (PR #3362): the suite fits in ~9 min on a warm runner, but
-    # shared-hosted variance (uniform 2x slowdown observed on a contended
-    # run) cancels the job at 20 and fails the required gate. Other heavy
-    # jobs in this workflow already run at 30/35.
-    timeout-minutes: 30
+    # The hosted runner took 28m30s for pytest alone in run 44721383309.
+    # Leave time for dependency setup, migrations and the remaining checks.
+    timeout-minutes: 40
     needs: [ci-scope]
     if: |
       always() &&
