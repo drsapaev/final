@@ -547,7 +547,9 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def get_trends(db: Session, days: int = 30) -> dict[str, Any]:
+    def get_trends(
+        db: Session, days: int = 30, *, include_revenue: bool
+    ) -> dict[str, Any]:
         """Получение трендов за последние N дней"""
         end_date = queue_service.get_local_timestamp(db)
         start_date = end_date - timedelta(days=days)
@@ -575,6 +577,10 @@ class AnalyticsService:
                 {"date": date.strftime("%Y-%m-%d"), "visits": visit_count}
             )
 
+        result: dict[str, Any] = {"period_days": days, "visit_trend": visit_trend}
+        if not include_revenue:
+            return result
+
         # Compare absolute times to the existing clinic-local day windows.
         windows = [(start_date + timedelta(days=i)).astimezone(UTC) for i in range(days + 1)]
         payments, _ = _gross_payment_report(db, windows[0], windows[-1], None)
@@ -586,16 +592,11 @@ class AnalyticsService:
             index = bisect_right(windows, posted_at) - 1
             if 0 <= index < days:
                 totals[index] += payment.amount
-        revenue_trend = [
+        result["revenue_trend"] = [
             {"date": item["date"], "revenue": float(total)}
             for item, total in zip(visit_trend, totals, strict=True)
         ]
-
-        return {
-            "period_days": days,
-            "visit_trend": visit_trend,
-            "revenue_trend": revenue_trend,
-        }
+        return result
 
     @staticmethod
     def get_payment_provider_analytics(

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
@@ -12,6 +13,7 @@ from app.models.payment import Payment, PaymentVisit
 from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 from app.models.user import User
 from app.models.visit import Visit
+from app.services import analytics as analytics_module
 from app.services.analytics import AnalyticsService
 from app.services.billing_service import BillingService
 from app.services.billing_service_pkg import _payments as billing_payments
@@ -242,6 +244,44 @@ def test_revenue_groups_payments_by_posting_day(
         {"date": order_day.date().isoformat(), "revenue": 5.00},
         {"date": posting_day.date().isoformat(), "revenue": 60.25},
     ]
+
+
+@pytest.mark.parametrize("is_superuser", [False, True])
+def test_trends_query_finance_only_for_financial_roles(
+    client: TestClient,
+    db_session,
+    test_doctor_user,
+    test_patient,
+    monkeypatch,
+    is_superuser: bool,
+) -> None:
+    from tests.conftest import mint_access_token
+
+    now = datetime(2040, 8, 2, 12, tzinfo=UTC)
+    yesterday = (now - timedelta(days=1)).date()
+    db_session.add(Visit(patient_id=test_patient.id, visit_date=yesterday))
+    test_doctor_user.is_superuser = is_superuser
+    db_session.commit()
+
+    monkeypatch.setattr(queue_service, "get_local_timestamp", lambda db: now)
+    financial_report = Mock(return_value=([], {}))
+    monkeypatch.setattr(analytics_module, "_gross_payment_report", financial_report)
+    response = client.get(
+        "/api/v1/analytics/trends",
+        headers=_auth_headers(mint_access_token(test_doctor_user)),
+        params={"days": 1},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["visit_trend"] == [{"date": yesterday.isoformat(), "visits": 1}]
+    if is_superuser:
+        assert payload["revenue_trend"] == [
+            {"date": yesterday.isoformat(), "revenue": 0.0}
+        ]
+        financial_report.assert_called_once()
+    else:
+        assert "revenue_trend" not in payload
+        financial_report.assert_not_called()
 
 
 def test_payment_confirmation_records_an_absolute_utc_time(

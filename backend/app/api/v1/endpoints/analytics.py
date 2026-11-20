@@ -1,11 +1,12 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.models.user import User
 from app.services.analytics import AnalyticsService
 from app.services.analytics_simple_api_service import (
     AnalyticsSimpleApiService,
@@ -98,16 +99,16 @@ async def get_dashboard_data(
 @router.get("/trends", response_model=dict[str, Any])
 async def get_trends_analytics(
     days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
-    current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
+    current_user: User = Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Получение трендов за последние N дней через SSOT"""
     try:
-        _end_date = datetime.now()
-        _start_date = _end_date - timedelta(days=days)
-
-        # Используем SSOT для получения трендов
-        return AnalyticsService.get_trends(db, days)
+        include_revenue = (
+            current_user.is_superuser
+            or current_user.role.strip().lower() in FINANCIAL_ANALYTICS_ROLES
+        )
+        return AnalyticsService.get_trends(db, days, include_revenue=include_revenue)
     except Exception as e:
         logger.warning(
             "Analytics trends endpoint failed error_type=%s",
