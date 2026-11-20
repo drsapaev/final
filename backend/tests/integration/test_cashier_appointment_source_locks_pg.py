@@ -3,49 +3,82 @@ from __future__ import annotations
 
 import asyncio
 import os
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from pathlib import Path
 from threading import Barrier, Event
 from types import SimpleNamespace
 
 import pytest
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
-from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.api.v1.endpoints.cashier import _payments
-from app.db.base import Base
+from app.db.capability_namespace import capability_schema_name
 from app.models.appointment import Appointment
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.visit import Visit
 from app.repositories.canonical_visit_repository import CanonicalVisitRepository
 from app.services.canonical_visit_service import CanonicalVisitService
+from tests.integration.test_staff_confirmation_guard_pg import (
+    _module,
+    isolated_staff_guard_postgres,
+)
 
 
 @pytest.fixture
-def pg_engine():
-    raw = os.environ.get('DATABASE_URL', '')
-    if not raw or make_url(raw).get_backend_name() != 'postgresql':
-        pytest.skip('requires disposable PostgreSQL')
-    url = make_url(raw)
-    if os.environ.get('CI', '').lower() != 'true' and not (url.database or '').startswith('clinic_test'):
-        pytest.skip('requires an explicitly disposable clinic_test database')
-    schema = 'test_cashier_source_' + uuid.uuid4().hex
-    admin = create_engine(url)
-    with admin.begin() as connection:
-        connection.execute(CreateSchema(schema))
-    engine = create_engine(url, connect_args={'options': f'-csearch_path={schema} -cstatement_timeout=15000 -clock_timeout=15000'})
-    try:
-        Base.metadata.create_all(engine)
-        yield engine
-    finally:
-        engine.dispose()
-        with admin.begin() as connection:
-            connection.execute(DropSchema(schema, cascade=True))
-        admin.dispose()
+def pg_cashier(monkeypatch):
+    url = make_url(os.getenv("DATABASE_URL", "sqlite://"))
+    ci_service = (
+        os.getenv("CI", "").lower() == "true"
+        and url.database == "clinicdb"
+        and url.host in {"localhost", "127.0.0.1", "::1"}
+    )
+    if url.get_backend_name() != "postgresql" or not (
+        ci_service or (url.database or "").startswith("clinic_test")
+    ):
+        pytest.skip("requires a disposable PostgreSQL database")
+
+    with isolated_staff_guard_postgres(url, monkeypatch) as (owner, runtime, ids):
+        root = Path(__file__).resolve().parents[3]
+        with owner.begin() as db:
+            quote = db.dialect.identifier_preparer.quote_identifier
+            schema_name = db.dialect.default_schema_name
+            schema = quote(schema_name)
+            runtime_role = runtime.url.username
+            table = f"{schema}.appointments"
+            role = quote(runtime_role)
+            private = quote(capability_schema_name(schema_name))
+            migration = _module(root / "backend/alembic/versions/0123_reconciliation_fence.py")
+            migration.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": schema_name}))
+            migration.upgrade()
+            db.exec_driver_sql(f"ALTER TABLE {schema}.click_callback_receipts ENABLE ROW LEVEL SECURITY")
+            db.exec_driver_sql(f"ALTER TABLE {schema}.click_callback_receipts FORCE ROW LEVEL SECURITY")
+            expected_owner = db.scalar(text("SELECT CURRENT_USER"))
+            capability = db.scalar(text("""
+                SELECT pg_catalog.pg_get_userbyid(proowner) FROM pg_catalog.pg_proc
+                WHERE oid=pg_catalog.to_regprocedure(:signature)
+            """), {"signature": f"{private}.financial_lock_rows(text,integer[])"})
+            db.exec_driver_sql(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+            db.exec_driver_sql(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+            # A row lock needs column UPDATE privilege. RLS allows locking
+            # an appointment but refuses any update by this synthetic role.
+            db.exec_driver_sql(f"GRANT SELECT, UPDATE (id) ON {table} TO {role}")
+            db.exec_driver_sql(f"CREATE POLICY cashier_read ON {table} FOR SELECT TO {role} USING (true)")
+            db.exec_driver_sql(
+                f"CREATE POLICY cashier_lock ON {table} FOR UPDATE TO {role} USING (true) WITH CHECK (false)"
+            )
+        reconciliation = _module(root / "scripts/provision_reconciliation_fence_role.py")
+        reconciliation.provision(
+            owner, schema=schema_name, expected_owner=expected_owner,
+            backend_role=runtime_role, capability_role=capability,
+        )
+        yield owner, runtime, ids["stage"]
 
 
 def _seed(engine):
@@ -65,35 +98,43 @@ def _seed(engine):
         return [visit.id for visit in visits], [appointment.id for appointment in appointments]
 
 
-def _run_payment(engine, visit_id, appointment_id):
+def _run_payment(engine, visit_id, appointment_id, actor_id, start=None):
     with Session(engine) as db:
         request = _payments.CreatePaymentRequest(
             visit_id=visit_id, appointment_id=appointment_id, amount=1, method='card'
         )
+        if start is not None:
+            start.wait(timeout=10)
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(_payments.create_payment(request, db=db, current_user=SimpleNamespace(id=1)))
-        return exc.value.status_code
+            asyncio.run(_payments.create_payment(request, db=db, current_user=SimpleNamespace(id=actor_id)))
+        return exc.value.status_code, exc.value.detail
 
 
-def test_cross_linked_cashier_requests_reject_without_deadlock(pg_engine, monkeypatch):
-    visits, appointments = _seed(pg_engine)
+def test_cross_linked_cashier_requests_reject_without_deadlock(pg_cashier, monkeypatch):
+    owner, runtime, actor_id = pg_cashier
+    visits, appointments = _seed(owner)
     barrier = Barrier(2)
+    resolved = []
 
-    class BarrierService(CanonicalVisitService):
-        def resolve_canonical_visit(self, *args, **kwargs):
-            # The cashier endpoint has acquired its requested Visit by now.
-            barrier.wait(timeout=10)
-            return super().resolve_canonical_visit(*args, **kwargs)
+    class ObservedService(CanonicalVisitService):
+        def resolve_canonical_visit(self, appointment_id, **kwargs):
+            resolved.append(appointment_id)
+            return super().resolve_canonical_visit(appointment_id, **kwargs)
 
-    monkeypatch.setattr(_payments, 'CanonicalVisitService', BarrierService)
+    monkeypatch.setattr(_payments, 'CanonicalVisitService', ObservedService)
     with ThreadPoolExecutor(max_workers=2) as pool:
-        futures = [pool.submit(_run_payment, pg_engine, visits[0], appointments[1]),
-                   pool.submit(_run_payment, pg_engine, visits[1], appointments[0])]
-        assert [future.result(timeout=20) for future in futures] == [409, 409]
+        # Start both requests before the reconciliation mutex serializes them.
+        futures = [pool.submit(_run_payment, runtime, visits[0], appointments[1], actor_id, barrier),
+                   pool.submit(_run_payment, runtime, visits[1], appointments[0], actor_id, barrier)]
+        assert [future.result(timeout=20) for future in futures] == [(409, "appointment_id does not match visit_id")] * 2
+    assert sorted(resolved) == sorted(appointments)
+    with Session(owner) as db:
+        assert not db.query(Payment.id).filter(Payment.visit_id.in_(visits)).first()
 
 
-def test_source_changed_after_hint_is_rechecked_by_cashier(pg_engine, monkeypatch):
-    visits, appointments = _seed(pg_engine)
+def test_source_changed_after_hint_is_rechecked_by_cashier(pg_cashier, monkeypatch):
+    owner, runtime, actor_id = pg_cashier
+    visits, appointments = _seed(owner)
     have_hint = Event()
     proceed = Event()
 
@@ -110,16 +151,18 @@ def test_source_changed_after_hint_is_rechecked_by_cashier(pg_engine, monkeypatc
 
     monkeypatch.setattr(_payments, 'CanonicalVisitService', PausedService)
     with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(_run_payment, pg_engine, visits[0], appointments[0])
+        future = pool.submit(_run_payment, runtime, visits[0], appointments[0], actor_id)
         assert have_hint.wait(timeout=10)
         try:
-            with Session(pg_engine) as modifier:
+            with Session(owner) as modifier:
                 appointment = modifier.get(Appointment, appointments[0])
                 appointment.source_visit_id = visits[1]
                 modifier.commit()
         finally:
             proceed.set()
-        assert future.result(timeout=20) == 409
+        assert future.result(timeout=20) == (409, "appointment_id does not match visit_id")
+    with Session(owner) as db:
+        assert not db.query(Payment.id).filter(Payment.visit_id.in_(visits)).first()
 
 
 @pytest.mark.parametrize('mode,expected', [('source', 200), ('visit_only', 200), ('legacy', 409)])
@@ -127,7 +170,6 @@ def test_cashier_compatible_and_legacy_payment_paths(
     mode, expected, client, db_session, admin_auth_headers, test_patient, test_service, monkeypatch
 ):
     import app.ws.cashier_ws as cashier_ws
-    from app.models.payment import Payment
     from app.models.visit import VisitService
 
     async def noop(*args, **kwargs):
