@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -8,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.billing import Invoice, InvoiceStatus
 from app.models.patient import Patient
+from app.models.payment import Payment
 
 
 def _create_invoice(db_session: Session, patient: Patient) -> Invoice:
@@ -108,6 +111,35 @@ def test_admin_cannot_delete_legacy_draft_with_recorded_money(client, db_session
     response = client.delete(f"/api/v1/billing/invoices/{invoice_id}", headers=admin_auth_headers)
     assert response.status_code == 400, response.text
     assert db_session.get(Invoice, invoice_id).paid_amount == 1
+
+
+def test_billing_analytics_includes_the_end_date_and_filters_the_breakdown(
+    client, db_session, admin_auth_headers, test_patient, test_visit,
+):
+    inside = _create_invoice(db_session, test_patient)
+    outside = _create_invoice(db_session, test_patient)
+    day = date(2031, 3, 4)
+    midday = datetime(2031, 3, 4, 12, 30)
+    inside.issue_date = midday
+    inside.status = InvoiceStatus.PENDING
+    outside.issue_date = midday + timedelta(days=1)
+    outside.status = InvoiceStatus.OVERDUE
+    db_session.add_all([
+        Payment(visit_id=test_visit.id, amount=Decimal("15.25"), created_at=midday.replace(tzinfo=UTC)),
+        Payment(visit_id=test_visit.id, amount=Decimal("90.50"),
+                created_at=(midday + timedelta(days=1)).replace(tzinfo=UTC)),
+    ])
+    db_session.commit()
+    response = client.get(
+        "/api/v1/billing/analytics", headers=admin_auth_headers,
+        params={"date_from": day.isoformat(), "date_to": day.isoformat()},
+    )
+    assert response.status_code == 200, response.text
+    report = response.json()
+    assert report["summary"]["total_invoices"] == 1
+    assert report["summary"]["total_payments"] == 1
+    assert report["summary"]["payments_amount"] == "15.25"
+    assert [entry["status"] for entry in report["status_breakdown"]] == ["pending"]
 
 
 def test_patient_cannot_run_legacy_billing_wide_actions(

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time
 from typing import Any
 
 from sqlalchemy import func
@@ -87,11 +87,13 @@ class BillingApiRepository:
         payment_query = self.db.query(Payment)
 
         if date_from:
-            invoice_query = invoice_query.filter(Invoice.issue_date >= date_from)
-            payment_query = payment_query.filter(Payment.payment_date >= date_from)
+            start = datetime.combine(date_from, time.min)
+            invoice_query = invoice_query.filter(Invoice.issue_date >= start)
+            payment_query = payment_query.filter(Payment.created_at >= start)
         if date_to:
-            invoice_query = invoice_query.filter(Invoice.issue_date <= date_to)
-            payment_query = payment_query.filter(Payment.payment_date <= date_to)
+            end = datetime.combine(date_to, time.max)
+            invoice_query = invoice_query.filter(Invoice.issue_date <= end)
+            payment_query = payment_query.filter(Payment.created_at <= end)
 
         total_invoices = invoice_query.count()
         total_amount = (
@@ -116,7 +118,7 @@ class BillingApiRepository:
         )
 
         status_stats = (
-            self.db.query(
+            invoice_query.with_entities(
                 Invoice.status,
                 func.count(Invoice.id).label("count"),
                 func.sum(Invoice.total_amount).label("amount"),
