@@ -14,6 +14,7 @@ from app.models.payment import Payment, PaymentVisit
 from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 from app.models.user import User
 from app.models.visit import Visit
+from app.repositories.analytics_simple_repository import AnalyticsSimpleRepository
 from app.services import analytics as analytics_module
 from app.services.analytics import AnalyticsService
 from app.services.billing_service import BillingService
@@ -40,6 +41,31 @@ def doctor_token(client: TestClient, test_doctor_user: User) -> str:
 
 def _auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.mark.parametrize("path", ["quick-stats", "dashboard"])
+def test_analytics_response_hides_unexpected_repository_failure(
+    client: TestClient,
+    doctor_token: str,
+    monkeypatch,
+    caplog,
+    path: str,
+) -> None:
+    marker = "SYNTHETIC_ANALYTICS_QUERY_FAILURE"
+    monkeypatch.setattr(
+        AnalyticsSimpleRepository,
+        "count_patients",
+        Mock(side_effect=RuntimeError(marker)),
+    )
+
+    response = client.get(
+        f"/api/v1/analytics/{path}", headers=_auth_headers(doctor_token)
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Internal server error"
+    assert marker not in response.text
+    assert marker not in caplog.text
 
 
 @pytest.mark.parametrize(
