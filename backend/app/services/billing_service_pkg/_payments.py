@@ -4,9 +4,12 @@ Split from billing_service.py.
 """
 from __future__ import annotations
 
+from decimal import Decimal
+
+from fastapi import HTTPException
+
 from app.services.billing_service_pkg._base import *  # noqa: F401, F403
 from app.services.billing_service_pkg._base import BillingServiceMixinBase
-from decimal import Decimal
 
 
 class PaymentsMixin(BillingServiceMixinBase):
@@ -419,15 +422,9 @@ class PaymentsMixin(BillingServiceMixinBase):
         Delegates payment creation to
         ``PaymentInvariantService.create_payment_for_visit(commit=False)``.
 
-        This provides:
-        - ``with_for_update()`` lock on Visit row (serializes concurrent payments)
-        - ``paid_amount`` vs ``total_cost`` check (prevents overpayment)
-        - Overpayment policy (allow as advance/deposit, logged at WARNING)
-        - ``IntegrityError`` defense-in-depth (degrades to 409)
-
-        The Invoice update logic (paid_amount, balance, status) is preserved
-        — ``create_payment_for_visit()`` does NOT touch Invoice, so we update
-        it here in the same transaction.
+        The shared financial preflight serializes receipts for the visit.
+        The legacy invoice is reread under its own lock, then updated in
+        the same transaction as the new receipt.
 
         Args:
             invoice_id: ID of the Invoice to record payment against.
@@ -450,11 +447,12 @@ class PaymentsMixin(BillingServiceMixinBase):
             HTTPException: 400/409 from PaymentInvariantService (overpayment,
                 concurrent payment race, etc.).
         """
-        invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        if not invoice:
+        reference = self.db.query(Invoice.visit_id).filter(Invoice.id == invoice_id).one_or_none()
+        if reference is None:
             raise ValueError("Счет не найден")
 
-        if not invoice.visit_id:
+        visit_id = reference.visit_id
+        if not visit_id:
             raise ValueError(
                 "Невозможно записать платеж: у счета нет связанного визита (invoice.visit_id)"
             )
@@ -477,17 +475,6 @@ class PaymentsMixin(BillingServiceMixinBase):
                 f"payment_method must be PaymentMethod enum or string, got {type(payment_method)}"
             )
 
-        # Delegate to PaymentInvariantService for race-condition protection:
-        #   - with_for_update() on Visit row
-        #   - paid_amount vs total_cost check
-        #   - overpayment policy
-        #   - IntegrityError defense-in-depth
-        #
-        # commit=False because we need to update Invoice in the same transaction.
-        # The Visit lock is held until we commit at the end of this method.
-        #
-        # Note: create_payment_for_visit() sets status='paid' and paid_at automatically.
-        # It does not accept receipt_no and provider_payment_id, so we set them after.
         from app.services.payment_invariant_service import PaymentInvariantService
 
         # Build current_user object if only created_by (int) was provided
@@ -498,8 +485,23 @@ class PaymentsMixin(BillingServiceMixinBase):
             current_user = type("UserRef", (), {"id": None})()
 
         payment_service = PaymentInvariantService(self.db)
+        # Lock the complete financial group before the legacy invoice row.
+        # A concurrent receipt may have updated the invoice while we waited.
+        payment_service.preflight_payment_groups([visit_id])
+        invoice = (
+            self.db.query(Invoice)
+            .filter(Invoice.id == invoice_id)
+            .with_for_update(of=Invoice)
+            .populate_existing()
+            .one_or_none()
+        )
+        visit = self.db.get(Visit, visit_id, populate_existing=True)
+        if invoice is None or invoice.visit_id != visit_id or visit is None or invoice.patient_id != visit.patient_id:
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail="Контекст счёта требует сверки")
+
         payment = payment_service.create_payment_for_visit(
-            visit_id=invoice.visit_id,
+            visit_id=visit_id,
             amount=Decimal(str(amount)),
             method=method_str,
             note=description,
@@ -514,7 +516,6 @@ class PaymentsMixin(BillingServiceMixinBase):
         payment.receipt_no = payment_number
         payment.provider_payment_id = reference_number
 
-        # Обновляем статус счета (preserved from original record_payment)
         invoice.paid_amount += amount
         invoice.balance = invoice.total_amount - invoice.paid_amount
 

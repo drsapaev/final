@@ -67,6 +67,13 @@ class TestRecordPaymentMigration:
     def _make_invoice(self, db_session, visit_id=None, total_amount=10000, paid_amount=0):
         """Create a test Invoice."""
         from app.models.billing import Invoice, InvoiceStatus
+        from app.models.visit import Visit
+
+        if visit_id is not None:
+            db_session.add(Visit(
+                id=visit_id, patient_id=1, status="open", discount_mode="none", confirmation_context_epoch=1,
+            ))
+            db_session.flush()
         invoice = Invoice(
             invoice_number=f"TEST-{uuid4().hex[:12]}",
             patient_id=1,
