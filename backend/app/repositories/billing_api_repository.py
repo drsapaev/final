@@ -28,8 +28,11 @@ class BillingApiRepository:
         self.db.delete(instance)
         self.db.commit()
 
-    def get_invoice(self, invoice_id: int) -> Invoice | None:
-        return self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    def get_invoice(self, invoice_id: int, *, for_update: bool = False) -> Invoice | None:
+        query = self.db.query(Invoice).filter(Invoice.id == invoice_id)
+        if for_update:
+            query = query.with_for_update(of=Invoice).populate_existing()
+        return query.first()
 
     def list_invoices(
         self,

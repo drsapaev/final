@@ -23,6 +23,7 @@ from app.models.billing import BillingSettings, Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentClientRequest
 from app.models.user import User
 from app.services import payment_client_requests
+from app.services.billing_api_service import BillingApiDomainError, BillingApiService
 from app.services.billing_service import BillingService
 from tests.integration.test_encounter_migration_pg import _migration
 from tests.integration.test_refund_cross_channel_budget import (
@@ -181,6 +182,29 @@ def test_record_payment_persists_across_sessions(legacy_invoice_pg):
         _record(db, invoice_id=invoice_id, actor_id=ids["stage"], amount=10)
         db.commit()
     _assert_settled(owner, invoice_id, ids["visit"], [Decimal("10.00")])
+
+
+def test_invoice_edit_cannot_overwrite_a_concurrently_settled_status(legacy_invoice_pg):
+    owner, runtime, invoice_id, ids = legacy_invoice_pg
+    with Session(owner, expire_on_commit=False) as editor, Session(runtime) as cashier:
+        cached = editor.get(Invoice, invoice_id)
+        assert cached.status == InvoiceStatus.DRAFT
+        _record(cashier, invoice_id=invoice_id, actor_id=ids["cashier"], amount=4)
+        cashier.commit()
+        assert cached.status == InvoiceStatus.DRAFT
+        service = BillingApiService(editor)
+        with pytest.raises(BillingApiDomainError) as rejected:
+            service.update_invoice(invoice_id=invoice_id, update_data={"status": InvoiceStatus.CANCELLED})
+        assert rejected.value.status_code == 409
+        assert cached.status == InvoiceStatus.PARTIALLY_PAID
+        editor.rollback()
+        with pytest.raises(BillingApiDomainError) as delete:
+            service.delete_invoice(invoice_id=invoice_id)
+        assert delete.value.status_code == 400
+    with Session(owner) as db:
+        invoice = db.get(Invoice, invoice_id)
+        assert invoice.status == InvoiceStatus.PARTIALLY_PAID and invoice.paid_amount == 4
+        assert db.query(Payment).filter_by(visit_id=ids["visit"]).count() == 1
 
 
 @pytest.mark.parametrize("amount", [Decimal("4.00"), Decimal("10.00")], ids=["partial", "fully-settled"])

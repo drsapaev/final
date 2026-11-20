@@ -14,7 +14,8 @@ class TestBillingApiService:
         invoice = SimpleNamespace(status=InvoiceStatus.PAID)
 
         class Repository:
-            def get_invoice(self, invoice_id):
+            def get_invoice(self, invoice_id, *, for_update):
+                assert for_update
                 return invoice
 
         service = BillingApiService(db=None, repository=Repository())
