@@ -8,12 +8,23 @@ from decimal import Decimal
 import pytest
 
 from app.models.payment import Payment
+from app.models.visit import VisitService
+
+
+def _price_visit(db_session, visit, amount: int, currency: str) -> None:
+    db_session.add(VisitService(
+        visit_id=visit.id, service_id=1, name="SYNTHETIC-online checkout",
+        qty=1, price=amount, currency=currency,
+    ))
+    db_session.commit()
 
 
 @pytest.fixture(autouse=True)
 def configured_payment_providers(monkeypatch):
     from app.core.config import get_settings
-    from app.services.payment_provider_manager_factory import reset_payment_manager_for_tests
+    from app.services.payment_provider_manager_factory import (
+        reset_payment_manager_for_tests,
+    )
 
     settings = get_settings()
     monkeypatch.setattr(settings, "CLICK_ENABLED", True)
@@ -46,6 +57,7 @@ class TestPaymentInitE2E:
         assert payment.status in ["pending", "processing"]
 
     def test_click_init_success(self, client, auth_headers, test_visit, db_session):
+        _price_visit(db_session, test_visit, 150_000, "UZS")
         response = client.post(
             "/api/v1/payments/init",
             headers=auth_headers,
@@ -65,6 +77,7 @@ class TestPaymentInitE2E:
         self._assert_payment_created(db_session, data["payment_id"], "click", "UZS")
 
     def test_payme_init_success(self, client, auth_headers, test_visit, db_session):
+        _price_visit(db_session, test_visit, 150_000, "UZS")
         response = client.post(
             "/api/v1/payments/init",
             headers=auth_headers,
@@ -84,6 +97,7 @@ class TestPaymentInitE2E:
         self._assert_payment_created(db_session, data["payment_id"], "payme", "UZS")
 
     def test_kaspi_init_success(self, client, auth_headers, test_visit, db_session):
+        _price_visit(db_session, test_visit, 1000, "KZT")
         response = client.post(
             "/api/v1/payments/init",
             headers=auth_headers,
@@ -122,6 +136,7 @@ class TestPaymentInitE2E:
     def test_test_init_allows_authorized_payment_staff(
         self, client, auth_headers, test_visit, db_session
     ):
+        _price_visit(db_session, test_visit, 150_000, "UZS")
         response = client.post(
             "/api/v1/payments/test-init",
             headers=auth_headers,
