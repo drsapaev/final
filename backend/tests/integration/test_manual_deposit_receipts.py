@@ -201,3 +201,37 @@ def test_manual_deposit_receipt_is_immutable_and_prevents_downgrade(manual_depos
     with pytest.raises(DBAPIError, match="manual deposit receipts prevent downgrade"), owner.begin() as conn:
         migration.op = Operations(MigrationContext.configure(conn))
         migration.downgrade()
+
+
+def test_deposit_ledger_refuses_truncation_and_preserves_command_replay(manual_deposit_pg):
+    owner, runtime, ids = manual_deposit_pg
+    revision = _migration("0139_deposit_receipt_truncate.py")
+    schema = owner.dialect.default_schema_name
+    options = {"version_table_schema": schema}
+    quoted = owner.dialect.identifier_preparer.quote_schema(schema)
+    with owner.begin() as conn:
+        revision.op = Operations(MigrationContext.configure(conn, opts=options))
+        revision.upgrade()
+
+    command = AddDepositRequest(**_body(ids["patient"], "25.00"))
+    with Session(runtime) as db:
+        committed = ForceMajeureApiService(db).add_to_deposit(request=command, current_user_id=ids["stage"])
+
+    for table in ("deposit_transactions", "patient_deposits"):
+        with pytest.raises(DBAPIError, match="deposit receipt ledger cannot be truncated") as denied:
+            with owner.begin() as conn:
+                conn.exec_driver_sql(f"TRUNCATE {quoted}.{table} CASCADE")
+        assert denied.value.orig.sqlstate == "23514"
+
+    with pytest.raises(DBAPIError, match="deposit receipts prevent downgrade"), owner.begin() as conn:
+        revision.op = Operations(MigrationContext.configure(conn, opts=options))
+        revision.downgrade()
+
+    with Session(runtime) as db:
+        replay = ForceMajeureApiService(db).add_to_deposit(request=command, current_user_id=ids["stage"])
+        assert replay == committed
+    with Session(owner) as db:
+        receipt = db.scalars(select(DepositTransaction).filter_by(client_request_id=command.client_request_id)).one()
+        assert receipt.amount == Decimal("25.00")
+        assert receipt.balance_after == receipt.deposit.balance == receipt.amount
+        assert receipt.performed_by == ids["stage"]
