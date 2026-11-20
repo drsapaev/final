@@ -870,7 +870,10 @@ const DermatologistPanelUnified = () => {
     null
   ), [currentAppointment?.patient_id, selectedPatient]);
 
-  const patientHistory = useDermatologyPatientHistory(getSelectedPatientId());
+  const historyPatientId = getSelectedPatientId();
+  const historyPatientIdRef = useRef(historyPatientId);
+  historyPatientIdRef.current = historyPatientId;
+  const patientHistory = useDermatologyPatientHistory(historyPatientId);
   const {
     appointments: patientAppointmentsHistory,
     skinExaminations,
@@ -1722,13 +1725,11 @@ const DermatologistPanelUnified = () => {
                   patientId={(currentAppointment?.patient_id ?? undefined) as string | number | null | undefined}
                   specialty="dermatology"
                   onPersisted={() => {
-                    refreshCanonicalStatus(currentVisitContext, true);
-                    // DERMAHIST-FE-003 (audit 3892): сохранение EMR
-                    // (осмотр/процедуры) должно обновлять историю пациента
-                    // той же выборки — hook держит reload() именно для
-                    // этого; без него врач возвращается к устаревшему
-                    // снимку до перемонтирования hook'а.
-                    patientHistory.reload();
+                    const savedPatientId = String(currentAppointment.patient_id ?? '');
+                    if (savedPatientId && savedPatientId === String(historyPatientIdRef.current ?? '')) {
+                      patientHistory.reload();
+                    }
+                    return refreshCanonicalStatus(currentVisitContext, true);
                   }} />
 
                 </div>

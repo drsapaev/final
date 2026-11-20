@@ -33,6 +33,7 @@ import { renderWithProviders } from '../../test/renderWithProviders';
 
 const holder = vi.hoisted(() => ({
   navigate: null as ((to: string) => void) | null,
+  onEmrPersisted: undefined as (() => void | Promise<void>) | undefined,
 }));
 
 function NavigateProbe() {
@@ -75,13 +76,20 @@ vi.mock('../../stores/auth', () => ({
   subscribe: () => () => undefined,
 }));
 vi.mock('../../components/emr-v2/EMRContainerV2', () => ({
-  EMRContainerV2: (props: { visitId?: unknown; patientId?: unknown }) => (
-    <div
-      data-testid="emr-editor"
-      data-visit={String(props.visitId ?? '')}
-      data-patient={String(props.patientId ?? '')}
-    />
-  ),
+  EMRContainerV2: (props: {
+    visitId?: unknown;
+    patientId?: unknown;
+    onPersisted?: () => void | Promise<void>;
+  }) => {
+    holder.onEmrPersisted = props.onPersisted;
+    return (
+      <div
+        data-testid="emr-editor"
+        data-visit={String(props.visitId ?? '')}
+        data-patient={String(props.patientId ?? '')}
+      />
+    );
+  },
 }));
 vi.mock('../../components/PrescriptionSystem', () => ({
   default: (props: {
@@ -143,24 +151,6 @@ vi.mock('../../hooks/useSessionTimeoutWarning', () => ({
 }));
 vi.mock('../../hooks/useDermaHotkeys', () => ({ useDermaHotkeys: vi.fn() }));
 vi.mock('../../hooks/useVisitLifecycle', () => ({ useVisitLifecycle: vi.fn() }));
-vi.mock('../../useDermatologyPatientHistory', () => ({
-  useDermatologyPatientHistory: () => ({
-    appointments: [],
-    skinExaminations: [],
-    cosmeticProcedures: [],
-    skinExaminationsTotal: 0,
-    cosmeticProceduresTotal: 0,
-    hasMoreExaminations: false,
-    hasMoreProcedures: false,
-    loadingMoreExaminations: false,
-    loadingMoreProcedures: false,
-    loadMoreExaminations: () => undefined,
-    loadMoreProcedures: () => undefined,
-    loading: false,
-    ready: true,
-    error: null,
-  }),
-}));
 
 import { api } from '../../api/client';
 import tokenManager from '../../utils/tokenManager';
@@ -216,6 +206,10 @@ function mountPanel(initialEntry: string) {
   mockedGet.mockImplementation(async (url: unknown) => {
     const path = String(url);
     if (path === '/registrar/queues/today') return queueResponse([ROW_PATIENT_23, ROW_PATIENT_40]);
+    if (/^\/patients\/\d+\/appointments$/.test(path)) return { data: [], status: 200 } as never;
+    if (path === '/derma/examinations' || path === '/derma/procedures') {
+      return { data: { items: [], total: 0, page: 1, pages: 0 }, status: 200 } as never;
+    }
     if (path === '/appointments/40/status') {
       return { data: { visit_id: 98, emr: { id: 1, is_draft: false }, prescription: null, can_create_prescription: true, can_complete: true }, status: 200 } as never;
     }
@@ -310,5 +304,48 @@ describe('DERMARX-FE-004 — a late prescription POST is dropped after the visit
     }, { timeout: 2500 });
     expect(mockedNotifySuccess).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('emr-editor').getAttribute('data-visit')).toBe('55');
+  });
+});
+
+describe('DERMAHIST-FE-003 post-persist history refresh', () => {
+  function historyRequests(patientId: string) {
+    return mockedGet.mock.calls.filter(([url, config]) =>
+      url === '/derma/examinations'
+      && (config?.params as { patient_id?: string } | undefined)?.patient_id === patientId,
+    );
+  }
+
+  it('refreshes the current history and visit status after an EMR save', async () => {
+    mountPanel('/doctor/dermatology?patientId=23&visitId=98');
+    await screen.findByTestId('emr-editor');
+    await waitFor(() => expect(historyRequests('23')).toHaveLength(1));
+    mockedGet.mockClear();
+
+    await act(async () => { await holder.onEmrPersisted?.(); });
+
+    expect(historyRequests('23')).toHaveLength(1);
+    expect(mockedGet).toHaveBeenCalledWith('/appointments/40/status');
+  });
+
+  it('ignores a post-persist callback for the patient who was previously selected', async () => {
+    mountPanel('/doctor/dermatology?patientId=23&visitId=98');
+    await screen.findByTestId('emr-editor');
+    const latePersist = holder.onEmrPersisted;
+    expect(latePersist).toBeTypeOf('function');
+
+    await act(async () => {
+      holder.navigate?.('/doctor/dermatology?patientId=40&visitId=55');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('emr-editor')).toHaveAttribute('data-patient', '40');
+      expect(historyRequests('40')).toHaveLength(1);
+    });
+    mockedGet.mockClear();
+
+    await act(async () => { await latePersist?.(); });
+
+    expect(historyRequests('23')).toHaveLength(0);
+    expect(historyRequests('40')).toHaveLength(0);
+    expect(mockedGet).not.toHaveBeenCalledWith('/appointments/40/status');
   });
 });
