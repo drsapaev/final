@@ -5,6 +5,8 @@ Split from doctor_integration.py (1900 LOC god file → modular).
 
 from __future__ import annotations
 
+from fastapi import BackgroundTasks
+
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     DOCTOR_QUEUE_ALLOWED_TAGS,
@@ -29,11 +31,15 @@ from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
     move_paired_appointment_to_day,
 )
+from app.models.enums import (
+    AppointmentStatus,
+    can_transition_status,
+    normalize_appointment_status,
+)
 from app.schemas.doctor_queue import (
     DoctorQueueStartVisitResponse,
     DoctorQueueTodayResponse,
 )
-from app.models.enums import AppointmentStatus, can_transition_status, normalize_appointment_status
 from app.services.emr_completion_policy import (
     EMR_REQUIRED_DETAIL,
     requires_saved_emr,
@@ -222,12 +228,7 @@ def get_doctor_queue_today(
             )
 
         # Формируем данные для врача
-        # DOCWORKLIST-BE-002 (audit 3892 group 24): viewing/history stays
-        # readable for INACTIVE queues (owner-policy), but the operational
-        # next-call marker must be computed over ACTIVE queues only.
-        active_queue_ids = {
-            queue.id for queue in daily_queues if queue.active
-        }
+        active_queue_ids = {queue.id for queue in daily_queues if queue.active}
         queue_entries = []
         next_call_entry_id = None
         for entry in entries:
@@ -241,11 +242,10 @@ def get_doctor_queue_today(
                     action for action in available_actions if action != "complete"
                 ]
                 action_flags["can_complete"] = False
-            if (
-                next_call_entry_id is None
-                and action_flags["can_call"]
-                and entry.queue_id in active_queue_ids
-            ):
+            if entry.queue_id not in active_queue_ids:
+                available_actions = [action for action in available_actions if action != "call"]
+                action_flags["can_call"] = False
+            if next_call_entry_id is None and action_flags["can_call"]:
                 next_call_entry_id = entry.id
 
             patient_data = None
@@ -577,6 +577,8 @@ def call_patient(
             "Lab",
         )
     ),
+    *,
+    background_tasks: BackgroundTasks = None,
 ):
     """
     Вызвать пациента в кабинет
@@ -600,16 +602,6 @@ def call_patient(
         if not daily_queue:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
-            )
-
-        # DOCWORKLIST-BE-002 (audit 3892 group 24): operational actions
-        # fail closed for INACTIVE queues — the previous guard set
-        # validated specialty and entry status only, so inactive same-day
-        # queues stayed operable. Viewing/history is unaffected.
-        if not daily_queue.active:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Очередь неактивна — вызов недоступен",
             )
 
         doctor = daily_queue.specialist
@@ -667,6 +659,12 @@ def call_patient(
                         detail="Нет прав для работы с этой очередью — вы не владелец и специальность не совпадает",
                     )
 
+        if not daily_queue.active:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Очередь неактивна — вызов недоступен",
+            )
+
         # Обновляем статус на "вызван"
         if "call" not in _doctor_queue_available_actions(queue_entry):
             raise HTTPException(
@@ -685,13 +683,11 @@ def call_patient(
         db.commit()
         db.refresh(queue_entry)
 
-        # Отправляем событие в WebSocket для табло
-        try:
-            import asyncio
+        # FastAPI supplies the task runner for HTTP requests.
+        if background_tasks is not None:
+            try:
+                from app.services.display_websocket import get_display_manager
 
-            from app.services.display_websocket import get_display_manager
-
-            async def send_to_display():
                 manager = get_display_manager()
                 if doctor is not None:
                     doctor_name = (
@@ -699,29 +695,28 @@ def call_patient(
                     )
                     cabinet = doctor.cabinet
                 else:
-                    # QD-2C (Codex round-34 P2): ресурс-ось — владелец из
-                    # реестра (round-12 паттерн), не AttributeError на
-                    # None-враче
+                    # Resource-owned queues use the registry name and cabinet.
                     resource = daily_queue.queue_resource
                     doctor_name = (
-                        resource.display_name
-                        if resource is not None
-                        else "Ресурс очереди"
+                        resource.display_name if resource is not None else "Ресурс очереди"
                     )
                     cabinet = daily_queue.cabinet_number or (
                         resource.default_cabinet if resource is not None else None
                     )
 
-                await manager.broadcast_patient_call(
-                    queue_entry=queue_entry, doctor_name=doctor_name, cabinet=cabinet
+                # Load queue relations while the request session is still open.
+                message, board_ids = manager.prepare_patient_call(
+                    queue_entry, doctor_name, cabinet
+                )
+                background_tasks.add_task(
+                    manager.broadcast_patient_call_data, message, board_ids=board_ids
                 )
 
-            # Запускаем асинхронную отправку в фоне
-            asyncio.create_task(send_to_display())
-
-        except Exception as ws_error:
-            # Не прерываем основной процесс если WebSocket не работает
-            logger.warning("Не удалось отправить на табло: %s", ws_error, exc_info=True)
+            except Exception as ws_error:
+                logger.warning(
+                    "Не удалось подготовить вызов для табло, тип ошибки %s",
+                    type(ws_error).__name__,
+                )
 
         return {
             "success": True,
