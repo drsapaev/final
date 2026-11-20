@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.endpoints import payments
 from app.models.encounter import Encounter
@@ -34,6 +35,36 @@ def _visit(db, patient, currency):
                         price=Decimal("1.00"), currency=currency))
     db.commit()
     return visit
+
+
+@pytest.mark.parametrize("pending", (False, True))
+def test_payment_write_conflict_omits_driver_detail(
+    db_session, test_patient, admin_user, monkeypatch, caplog, pending,
+):
+    visit_id = _visit(db_session, test_patient, "UZS").id
+    private_detail = "SYNTHETIC-PAYMENT-CONSTRAINT-DETAIL"
+    flush = db_session.flush
+
+    def fail_payment_flush(objects=None):
+        if any(isinstance(row, Payment) for row in db_session.new):
+            raise IntegrityError(None, None, ValueError(private_detail))
+        return flush(objects)
+
+    monkeypatch.setattr(db_session, "flush", fail_payment_flush)
+    service = PaymentInvariantService(db_session)
+    with pytest.raises(HTTPException) as conflict:
+        if pending:
+            service.create_pending_payment(visit_id, Decimal("1.00"), "UZS", "online", "click", None,
+                                           admin_user, commit=False)
+        else:
+            service.create_payment_for_visit(visit_id, Decimal("1.00"), "cash", None, admin_user, commit=False)
+
+    assert conflict.value.status_code == 409
+    expected_reason = "pending_payment_already_in_progress" if pending else "payment_already_in_progress"
+    assert conflict.value.detail["reason"] == expected_reason
+    assert private_detail not in caplog.text
+    assert "error_type=ValueError" in caplog.text
+    assert db_session.query(Payment).filter_by(visit_id=visit_id).count() == 0
 
 
 @pytest.mark.parametrize("stored,requested", [(None, "UZS"), ("USD", "UZS"), ("UZS", "USD")])

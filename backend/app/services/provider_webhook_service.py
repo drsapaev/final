@@ -350,8 +350,8 @@ class ProviderWebhookService:
                 }
 
         except Exception as exc:
-            logger.error("Click webhook error: %s", exc)
-            return {"error": -1, "error_note": f"Internal server error: {exc}"}
+            logger.error("Click webhook error type=%s", type(exc).__name__)
+            return {"error": -1, "error_note": "Internal server error"}
 
     def process_payme_webhook(
         self, webhook_data: dict[str, Any], auth_header: str | None
@@ -664,9 +664,9 @@ class ProviderWebhookService:
                 }
 
         except Exception as exc:
-            logger.error("Payme webhook error: %s", exc)
+            logger.error("Payme webhook error type=%s", type(exc).__name__)
             return {
-                "error": {"code": -32603, "message": f"Internal server error: {exc}"},
+                "error": {"code": -32603, "message": "Internal server error"},
                 "id": request_id,
             }
 

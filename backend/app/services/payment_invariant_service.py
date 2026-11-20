@@ -1021,11 +1021,11 @@ class PaymentInvariantService:
             logger.warning(
                 "payment.create IntegrityError (defense-in-depth, "
                 "expected row-lock to have prevented this): "
-                "visit_id=%s amount=%s cashier_id=%s error=%s",
+                "visit_id=%s amount=%s cashier_id=%s error_type=%s",
                 visit_id,
                 str(amount),
                 getattr(current_user, "id", None),
-                str(integrity_exc.orig) if integrity_exc.orig else "unknown",
+                type(integrity_exc.orig).__name__,
             )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1168,10 +1168,10 @@ class PaymentInvariantService:
             self.db.rollback()
             logger.warning(
                 "payment.create_pending IntegrityError (defense-in-depth): "
-                "visit_id=%s provider=%s error=%s",
+                "visit_id=%s provider=%s error_type=%s",
                 visit_id,
                 provider,
-                str(integrity_exc.orig) if integrity_exc.orig else "unknown",
+                type(integrity_exc.orig).__name__,
             )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

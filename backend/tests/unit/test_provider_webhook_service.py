@@ -11,6 +11,25 @@ from app.services.provider_webhook_service import ProviderWebhookService
 
 @pytest.mark.unit
 class TestProviderWebhookService:
+    def test_webhook_error_responses_and_logs_omit_internal_details(self, client, caplog):
+        private_detail = "SYNTHETIC-DRIVER-DIAGNOSTIC"
+        with patch(
+            "app.services.provider_webhook_service.get_payment_manager",
+            side_effect=RuntimeError(private_detail),
+        ):
+            click = client.post("/api/v1/payments/webhook/click", json={})
+            payme = client.post("/api/v1/payments/webhook/payme", json={"id": "synthetic-rpc"})
+
+        assert click.status_code == payme.status_code == 200
+        assert click.json() == {"error": -1, "error_note": "Internal server error"}
+        assert payme.json() == {
+            "error": {"code": -32603, "message": "Internal server error"},
+            "id": "synthetic-rpc",
+        }
+        assert private_detail not in caplog.text
+        assert "Click webhook error type=RuntimeError" in caplog.text
+        assert "Payme webhook error type=RuntimeError" in caplog.text
+
     def test_click_webhook_requires_signature(self, db_session):
         service = ProviderWebhookService(db_session)
         try:
