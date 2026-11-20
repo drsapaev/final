@@ -11142,6 +11142,12 @@ const kk = {
     template: 'Үлгі'
   },
   registrarPanel: {
+    invitation_task_title: 'Қабылдауды растау',
+    invitation_task_patient: 'Пациент',
+    invitation_task_date: 'Күні мен уақыты',
+    invitation_task_phone: 'Телефон',
+    invitation_task_unavailable: 'Тапсырма қолжетімсіз немесе мерзімі өткен.',
+    invitation_task_load_error: 'Тапсырманы жүктеу мүмкін болмады. Қайта көріңіз.',
     rt_unsaved_warning: 'Қойындылардың сақталмаған өзгерістері бар. Беттен шығып, олардан бас тарту керек пе?',
     rt_discard_reload: 'Өзгерістерден бас тартып, жаңарту',
     rt_title: 'Тіркеу бөлімі қойындылары',

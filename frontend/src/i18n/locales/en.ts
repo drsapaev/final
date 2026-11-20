@@ -11146,6 +11146,12 @@ const en = {
     template: 'Template'
   },
   registrarPanel: {
+    invitation_task_title: 'Visit confirmation',
+    invitation_task_patient: 'Patient',
+    invitation_task_date: 'Date and time',
+    invitation_task_phone: 'Phone',
+    invitation_task_unavailable: 'The task is unavailable or expired.',
+    invitation_task_load_error: 'Could not load the task. Try again.',
     rt_unsaved_warning: 'You have unsaved tab changes. Leave the page and discard them?',
     rt_discard_reload: 'Discard changes and reload',
     rt_title: 'Registrar tabs',

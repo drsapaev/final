@@ -11153,6 +11153,12 @@ const uzCyrl = {
     template: 'Шаблон'
   },
   registrarPanel: {
+    invitation_task_title: 'Ташрифни тасдиқлаш',
+    invitation_task_patient: 'Бемор',
+    invitation_task_date: 'Сана ва вақт',
+    invitation_task_phone: 'Телефон',
+    invitation_task_unavailable: 'Вазифа мавжуд эмас ёки муддати тугаган.',
+    invitation_task_load_error: 'Вазифани юклаб бўлмади. Қайта уриниб кўринг.',
     rt_unsaved_warning: 'Ёрлиқларда сақланмаган ўзгаришлар бор. Саҳифадан чиқиб, уларни бекор қиласизми?',
     rt_discard_reload: 'Ўзгаришларни бекор қилиб янгилаш',
     rt_title: 'Регистратура ёрлиқлари',

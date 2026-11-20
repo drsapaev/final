@@ -242,7 +242,7 @@ const RegistrarPanel = () => {
     setShowSlotsModal,
     setActiveTab,
     navigate,
-    showWizard,
+    showWizard: showWizard || searchParams.has('invitation'),
     showSlotsModal,
     appointments,
   });

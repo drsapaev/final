@@ -11142,6 +11142,12 @@ const uzLatn = {
     template: 'Shablon'
   },
   registrarPanel: {
+    invitation_task_title: 'Tashrifni tasdiqlash',
+    invitation_task_patient: 'Bemor',
+    invitation_task_date: 'Sana va vaqt',
+    invitation_task_phone: 'Telefon',
+    invitation_task_unavailable: 'Vazifa mavjud emas yoki muddati tugagan.',
+    invitation_task_load_error: 'Vazifani yuklab bo‘lmadi. Qayta urinib ko‘ring.',
     rt_unsaved_warning: 'Yorliqlarda saqlanmagan o‘zgarishlar bor. Sahifadan chiqib, ularni bekor qilasizmi?',
     rt_discard_reload: 'O‘zgarishlarni bekor qilib yangilash',
     rt_title: 'Registratura yorliqlari',

@@ -11289,6 +11289,12 @@ const ru = {
   },
 
   registrarPanel: {
+    invitation_task_title: 'Подтверждение визита',
+    invitation_task_patient: 'Пациент',
+    invitation_task_date: 'Дата и время',
+    invitation_task_phone: 'Телефон',
+    invitation_task_unavailable: 'Задача недоступна или устарела.',
+    invitation_task_load_error: 'Не удалось загрузить задачу. Повторите попытку.',
     rt_unsaved_warning: 'Есть несохранённые изменения вкладок. Покинуть страницу и отменить их?',
     rt_discard_reload: 'Отменить изменения и обновить',
     rt_title: 'Вкладки регистратуры',
