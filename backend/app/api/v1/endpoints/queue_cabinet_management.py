@@ -383,6 +383,11 @@ def apply_cabinet_reassignment(
         _raise_queue_cabinet_internal_error("apply_cabinet_reassignment", exc)
 
 
+# The committed receipt contains queue IDs and timestamps under the same
+# global Admin gate as the command.
+apply_cabinet_reassignment.idempotency_replay_global_roles = ("Admin",)
+
+
 @router.put(
     "/queues/{queue_id}/cabinet-info",
     response_model=dict[str, Any],
