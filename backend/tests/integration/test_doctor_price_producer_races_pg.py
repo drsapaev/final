@@ -9,6 +9,7 @@ import base64
 import importlib.util
 import json
 import os
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -58,98 +59,131 @@ def provisioned_database():
     if (os.getenv("DOCTOR_PRICE_ENDPOINT_TEST_DB") != "1" or url.get_backend_name() != "postgresql"
             or not (url.database or "").startswith("clinic_test_") or not runtime_role or not capability_role):
         pytest.skip("requires explicitly isolated PostgreSQL and disposable roles")
+    with provision_price_endpoint_database(url, runtime_role, capability_role) as profile:
+        yield profile
+
+
+@contextmanager
+def provision_price_endpoint_database(url, runtime_role, capability_role):
+    """Apply the protected endpoint setup to a fresh disposable 0117 database."""
     admin_engine = create_engine(url)
-    quote = admin_engine.dialect.identifier_preparer.quote_identifier
-    root = Path(__file__).resolve().parents[3]
-    with admin_engine.begin() as db:
-        revision = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert revision == "0117_visit_invitation_delivery"
-        schema_owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(nspowner) FROM pg_catalog.pg_namespace WHERE nspname='public'")).scalar_one()
-        table_owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class WHERE oid='public.visit_invitation_deliveries'::pg_catalog.regclass")).scalar_one()
-        # Apply the price and invitation pieces used by this focused fixture.
-        # The standard invitation provisioner checks the trigger body from 0130.
-        operations = Operations(MigrationContext.configure(db, opts={"version_table_schema": "public"}))
-        for revision in (
-            "0121_doctor_price_runtime_access",
-            "0126_invitation_issuer_auth",
-            "0128_invitation_price_approval",
-            "0130_invitation_nonce_guard",
-        ):
-            migration = _module(f"synthetic_{revision}", root / "backend/alembic/versions" / f"{revision}.py")
-            migration.op = operations
-            migration.upgrade()
-        # Synthetic-only clinical permissions make the full route executable;
-        # production grants for clinical tables require their own review.
-        protected = {"doctor_price_hmac_key_versions", "doctor_price_intents", "doctor_price_intent_keys",
-                     "doctor_price_intent_lines", "visit_invitation_deliveries", "visit_invitation_issuer_auth",
-                     "visit_invitation_price_approval_auth", "visit_invitation_approval_recoveries", "alembic_version"}
-        db.execute(text("ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY"))
-        relations = db.execute(text("""
-            SELECT c.relname,c.relrowsecurity FROM pg_catalog.pg_class c
-            JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
-            WHERE n.nspname='public' AND c.relkind IN ('r','p')
-        """)).all()
-        for relation in relations:
-            if relation.relname in protected:
-                continue
-            table = f"public.{quote(relation.relname)}"
-            db.exec_driver_sql(f"GRANT SELECT, INSERT, UPDATE ON {table} TO {quote(runtime_role)}")
-            if relation.relrowsecurity:
-                db.exec_driver_sql(f"CREATE POLICY synthetic_price_test_runtime ON {table} TO {quote(runtime_role)} USING (true) WITH CHECK (true)")
-        sequences = db.execute(text("""
-            SELECT c.relname FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
-            WHERE n.nspname='public' AND c.relkind='S'
-        """)).scalars().all()
-        for sequence in sequences:
-            if sequence in {"doctor_price_generation_seq", "doctor_price_intents_id_seq",
-                            "doctor_price_intent_keys_id_seq", "doctor_price_intent_lines_id_seq"} or sequence.startswith("visit_invitation_"):
-                continue
-            db.exec_driver_sql(f"GRANT USAGE ON SEQUENCE public.{quote(sequence)} TO {quote(runtime_role)}")
-    price = _module("synthetic_price_role_provision", root / "scripts/provision_doctor_price_backend_role.py")
-    invitation = _module("synthetic_invitation_role_provision", root / "backend/scripts/provision_invitation_delivery_role.py")
-    subject = _module("synthetic_subject_role_provision", root / "scripts/provision_confirmation_subject_role.py")
-    price.provision(admin_engine, "public", runtime_role)
-    invitation.provision(admin_engine, "public", runtime_role)
+    runtime_engine = None
     try:
-        subject.provision(admin_engine, "public", capability_role, runtime_role, expected_owner=schema_owner)
-    except Exception:
-        # Diagnostic metadata only, from this explicitly disposable database.
-        from app.db.capability_namespace import capability_schema_name
-        with admin_engine.connect() as db:
-            routines = db.execute(text("""
-              SELECT p.proname,pg_catalog.pg_get_userbyid(p.proowner) AS owner,
-                     CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(a.grantee) END AS grantee,
-                     a.privilege_type,a.is_grantable
-              FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace,
-                LATERAL pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
-              WHERE n.nspname=:schema ORDER BY p.proname,grantee
-            """), {"schema": capability_schema_name("public")}).all()
-            print("SYNTHETIC_CAPABILITY_ROUTINES", routines)
-        raise
-    runtime_engine = create_engine(url)
-
-    @event.listens_for(runtime_engine, "handle_error")
-    def record_synthetic_privilege_error(context):
-        original = context.original_exception
-        if getattr(original, "sqlstate", None) == "42501":
-            diag = getattr(original, "diag", None)
-            print("SYNTHETIC_PERMISSION_FAILURE", getattr(diag, "message_primary", "unknown"))
-
-    @event.listens_for(runtime_engine, "connect")
-    def assume_synthetic_login(connection, _):
-        previous = connection.autocommit
-        connection.autocommit = True
+        quote = admin_engine.dialect.identifier_preparer.quote_identifier
+        root = Path(__file__).resolve().parents[3]
+        with admin_engine.begin() as db:
+            revision = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            assert revision == "0117_visit_invitation_delivery"
+            schema_owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(nspowner) FROM pg_catalog.pg_namespace WHERE nspname='public'")).scalar_one()
+            table_owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class WHERE oid='public.visit_invitation_deliveries'::pg_catalog.regclass")).scalar_one()
+            # Apply the price and invitation pieces used by this focused fixture.
+            # The standard invitation provisioner checks the trigger body from 0130.
+            operations = Operations(MigrationContext.configure(db, opts={"version_table_schema": "public"}))
+            for revision in (
+                "0121_doctor_price_runtime_access",
+                "0126_invitation_issuer_auth",
+                "0128_invitation_price_approval",
+                "0130_invitation_nonce_guard",
+            ):
+                migration = _module(f"synthetic_{revision}", root / "backend/alembic/versions" / f"{revision}.py")
+                migration.op = operations
+                migration.upgrade()
+            # Synthetic-only clinical permissions make the full route executable;
+            # production grants for clinical tables require their own review.
+            protected = {"doctor_price_hmac_key_versions", "doctor_price_intents", "doctor_price_intent_keys",
+                         "doctor_price_intent_lines", "visit_invitation_deliveries", "visit_invitation_issuer_auth",
+                         "visit_invitation_price_approval_auth", "visit_invitation_approval_recoveries", "alembic_version"}
+            db.execute(text("ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY"))
+            relations = db.execute(text("""
+                SELECT c.relname,c.relrowsecurity FROM pg_catalog.pg_class c
+                JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+                WHERE n.nspname='public' AND c.relkind IN ('r','p')
+            """)).all()
+            for relation in relations:
+                if relation.relname in protected:
+                    continue
+                table = f"public.{quote(relation.relname)}"
+                db.exec_driver_sql(f"GRANT SELECT, INSERT, UPDATE ON {table} TO {quote(runtime_role)}")
+                if relation.relrowsecurity:
+                    db.exec_driver_sql(f"CREATE POLICY synthetic_price_test_runtime ON {table} TO {quote(runtime_role)} USING (true) WITH CHECK (true)")
+            sequences = db.execute(text("""
+                SELECT c.relname FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+                WHERE n.nspname='public' AND c.relkind='S'
+            """)).scalars().all()
+            for sequence in sequences:
+                if sequence in {"doctor_price_generation_seq", "doctor_price_intents_id_seq",
+                                "doctor_price_intent_keys_id_seq", "doctor_price_intent_lines_id_seq"} or sequence.startswith("visit_invitation_"):
+                    continue
+                db.exec_driver_sql(f"GRANT USAGE ON SEQUENCE public.{quote(sequence)} TO {quote(runtime_role)}")
+        price = _module("synthetic_price_role_provision", root / "scripts/provision_doctor_price_backend_role.py")
+        invitation = _module("synthetic_invitation_role_provision", root / "backend/scripts/provision_invitation_delivery_role.py")
+        subject = _module("synthetic_subject_role_provision", root / "scripts/provision_confirmation_subject_role.py")
+        price.provision(admin_engine, "public", runtime_role)
+        invitation.provision(admin_engine, "public", runtime_role)
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SET SESSION AUTHORIZATION {quote(runtime_role)}")
-        finally:
-            connection.autocommit = previous
+            subject.provision(admin_engine, "public", capability_role, runtime_role, expected_owner=schema_owner)
+        except Exception:
+            # Diagnostic metadata only, from this explicitly disposable database.
+            from app.db.capability_namespace import capability_schema_name
+            with admin_engine.connect() as db:
+                routines = db.execute(text("""
+                  SELECT p.proname,pg_catalog.pg_get_userbyid(p.proowner) AS owner,
+                         CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(a.grantee) END AS grantee,
+                         a.privilege_type,a.is_grantable
+                  FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace,
+                    LATERAL pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
+                  WHERE n.nspname=:schema ORDER BY p.proname,grantee
+                """), {"schema": capability_schema_name("public")}).all()
+                print("SYNTHETIC_CAPABILITY_ROUTINES", routines)
+            raise
+        runtime_engine = create_engine(url)
 
-    try:
+        @event.listens_for(runtime_engine, "handle_error")
+        def record_synthetic_privilege_error(context):
+            original = context.original_exception
+            if getattr(original, "sqlstate", None) == "42501":
+                diag = getattr(original, "diag", None)
+                print("SYNTHETIC_PERMISSION_FAILURE", getattr(diag, "message_primary", "unknown"))
+
+        @event.listens_for(runtime_engine, "connect")
+        def assume_synthetic_login(connection, _):
+            previous = connection.autocommit
+            connection.autocommit = True
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute(f"SET SESSION AUTHORIZATION {quote(runtime_role)}")
+            finally:
+                connection.autocommit = previous
         yield admin_engine, runtime_engine, schema_owner, table_owner, runtime_role
     finally:
-        runtime_engine.dispose()
+        if runtime_engine is not None:
+            runtime_engine.dispose()
         admin_engine.dispose()
+
+
+def pin_price_endpoint_test_settings(monkeypatch, admin_engine, schema_owner, table_owner, runtime_role):
+    monkeypatch.setattr(settings, "DOCTOR_PRICE_HMAC_KEYS", SecretStr(json.dumps({"1": base64.urlsafe_b64encode(b"a" * 32).decode()})))
+    monkeypatch.setattr(settings, "DOCTOR_PRICE_HMAC_ACTIVE_VERSION", 1)
+    monkeypatch.setattr(settings, "DOCTOR_PRICE_DB_SCHEMA", "public")
+    monkeypatch.setattr(settings, "DOCTOR_PRICE_DB_SCHEMA_OWNER", schema_owner)
+    monkeypatch.setattr(settings, "DOCTOR_PRICE_DB_RUNTIME_ROLE", runtime_role)
+    monkeypatch.setattr(settings, "TRUSTED_DB_SCHEMA", "public")
+    monkeypatch.setattr(settings, "TRUSTED_DB_SCHEMA_OWNER", schema_owner)
+    monkeypatch.setattr(settings, "TRUSTED_DB_RUNTIME_ROLE", runtime_role)
+    monkeypatch.setattr(settings, "TRUSTED_DB_OWNER_MEMBERS", ())
+    with admin_engine.connect() as connection:
+        auth_owner = connection.execute(text("SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class WHERE oid='public.token_blacklist'::pg_catalog.regclass")).scalar_one()
+        users_owner = connection.execute(text("SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class WHERE oid='public.users'::pg_catalog.regclass")).scalar_one()
+    monkeypatch.setattr(settings, "TRUSTED_AUTH_TABLE_OWNER", auth_owner)
+    monkeypatch.setattr(settings, "TRUSTED_AUTH_OWNER_MEMBERS", ())
+    monkeypatch.setattr(settings, "TRUSTED_AUTH_READ_ROLES", ())
+    monkeypatch.setattr(settings, "TRUSTED_AUTH_WRITE_ROLES", ())
+    monkeypatch.setattr(settings, "TRUSTED_AUTH_USERS_OWNER", users_owner)
+    monkeypatch.setattr(settings, "TRUSTED_AUTH_USERS_OWNER_MEMBERS", ())
+    monkeypatch.setattr(settings, "TRUSTED_AUTH_USERS_WRITE_ROLES", ())
+    monkeypatch.setattr(settings, "INVITATION_DB_SCHEMA", "public")
+    monkeypatch.setattr(settings, "INVITATION_DB_SCHEMA_OWNER", schema_owner)
+    monkeypatch.setattr(settings, "INVITATION_DB_TABLE_OWNER", table_owner)
 
 
 @pytest.fixture
@@ -176,28 +210,7 @@ def migrated_endpoint(monkeypatch, provisioned_database):
         token = authentication_service.create_access_token({"sub": str(actor.id), "username": actor.username,
             "role": actor.role, "is_active": True, "is_superuser": False, "auth_epoch": actor.auth_epoch})
         actor_id, patient_id, foreign_id, service_id = actor.id, patient.id, foreign.id, service.id
-    monkeypatch.setattr(settings, "DOCTOR_PRICE_HMAC_KEYS", SecretStr(json.dumps({"1": base64.urlsafe_b64encode(b"a" * 32).decode()})))
-    monkeypatch.setattr(settings, "DOCTOR_PRICE_HMAC_ACTIVE_VERSION", 1)
-    monkeypatch.setattr(settings, "DOCTOR_PRICE_DB_SCHEMA", "public")
-    monkeypatch.setattr(settings, "DOCTOR_PRICE_DB_SCHEMA_OWNER", schema_owner)
-    monkeypatch.setattr(settings, "DOCTOR_PRICE_DB_RUNTIME_ROLE", runtime_role)
-    monkeypatch.setattr(settings, "TRUSTED_DB_SCHEMA", "public")
-    monkeypatch.setattr(settings, "TRUSTED_DB_SCHEMA_OWNER", schema_owner)
-    monkeypatch.setattr(settings, "TRUSTED_DB_RUNTIME_ROLE", runtime_role)
-    monkeypatch.setattr(settings, "TRUSTED_DB_OWNER_MEMBERS", ())
-    with admin_engine.connect() as connection:
-        auth_owner = connection.execute(text("SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class WHERE oid='public.token_blacklist'::pg_catalog.regclass")).scalar_one()
-        users_owner = connection.execute(text("SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class WHERE oid='public.users'::pg_catalog.regclass")).scalar_one()
-    monkeypatch.setattr(settings, "TRUSTED_AUTH_TABLE_OWNER", auth_owner)
-    monkeypatch.setattr(settings, "TRUSTED_AUTH_OWNER_MEMBERS", ())
-    monkeypatch.setattr(settings, "TRUSTED_AUTH_READ_ROLES", ())
-    monkeypatch.setattr(settings, "TRUSTED_AUTH_WRITE_ROLES", ())
-    monkeypatch.setattr(settings, "TRUSTED_AUTH_USERS_OWNER", users_owner)
-    monkeypatch.setattr(settings, "TRUSTED_AUTH_USERS_OWNER_MEMBERS", ())
-    monkeypatch.setattr(settings, "TRUSTED_AUTH_USERS_WRITE_ROLES", ())
-    monkeypatch.setattr(settings, "INVITATION_DB_SCHEMA", "public")
-    monkeypatch.setattr(settings, "INVITATION_DB_SCHEMA_OWNER", schema_owner)
-    monkeypatch.setattr(settings, "INVITATION_DB_TABLE_OWNER", table_owner)
+    pin_price_endpoint_test_settings(monkeypatch, admin_engine, schema_owner, table_owner, runtime_role)
 
     def session_override():
         with sessions() as session:
