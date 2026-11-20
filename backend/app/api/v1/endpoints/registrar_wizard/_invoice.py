@@ -67,7 +67,10 @@ def _lock_invoice_settlement_context(
         )
 
     invariant = PaymentInvariantService(db)
-    invariant.preflight_payment_groups(initial_visit_ids)
+    if starting_payment:
+        invariant.preflight_new_payment(initial_visit_ids)
+    else:
+        invariant.preflight_payment_groups(initial_visit_ids)
 
     invoice = (
         db.query(PaymentInvoice)

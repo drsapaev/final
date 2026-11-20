@@ -1,13 +1,18 @@
-"""Shared evidence checks for protected staff refunds."""
+"""Shared financial evidence checks for collection and refunds."""
 
 from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 
 from app.models.payment import Payment
-from app.models.refund_deposit import DepositTransaction, RefundRequest
+from app.models.refund_deposit import (
+    DepositTransaction,
+    DepositTransactionType,
+    RefundRequest,
+)
 from app.services.encounter_financial_fence import (
     FinancialFenceError,
     _financial_schema,
+    require_preflighted_payment_visits,
 )
 
 CASHIER_IMMEDIATE_PAID_METHODS = frozenset({"cash", "card"})
@@ -32,12 +37,12 @@ def local_refund_requires_reconciliation(payment: Payment) -> bool:
     )
 
 
-def require_visible_external_refunds(db: Session, schema: str) -> None:
+def _require_visible_evidence(db: Session, schema: str, reads: dict[str, tuple[str, ...]], message: str) -> None:
     # Hold relation locks through policy verification and the evidence read.
-    for table, columns in _EXTERNAL_REFUND_READS.items():
+    for table, columns in reads.items():
         db.execute(text(f"SELECT {', '.join(columns)} FROM {schema}.{table} WHERE false"))
     valid = db.execute(text("""
-      SELECT count(*)=2 AND COALESCE(bool_and(NOT c.relrowsecurity OR (
+      SELECT count(*)=:expected AND COALESCE(bool_and(NOT c.relrowsecurity OR (
         EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=c.oid
           AND p.polpermissive AND p.polcmd IN ('r','*')
           AND (SELECT oid FROM pg_catalog.pg_roles WHERE rolname=CURRENT_USER)=ANY(p.polroles)
@@ -50,9 +55,31 @@ def require_visible_external_refunds(db: Session, schema: str) -> None:
       FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname=:schema AND c.relname=ANY(:tables) AND c.relkind IN ('r','p')
     """), {"schema": db.get_bind().dialect.default_schema_name,
-           "tables": list(_EXTERNAL_REFUND_READS)}).scalar_one()
+           "tables": list(reads), "expected": len(reads)}).scalar_one()
     if valid is not True:
-        raise FinancialFenceError("История возвратов временно недоступна")
+        raise FinancialFenceError(message)
+
+
+def require_visible_external_refunds(db: Session, schema: str) -> None:
+    _require_visible_evidence(db, schema, _EXTERNAL_REFUND_READS, "История возвратов временно недоступна")
+
+
+def require_clear_visit_debit_history(db: Session, visit_id: int) -> None:
+    """Use the locked financial closure before accepting new funds."""
+    visit_ids = require_preflighted_payment_visits(db, visit_id)
+    if db.get_bind().dialect.name == "postgresql":
+        _require_visible_evidence(
+            db, _financial_schema(db),
+            {"deposit_transactions": ("id", "visit_id", "payment_id", "transaction_type")},
+            "История списаний с депозита временно недоступна",
+        )
+    history = db.query(DepositTransaction.id).filter(
+        DepositTransaction.visit_id.in_(visit_ids),
+        DepositTransaction.payment_id.is_(None),
+        DepositTransaction.transaction_type == DepositTransactionType.DEBIT.value,
+    ).first()
+    if history is not None:
+        raise FinancialFenceError("Историческое списание с депозита требует сверки")
 
 
 def lock_refund_evidence(db: Session) -> None:

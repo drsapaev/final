@@ -5,19 +5,24 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from json import dumps
 from threading import Barrier
+from types import SimpleNamespace
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from fastapi import HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.force_majeure import AddDepositRequest, UseDepositRequest
+from app.api.v1.endpoints.registrar_wizard import _invoice
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment, PaymentVisit
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.refund_deposit import (
     DepositTransaction,
     PatientDeposit,
@@ -33,6 +38,8 @@ from app.services.force_majeure_api_service import (
     ForceMajeureApiService,
 )
 from app.services.force_majeure_service import ForceMajeureError, ForceMajeureService
+from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
+from app.services.payment_invariant_service import PaymentInvariantService
 from tests.conftest import mint_access_token
 from tests.integration.test_cashier_appointment_source_locks_pg import pg_cashier  # noqa: F401
 from tests.integration.test_deposit_refund_evidence_pg import install_deposit_guards
@@ -319,6 +326,56 @@ def test_postgres_refuses_a_new_tender_with_unpaired_historical_debit(visit_depo
         assert db.scalar(select(func.count()).select_from(Payment)) == 0
         [old_debit] = db.scalars(select(DepositTransaction).filter_by(visit_id=visit_id)).all()
         assert old_debit.payment_id is None and old_debit.amount == Decimal("5.00")
+
+
+@pytest.mark.parametrize("visit_deposit_pg", ["unpaired_debit"], indirect=True)
+@pytest.mark.parametrize("can_see_history", [True, False])
+def test_new_cash_and_provider_collection_waits_for_deposit_reconciliation(
+    visit_deposit_pg, can_see_history, monkeypatch,
+):
+    owner, runtime, ids = visit_deposit_pg
+    patient_id, visit_id, actor_id = ids["patient"], ids["visit"], ids["stage"]
+    with Session(owner, expire_on_commit=False) as db:
+        invoice = PaymentInvoice(patient_id=patient_id, total_amount=Decimal("10.00"), currency="UZS", status="pending")
+        db.add(invoice)
+        db.flush()
+        db.add(PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=visit_id, visit_amount=Decimal("10.00")))
+        db.commit()
+    if not can_see_history:
+        with owner.begin() as conn:
+            conn.exec_driver_sql("ALTER POLICY synthetic_debit_read ON deposit_transactions USING (visit_id IS NULL)")
+
+    actor = SimpleNamespace(id=actor_id, role="Admin")
+    expected = ("Историческое списание с депозита требует сверки" if can_see_history
+                else "История списаний с депозита временно недоступна")
+    with Session(runtime) as db:
+        with pytest.raises(HTTPException) as cash:
+            PaymentInvariantService(db).create_payment_for_visit(visit_id, Decimal("10.00"), "cash", None, actor)
+        assert (cash.value.status_code, cash.value.detail) == (409, expected)
+
+        gateway = Mock()
+        gateway.get_providers_for_currency.return_value = ["click"]
+        with pytest.raises(PaymentInitDomainError) as pending:
+            PaymentInitService(db, gateway).init_payment(
+                request=SimpleNamespace(state=None), current_user_id=actor_id,
+                visit_id=visit_id, provider="click", amount=10.0, currency="UZS",
+                description=None, return_url=None, cancel_url=None,
+            )
+        assert (pending.value.status_code, pending.value.detail) == (409, expected)
+        gateway.create_payment.assert_not_called()
+
+        factory = Mock()
+        monkeypatch.setattr(_invoice, "get_payment_manager", factory)
+        with pytest.raises(HTTPException) as invoice_error:
+            _invoice.init_invoice_payment(_invoice.InvoicePaymentRequest(invoice_id=invoice.id, provider="click"), db, actor)
+        assert (invoice_error.value.status_code, invoice_error.value.detail) == (409, expected)
+        factory.assert_not_called()
+
+    with Session(owner) as db:
+        assert db.scalar(select(func.count()).select_from(Payment)) == 0
+        assert db.get(PaymentInvoice, invoice.id).status == "pending"
+        assert db.scalar(select(PatientDeposit.balance).filter_by(patient_id=patient_id)) == Decimal("20.00")
+        assert db.scalar(select(func.count()).select_from(DepositTransaction)) == 1
 
 
 def test_linked_deposit_conserves_ledger_and_returns_to_same_deposit_on_postgres(visit_deposit_pg):

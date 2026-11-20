@@ -124,6 +124,10 @@ from app.services.encounter_financial_fence import (
     preflight_payment_record,
     require_preflighted_payment_visits,
 )
+from app.services.payment_refund_guard import (
+    CASHIER_IMMEDIATE_PAID_METHODS,
+    require_clear_visit_debit_history,
+)
 
 logger = logging.getLogger(__name__)
 PAYMENT_RECONCILIATION_REQUIRED = "reconciliation_required"
@@ -163,6 +167,21 @@ class PaymentInvariantService:
                 raise
             self.db.rollback()
             raise HTTPException(status_code=409, detail="Обращение занято, повторите оплату") from exc
+
+    def preflight_new_payment(self, visit_ids: list[int]) -> None:
+        """Check settlement evidence before any new collection."""
+        self.preflight_payment_groups(visit_ids)
+        try:
+            require_clear_visit_debit_history(self.db, visit_ids[0])
+        except FinancialFenceError as exc:
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except DBAPIError as exc:
+            self.db.rollback()
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate not in {"42501", "55P03"}:
+                raise
+            raise HTTPException(status_code=409, detail="История списаний с депозита временно недоступна") from None
 
     def preflight_payment_record(self, payment_id: int) -> LockedPaymentRecord:
         """Acquire and verify all PaymentVisit links before staff mutation."""
@@ -925,7 +944,10 @@ class PaymentInvariantService:
                 detail="Payment amount must be positive",
             )
 
-        self.preflight_payment_groups([visit_id])
+        if method in CASHIER_IMMEDIATE_PAID_METHODS and provider is None and settling_invoice_id is None:
+            self.preflight_new_payment([visit_id])
+        else:
+            self.preflight_payment_groups([visit_id])
         # Acquire row lock — serializes concurrent payment attempts.
         # This is the critical concurrency control: any other endpoint
         # that calls create_payment_for_visit on the same visit will
@@ -1126,7 +1148,7 @@ class PaymentInvariantService:
 
         # Preflight the full encounter before the Visit/payment mutation.
         # Post-debit settlement also requires a durable provider receipt.
-        self.preflight_payment_groups([visit_id])
+        self.preflight_new_payment([visit_id])
 
         # Acquire row lock — serializes concurrent pending payment attempts.
         visit = self._load_visit_for_update(visit_id)
