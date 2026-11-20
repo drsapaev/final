@@ -32,6 +32,50 @@ executed the checks in this runbook AND they all passed. Hallucinating
 
 ---
 
+## Cloud staging integrations
+
+Use the published Codex Cloud environment **`final`** for isolated cloud
+validation. Start in a fresh checkout of the exact requested SHA, use only
+synthetic fixtures and owned loopback services, and record teardown. Never
+copy a clinic database, access the production bot, or reuse production
+credentials. These settings have separate storage in the two execution paths;
+neither path inherits the other's settings automatically.
+
+| Purpose | Codex Cloud `final` | GitHub Actions |
+|---|---|---|
+| Frontend Sentry | `STAGING_VITE_SENTRY_DSN` → build argument `VITE_SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
+| Backend Sentry | `STAGING_SENTRY_DSN` → backend runtime `SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
+| Telegram token | `STAGING_TELEGRAM_BOT_TOKEN`, a host-only network secret for `api.telegram.org`; use the authorized proxy injection, not a raw token | Same name as an Actions secret scoped to protected Environment `staging-integrations` |
+| Telegram destination | `STAGING_TELEGRAM_CHAT_ID` is a logical input, not currently provisioned; resolve only through an approved destination source | Also not provisioned; do not guess or assume a default |
+
+Verify settings are available in the selected executor before asking for
+anything. If a specific input is missing, report its **name and scope**, not
+its value. Never request credentials in chat, export the proxy-injected
+token, embed it in a URL yourself in Cloud, dump resolved configuration, or
+broaden network access or token scopes. Only reviewed workflows explicitly
+bound to `staging-integrations` can consume its variables/secrets; their
+existence does not prove a workflow uses them.
+
+**Sentry:** Use only the dedicated `kosmed-staging-frontend` and
+`kosmed-staging-backend` projects in `kosmed-clinic`. For a Cloud run,
+build the frontend with `VITE_SENTRY_ENV=staging` and
+`VITE_APP_VERSION=<full SHA>`; run the backend with `SENTRY_ENV=staging`
+and `APP_VERSION=<full SHA>`. Pass both values through the supported build
+or runtime path. Give the authorized reviewer each exact event ID, project
+and tested SHA for dashboard readback; ingest HTTP 200 is not readback.
+Do not resend or request broader access when readback is unavailable.
+Delivery, pre-transport masking, hosted masking readback, and full release
+admission are separate results. Evidence applies only to the tested SHA.
+
+**Telegram:** `@kosmed_staging_bot` and the closed **KosMed Staging Alerts**
+group are the designated test resources. A private chat requires distinct
+explicit authorization. Do not use `getUpdates` to find a recipient or verify
+delivery, change the webhook, or guess a chat ID. Without a verified,
+authorized destination, mark live delivery `BLOCKED` and continue checks
+that do not send.
+
+---
+
 ## Prerequisites
 
 Before running any check below:
@@ -108,6 +152,10 @@ code 2 and also block — fix the environment before retrying.
 
 **Why it matters**: without Sentry, you have zero visibility into production
 errors. Patients see white screens, you see nothing.
+
+For Codex Cloud, follow [Cloud staging integrations](#cloud-staging-integrations)
+for `environment=staging` and exact-SHA release evidence. The local example
+below uses a legacy test label and is not Cloud release evidence.
 
 ### Backend
 
