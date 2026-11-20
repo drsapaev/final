@@ -51,6 +51,7 @@ from app.services.appointment_slot_guard import (
     lock_department_for_booking,
     lock_doctor_for_slot_reservation,
 )
+from app.services.patient_subject_lock import PatientSubjectLockError
 from app.services.public_booking_availability_service import (
     PUBLIC_BOOKING_TIMEZONE,
     PublicBookingAvailabilityService,
@@ -723,7 +724,10 @@ class PublicBookingRequestService:
         )
 
     def _lock_patient_for_booking(self, patient_id: int) -> None:
-        patient = self.repository.lock_patient_for_booking(patient_id=patient_id)
+        try:
+            patient = self.repository.lock_patient_for_booking(patient_id=patient_id)
+        except PatientSubjectLockError as exc:
+            raise PublicBookingRequestError(exc.status_code, "public_booking_unavailable") from None
         if patient is None or patient.is_deleted:
             raise PublicBookingRequestError(409, "public_booking_unavailable")
 

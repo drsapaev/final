@@ -23,15 +23,14 @@ def _require(condition: object, message: str) -> None:
         raise ProvisionError(message)
 
 
-def _reviewed_body(quoted_schema: str, private_schema: str, *, patient_lock: bool = False) -> str:
-    path = Path(__file__).resolve().parents[1] / "backend/alembic/versions/0116_patient_owner_confirmation.py"
-    spec = importlib.util.spec_from_file_location("confirmation_migration_0116", path)
+def _reviewed_migration(filename: str):
+    path = Path(__file__).resolve().parents[1] / "backend/alembic/versions" / filename
+    spec = importlib.util.spec_from_file_location(path.stem, path)
     if spec is None or spec.loader is None:
         raise ProvisionError("Reviewed migration unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    factory = module.patient_lock_function_body if patient_lock else module.owner_function_body
-    return factory(quoted_schema, private_schema)
+    return module
 
 
 def _namespace_helper():
@@ -45,7 +44,8 @@ def _namespace_helper():
 
 
 def provision(engine: Engine, schema: str, capability_role: str, runtime_role: str, *,
-              expected_owner: str, trusted_owner_members: tuple[str, ...] = ()) -> None:
+              expected_owner: str, trusted_owner_members: tuple[str, ...] = (),
+              booking_lock_only: bool = False) -> None:
     _require(engine.dialect.name == "postgresql", "PostgreSQL is required")
     _require(bool(schema) and bool(capability_role) and bool(runtime_role) and bool(expected_owner), "Explicit schema, owner and both roles are required")
     _require("\0" not in schema + capability_role + runtime_role + expected_owner and capability_role != runtime_role,
@@ -58,13 +58,18 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
     qp = quote(private)
     function = f"{qp}.invalidate_patient_owner_confirmations()"
     patient_lock = f"{qp}.lock_confirmation_patient(pg_catalog.int4)"
+    booking_lock = f"{qp}.lock_booking_patient(pg_catalog.int4)"
     with engine.begin() as db:
         db.execute(text("SET LOCAL search_path=pg_catalog"))
-        namespace.merge_namespace_roles(
-            db, schema, expected_owner=expected_owner,
-            backend_roles=(runtime_role,), capability_owner_roles=(capability_role,),
-            trusted_owner_members=trusted_owner_members,
-        )
+        if booking_lock_only:
+            namespace.validate_namespace(db, schema, expected_owner=expected_owner,
+                                         trusted_owner_members=trusted_owner_members)
+        else:
+            namespace.merge_namespace_roles(
+                db, schema, expected_owner=expected_owner,
+                backend_roles=(runtime_role,), capability_owner_roles=(capability_role,),
+                trusted_owner_members=trusted_owner_members,
+            )
         roles = db.execute(text("""
           SELECT oid,rolname,rolcanlogin,rolsuper,rolbypassrls,rolcreaterole,rolcreatedb,rolreplication
           FROM pg_catalog.pg_roles WHERE rolname IN (:cap,:runtime)
@@ -118,11 +123,12 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
             WHERE c.oid=ANY(:tables) AND a.privilege_type='TRIGGER' AND a.grantee<>ALL(:owners))
         """), {"tables": [tables["patients"]["oid"], tables["visits"]["oid"]], "owners": list(trusted_owners)}).scalar_one(),
                  "Untrusted TRIGGER grant exists")
-        _require(not db.execute(text("""
-          SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
-            WHERE t.tgrelid=ANY(:tables) AND NOT t.tgisinternal AND p.proowner<>ALL(:owners))
-        """), {"tables": [tables["patients"]["oid"], tables["visits"]["oid"]], "owners": list(trusted_owners | {cap["oid"]})}).scalar_one(),
-                 "Untrusted existing trigger function")
+        if not booking_lock_only:
+            _require(not db.execute(text("""
+              SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
+                WHERE t.tgrelid=ANY(:tables) AND NOT t.tgisinternal AND p.proowner<>ALL(:owners))
+            """), {"tables": [tables["patients"]["oid"], tables["visits"]["oid"]], "owners": list(trusted_owners | {cap["oid"]})}).scalar_one(),
+                     "Untrusted existing trigger function")
         _require(not db.execute(text("""
           SELECT pg_catalog.has_table_privilege(:role,:visits,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
             OR pg_catalog.has_table_privilege(:role,:patients,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -149,10 +155,11 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
             OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a, LATERAL pg_catalog.aclexplode(a.attacl) x
               WHERE a.attrelid NOT IN (:visits,:patient) AND x.grantee=:role)
             OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc p WHERE p.proowner=:role
-              AND p.oid NOT IN (pg_catalog.to_regprocedure(:function),pg_catalog.to_regprocedure(:patient_lock)))
+              AND p.oid NOT IN (pg_catalog.to_regprocedure(:function),pg_catalog.to_regprocedure(:patient_lock))
+              AND p.oid IS DISTINCT FROM pg_catalog.to_regprocedure(:booking_lock))
         """), {"role": cap["oid"], "visits": tables["visits"]["oid"],
                  "patient": tables["patients"]["oid"], "seq": f"{qs}.visit_confirmation_generation_seq",
-                 "function": function, "patient_lock": patient_lock}).scalar_one(),
+                 "function": function, "patient_lock": patient_lock, "booking_lock": booking_lock}).scalar_one(),
                  "Capability role has unrelated ownership or grants")
         _require(not db.execute(text("""
           SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_class c,
@@ -166,30 +173,46 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
           WHERE oid=pg_catalog.to_regprocedure(:name)
         """), {"name": function}).mappings().first()
         migration_schema = engine.dialect.identifier_preparer.quote_schema(schema)
-        _require(fn is not None and fn["prosrc"] == _reviewed_body(migration_schema, private), "Trigger capability body differs from reviewed migration")
+        confirmation = _reviewed_migration("0116_patient_owner_confirmation.py")
+        _require(fn is not None and fn["prosrc"] == confirmation.owner_function_body(migration_schema, private),
+                 "Trigger capability body differs from reviewed migration")
         _require(fn["proowner"] in trusted_owners | {cap["oid"]}, "Unexpected trigger function owner")
         expected_base = {"search_path=pg_catalog", "standard_conforming_strings=on"}
         config = set(fn["proconfig"] or ())
         _require((not fn["prosecdef"] and config == expected_base | {"row_security=off"})
                  or (fn["prosecdef"] and config == expected_base | {"row_security=on"}),
                  "Trigger capability configuration differs from reviewed policy")
-        lock_fn = db.execute(text("""
-          SELECT oid,proowner,prosrc,prosecdef,proconfig FROM pg_catalog.pg_proc
-          WHERE oid=pg_catalog.to_regprocedure(:name)
-        """), {"name": patient_lock}).mappings().first()
-        _require(lock_fn is not None and lock_fn["proowner"] in trusted_owners | {cap["oid"]}
-                 and lock_fn["prosrc"] == _reviewed_body(migration_schema, private, patient_lock=True),
-                 "Patient lock capability differs from reviewed migration")
-        lock_config = set(lock_fn["proconfig"] or ())
-        _require((not lock_fn["prosecdef"] and lock_config == expected_base | {"row_security=off"})
-                 or (lock_fn["prosecdef"] and lock_config == expected_base | {"row_security=on"}),
-                 "Patient lock capability configuration differs from reviewed policy")
-        _require(not db.execute(text("""
-          SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_proc p,
-            LATERAL pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
-            WHERE p.oid=:fn AND a.grantee NOT IN (p.proowner,:cap,:runtime) AND a.privilege_type='EXECUTE')
-        """), {"fn": lock_fn["oid"], "cap": cap["oid"], "runtime": runtime["oid"]}).scalar_one(),
-                 "Unexpected patient lock EXECUTE grant")
+        patient_locks = {}
+        for signature in (patient_lock, booking_lock):
+            lock_fn = db.execute(text("""
+              SELECT oid,proowner,prosrc,prosecdef,proconfig,
+                prokind='f' AND provolatile='v' AND NOT proretset
+                  AND prorettype='pg_catalog.bool'::pg_catalog.regtype AS lock_signature
+              FROM pg_catalog.pg_proc WHERE oid=pg_catalog.to_regprocedure(:name)
+            """), {"name": signature}).mappings().first()
+            if signature == booking_lock:
+                if lock_fn is None:
+                    # Historical deployments and migration tests still provision 0116 alone.
+                    continue
+                booking = _reviewed_migration("0140_booking_patient_lock.py")
+                expected_body = booking.booking_lock_function_body(migration_schema)
+            else:
+                expected_body = confirmation.patient_lock_function_body(migration_schema, private)
+            _require(lock_fn is not None and lock_fn["lock_signature"]
+                     and lock_fn["proowner"] in trusted_owners | {cap["oid"]} and lock_fn["prosrc"] == expected_body,
+                     "Patient lock capability differs from reviewed migration")
+            lock_config = set(lock_fn["proconfig"] or ())
+            expected_rls = "row_security=on" if lock_fn["prosecdef"] else "row_security=off"
+            _require(lock_config == expected_base | {expected_rls},
+                     "Patient lock capability configuration differs from reviewed policy")
+            _require(not db.execute(text("""
+              SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_proc p,
+                LATERAL pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
+                WHERE p.oid=:fn AND a.grantee<>p.proowner AND a.privilege_type='EXECUTE'
+                  AND (a.grantee NOT IN (:cap,:runtime) OR a.is_grantable))
+            """), {"fn": lock_fn["oid"], "cap": cap["oid"], "runtime": runtime["oid"]}).scalar_one(),
+                     "Unexpected patient lock EXECUTE grant")
+            patient_locks[signature] = lock_fn
         trigger_valid = db.execute(text("""
           SELECT t.tgenabled IN ('O','A') AND t.tgtype=17 AND t.tgqual IS NULL
             AND ARRAY(SELECT a.attname FROM pg_catalog.unnest(t.tgattr::smallint[]) x
@@ -235,6 +258,7 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
               FROM pg_catalog.pg_policy p WHERE p.polrelid=:visits AND p.polname=:name
             """), {"visits": tables["visits"]["oid"], "name": name}).mappings().first()
             if policy is None:
+                _require(not booking_lock_only, "Established confirmation policies are required")
                 check = " WITH CHECK (true)" if command == "UPDATE" else ""
                 db.exec_driver_sql(f"CREATE POLICY {quote(name)} ON {visits} FOR {command} TO {qc} USING (true){check}")
             else:
@@ -253,32 +277,52 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
               FROM pg_catalog.pg_policy p WHERE p.polrelid=pg_catalog.to_regclass(:table) AND p.polname=:name
             """), {"table": table, "name": name}).mappings().first()
             if policy is None:
+                _require(not booking_lock_only, "Established subject lock policies are required")
                 check_sql = f" WITH CHECK ({check})" if check is not None else ""
                 db.exec_driver_sql(f"CREATE POLICY {quote(name)} ON {table} FOR {command} TO {role} USING (true){check_sql}")
             else:
                 _require(policy["polcmd"] == ("r" if command == "SELECT" else "w") and policy["polpermissive"]
                          and policy["polroles"] == [role_oid] and policy["qual"] == "true"
                          and policy["checked"] == check, "Existing subject policy differs from reviewed policy")
-        db.exec_driver_sql(f"GRANT USAGE ON SCHEMA {qs} TO {qc}")
-        db.exec_driver_sql(f"GRANT SELECT (id,patient_id,status,confirmation_token,reminder_generation) ON {visits} TO {qc}")
-        db.exec_driver_sql(f"GRANT UPDATE (confirmation_context_epoch,confirmation_token,confirmation_expires_at,reminder_sent_at,reminder_generation) ON {visits} TO {qc}")
-        db.exec_driver_sql(f"GRANT SELECT (id,is_deleted), UPDATE (id) ON {patients} TO {qc}")
-        db.exec_driver_sql(f"GRANT SELECT ON {patients}, {visits} TO {qr}")
-        db.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {qs}.visit_confirmation_generation_seq TO {qc}")
-        if fn["proowner"] != cap["oid"] or lock_fn["proowner"] != cap["oid"]:
+        if booking_lock_only:
+            prior_lock = patient_locks[patient_lock]
+            _require(booking_lock in patient_locks and prior_lock["prosecdef"] and prior_lock["proowner"] == cap["oid"],
+                     "The deployed confirmation capability and booking function are required")
+            _require(db.execute(text("""
+              SELECT pg_catalog.has_function_privilege(:runtime,:lock,'EXECUTE')
+                 AND pg_catalog.has_column_privilege(:cap,:patient,'id','SELECT')
+                 AND pg_catalog.has_column_privilege(:cap,:patient,'is_deleted','SELECT')
+                 AND pg_catalog.has_column_privilege(:cap,:patient,'id','UPDATE')
+            """), {"runtime": runtime["oid"], "lock": prior_lock["oid"], "cap": cap["oid"],
+                     "patient": tables["patients"]["oid"]}).scalar_one(),
+                     "Established subject lock grants are required")
+            functions_to_provision = {booking_lock: patient_locks[booking_lock]}
+        else:
+            db.exec_driver_sql(f"GRANT USAGE ON SCHEMA {qs} TO {qc}")
+            db.exec_driver_sql(f"GRANT SELECT (id,patient_id,status,confirmation_token,reminder_generation) ON {visits} TO {qc}")
+            db.exec_driver_sql(f"GRANT UPDATE (confirmation_context_epoch,confirmation_token,confirmation_expires_at,reminder_sent_at,reminder_generation) ON {visits} TO {qc}")
+            db.exec_driver_sql(f"GRANT SELECT (id,is_deleted), UPDATE (id) ON {patients} TO {qc}")
+            db.exec_driver_sql(f"GRANT SELECT ON {patients}, {visits} TO {qr}")
+            db.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {qs}.visit_confirmation_generation_seq TO {qc}")
+            functions_to_provision = {function: fn, **patient_locks}
+        ownership_updates = [
+            signature for signature, metadata in functions_to_provision.items()
+            if metadata["proowner"] != cap["oid"]
+        ]
+        if ownership_updates:
             db.exec_driver_sql(f"GRANT CREATE ON SCHEMA {qp} TO {qc}")
-            if fn["proowner"] != cap["oid"]:
-                db.exec_driver_sql(f"ALTER FUNCTION {function} OWNER TO {qc}")
-            if lock_fn["proowner"] != cap["oid"]:
-                db.exec_driver_sql(f"ALTER FUNCTION {patient_lock} OWNER TO {qc}")
+            for signature in ownership_updates:
+                db.exec_driver_sql(f"ALTER FUNCTION {signature} OWNER TO {qc}")
             db.exec_driver_sql(f"REVOKE CREATE ON SCHEMA {qp} FROM {qc}")
-        for signature in (function, patient_lock):
+        for signature in functions_to_provision:
             db.exec_driver_sql(f"ALTER FUNCTION {signature} SECURITY DEFINER")
             db.exec_driver_sql(f"ALTER FUNCTION {signature} SET row_security=on")
             db.exec_driver_sql(f"ALTER FUNCTION {signature} SET standard_conforming_strings=on")
-        db.exec_driver_sql(f"REVOKE ALL ON FUNCTION {function} FROM PUBLIC, {qr}")
-        db.exec_driver_sql(f"REVOKE ALL ON FUNCTION {patient_lock} FROM PUBLIC")
-        db.exec_driver_sql(f"GRANT EXECUTE ON FUNCTION {patient_lock} TO {qr}")
+            db.exec_driver_sql(f"REVOKE ALL ON FUNCTION {signature} FROM PUBLIC")
+            if signature in patient_locks:
+                db.exec_driver_sql(f"GRANT EXECUTE ON FUNCTION {signature} TO {qr}")
+        if not booking_lock_only:
+            db.exec_driver_sql(f"REVOKE ALL ON FUNCTION {function} FROM {qr}")
         namespace.validate_namespace(db, schema, expected_owner=expected_owner,
                                      trusted_owner_members=trusted_owner_members)
 
@@ -290,6 +334,8 @@ def main() -> int:
     parser.add_argument("--trusted-owner-member", action="append", default=[])
     parser.add_argument("--capability-role", required=True)
     parser.add_argument("--runtime-role", required=True)
+    parser.add_argument("--booking-lock-only", action="store_true",
+                        help="Provision revision 0140 using the deployed 0116 subject role and policies")
     args = parser.parse_args()
     url = os.environ.get("DATABASE_URL")
     if not url:
@@ -297,10 +343,12 @@ def main() -> int:
     engine = create_engine(url)
     try:
         provision(engine, args.schema, args.capability_role, args.runtime_role,
-                  expected_owner=args.schema_owner, trusted_owner_members=tuple(args.trusted_owner_member))
+                  expected_owner=args.schema_owner, trusted_owner_members=tuple(args.trusted_owner_member),
+                  booking_lock_only=args.booking_lock_only)
     finally:
         engine.dispose()
-    print("Confirmation trigger capability provisioned; public read capability is a separate step.")
+    print("Booking patient lock provisioned." if args.booking_lock_only else
+          "Confirmation trigger capability provisioned; public read capability is a separate step.")
     return 0
 
 

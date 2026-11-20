@@ -22,6 +22,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from fastapi import HTTPException
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
@@ -36,6 +37,9 @@ from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.repositories.public_booking_request_repository import (
+    PublicBookingRequestRepository,
+)
 from app.services.all_free_guard import (
     AllFreeGuardError,
     PendingAllFreeError,
@@ -45,6 +49,7 @@ from app.services.all_free_request_service import (
     AllFreeRequestError,
     AllFreeRequestService,
 )
+from app.services.patient_subject_lock import PatientSubjectLockError
 from app.services.profile_contact_security import ProfileBearerContext
 from app.services.registrar_cart_replay import (
     RegistrarCartReceipt,
@@ -205,6 +210,53 @@ def _confirm(db, ids):
     actor, _ = lock_staff_confirmation_subjects(db, bearer=_bearer(ids["confirm"]), visit_ids=[ids["visit"]])
     VisitLifecycleService(db).confirm_visit(visit_id=ids["visit"], current_user=actor, confirmed_by="synthetic", commit=False)
     db.flush()
+
+
+def test_booking_subject_lock_preserves_fk_compatibility_without_runtime_update(guarded_pg):
+    owner, runtime, ids = guarded_pg
+    root = Path(__file__).resolve().parents[3]
+    schema = owner.dialect.default_schema_name
+    private = owner.dialect.identifier_preparer.quote_identifier(capability_schema_name(schema))
+    with owner.begin() as db:
+        migration = _module(root / "backend/alembic/versions/0140_booking_patient_lock.py")
+        migration.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": schema}))
+        migration.upgrade()
+        expected_owner = db.scalar(sa.text("SELECT CURRENT_USER"))
+        capability = db.scalar(sa.text("""
+          SELECT pg_catalog.pg_get_userbyid(proowner) FROM pg_catalog.pg_proc
+          WHERE oid=pg_catalog.to_regprocedure(:signature)
+        """), {"signature": f"{private}.lock_confirmation_patient(pg_catalog.int4)"})
+
+    patient_id = ids["patient"]
+    with Session(runtime) as db, pytest.raises(PatientSubjectLockError) as unavailable:
+        PublicBookingRequestRepository(db).lock_patient_for_booking(patient_id=patient_id)
+    assert unavailable.value.status_code == 503
+
+    provision = _module(root / "scripts/provision_confirmation_subject_role.py")
+    for _ in range(2):
+        provision.provision(owner, schema, capability, runtime.url.username, expected_owner=expected_owner,
+                            booking_lock_only=True)
+
+    subject = sa.select(Patient.id).filter_by(id=patient_id)
+    with owner.begin() as foreign_key_holder:
+        assert foreign_key_holder.scalar(subject.with_for_update(read=True, key_share=True)) == patient_id
+        with Session(runtime) as booking:
+            assert booking.scalar(sa.text(
+                "SELECT pg_catalog.has_any_column_privilege(CURRENT_USER, 'patients', 'UPDATE')"
+            )) is False
+            locked = PublicBookingRequestRepository(booking).lock_patient_for_booking(patient_id=patient_id)
+            assert locked is not None and locked.id == patient_id
+            with pytest.raises(DBAPIError) as busy, owner.begin() as contender:
+                contender.scalar(subject.with_for_update(key_share=True, nowait=True))
+            assert busy.value.orig.sqlstate == "55P03"
+
+    with Session(owner, expire_on_commit=False) as db:
+        deleted = Patient(first_name="SYNTHETIC", last_name="DELETED BOOKING", is_deleted=True)
+        db.add(deleted)
+        db.commit()
+        deleted_id = deleted.id
+    with Session(runtime) as db:
+        assert PublicBookingRequestRepository(db).lock_patient_for_booking(patient_id=deleted_id) is None
 
 
 def test_cart_receipt_requires_the_issuer_and_current_financial_membership(guarded_pg):

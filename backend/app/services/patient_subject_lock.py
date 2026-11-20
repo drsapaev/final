@@ -21,7 +21,7 @@ class PatientSubjectLockError(RuntimeError):
         self.detail = detail
 
 
-def require_patient_subject_visibility(db) -> None:
+def require_patient_subject_visibility(db, *, for_booking: bool = False) -> None:
     """Prove full subject visibility for the trusted nonowner backend."""
     if db.get_bind().dialect.name == "postgresql":
         try:
@@ -46,6 +46,7 @@ def require_patient_subject_visibility(db) -> None:
             qualified = quote(schema)
             private_name = capability_schema_name(schema)
             private = quote(private_name)
+            lock_function = "lock_booking_patient" if for_booking else "lock_confirmation_patient"
             db.execute(text("SET LOCAL row_security=on"))
             # Hold relation locks across policy proof and all subsequent reads.
             db.execute(text(f"LOCK TABLE {qualified}.patients, {qualified}.visits IN ACCESS SHARE MODE"))
@@ -95,7 +96,7 @@ def require_patient_subject_visibility(db) -> None:
                 JOIN pg_catalog.pg_namespace app_ns ON app_ns.nspname=:schema
               WHERE p.oid=pg_catalog.to_regprocedure(:signature) AND private_ns.nspname=:private
             """), {"schema": schema, "private": private_name,
-                   "signature": f"{private}.lock_confirmation_patient(pg_catalog.int4)"}).scalar_one_or_none()
+                   "signature": f"{private}.{lock_function}(pg_catalog.int4)"}).scalar_one_or_none()
             if trusted is not True or lock_safe is not True:
                 raise TrustedSchemaUnavailable("Confirmation visibility is unavailable")
         except DBAPIError as exc:
@@ -108,7 +109,7 @@ def require_patient_subject_visibility(db) -> None:
             raise PatientSubjectLockError(status_code=503, detail="Подтверждение временно недоступно") from None
 
 
-def lock_patient_subject(db, patient_id: int) -> bool:
+def lock_patient_subject(db, patient_id: int, *, for_booking: bool = False) -> bool:
     """Lock an active Patient in this transaction, returning false if absent.
 
     PostgreSQL uses a reviewed private capability; the backend never receives
@@ -116,14 +117,15 @@ def lock_patient_subject(db, patient_id: int) -> bool:
     """
     if type(patient_id) is not int or patient_id <= 0:
         raise PatientSubjectLockError(status_code=404, detail="Подтверждение временно недоступно")
-    require_patient_subject_visibility(db)
+    require_patient_subject_visibility(db, for_booking=for_booking)
     dialect = db.get_bind().dialect.name
     try:
         if dialect == "postgresql":
             private = db.get_bind().dialect.identifier_preparer.quote_identifier(
                 capability_schema_name(settings.TRUSTED_DB_SCHEMA)
             )
-            result = db.execute(text(f"SELECT {private}.lock_confirmation_patient(:subject_id)"),
+            lock_function = "lock_booking_patient" if for_booking else "lock_confirmation_patient"
+            result = db.execute(text(f"SELECT {private}.{lock_function}(:subject_id)"),
                                 {"subject_id": patient_id}).scalar_one()
             if type(result) is not bool:
                 raise PatientSubjectLockError(status_code=503, detail="Подтверждение временно недоступно")
