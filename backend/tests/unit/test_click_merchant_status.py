@@ -1,5 +1,4 @@
 """All Merchant API traffic uses a synthetic MockTransport."""
-import hashlib
 import json
 import logging
 import threading
@@ -56,7 +55,8 @@ def test_status_observation_binds_order_and_provider_id_without_granting_paid(ca
     assert requests[0].url.path == f"/v2/merchant/payment/status_by_mti/100/{ORDER}"
     assert requests[1].url.path == "/v2/merchant/payment/status/100/97"
     assert requests[2].url.path == requests[0].url.path
-    expected = hashlib.sha1((str(NOW) + SECRET).encode(), usedforsecurity=False).hexdigest()
+    # Fixed Merchant Auth vector for the synthetic timestamp and credential.
+    expected = "beb6e278970905f26b3b3e6b953db6337935fe3b"
     assert all(request.headers["Auth"] == f"200:{expected}:{NOW}" for request in requests)
     assert SECRET not in caplog.text and expected not in caplog.text
     assert SECRET not in repr(observation)

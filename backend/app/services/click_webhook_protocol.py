@@ -12,15 +12,15 @@ import hmac
 import json
 import re
 from dataclasses import dataclass, replace
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from urllib.parse import parse_qsl
 
 _MAX_BODY = 256 * 1024
 _MAX_FIELD = 1024
 _MAX_FIELDS = 64
+_MAX_AMOUNT_LENGTH = 128
 _BAD_PERCENT_ESCAPE = re.compile(r"%(?![0-9a-fA-F]{2})")
 _HEX_DIGEST = re.compile(r"[0-9a-fA-F]{32}\Z")
-_DECIMAL = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?\Z")
 
 
 class ClickProtocolError(ValueError):
@@ -103,22 +103,30 @@ def parse_click_fields(body: bytes, content_type: str) -> dict[str, str]:
     return data
 
 
+def _amount_parts(raw: str) -> tuple[str, str] | None:
+    if len(raw) > _MAX_AMOUNT_LENGTH:
+        return None
+    whole, dot, fraction = raw.partition(".")
+    if not whole.isascii() or not whole.isdecimal() or (len(whole) > 1 and whole.startswith("0")):
+        return None
+    if dot and not (fraction.isascii() and fraction.isdecimal()):
+        return None
+    return whole, fraction
+
+
 def _major_and_minor(raw: str) -> tuple[Decimal | None, str | None]:
     # Protocol signature verification must be possible even if the exact
     # amount cannot be represented by the financial schema. A signed unusual
     # amount must go to an exception receipt, not be rounded or discarded.
-    if not _DECIMAL.fullmatch(raw) or len(raw) > 128:
+    parts = _amount_parts(raw)
+    if parts is None:
         return None, None
-    try:
-        amount = Decimal(raw)
-    except InvalidOperation:
-        return None, None
-    whole, dot, fraction = raw.partition(".")
-    significant_fraction = fraction.rstrip("0") if dot else ""
-    if len(significant_fraction) > 2:
+    whole, fraction = parts
+    amount = Decimal(raw)
+    if len(fraction.rstrip("0")) > 2:
         return amount, None
-    minor = (whole + (fraction[:2] if dot else "").ljust(2, "0")).lstrip("0") or "0"
-    if len(minor) > 128:
+    minor = (whole + fraction[:2].ljust(2, "0")).lstrip("0") or "0"
+    if len(minor) > _MAX_AMOUNT_LENGTH:
         return amount, None
     return amount, minor
 
@@ -196,10 +204,12 @@ def authenticate_click_receipt(fields: dict[str, str], *, service_id: str, secre
         # A common PHP conversion removes decimal trailing zeroes. This is
         # only a candidate for evidence retention, never proof of settlement.
         value = fields.get("amount")
-        if not isinstance(value, _JsonNumber) or not _DECIMAL.fullmatch(value) or len(value) > 128:
+        parts = _amount_parts(value) if isinstance(value, _JsonNumber) else None
+        if parts is None:
             raise ClickProtocolError("unverified callback") from None
-        whole, dot, fraction = value.partition(".")
-        if not dot:
+        whole, fraction = parts
+        if not fraction:
             raise ClickProtocolError("unverified callback") from None
-        candidate["amount"] = whole + (("." + fraction.rstrip("0")) if fraction.rstrip("0") else "")
+        significant_fraction = fraction.rstrip("0")
+        candidate["amount"] = f"{whole}.{significant_fraction}" if significant_fraction else whole
         return probable(verify_click_fields(candidate, service_id=service_id, secret_key=secret_key))

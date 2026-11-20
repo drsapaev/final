@@ -125,6 +125,9 @@ def test_probable_json_retains_original_numeric_spelling():
     ("0.0700", Decimal("0.0700"), "7"), ("0", Decimal("0"), "0"),
     ("1.001", Decimal("1.001"), None), ("1e-1000", None, None),
     ("9" * 128, Decimal("9" * 128), None),
+    ("9" * 129, None, None), ("00.10", None, None), ("0.", None, None),
+    (".10", None, None), ("0.1.2", None, None), ("２.１", None, None),
+    ("2.１", None, None), ("+1", None, None), ("1\n", None, None),
 ])
 def test_signed_unrepresentable_amount_remains_an_observation(value, major, minor):
     # Test parsing separately from authentication; no credential is a real one.

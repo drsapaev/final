@@ -1,5 +1,4 @@
 """Synthetic in-process receipts: no provider or live database calls."""
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -46,13 +45,18 @@ def database():
 
 
 def callback(*, action="1", amount="23.45", error="0", note="Success"):
+    # Fixed Shop API vectors for the synthetic fields below.
+    signatures = {
+        ("0", "23.45"): "77516c8d659dde2301eaa3a07fc3134a",
+        ("1", "23.45"): "25a20b004ef4db7d83ac6723e4c68bcf",
+        ("1", "0.001"): "956bda03646beeb77f507c5f0041e17c",
+    }
     fields = {"click_trans_id": "12345", "service_id": "100", "click_paydoc_id": "42",
               "merchant_trans_id": "invoice_1", "amount": amount, "action": action,
-              "error": error, "error_note": note, "sign_time": "2026-11-17 12:01:00"}
+              "error": error, "error_note": note, "sign_time": "2026-11-17 12:01:00",
+              "sign_string": signatures[action, amount]}
     if action == "1":
         fields["merchant_prepare_id"] = "77"
-    material = "12345100" + SECRET + "invoice_1" + ("77" if action == "1" else "") + amount + action + fields["sign_time"]
-    fields["sign_string"] = hashlib.md5(material.encode(), usedforsecurity=False).hexdigest()
     return urlencode(fields).encode()
 
 
