@@ -1804,9 +1804,34 @@ export type paths = {
         put?: never;
         /**
          * Confirm Visit By Telegram
-         * @description Подтверждение визита через Telegram бот по токену.
+         * @deprecated
+         * @description A claimed Telegram user ID in an unauthenticated request is untrusted.
+         *
+         *     Telegram updates are handled by the authenticated webhook or polling
+         *     transport and invoke the service directly with the verified actor.
          */
         post: operations["confirm_visit_by_telegram_api_v1_telegram_visits_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/visits/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Visit By Telegram
+         * @deprecated
+         * @description Reject caller-asserted Telegram identities on the public API.
+         */
+        post: operations["cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1918,10 +1943,7 @@ export type paths = {
         put?: never;
         /**
          * Webauthn Register Begin
-         * @description Begin passkey registration (M4-P1-4).
-         *
-         *     Requires existing patient authentication (initData in body).
-         *     Returns WebAuthn registration options for navigator.credentials.create().
+         * @description Begin registration after a one-use patient OTP step-up.
          */
         post: operations["webauthn_register_begin"];
         delete?: never;
@@ -1946,6 +1968,66 @@ export type paths = {
          *     Verifies browser response and stores credential.
          */
         post: operations["webauthn_register_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/discoverable/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Discoverable Begin
+         * @description Begin anonymous passkey login under shared distributed quotas.
+         */
+        post: operations["webauthn_discoverable_begin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/discoverable/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Discoverable Finish
+         * @description Verify the first assertion and request a fresh bound assertion.
+         */
+        post: operations["webauthn_discoverable_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/discoverable/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Discoverable Complete
+         * @description Verify a second, epoch-bound assertion before issuing a session.
+         */
+        post: operations["webauthn_discoverable_complete"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1987,7 +2069,7 @@ export type paths = {
          * Webauthn Login Finish
          * @description Finish passkey authentication (M4-P1-4).
          *
-         *     Verifies assertion and issues JWT.
+         *     Verifies assertion and issues a session or a second-factor challenge.
          */
         post: operations["webauthn_login_finish"];
         delete?: never;
@@ -6508,6 +6590,41 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/registrar/tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Registrar Tabs */
+        get: operations["get_registrar_tabs_api_v1_registrar_tabs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/registrar-tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Registrar Tabs */
+        get: operations["get_admin_registrar_tabs_api_v1_admin_registrar_tabs_get"];
+        /** Update Admin Registrar Tabs */
+        put: operations["update_admin_registrar_tabs_api_v1_admin_registrar_tabs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/registrar/queues/today": {
         parameters: {
             query?: never;
@@ -9352,7 +9469,10 @@ export type paths = {
         put?: never;
         /**
          * Send Notification
-         * @description Отправка уведомления пациенту
+         * @description Send a supported appointment or lab event to its verified patient chat.
+         *
+         *     ``data`` must contain the matching canonical appointment or lab result ID.
+         *     Caller-supplied clinical content is ignored.
          */
         post: operations["send_notification_api_v1_telegram_send_notification_post"];
         delete?: never;
@@ -9372,7 +9492,7 @@ export type paths = {
         put?: never;
         /**
          * Send Appointment Reminder
-         * @description Отправка напоминания о записи
+         * @description Send the canonical appointment; an unambiguous appointment ID is required.
          */
         post: operations["send_appointment_reminder_api_v1_telegram_appointment_reminder_post"];
         delete?: never;
@@ -9392,7 +9512,7 @@ export type paths = {
         put?: never;
         /**
          * Send Lab Results Notification
-         * @description Уведомление о готовности результатов анализов
+         * @description Send a readiness notification; a finalized lab result ID is required.
          */
         post: operations["send_lab_results_notification_api_v1_telegram_lab_results_notification_post"];
         delete?: never;
@@ -12168,12 +12288,7 @@ export type paths = {
         put?: never;
         /**
          * Mobile Login
-         * @description Мобильная аутентификация
-         *
-         *     Поддерживает:
-         *     - Вход по номеру телефона и паролю
-         *     - Вход через Telegram ID
-         *     - Регистрация нового пользователя
+         * @description Authenticate a linked active patient by phone/password and configured 2FA.
          */
         post: operations["mobile_login_api_v1_mobile_auth_login_post"];
         delete?: never;
@@ -14583,7 +14698,7 @@ export type paths = {
         put?: never;
         /**
          * Regenerate Backup Codes
-         * @description Перегенерировать backup коды
+         * @description Rotate backup codes after password and second-factor verification.
          */
         post: operations["regenerate_backup_codes_api_v1_2fa_backup_codes_regenerate_post"];
         delete?: never;
@@ -15625,7 +15740,7 @@ export type paths = {
         put?: never;
         /**
          * Send Appointment Reminder
-         * @description Отправить напоминание о записи на прием
+         * @description Send only to the current consenting, patient-linked private chat.
          */
         post: operations["send_appointment_reminder_api_v1_telegram_send_appointment_reminder_post"];
         delete?: never;
@@ -15645,7 +15760,9 @@ export type paths = {
         put?: never;
         /**
          * Send Lab Results
-         * @description Отправить результаты анализов пациенту
+         * @description Notify only when every result belongs to the patient and is finalized.
+         *
+         *     HTTP 200 with ``success: false`` means that no eligible chat was available.
          */
         post: operations["send_lab_results_api_v1_telegram_send_lab_results_post"];
         delete?: never;
@@ -15691,16 +15808,9 @@ export type paths = {
         put?: never;
         /**
          * Send Payment Confirmation
-         * @description Отправить подтверждение платежа.
+         * @description Use a verified paid record; caller-supplied amounts are ignored.
          *
-         *     P0-6b FIX: ``payment_data`` is now typed as ``PaymentData`` (Pydantic
-         *     model with ``extra='allow'`` so unknown keys like ``transaction_id``
-         *     and ``receipt_link`` are preserved). The model validates field types
-         *     and sizes at the framework boundary, preventing mass-assignment of
-         *     arbitrary keys. Internally the model is converted back to a dict
-         *     via ``.model_dump()`` so existing helpers (``_safe_payment_template_data``,
-         *     ``_ensure_payment_confirmation_belongs_to_patient``) continue to work
-         *     unchanged.
+         *     HTTP 200 with ``success: false`` means that no eligible chat was available.
          */
         post: operations["send_payment_confirmation_api_v1_telegram_send_payment_confirmation_post"];
         delete?: never;
@@ -16176,13 +16286,13 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
+        get?: never;
+        put?: never;
         /**
          * Get Verification Status
          * @description Получение статуса верификации
          */
-        get: operations["get_verification_status_api_v1_phone_verification_status_get"];
-        put?: never;
-        post?: never;
+        post: operations["get_verification_status_api_v1_phone_verification_status_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16198,12 +16308,12 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        post?: never;
         /**
          * Cancel Verification
          * @description Отмена верификации
          */
-        delete: operations["cancel_verification_api_v1_phone_verification_cancel_delete"];
+        post: operations["cancel_verification_api_v1_phone_verification_cancel_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -16338,7 +16448,7 @@ export type paths = {
         };
         /**
          * Validate Reset Token
-         * @description Проверка валидности токена сброса пароля
+         * @description Validate a reset token; query transport is retained for older clients.
          */
         get: operations["validate_reset_token_api_v1_password_reset_validate_token_get"];
         put?: never;
@@ -16619,10 +16729,11 @@ export type paths = {
          * Send Appointment Reminder Enhanced
          * @description Расширенное напоминание о записи.
          *
-         *     P0-6a FIX: ``template_data`` is now typed as ``TemplateDataBase`` so
-         *     Pydantic validates field sizes (strings ≤ 100KB) and shape at the
-         *     framework boundary, preventing template-injection via oversized
-         *     payloads.
+         *     HTTP 200 reports the attempt. Check ``success`` and per-channel details;
+         *     missing contacts, unsupported channels and provider failures are not sent.
+         *
+         *     ``template_data`` is accepted for compatibility but ignored; resource
+         *     notification content comes from the database.
          */
         post: operations["send_appointment_reminder_enhanced_api_v1_email_sms_send_appointment_reminder_enhanced_post"];
         delete?: never;
@@ -16644,8 +16755,11 @@ export type paths = {
          * Send Lab Results Enhanced
          * @description Расширенная отправка результатов анализов.
          *
-         *     P0-6a FIX: ``template_data`` is now typed as ``TemplateDataBase``
-         *     for framework-level validation.
+         *     HTTP 200 reports the attempt; ``success`` is false unless every requested
+         *     channel has an available contact and reports successful delivery.
+         *
+         *     ``template_data`` is accepted for compatibility but ignored; resource
+         *     notification content comes from the database.
          */
         post: operations["send_lab_results_enhanced_api_v1_email_sms_send_lab_results_enhanced_post"];
         delete?: never;
@@ -16667,11 +16781,10 @@ export type paths = {
          * Send Payment Confirmation Enhanced
          * @description Расширенное подтверждение платежа.
          *
-         *     P0-6a FIX: ``payment_data`` is now typed as ``PaymentData`` and
-         *     ``template_data`` as ``TemplateDataBase`` so Pydantic validates
-         *     field types and sizes at the framework boundary. ``PaymentData``
-         *     uses ``model_config = {"extra": "allow"}`` so unknown keys
-         *     (e.g. ``transaction_id``, ``receipt_link``) are preserved.
+         *     A payment ID is required. Amount, currency, method and receipt details
+         *     are loaded from the matching paid payment, not from the request body.
+         *     HTTP 200 reports the attempt; inspect ``success`` and per-channel details.
+         *     ``template_data`` is accepted for compatibility but ignored.
          */
         post: operations["send_payment_confirmation_enhanced_api_v1_email_sms_send_payment_confirmation_enhanced_post"];
         delete?: never;
@@ -19288,7 +19401,10 @@ export type paths = {
         put?: never;
         /**
          * Send Notification
-         * @description Отправка уведомления с использованием шаблона
+         * @description Поставить попытки отправки в фон; ответ не подтверждает доставку.
+         *
+         *     При ошибке рендеринга шаблона сообщение не отправляется, а попытка
+         *     отмечается как неудачная в истории уведомлений.
          */
         post: operations["send_notification_api_v1_notifications_send_post"];
         delete?: never;
@@ -23773,6 +23889,17 @@ export type webhooks = Record<string, never>;
 export type components = {
     schemas: {
         /**
+         * AIChatSafetyMeta
+         * @description A strict, explicit clinical boundary for each AI chat message.
+         */
+        AIChatSafetyMeta: {
+            /**
+             * Requires Doctor Confirmation
+             * @constant
+             */
+            requires_doctor_confirmation: true;
+        };
+        /**
          * AILearningInsightsResponse
          * @description Схема ответа с инсайтами для обучения AI
          */
@@ -24121,6 +24248,8 @@ export type components = {
              * @description Предупреждения
              */
             warnings?: string[];
+            /** @description Server-owned safety boundary for medical AI suggestions */
+            ai_safety_meta: components["schemas"]["MedicalAISafetyMeta"];
             /**
              * Requires Doctor Confirmation
              * @description Врач должен подтвердить предложение AI перед внесением в ЭМК
@@ -24235,8 +24364,9 @@ export type components = {
             /**
              * Requiresdoctorconfirmation
              * @default true
+             * @constant
              */
-            requiresDoctorConfirmation: boolean;
+            requiresDoctorConfirmation: true;
         };
         /**
          * AISystemSettings
@@ -24684,6 +24814,28 @@ export type components = {
             /** Subject Key */
             subject_key?: string | null;
         };
+        /** AdminPhoneVerificationSendResponse */
+        AdminPhoneVerificationSendResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Expires In Minutes */
+            expires_in_minutes: number;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** Provider */
+            provider: string | null;
+            /** Phone */
+            phone: string;
+            /** Purpose */
+            purpose: string;
+            /** Sent By Admin */
+            sent_by_admin: string;
+        };
         /** AdminQueueDirection */
         AdminQueueDirection: {
             profile: components["schemas"]["AdminDirectionProfile"];
@@ -24729,6 +24881,37 @@ export type components = {
             /** Directions */
             directions?: components["schemas"]["AdminQueueDirection"][];
             unattached: components["schemas"]["AdminUnattachedCatalog"];
+        };
+        /** AdminRegistrarTabsOut */
+        AdminRegistrarTabsOut: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "legacy" | "configured";
+            /** Version */
+            version: number;
+            /** Tabs */
+            tabs: components["schemas"]["ResolvedRegistrarTab"][];
+            /** Profile Filters */
+            profile_filters: components["schemas"]["RegistrarProfileFilter"][];
+            /** Options */
+            options: components["schemas"]["ResolvedRegistrarTab"][];
+        };
+        /** AdminSendCodeRequest */
+        AdminSendCodeRequest: {
+            /** Phone */
+            phone: string;
+            /**
+             * Purpose
+             * @default verification
+             * @enum {string}
+             */
+            purpose: "verification" | "phone_change";
+            /** Provider */
+            provider?: string | null;
+            /** Message */
+            message?: string | null;
         };
         /** AdminUnattachedCatalog */
         AdminUnattachedCatalog: {
@@ -25130,6 +25313,8 @@ export type components = {
             created_at: string;
             /** Updated At */
             updated_at?: string | null;
+            /** Patient Confirmed At */
+            patient_confirmed_at?: string | null;
             /** Patient Name */
             patient_name?: string | null;
             /** Department Id */
@@ -26944,6 +27129,7 @@ export type components = {
             was_cached: boolean;
             /** Created At */
             created_at: string;
+            ai_safety_meta: components["schemas"]["AIChatSafetyMeta"];
         };
         /**
          * ChatSessionCreate
@@ -27957,6 +28143,8 @@ export type components = {
             distribution?: string | null;
             /** Symptoms */
             symptoms?: string | null;
+            /** Localization */
+            localization?: string | null;
             /** Diagnosis */
             diagnosis?: string | null;
             /** Treatment Plan */
@@ -28010,6 +28198,8 @@ export type components = {
             distribution?: string | null;
             /** Symptoms */
             symptoms?: string | null;
+            /** Localization */
+            localization?: string | null;
             /** Diagnosis */
             diagnosis?: string | null;
             /** Treatment Plan */
@@ -33073,6 +33263,37 @@ export type components = {
             notes?: string | null;
         };
         /**
+         * MedicalAIListResponse
+         * @description Envelope collections, including empty lists, with explicit safety metadata.
+         */
+        MedicalAIListResponse: {
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            }[];
+            ai_safety_meta: components["schemas"]["MedicalAISafetyMeta"];
+        };
+        /**
+         * MedicalAIResultResponse
+         * @description Preserve existing response fields while requiring server-owned safety metadata.
+         */
+        MedicalAIResultResponse: {
+            ai_safety_meta: components["schemas"]["MedicalAISafetyMeta"];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * MedicalAISafetyMeta
+         * @description A medical suggestion always requires an explicit doctor's review.
+         */
+        MedicalAISafetyMeta: {
+            /**
+             * Requires Doctor Confirmation
+             * @constant
+             */
+            requires_doctor_confirmation: true;
+        };
+        /**
          * MedicalDocumentRequest
          * @description Запрос на печать медицинского документа
          */
@@ -33409,6 +33630,16 @@ export type components = {
              */
             password?: string | null;
             /**
+             * Totp Code
+             * @description TOTP код при включённой 2FA; значение действует в стандартном временном окне и не ограничено одним входом
+             */
+            totp_code?: string | null;
+            /**
+             * Backup Code
+             * @description Одноразовый резервный код при включённой 2FA
+             */
+            backup_code?: string | null;
+            /**
              * Telegram Id
              * @description Telegram ID
              */
@@ -33605,6 +33836,11 @@ export type components = {
             role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
             /** Doctor Profile */
             doctor_profile?: null;
+        };
+        /** NotificationDeliveryError */
+        NotificationDeliveryError: {
+            /** Detail */
+            detail: string;
         };
         /** NotificationInboxItem */
         NotificationInboxItem: {
@@ -33963,17 +34199,17 @@ export type components = {
         /** NotificationTemplateUpdate */
         NotificationTemplateUpdate: {
             /** Name */
-            name?: string | null;
+            name?: string;
             /** Type */
-            type?: string | null;
+            type?: string;
             /** Channel */
-            channel?: string | null;
+            channel?: string;
             /** Subject */
             subject?: string | null;
             /** Template */
-            template?: string | null;
+            template?: string;
             /** Is Active */
-            is_active?: boolean | null;
+            is_active?: boolean;
         };
         /** NotificationUnreadCountResponse */
         NotificationUnreadCountResponse: {
@@ -35903,6 +36139,98 @@ export type components = {
             /** Is Active */
             is_active: boolean;
         };
+        /** PhoneResetErrorResponse */
+        PhoneResetErrorResponse: {
+            /** Detail */
+            detail: string | components["schemas"]["PhoneResetVerificationFailure"];
+        };
+        /** PhoneResetValidationResponse */
+        PhoneResetValidationResponse: {
+            /** Error */
+            error: string;
+            /** Message */
+            message: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** PhoneResetVerificationFailure */
+        PhoneResetVerificationFailure: {
+            /**
+             * Success
+             * @constant
+             */
+            success: false;
+            /** Error */
+            error: string;
+            /** Error Code */
+            error_code?: string | null;
+            /** Attempts Left */
+            attempts_left?: number | null;
+        };
+        /** PhoneResetVerificationResponse */
+        PhoneResetVerificationResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Reset Token */
+            reset_token: string;
+            /** Expires In Hours */
+            expires_in_hours: number;
+        };
+        /** PhoneVerificationCancelResponse */
+        PhoneVerificationCancelResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+        };
+        /** PhoneVerificationErrorResponse */
+        PhoneVerificationErrorResponse: {
+            /** Detail */
+            detail: string | components["schemas"]["PhoneVerificationFailure"];
+        };
+        /** PhoneVerificationFailure */
+        PhoneVerificationFailure: {
+            /**
+             * Success
+             * @constant
+             */
+            success: false;
+            /** Error */
+            error: string;
+            /** Error Code */
+            error_code?: string | null;
+            /** Attempts Left */
+            attempts_left?: number | null;
+        };
+        /** PhoneVerificationProofResponse */
+        PhoneVerificationProofResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Phone */
+            phone: string;
+            /** Verified At */
+            verified_at: string;
+        };
+        /** PhoneVerificationRateLimitResponse */
+        PhoneVerificationRateLimitResponse: {
+            /** Error */
+            error: string;
+        };
         /**
          * PhoneVerificationRequest
          * @description Запрос на верификацию телефона для сброса пароля
@@ -35912,6 +36240,121 @@ export type components = {
             phone: string;
             /** Verification Code */
             verification_code: string;
+        };
+        /**
+         * PhoneVerificationScope
+         * @description Phone and purpose belong in the request body, never in a URL.
+         */
+        PhoneVerificationScope: {
+            /** Phone */
+            phone: string;
+            /**
+             * Purpose
+             * @default verification
+             * @enum {string}
+             */
+            purpose: "verification" | "phone_change";
+        };
+        /** PhoneVerificationSendResponse */
+        PhoneVerificationSendResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Expires In Minutes */
+            expires_in_minutes: number;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** Provider */
+            provider: string | null;
+        };
+        /** PhoneVerificationSettings */
+        PhoneVerificationSettings: {
+            /** Code Length */
+            code_length: number;
+            /** Ttl Minutes */
+            ttl_minutes: number;
+            /** Max Attempts */
+            max_attempts: number;
+            /** Rate Limit Minutes */
+            rate_limit_minutes: number;
+        };
+        /** PhoneVerificationStatistics */
+        PhoneVerificationStatistics: {
+            /** Total Active Codes */
+            total_active_codes: number;
+            /** Verified Codes */
+            verified_codes: number;
+            /** Pending Codes */
+            pending_codes: number;
+            /** Expiring Soon */
+            expiring_soon: number;
+            /** By Purpose */
+            by_purpose: {
+                [key: string]: number;
+            };
+            /** By Provider */
+            by_provider: {
+                [key: string]: number;
+            };
+            settings: components["schemas"]["PhoneVerificationSettings"];
+        };
+        /** PhoneVerificationStatisticsResponse */
+        PhoneVerificationStatisticsResponse: {
+            statistics: components["schemas"]["PhoneVerificationStatistics"];
+            /** Timestamp */
+            timestamp: string;
+        };
+        /** PhoneVerificationStatusResponse */
+        PhoneVerificationStatusResponse: {
+            /** Exists */
+            exists: boolean;
+            /** Verified */
+            verified: boolean;
+            /** Phone */
+            phone?: string | null;
+            /** Purpose */
+            purpose?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Attempts */
+            attempts?: number | null;
+            /** Max Attempts */
+            max_attempts?: number | null;
+            /** Time Left Minutes */
+            time_left_minutes?: number | null;
+        };
+        /** PhoneVerificationUpdateResponse */
+        PhoneVerificationUpdateResponse: {
+            /**
+             * Success
+             * @constant
+             */
+            success: true;
+            /** Message */
+            message: string;
+            /** Phone */
+            phone: string;
+            /** Verified At */
+            verified_at: string;
+            /** Sessions Revoked */
+            sessions_revoked: boolean;
+        };
+        /** PhoneVerificationValidationResponse */
+        PhoneVerificationValidationResponse: {
+            /** Error */
+            error: string;
+            /** Message */
+            message: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * PhraseSuggestRequest
@@ -39084,6 +39527,20 @@ export type components = {
             /** Records */
             records: components["schemas"]["RegistrarRecordRef"][];
         };
+        /**
+         * RegistrarProfileFilter
+         * @description Historical deep-link filter metadata; does not create a visible tab.
+         */
+        RegistrarProfileFilter: {
+            /** Key */
+            key: string;
+            /** Queue Tags */
+            queue_tags: string[];
+            /** Title */
+            title: string;
+            /** Title Ru */
+            title_ru: string | null;
+        };
         /** RegistrarRecordActionItemResponse */
         RegistrarRecordActionItemResponse: {
             /** Record Kind */
@@ -39152,6 +39609,65 @@ export type components = {
             record_kind: string;
             /** Record Id */
             record_id: number;
+        };
+        /** RegistrarTabInput */
+        RegistrarTabInput: {
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "profile" | "doctor";
+            /** Target Id */
+            target_id: number;
+            /** Title */
+            title?: string | null;
+            /**
+             * Visible
+             * @default true
+             */
+            visible: boolean;
+        };
+        /** RegistrarTabsErrorDetail */
+        RegistrarTabsErrorDetail: {
+            /** Code */
+            code: string;
+        };
+        /** RegistrarTabsErrorResponse */
+        RegistrarTabsErrorResponse: {
+            detail: components["schemas"]["RegistrarTabsErrorDetail"];
+        };
+        /** RegistrarTabsOut */
+        RegistrarTabsOut: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "legacy" | "configured";
+            /** Version */
+            version: number;
+            /** Tabs */
+            tabs: components["schemas"]["ResolvedRegistrarTab"][];
+            /** Profile Filters */
+            profile_filters: components["schemas"]["RegistrarProfileFilter"][];
+        };
+        /** RegistrarTabsUpdate */
+        RegistrarTabsUpdate: {
+            /** Expected Version */
+            expected_version: number;
+            /** Tabs */
+            tabs: components["schemas"]["RegistrarTabInput"][];
+            /**
+             * Reason
+             * @constant
+             */
+            reason: "configure_registrar_tabs";
+        };
+        /** RegistrarTabsValidationResponse */
+        RegistrarTabsValidationResponse: {
+            /** Detail */
+            detail: components["schemas"]["RegistrarTabsErrorDetail"] | {
+                [key: string]: unknown;
+            }[];
         };
         /** RegistrarVisitPaymentSummary */
         RegistrarVisitPaymentSummary: {
@@ -39253,6 +39769,41 @@ export type components = {
             size?: number | null;
             /** Error */
             error?: string | null;
+        };
+        /** ResetTokenErrorResponse */
+        ResetTokenErrorResponse: {
+            /** Detail */
+            detail: string;
+        };
+        /** ResolvedRegistrarTab */
+        ResolvedRegistrarTab: {
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "profile" | "doctor";
+            /** Target Id */
+            target_id: number;
+            /** Custom Title */
+            custom_title: string | null;
+            /** Title */
+            title: string;
+            /** Title Ru */
+            title_ru: string | null;
+            /** Profile Key */
+            profile_key: string | null;
+            /** Queue Tags */
+            queue_tags: string[];
+            /** Icon */
+            icon: string | null;
+            /** Color */
+            color: string | null;
+            /** Visible */
+            visible: boolean;
+            /** Available */
+            available: boolean;
+            /** Reason Code */
+            reason_code: ("missing_target" | "inactive_target") | null;
         };
         /**
          * RestoreRequest
@@ -39960,11 +40511,15 @@ export type components = {
             /**
              * Purpose
              * @default verification
+             * @enum {string}
              */
-            purpose: string;
+            purpose: "verification" | "phone_change";
             /** Provider */
             provider?: string | null;
-            /** Custom Message */
+            /**
+             * Custom Message
+             * @description Must be omitted or null for self-service; use the admin endpoint for custom text.
+             */
             custom_message?: string | null;
         };
         /**
@@ -40765,6 +41320,7 @@ export type components = {
         SuggestResponseV2: {
             /** Suggestions */
             suggestions: components["schemas"]["AISuggestionV2"][];
+            ai_safety_meta: components["schemas"]["MedicalAISafetyMeta"];
             /**
              * Model
              * @default mock
@@ -40939,6 +41495,13 @@ export type components = {
             /** Commands Processed Today */
             commands_processed_today: number;
         };
+        /** TelegramCancelRequest */
+        TelegramCancelRequest: {
+            /** Token */
+            token: string;
+            /** Telegram User Id */
+            telegram_user_id?: string | null;
+        };
         /** TelegramConfirmRequest */
         TelegramConfirmRequest: {
             /** Token */
@@ -40947,6 +41510,11 @@ export type components = {
             telegram_user_id?: string | null;
             /** Telegram Username */
             telegram_username?: string | null;
+        };
+        /** TelegramDeliveryError */
+        TelegramDeliveryError: {
+            /** Detail */
+            detail: string;
         };
         /** TelegramMiniAppAppointmentPreviewRequest */
         TelegramMiniAppAppointmentPreviewRequest: {
@@ -41094,6 +41662,11 @@ export type components = {
              * @default false
              */
             send_to_all_users: boolean;
+        };
+        /** TelegramVisitActionDenied */
+        TelegramVisitActionDenied: {
+            /** Detail */
+            detail: string;
         };
         /** TelegramWebhookRequest */
         TelegramWebhookRequest: {
@@ -43731,8 +44304,9 @@ export type components = {
             /**
              * Purpose
              * @default verification
+             * @enum {string}
              */
-            purpose: string;
+            purpose: "verification" | "phone_change";
         };
         /**
          * TelemetryResponse
@@ -48106,13 +48680,48 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Telegram actions require an authenticated bot update. */
+            403: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramVisitActionDenied"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConfirmationResponse"];
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_visit_by_telegram_api_v1_telegram_visits_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Telegram actions require an authenticated bot update. */
+            403: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramVisitActionDenied"];
                 };
             };
             /** @description Validation Error */
@@ -48261,18 +48870,76 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Verified phone of the authenticated patient */
+                    phone: string;
+                    /** @description Single-use patient OTP grant */
+                    verification_grant: string;
+                };
+            };
+        };
         responses: {
-            /** @description Successful Response */
+            /** @description Registration ceremony options */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        options: {
+                            challenge: string;
+                            ceremony_id: string;
+                            rp: {
+                                id: string;
+                                name: string;
+                            };
+                            user: {
+                                id: string;
+                                name: string;
+                                displayName: string;
+                            };
+                        };
+                    } & {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Invalid or missing request data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Patient identity or step-up rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication service temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -48283,16 +48950,371 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    ceremony_id: string;
+                    credential_response: {
+                        id: string;
+                        rawId: string;
+                        type: string;
+                        response: {
+                            attestationObject: string;
+                            clientDataJSON: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    credential_name?: string | null;
+                };
+            };
+        };
         responses: {
-            /** @description Successful Response */
+            /** @description Registered credential */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        registered: boolean;
+                        credential_id: number;
+                        name: string | null;
+                    } & {
                         [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid or missing request data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Patient identity or step-up rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication service temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    webauthn_discoverable_begin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Discoverable login options */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        options: {
+                            challenge: string;
+                            ceremony_id: string;
+                            rpId: string;
+                            timeout: number;
+                            userVerification: string;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Authentication service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    webauthn_discoverable_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ceremony_id: string;
+                    assertion_response: {
+                        id: string;
+                        rawId: string;
+                        type: string;
+                        response: {
+                            authenticatorData: string;
+                            clientDataJSON: string;
+                            signature: string;
+                            userHandle?: string | null;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Second user-verified assertion required */
+            200: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        next_options: {
+                            challenge: string;
+                            ceremony_id: string;
+                            rpId: string;
+                            timeout: number;
+                            /** @constant */
+                            userVerification: "required";
+                            allowCredentials: {
+                                /** @constant */
+                                type: "public-key";
+                                id: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Authentication rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Authentication service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    webauthn_discoverable_complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ceremony_id: string;
+                    assertion_response: {
+                        id: string;
+                        rawId: string;
+                        type: string;
+                        response: {
+                            authenticatorData: string;
+                            clientDataJSON: string;
+                            signature: string;
+                            userHandle?: string | null;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Patient access session or second-factor challenge */
+            200: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    } & ({
+                        access_token: string;
+                        token_type: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** @constant */
+                        requires_2fa: true;
+                        /** @constant */
+                        two_factor_method: "totp";
+                        pending_2fa_token: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    });
+                };
+            };
+            /** @description Authentication rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Authentication service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
                     };
                 };
             };
@@ -48329,14 +49351,87 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Patient access session or second-factor challenge */
             200: {
                 headers: {
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         [key: string]: unknown;
+                    } & ({
+                        access_token: string;
+                        token_type: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** @constant */
+                        requires_2fa: true;
+                        /** @constant */
+                        two_factor_method: "totp";
+                        pending_2fa_token: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    });
+                };
+            };
+            /** @description Authentication rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Authentication service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: {
+                            reason: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
                     };
                 };
             };
@@ -48351,16 +49446,39 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Active credentials for the current patient */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        credentials: {
+                            id: number;
+                            name: string | null;
+                            device_type: string | null;
+                            created_at: string | null;
+                            last_used_at: string | null;
+                        }[];
+                        total: number;
+                    } & {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Authentication required or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Patient identity or step-up rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -48373,18 +49491,65 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Verified phone of the authenticated patient */
+                    phone: string;
+                    /** @description Single-use patient OTP grant */
+                    verification_grant: string;
+                };
+            };
+        };
         responses: {
-            /** @description Successful Response */
+            /** @description Credential deactivated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        deactivated: boolean;
+                        credential_id: number;
+                    } & {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Invalid or missing request data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Patient identity or step-up rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Credential not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cannot deactivate last active credential */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -48394,6 +49559,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication service temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -56667,6 +57846,151 @@ export interface operations {
             };
         };
     };
+    get_registrar_tabs_api_v1_registrar_tabs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsValidationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+        };
+    };
+    get_admin_registrar_tabs_api_v1_admin_registrar_tabs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegistrarTabsOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsValidationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+        };
+    };
+    update_admin_registrar_tabs_api_v1_admin_registrar_tabs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarTabsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegistrarTabsOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsValidationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarTabsErrorResponse"];
+                };
+            };
+        };
+    };
     get_today_queues_api_v1_registrar_queues_today_get: {
         parameters: {
             query?: {
@@ -58696,9 +60020,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -58731,9 +60053,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -58766,9 +60086,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -58801,9 +60119,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -58836,9 +60152,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -58904,9 +60218,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -58975,9 +60287,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59010,9 +60320,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    }[];
+                    "application/json": components["schemas"]["MedicalAIListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59045,9 +60353,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59080,9 +60386,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -59115,9 +60419,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60468,9 +61770,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60501,9 +61801,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60569,9 +61867,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60607,9 +61903,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60677,9 +61971,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60714,9 +62006,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60783,9 +62073,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60818,9 +62106,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -60886,9 +62172,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["MedicalAIListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61060,6 +62344,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61067,6 +62387,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -61095,6 +62433,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61102,6 +62476,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -61130,6 +62522,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61137,6 +62565,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -61187,6 +62633,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61194,6 +62676,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -61207,9 +62707,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SendAppointmentReminderIntegrationRequest"] | {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["SendAppointmentReminderIntegrationRequest"];
             };
         };
         responses: {
@@ -61224,6 +62722,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61231,6 +62765,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -61244,9 +62796,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SendLabResultsNotificationRequest"] | {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["SendLabResultsNotificationRequest"];
             };
         };
         responses: {
@@ -61261,6 +62811,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61268,6 +62854,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -61296,6 +62900,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61303,6 +62943,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -61372,6 +63030,7 @@ export interface operations {
                 appointment_time: string;
                 specialty?: string;
                 cabinet?: string;
+                appointment_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -61390,6 +63049,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61397,6 +63092,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -61428,6 +63141,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or authorized resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The clinical resource changed or is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61435,6 +63184,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -67171,10 +68938,33 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["MobileLoginResponse"];
+                };
+            };
+            /** @description Unsupported login method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Invalid credentials or second factor */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -67184,6 +68974,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Authentication service unavailable */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -68630,9 +70431,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -68665,9 +70464,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -68698,9 +70495,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -68736,9 +70531,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -68771,9 +70564,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -68809,9 +70600,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -68976,7 +70765,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69012,7 +70801,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69046,7 +70835,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69079,7 +70868,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -69144,7 +70933,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalAIResultResponse"];
                 };
             };
             /** @description Validation Error */
@@ -70893,13 +72682,37 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 2FA setup artifacts */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorSetupResponse"];
+                };
+            };
+            /** @description 2FA is already enabled */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Authentication or enrollment session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -70909,6 +72722,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -70926,13 +72750,37 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Verification result and optional session tokens */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorVerifyResponse"];
+                };
+            };
+            /** @description Invalid TOTP code format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Authentication or enrollment session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -70942,6 +72790,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -70959,13 +72818,37 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 2FA verification and optional session tokens */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorVerifyResponse"];
+                };
+            };
+            /** @description A verification factor is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Authentication or pending session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -70975,6 +72858,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -71008,6 +72902,19 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests from this client */
+            429: {
+                headers: {
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                        retry_after: number | null;
+                    };
                 };
             };
         };
@@ -71087,13 +72994,48 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Remaining count; backup values are not returned */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorBackupCodesResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description 2FA not configured */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -71105,15 +73047,87 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorDisableRequest"];
+            };
+        };
         responses: {
-            /** @description Successful Response */
+            /** @description New codes, disclosed only in this response */
             200: {
                 headers: {
+                    /** @description Sensitive response must not be cached */
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TwoFactorBackupCodesResponse"];
+                };
+            };
+            /** @description A second factor is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Reauthentication failed or is temporarily locked */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests from this client */
+            429: {
+                headers: {
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                        retry_after: number | null;
+                    };
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -72770,6 +74784,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The resource or recipient changed or is not eligible */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72777,6 +74827,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing or report delivery failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -72807,6 +74884,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The resource or recipient changed or is not eligible */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72814,6 +74927,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing or report delivery failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -72842,6 +74982,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The resource or recipient changed or is not eligible */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72849,6 +75025,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing or report delivery failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -72879,6 +75073,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or ambiguous resource identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Staff role is not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Recipient or resource is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description The resource or recipient changed or is not eligible */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72886,6 +75116,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing or report delivery failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram did not confirm delivery */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
+                };
+            };
+            /** @description Telegram is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeliveryError"];
                 };
             };
         };
@@ -73551,21 +75808,75 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationSendResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"] | components["schemas"]["PhoneVerificationRateLimitResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
@@ -73586,93 +75897,217 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationProofResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"] | components["schemas"]["PhoneVerificationRateLimitResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
     };
-    get_verification_status_api_v1_phone_verification_status_get: {
+    get_verification_status_api_v1_phone_verification_status_post: {
         parameters: {
-            query: {
-                /** @description Номер телефона в формате +998XXXXXXXXX */
-                phone: string;
-                /** @description Цель верификации */
-                purpose?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneVerificationScope"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationStatusResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
     };
-    cancel_verification_api_v1_phone_verification_cancel_delete: {
+    cancel_verification_api_v1_phone_verification_cancel_post: {
         parameters: {
-            query: {
-                /** @description Номер телефона в формате +998XXXXXXXXX */
-                phone: string;
-                /** @description Цель верификации */
-                purpose?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneVerificationScope"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationCancelResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
@@ -73693,21 +76128,84 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationUpdateResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"] | components["schemas"]["PhoneVerificationRateLimitResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
@@ -73724,52 +76222,155 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneVerificationStatisticsResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
     };
     admin_send_verification_code_api_v1_phone_verification_admin_send_code_post: {
         parameters: {
-            query: {
-                /** @description Номер телефона в формате +998XXXXXXXXX */
-                phone: string;
-                /** @description Цель верификации */
-                purpose?: string;
-                /** @description SMS провайдер */
-                provider?: string | null;
-                /** @description Кастомное сообщение с {code} */
-                message?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSendCodeRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AdminPhoneVerificationSendResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneVerificationValidationResponse"];
+                };
+            };
+            /** @description Request rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"] | components["schemas"]["PhoneVerificationRateLimitResponse"];
+                };
+            };
+            /** @description Request rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
+                };
+            };
+            /** @description Request rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneVerificationErrorResponse"];
                 };
             };
         };
@@ -73807,6 +76408,16 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Password reset temporarily unavailable */
+            503: {
+                headers: {
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
         };
     };
     verify_phone_for_reset_api_v1_password_reset_verify_phone_post: {
@@ -73825,21 +76436,75 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PhoneResetVerificationResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Verification rejected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Invalid verification request */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PhoneResetValidationResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
+                };
+            };
+            /** @description Verification rejected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneResetErrorResponse"];
                 };
             };
         };
@@ -73881,11 +76546,17 @@ export interface operations {
     };
     validate_reset_token_api_v1_password_reset_validate_token_get: {
         parameters: {
-            query: {
-                /** @description Токен сброса пароля */
-                token: string;
+            query?: {
+                /**
+                 * @deprecated
+                 * @description Legacy reset token transport
+                 */
+                token?: string | null;
             };
-            header?: never;
+            header?: {
+                /** @description Reset token */
+                "X-Reset-Token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -73894,12 +76565,50 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description Sensitive response is not cacheable */
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Missing or ambiguous token */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
+            /** @description Token not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
+            /** @description Token already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
+            /** @description Token expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -73909,6 +76618,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
+                };
+            };
+            /** @description Validation temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTokenErrorResponse"];
                 };
             };
         };
@@ -74018,15 +76745,44 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Patient access-only session or restricted second-factor challenge */
             200: {
                 headers: {
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    } & ({
+                        access_token: string;
+                        /** @constant */
+                        token_type: "bearer";
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** @constant */
+                        requires_2fa: true;
+                        /** @constant */
+                        two_factor_method: "totp";
+                        pending_2fa_token: string;
+                        user: {
+                            id: number;
+                            username: string;
+                            role: string;
+                            is_active: boolean;
+                            is_superuser: boolean;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    });
                 };
             };
             /** @description Validation Error */
@@ -74331,6 +77087,33 @@ export interface operations {
                     };
                 };
             };
+            /** @description Visit is not assigned to the doctor */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Appointment or patient not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Appointment is not eligible for a reminder */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74338,6 +77121,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
                 };
             };
         };
@@ -74371,6 +77163,33 @@ export interface operations {
                     };
                 };
             };
+            /** @description Result is not assigned to the requested patient or doctor */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Patient or result not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Lab result is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74378,6 +77197,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
                 };
             };
         };
@@ -74410,6 +77238,42 @@ export interface operations {
                     };
                 };
             };
+            /** @description Missing or conflicting payment ID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Payment belongs to another patient */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Patient or payment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
+            /** @description Payment is not paid */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74417,6 +77281,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Notification processing failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
                 };
             };
         };
@@ -74528,6 +77401,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description Unscoped doctor destination is forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74564,6 +77446,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Unscoped doctor destination is forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryError"];
                 };
             };
             /** @description Validation Error */
@@ -78771,14 +81662,43 @@ export interface operations {
                     "application/json": components["schemas"]["NotificationTemplate"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Конфликт шаблона */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Ошибка валидации запроса */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": {
+                        error: string;
+                        message: string;
+                        detail: Record<string, never>[];
+                    };
                 };
+            };
+            /** @description Ошибка обработки или базы данных */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Сервис базы данных недоступен */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -78806,14 +81726,56 @@ export interface operations {
                     "application/json": components["schemas"]["NotificationTemplate"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Шаблон не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Конфликт шаблона */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Ошибка валидации запроса или полей шаблона */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": {
+                        error: string;
+                        message: string;
+                        detail: Record<string, never>[];
+                    } | {
+                        detail: string;
+                    };
                 };
+            };
+            /** @description Ошибка обработки или базы данных */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Сервис базы данных недоступен */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -80025,6 +82987,30 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Activation attempt budget exceeded */
+            429: {
+                headers: {
+                    /** @description Seconds until retry */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Activation temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
         };
     };
     activation_status_api_v1_activation_status_get: {
@@ -80203,6 +83189,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Activation attempt budget exceeded */
+            429: {
+                headers: {
+                    /** @description Seconds until retry */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Activation temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
         };
@@ -80402,6 +83412,16 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Password reset temporarily unavailable */
+            503: {
+                headers: {
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
         };
     };
     confirm_password_reset_api_v1_authentication_password_reset_confirm_post: {
@@ -80488,6 +83508,42 @@ export interface operations {
                     "application/json": components["schemas"]["AuthSuccessResponse"];
                 };
             };
+            /** @description Bearer session unavailable */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
+            /** @description Verification request limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
+            /** @description Email delivery failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
+            /** @description Verification unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
         };
     };
     confirm_email_verification_api_v1_authentication_email_verification_confirm_post: {
@@ -80512,6 +83568,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuthSuccessResponse"];
                 };
             };
+            /** @description Invalid or expired verification token */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -80519,6 +83584,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };
@@ -80667,6 +83741,13 @@ export interface operations {
                     };
                 };
             };
+            /** @description Отзыв отдельной сессии пока недоступен */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -80771,6 +83852,13 @@ export interface operations {
                     };
                 };
             };
+            /** @description Текущая сессия не может быть определена */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     revoke_user_session_api_v1_authentication_sessions__session_id__revoke_post: {
@@ -80797,6 +83885,13 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Отзыв отдельной сессии пока недоступен */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -80833,6 +83928,13 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Сохранение текущей сессии пока недоступно */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

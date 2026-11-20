@@ -4,9 +4,6 @@
  */
 import { api } from './client';
 import { tokenManager } from '../utils/tokenManager';
-import { clearToken as clearAuthState } from '../stores/auth';
-import logger from '../utils/logger';
-import { handleError } from '../utils/errorHandler';
 import type { HttpApiError } from '../types/errors';
 
 
@@ -68,10 +65,8 @@ export function setupInterceptors(): void {
  * Установка базового токена при загрузке приложения
  */
 export function initializeAuth(): void {
-  const token = tokenManager.getAccessToken();
-  if (token) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  }
+  // client.ts reads the current session per trusted API request. Never place
+  // it in Axios defaults, which are also merged into external requests.
 }
 
 /**

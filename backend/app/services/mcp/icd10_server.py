@@ -220,7 +220,7 @@ class MedicalICD10MCPServer(BaseMCPServer):
                 try:
                     provider_type = AIProviderType(provider.lower())
                 except ValueError:
-                    logger.warning(f"Invalid provider: {provider}, using default")
+                    logger.warning("Invalid provider, using default")
 
             # Получаем подсказки через AI
             suggestions = await self.ai_manager.suggest_icd10(

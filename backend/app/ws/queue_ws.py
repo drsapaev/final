@@ -24,6 +24,7 @@ if not log.handlers:
     log.info("WS logger initialized with console handler")
 
 router = APIRouter()
+QUEUE_AUTH_TIMEOUT_SECONDS = 2
 
 
 # -----------------------------------------------------------------------------
@@ -412,6 +413,42 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
     return _resolve_ws_auth(headers, token_qs) is not None
 
 
+def _resolve_queue_room_auth(headers, token: str | None, department: str):
+    """Resolve identity and room grant in a worker using short-lived sessions."""
+    user = _resolve_ws_auth(headers, token)
+    if user is None:
+        return None, False
+    if user is _WS_TESTING_PRINCIPAL:
+        return user, True
+    from app.api.v1.endpoints.websocket_auth import _has_department_access
+
+    return user, bool(_has_department_access(user, department))
+
+
+async def _bounded_queue_room_auth(headers, token: str | None, department: str):
+    """A stalled database must not block this loop or keep a room grant alive."""
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_resolve_queue_room_auth, headers, token, department),
+            timeout=QUEUE_AUTH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return None, False
+
+
+async def _close_revoked_queue_socket(websocket: WebSocket) -> None:
+    try:
+        await asyncio.wait_for(
+            websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Queue authorization expired or revoked",
+            ),
+            timeout=QUEUE_AUTH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        pass
+
+
 # -----------------------------------------------------------------------------
 # PR-5: /ws/noauth endpoint REMOVED — was a literal no-auth WebSocket.
 # Even though it was disabled in production, it's a security risk in
@@ -447,7 +484,8 @@ async def ws_queue(
     # ✅ SECURITY: single JWT resolution for both checks below. The legacy
     # flow called _auth_ok twice (production gate, then unconditional gate);
     # both share one resolution now.
-    user = _resolve_ws_auth(websocket.headers, token)
+    auth_headers = dict(websocket.headers)
+    user, room_allowed = await _bounded_queue_room_auth(auth_headers, token, department)
 
     # ✅ SECURITY: In production, require authentication
     if is_production:
@@ -478,26 +516,17 @@ async def ws_queue(
     # Patient-role token is closed with 1008 without ever joining the room
     # or receiving a single queue event. The dev/test bypass principal has
     # no identity to authorize and is skipped (pytest harness only).
-    if user is not _WS_TESTING_PRINCIPAL:
-        from app.api.v1.endpoints.websocket_auth import _has_department_access
-
-        if not _has_department_access(user, department):
-            log.warning(
-                "WS auth rejected: user %s (role=%s) may not subscribe to "
-                "queue room department=%r",
-                getattr(user, "username", None),
-                getattr(user, "role", None),
-                department,
-            )
-            await websocket.accept()
-            await websocket.send_json(
-                {
-                    "type": "error",
-                    "reason": "not allowed to subscribe to this queue room",
-                }
-            )
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-            return
+    if not room_allowed:
+        log.warning("WS auth rejected: user may not subscribe to queue room")
+        await websocket.accept()
+        await websocket.send_json(
+            {
+                "type": "error",
+                "reason": "not allowed to subscribe to this queue room",
+            }
+        )
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
 
     # ✅ Только после всех проверок — accept
     # QUEUEWSHANDSHAKE-BE-001: browsers that offer Sec-WebSocket-Protocol
@@ -510,7 +539,15 @@ async def ws_queue(
     await accept_echoing_subprotocol(websocket)
 
     room = f"{department.strip()}::{date.strip()}"
-    await ws_manager.connect(websocket, room)
+    try:
+        await asyncio.wait_for(ws_manager.connect(websocket, room), timeout=QUEUE_AUTH_TIMEOUT_SECONDS)
+    except asyncio.CancelledError:
+        ws_manager.disconnect(websocket, room)
+        raise
+    except Exception:
+        ws_manager.disconnect(websocket, room)
+        await _close_revoked_queue_socket(websocket)
+        return
 
     # ✅ SECURITY: Heartbeat configuration
     HEARTBEAT_INTERVAL = 30  # seconds
@@ -521,16 +558,11 @@ async def ws_queue(
     last_auth_check = [loop.time()]
     from app.api.v1.endpoints.websocket_auth import QUEUE_WS_AUTH_RECHECK_SECONDS
 
-    def refresh_queue_auth() -> bool:
+    async def refresh_queue_auth() -> bool:
         nonlocal user
-        current_user = _resolve_ws_auth(websocket.headers, auth_token)
-        if current_user is None:
+        current_user, allowed = await _bounded_queue_room_auth(auth_headers, auth_token, department)
+        if current_user is None or not allowed:
             return False
-        if current_user is not _WS_TESTING_PRINCIPAL:
-            from app.api.v1.endpoints.websocket_auth import _has_department_access
-
-            if not _has_department_access(current_user, department):
-                return False
         user = current_user
         last_auth_check[0] = loop.time()
         return True
@@ -549,7 +581,10 @@ async def ws_queue(
     heartbeat_task = asyncio.create_task(send_heartbeat())
 
     try:
-        await websocket.send_json({"type": "queue.connected", "room": room})
+        await asyncio.wait_for(
+            websocket.send_json({"type": "queue.connected", "room": room}),
+            timeout=QUEUE_AUTH_TIMEOUT_SECONDS,
+        )
         while True:
             try:
                 elapsed = loop.time() - last_auth_check[0]
@@ -562,11 +597,8 @@ async def ws_queue(
                     ),
                 )
                 if loop.time() - last_auth_check[0] >= QUEUE_WS_AUTH_RECHECK_SECONDS:
-                    if not refresh_queue_auth():
-                        await websocket.close(
-                            code=status.WS_1008_POLICY_VIOLATION,
-                            reason="Queue authorization expired or revoked",
-                        )
+                    if not await refresh_queue_auth():
+                        await _close_revoked_queue_socket(websocket)
                         break
 
                 # Parse message
@@ -588,11 +620,8 @@ async def ws_queue(
                 break
             except TimeoutError:
                 if loop.time() - last_auth_check[0] >= QUEUE_WS_AUTH_RECHECK_SECONDS:
-                    if not refresh_queue_auth():
-                        await websocket.close(
-                            code=status.WS_1008_POLICY_VIOLATION,
-                            reason="Queue authorization expired or revoked",
-                        )
+                    if not await refresh_queue_auth():
+                        await _close_revoked_queue_socket(websocket)
                         break
                 # Check if connection is still alive
                 # ✅ BUGFIX: Access list element to get current value
@@ -602,7 +631,10 @@ async def ws_queue(
                     break
                 # Send ping to check connection
                 try:
-                    await websocket.send_json({"type": "ping", "timestamp": asyncio.get_event_loop().time()})
+                    await asyncio.wait_for(
+                        websocket.send_json({"type": "ping", "timestamp": asyncio.get_event_loop().time()}),
+                        timeout=QUEUE_AUTH_TIMEOUT_SECONDS,
+                    )
                 except Exception:
                     break  # Connection is dead
             except Exception:

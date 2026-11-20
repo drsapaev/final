@@ -113,8 +113,7 @@ def issue_key(
     key = generate_key()
     exp = datetime.now(UTC) + timedelta(days=int(days))
     logger.info(
-        "[FIX:ACTIVATION] Issuing activation key %s status=%s days=%s",
-        key,
+        "Issuing activation key status=%s days=%s",
         status,
         days,
     )
@@ -137,7 +136,7 @@ def issue_key(
     db.add(row)
     db.flush()
     db.commit()
-    logger.info("[FIX:ACTIVATION] Activation key persisted %s", key)
+    logger.info("Activation key persisted")
     return IssueResult(key=key, expiry_date=exp.strftime("%Y-%m-%d"), status=row.status)
 
 
@@ -156,7 +155,7 @@ def _activate_key(db: Session, *, key: str, commit: bool) -> ActivateResult:
         return ActivateResult(ok=False, reason="EMPTY_KEY")
 
     row: Activation | None = (
-        db.execute(select(Activation).where(Activation.key == key)).scalars().first()
+        db.execute(select(Activation).where(Activation.key == key).with_for_update()).scalars().first()
     )
     if not row:
         return ActivateResult(ok=False, reason="KEY_NOT_FOUND", key=key)
@@ -169,7 +168,7 @@ def _activate_key(db: Session, *, key: str, commit: bool) -> ActivateResult:
     # Если ключ уже привязан к другому устройству — запрет
     if row.machine_hash and row.machine_hash != mh:
         return ActivateResult(
-            ok=False, reason="KEY_IN_USE", key=key, machine_hash=row.machine_hash
+            ok=False, reason="KEY_IN_USE", key=key
         )
 
     # Проверим срок

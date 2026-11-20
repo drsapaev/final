@@ -8,7 +8,8 @@ AI Chat Endpoints - REST и WebSocket API для AI чата.
 
 import asyncio
 import logging
-from typing import Any
+from contextlib import suppress
+from typing import Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -18,11 +19,11 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.v1.endpoints.ws_token import extract_ws_token, accept_echoing_subprotocol
+from app.api.v1.endpoints.ws_token import accept_echoing_subprotocol, extract_ws_token
 from app.core.config import settings
 from app.core.messaging_contract import CONTRACT_VERSION
 from app.core.rbac import AIPermission, has_permission, require_ai_permission
@@ -30,10 +31,16 @@ from app.models.user import User
 from app.services.ai.chat_service import get_chat_service
 from app.services.ai_chat_api_service import AIChatApiDomainError, AIChatApiService
 from app.services.ai_feature_gating import RequireAiFeature
+from app.ws.chat_ws import close_revoked_websocket, monitor_websocket_authorization
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _required_doctor_confirmation() -> dict[str, bool]:
+    """Server-owned policy: AI output is a suggestion requiring a clinician."""
+    return {"requires_doctor_confirmation": True}
 
 
 def _build_ai_ws_payload(event_type: str, session_id: int | None = None, **data: Any) -> dict[str, Any]:
@@ -44,6 +51,10 @@ def _build_ai_ws_payload(event_type: str, session_id: int | None = None, **data:
     if session_id is not None:
         payload["session_id"] = session_id
     payload.update(data)
+    # Medical content is streamed in multiple independently consumable frames.
+    # Each frame carries the server-owned safety boundary, never caller data.
+    if event_type in {"chunk", "done", "error"}:
+        payload["ai_safety_meta"] = _required_doctor_confirmation()
     return payload
 
 
@@ -78,6 +89,20 @@ class ChatMessageCreate(BaseModel):
     include_history: bool = Field(True, description="Включить контекст истории")
 
 
+class AIChatSafetyMeta(BaseModel):
+    """A strict, explicit clinical boundary for each AI chat message."""
+
+    requires_doctor_confirmation: Literal[True]
+
+    @field_validator("requires_doctor_confirmation", mode="before")
+    @classmethod
+    def require_boolean_true(cls, value: object) -> object:
+        # Literal[True] alone accepts integer 1 because bool subclasses int.
+        if value is not True:
+            raise ValueError("AI output must require doctor confirmation")
+        return value
+
+
 class ChatMessageResponse(BaseModel):
     """Ответ с сообщением"""
     id: int
@@ -90,6 +115,7 @@ class ChatMessageResponse(BaseModel):
     is_error: bool
     was_cached: bool
     created_at: str
+    ai_safety_meta: AIChatSafetyMeta
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -226,7 +252,16 @@ async def get_messages(
             limit=limit,
             before_id=before_id,
         )
-        return [ChatMessageResponse(**item) for item in payload]
+        # Existing persisted history predates this envelope. The added
+        # marker declares the current display policy, not prior validation.
+        # An explicitly supplied invalid marker is rejected rather than fixed.
+        return [
+            ChatMessageResponse(**{
+                **item,
+                "ai_safety_meta": item.get("ai_safety_meta", _required_doctor_confirmation()),
+            })
+            for item in payload
+        ]
     except AIChatApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -265,7 +300,8 @@ async def send_message(
             latency_ms=response.latency_ms,
             is_error=response.is_error,
             was_cached=response.was_cached,
-            created_at=response.created_at.isoformat()
+            created_at=response.created_at.isoformat(),
+            ai_safety_meta=getattr(response, "ai_safety_meta", _required_doctor_confirmation()),
         )
 
     except ValueError:
@@ -304,11 +340,99 @@ async def authenticate_websocket(token: str, db: Session) -> User | None:
     """
     Аутентификация WebSocket по JWT token.
     """
-    return AIChatApiService(db).authenticate_websocket_user(
-        token=token,
-        secret_key=settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
+    return await asyncio.to_thread(
+        AIChatApiService(db).authenticate_websocket_user,
+        token=token, secret_key=settings.SECRET_KEY, algorithm=settings.ALGORITHM,
     )
+
+
+def _ai_ws_session_is_current(token: str, user_id: int) -> bool:
+    """Use a fresh DB session for each periodic reauthorization."""
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        user = AIChatApiService(db).authenticate_websocket_user(
+            token=token, secret_key=settings.SECRET_KEY, algorithm=settings.ALGORITHM
+        )
+        return bool(
+            user is not None and user.id == user_id
+            and has_permission(user.role, AIPermission.CHAT)
+        )
+    except Exception:
+        return False
+    finally:
+        db.close()
+
+
+async def _ai_ws_authorized_or_close(websocket, token: str, user_id: int, revoked, close_lock) -> bool:
+    """Revalidate after potentially blocking AI/DB work before sending data."""
+    try:
+        allowed = await asyncio.wait_for(
+            asyncio.to_thread(_ai_ws_session_is_current, token, user_id), timeout=5.0
+        )
+    except Exception:
+        allowed = False
+    if not allowed or revoked.is_set():
+        await close_revoked_websocket(websocket, revoked, close_lock)
+        return False
+    return True
+
+
+class _AIWebSocketRevoked(Exception):
+    """Stop handling messages after the watchdog has revoked the socket."""
+
+
+AI_WS_SEND_TIMEOUT_SECONDS = 2.0
+
+
+def _ai_ws_safety_valid(payload: object) -> bool:
+    """Fail closed if a medical frame lacks the exact boolean safety marker."""
+    if not isinstance(payload, dict):
+        return False
+    event_type = payload.get("type")
+    carries_text = "content" in payload or "message" in payload
+    if not carries_text and event_type not in ("chunk", "done", "error"):
+        return True
+    metadata = payload.get("ai_safety_meta")
+    return (
+        isinstance(metadata, dict)
+        and metadata.get("requires_doctor_confirmation") is True
+    )
+
+
+async def _ai_ws_close_unsafe(websocket, revoked, close_lock):
+    """Close invalid output without racing a concurrent revocation close."""
+    revoked.set()
+    async with close_lock:
+        if getattr(revoked, "_ws_close_started", False):
+            return
+        revoked._ws_close_started = True
+        try:
+            await asyncio.wait_for(
+                websocket.close(code=1011, reason="Safety metadata required"),
+                timeout=2.0,
+            )
+        except Exception:
+            pass
+
+
+async def _ai_ws_send(websocket, payload, revoked, close_lock):
+    """Serialize each payload with revocation, including every stream chunk."""
+    if not _ai_ws_safety_valid(payload):
+        logger.error("AI WebSocket output missing required safety metadata")
+        await _ai_ws_close_unsafe(websocket, revoked, close_lock)
+        raise _AIWebSocketRevoked
+    try:
+        async with asyncio.timeout(AI_WS_SEND_TIMEOUT_SECONDS):
+            async with close_lock:
+                if revoked.is_set():
+                    raise _AIWebSocketRevoked
+                await websocket.send_json(payload)
+    except TimeoutError:
+        # Release the send lock before acquiring it again to close.
+        await close_revoked_websocket(websocket, revoked, close_lock)
+        raise _AIWebSocketRevoked from None
 
 
 @router.websocket("/ws")
@@ -340,14 +464,14 @@ async def chat_websocket(
     Server -> Client (streaming):
     ```json
     {"type": "session", "session_id": 123}
-    {"type": "chunk", "content": "Здравст"}
-    {"type": "chunk", "content": "вуйте!"}
-    {"type": "done", "message_id": 456, "provider": "deepseek", "tokens": 42}
+    {"type": "chunk", "content": "Здравст", "ai_safety_meta": {"requires_doctor_confirmation": true}}
+    {"type": "chunk", "content": "вуйте!", "ai_safety_meta": {"requires_doctor_confirmation": true}}
+    {"type": "done", "message_id": 456, "provider": "deepseek", "tokens": 42, "ai_safety_meta": {"requires_doctor_confirmation": true}}
     ```
 
     Server -> Client (error):
     ```json
-    {"type": "error", "message": "Rate limit exceeded"}
+    {"type": "error", "message": "Rate limit exceeded", "ai_safety_meta": {"requires_doctor_confirmation": true}}
     ```
     """
     await accept_echoing_subprotocol(websocket)
@@ -374,22 +498,35 @@ async def chat_websocket(
 
     logger.info(f"WebSocket chat connected: user={user.id}")
 
-    service = get_chat_service(db)
     current_session_id: int | None = None
+    revoked = asyncio.Event()
+    close_lock = asyncio.Lock()
+    async def send_authorized(payload):
+        await _ai_ws_send(websocket, payload, revoked, close_lock)
+
+    owner_task = asyncio.current_task()
+    watchdog = asyncio.create_task(
+        monitor_websocket_authorization(
+            websocket, lambda: _ai_ws_session_is_current(token, user.id), revoked, owner_task, close_lock
+        )
+    )
 
     try:
+        service = get_chat_service(db)
         async for message in websocket.iter_json():
+            if not await _ai_ws_authorized_or_close(websocket, token, user.id, revoked, close_lock):
+                return
             msg_type = message.get("type", "message")
 
             if msg_type == "ping":
-                await websocket.send_json(_build_ai_ws_payload("pong", current_session_id))
+                await send_authorized(_build_ai_ws_payload("pong", current_session_id))
                 continue
 
             if msg_type == "message":
                 content = message.get("content", "").strip()
 
                 if not content:
-                    await websocket.send_json({
+                    await send_authorized({
                         **_build_ai_ws_payload("error", current_session_id, message="Empty message")
                     })
                     continue
@@ -406,7 +543,9 @@ async def chat_websocket(
                     session_id = session.id
                     current_session_id = session_id
 
-                    await websocket.send_json({
+                    if not await _ai_ws_authorized_or_close(websocket, token, user.id, revoked, close_lock):
+                        return
+                    await send_authorized({
                         **_build_ai_ws_payload("session", session_id)
                     })
 
@@ -419,6 +558,9 @@ async def chat_websocket(
                         include_history=True
                     )
 
+                    if not await _ai_ws_authorized_or_close(websocket, token, user.id, revoked, close_lock):
+                        return
+
                     # FA-008: streaming rate limit — max response length + chunk count
                     MAX_RESPONSE_LENGTH = 8000
                     MAX_CHUNKS = 400
@@ -428,19 +570,19 @@ async def chat_websocket(
 
                     for i in range(0, len(full_content), chunk_size):
                         if chunks_sent >= MAX_CHUNKS:
-                            await websocket.send_json({
+                            await send_authorized({
                                 **_build_ai_ws_payload("truncated", session_id,
                                     reason="max_length_reached")
                             })
                             break
                         chunk = full_content[i:i + chunk_size]
-                        await websocket.send_json({
+                        await send_authorized({
                             **_build_ai_ws_payload("chunk", session_id, content=chunk)
                         })
                         await asyncio.sleep(0.03)
                         chunks_sent += 1
 
-                    await websocket.send_json({
+                    await send_authorized({
                         **_build_ai_ws_payload(
                             "done",
                             session_id,
@@ -453,30 +595,47 @@ async def chat_websocket(
                         )
                     })
 
-                except ValueError as e:
-                    await websocket.send_json({
-                        **_build_ai_ws_payload("error", session_id, message=str(e))
+                except _AIWebSocketRevoked:
+                    raise
+                except ValueError:
+                    if not await _ai_ws_authorized_or_close(websocket, token, user.id, revoked, close_lock):
+                        return
+                    await send_authorized({
+                        **_build_ai_ws_payload("error", session_id, message="Request failed")
                     })
                 except Exception as e:
-                    logger.exception(f"Chat error: {e}")
-                    await websocket.send_json({
+                    logger.error("Chat error: %s", type(e).__name__)
+                    if not await _ai_ws_authorized_or_close(websocket, token, user.id, revoked, close_lock):
+                        return
+                    await send_authorized({
                         **_build_ai_ws_payload("error", session_id, message="Internal error occurred")
                     })
 
             elif msg_type == "close_session":
                 if current_session_id:
                     await service.close_session(current_session_id, user.id)
-                    await websocket.send_json({
+                    if not await _ai_ws_authorized_or_close(websocket, token, user.id, revoked, close_lock):
+                        return
+                    await send_authorized({
                         **_build_ai_ws_payload("session_closed", current_session_id)
                     })
                     current_session_id = None
 
+    except _AIWebSocketRevoked:
+        pass
     except WebSocketDisconnect:
         logger.info(f"WebSocket chat disconnected: user={user.id}")
+    except asyncio.CancelledError:
+        if not revoked.is_set():
+            raise
     except Exception as e:
-        logger.exception(f"WebSocket error: {e}")
+        logger.error("WebSocket error: %s", type(e).__name__)
         try:
             # AI-REAUDIT-28 P1-11: не泄露 exception в close reason.
             await websocket.close(code=1011, reason="Internal server error")
         except Exception:
             pass
+    finally:
+        watchdog.cancel()
+        with suppress(asyncio.CancelledError):
+            await watchdog

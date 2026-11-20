@@ -95,3 +95,15 @@ async def test_confirm_rejects_same_as_old_password(db_session, svc):
         .first()
     )
     assert row.used is False
+
+
+def test_recovery_enforces_eight_characters_without_consuming_token(db_session, svc):
+    user = _seed_user(db_session)
+    token = _seed_token(db_session, svc, user)
+    result = svc.reset_password_with_token(db_session, token, "short7!")
+    assert result["error_code"] == "PASSWORD_TOO_SHORT"
+
+    # The rejected password must not consume the token; an eight-character
+    # password can still complete recovery using that same token.
+    result = svc.reset_password_with_token(db_session, token, "Passw0!8")
+    assert result["success"] is True
