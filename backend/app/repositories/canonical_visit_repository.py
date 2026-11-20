@@ -28,6 +28,15 @@ class CanonicalVisitRepository:
         return (self.db.query(Encounter).filter(Encounter.id == encounter_id)
                 .with_for_update(of=Encounter).populate_existing().first())
 
+    def read_payment_source_context(self, visit_id: int) -> tuple[Visit | None, Encounter | None]:
+        """Read context that the cashier already locked through payment preflight."""
+        visit = self.db.query(Visit).filter(Visit.id == visit_id).populate_existing().first()
+        if visit is None or visit.encounter_id is None:
+            return visit, None
+        encounter = (self.db.query(Encounter).filter(Encounter.id == visit.encounter_id)
+                     .populate_existing().first())
+        return visit, encounter
+
     def lock_appointment(self, appointment_id: int) -> Appointment | None:
         return (self.db.query(Appointment).filter(Appointment.id == appointment_id)
                 .with_for_update(of=Appointment).populate_existing().first())

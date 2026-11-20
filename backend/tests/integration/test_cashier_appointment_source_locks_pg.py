@@ -24,7 +24,11 @@ from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.repositories.canonical_visit_repository import CanonicalVisitRepository
-from app.services.canonical_visit_service import CanonicalVisitService
+from app.services.canonical_visit_service import (
+    CanonicalVisitResolutionError,
+    CanonicalVisitService,
+)
+from app.services.payment_invariant_service import PaymentInvariantService
 from tests.integration.test_staff_confirmation_guard_pg import (
     _module,
     isolated_staff_guard_postgres,
@@ -78,7 +82,7 @@ def pg_cashier(monkeypatch):
             owner, schema=schema_name, expected_owner=expected_owner,
             backend_role=runtime_role, capability_role=capability,
         )
-        yield owner, runtime, ids["stage"]
+        yield owner, runtime, ids
 
 
 def _seed(engine):
@@ -111,7 +115,8 @@ def _run_payment(engine, visit_id, appointment_id, actor_id, start=None):
 
 
 def test_cross_linked_cashier_requests_reject_without_deadlock(pg_cashier, monkeypatch):
-    owner, runtime, actor_id = pg_cashier
+    owner, runtime, ids = pg_cashier
+    actor_id = ids["stage"]
     visits, appointments = _seed(owner)
     barrier = Barrier(2)
     resolved = []
@@ -133,17 +138,18 @@ def test_cross_linked_cashier_requests_reject_without_deadlock(pg_cashier, monke
 
 
 def test_source_changed_after_hint_is_rechecked_by_cashier(pg_cashier, monkeypatch):
-    owner, runtime, actor_id = pg_cashier
+    owner, runtime, ids = pg_cashier
+    actor_id = ids["stage"]
     visits, appointments = _seed(owner)
     have_hint = Event()
     proceed = Event()
 
     class PausedRepository(CanonicalVisitRepository):
-        def lock_source_visit(self, visit_id):
+        def read_payment_source_context(self, visit_id):
             assert visit_id == visits[0]
             have_hint.set()
             assert proceed.wait(timeout=10)
-            return super().lock_source_visit(visit_id)
+            return super().read_payment_source_context(visit_id)
 
     class PausedService(CanonicalVisitService):
         def __init__(self, db):
@@ -163,6 +169,33 @@ def test_source_changed_after_hint_is_rechecked_by_cashier(pg_cashier, monkeypat
         assert future.result(timeout=20) == (409, "appointment_id does not match visit_id")
     with Session(owner) as db:
         assert not db.query(Payment.id).filter(Payment.visit_id.in_(visits)).first()
+
+
+def test_grouped_source_resolution_uses_existing_locks_without_encounter_update(pg_cashier):
+    owner, runtime, ids = pg_cashier
+    with Session(owner, expire_on_commit=False) as db:
+        visit = db.get(Visit, ids["visit"])
+        appointment = Appointment(
+            patient_id=visit.patient_id, encounter_id=visit.encounter_id,
+            appointment_date=visit.visit_date, status="paid", source_visit_id=visit.id,
+        )
+        db.add(appointment)
+        db.commit()
+        appointment_id = appointment.id
+
+    def resolve(db):
+        return CanonicalVisitService(db).resolve_canonical_visit(
+            appointment_id, create_if_missing=False, expected_visit_id=ids["visit"],
+            require_payment_preflight=True,
+        )
+
+    with Session(runtime) as db:
+        assert db.scalar(text("SELECT has_any_column_privilege(CURRENT_USER,'encounters','UPDATE')")) is False
+        with pytest.raises(CanonicalVisitResolutionError) as unproven:
+            resolve(db)
+        assert unproven.value.status_code == 409
+        PaymentInvariantService(db).preflight_payment_groups([ids["visit"]])
+        assert resolve(db) == ids["visit"]
 
 
 @pytest.mark.parametrize('mode,expected', [('source', 200), ('visit_only', 200), ('legacy', 409)])

@@ -829,6 +829,7 @@ async def create_payment(
                         payment_data.appointment_id,
                         create_if_missing=False,
                         expected_visit_id=visit.id,
+                        require_payment_preflight=True,
                     )
                 except CanonicalVisitResolutionError as exc:
                     raise HTTPException(
