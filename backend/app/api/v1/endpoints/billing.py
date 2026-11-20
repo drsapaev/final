@@ -7,12 +7,18 @@ from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.core.security import require_roles
-from app.models.billing import InvoiceStatus, InvoiceType, PaymentMethod, RecurrenceType
+from app.models.billing import (
+    Invoice,
+    InvoiceStatus,
+    InvoiceType,
+    PaymentMethod,
+    RecurrenceType,
+)
 from app.models.user import User
 from app.services.billing_api_service import BillingApiDomainError, BillingApiService
 from app.services.billing_service import BillingService
@@ -356,11 +362,35 @@ def record_payment(
             description=payment_data.description,
             created_by=current_user.id,
             current_user=current_user,
+            commit=False,
         )
-        return payment
+        invoice = db.get(Invoice, payment_data.invoice_id)
+        if invoice is None:
+            raise RuntimeError("Payment invoice unavailable")
+        response = PaymentResponse(
+            id=payment.id,
+            payment_number=payment.receipt_no,
+            invoice_id=invoice.id,
+            patient_id=invoice.patient_id,
+            amount=payment.amount,
+            payment_method=payment.method,
+            payment_date=payment.paid_at,
+            reference_number=payment.provider_payment_id,
+            description=payment.note,
+            is_confirmed=payment.status == "paid",
+            confirmed_at=payment.paid_at,
+            created_at=payment.created_at,
+        )
+        db.commit()
+        return response
+    except ValidationError as exc:
+        db.rollback()
+        raise _billing_http_error(exc, "record_payment_response") from exc
     except ValueError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Internal server error")
     except Exception:
+        db.rollback()
         raise HTTPException(status_code=400, detail="Internal server error")
 
 

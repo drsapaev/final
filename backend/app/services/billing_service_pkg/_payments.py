@@ -410,6 +410,8 @@ class PaymentsMixin(BillingServiceMixinBase):
         description: str = None,
         created_by: int = None,
         current_user: Any = None,
+        *,
+        commit: bool = True,
     ) -> Payment:
         """
         Записать платеж для счета.
@@ -437,6 +439,8 @@ class PaymentsMixin(BillingServiceMixinBase):
             current_user: The User object creating the payment (required for
                 PaymentInvariantService audit logging). If None, a lightweight
                 wrapper with .id=created_by is used for backward compatibility.
+            commit: Persist the receipt and the invoice together. HTTP callers
+                can validate their response before committing the transaction.
 
         Returns:
             Payment - созданный платеж
@@ -520,8 +524,9 @@ class PaymentsMixin(BillingServiceMixinBase):
         elif invoice.paid_amount > 0:
             invoice.status = InvoiceStatus.PARTIALLY_PAID
 
-        self.db.commit()
-        self.db.refresh(payment)
+        if commit:
+            self.db.commit()
+            self.db.refresh(payment)
 
         return payment
 

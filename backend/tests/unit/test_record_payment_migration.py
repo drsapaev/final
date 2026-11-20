@@ -290,3 +290,63 @@ class TestRecordPaymentMigration:
         call_kwargs = mock_create.call_args.kwargs
         assert isinstance(call_kwargs["amount"], Decimal)
         assert call_kwargs["amount"] == Decimal("10000")
+
+
+@pytest.mark.parametrize("reject_response", [False, True])
+def test_billing_route_validates_the_receipt_before_commit(
+    client, db_session, admin_auth_headers, test_visit, test_service, monkeypatch, reject_response,
+):
+    from app.api.v1.endpoints import billing
+    from app.models.billing import BillingSettings, Invoice, InvoiceStatus
+    from app.models.payment import Payment
+    from app.models.visit import VisitService
+
+    visit_id = test_visit.id
+    invoice = Invoice(
+        invoice_number=f"SYNTHETIC-{uuid4().hex[:12]}", patient_id=test_visit.patient_id,
+        visit_id=visit_id, subtotal=100, total_amount=100, paid_amount=0, balance=100,
+    )
+    db_session.add_all([
+        invoice,
+        BillingSettings(currency_code="UZS"),
+        VisitService(
+            visit_id=visit_id, service_id=test_service.id, name="Synthetic billing line",
+            qty=1, price=Decimal("100.00"), currency="UZS",
+        ),
+    ])
+    db_session.commit()
+    invoice_id, patient_id = invoice.id, invoice.patient_id
+    if reject_response:
+        response_model = billing.PaymentResponse
+
+        def reject_invalid_receipt(**payload):
+            payload.pop("payment_number")
+            return response_model(**payload)
+
+        monkeypatch.setattr(billing, "PaymentResponse", reject_invalid_receipt)
+
+    response = client.post(
+        "/api/v1/billing/payments", headers=admin_auth_headers,
+        json={"invoice_id": invoice_id, "amount": 100, "payment_method": "cash",
+              "reference_number": "SYNTHETIC-REF", "description": "Synthetic payment"},
+    )
+    db_session.expire_all()
+    receipts = db_session.query(Payment).filter_by(visit_id=visit_id).all()
+    stored_invoice = db_session.get(Invoice, invoice_id)
+    if reject_response:
+        assert response.status_code == 500, response.text
+        assert receipts == []
+        assert stored_invoice.paid_amount == 0 and stored_invoice.balance == 100
+        assert stored_invoice.status == InvoiceStatus.DRAFT
+        return
+
+    assert response.status_code == 200, response.text
+    receipt, = receipts
+    payload = response.json()
+    assert payload["id"] == receipt.id
+    assert payload["payment_number"] == receipt.receipt_no
+    assert payload["invoice_id"] == invoice_id and payload["patient_id"] == patient_id
+    assert payload["amount"] == 100 and payload["payment_method"] == "cash"
+    assert payload["reference_number"] == "SYNTHETIC-REF" and payload["is_confirmed"] is True
+    assert stored_invoice.paid_amount == 100 and stored_invoice.balance == 0
+    assert stored_invoice.status == InvoiceStatus.PAID
