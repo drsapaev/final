@@ -9,6 +9,7 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
 )  # noqa: F401
 from app.crud import queue_resource_routing  # QD-2C (round-17 P1)
 from app.crud.clinic import clinic_today
+from app.services.payment_invariant_service import PAYMENT_RECONCILIATION_REQUIRED
 from app.services.queue_service import queue_service  # noqa: F401
 
 _REGISTRAR_QUEUE_CACHE_KEY = "_registrar_queue_read_cache"
@@ -1324,6 +1325,7 @@ def _serialize_queue_entry(
         "cost": total_cost,
         "payment_status": payment_status,
         "payment_type": payment_type,
+        "blocks_group_payment": payment_status == PAYMENT_RECONCILIATION_REQUIRED,
         "can_mark_paid": can_mark_paid,
         "can_start_visit": can_start_visit,
         "can_print_ticket": can_print_ticket,

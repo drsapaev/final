@@ -236,6 +236,7 @@ class TestRegistrarAllAppointments:
             assert (row["payment_status"], row["payment_type"], row["can_mark_paid"]) == (
                 payment_status, payment_type, can_pay,
             )
+            assert row["blocks_group_payment"] is (payment_status == "reconciliation_required")
             assert ("mark_paid" in row["available_actions"]) is can_pay
 
     def test_date_filters_accept_iso_strings_for_appointments_and_visits(

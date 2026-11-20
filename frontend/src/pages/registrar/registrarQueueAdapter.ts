@@ -107,6 +107,7 @@ export const adaptQueueEntry = (
     approval_status: fullEntry.approval_status || null,
     available_actions: Array.isArray(fullEntry.available_actions) ? fullEntry.available_actions : [],
     can_mark_paid: Boolean(fullEntry.can_mark_paid),
+    blocks_group_payment: (fullEntry.blocks_group_payment ?? entry.blocks_group_payment) === true,
     can_start_visit: Boolean(fullEntry.can_start_visit),
     can_cancel: Boolean(fullEntry.can_cancel),
     can_print_ticket: Boolean(fullEntry.can_print_ticket),
