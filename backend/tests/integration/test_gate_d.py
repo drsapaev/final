@@ -921,78 +921,46 @@ def test_d6b_refund_failure_rollback(db_session, new_session_factory, test_user)
     db_session.commit()
 
 
-def test_d6c_telegram_refund_serializes_on_visit_lock(
-    db_session, new_session_factory, test_user
-):
+def test_d6c_telegram_refund_serializes_on_visit_lock(guarded_pg, monkeypatch):
     """D6c: protected Telegram refunds join the canonical visit lock order."""
     from sqlalchemy.exc import OperationalError
+    from sqlalchemy.orm import Session
 
     from app.services.telegram_staff_action_adapter_service import (
         TelegramStaffActionAdapterService,
     )
+    from tests.integration.test_cashier_daily_currency import _daily_pg_app
 
-    visit = create_test_visit(db_session, status="in_progress")
-    payment = Payment(
-        visit_id=visit.id,
-        amount=Decimal("10000"),
-        currency="UZS",
-        method="cash",
-        status="paid",
-        paid_at=datetime.now(UTC),
-        created_at=datetime.now(UTC),
-    )
-    db_session.add(payment)
-    db_session.commit()
-    payment_id = payment.id
-    visit_id = visit.id
-    actor_user_id = test_user.id
+    owner, runtime, ids, _, _, schema, role, _ = _daily_pg_app(guarded_pg, monkeypatch)
+    quote = owner.dialect.identifier_preparer.quote_identifier
+    qs, qr = quote(schema), quote(role)
+    with owner.begin() as conn:
+        conn.exec_driver_sql(f"GRANT SELECT ON {qs}.payments, {qs}.payment_visits TO {qr}")
+        conn.exec_driver_sql(f"GRANT UPDATE (refunded_amount,refund_reason,refunded_at,refunded_by,updated_at) "
+                             f"ON {qs}.payments TO {qr}")
+        conn.exec_driver_sql(f"GRANT INSERT, SELECT (id) ON {qs}.audit_logs TO {qr}")
+        conn.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {qs}.audit_logs_id_seq TO {qr}")
 
-    PaymentInvariantService(db_session).lock_visit_for_payment_change(visit_id)
+    with Session(owner) as holder:
+        payment = holder.query(Payment).filter_by(visit_id=ids["visit"], status="paid").one()
+        payment_id = payment.id
+        PaymentInvariantService(holder).lock_visit_for_payment_change(ids["visit"])
+        with Session(runtime) as blocked:
+            blocked.execute(text("SET LOCAL lock_timeout = '800ms'"))
+            with pytest.raises(OperationalError) as exc_info:
+                TelegramStaffActionAdapterService(blocked).staff_refund_payment(
+                    payment_id=payment_id, amount="1.25", actor_user_id=ids["stage"],
+                )
+            assert exc_info.value.orig.sqlstate == "55P03"
+        assert payment.status == "paid" and payment.refunded_amount is None
 
-    blocked = new_session_factory()
-    try:
-        blocked.execute(text("SET LOCAL lock_timeout = '800ms'"))
-        with pytest.raises(OperationalError):
-            TelegramStaffActionAdapterService(blocked).staff_refund_payment(
-                payment_id=payment_id,
-                amount=Decimal("5000"),
-                actor_user_id=actor_user_id,
-                commit=True,
-            )
-    finally:
-        blocked.rollback()
-        blocked.close()
-
-    fresh = new_session_factory()
-    try:
-        unchanged = fresh.query(Payment).filter(Payment.id == payment_id).one()
-        assert unchanged.status == "paid"
-        assert unchanged.refunded_amount in {None, Decimal("0")}
-    finally:
-        fresh.close()
-
-    db_session.rollback()
-    after_lock = new_session_factory()
-    try:
+    with Session(runtime) as after_lock:
         result = TelegramStaffActionAdapterService(after_lock).staff_refund_payment(
-            payment_id=payment_id,
-            amount=Decimal("5000"),
-            actor_user_id=actor_user_id,
-            commit=True,
+            payment_id=payment_id, amount="1.25", actor_user_id=ids["stage"],
         )
-        assert result["refunded_amount"] == Decimal("5000")
-    finally:
-        after_lock.close()
-
-    cleanup = new_session_factory()
-    try:
-        cleanup.execute(
-            text("DELETE FROM payments WHERE id = :pid"), {"pid": payment_id}
-        )
-        cleanup.execute(text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
-        cleanup.commit()
-    finally:
-        cleanup.close()
+        assert result["refunded_amount"] == Decimal("1.25")
+    with Session(owner) as db:
+        assert db.get(Payment, payment_id).refunded_amount == Decimal("1.25")
 
 
 
