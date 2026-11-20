@@ -1,19 +1,80 @@
 import calendar
 import statistics
+from collections import defaultdict
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import Row, and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.appointment import Appointment
 from app.core.specialties import specialty_variants
+from app.models.appointment import Appointment
 from app.models.department import Department
 from app.models.patient import Patient
-from app.models.payment_webhook import PaymentWebhook
+from app.models.payment import Payment, PaymentVisit
 from app.models.service import Service
 from app.models.visit import Visit
 from app.services.queue_service import queue_service
+
+_REPORT_CURRENCY = "UZS"
+_ZERO = Decimal("0.00")
+
+
+def _gross_payment_report(
+    db: Session, start_date: datetime, end_date: datetime, department: str | None,
+) -> tuple[list[Row], dict[str, Any]]:
+    from app.services.payment_refund_guard import recorded_payment_currency
+
+    links = select(PaymentVisit.id).where(PaymentVisit.payment_id == Payment.id)
+    mismatched_link = links.where(or_(
+        PaymentVisit.visit_id.is_distinct_from(Payment.visit_id),
+        PaymentVisit.amount.is_distinct_from(Payment.amount),
+    )).exists()
+    link_count = select(func.count(PaymentVisit.id)).where(
+        PaymentVisit.payment_id == Payment.id
+    ).scalar_subquery()
+    verified_department = and_(Visit.id.is_not(None), ~mismatched_link, link_count <= 1)
+    query = db.query(
+        Payment.amount, Payment.currency, Payment.provider, Payment.method,
+        Payment.created_at, Payment.visit_id, Visit.department,
+        verified_department.label("verified_department"),
+    ).outerjoin(Visit, Visit.id == Payment.visit_id).filter(
+        Payment.status.in_(("paid", "completed")),
+        Payment.created_at >= start_date,
+        Payment.created_at <= end_date,
+    )
+    if department:
+        query = query.filter(Visit.department == department)
+
+    by_currency: dict[str, list[Row]] = defaultdict(list)
+    unclassified = 0
+    unattributed = 0
+    for payment in query:
+        currency = recorded_payment_currency(payment.currency)
+        amount = payment.amount
+        if currency is None or not isinstance(amount, Decimal) or not amount.is_finite() or amount < 0:
+            unclassified += 1
+            continue
+        if not payment.verified_department:
+            unattributed += 1
+            if department:
+                continue
+        by_currency[currency].append(payment)
+
+    return by_currency.get(_REPORT_CURRENCY, []), {
+        "currency": _REPORT_CURRENCY,
+        "basis": "gross_settled_payments",
+        "unclassified_transactions": unclassified,
+        "unattributed_transactions": unattributed,
+        "by_currency": {
+            currency: {
+                "total_revenue": float(sum((payment.amount for payment in payments), _ZERO)),
+                "total_transactions": len(payments),
+            }
+            for currency, payments in sorted(by_currency.items())
+        },
+    }
 
 
 def department_ids_for_filter(db: Session, department: str | None) -> list[int] | None:
@@ -245,102 +306,30 @@ class AnalyticsService:
         end_date: datetime,
         department: str | None = None,
     ) -> dict[str, Any]:
-        """
-        Расчёт доходов (SSOT).
-
-        Получение статистики доходов за период с расширенными метриками.
-        """
-        from app.models.payment import Payment
-
-        # Базовые фильтры для платежей
-        filters = [
-            Payment.created_at >= start_date,
-            Payment.created_at <= end_date,
-            Payment.status == "paid",
-        ]
-
-        # Получаем успешные платежи за период (из PaymentWebhook для онлайн-платежей)
-        webhook_payments = (
-            db.query(PaymentWebhook)
-            .filter(
-                and_(
-                    PaymentWebhook.status == "success",
-                    PaymentWebhook.created_at >= start_date,
-                    PaymentWebhook.created_at <= end_date,
-                )
-            )
-            .all()
-        )
-
-        # Получаем платежи из таблицы Payment
-        payment_query = db.query(Payment).filter(and_(*filters))
-        if department:
-            # Если нужна фильтрация по отделению, нужно связать через Visit
-            from app.models.visit import Visit
-
-            payment_query = payment_query.join(Visit).filter(
-                Visit.department == department
-            )
-
-        payments = payment_query.all()
-
-        # Общий доход из PaymentWebhook (онлайн-платежи)
-        webhook_revenue = sum(float(p.amount) / 100 for p in webhook_payments)
-
-        # Общий доход из Payment (все платежи)
-        payment_revenue = sum(float(p.amount) for p in payments)
-
-        total_revenue = webhook_revenue + payment_revenue
-
-        # Доходы по дням
-        daily_revenue = {}
-        for payment in webhook_payments:
-            date_str = payment.created_at.strftime("%Y-%m-%d")
-            daily_revenue[date_str] = (
-                daily_revenue.get(date_str, 0) + float(payment.amount) / 100
-            )
+        """Gross settled receipts, with UZS for the legacy dashboard fields."""
+        payments, reporting = _gross_payment_report(db, start_date, end_date, department)
+        daily = defaultdict(lambda: _ZERO)
+        providers = defaultdict(lambda: _ZERO)
+        methods = defaultdict(lambda: _ZERO)
         for payment in payments:
-            date_str = payment.created_at.strftime("%Y-%m-%d")
-            daily_revenue[date_str] = daily_revenue.get(date_str, 0) + float(
-                payment.amount
-            )
+            daily[payment.created_at.date().isoformat()] += payment.amount
+            methods[payment.method or "unknown"] += payment.amount
+            if payment.provider:
+                providers[payment.provider] += payment.amount
 
-        # Доходы по провайдерам (из PaymentWebhook)
-        provider_revenue = {}
-        for payment in webhook_payments:
-            provider = payment.provider or "unknown"
-            provider_revenue[provider] = (
-                provider_revenue.get(provider, 0) + float(payment.amount) / 100
-            )
-
-        # Доходы по методам оплаты (из Payment)
-        method_revenue = {}
-        for payment in payments:
-            method = payment.method or "cash"
-            method_revenue[method] = method_revenue.get(method, 0) + float(
-                payment.amount
-            )
-
-        # Средний чек
-        total_transactions = len(webhook_payments) + len(payments)
-        avg_check = total_revenue / total_transactions if total_transactions > 0 else 0
-
-        # Средний дневной доход
-        days_in_period = (end_date - start_date).days + 1
-        avg_daily_revenue = total_revenue / days_in_period if days_in_period > 0 else 0
-
+        total = sum((payment.amount for payment in payments), _ZERO)
+        transactions = len(payments)
+        days = (end_date - start_date).days + 1
         return {
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-            },
-            "total_revenue": round(total_revenue, 2),
-            "total_transactions": total_transactions,
-            "average_check": round(avg_check, 2),
-            "average_daily_revenue": round(avg_daily_revenue, 2),
-            "daily_revenue": daily_revenue,
-            "by_provider": provider_revenue,
-            "by_payment_method": method_revenue,
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            **reporting,
+            "total_revenue": float(total),
+            "total_transactions": transactions,
+            "average_check": float(round(total / transactions, 2)) if transactions else 0,
+            "average_daily_revenue": float(round(total / days, 2)) if days > 0 else 0,
+            "daily_revenue": {day: float(amount) for day, amount in sorted(daily.items())},
+            "by_provider": {provider: float(amount) for provider, amount in sorted(providers.items())},
+            "by_payment_method": {method: float(amount) for method, amount in sorted(methods.items())},
         }
 
     @staticmethod
@@ -828,87 +817,50 @@ class AnalyticsService:
         end_date: datetime,
         department: str | None = None,
     ) -> dict[str, Any]:
-        """Детальная аналитика доходов"""
-        from app.models.payment_webhook import PaymentTransaction
-        from app.models.visit import Visit
+        """Break down the same settled ledger used by the default dashboard."""
+        payments, reporting = _gross_payment_report(db, start_date, end_date, department)
+        daily = defaultdict(lambda: _ZERO)
+        provider_amounts = defaultdict(lambda: _ZERO)
+        provider_counts = defaultdict(int)
+        department_amounts = defaultdict(lambda: _ZERO)
+        department_visits = defaultdict(set)
+        for payment in payments:
+            daily[payment.created_at.date().isoformat()] += payment.amount
+            if payment.provider:
+                provider_amounts[payment.provider] += payment.amount
+                provider_counts[payment.provider] += 1
+            if payment.verified_department:
+                key = payment.department or "Общее"
+                department_amounts[key] += payment.amount
+                department_visits[key].add(payment.visit_id)
 
-        # Доходы по провайдерам
-        provider_revenue = {}
-        transactions = (
-            db.query(PaymentTransaction)
-            .filter(
-                and_(
-                    PaymentTransaction.status == "success",
-                    PaymentTransaction.created_at >= start_date,
-                    PaymentTransaction.created_at <= end_date,
-                )
-            )
-            .all()
-        )
-
-        for transaction in transactions:
-            provider = transaction.provider
-            if provider not in provider_revenue:
-                provider_revenue[provider] = {
-                    "count": 0,
-                    "total_amount": 0,
-                    "average_amount": 0,
-                }
-            provider_revenue[provider]["count"] += 1
-            provider_revenue[provider]["total_amount"] += transaction.amount
-
-        # Вычисляем средние суммы
-        for _provider, stats in provider_revenue.items():
-            stats["average_amount"] = (
-                stats["total_amount"] / stats["count"] if stats["count"] > 0 else 0
-            )
-
-        # Доходы по отделениям (через визиты)
-        department_revenue = {}
-        visits = (
-            db.query(Visit)
-            .filter(and_(Visit.created_at >= start_date, Visit.created_at <= end_date))
-            .all()
-        )
-
-        for visit in visits:
-            dept = "Общее"  # У модели Visit нет поля department
-            if dept not in department_revenue:
-                department_revenue[dept] = {"visits": 0, "total_revenue": 0}
-            department_revenue[dept]["visits"] += 1
-            # Используем payment_amount вместо total_price
-            if hasattr(visit, "payment_amount") and visit.payment_amount:
-                department_revenue[dept]["total_revenue"] += float(visit.payment_amount)
-
-        # Ежедневные доходы
-        daily_revenue = {}
-        for transaction in transactions:
-            date_str = transaction.created_at.strftime("%Y-%m-%d")
-            if date_str not in daily_revenue:
-                daily_revenue[date_str] = 0
-            daily_revenue[date_str] += transaction.amount
-
-        # Сортируем по дате
-        daily_revenue_list = [
-            {"date": date, "amount": amount}
-            for date, amount in sorted(daily_revenue.items())
-        ]
-
+        total = sum((payment.amount for payment in payments), _ZERO)
+        transactions = len(payments)
         return {
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            **reporting,
+            "total_revenue": float(total),
+            "total_transactions": transactions,
+            "average_transaction": float(round(total / transactions, 2)) if transactions else 0,
+            "provider_breakdown": {
+                provider: {
+                    "count": provider_counts[provider],
+                    "total_amount": float(amount),
+                    "average_amount": float(round(amount / provider_counts[provider], 2)),
+                }
+                for provider, amount in sorted(provider_amounts.items())
             },
-            "total_revenue": sum(t.amount for t in transactions),
-            "total_transactions": len(transactions),
-            "average_transaction": (
-                sum(t.amount for t in transactions) / len(transactions)
-                if transactions
-                else 0
-            ),
-            "provider_breakdown": provider_revenue,
-            "department_breakdown": department_revenue,
-            "daily_revenue": daily_revenue_list,
+            "provider_totals": {
+                "total_transactions": sum(provider_counts.values()),
+                "total_revenue": float(sum(provider_amounts.values(), _ZERO)),
+            },
+            "department_breakdown": {
+                key: {"visits": len(department_visits[key]), "total_revenue": float(amount)}
+                for key, amount in sorted(department_amounts.items())
+            },
+            "daily_revenue": [
+                {"date": day, "amount": float(amount)} for day, amount in sorted(daily.items())
+            ],
         }
 
     @staticmethod

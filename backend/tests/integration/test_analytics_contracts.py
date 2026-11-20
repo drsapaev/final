@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.models.payment import Payment, PaymentVisit
+from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 from app.models.user import User
+from app.models.visit import Visit
+from app.services.analytics import AnalyticsService
 
 
 @pytest.fixture
@@ -54,6 +61,98 @@ def test_analytics_legacy_contracts_exist(
     payload: dict[str, Any] = response.json()
     for key in expected_keys:
         assert key in payload
+
+
+def test_revenue_counts_settled_payments_once_and_keeps_currencies_separate(
+    client: TestClient, admin_token: str, db_session, test_patient,
+) -> None:
+    created_at = datetime(2032, 6, 7, 12, tzinfo=UTC)
+    cardio = Visit(patient_id=test_patient.id, visit_date=created_at.date(), department="cardiology")
+    lab = Visit(patient_id=test_patient.id, visit_date=created_at.date(), department="laboratory")
+    db_session.add_all([cardio, lab])
+    db_session.flush()
+
+    online = Payment(
+        visit_id=cardio.id, amount=Decimal("44.25"), currency="UZS",
+        status="completed", method="click", provider="click", created_at=created_at,
+    )
+    ambiguous = Payment(
+        visit_id=cardio.id, amount=Decimal("50.00"), currency="UZS",
+        status="paid", method="cash", created_at=created_at,
+    )
+    db_session.add_all([online, ambiguous])
+    db_session.add(Payment(
+        visit_id=cardio.id, amount=Decimal("999.00"), currency="UZS",
+        status="paid", method="cash", created_at=created_at + timedelta(hours=12),
+    ))
+    for visit_id, amount, currency, status in (
+        (cardio.id, "125.50", "UZS", "paid"),
+        (lab.id, "75.00", "UZS", "paid"),
+        (cardio.id, "10.50", "USD", "paid"),
+        (cardio.id, "33.20", "", "paid"),
+        (cardio.id, "999.00", "UZS", "pending"),
+        (cardio.id, "777.00", "UZS", "failed"),
+    ):
+        db_session.add(Payment(
+            visit_id=visit_id, amount=Decimal(amount), currency=currency,
+            status=status, method="cash", created_at=created_at,
+        ))
+    db_session.flush()
+    db_session.add_all([
+        PaymentVisit(payment_id=online.id, visit_id=cardio.id, amount=online.amount),
+        PaymentVisit(payment_id=ambiguous.id, visit_id=lab.id, amount=ambiguous.amount),
+    ])
+    for _ in range(2):
+        external_id = f"synthetic-{uuid4()}"
+        receipt = PaymentWebhook(
+            provider="click", webhook_id=external_id, transaction_id=external_id,
+            amount=4425, currency="UZS", raw_data={}, status="success", created_at=created_at,
+        )
+        db_session.add(receipt)
+        db_session.flush()
+        db_session.add(PaymentTransaction(
+            provider="click", transaction_id=external_id, amount=4425,
+            currency="UZS", status="success", payment_id=online.id, webhook_id=receipt.id,
+            created_at=created_at,
+        ))
+    db_session.commit()
+
+    dashboard = AnalyticsService.calculate_revenue(
+        db_session, created_at - timedelta(hours=1), created_at + timedelta(hours=1),
+    )
+    assert dashboard["total_revenue"] == 294.75
+    assert dashboard["total_transactions"] == 4
+    assert dashboard["by_provider"] == {"click": 44.25}
+    assert dashboard["daily_revenue"] == {"2032-06-07": 294.75}
+    assert dashboard["by_currency"]["USD"] == {"total_revenue": 10.50, "total_transactions": 1}
+    assert dashboard["unclassified_transactions"] == 1
+    assert dashboard["unattributed_transactions"] == 1
+
+    response = client.get(
+        "/api/v1/analytics/revenue-breakdown",
+        headers=_auth_headers(admin_token),
+        params={"start_date": "2032-06-07", "end_date": "2032-06-07", "department": "cardiology"},
+    )
+    assert response.status_code == 200, response.text
+    filtered = response.json()
+    assert filtered["currency"] == "UZS"
+    assert filtered["basis"] == "gross_settled_payments"
+    assert filtered["total_revenue"] == 169.75
+    assert filtered["total_transactions"] == 2
+    assert filtered["by_currency"]["USD"]["total_revenue"] == 10.50
+    assert filtered["provider_breakdown"]["click"]["total_amount"] == 44.25
+    assert filtered["department_breakdown"] == {"cardiology": {"visits": 1, "total_revenue": 169.75}}
+    assert filtered["daily_revenue"] == [{"date": "2032-06-07", "amount": 169.75}]
+
+    providers = client.get(
+        "/api/v1/analytics/payment-providers",
+        headers=_auth_headers(admin_token),
+        params={"start_date": "2032-06-07", "end_date": "2032-06-07", "department": "cardiology"},
+    )
+    assert providers.status_code == 200, providers.text
+    summary = providers.json()["summary"]
+    assert summary["total_transactions"] == 1
+    assert summary["total_revenue"] == 44.25
 
 
 def test_predictive_endpoint_returns_flat_forecasts(

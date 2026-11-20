@@ -24,12 +24,26 @@ CLINICAL_ANALYTICS_ROLES = ["admin", "doctor"]
 FINANCIAL_ANALYTICS_ROLES = ["admin"]
 
 
+def _revenue_report_dates(start_date: str, end_date: str) -> tuple[datetime, datetime]:
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный формат даты") from None
+    if start > end:
+        raise HTTPException(
+            status_code=400, detail="Начальная дата должна быть раньше конечной"
+        )
+    return start, datetime.combine(end.date(), datetime.max.time())
+
+
 def _build_payment_provider_payload(
     db: Session, start: datetime, end: datetime, department: str | None
 ) -> dict:
     revenue_breakdown = AnalyticsService.get_revenue_breakdown_analytics(
         db, start, end, department
     )
+    provider_totals = revenue_breakdown["provider_totals"]
 
     providers = {}
     for provider_code, stats in revenue_breakdown.get("provider_breakdown", {}).items():
@@ -42,11 +56,12 @@ def _build_payment_provider_payload(
         }
 
     return {
+        "currency": revenue_breakdown["currency"],
         "providers": providers,
         "summary": {
             "active_providers": sum(1 for stats in providers.values() if stats["count"]),
-            "total_transactions": revenue_breakdown.get("total_transactions", 0),
-            "total_revenue": revenue_breakdown.get("total_revenue", 0),
+            "total_transactions": provider_totals["total_transactions"],
+            "total_revenue": provider_totals["total_revenue"],
             "total_commission": 0,
         },
         "period": revenue_breakdown.get("period", {}),
@@ -135,17 +150,7 @@ async def get_revenue_breakdown_analytics(
     db: Session = Depends(get_db),
 ):
     """Legacy-compatible analytics route for revenue breakdown."""
-    try:
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        end = datetime.strptime(end_date, "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Неверный формат даты")
-
-    if start > end:
-        raise HTTPException(
-            status_code=400, detail="Начальная дата должна быть раньше конечной"
-        )
-
+    start, end = _revenue_report_dates(start_date, end_date)
     return AnalyticsService.get_revenue_breakdown_analytics(db, start, end, department)
 
 
@@ -158,15 +163,5 @@ async def get_payment_provider_analytics(
     db: Session = Depends(get_db),
 ):
     """Legacy-compatible analytics route for provider summary."""
-    try:
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        end = datetime.strptime(end_date, "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Неверный формат даты")
-
-    if start > end:
-        raise HTTPException(
-            status_code=400, detail="Начальная дата должна быть раньше конечной"
-        )
-
+    start, end = _revenue_report_dates(start_date, end_date)
     return _build_payment_provider_payload(db, start, end, department)
