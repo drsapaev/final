@@ -728,6 +728,11 @@ def _create_dental_override(client, db_session, *, monkeypatch, sender) -> int:
         service=service,
         price=Decimal("200000"),
     )
+    # The migrated schema assigns these generations. The metadata-only
+    # fixture needs them to exercise notification after a valid request.
+    dentist.repeat_owner_generation = 1
+    visit.confirmation_context_epoch = 1
+    db_session.commit()
     headers = _login_headers(client, dentist_user)
 
     response = client.post(
