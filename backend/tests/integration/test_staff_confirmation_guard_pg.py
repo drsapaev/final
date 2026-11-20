@@ -32,6 +32,7 @@ from app.models.all_free_request import AllFreeRequest
 from app.models.authentication import TokenBlacklist
 from app.models.encounter import Encounter
 from app.models.patient import Patient
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
@@ -45,6 +46,10 @@ from app.services.all_free_request_service import (
     AllFreeRequestService,
 )
 from app.services.profile_contact_security import ProfileBearerContext
+from app.services.registrar_cart_replay import (
+    RegistrarCartReceipt,
+    registrar_cart_receipt_is_current,
+)
 from app.services.staff_confirmation_guard import lock_staff_confirmation_subjects
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
@@ -200,6 +205,43 @@ def _confirm(db, ids):
     actor, _ = lock_staff_confirmation_subjects(db, bearer=_bearer(ids["confirm"]), visit_ids=[ids["visit"]])
     VisitLifecycleService(db).confirm_visit(visit_id=ids["visit"], current_user=actor, confirmed_by="synthetic", commit=False)
     db.flush()
+
+
+def test_cart_receipt_requires_the_issuer_and_current_financial_membership(guarded_pg):
+    owner, runtime, ids = guarded_pg
+    amount = Decimal("10.00")
+    with Session(owner, expire_on_commit=False) as db:
+        visit = db.get(Visit, ids["visit"])
+        visit.status, visit.approval_status = "confirmed", "approved"
+        visit.confirmed_by = f"registrar_{ids['stage']}"
+        encounter = db.get(Encounter, visit.encounter_id)
+        invoice = PaymentInvoice(
+            patient_id=ids["patient"], total_amount=amount,
+            registrar_encounter_id_snapshot=encounter.id,
+            registrar_encounter_generation_snapshot=encounter.generation,
+        )
+        db.add(invoice)
+        db.flush()
+        db.add(PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=visit.id, visit_amount=amount))
+        db.commit()
+        receipt = RegistrarCartReceipt(invoice.id, amount, ((visit.id, "confirmed", "approved"),))
+        encounter_id = encounter.id
+
+    with Session(runtime) as db:
+        db.query(User.id).filter_by(id=ids["stage"]).with_for_update().one()
+        assert registrar_cart_receipt_is_current(db, actor_id=ids["stage"], receipt=receipt)
+    with Session(runtime) as db:
+        db.query(User.id).filter_by(id=ids["confirm"]).with_for_update().one()
+        assert not registrar_cart_receipt_is_current(db, actor_id=ids["confirm"], receipt=receipt)
+    with Session(owner) as db:
+        db.add(Visit(
+            patient_id=ids["patient"], encounter_id=encounter_id, visit_date=date(2099, 1, 2),
+            status="pending_confirmation", source="desk",
+        ))
+        db.commit()
+    with Session(runtime) as db:
+        db.query(User.id).filter_by(id=ids["stage"]).with_for_update().one()
+        assert not registrar_cart_receipt_is_current(db, actor_id=ids["stage"], receipt=receipt)
 
 
 @pytest.mark.parametrize("allow_write", ["explicit_check", "implicit_check"])

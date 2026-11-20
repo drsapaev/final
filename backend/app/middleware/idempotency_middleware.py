@@ -56,7 +56,7 @@ import re
 import time
 import uuid
 from collections import OrderedDict
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit, urlunsplit
 
 import jwt
@@ -64,6 +64,9 @@ import redis as redis_lib
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
+if TYPE_CHECKING:
+    from app.services.registrar_cart_replay import RegistrarCartReceipt
 
 logger = logging.getLogger(__name__)
 
@@ -1085,6 +1088,7 @@ def _check_principal_authorized_sync(
     patient_scope_generation: int | None = None,
     token_epoch: int = 0,
     patient_booking_result: tuple[str, int | uuid.UUID] | None = None,
+    registrar_cart_result: RegistrarCartReceipt | None = None,
 ) -> tuple[bool, str | None, bool]:
     """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
 
@@ -1132,6 +1136,16 @@ def _check_principal_authorized_sync(
             if patient_booking_result is not None:
                 kwargs["patient_booking_result"] = patient_booking_result
             result = _user_authorized_in_db(db, user_id, username, jti, **kwargs)
+            if result[0] and registrar_cart_result is not None:
+                from app.services.registrar_cart_replay import (
+                    registrar_cart_receipt_is_current,
+                )
+
+                _, role, is_superuser = result
+                if user_id is None or (not is_superuser and (role or "").strip().casefold() not in {"admin", "registrar"}):
+                    return False, role, is_superuser
+                if not registrar_cart_receipt_is_current(db, actor_id=user_id, receipt=registrar_cart_result):
+                    return False, role, is_superuser
             if not result[0] and patient_scope_id is None and user_id is not None:
                 _audit_inactive_principal(db, request, user_id, jti, token_epoch)
             return result
@@ -4338,6 +4352,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         *,
         allow_unbound_patient_denial: bool = False,
         patient_booking_result: tuple[str, int | uuid.UUID] | None = None,
+        registrar_cart_result: RegistrarCartReceipt | None = None,
     ) -> tuple[bool, str | None, bool]:
         """DB-backed authorization before any replay (Codex R3/R4/R6 #3092).
 
@@ -4386,6 +4401,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 scope_kwargs["token_epoch"] = token_epoch
             if patient_booking_result is not None:
                 scope_kwargs["patient_booking_result"] = patient_booking_result
+            if registrar_cart_result is not None:
+                scope_kwargs["registrar_cart_result"] = registrar_cart_result
             authorized, role, is_superuser = await asyncio.to_thread(
                 _check_principal_authorized_sync,
                 request,
@@ -4534,6 +4551,27 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         is_superuser: bool,
     ) -> bool | None:
         op_scope = f"{request.method.upper()}:{_normalize_idem_path(request.url.path)}"
+        if op_scope == "POST:/api/v1/registrar/cart":
+            from app.api.v1.endpoints.registrar_wizard import _cart
+            from app.services.registrar_cart_replay import parse_registrar_cart_receipt
+
+            selected = self._matched_audit_request(request)
+            if (
+                selected is None or selected.scope.get("endpoint") is not _cart.create_cart_appointments
+                or cached_response.status_code != 200
+            ):
+                return None
+            receipt = parse_registrar_cart_receipt(cached_response.body)
+            if receipt is None:
+                return None
+            try:
+                authorized, _, _ = await self._principal_authorized(
+                    request, principal_payload, registrar_cart_result=receipt,
+                )
+            except IdempotencyAuthorizationUnavailable:
+                return None
+            return True if authorized else None
+
         policy = _PATIENT_BOOKING_COMMANDS.get(op_scope)
         if policy is None:
             return self._role_permitted_for_replay(request, stored_role, current_role, is_superuser)
