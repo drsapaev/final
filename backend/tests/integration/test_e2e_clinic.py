@@ -3,20 +3,20 @@ End-to-End интеграционный тест для полного флоу 
 Login → Create Patient → Create Visit → Create EMR → Create Payment → PayMe Webhook → Verify
 """
 import base64
-import json
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import pytest  # pyright: ignore[reportMissingImports]
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.main import app
 from app.models.appointment import Appointment
 from app.models.payment import Payment
+from app.models.payment_webhook import PaymentTransaction
 from app.models.user_profile import UserAuditLog
-from app.models.visit import Visit
-
+from app.models.visit import Visit, VisitService
 
 # Используем фикстуру client из conftest.py
 # Не создаем новую, чтобы избежать проблем с потоками SQLite
@@ -88,7 +88,9 @@ def _create_payme_auth_header(secret_key: str) -> str:
 @pytest.fixture
 def payme_secret_key(monkeypatch):
     """Возвращает PayMe secret key для тестов из настроек, чтобы совпадал с провайдером"""
-    from app.services.payment_provider_manager_factory import reset_payment_manager_for_tests
+    from app.services.payment_provider_manager_factory import (
+        reset_payment_manager_for_tests,
+    )
 
     test_secret_key = "test_secret"
     settings = get_settings()
@@ -106,7 +108,9 @@ def test_e2e_clinic_flow(
     db_session: Session,
     registrar_user,
     test_doctor_user,
+    test_service,
     payme_secret_key,
+    monkeypatch,
 ):
     """
     Полный E2E тест флоу клиники:
@@ -120,6 +124,10 @@ def test_e2e_clinic_flow(
     8. Verify Payment Status
     9. Verify Audit Logs
     """
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.payment_webhooks._emit_payment_notification_from_webhook_result",
+        AsyncMock(),
+    )
     # ========== ШАГ 1: LOGIN ==========
     login_response = client.post(
         "/api/v1/authentication/login",
@@ -136,8 +144,8 @@ def test_e2e_clinic_flow(
 
     # ========== ШАГ 2: CREATE PATIENT ==========
     patient_data = {
-        "last_name": "Тестов",
-        "first_name": "Пациент",
+        "last_name": "CHECKOUT",
+        "first_name": "SYNTHETIC",
         "middle_name": "E2E",
         "birth_date": "1990-01-01",
         "sex": "M",
@@ -273,9 +281,17 @@ def test_e2e_clinic_flow(
     assert audit_log_emr.user_id == test_doctor_user.id
 
     # ========== ШАГ 6: CREATE PAYMENT ==========
+    amount = Decimal(str(test_service.price))
+    # The metadata-only test database omits the confirmation epoch trigger.
+    visit_obj.confirmation_context_epoch = 1
+    db_session.add(VisitService(
+        visit_id=visit_id, service_id=test_service.id, name=test_service.name,
+        qty=1, price=amount, currency="UZS",
+    ))
+    db_session.commit()
     payment_data = {
         "visit_id": visit_id,
-        "amount": 100000,  # 1000.00 UZS
+        "amount": format(amount, "f"),
         "currency": "UZS",
         "method": "online",
         "provider": "payme",
@@ -287,10 +303,9 @@ def test_e2e_clinic_flow(
     )
     assert payment_response.status_code == 200, f"Create payment failed: {payment_response.text}"
     payment_init = payment_response.json()
-    # В тестовой среде провайдер может быть не настроен → success=False,
-    # но платеж и аудит должны быть созданы, а payment_id возвращён.
-    payment_id = payment_init.get("payment_id")
-    assert payment_id is not None, f"Payment ID should not be None. Response: {payment_init}"
+    assert payment_init["success"] is True, payment_init
+    payment_id = payment_init["payment_id"]
+    assert payment_id is not None
 
     # Проверяем audit log для создания платежа
     audit_log_payment = (
@@ -304,115 +319,55 @@ def test_e2e_clinic_flow(
     )
     assert audit_log_payment is not None, "Audit log для создания платежа должен существовать"
 
-    # Получаем payment из БД для order_id
-    payment_obj = db_session.query(Payment).filter(Payment.id == payment_id).first()
-    assert payment_obj is not None, "Payment должен существовать в БД"
-    order_id = f"clinic_{payment_id}_{int(datetime.now().timestamp())}"
-
     # ========== ШАГ 7: SIMULATE PAYME WEBHOOK ==========
-    # Используем тестовый secret key из фикстуры
-
-    # Получаем order_id из payment (он должен быть в provider_data или payment_id)
-    # PayMe использует order_id в формате "clinic_{payment_id}_{timestamp}"
-    # Обновляем payment из БД для получения актуальных данных
-    db_session.refresh(payment_obj)
-    order_id = payment_obj.provider_data.get("account", {}).get("order_id") if payment_obj.provider_data else None
-    if not order_id:
-        # Если order_id нет в provider_data, создаем его
-        from app.services.queue_service import queue_service
-        now = queue_service.get_local_timestamp(db_session)
-        order_id = f"clinic_{payment_id}_{int(now.timestamp())}"
-    payme_amount = int(payment_obj.amount * 100)
-
-    # Создаем PayMe webhook payload (JSON-RPC формат) для CheckPerformTransaction
-    check_payload = {
-        "method": "CheckPerformTransaction",
-        "params": {
-            "amount": payme_amount,
-            "account": {
-                "order_id": order_id,
-            },
-        },
-        "id": "test_request_123",
-    }
-
-    # Создаем Authorization header
+    payment_obj = db_session.get(Payment, payment_id)
+    assert payment_obj.visit_id == visit_id
+    assert payment_obj.amount == amount and payment_obj.currency == "UZS"
+    assert payment_obj.status == "pending"
+    order_id = payment_obj.provider_data["account"]["order_id"]
+    assert order_id == payment_init["provider_payment_id"]
     auth_header = _create_payme_auth_header(payme_secret_key)
+    provider_transaction_id = f"synthetic-payme-{payment_id}"
+    timestamp = int(datetime.now(UTC).timestamp() * 1000)
+    order = {"amount": int(amount * 100), "account": {"order_id": order_id}}
 
-    # Отправляем CheckPerformTransaction webhook
-    check_response = client.post(
-        "/api/v1/payments/webhook/payme",
-        json=check_payload,
-        headers={"Authorization": auth_header},
-    )
-    assert check_response.status_code == 200, f"CheckPerformTransaction webhook failed: {check_response.text}"
-    check_result = check_response.json()
-    assert "result" in check_result or "error" not in check_result, "CheckPerformTransaction should succeed"
+    def acknowledge(method: str, params: dict) -> dict:
+        response = client.post(
+            "/api/v1/payments/webhook/payme",
+            json={"method": method, "params": params, "id": f"synthetic-{method}"},
+            headers={"Authorization": auth_header},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert "result" in body, body
+        return body["result"]
 
-    # Отправляем CreateTransaction webhook
-    payme_transaction_id = f"test_trans_{payment_id}_{int(datetime.now().timestamp())}"
-    create_payload = {
-        "method": "CreateTransaction",
-        "params": {
-            "amount": payme_amount,
-            "account": {
-                "order_id": order_id,
-            },
-            "time": int(datetime.now().timestamp() * 1000),
-        },
-        "id": "test_request_124",
-    }
-
-    create_response = client.post(
-        "/api/v1/payments/webhook/payme",
-        json=create_payload,
-        headers={"Authorization": auth_header},
-    )
-    assert create_response.status_code == 200, f"CreateTransaction webhook failed: {create_response.text}"
-    create_result = create_response.json()
-
-    # Извлекаем transaction ID из ответа CreateTransaction
-    # PayMe возвращает transaction ID в result.transaction
-    if "result" in create_result and "transaction" in create_result["result"]:
-        payme_transaction_id = str(create_result["result"]["transaction"])
-    elif "result" in create_result and isinstance(create_result["result"], dict):
-        # Альтернативный формат ответа
-        payme_transaction_id = str(create_result["result"].get("transaction", payme_transaction_id))
-
-    # Отправляем PerformTransaction webhook (симуляция успешной оплаты)
-    perform_payload = {
-        "method": "PerformTransaction",
-        "params": {
-            "id": payme_transaction_id,
-            "time": int(datetime.now().timestamp() * 1000),
-        },
-        "id": "test_request_125",
-    }
-
-    perform_response = client.post(
-        "/api/v1/payments/webhook/payme",
-        json=perform_payload,
-        headers={"Authorization": auth_header},
-    )
-    assert perform_response.status_code == 200, f"PerformTransaction webhook failed: {perform_response.text}"
+    assert acknowledge("CheckPerformTransaction", order)["allow"] is True
+    created = acknowledge("CreateTransaction", order | {"id": provider_transaction_id, "time": timestamp})
+    assert created["state"] == 1
+    performed = acknowledge("PerformTransaction", {"id": provider_transaction_id})
+    assert performed["state"] == 2
 
     # ========== ШАГ 8: VERIFY PAYMENT STATUS ==========
     # Обновляем payment из БД
     db_session.refresh(payment_obj)
 
-    # Проверяем статус платежа (может быть "paid" или "pending" в зависимости от обработки webhook)
-    # В реальном сценарии webhook должен обновить статус
+    assert payment_obj.status == "paid" and payment_obj.paid_at is not None
+    paid_at = payment_obj.paid_at
+    assert acknowledge("PerformTransaction", {"id": provider_transaction_id})["state"] == 2
+    db_session.refresh(payment_obj)
+    assert payment_obj.status == "paid" and payment_obj.paid_at == paid_at
+    settlement = db_session.query(PaymentTransaction).filter_by(
+        provider="payme", transaction_id=provider_transaction_id,
+    ).one()
+    assert settlement.payment_id == payment_id
+
     payment_status_response = client.get(
         f"/api/v1/payments/{payment_id}",
         headers=headers,
     )
-    if payment_status_response.status_code == 200:
-        payment_status = payment_status_response.json()
-        # В тестовой среде статус может быть "processing"/"pending"/"paid"/"failed"
-        # в зависимости от последовательности webhook-вызовов.
-        assert payment_status.get("status") in ["paid", "pending", "failed", "processing"], (
-            f"Unexpected payment status: {payment_status.get('status')}"
-        )
+    assert payment_status_response.status_code == 200, payment_status_response.text
+    assert payment_status_response.json()["status"] == "paid"
 
     # ========== ШАГ 9: VERIFY AUDIT LOGS ==========
     # Проверяем, что все audit logs созданы
