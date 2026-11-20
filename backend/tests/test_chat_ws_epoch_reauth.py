@@ -485,12 +485,25 @@ async def test_ai_stream_stops_during_stalled_revocation_close(ws_identity, monk
                                model="synthetic", tokens_used=1, latency_ms=1, was_cached=False)
     monkeypatch.setattr(ai_chat, "get_chat_service", lambda _: SimpleNamespace(send_message=send_message))
 
-    first_chunk, close_entered, release_close = asyncio.Event(), asyncio.Event(), asyncio.Event()
-    class Socket(_AISocket):
-        async def send_json(self, payload):
-            await super().send_json(payload)
-            first_chunk.set()
+    first_chunk = asyncio.Event()
+    close_entered = asyncio.Event()
+    next_send_started = asyncio.Event()
+    release_close = asyncio.Event()
+    send = ai_chat._ai_ws_send
 
+    async def pause_after_first_chunk(websocket, payload, revoked, close_lock):
+        if first_chunk.is_set():
+            next_send_started.set()
+            await send(websocket, payload, revoked, close_lock)
+            return
+        await send(websocket, payload, revoked, close_lock)
+        first_chunk.set()
+        # The send lock is free while the real watchdog marks revocation.
+        await close_entered.wait()
+
+    monkeypatch.setattr(ai_chat, "_ai_ws_send", pause_after_first_chunk)
+
+    class Socket(_AISocket):
         async def close(self, **kwargs):
             self.closed.append(kwargs)
             close_entered.set()
@@ -499,13 +512,14 @@ async def test_ai_stream_stops_during_stalled_revocation_close(ws_identity, monk
     ws = Socket({"type": "message", "session_id": 1, "content": "synthetic"})
     with sessions() as endpoint_db:
         task = asyncio.create_task(ai_chat.chat_websocket(ws, endpoint_db))
-        await asyncio.wait_for(first_chunk.wait(), 2)
-        _revoke(sessions, user_id, token, "epoch")
-        await asyncio.wait_for(close_entered.wait(), 2)
-        sent_before = list(ws.sent)
-        await asyncio.sleep(0.1)
-        assert ws.sent == sent_before
-        release_close.set()
+        try:
+            await asyncio.wait_for(first_chunk.wait(), 2)
+            _revoke(sessions, user_id, token, "epoch")
+            await asyncio.wait_for(close_entered.wait(), 2)
+            await asyncio.wait_for(next_send_started.wait(), 2)
+            assert len(ws.sent) == 1
+        finally:
+            release_close.set()
         await asyncio.wait_for(task, 2)
     assert len(ws.sent) == 1
     assert ws.sent[0]["type"] == "chunk"
