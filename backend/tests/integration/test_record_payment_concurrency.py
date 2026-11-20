@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -205,6 +206,35 @@ def test_invoice_edit_cannot_overwrite_a_concurrently_settled_status(legacy_invo
         invoice = db.get(Invoice, invoice_id)
         assert invoice.status == InvoiceStatus.PARTIALLY_PAID and invoice.paid_amount == 4
         assert db.query(Payment).filter_by(visit_id=ids["visit"]).count() == 1
+
+
+def test_postgres_billing_report_uses_the_full_period_for_totals_and_statuses(legacy_invoice_pg):
+    owner, _, invoice_id, ids = legacy_invoice_pg
+    report_day = date(2031, 3, 4)
+    midday = datetime(2031, 3, 4, 12, 30)
+    next_day = midday + timedelta(days=1)
+    with Session(owner) as db:
+        assert db.get_bind().dialect.name == "postgresql"
+        invoice = db.get(Invoice, invoice_id)
+        invoice.issue_date = midday
+        invoice.status = InvoiceStatus.PENDING
+        db.add_all([
+            Invoice(
+                invoice_number=f"SYNTHETIC-{uuid4().hex[:12]}",
+                patient_id=ids["patient"], total_amount=5, balance=5,
+                issue_date=next_day, status=InvoiceStatus.OVERDUE,
+            ),
+            Payment(visit_id=ids["visit"], amount=Decimal("4.25"), created_at=midday.replace(tzinfo=UTC)),
+            Payment(visit_id=ids["visit"], amount=Decimal("5.75"), created_at=next_day.replace(tzinfo=UTC)),
+        ])
+        db.commit()
+        db.execute(text("SET LOCAL TIME ZONE 'UTC'"))
+        report = BillingApiService(db).get_billing_analytics(date_from=report_day, date_to=report_day)
+
+    assert report["summary"]["total_invoices"] == 1
+    assert report["summary"]["total_payments"] == 1
+    assert report["summary"]["payments_amount"] == Decimal("4.25")
+    assert [item["status"] for item in report["status_breakdown"]] == [InvoiceStatus.PENDING]
 
 
 @pytest.mark.parametrize("amount", [Decimal("4.00"), Decimal("10.00")], ids=["partial", "fully-settled"])
