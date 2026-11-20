@@ -143,6 +143,15 @@ def _is_provider_webhook_idempotency_exempt(method: str, path: str) -> bool:
     return method.upper() == "POST" and bool(_PROVIDER_WEBHOOK_PATH.fullmatch(path))
 
 
+# These routes publish typed refusals for an absent or deleted patient card.
+_PATIENT_BOOKING_COMMANDS = frozenset({
+    "POST:/api/v1/patients/booking",
+    "POST:/api/v1/patients/booking/preview",
+    "POST:/api/v1/patients/booking-requests",
+    "POST:/api/v1/patients/public-booking/appointments",
+})
+
+
 # Round-6 (owner P1, PR #3340): the in-process scope-binding mirror is
 # attacker-reachable (every keyed request with a fresh key creates an entry
 # BEFORE endpoint validation), so it is a bounded LRU — the response cache
@@ -909,32 +918,13 @@ def _audit_patient_replay(request: Any, patient_scope: str) -> None:
 
 def _patient_replay_policy_sync(
     request: Any, canonical_user_id: int
-) -> tuple[str, bool, bool | None]:
-    """Round-3 (owner P1): patient-aware replay policy, one DB roundtrip.
+) -> tuple[str, str | None, bool | None]:
+    """Resolve the current patient binding or a reason to refuse the command.
 
-    Returns ``(patient_scope, fall_through, user_is_active)``:
-
-    - non-Patient principal (or user row gone — later exec-auth refuses
-      fail-closed): ``("", False, None)`` — namespace carries NO patient
-      scope;
-    - Patient with an ACTIVE card: ``("patient:{id}", False, is_active)``
-      — the namespace (local cache, Redis claim, execution intents) is
-      bound to the CURRENT card id, so a snapshot made under card A can
-      never be served after the account is re-linked to card B;
-    - Patient with a MISSING or SOFT-DELETED card: ``("", True, None)``
-      — the caller falls through to the endpoint WITHOUT any idempotency
-      machinery: no cached snapshot, no claim, no intent. The endpoint's
-      own guards answer 404 patient_profile_required / 403
-      patient_link_invalid (and write the denied audit row) exactly as
-      they would for a first request. Replaying a committed booking to a
-      revoked card is precisely the leak this policy closes.
-
-    Round-5 (owner P2): ``User.is_active`` is now part of the SAME query.
-    A DEACTIVATED account with a live card is refused HERE — the keyed
-    request must never reach the binding/claim machinery (and through it
-    the later non-auditing exec-auth refusal). The denied audit row is
-    written in this same DB pass (see ``_audit_keyed_patient_refusal``);
-    the dispatch then answers the non-executing 403.
+    Non-patient principals have no patient scope. An active card scopes the
+    key to the card and its current ownership generation. Missing or deleted
+    cards require a refusal before any cache lookup or command execution.
+    Audit refusals when the account still has an identifiable patient.
     """
     generator = _resolve_request_db(request)
     try:
@@ -948,10 +938,10 @@ def _patient_replay_policy_sync(
             select(User.role, User.is_active).where(User.id == int(canonical_user_id))
         ).first()
         if actor is None:
-            return "", False, None
+            return "", None, None
         role, user_is_active = actor
         if str(role or "").strip().casefold() != "patient":
-            return "", False, None
+            return "", None, None
         from app.services.patient_subject_lock import (
             PatientSubjectLockError,
             require_patient_subject_visibility,
@@ -967,12 +957,12 @@ def _patient_replay_policy_sync(
             .limit(2)
         ).all()
         if not rows:
-            return "", True, None
+            return "", "patient_profile_required", None
         if len(rows) != 1:
             raise IdempotencyAuthorizationUnavailable
         patient_id, is_deleted, owner_generation = rows[0]
         if patient_id is None:
-            return "", True, None
+            return "", "patient_profile_required", None
         if type(owner_generation) is not int or owner_generation <= 0:
             raise IdempotencyAuthorizationUnavailable
         user_is_active = bool(user_is_active)
@@ -980,8 +970,8 @@ def _patient_replay_policy_sync(
             _audit_keyed_patient_refusal(request, int(patient_id), canonical_user_id)
         elif bool(is_deleted):
             _audit_keyed_patient_refusal(request, int(patient_id), canonical_user_id, "patient_link_invalid")
-            return "", True, None
-        return f"patient:{owner_generation}:{int(patient_id)}", False, user_is_active
+            return "", "patient_link_invalid", None
+        return f"patient:{owner_generation}:{int(patient_id)}", None, user_is_active
     finally:
         try:
             next(generator)
@@ -2429,13 +2419,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         )
         # Round-3 (owner P1): patient-aware replay policy. The live card
         # state decides whether idempotency machinery may run AT ALL for a
-        # Patient principal: an active card scopes the namespace to the card
-        # id; a missing/soft-deleted card bypasses replay entirely so the
-        # endpoint's own guards (404/403 + denied audit) answer the retry.
+        # Patient principal: an active card scopes the namespace to its
+        # current ownership generation. An absent binding stops the command.
         try:
             (
                 patient_scope,
-                patient_fall_through,
+                patient_denial,
                 patient_user_active,
             ) = await asyncio.to_thread(
                 _patient_replay_policy_sync, request, canonical_id
@@ -2449,13 +2438,22 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 type(exc).__name__,
             )
             return _principal_refusal_response()
-        if patient_fall_through:
-            logger.warning(
-                "Idempotency replay policy: no ACTIVE Patient card; "
-                "refusing without execution: user=%s key_fingerprint=%s path=%s",
-                canonical_id, key_fingerprint, request.url.path,
+        if patient_denial:
+            if op_scope not in _PATIENT_BOOKING_COMMANDS:
+                return self._unverified_replay_response()
+            # Verify the session before returning the portal's denial. A
+            # relink after the scope lookup cannot let this request execute.
+            authorized, role, _ = await self._principal_authorized(
+                request, principal_payload, allow_unbound_patient_denial=True,
             )
-            return self._unverified_replay_response()
+            if not authorized or (role or "").strip().casefold() != "patient":
+                return _principal_refusal_response()
+            return Response(
+                status_code=404 if patient_denial == "patient_profile_required" else 403,
+                headers={"Cache-Control": "no-store"},
+                content=json.dumps({"detail": {"reason": patient_denial}}),
+                media_type="application/json",
+            )
         if patient_scope and patient_user_active is False:
             # Round-5 (owner P2): a DEACTIVATED patient account is refused
             # BEFORE any idempotency machinery runs. The keyed booking's
@@ -4304,6 +4302,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         request: Request,
         principal_payload: dict[str, Any],
         require_active_doctor_profile: bool = False,
+        *,
+        allow_unbound_patient_denial: bool = False,
     ) -> tuple[bool, str | None, bool]:
         """DB-backed authorization before any replay (Codex R3/R4/R6 #3092).
 
@@ -4321,6 +4321,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         Subject selection mirrors deps.py: the signed ``sub`` takes priority
         over the mutable username claim, preventing account substitution after
         username reassignment. Namespace and endpoint identity stay aligned.
+        The unbound-patient option belongs to the non-executing denial path.
         """
         user_id, username = _user_id_from_principal(principal_payload)
         jti = principal_payload.get("jti")
@@ -4360,7 +4361,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             if expiry <= time.time():
                 return False, role, is_superuser
-            if (str(role or "").strip().casefold() == "patient"
+            if (not allow_unbound_patient_denial
+                and str(role or "").strip().casefold() == "patient"
                 and patient_context is None):
                 return False, role, is_superuser
             from app.core.user_token_claims import is_user_allowed_for_claims

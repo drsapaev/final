@@ -165,6 +165,25 @@ class TestSoftDeletedPatientRejected:
         assert response.json()["detail"]["reason"] == "patient_link_invalid"
         assert db_session.query(Appointment).count() == 0
 
+    def test_revoked_session_does_not_receive_patient_binding_state(
+        self, client: TestClient, linked_patient_headers, db_session, test_patient,
+    ):
+        self._soft_delete(db_session, test_patient)
+        actor = db_session.get(User, test_patient.user_id)
+        actor.auth_epoch += 1
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "revoked-synthetic-session"},
+            json={"appointmentDate": str(date.today() + timedelta(days=3))},
+        )
+
+        assert response.status_code == 403
+        assert response.headers["Cache-Control"] == "no-store"
+        assert isinstance(response.json()["detail"], str)
+        assert db_session.query(Appointment).count() == 0
+
 
 class TestDeactivatedUserRejected:
     """Round-2 P1: an admin-deactivated Patient user must not keep PHI read
