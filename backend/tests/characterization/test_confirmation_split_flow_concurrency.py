@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import uuid
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -10,9 +11,10 @@ from sqlalchemy.orm import sessionmaker
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
+from app.models.service import Service
 from app.models.telegram_config import TelegramUser
 from app.models.user import User
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.visit_confirmation_service import (
@@ -28,7 +30,7 @@ def _future_telegram_start(monkeypatch):
 
 
 def _make_pending_confirmation_visit(
-    test_db, suffix: str
+    test_db, suffix: str,
 ) -> tuple[str, int, int, int, int, int, str]:
     session_local = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
     session = session_local()
@@ -80,9 +82,19 @@ def _make_pending_confirmation_visit(
             department="cardiology",
             confirmation_token=f"confirm-token-{suffix}",
             confirmation_channel="telegram",
-            confirmation_expires_at=datetime.utcnow() + timedelta(hours=2),
+            confirmation_expires_at=datetime.now(UTC) + timedelta(hours=2),
+            confirmation_context_epoch=1,
         )
-        session.add(visit)
+        service = Service(
+            code=f"SYNTH-CONF-{suffix}", name="SYNTHETIC consultation", price=Decimal("10.00"),
+            active=True, queue_tag="cardiology_common",
+        )
+        session.add_all([visit, service])
+        session.flush()
+        session.add(VisitService(
+            visit_id=visit.id, service_id=service.id, name=service.name,
+            code=service.code, qty=1, price=service.price, currency="UZS",
+        ))
         session.commit()
         session.refresh(visit)
         chat_id = 900000000000 + visit.id
@@ -224,9 +236,9 @@ def test_parallel_telegram_confirmation_claim_allows_only_one_mutation(test_db):
                 )
                 with lock:
                     successes.append(int(result["visit_id"]))
-            except VisitConfirmationDomainError:
+            except VisitConfirmationDomainError as exc:
                 with lock:
-                    failures.append(1)
+                    failures.append(exc.status_code)
         finally:
             session.close()
 
@@ -246,7 +258,7 @@ def test_parallel_telegram_confirmation_claim_allows_only_one_mutation(test_db):
                 .all()
             )
             assert successes == [visit_id]
-            assert failures == [1]
+            assert failures == [404]
             assert visit.status == "open"
             assert len(entries) == 1
             assert entries[0].source == "confirmation"
