@@ -209,6 +209,27 @@ def create_patient(
     )
 
 
+def can_replay_patient_creation(
+    db: Session, *, record_id: int, response_body: bytes, actor: User, request: Request,
+) -> bool:
+    if not actor.is_superuser and normalize_role_value(actor.role) not in {"admin", "registrar"}:
+        return False
+    patient = db.get(Patient, record_id)
+    if patient is None or patient.is_deleted is not False:
+        return False
+
+    current_body = patient_schemas.Patient.model_validate(patient).model_dump_json(by_alias=True).encode()
+    if current_body != response_body:
+        return False
+
+    log_patient_access(
+        db, actor_user=actor, subject_patient_id=patient.id,
+        resource_type="patient", resource_id=str(patient.id), action="view",
+        request=request, extra_data={"operation": "patient_create_replay"},
+    )
+    return True
+
+
 @router.get("/deleted", response_model=list[patient_schemas.Patient])
 def get_deleted_patients(
     *,

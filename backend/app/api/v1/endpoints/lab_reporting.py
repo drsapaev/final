@@ -604,13 +604,13 @@ def create_lab_report_instance(
 
 
 def can_replay_lab_report_creation(
-    db: Session, *, instance_id: int, response_body: bytes, actor: User, request: Request,
+    db: Session, *, record_id: int, response_body: bytes, actor: User, request: Request,
 ) -> bool:
     if not actor.is_superuser and normalize_role_value(actor.role) not in {"admin", "lab"}:
         return False
 
     service = LabReportingService(db)
-    instance = service.repository.get_instance(instance_id)
+    instance = service.repository.get_instance(record_id)
     if instance is None or db.query(Patient.id).filter(
         Patient.id == instance.patient_id, Patient.is_deleted.is_(False),
     ).first() is None:

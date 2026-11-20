@@ -9,13 +9,15 @@ This PR adds all 3.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
 
 from app.core.security import get_password_hash
 from app.models.clinic import Doctor
+from app.models.patient import Patient
+from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.user import User
 
 
@@ -151,10 +153,9 @@ def test_mobile_attest_ios_returns_200(client, db_session):
     assert "status" in body
 
 
-def test_idempotency_key_prevents_duplicate_post(client, db_session):
-    """POST with same Idempotency-Key should return cached response, not create duplicate."""
-    from app.models.patient import Patient
-
+@pytest.mark.parametrize("change", ("data_changed", "record_deleted", "role_removed"))
+def test_idempotency_key_prevents_duplicate_post(client, db_session, change):
+    """A retry returns one current receipt and refuses it after authority or data changes."""
     user = _make_patient_user(db_session)
     # Make user a registrar so they can create patients
     user.role = "Registrar"
@@ -171,16 +172,30 @@ def test_idempotency_key_prevents_duplicate_post(client, db_session):
     idem_key = f"idem-{_suffix()}"
     headers_with_key = {**headers, "Idempotency-Key": idem_key}
 
-    # First request — creates patient
     r1 = client.post("/api/v1/patients/", json=patient_data, headers=headers_with_key)
-    assert r1.status_code in (200, 201), r1.text
+    assert r1.status_code == 200, r1.text
+    patient_id = r1.json()["id"]
 
-    # Second request with same Idempotency-Key — should return cached response
     r2 = client.post("/api/v1/patients/", json=patient_data, headers=headers_with_key)
-    assert r2.status_code in (200, 201), r2.text
+    assert r2.status_code == 200, r2.text
+    assert r2.content == r1.content
+    audit = db_session.query(PatientAccessAuditLog).filter_by(
+        subject_patient_id=patient_id, actor_staff_user_id=user.id,
+        resource_type="patient", resource_id=str(patient_id), action="view",
+    ).one()
+    assert audit.outcome == "success"
 
-    # Both responses should have the same patient id (idempotent)
-    if r1.status_code == 200 and r2.status_code == 200:
-        id1 = r1.json().get("id")
-        id2 = r2.json().get("id")
-        assert id1 == id2, "Idempotency-Key should prevent duplicate creation"
+    patient = db_session.get(Patient, patient_id)
+    if change == "data_changed":
+        patient.address = "SYNTHETIC UPDATED ADDRESS"
+    elif change == "record_deleted":
+        patient.is_deleted = True
+    else:
+        user.role = "Lab"
+    db_session.commit()
+
+    refused = client.post("/api/v1/patients/", json=patient_data, headers=headers_with_key)
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "idempotency_reconciliation_required"
+    assert "phone" not in refused.json()
+    assert db_session.query(Patient.id).filter_by(phone=patient.phone).all() == [(patient_id,)]
