@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../../contexts/ThemeContext';
 import { useRegistrarActions } from '../../../pages/registrar/useRegistrarActions';
@@ -102,7 +104,12 @@ function Worklist({ rows }: { rows: Record<string, unknown>[] }) {
   );
 }
 
-const renderWorklist = (rows: Record<string, unknown>[]) => render(<Worklist rows={rows} />, { wrapper: ThemeProvider });
+function WorklistProviders({ children }: { children: ReactNode }) {
+  return <MemoryRouter><ThemeProvider>{children}</ThemeProvider></MemoryRouter>;
+}
+
+const renderWorklist = (rows: Record<string, unknown>[]) =>
+  render(<Worklist rows={rows} />, { wrapper: WorklistProviders });
 const action = (name: string) => screen.getByRole('button', { name });
 const fillReason = () => fireEvent.change(screen.getByLabelText('misc.cd_prichina_otmeny_zapisi'), {
   target: { value: reason },
