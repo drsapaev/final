@@ -36,14 +36,16 @@ def _gross_payment_report(
         PaymentVisit.payment_id == Payment.id
     ).scalar_subquery()
     verified_department = and_(Visit.id.is_not(None), ~mismatched_link, link_count <= 1)
+    # Match the receipt timestamp, including the fallback for historical payments.
+    posted_at = func.coalesce(Payment.paid_at, Payment.created_at)
     query = db.query(
         Payment.amount, Payment.currency, Payment.provider, Payment.method,
-        Payment.created_at, Payment.visit_id, Visit.department,
+        posted_at.label("posted_at"), Payment.visit_id, Visit.department,
         verified_department.label("verified_department"),
     ).outerjoin(Visit, Visit.id == Payment.visit_id).filter(
         Payment.status.in_(("paid", "completed")),
-        Payment.created_at >= start_date,
-        Payment.created_at <= end_date,
+        posted_at >= start_date,
+        posted_at <= end_date,
     )
     if department:
         query = query.filter(Visit.department == department)
@@ -313,7 +315,7 @@ class AnalyticsService:
         providers = defaultdict(lambda: _ZERO)
         methods = defaultdict(lambda: _ZERO)
         for payment in payments:
-            daily[payment.created_at.date().isoformat()] += payment.amount
+            daily[payment.posted_at.date().isoformat()] += payment.amount
             methods[payment.method or "unknown"] += payment.amount
             if payment.provider:
                 providers[payment.provider] += payment.amount
@@ -578,10 +580,10 @@ class AnalyticsService:
         payments, _ = _gross_payment_report(db, windows[0], windows[-1], None)
         totals = [_ZERO] * days
         for payment in payments:
-            created_at = payment.created_at
-            if created_at.tzinfo is None:
-                created_at = created_at.replace(tzinfo=UTC)
-            index = bisect_right(windows, created_at) - 1
+            posted_at = payment.posted_at
+            if posted_at.tzinfo is None:
+                posted_at = posted_at.replace(tzinfo=UTC)
+            index = bisect_right(windows, posted_at) - 1
             if 0 <= index < days:
                 totals[index] += payment.amount
         revenue_trend = [
@@ -820,7 +822,7 @@ class AnalyticsService:
         department_amounts = defaultdict(lambda: _ZERO)
         department_visits = defaultdict(set)
         for payment in payments:
-            daily[payment.created_at.date().isoformat()] += payment.amount
+            daily[payment.posted_at.date().isoformat()] += payment.amount
             if payment.provider:
                 provider_amounts[payment.provider] += payment.amount
                 provider_counts[payment.provider] += 1

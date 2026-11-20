@@ -398,7 +398,7 @@ class PaymentsMixin(BillingServiceMixinBase):
 
         # Устанавливаем paid_at если статус "paid"
         if new_status_lower == "paid" and not payment.paid_at:
-            payment.paid_at = self._get_local_timestamp_naive()
+            payment.paid_at = datetime.now(UTC)
 
         # Обновляем метаданные если переданы
         if meta:

@@ -13,6 +13,8 @@ from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.analytics import AnalyticsService
+from app.services.billing_service import BillingService
+from app.services.billing_service_pkg import _payments as billing_payments
 from app.services.queue_service import queue_service
 
 
@@ -162,6 +164,125 @@ def test_revenue_counts_settled_payments_once_and_keeps_currencies_separate(
     summary = providers.json()["summary"]
     assert summary["total_transactions"] == 1
     assert summary["total_revenue"] == 44.25
+
+
+def test_revenue_groups_payments_by_posting_day(
+    client: TestClient,
+    admin_token: str,
+    db_session,
+    test_patient,
+    monkeypatch,
+) -> None:
+    posting_day = datetime(2034, 7, 12, tzinfo=UTC)
+    order_day = posting_day - timedelta(days=1)
+    visit = Visit(
+        patient_id=test_patient.id, visit_date=order_day.date(), department="cardiology"
+    )
+    db_session.add(visit)
+    db_session.flush()
+    db_session.add_all(
+        [
+            Payment(
+                visit_id=visit.id,
+                amount=Decimal("60.25"),
+                currency="UZS",
+                status="paid",
+                method="click",
+                provider="click",
+                created_at=order_day + timedelta(hours=10),
+                paid_at=posting_day + timedelta(hours=11),
+            ),
+            Payment(
+                visit_id=visit.id,
+                amount=Decimal("5.00"),
+                currency="UZS",
+                status="paid",
+                method="cash",
+                created_at=order_day + timedelta(hours=10),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/analytics/revenue-breakdown",
+        headers=_auth_headers(admin_token),
+        params={
+            "start_date": order_day.date().isoformat(),
+            "end_date": posting_day.date().isoformat(),
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["daily_revenue"] == [
+        {"date": order_day.date().isoformat(), "amount": 5.00},
+        {"date": posting_day.date().isoformat(), "amount": 60.25},
+    ]
+
+    on_posting_day = AnalyticsService.calculate_revenue(
+        db_session,
+        posting_day,
+        posting_day + timedelta(hours=23),
+    )
+    assert on_posting_day["total_revenue"] == 60.25
+    assert on_posting_day["by_provider"] == {"click": 60.25}
+
+    monkeypatch.setattr(
+        queue_service, "get_local_timestamp", lambda db: posting_day + timedelta(days=1)
+    )
+    response = client.get(
+        "/api/v1/analytics/trends",
+        headers=_auth_headers(admin_token),
+        params={"days": 2},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["revenue_trend"] == [
+        {"date": order_day.date().isoformat(), "revenue": 5.00},
+        {"date": posting_day.date().isoformat(), "revenue": 60.25},
+    ]
+
+
+def test_payment_confirmation_records_an_absolute_utc_time(
+    db_session, test_patient, monkeypatch
+) -> None:
+    confirmed_at = datetime(2034, 7, 12, 6, 30, tzinfo=UTC)
+    clock_time = confirmed_at
+
+    class ConfirmationClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock_time.astimezone(tz)
+
+    monkeypatch.setattr(billing_payments, "datetime", ConfirmationClock)
+    monkeypatch.setattr(
+        BillingService,
+        "_get_local_timestamp_naive",
+        lambda self: confirmed_at.replace(tzinfo=None) + timedelta(hours=5),
+    )
+    visit = Visit(
+        patient_id=test_patient.id,
+        visit_date=confirmed_at.date(),
+        department="cardiology",
+    )
+    db_session.add(visit)
+    db_session.flush()
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("32.00"),
+        currency="UZS",
+        status="pending",
+        method="click",
+    )
+    db_session.add(payment)
+    db_session.flush()
+
+    service = BillingService(db_session)
+    settled = service.update_payment_status(payment.id, "paid", commit=False)
+    assert settled.paid_at == confirmed_at
+    clock_time += timedelta(days=1)
+    assert (
+        service.update_payment_status(payment.id, "paid", commit=False).paid_at
+        == confirmed_at
+    )
 
 
 def test_predictive_endpoint_returns_flat_forecasts(
