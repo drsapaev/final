@@ -85,7 +85,7 @@ def _candidate_admin_urls() -> list[str]:
     """Admin DSNs for scratch provisioning — LOCAL servers only."""
     urls: list[str] = []
     explicit = os.getenv("RQ13B_PG_ADMIN_URL", "").strip()
-    if explicit:
+    if is_local_admin_dsn(explicit):
         urls.append(explicit)
     local_pw = os.getenv("LOCAL_PG_SUPERUSER_PASSWORD", "").strip()
     if local_pw:
@@ -594,7 +594,9 @@ def test_0067_backfills_owner_values_and_reversible(pg_session, pg_engine):
     pg_session.close()
 
     env = dict(os.environ, TESTING="1")
-    env["DATABASE_URL"] = str(pg_engine.url)
+    # SQLAlchemy masks the password in str(url). Only the child process
+    # receives the unchanged connection string for the disposable fixture.
+    env["DATABASE_URL"] = pg_engine.url.render_as_string(hide_password=False)
 
     def _alembic(*args: str) -> None:
         r = subprocess.run(
@@ -604,7 +606,8 @@ def test_0067_backfills_owner_values_and_reversible(pg_session, pg_engine):
             cwd=str(BACKEND_DIR),
             env=env,
         )
-        assert r.returncode == 0, r.stderr[-1500:]
+        stderr = r.stderr.replace(env["DATABASE_URL"], str(pg_engine.url))
+        assert r.returncode == 0, stderr[-1500:]
 
     _alembic("downgrade", "0066")
     _alembic("upgrade", "head")
