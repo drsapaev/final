@@ -3,7 +3,7 @@ import { api } from '../api/client';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import type { AsyncState } from '../types/async-state';
-import type { components } from '../types/generated/api';
+import type { components } from '../types/api';
 import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 const formatPaymentError = (err: unknown, fallbackMessage: string): string =>

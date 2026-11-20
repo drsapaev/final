@@ -21,7 +21,7 @@ interface Props {
   onClose: () => void;
 }
 
-export default function AllFreeInvitationDialog({ review, onClose }: Props) {
+export default function AllFreeInvitationReview({ review, onClose }: Props) {
   const { t, language } = useTranslation();
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);

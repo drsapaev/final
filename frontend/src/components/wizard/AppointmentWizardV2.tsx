@@ -61,53 +61,12 @@ import type { CartService } from './CartStepV2';
 // PR-45 / High-15: extracted sub-components to reduce god component size
 import EditModeBanner from './EditModeBanner';
 import StepProgressIndicator from './StepProgressIndicator';
+import type { CartItem, DoctorData, PatientRecord, RepeatCandidate, VisitGroup, VisitServiceItem } from './wizardTypes';
 import { getErrorMessage } from '../../utils/type-guards';
 
 // ============================================================================
 // Type definitions (TypeScript strict-mode migration)
 // ============================================================================
-
-interface CartItem {
-  id?: string | number;
-  service_id?: string | number;
-  service_name?: string;
-  service_price?: number;
-  doctor_id?: string | number | null;
-  doctor_name?: string;
-  notes?: string;
-  _temp_name?: string;
-  _temp_price?: number;
-  quantity?: number;
-  visit_date?: string;
-  visit_time?: string | null;
-  original_queue_id?: string | number;
-  service_code?: string;
-  name?: string;
-  _source?: string;
-  code?: string;
-  [k: string]: unknown;
-}
-
-interface PatientRecord {
-  id?: string | number;
-  phone?: string;
-  fio?: string;
-  last_name?: string;
-  first_name?: string;
-  middle_name?: string;
-  gender?: string;
-  birth_date?: string;
-  [k: string]: unknown;
-}
-
-interface DoctorData {
-  id?: string | number;
-  name?: string;
-  full_name?: string;
-  specialty?: string;
-  department?: string;
-  [k: string]: unknown;
-}
 
 interface WizardProps {
   isOpen?: boolean;
@@ -134,35 +93,6 @@ interface WizardAction {
   loading?: boolean;
   icon?: React.ReactNode;
   [k: string]: unknown;
-}
-
-interface VisitServiceItem {
-  service_id?: string | number;
-  service_name?: string;
-  service_price?: number;
-  quantity?: number | string;
-  original_queue_id?: string | number;
-  service_code?: string;
-  name?: string;
-  _source?: string;
-  [k: string]: unknown;
-}
-
-interface VisitGroup {
-  doctor_id?: string | number | null;
-  services: VisitServiceItem[];
-  visit_date?: string;
-  visit_time?: string | null;
-  department?: string;
-  notes?: string | null;
-  [k: string]: unknown;
-}
-
-interface RepeatCandidate {
-  candidate_key: string;
-  doctor_id?: string | number;
-  service_id?: string | number;
-  visit_date: string;
 }
 
 // UX Audit Stage 3 (Wizard issue 5.1):

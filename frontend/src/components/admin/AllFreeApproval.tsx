@@ -28,7 +28,7 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
 import { getErrorMessage } from '../../utils/type-guards';
-import AllFreeInvitationDialog, { type InvitationReview } from './AllFreeInvitationDialog';
+import AllFreeInvitationReview, { type InvitationReview } from './AllFreeInvitationReview';
 
 const ALL_FREE_ACTION_CAN_FIELD: Record<string, string> = {
   approve: 'can_approve',
@@ -516,7 +516,7 @@ const AllFreeApproval = () => {
         }
 
         {invitationReview && (
-          <AllFreeInvitationDialog review={invitationReview} onClose={() => {
+          <AllFreeInvitationReview review={invitationReview} onClose={() => {
             setInvitationReview(null);
             void loadAllFreeRequests();
           }} />

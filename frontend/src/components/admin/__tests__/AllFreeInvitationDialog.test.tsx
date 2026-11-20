@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '../../../api/client';
-import AllFreeInvitationDialog, { type InvitationReview } from '../AllFreeInvitationDialog';
+import AllFreeInvitationReview, { type InvitationReview } from '../AllFreeInvitationReview';
 
 vi.mock('../../../api/client', () => ({ api: { post: vi.fn() } }));
 vi.mock('../../../i18n/useTranslation', () => ({
@@ -28,7 +28,7 @@ describe('All Free invitation task', () => {
 
   it('renders the server review and stages only the explicit protected inbox action', async () => {
     vi.mocked(api.post).mockResolvedValueOnce({ data: { state: 'pending' } });
-    render(<AllFreeInvitationDialog review={review} onClose={vi.fn()} />);
+    render(<AllFreeInvitationReview review={review} onClose={vi.fn()} />);
     expect(screen.getByRole('dialog').textContent).toContain('21.50 USD');
     expect(screen.getByRole('dialog').textContent).not.toContain(review.token);
     expect(api.post).not.toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe('All Free invitation task', () => {
     vi.mocked(api.post)
       .mockRejectedValueOnce(new Error('SYNTHETIC lost response'))
       .mockResolvedValueOnce({ data: { state: 'unknown' } });
-    render(<AllFreeInvitationDialog review={review} onClose={vi.fn()} />);
+    render(<AllFreeInvitationReview review={review} onClose={vi.fn()} />);
     const submit = () => fireEvent.click(screen.getByRole('button', { name: 'admin2.af_invitation_submit' }));
 
     submit();
