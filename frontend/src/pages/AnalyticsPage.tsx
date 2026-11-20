@@ -135,9 +135,9 @@ interface ProvidersData {
     active_providers?: number;
     total_transactions?: number;
     total_revenue?: number;
-    total_commission?: number;
+    total_commission?: number | null;
   };
-  providers?: Record<string, { name?: string; total_amount?: number; success_rate?: number }>;
+  providers?: Record<string, { name?: string; total_amount?: number; success_rate?: number | null }>;
 }
 
 interface AnalyticsDataState {
@@ -861,24 +861,31 @@ export default function AnalyticsPage() {
       accent: 'var(--mac-accent-purple)',
       format: 'revenue',
       icon: <DollarSign size={18} />
-    },
-    {
-      label: t('misc.an_prov_metric_commission'),
-      value: summary.total_commission || 0,
-      helper: t('misc.an_prov_helper_costs'),
-      accent: 'var(--mac-warning)',
-      format: 'revenue',
-      icon: <Wallet size={18} />
     }];
+
+    const commission = summary.total_commission;
+    if (typeof commission === 'number' && Number.isFinite(commission)) {
+      metrics.push({
+        label: t('misc.an_prov_metric_commission'),
+        value: commission,
+        helper: t('misc.an_prov_helper_costs'),
+        accent: 'var(--mac-warning)',
+        format: 'revenue',
+        icon: <Wallet size={18} />,
+      });
+    }
 
     const providerAmount = normalizePairs(providers, (_: string, stats: unknown) => ({
       label: (stats as { name?: string } | undefined)?.name || t('misc.an_prov_no_name'),
       value: (stats as { total_amount?: number } | undefined)?.total_amount || 0
     }));
-    const providerSuccess = normalizePairs(providers, (_: string, stats: unknown) => ({
-      label: (stats as { name?: string } | undefined)?.name || t('misc.an_prov_no_name'),
-      value: (stats as { success_rate?: number } | undefined)?.success_rate || 0
-    }));
+    const providerSuccess = Object.values(providers).flatMap((stats) => {
+      const rate = stats?.success_rate;
+      if (typeof rate !== 'number' || !Number.isFinite(rate)) {
+        return [];
+      }
+      return [{ label: stats.name || t('misc.an_prov_no_name'), value: rate }];
+    });
 
 
     return (

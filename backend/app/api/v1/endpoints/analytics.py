@@ -45,6 +45,7 @@ def _build_payment_provider_payload(
     )
     provider_totals = revenue_breakdown["provider_totals"]
 
+    # Settled payments alone provide neither the attempt count nor verified commissions.
     providers = {}
     for provider_code, stats in revenue_breakdown.get("provider_breakdown", {}).items():
         providers[provider_code] = {
@@ -52,7 +53,7 @@ def _build_payment_provider_payload(
             "count": stats.get("count", 0),
             "total_amount": stats.get("total_amount", 0),
             "average_amount": stats.get("average_amount", 0),
-            "success_rate": 100.0 if stats.get("count", 0) > 0 else 0.0,
+            "success_rate": None,
         }
 
     return {
@@ -62,7 +63,7 @@ def _build_payment_provider_payload(
             "active_providers": sum(1 for stats in providers.values() if stats["count"]),
             "total_transactions": provider_totals["total_transactions"],
             "total_revenue": provider_totals["total_revenue"],
-            "total_commission": 0,
+            "total_commission": None,
         },
         "period": revenue_breakdown.get("period", {}),
     }

@@ -161,9 +161,12 @@ def test_revenue_counts_settled_payments_once_and_keeps_currencies_separate(
         params={"start_date": "2032-06-07", "end_date": "2032-06-07", "department": "cardiology"},
     )
     assert providers.status_code == 200, providers.text
-    summary = providers.json()["summary"]
+    provider_report = providers.json()
+    summary = provider_report["summary"]
     assert summary["total_transactions"] == 1
     assert summary["total_revenue"] == 44.25
+    assert summary["total_commission"] is None
+    assert provider_report["providers"]["click"]["success_rate"] is None
 
 
 def test_revenue_groups_payments_by_posting_day(
