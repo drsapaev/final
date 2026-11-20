@@ -217,10 +217,10 @@ def log_patient_access(
             pass
         logger.warning(
             "Failed to write patient access audit log "
-            "(resource_type=%s, action=%s): %s",
+            "(resource_type=%s, action=%s, error_type=%s)",
             resource_type,
             action,
-            exc,
+            type(exc).__name__,
         )
 
 
@@ -276,9 +276,9 @@ def log_patient_access_many(
             pass
         logger.warning(
             "Failed to write batched patient access audit logs "
-            "(resource_type=%s, action=%s, subjects=%s): %s",
+            "(resource_type=%s, action=%s, subjects=%s, error_type=%s)",
             resource_type,
             action,
             len(resource_entries or subject_patient_ids or []),
-            exc,
+            type(exc).__name__,
         )

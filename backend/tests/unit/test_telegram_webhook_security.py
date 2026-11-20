@@ -1728,8 +1728,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 101,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7001},
-                "from": {"id": 111},
+                "chat": {"id": 7001, "type": "private"},
+                "from": {"id": 7001},
                 "contact": {
                     "user_id": 222,
                     "phone_number": "+998900000121",
@@ -1836,8 +1836,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 102,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7006},
-                "from": {"id": 111, "language_code": "uz"},
+                "chat": {"id": 7006, "type": "private"},
+                "from": {"id": 7006, "language_code": "uz"},
                 "text": "🇺🇿 O'zbekcha",
             },
         }
@@ -1878,7 +1878,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 119,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7018},
+                "chat": {"id": 7018, "type": "private"},
                 "from": {"id": 7018, "username": "first_start"},
                 "text": "/start",
             },
@@ -1919,8 +1919,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 120,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7020},
-                "from": {"id": 111, "language_code": "ru"},
+                "chat": {"id": 7020, "type": "private"},
+                "from": {"id": 7020, "language_code": "ru"},
                 "text": "O'zbekcha",
             },
         }
@@ -1951,8 +1951,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 121,
             "message": {
                 "message_id": 2,
-                "chat": {"id": 7020},
-                "from": {"id": 111, "language_code": "ru"},
+                "chat": {"id": 7020, "type": "private"},
+                "from": {"id": 7020, "language_code": "ru"},
                 "text": "Yordam",
             },
         }
@@ -1990,8 +1990,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 126,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7026},
-                "from": {"id": 111, "language_code": "uz"},
+                "chat": {"id": 7026, "type": "private"},
+                "from": {"id": 7026, "language_code": "uz"},
                 "text": "/menu",
             },
         }
@@ -2046,8 +2046,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 122,
             "message": {
                 "message_id": 3,
-                "chat": {"id": 7021},
-                "from": {"id": 111, "language_code": "ru"},
+                "chat": {"id": 7021, "type": "private"},
+                "from": {"id": 7021, "language_code": "ru"},
                 "text": "O'zbekcha",
             },
         }
@@ -2098,8 +2098,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 109,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7015},
-                "from": {"id": 111, "language_code": "uz"},
+                "chat": {"id": 7015, "type": "private"},
+                "from": {"id": 7015, "language_code": "uz"},
                 "text": "🇷🇺 Русский",
             },
         }
@@ -2138,8 +2138,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 103,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7007},
-                "from": {"id": 111},
+                "chat": {"id": 7007, "type": "private"},
+                "from": {"id": 7007},
                 "text": "🔔 Xabarnomalarga roziman",
             },
         }
@@ -2177,8 +2177,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 104,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7008},
-                "from": {"id": 111},
+                "chat": {"id": 7008, "type": "private"},
+                "from": {"id": 7008},
                 "text": "Без уведомлений",
             },
         }
@@ -2225,8 +2225,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 123,
             "message": {
                 "message_id": 4,
-                "chat": {"id": 7022},
-                "from": {"id": 111},
+                "chat": {"id": 7022, "type": "private"},
+                "from": {"id": 7022},
                 "text": "Без уведомлений",
             },
         }
@@ -2282,8 +2282,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 105,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7009},
-                "from": {"id": 111},
+                "chat": {"id": 7009, "type": "private"},
+                "from": {"id": 7009},
                 "text": "/settings",
             },
         }
@@ -2324,8 +2324,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 125,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7019},
-                "from": {"id": 111},
+                "chat": {"id": 7019, "type": "private"},
+                "from": {"id": 7019},
                 "text": "/support",
             },
         }
@@ -2368,8 +2368,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 126,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7022},
-                "from": {"id": 111},
+                "chat": {"id": 7022, "type": "private"},
+                "from": {"id": 7022},
                 "text": "/book",
             },
         }
@@ -2478,8 +2478,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": update_id,
             "message": {
                 "message_id": 1,
-                "chat": {"id": chat_id},
-                "from": {"id": 111},
+                "chat": {"id": chat_id, "type": "private"},
+                "from": {"id": chat_id},
                 "text": command,
             },
         }
@@ -2580,8 +2580,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": update_id,
             "message": {
                 "message_id": 1,
-                "chat": {"id": chat_id},
-                "from": {"id": 111},
+                "chat": {"id": chat_id, "type": "private"},
+                "from": {"id": chat_id},
                 "text": command,
             },
         }
@@ -2625,8 +2625,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 127,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7030},
-                "from": {"id": 111},
+                "chat": {"id": 7030, "type": "private"},
+                "from": {"id": 7030},
                 "text": "/book",
             },
         }
@@ -2718,8 +2718,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": update_id,
             "message": {
                 "message_id": 1,
-                "chat": {"id": chat_id},
-                "from": {"id": 111},
+                "chat": {"id": chat_id, "type": "private"},
+                "from": {"id": chat_id},
                 "text": command,
             },
         }
@@ -2791,7 +2791,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 106,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7010},
+                "chat": {"id": 7010, "type": "private"},
                 "from": {
                     "id": 7010,
                     "username": "staff_chat",
@@ -2865,7 +2865,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 107,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7011},
+                "chat": {"id": 7011, "type": "private"},
                 "from": {"id": 7011, "first_name": "Staff"},
                 "text": f"/start {token}",
             },
@@ -2909,7 +2909,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 109,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7013},
+                "chat": {"id": 7013, "type": "private"},
                 "from": {"id": 7013, "first_name": "Staff"},
                 "text": "/start stl_invalid",
             },
@@ -2949,7 +2949,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 110,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7012},
+                "chat": {"id": 7012, "type": "private"},
                 "from": {"id": 7012},
                 "text": "/start stl_test",
             },
@@ -2994,7 +2994,7 @@ class TestMiniAppClinicCalendarDateValidation:
         fake_service = FakeTelegramBotService(active=True)
         message = {
             "message_id": 1,
-            "chat": {"id": 7024},
+            "chat": {"id": 7024, "type": "private"},
             "from": {"id": 7024, "language_code": "ru"},
             "contact": {
                 "user_id": 7024,
@@ -3036,7 +3036,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 128,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7025},
+                "chat": {"id": 7025, "type": "private"},
                 "from": {"id": 7025, "language_code": "uz"},
                 "text": f"/start {telegram_webhook.TELEGRAM_TICKET_QR_PREFIX}_abc",
             },
@@ -3074,7 +3074,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 129,
             "message": {
                 "message_id": 1,
-                "chat": {"id": chat_id},
+                "chat": {"id": chat_id, "type": "private"},
                 "from": {"id": chat_id, "language_code": "ru"},
                 "text": "/start",
             },
@@ -3096,7 +3096,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 130,
             "message": {
                 "message_id": 2,
-                "chat": {"id": chat_id},
+                "chat": {"id": chat_id, "type": "private"},
                 "from": {"id": chat_id, "language_code": "ru"},
                 "text": "O'zbekcha",
             },
@@ -3126,7 +3126,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 131,
             "message": {
                 "message_id": 3,
-                "chat": {"id": chat_id},
+                "chat": {"id": chat_id, "type": "private"},
                 "from": {"id": chat_id, "language_code": "uz"},
                 "contact": {
                     "user_id": chat_id,
@@ -3159,7 +3159,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 132,
             "message": {
                 "message_id": 4,
-                "chat": {"id": chat_id},
+                "chat": {"id": chat_id, "type": "private"},
                 "from": {"id": chat_id, "language_code": "uz"},
                 "text": "Xabarnomalarga roziman",
             },
@@ -3318,8 +3318,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 122,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7022},
-                "from": {"id": 111},
+                "chat": {"id": 7022, "type": "private"},
+                "from": {"id": 7022},
                 "text": "/profile",
             },
         }
@@ -3429,8 +3429,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 124,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7024},
-                "from": {"id": 111},
+                "chat": {"id": 7024, "type": "private"},
+                "from": {"id": 7024},
                 "text": "/payments",
             },
         }

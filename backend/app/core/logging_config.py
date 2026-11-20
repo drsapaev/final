@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import re
 import sys
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any
 
@@ -156,6 +159,89 @@ class PIIMaskingFilter(logging.Filter):
         return True  # always allow the record through
 
 
+
+_sms_transport_active: ContextVar[bool] = ContextVar("sms_transport_active", default=False)
+_click_transport_active: ContextVar[bool] = ContextVar("click_transport_active", default=False)
+_telegram_preview_active: ContextVar[bool] = ContextVar("telegram_preview_active", default=False)
+
+
+@contextmanager
+def protect_telegram_preview_logs():
+    """Redact scoped provider transport logs containing preview capabilities.
+
+    Independent handlers and external instrumentation require operator review.
+    """
+    token = _telegram_preview_active.set(True)
+    try:
+        yield
+    finally:
+        _telegram_preview_active.reset(token)
+
+
+@contextmanager
+def protect_click_transport_logs():
+    """Redact only this Click call on the configured application handler.
+
+    Independently configured child handlers and external HTTP instrumentation
+    are outside this handler's control and require deployment review.
+    """
+    token = _click_transport_active.set(True)
+    try:
+        yield
+    finally:
+        _click_transport_active.reset(token)
+
+
+def protect_sms_transport_logs(function):
+    """Scope SMS transport logging; independently configured handlers are external."""
+    @functools.wraps(function)
+    async def wrapped(*args, **kwargs):
+        token = _sms_transport_active.set(True)
+        try:
+            return await function(*args, **kwargs)
+        finally:
+            _sms_transport_active.reset(token)
+    return wrapped
+
+
+class _SensitiveTransportFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if _telegram_preview_active.get() and record.name.split(".", 1)[0] in {
+            "httpx", "httpcore", "aiohttp", "aiogram"
+        }:
+            record.msg = "Telegram preview transport event"
+            record.args = ()
+            record.exc_info = None
+            record.exc_text = None
+            record.stack_info = None
+            for field in _STRUCTURED_FIELDS:
+                if hasattr(record, field):
+                    setattr(record, field, None)
+            return True
+        if _click_transport_active.get() and (
+            record.name == "httpx" or record.name.startswith("httpx.")
+            or record.name == "httpcore" or record.name.startswith("httpcore.")
+        ):
+            # httpx INFO includes the full request URL. httpcore traces can
+            # contain exception details or response headers. Keep severity and
+            # logger identity without exposing order/payment IDs or Auth.
+            record.msg = "Click provider transport event"
+            record.args = ()
+            record.exc_info = None
+            record.exc_text = None
+            record.stack_info = None
+            for field in _STRUCTURED_FIELDS:
+                if hasattr(record, field):
+                    setattr(record, field, None)
+            return True
+        # httpcore DEBUG includes repr(exception), potentially containing a
+        # complete outbound SMS. Restrict only this task and transport.
+        return not (
+            _sms_transport_active.get()
+            and record.levelno == logging.DEBUG
+            and (record.name == "httpcore" or record.name.startswith("httpcore."))
+        )
+
 def setup_logging(
     level: int = logging.INFO,
     *,
@@ -184,6 +270,7 @@ def setup_logging(
             date_format = "%Y-%m-%d %H:%M:%S"
         handler.setFormatter(logging.Formatter(format_string, datefmt=date_format))
 
+    handler.addFilter(_SensitiveTransportFilter())
     if enable_pii_masking:
         handler.addFilter(PIIMaskingFilter())
 

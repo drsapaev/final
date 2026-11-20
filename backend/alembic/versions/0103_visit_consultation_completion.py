@@ -176,9 +176,7 @@ def _pg_allocator_preflight(*, require_complete: bool = False) -> tuple[str, str
     return qualified, owner["rolname"], sequence_users
 
 
-def upgrade() -> None:
-    if op.get_context().as_sql:
-        raise RuntimeError("Repeat evidence migration requires a live database preflight")
+def _upgrade() -> None:
     dialect = op.get_context().dialect.name
     if dialect == "postgresql":
         sequence, schema_owner, sequence_users = _pg_allocator_preflight()
@@ -493,9 +491,7 @@ def upgrade() -> None:
             """)
 
 
-def downgrade() -> None:
-    if op.get_context().as_sql:
-        raise RuntimeError("Repeat evidence migration requires a live database preflight")
+def _downgrade() -> None:
     dialect = op.get_context().dialect.name
     if dialect == "postgresql":
         # Apply the same trusted namespace, owner, ACL and retained-allocator
@@ -556,3 +552,49 @@ def downgrade() -> None:
     op.drop_column("visits", "repeat_proof_generation")
     op.drop_column("visits", "repeat_evidence_generation")
     op.drop_column("doctors", "repeat_owner_generation")
+
+
+def _run_with_restored_pg_settings(operation) -> None:
+    """Keep the allocator's trusted settings inside this revision only.
+
+    A PostgreSQL statement error aborts the transaction; in that case the
+    required rollback also restores the settings and the original exception
+    must remain visible to Alembic.
+    """
+    if op.get_context().dialect.name != "postgresql":
+        operation()
+        return
+    db = op.get_bind()
+    original = db.execute(sa.text("""
+        SELECT pg_catalog.current_setting('search_path'),
+               pg_catalog.current_setting('row_security')
+    """)).one()
+
+    def restore() -> None:
+        db.execute(sa.text("""
+            SELECT pg_catalog.set_config('search_path', :path, true),
+                   pg_catalog.set_config('row_security', :rls, true)
+        """), {"path": original[0], "rls": original[1]})
+
+    try:
+        operation()
+    except BaseException:
+        try:
+            restore()
+        except sa.exc.SQLAlchemyError:
+            # A failed or closed transaction must be rolled back by Alembic.
+            pass
+        raise
+    restore()
+
+
+def upgrade() -> None:
+    if op.get_context().as_sql:
+        raise RuntimeError("Repeat evidence migration requires a live database preflight")
+    _run_with_restored_pg_settings(_upgrade)
+
+
+def downgrade() -> None:
+    if op.get_context().as_sql:
+        raise RuntimeError("Repeat evidence migration requires a live database preflight")
+    _run_with_restored_pg_settings(_downgrade)

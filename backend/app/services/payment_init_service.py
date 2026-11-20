@@ -6,9 +6,10 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.config import settings
@@ -41,7 +42,7 @@ def _with_payment_id(url: str, payment_id: int) -> str:
 @dataclass
 class PaymentInitDomainError(Exception):
     status_code: int
-    detail: str
+    detail: Any
 
 
 class PaymentInitService:
@@ -224,6 +225,9 @@ class PaymentInitService:
         except PaymentInitDomainError:
             self.repository.rollback()
             raise
+        except HTTPException as exc:
+            self.repository.rollback()
+            raise PaymentInitDomainError(status_code=exc.status_code, detail=exc.detail) from exc
         except Exception as exc:
             self.repository.rollback()
             if payment is not None and getattr(payment, "id", None):

@@ -278,6 +278,10 @@ async def _handle_ticket_qr_start(
         return False
 
     token, message = extracted
+    from app.services.telegram_private_chat import is_private_patient_message
+
+    if not is_private_patient_message(message):
+        return True
     chat_id = (message.get("chat") or {}).get("id")
     # Резолвим ``consume_telegram_ticket_start_token`` через атрибут пакета
     # ``telegram_webhook`` во время вызова, чтобы monkeypatch-и, выполненные
@@ -520,11 +524,14 @@ def _telegram_user_for_chat(db: Session, chat_id: int) -> TelegramUser | None:
 def _patient_for_telegram_chat(
     db: Session, chat_id: int
 ) -> tuple[TelegramUser | None, Patient | None]:
+    if type(chat_id) is not int or chat_id <= 0:
+        return None, None
     telegram_user = _telegram_user_for_chat(db, chat_id)
-    if not telegram_user or not telegram_user.patient_id:
-        return telegram_user, None
-    patient = db.query(Patient).filter(Patient.id == telegram_user.patient_id).first()
-    return telegram_user, patient
+    if not telegram_user or not telegram_user.patient_id or not telegram_user.active or telegram_user.blocked:
+        return None, None
+    patient = (db.query(Patient).filter(Patient.id == telegram_user.patient_id,
+                                      Patient.is_deleted.is_not(True)).first())
+    return (telegram_user, patient) if patient is not None else (None, None)
 
 
 def _patient_today_queue_entries(
@@ -1160,6 +1167,10 @@ async def _handle_contact_link(
     if not contact:
         return False
 
+    from app.services.telegram_private_chat import is_private_patient_message
+
+    if not is_private_patient_message(message):
+        return True
     chat_id = _message_chat_id(message)
     from_user_id = (message.get("from") or {}).get("id")
     contact_user_id = contact.get("user_id")

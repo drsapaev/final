@@ -51,6 +51,7 @@ import heapq
 import hmac
 import json
 import logging
+import math
 import re
 import time
 import uuid
@@ -116,6 +117,31 @@ def _is_display_device_idempotency_exempt(method: str, path: str) -> bool:
     return normalized_path == _DISPLAY_DEVICE_TOKEN_PATH or bool(
         _DISPLAY_DEVICE_ISSUANCE_PATH.fullmatch(normalized_path)
     )
+
+# Doctor scheduling has database-backed request identity and may return a
+# confirmation bearer. The generic cache must never answer before the
+# endpoint rechecks session, patient and visit state. Pass the original key
+# through intact; this is not permission to execute without DB idempotency.
+_DOCTOR_PRICE_SCHEDULE_PATH = re.compile(r"^/api/v1/doctor/visits/schedule-next/?$")
+_DOCTOR_PRICE_ADD_PATH = re.compile(r"^/api/v1/doctor/visits/[0-9]+/add-service/?$")
+_CONFIRMATION_REISSUE_PATH = re.compile(r"^/api/v1/visits/[0-9]+/confirmation-reissue/?$")
+
+
+def _is_doctor_price_idempotency_exempt(method: str, path: str) -> bool:
+    return (method.upper() == "POST" and (
+        bool(_DOCTOR_PRICE_SCHEDULE_PATH.fullmatch(path)) or bool(_CONFIRMATION_REISSUE_PATH.fullmatch(path))
+    )) or (method.upper() == "PUT" and bool(_DOCTOR_PRICE_ADD_PATH.fullmatch(path)))
+
+
+# Provider callbacks require their own phase-aware durable idempotency. The user
+# response cache must not buffer an unbounded callback body, replay an ACK, or
+# skip provider verification on a retry carrying an unrelated bearer header.
+_PROVIDER_WEBHOOK_PATH = re.compile(r"^/api/v1/payments/webhook/(?:click|payme|kaspi)/?$")
+
+
+def _is_provider_webhook_idempotency_exempt(method: str, path: str) -> bool:
+    return method.upper() == "POST" and bool(_PROVIDER_WEBHOOK_PATH.fullmatch(path))
+
 
 # Round-6 (owner P1, PR #3340): the in-process scope-binding mirror is
 # attacker-reachable (every keyed request with a fresh key creates an entry
@@ -384,6 +410,7 @@ def _user_authorized_in_db(
     jti: Any,
     require_active_doctor_profile: bool = False,
     patient_scope_id: int | None = None,
+    patient_scope_generation: int | None = None,
     token_epoch: int = 0,
 ) -> tuple[bool, str | None, bool]:
     """Pure DB-backed authorization query — fails CLOSED (Codex R3/R4 #3092).
@@ -448,15 +475,14 @@ def _user_authorized_in_db(
         if patient_scope_id is not None:
             from app.models.patient import Patient
 
-            patient_binding = (
-                select(Patient.id)
-                .where(
-                    Patient.id == patient_scope_id,
-                    Patient.user_id == User.id,
-                    Patient.is_deleted.is_not(True),
-                )
-                .exists()
-            )
+            patient_conditions = [
+                Patient.id == patient_scope_id,
+                Patient.user_id == User.id,
+                Patient.is_deleted.is_not(True),
+            ]
+            if patient_scope_generation is not None:
+                patient_conditions.append(Patient.notification_owner_generation == patient_scope_generation)
+            patient_binding = select(Patient.id).where(*patient_conditions).exists()
             stmt = stmt.add_columns(patient_binding.label("patient_binding"))
         row = db.execute(stmt).first()
         if row is None:
@@ -473,7 +499,7 @@ def _user_authorized_in_db(
                 and (role_label or "").strip().lower() == "patient"
                 and is_superuser is False
             )
-        if authorized and require_active_doctor_profile and role_label == "Doctor":
+        if authorized and require_active_doctor_profile and (role_label or "").strip().casefold() == "doctor":
             from app.models.clinic import Doctor
 
             has_active_profile = (
@@ -491,10 +517,10 @@ def _user_authorized_in_db(
                 )
                 return False, role_label, bool(is_superuser)
         return authorized, role_label, bool(is_superuser)
-    except Exception:
+    except Exception as exc:
         logger.warning(
-            "Idempotency principal authorization query failed; refusing replay",
-            exc_info=True,
+            "Idempotency principal authorization query failed; refusing replay (%s)",
+            type(exc).__name__,
         )
         return False, None, False
 
@@ -552,13 +578,15 @@ def _resolve_principal_id_sync(
                 pass
             except Exception:  # pragma: no cover - generator teardown
                 pass
-    except Exception:
+    except IdempotencyAuthorizationUnavailable:
+        raise
+    except Exception as exc:
         # Fail CLOSED: without a canonical id there is NO namespace and no
         # idempotency protection can be evaluated — the caller refuses
         # non-executing instead of running the endpoint unprotected.
         logger.warning(
-            "Idempotency principal namespace resolution failed; refusing",
-            exc_info=True,
+            "Idempotency principal namespace resolution failed; refusing (%s)",
+            type(exc).__name__,
         )
         return None
 
@@ -578,9 +606,99 @@ def _principal_refusal_response() -> Response:
     """
     return Response(
         status_code=403,
+        headers={"Cache-Control": "no-store"},
         content='{"detail": "Пользователь деактивирован или сессия недействительна"}',
         media_type="application/json",
     )
+
+
+def _audit_replay_role_denial(request: Any, user_id: int, role: str | None, allowed: frozenset[str]) -> None:
+    """Use the same best-effort RBAC audit sink without running the handler."""
+    generator = None
+    db = None
+    try:
+        from app.core.audit import log_critical_change
+
+        generator = _resolve_request_db(request)
+        db = next(generator)
+        path = request.url.path
+        parts = [part for part in path.split("/") if part]
+        resource = parts[2] if len(parts) >= 3 and parts[:2] == ["api", "v1"] else "unknown"
+        row_id = int(parts[3]) if len(parts) >= 4 and parts[3].isdigit() else None
+        log_critical_change(
+            db=db, user_id=user_id, action="ACCESS_DENIED", table_name=resource,
+            row_id=row_id, old_data=None,
+            new_data={"required_roles": sorted(allowed), "user_role": role, "request_available": True},
+            request=request, description="Idempotent replay denied by role policy",
+        )
+        db.commit()
+    except Exception as exc:
+        if db is not None:
+            db.rollback()
+        # SQL errors can contain bearer/JTI or PHI-bearing parameters.
+        logger.warning("Idempotency replay denial audit failed (%s)", type(exc).__name__)
+    finally:
+        if generator is not None:
+            try:
+                next(generator)
+            except StopIteration:
+                pass
+            except Exception:
+                pass
+
+
+def _audit_inactive_principal(db: Any, request: Any, user_id: int, jti: str, epoch: int) -> None:
+    """Mirror require_active_roles only for a live, role-authorized bearer."""
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from app.core.audit import log_audit_event
+    from app.core.security import _audit_resource_identity
+    from app.models.authentication import TokenBlacklist
+    from app.models.user import User
+
+    allowed = IdempotencyMiddleware._endpoint_allowed_roles(request)
+    if not allowed:
+        return
+    actor = db.query(User).filter(User.id == user_id, User.auth_epoch == epoch).first()
+    if actor is None or actor.is_active:
+        return
+    role = str(actor.role or "")
+    if not actor.is_superuser and role.strip().casefold() not in allowed:
+        return
+    revoked = db.execute(select(TokenBlacklist.id).where(
+        (TokenBlacklist.jti == jti)
+        | ((TokenBlacklist.user_id == user_id)
+           & TokenBlacklist.reason.like("all_user_tokens:%")
+           & (TokenBlacklist.expires_at > datetime.now(UTC))
+           & (epoch == 0))
+    ).limit(1)).first()
+    if revoked:
+        return
+    resource, row_id = _audit_resource_identity(
+        IdempotencyMiddleware._matched_audit_request(request) or request
+    )
+    try:
+        log_audit_event(
+            db=db, user_id=user_id, action="ACCESS_DENIED",
+            table_name=resource or "unknown", row_id=row_id,
+            old_values=None,
+            new_values={"required_roles": sorted(allowed), "user_role": role,
+                        "denial_reason": "user_deactivated", "request_available": True},
+            description="Idempotent request denied: account deactivated",
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Idempotency inactive-account audit failed (%s)", type(exc).__name__)
+
+
+async def _role_refusal_response(
+    request: Request, user_id: int, role: str | None, allowed: frozenset[str],
+) -> Response:
+    await asyncio.to_thread(_audit_replay_role_denial, request, user_id, role, allowed)
+    return _principal_refusal_response()
 
 
 def _normalize_idem_path(path: str) -> str:
@@ -593,7 +711,8 @@ def _normalize_idem_path(path: str) -> str:
 
 
 def _audit_keyed_patient_refusal(
-    request: Any, subject_patient_id: int, canonical_user_id: int
+    request: Any, subject_patient_id: int, canonical_user_id: int,
+    reason: str = "user_deactivated",
 ) -> None:
     """Round-5 (owner P2): denied PHI-audit row for a middleware refusal.
 
@@ -615,17 +734,71 @@ def _audit_keyed_patient_refusal(
     path = getattr(getattr(request, "url", None), "path", "") or ""
     if path.rstrip("/").endswith("booking"):
         resource_type, action = "appointment", "create"
+    elif path.rstrip("/").endswith("preview"):
+        resource_type, action = "appointment", "preview"
     else:
         resource_type, action = "patient_portal", "access"
     try:
         generator = _resolve_request_db(request)
         try:
             db = next(generator)
+            # Serialize the signed session and actual patient ownership with
+            # the audit write. The 0116 capability locks even a deleted row
+            # before returning its active bit; false also covers an absent row,
+            # so the subject is re-read and checked while that lock is held.
+            from datetime import UTC, datetime
+
+            from sqlalchemy import select
+
+            from app.core.user_token_claims import parse_user_auth_epoch
+            from app.models.authentication import TokenBlacklist
+            from app.models.patient import Patient
+            from app.models.user import User
             from app.services.patient_access_audit import log_patient_access
+            from app.services.patient_subject_lock import lock_patient_subject
             from app.services.telegram_mini_app_init_data import (
                 TelegramMiniAppSessionScope,
             )
 
+            payload = IdempotencyMiddleware._verified_principal(None, request)
+            if payload is None or payload.get("sub") != str(canonical_user_id):
+                return
+            # Scoped portal tokens are rejected by canonical authentication
+            # before these denial paths: they require an active user and card.
+            if payload.get("scope") == "patient_portal":
+                return
+            jti, expiry = payload.get("jti"), payload.get("exp")
+            epoch = parse_user_auth_epoch(payload)
+            if (not isinstance(jti, str) or not jti or epoch is None
+                or type(expiry) not in (int, float) or not math.isfinite(expiry)
+                or expiry <= time.time()):
+                return
+            if db.get_bind().dialect.name == "sqlite":
+                db.connection().exec_driver_sql("UPDATE users SET id=id WHERE 0")
+            actor = (db.query(User).filter(User.id == canonical_user_id, User.auth_epoch == epoch)
+                     .with_for_update(nowait=True).populate_existing().first())
+            if (actor is None or str(actor.role or "").strip().casefold() != "patient"
+                or bool(actor.is_active) != (reason == "patient_link_invalid")):
+                return
+            revoked = db.execute(select(TokenBlacklist.id).where(
+                (TokenBlacklist.jti == jti)
+                | ((TokenBlacklist.user_id == canonical_user_id)
+                   & TokenBlacklist.reason.like("all_user_tokens:%")
+                   & (TokenBlacklist.expires_at > datetime.now(UTC)) & (epoch == 0))
+            ).limit(1)).first()
+            if revoked:
+                return
+            active_patient = lock_patient_subject(db, subject_patient_id)
+            if reason == "patient_link_invalid" and active_patient:
+                return
+            subject_query = db.query(Patient.id).filter(
+                Patient.id == subject_patient_id, Patient.user_id == canonical_user_id,
+            )
+            if reason == "patient_link_invalid":
+                subject_query = subject_query.filter(Patient.is_deleted.is_(True))
+            subject = subject_query.first()
+            if subject is None or expiry <= time.time():
+                return
             log_patient_access(
                 db,
                 scope=TelegramMiniAppSessionScope(
@@ -638,7 +811,7 @@ def _audit_keyed_patient_refusal(
                 action=action,
                 outcome="denied",
                 request=request,
-                extra_data={"reason": "user_deactivated", "surface": "jwt_portal"},
+                extra_data={"reason": reason, "surface": "jwt_portal"},
             )
         finally:
             try:
@@ -647,11 +820,11 @@ def _audit_keyed_patient_refusal(
                 pass
             except Exception:  # pragma: no cover - generator teardown
                 pass
-    except Exception:
+    except Exception as exc:
         logger.warning(
             "Idempotency denied-audit write failed for a deactivated patient "
-            "(keyed request); refusing without an audit row",
-            exc_info=True,
+            "(keyed request); refusing without an audit row (%s)",
+            type(exc).__name__,
         )
 
 
@@ -726,11 +899,11 @@ def _audit_patient_replay(request: Any, patient_scope: str) -> None:
                 pass
             except Exception:  # pragma: no cover - generator teardown
                 pass
-    except Exception:
+    except Exception as exc:
         logger.warning(
             "Idempotency replay-audit write failed for a patient-scope "
-            "replay; replaying without an audit row",
-            exc_info=True,
+            "replay; replaying without an audit row (%s)",
+            type(exc).__name__,
         )
 
 
@@ -771,22 +944,44 @@ def _patient_replay_policy_sync(
         from app.models.patient import Patient
         from app.models.user import User
 
-        row = db.execute(
-            select(User.role, Patient.id, Patient.is_deleted, User.is_active)
-            .outerjoin(Patient, Patient.user_id == User.id)
-            .where(User.id == int(canonical_user_id))
+        actor = db.execute(
+            select(User.role, User.is_active).where(User.id == int(canonical_user_id))
         ).first()
-        if row is None:
+        if actor is None:
             return "", False, None
-        role, patient_id, is_deleted, user_is_active = row
+        role, user_is_active = actor
         if str(role or "").strip().casefold() != "patient":
             return "", False, None
-        if patient_id is None or bool(is_deleted):
+        from app.services.patient_subject_lock import (
+            PatientSubjectLockError,
+            require_patient_subject_visibility,
+        )
+
+        try:
+            require_patient_subject_visibility(db)
+        except PatientSubjectLockError:
+            raise IdempotencyAuthorizationUnavailable from None
+        rows = db.execute(
+            select(Patient.id, Patient.is_deleted, Patient.notification_owner_generation)
+            .where(Patient.user_id == int(canonical_user_id))
+            .limit(2)
+        ).all()
+        if not rows:
             return "", True, None
+        if len(rows) != 1:
+            raise IdempotencyAuthorizationUnavailable
+        patient_id, is_deleted, owner_generation = rows[0]
+        if patient_id is None:
+            return "", True, None
+        if type(owner_generation) is not int or owner_generation <= 0:
+            raise IdempotencyAuthorizationUnavailable
         user_is_active = bool(user_is_active)
         if not user_is_active:
             _audit_keyed_patient_refusal(request, int(patient_id), canonical_user_id)
-        return f"patient:{int(patient_id)}", False, user_is_active
+        elif bool(is_deleted):
+            _audit_keyed_patient_refusal(request, int(patient_id), canonical_user_id, "patient_link_invalid")
+            return "", True, None
+        return f"patient:{owner_generation}:{int(patient_id)}", False, user_is_active
     finally:
         try:
             next(generator)
@@ -794,6 +989,10 @@ def _patient_replay_policy_sync(
             pass
         except Exception:  # pragma: no cover - generator teardown
             pass
+
+
+class IdempotencyAuthorizationUnavailable(RuntimeError):
+    """The middleware cannot prove that its authorization reads are complete."""
 
 
 def _resolve_request_db(request: Any):
@@ -812,7 +1011,58 @@ def _resolve_request_db(request: Any):
         override = request.app.dependency_overrides.get(canonical_get_db)
     except Exception:  # pragma: no cover - app object without overrides
         override = None
-    return (override or canonical_get_db)()
+    source = (override or canonical_get_db)()
+
+    def pinned_session():
+        try:
+            db = next(source)
+            try:
+                from sqlalchemy.exc import SQLAlchemyError
+
+                from app.core.config import settings
+                from app.db.trusted_schema import (
+                    TrustedSchemaUnavailable,
+                    pin_application_schema,
+                )
+
+                if db.get_bind().dialect.name == "postgresql":
+                    # Match the financial authentication preflight before any
+                    # identity or blacklist query on this independent session.
+                    db.connection()
+                    schema = settings.TRUSTED_DB_SCHEMA
+                    owner = settings.TRUSTED_DB_SCHEMA_OWNER
+                    if (
+                        schema != db.get_bind().dialect.default_schema_name
+                        or (settings.DOCTOR_PRICE_DB_SCHEMA is not None and settings.DOCTOR_PRICE_DB_SCHEMA != schema)
+                        or (settings.DOCTOR_PRICE_DB_SCHEMA_OWNER is not None and settings.DOCTOR_PRICE_DB_SCHEMA_OWNER != owner)
+                        or (settings.INVITATION_DB_SCHEMA is not None and settings.INVITATION_DB_SCHEMA != schema)
+                        or (settings.INVITATION_DB_SCHEMA_OWNER is not None and settings.INVITATION_DB_SCHEMA_OWNER != owner)
+                    ):
+                        raise TrustedSchemaUnavailable("Trusted database schema unavailable")
+                pin_application_schema(
+                    db, schema=settings.TRUSTED_DB_SCHEMA,
+                    expected_owner=settings.TRUSTED_DB_SCHEMA_OWNER,
+                    expected_runtime_role=settings.TRUSTED_DB_RUNTIME_ROLE,
+                    trusted_owner_members=settings.TRUSTED_DB_OWNER_MEMBERS,
+                    expected_auth_owner=settings.TRUSTED_AUTH_TABLE_OWNER,
+                    trusted_auth_owner_members=settings.TRUSTED_AUTH_OWNER_MEMBERS,
+                    trusted_auth_read_roles=settings.TRUSTED_AUTH_READ_ROLES,
+                    trusted_auth_write_roles=settings.TRUSTED_AUTH_WRITE_ROLES,
+                    expected_users_owner=settings.TRUSTED_AUTH_USERS_OWNER,
+                    trusted_users_owner_members=settings.TRUSTED_AUTH_USERS_OWNER_MEMBERS,
+                    trusted_users_write_roles=settings.TRUSTED_AUTH_USERS_WRITE_ROLES,
+                )
+            except (TrustedSchemaUnavailable, SQLAlchemyError):
+                db.rollback()
+                raise IdempotencyAuthorizationUnavailable from None
+            yield db
+        finally:
+            try:
+                next(source)
+            except StopIteration:
+                pass
+
+    return pinned_session()
 
 
 def _check_principal_authorized_sync(
@@ -822,6 +1072,7 @@ def _check_principal_authorized_sync(
     jti: Any,
     require_active_doctor_profile: bool = False,
     patient_scope_id: int | None = None,
+    patient_scope_generation: int | None = None,
     token_epoch: int = 0,
 ) -> tuple[bool, str | None, bool]:
     """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
@@ -835,13 +1086,42 @@ def _check_principal_authorized_sync(
         generator = _resolve_request_db(request)
         try:
             db = next(generator)
+            from sqlalchemy.exc import SQLAlchemyError
+
+            from app.models.user import User
+
+            try:
+                if db.get_bind().dialect.name == "sqlite":
+                    db.connection().exec_driver_sql("UPDATE users SET id=id WHERE 0")
+                actor = (db.query(User.id).filter(User.id == user_id)
+                         .with_for_update(nowait=True).first())
+                if actor is None:
+                    return False, None, False
+                if patient_scope_id is not None:
+                    from app.services.patient_subject_lock import (
+                        PatientSubjectLockError,
+                        lock_patient_subject,
+                    )
+
+                    try:
+                        if not lock_patient_subject(db, patient_scope_id):
+                            return False, None, False
+                    except PatientSubjectLockError:
+                        raise IdempotencyAuthorizationUnavailable from None
+            except SQLAlchemyError:
+                db.rollback()
+                raise IdempotencyAuthorizationUnavailable from None
             kwargs = {
                 "require_active_doctor_profile": require_active_doctor_profile,
                 "token_epoch": token_epoch,
             }
             if patient_scope_id is not None:
                 kwargs["patient_scope_id"] = patient_scope_id
-            return _user_authorized_in_db(db, user_id, username, jti, **kwargs)
+                kwargs["patient_scope_generation"] = patient_scope_generation
+            result = _user_authorized_in_db(db, user_id, username, jti, **kwargs)
+            if not result[0] and patient_scope_id is None and user_id is not None:
+                _audit_inactive_principal(db, request, user_id, jti, token_epoch)
+            return result
         finally:
             try:
                 next(generator)
@@ -849,10 +1129,12 @@ def _check_principal_authorized_sync(
                 pass
             except Exception:  # pragma: no cover - generator teardown
                 pass
-    except Exception:
+    except IdempotencyAuthorizationUnavailable:
+        raise
+    except Exception as exc:
         logger.warning(
-            "Idempotency principal authorization check failed; refusing replay",
-            exc_info=True,
+            "Idempotency principal authorization check failed; refusing replay (%s)",
+            type(exc).__name__,
         )
         return False, None, False
 
@@ -1176,22 +1458,50 @@ def get_idempotency_cache() -> IdempotencyResponseCache:
     return _idempotency_cache
 
 
-def _decode_response_snapshot(raw: Any) -> tuple[Response | None, str | None, str | None]:
-    """Decode a stored response snapshot (shared by load_response and the
-    round-4 legacy probe). Never raises: a corrupt snapshot degrades to a
-    miss instead of failing the request."""
+def _snapshot_mac(snapshot: dict[str, Any], namespace: int | str, key: str) -> str:
+    """Bind an outcome to its exact Redis namespace, key and full contents."""
+    from app.core.config import settings
+
+    secret = settings.SECRET_KEY
+    if not isinstance(secret, str) or not secret:
+        raise ValueError("missing snapshot authentication key")
+    message = json.dumps(
+        [str(namespace), key, snapshot], sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), b"idempotency-snapshot-v2\0" + message, hashlib.sha256).hexdigest()
+
+
+def _decode_response_snapshot(raw: Any, namespace: int | str, key: str) -> tuple[Response | None, str | None, str | None]:
+    """Decode a snapshot; unknown provenance and corruption are never misses."""
     try:
         snapshot = json.loads(raw)
-        body = base64.b64decode(snapshot["body_b64"])
-        return Response(
+        if (not isinstance(snapshot, dict)
+            or type(snapshot.get("provenance_version")) is not int
+            or snapshot["provenance_version"] != 2):
+            raise ValueError("unverified outcome provenance")
+        signature = snapshot.pop("mac", None)
+        if not isinstance(signature, str) or not hmac.compare_digest(signature, _snapshot_mac(snapshot, namespace, key)):
+            raise ValueError("outcome integrity check failed")
+        if type(snapshot.get("status")) is not int or not 200 <= snapshot["status"] < 300:
+            raise ValueError("invalid outcome status")
+        if not isinstance(snapshot.get("payload_hash"), str) or not snapshot["payload_hash"]:
+            raise ValueError("missing outcome payload binding")
+        if not isinstance(snapshot.get("headers"), dict):
+            raise ValueError("invalid outcome headers")
+        body = base64.b64decode(snapshot["body_b64"], validate=True)
+        response = Response(
             content=body,
-            status_code=int(snapshot["status"]),
+            status_code=snapshot["status"],
             headers=dict(snapshot["headers"]),
             media_type=snapshot.get("media_type"),
-        ), snapshot.get("payload_hash"), snapshot.get("principal_role")
-    except Exception as exc:
-        logger.warning("Idempotency snapshot decode failed: %s", exc)
-        return None, None, None
+        )
+        return response, snapshot["payload_hash"], snapshot.get("principal_role")
+    except Exception:
+        # The stored bytes might be the only record of a committed operation.
+        # Keep them and return a sentinel that all readers must refuse.
+        response = Response(status_code=409)
+        response._idempotency_unverified = True
+        return response, None, None
 
 
 class DistributedIdempotencyClaim:
@@ -1441,9 +1751,9 @@ class DistributedIdempotencyClaim:
         if not self._ensure_available() or self._client is None:
             return None, None, None
         raw = self._run(self._client.get, self._resp_key(user_id, key))
-        if not raw:
+        if raw is None:
             return None, None, None
-        return _decode_response_snapshot(raw)
+        return _decode_response_snapshot(raw, user_id, key)
 
     def store_response(self, user_id: int | str, key: str, response: Response, ttl: int | None = None, payload_hash: str = "", principal_role: str | None = None, operation_scope: str | None = None) -> bool:
         """Store the outcome snapshot and REPORT whether Redis confirmed it.
@@ -1469,6 +1779,7 @@ class DistributedIdempotencyClaim:
             return False
         body = getattr(response, "body", b"") or b""
         snapshot_payload: dict[str, Any] = {
+            "provenance_version": 2,
             "status": response.status_code,
             "headers": dict(response.headers),
             "media_type": response.media_type,
@@ -1478,6 +1789,7 @@ class DistributedIdempotencyClaim:
         }
         if operation_scope:
             snapshot_payload["operation_scope"] = operation_scope
+        snapshot_payload["mac"] = _snapshot_mac(snapshot_payload, user_id, key)
         snapshot = json.dumps(snapshot_payload)
         stored = self._run(
             self._client.set,
@@ -1520,6 +1832,7 @@ class DistributedIdempotencyClaim:
             return False, False
         body = getattr(response, "body", b"") or b""
         snapshot_payload: dict[str, Any] = {
+            "provenance_version": 2,
             "status": response.status_code,
             "headers": dict(response.headers),
             "media_type": response.media_type,
@@ -1529,6 +1842,7 @@ class DistributedIdempotencyClaim:
         }
         if operation_scope:
             snapshot_payload["operation_scope"] = operation_scope
+        snapshot_payload["mac"] = _snapshot_mac(snapshot_payload, user_id, key)
         snapshot = json.dumps(snapshot_payload)
         result = self._run(
             self._client.eval,
@@ -1716,7 +2030,7 @@ class DistributedIdempotencyClaim:
         if not self._ensure_available() or self._client is None:
             return (None, None, None), False, False, None
         raw = self._run(self._client.get, self._resp_key(legacy_ns, key))
-        legacy = _decode_response_snapshot(raw) if raw else (None, None, None)
+        legacy = _decode_response_snapshot(raw, legacy_ns, key) if raw is not None else (None, None, None)
         legacy_op_scope: str | None = None
         if raw:
             try:
@@ -1982,6 +2296,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
+        try:
+            return await self._dispatch(request, call_next)
+        except IdempotencyAuthorizationUnavailable:
+            return Response(
+                status_code=503,
+                headers={"Cache-Control": "no-store"},
+                content='{"code":"idempotency_authorization_unavailable","detail":"Проверка доступа временно недоступна"}',
+                media_type="application/json",
+            )
+
+    async def _dispatch(self, request: Request, call_next: Any) -> Response:
+        if _is_provider_webhook_idempotency_exempt(request.method, request.url.path):
+            return await call_next(request)
+
         # Device create/rotate responses contain a one-time cleartext secret;
         # the token exchange returns a bearer JWT. Keep all three out of the
         # in-process and Redis idempotency response caches.
@@ -2003,6 +2331,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     media_type="application/json",
                 )
             return await call_next(request)
+
+        if _is_doctor_price_idempotency_exempt(request.method, request.url.path):
+            keys = request.headers.getlist("Idempotency-Key")
+            if (len(keys) > 1 or (keys and (not keys[0] or len(keys[0]) > _IDEMPOTENCY_KEY_MAX_LENGTH
+                or any(ord(char) < 32 or ord(char) == 127 for char in keys[0])))):
+                return Response(
+                    status_code=400, headers={"Cache-Control": "no-store"},
+                    content='{"code":"idempotency_key_invalid","detail":"Invalid idempotency key"}',
+                    media_type="application/json",
+                )
+            response = await call_next(request)
+            response.headers["Cache-Control"] = "no-store"
+            return response
 
         # Only intercept methods that benefit from idempotency
         if request.method.upper() not in _IDEMPOTENT_METHODS:
@@ -2099,20 +2440,22 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             ) = await asyncio.to_thread(
                 _patient_replay_policy_sync, request, canonical_id
             )
-        except Exception:
+        except IdempotencyAuthorizationUnavailable:
+            raise
+        except Exception as exc:
             logger.warning(
-                "Idempotency patient replay-policy check failed; refusing keyed write: path=%s",
+                "Idempotency patient replay-policy check failed; refusing keyed write: path=%s error_type=%s",
                 request.url.path,
-                exc_info=True,
+                type(exc).__name__,
             )
             return _principal_refusal_response()
         if patient_fall_through:
             logger.warning(
-                "Idempotency replay policy: no ACTIVE Patient card; bypassing replay, "
-                "endpoint guards decide: user=%s key_fingerprint=%s path=%s",
+                "Idempotency replay policy: no ACTIVE Patient card; "
+                "refusing without execution: user=%s key_fingerprint=%s path=%s",
                 canonical_id, key_fingerprint, request.url.path,
             )
-            return await call_next(request)
+            return self._unverified_replay_response()
         if patient_scope and patient_user_active is False:
             # Round-5 (owner P2): a DEACTIVATED patient account is refused
             # BEFORE any idempotency machinery runs. The keyed booking's
@@ -2127,6 +2470,16 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 canonical_id, key_fingerprint, request.url.path,
             )
             return _principal_refusal_response()
+
+        if patient_scope:
+            try:
+                prefix, generation, patient_id = patient_scope.split(":")
+                generation, patient_id = int(generation), int(patient_id)
+                if prefix != "patient" or generation <= 0 or patient_id <= 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return self._unverified_replay_response()
+            request.state.idempotency_patient_scope = (patient_id, generation)
 
         user_id = self._namespace(canonical_id, op_scope, patient_scope)
 
@@ -2299,11 +2652,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
             if bound_scope != patient_scope:
                 logger.warning(
-                    "Idempotency scope mismatch: key_fingerprint=%s bound to %s but current "
-                    "card scope is %s — refusing: user=%s path=%s",
+                    "Idempotency scope mismatch: key_fingerprint=%s — refusing: user=%s path=%s",
                     key_fingerprint,
-                    bound_scope,
-                    patient_scope,
                     canonical_id,
                     request.url.path,
                 )
@@ -2357,9 +2707,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # реактивации по тому же ключу).
                 return _principal_refusal_response()
             permitted = self._role_permitted_for_replay(request, cached_role, current_role, current_superuser)
-            if permitted is True or (
-                permitted is None and (cached_role is None or current_role == cached_role)
-            ):
+            if permitted is True:
                 logger.info(
                     "Idempotency hit: user=%s key_fingerprint=%s method=%s path=%s — returning cached response",
                     user_id, key_fingerprint, request.method, request.url.path,
@@ -2371,39 +2719,23 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     _audit_patient_replay(request, patient_scope)
                 return cached
             if permitted is False:
-                # Endpoint policy refuses the current role — the endpoint's
-                # require_roles 403s + audits it exactly as for a fresh
-                # request. The snapshot is KEPT: when the principal regains
-                # an allowed role, the same-key retry replays again instead
-                # of re-executing the write.
+                # Keep the snapshot and refuse without executing the handler.
                 logger.warning(
-                    "Idempotency replay refused (endpoint policy): user=%s key_fingerprint=%s path=%s (stored=%s current=%s) — falling through",
+                    "Idempotency replay refused (endpoint policy): user=%s key_fingerprint=%s path=%s (stored=%s current=%s)",
                     user_id, key_fingerprint, request.url.path, cached_role, current_role,
                 )
-                return await call_next(request)
-            # permitted is None (policy unknown) AND the role label changed:
-            # conservative R4 fallback — evict the stale binding so the
-            # re-execution re-stores with the fresh role. Round-7: patient
-            # operations drop ONLY the snapshot from the atomic entry — the
-            # card binding is unchanged and keeps guarding the key.
-            logger.warning(
-                "Idempotency replay refused (role changed since execution, policy unknown): user=%s key_fingerprint=%s path=%s (%s -> %s) — re-executing",
-                user_id, key_fingerprint, request.url.path, cached_role, current_role,
-            )
-            if patient_scope and origin_ns:
-                _local_patient_outcome_forget_snapshot(origin_ns, idempotency_key, patient_scope)
-            else:
-                _idempotency_cache.invalidate(user_id, idempotency_key)
-            if claim is not None and claim.try_available():
-                claim.forget_response(user_id, idempotency_key)
-            cached = None
-            cached_role = None
+                return await _role_refusal_response(
+                    request, canonical_id, current_role, self._endpoint_allowed_roles(request) or frozenset()
+                )
+            return self._unverified_replay_response()
 
         # Codex R1 #3092 (P1): distributed claim across workers. A retry may
         # land on a different worker (staging runs two) or overlap the first
         # request; the per-process cache alone cannot deduplicate either case.
         if claim is not None and claim.try_available():
             replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
+            if getattr(replayed, "_idempotency_unverified", False):
+                return self._unverified_replay_response()
             if replayed is not None:
                 if stored_hash and stored_hash != incoming_hash:
                     logger.warning(
@@ -2427,9 +2759,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # Codex R8 #3092 (P1): неисполняющий отказ, снапшот хранится.
                     return _principal_refusal_response()
                 permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
-                if permitted is True or (
-                    permitted is None and (stored_role is None or current_role == stored_role)
-                ):
+                if permitted is True:
                     logger.info(
                         "Idempotency distributed replay: user=%s key_fingerprint=%s path=%s",
                         user_id, key_fingerprint, request.url.path,
@@ -2441,28 +2771,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         _audit_patient_replay(request, patient_scope)
                     return replayed
                 if permitted is False:
-                    # Endpoint policy refuses the current role — fall through
-                    # to require_roles (403 + audit); snapshot KEPT (see the
-                    # local-cache branch).
+                    # Keep the snapshot and refuse without executing the handler.
                     logger.warning(
-                        "Idempotency distributed replay refused (endpoint policy): user=%s key_fingerprint=%s path=%s (stored=%s current=%s) — falling through",
+                        "Idempotency distributed replay refused (endpoint policy): user=%s key_fingerprint=%s path=%s (stored=%s current=%s)",
                         user_id, key_fingerprint, request.url.path, stored_role, current_role,
                     )
-                    return await call_next(request)
-                # permitted is None (policy unknown) AND role changed:
-                # conservative R4 — drop the snapshot so this request
-                # re-executes and re-stores with the fresh role. Round-7:
-                # patient operations drop ONLY the atomic entry's snapshot.
-                logger.warning(
-                    "Idempotency distributed replay refused (role changed since execution, policy unknown): user=%s key_fingerprint=%s path=%s (%s -> %s) — re-executing",
-                    user_id, key_fingerprint, request.url.path, stored_role, current_role,
-                )
-                claim.forget_response(user_id, idempotency_key)
-                if patient_scope and origin_ns:
-                    _local_patient_outcome_forget_snapshot(origin_ns, idempotency_key, patient_scope)
-                else:
-                    _idempotency_cache.invalidate(user_id, idempotency_key)
-                replayed = None
+                    return await _role_refusal_response(
+                        request, canonical_id, current_role, self._endpoint_allowed_roles(request) or frozenset()
+                    )
+                return self._unverified_replay_response()
 
             # Round-6 (owner P1): the reconciliation against the PRE-#3340
             # user-only namespace is a real MIGRATION FENCE, not a read.
@@ -2521,7 +2838,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 fenced and the contended path): payload binding → principal
                 authorization → endpoint role policy. Returns one of
                 "mismatch" / "unauthorized" / "replay" / "endpoint_policy" /
-                "role_changed" — the caller owns every side effect."""
+                "unverified" — the caller owns every side effect."""
                 if legacy_hash and legacy_hash != incoming_hash:
                     logger.warning(
                         "Idempotency payload mismatch (legacy namespace): "
@@ -2531,11 +2848,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         request.url.path,
                     )
                     return "mismatch"
-                authorized, current_role, current_superuser = (
-                    await self._principal_authorized(
-                        request, principal_payload, require_active_doctor_profile=True
+                try:
+                    authorized, current_role, current_superuser = (
+                        await self._principal_authorized(
+                            request, principal_payload, require_active_doctor_profile=True
+                        )
                     )
-                )
+                except BaseException:
+                    _release_legacy_fence()
+                    raise
                 if not authorized:
                     logger.warning(
                         "Idempotency legacy replay refused (principal not authorized): "
@@ -2551,27 +2872,25 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     current_role,
                     current_superuser,
                 )
-                if permitted is True or (
-                    permitted is None
-                    and (legacy_role is None or current_role == legacy_role)
-                ):
+                if permitted is True:
                     return "replay"
                 if permitted is False:
-                    # Endpoint policy refuses the current role — the
-                    # endpoint's require_roles 403s exactly as for a
-                    # fresh request; the legacy snapshot is KEPT.
+                    # Keep the legacy snapshot and refuse without execution.
                     logger.warning(
                         "Idempotency legacy replay refused (endpoint policy): "
-                        "user=%s key_fingerprint=%s path=%s (stored=%s current=%s) — falling through",
+                        "user=%s key_fingerprint=%s path=%s (stored=%s current=%s)",
                         canonical_id,
                         key_fingerprint,
                         request.url.path,
                         legacy_role,
                         current_role,
                     )
+                    await asyncio.to_thread(
+                        _audit_replay_role_denial, request, canonical_id, current_role,
+                        self._endpoint_allowed_roles(request) or frozenset(),
+                    )
                     return "endpoint_policy"
-                # permitted is None AND role changed: conservative R4 analog.
-                return "role_changed"
+                return "unverified"
 
             if not patient_scope and claim.try_available() and _legacy_bridge_active():
                 legacy_ns = self._namespace(canonical_id)
@@ -2592,14 +2911,16 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         _own_fence_marker,
                         legacy_op_scope,
                     ) = claim.probe_legacy_artifacts(legacy_ns, idempotency_key)
+                    if getattr(legacy_resp, "_idempotency_unverified", False):
+                        _release_legacy_fence()
+                        return self._unverified_replay_response()
                     # Round-8 (owner P2): a snapshot stamped with a DIFFERENT
                     # operation belongs to another POST under the same
                     # user-only key. It is neither replayed nor refused as a
                     # payload mismatch — the operation-scoped namespace
                     # decides this request (release the fence and fall
-                    # through to the new-namespace claim). Old-worker
-                    # snapshots carry no stamp and keep the migration
-                    # replay contract for the bounded bridge window.
+                    # through to the new-namespace claim). An unstamped
+                    # snapshot cannot prove which operation created it.
                     legacy_foreign_op = (
                         legacy_resp is not None
                         and legacy_op_scope is not None
@@ -2624,10 +2945,17 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # claim keeping the fence. A stored RESPONSE replays
                     # below; an intent without a response refuses
                     # conservatively.
+                    elif legacy_resp is not None and legacy_op_scope is None:
+                        _release_legacy_fence()
+                        return self._unverified_replay_response()
                     elif legacy_resp is not None:
-                        decision = await _legacy_replay_decision(
-                            legacy_resp, legacy_hash, legacy_role
-                        )
+                        try:
+                            decision = await _legacy_replay_decision(
+                                legacy_resp, legacy_hash, legacy_role
+                            )
+                        except BaseException:
+                            _release_legacy_fence()
+                            raise
                         if decision == "mismatch":
                             _release_legacy_fence()
                             return self._payload_mismatch_response()
@@ -2666,13 +2994,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             return legacy_resp
                         if decision == "endpoint_policy":
                             _release_legacy_fence()
-                            return await call_next(request)
-                        # decision == "role_changed": drop the stale legacy
-                        # snapshot and re-execute UNDER THE FENCE — old
-                        # workers stay blocked; the completion paths
-                        # dual-write the fresh outcome to both namespaces and
-                        # release the fence.
-                        claim.forget_response(legacy_ns, idempotency_key)
+                            return _principal_refusal_response()
+                        _release_legacy_fence()
+                        return self._unverified_replay_response()
                     elif legacy_intent:
                         # The pre-deploy attempt reached execution and died
                         # before its outcome landed (the intent survives its
@@ -2711,6 +3035,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         _contended_claim,
                         _contended_op_scope,
                     ) = claim.probe_legacy_artifacts(legacy_ns, idempotency_key)
+                    if getattr(legacy_resp, "_idempotency_unverified", False):
+                        return self._unverified_replay_response()
                     # Round-8 (owner P2): another operation's stamped snapshot
                     # is neither replayed nor mismatch-refused — the
                     # operation-scoped namespace decides; the in-flight
@@ -2721,6 +3047,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         and _contended_op_scope is not None
                         and _contended_op_scope != op_scope
                     )
+                    if legacy_resp is not None and _contended_op_scope is None:
+                        return self._unverified_replay_response()
                     if legacy_resp is not None and not _contended_foreign_op:
                         decision = await _legacy_replay_decision(
                             legacy_resp, legacy_hash, legacy_role
@@ -2754,11 +3082,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             )
                             return legacy_resp
                         if decision == "endpoint_policy":
-                            return await call_next(request)
-                        # decision == "role_changed" WITHOUT the fence: the
-                        # legacy claim is held by an old worker — re-executing
-                        # here would run BOTH versions in parallel (the exact
-                        # race the fence exists for). Refuse in-flight: the
+                            return _principal_refusal_response()
+                        if decision == "unverified":
+                            return self._unverified_replay_response()
+                        # The legacy claim is held by an old worker; refuse
+                        # rather than running both versions in parallel. The
                         # same-key retry after the old worker finishes either
                         # fences the legacy claim or replays the migrated
                         # outcome. The stale snapshot is KEPT.
@@ -2838,6 +3166,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # completed between our acquire attempt and now — re-check
                 # before rejecting.
                 replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
+                if getattr(replayed, "_idempotency_unverified", False):
+                    _release_legacy_fence()
+                    return self._unverified_replay_response()
                 if replayed is not None:
                     if stored_hash and stored_hash != incoming_hash:
                         _release_legacy_fence()
@@ -2850,9 +3181,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # Codex R8 #3092 (P1): principal refusal is NON-EXECUTING.
                     # Codex R15 #3092 (P1): active-Doctor-profile resource fact
                     # re-checked on replays (same-role included).
-                    authorized, current_role, current_superuser = await self._principal_authorized(
-                        request, principal_payload, require_active_doctor_profile=True
-                    )
+                    try:
+                        authorized, current_role, current_superuser = await self._principal_authorized(
+                            request, principal_payload, require_active_doctor_profile=True
+                        )
+                    except BaseException:
+                        _release_legacy_fence()
+                        raise
                     if not authorized:
                         logger.warning(
                             "Idempotency post-inflight replay refused (principal not authorized): user=%s key_fingerprint=%s path=%s",
@@ -2861,15 +3196,17 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         _release_legacy_fence()
                         return _principal_refusal_response()
                     permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
-                    if permitted is False or (
-                        permitted is None and stored_role is not None and current_role != stored_role
-                    ):
+                    if permitted is not True:
                         logger.warning(
                             "Idempotency post-inflight replay refused (role not permitted): user=%s key_fingerprint=%s path=%s",
                             user_id, key_fingerprint, request.url.path,
                         )
                         _release_legacy_fence()
-                        return await call_next(request)
+                        if permitted is False:
+                            return await _role_refusal_response(
+                                request, canonical_id, current_role, self._endpoint_allowed_roles(request) or frozenset()
+                            )
+                        return self._unverified_replay_response()
                     logger.info(
                         "Idempotency distributed replay (post-inflight): user=%s key_fingerprint=%s",
                         user_id, key_fingerprint,
@@ -2926,14 +3263,23 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # (compare-and-delete): claim, перезахваченный другим воркером
             # за время await, не задевается.
             replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
+            if getattr(replayed, "_idempotency_unverified", False):
+                claim.release(user_id, idempotency_key, claim_token)
+                _release_legacy_fence()
+                return self._unverified_replay_response()
             if replayed is not None:
                 if stored_hash and stored_hash != incoming_hash:
                     claim.release(user_id, idempotency_key, claim_token)
                     _release_legacy_fence()
                     return self._payload_mismatch_response()
-                authorized, current_role, current_superuser = await self._principal_authorized(
-                    request, principal_payload, require_active_doctor_profile=True
-                )
+                try:
+                    authorized, current_role, current_superuser = await self._principal_authorized(
+                        request, principal_payload, require_active_doctor_profile=True
+                    )
+                except BaseException:
+                    claim.release(user_id, idempotency_key, claim_token)
+                    _release_legacy_fence()
+                    raise
                 if not authorized:
                     logger.warning(
                         "Idempotency post-acquire replay refused (principal not authorized): user=%s key_fingerprint=%s path=%s",
@@ -2944,9 +3290,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     _release_legacy_fence()
                     return _principal_refusal_response()
                 permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
-                if permitted is True or (
-                    permitted is None and (stored_role is None or current_role == stored_role)
-                ):
+                if permitted is True:
                     logger.info(
                         "Idempotency distributed replay (post-acquire): user=%s key_fingerprint=%s path=%s",
                         user_id, key_fingerprint, request.url.path,
@@ -2961,26 +3305,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         _audit_patient_replay(request, patient_scope)
                     return replayed
                 if permitted is False:
-                    # Политика эндпоинта отказывает текущей роли — require_roles
-                    # внутри call_next даст штатный 403 + аудит, снапшот
-                    # ХРАНИТСЯ (тот же контракт, что и в ветках выше).
+                    # Keep the outcome and refuse without running the handler.
                     logger.warning(
                         "Idempotency post-acquire replay refused (endpoint policy): user=%s key_fingerprint=%s path=%s (stored=%s current=%s)",
                         user_id, key_fingerprint, request.url.path, stored_role, current_role,
                     )
                     claim.release(user_id, idempotency_key, claim_token)
                     _release_legacy_fence()
-                    return await call_next(request)
-                # permitted is None (политика неизвестна) И метка роли
-                # сменилась: консервативный R4 — эвикт устаревшей привязки и
-                # ИСПОЛНЕНИЕ под НАШИМ claim (владение уже захвачено), исход
-                # перезапишется с актуальной ролью — далее штатный путь.
-                logger.warning(
-                    "Idempotency post-acquire replay refused (role changed since execution, policy unknown): user=%s key_fingerprint=%s path=%s (%s -> %s) — re-executing",
-                    user_id, key_fingerprint, request.url.path, stored_role, current_role,
-                )
-                claim.forget_response(user_id, idempotency_key)
-                _idempotency_cache.invalidate(user_id, idempotency_key)
+                    return await _role_refusal_response(
+                        request, canonical_id, current_role, self._endpoint_allowed_roles(request) or frozenset()
+                    )
+                claim.release(user_id, idempotency_key, claim_token)
+                _release_legacy_fence()
+                return self._unverified_replay_response()
 
         # Round-8 (owner P1 #2, PR #3340): re-assert the scope binding UNDER
         # the just-acquired claim, re-stamped with THIS attempt's generation.
@@ -3019,10 +3356,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 if rebound == _SCOPE_BINDING_RESOLVED and bound_now != patient_scope:
                     logger.warning(
                         "Idempotency scope re-assert lost to another card: key_fingerprint=%s "
-                        "bound to %s, current %s — refusing: user=%s path=%s",
+                        "— refusing: user=%s path=%s",
                         key_fingerprint,
-                        bound_now,
-                        patient_scope,
                         canonical_id,
                         request.url.path,
                     )
@@ -3174,6 +3509,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     _release_legacy_fence()
                     if claim.try_available():
                         replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
+                        if getattr(replayed, "_idempotency_unverified", False):
+                            return self._unverified_replay_response()
                         if replayed is not None:
                             if stored_hash and stored_hash != incoming_hash:
                                 return self._payload_mismatch_response()
@@ -3212,9 +3549,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             # повтор с тем же ключом разрешит роль штатным
                             # replay-путём.
                             permitted = self._role_permitted_for_replay(request, stored_role, replay_role, _replay_superuser)
-                            if permitted is True or (
-                                permitted is None and (stored_role is None or replay_role == stored_role)
-                            ):
+                            if permitted is True:
                                 logger.info(
                                     "Idempotency replay after lease lapse (outcome stored by the new owner): user=%s key_fingerprint=%s path=%s",
                                     user_id, key_fingerprint, request.url.path,
@@ -3227,6 +3562,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                                 if patient_scope:
                                     _audit_patient_replay(request, patient_scope)
                                 return replayed
+                            if permitted is False:
+                                return await _role_refusal_response(
+                                    request, canonical_id, replay_role,
+                                    self._endpoint_allowed_roles(request) or frozenset(),
+                                )
                         logger.warning(
                             "Idempotency lease lapsed before execution (ownership lost): user=%s key_fingerprint=%s path=%s",
                             user_id, key_fingerprint, request.url.path,
@@ -3826,6 +4166,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 _release_legacy_fence()
 
     @staticmethod
+    def _unverified_replay_response() -> Response:
+        return Response(
+            status_code=409,
+            headers={"Cache-Control": "no-store"},
+            content=(
+                '{"code":"idempotency_reconciliation_required",'
+                '"detail":"Исход предыдущей операции сохранён, но повторную выдачу '
+                'нельзя проверить. Сверьте запись с администратором; не отправляйте '
+                'новую операцию до проверки."}'
+            ),
+            media_type="application/json",
+        )
+
+    @staticmethod
     def _payload_mismatch_response() -> Response:
         """409 for a reused key with a changed payload (Codex R2 #3092 P1)."""
         return Response(
@@ -3973,6 +4327,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         try:
             from app.core.user_token_claims import parse_user_auth_epoch
 
+            expiry = principal_payload.get("exp")
+            if (not isinstance(jti, str) or not jti
+                or type(expiry) not in (int, float) or not math.isfinite(expiry)
+                or expiry <= time.time()):
+                return False, None, False
             token_epoch = parse_user_auth_epoch(principal_payload)
             if token_epoch is None:
                 return False, None, False
@@ -3981,6 +4340,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 if principal_payload.get("scope") == "patient_portal"
                 else {}
             )
+            patient_context = getattr(request.state, "idempotency_patient_scope", None)
+            if patient_context is not None:
+                patient_id, generation = patient_context
+                if "patient_scope_id" in scope_kwargs and scope_kwargs["patient_scope_id"] != patient_id:
+                    return False, None, False
+                scope_kwargs["patient_scope_id"] = patient_id
+                scope_kwargs["patient_scope_generation"] = generation
             if token_epoch:
                 scope_kwargs["token_epoch"] = token_epoch
             authorized, role, is_superuser = await asyncio.to_thread(
@@ -3992,6 +4358,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 require_active_doctor_profile,
                 **scope_kwargs,
             )
+            if expiry <= time.time():
+                return False, role, is_superuser
+            if (str(role or "").strip().casefold() == "patient"
+                and patient_context is None):
+                return False, role, is_superuser
             from app.core.user_token_claims import is_user_allowed_for_claims
 
             if not is_user_allowed_for_claims(
@@ -4002,29 +4373,49 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             ):
                 return False, role, is_superuser
             return authorized, role, is_superuser
-        except Exception:  # pragma: no cover - to_thread failure is fail-closed
-            logger.warning("Idempotency principal check crashed; refusing replay", exc_info=True)
+        except IdempotencyAuthorizationUnavailable:
+            raise
+        except Exception as exc:  # pragma: no cover - to_thread failure is fail-closed
+            logger.warning("Idempotency principal check crashed; refusing replay (%s)", type(exc).__name__)
             return False, None, False
 
     @staticmethod
+    def _matched_audit_request(request: Request) -> Request | None:
+        """Provide canonical route-template identity before router dispatch."""
+        from fastapi.routing import APIRoute
+        from starlette.routing import Match
+
+        try:
+            scope = dict(request.scope)
+            app = scope.get("app")
+            for route in getattr(getattr(app, "router", None), "routes", ()):
+                match, child = route.matches(scope)
+                if match != Match.FULL:
+                    continue
+                scope.update(child)
+                context = None
+                while not isinstance(route, APIRoute):
+                    select = getattr(route, "_match", None)
+                    if not callable(select):
+                        return None
+                    match, child, route, context = select(dict(scope))
+                    if match != Match.FULL or route is None:
+                        return None
+                    scope.update(child)
+                # FastAPI's effective context holds the prefixed route template;
+                # otherwise the APIRoute is itself the selected route.
+                scope["route"] = context if getattr(context, "path_format", None) else route
+                return Request(scope)
+        except Exception:
+            logger.warning("Idempotency audit route lookup failed")
+        return None
+
+    @staticmethod
     def _endpoint_allowed_roles(request: Any) -> frozenset[str] | None:
-        """Resolve the endpoint's require_roles policy (Codex R6 #3092 P1).
+        """Return a matched handler's explicit global replay contract.
 
-        Returns the lowercase role labels the matched route accepts:
-        - empty frozenset: the route carries no require_roles dependency —
-          the resolver could not find a published policy. This does NOT
-          mean unrestricted access: the endpoint may enforce authorization
-          INLINE (e.g. queue.py combines get_current_user +
-          staff_authorization_service.can_read_queue() + a doctor-ownership
-          check). The replay policy treats it as unknown — see
-          _role_permitted_for_replay.
-        - None: the policy could NOT be determined (no app in scope, no
-          matching route) — callers fall back to the conservative R4
-          role-label comparison.
-
-        The roles come from the `required_roles` attribute that the SSOT
-        require_roles factory publishes on its dependency callable — the
-        middleware reads the policy, it never re-implements it.
+        A role dependency by itself cannot establish that the handler has no
+        subject or resource checks. Unmarked or unresolved routes return None.
         """
         try:
             scope = getattr(request, "scope", None) or {}
@@ -4041,15 +4432,31 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     continue
                 if match != Match.FULL:
                     continue
-                dependant = getattr(route, "dependant", None)
-                if dependant is None:
+                # Recent FastAPI versions retain included routers as lazy
+                # routing nodes. Resolve the same ordered selected candidate
+                # rather than assuming every app-level route is an APIRoute.
+                # Unknown router shapes fail closed instead of guessing.
+                from fastapi.routing import APIRoute
+
+                while not isinstance(route, APIRoute):
+                    select = getattr(route, "_match", None)
+                    if not callable(select):
+                        return None
+                    selected = select(dict(scope))
+                    if not isinstance(selected, tuple) or len(selected) != 4:
+                        return None
+                    match, _child_scope, route, _context = selected
+                    if match != Match.FULL or route is None:
+                        return None
+                # Role dependencies alone do not describe handler-level
+                # resource authorization. Only the matched handler can opt
+                # into a reviewed global role-only replay contract.
+                roles = getattr(getattr(route, "endpoint", None), "idempotency_replay_global_roles", None)
+                if not isinstance(roles, tuple) or not roles:
                     return None
-                allowed: set[str] = set()
-                for dep in getattr(dependant, "dependencies", []) or []:
-                    roles = getattr(getattr(dep, "call", None), "required_roles", None)
-                    if roles:
-                        allowed.update(str(r).strip().lower() for r in roles)
-                return frozenset(allowed)
+                if any(not isinstance(role, str) or not role.strip() for role in roles):
+                    return None
+                return frozenset(role.strip().lower() for role in roles)
         except Exception:  # pragma: no cover - never let policy lookup replay
             logger.warning("Idempotency endpoint policy lookup failed", exc_info=True)
             return None
@@ -4062,42 +4469,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         current_role: str | None,
         is_superuser: bool,
     ) -> bool | None:
-        """Codex R6 #3092 (P1): evaluate the ENDPOINT policy on role change.
+        """Evaluate the reviewed global role contract without discarding outcomes.
 
-        R4 refused every replay whose role label differed from the stored
-        one. That over-blocks /registrar/cart, which accepts BOTH Admin and
-        Registrar: an Admin→Registrar (or Registrar→Admin) change after a
-        committed request whose response was lost evicted the snapshot and
-        the authorized retry re-executed the cart — duplicate visits,
-        invoices and queue entries.
-
-        True  — the endpoint policy still authorizes the principal
-                (superuser bypass, no require_roles dependency, or the
-                current role in the endpoint's allowed set): keep the
-                committed snapshot and replay.
-        False — the policy refuses the current role: do NOT replay (the
-                endpoint's require_roles will 403 + audit exactly as it
-                would for a fresh request). The snapshot is KEPT — when the
-                principal regains an allowed role, the retry replays again
-                instead of re-executing the write.
-        None  — policy unknown: fall back to the conservative R4 exact
-                role-label comparison (caller decides).
+        None means no replay contract was proven: reconcile instead of
+        returning the stored body or running the original action again.
         """
-        if is_superuser:
-            return True
         allowed = self._endpoint_allowed_roles(request)
         if allowed is None:
             return None
         if not allowed:
-            # Codex R12 #3092 (P1): NO require_roles dependency on the matched
-            # route means the middleware cannot statically evaluate the
-            # endpoint's authorization — the handler may enforce it INLINE
-            # (e.g. queue.py: get_current_user + can_read_queue +
-            # doctor-ownership). An empty allowed set is INSUFFICIENT policy
-            # information, not unrestricted access: fall back to the
-            # conservative R4 comparison — same role replays, a changed role
-            # falls through so the inline authorization re-runs for real.
+            # An empty set never grants unrestricted replay.
             return None
+        if is_superuser:
+            return True
         if not current_role:
             return False
         return current_role.strip().lower() in allowed

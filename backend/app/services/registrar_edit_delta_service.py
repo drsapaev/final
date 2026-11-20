@@ -59,11 +59,273 @@ class RegistrarEditDeltaItem:
     queue_entry_id: int | None = None
 
 
+@dataclass
+class _EditLockContext:
+    transaction: Any
+    nested_transaction: Any
+    patient_id: int
+    actor_id: int | None
+    visit_ids: set[int]
+    entry_visits: dict[int, int | None]
+    catalog_ids: set[int]
+    queue_ready: bool
+
+
 class RegistrarEditDeltaService:
     """Append edit-mode service deltas without duplicating active queue rows."""
 
     def __init__(self, db: Session):
         self.db = db
+
+    def lock_edit_context(
+        self,
+        patient_id: int,
+        current_user: User | None = None,
+        *,
+        lock_queues: bool = True,
+        service_ids: tuple[int, ...] = (),
+    ) -> Patient:
+        """Lock identity and patient-owned rows before quote, changes, or flush.
+
+        Phone changes can invalidate every pending Visit through the 0102
+        trigger. Lock all of this patient's existing visits in id order before
+        queue routing or any mutation; membership probes are hints only.
+        """
+        actor_id = getattr(current_user, "id", None)
+        actor_id = int(actor_id) if actor_id is not None else None
+        old = self.db.info.get("registrar_edit_lock_context")
+        if (
+            old is not None
+            and old.transaction is self.db.get_transaction()
+            and old.nested_transaction is self.db.get_nested_transaction()
+        ):
+            if old.patient_id != patient_id or old.actor_id != actor_id:
+                raise HTTPException(
+                    status_code=409, detail="Контекст редактирования изменился"
+                )
+            patient = self.db.get(Patient, patient_id)
+            if patient is None:
+                raise HTTPException(status_code=409, detail="Пациент изменился")
+            if lock_queues:
+                self.lock_queue_context(service_ids, catalog_prelocked=False)
+            return patient
+
+        # Refreshing locked ORM rows would silently overwrite unsaved caller
+        # changes. The request must enter this boundary with a clean unit of work.
+        if (
+            self.db.new
+            or self.db.deleted
+            or any(
+                self.db.is_modified(obj, include_collections=True)
+                for obj in self.db.dirty
+            )
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Есть несохранённые изменения; повторите операцию",
+            )
+
+        actor_snapshot = None
+        if actor_id is not None:
+            actor_snapshot = (
+                current_user.role,
+                current_user.is_superuser,
+                current_user.auth_epoch,
+            )
+        with self.db.no_autoflush:
+            hint = (
+                self.db.query(Patient.user_id).filter(Patient.id == patient_id).first()
+            )
+            if hint is None:
+                raise ValueError(f"Patient {patient_id} not found")
+            patient_user_id = hint[0]
+            user_ids = sorted(
+                {int(uid) for uid in (actor_id, patient_user_id) if uid is not None}
+            )
+            users = (
+                (
+                    self.db.query(User)
+                    .filter(User.id.in_(user_ids))
+                    .order_by(User.id)
+                    .with_for_update(of=User)
+                    .populate_existing()
+                    .all()
+                )
+                if user_ids
+                else []
+            )
+            users_by_id = {user.id: user for user in users}
+            if actor_id is not None:
+                actor = users_by_id.get(actor_id)
+                if (
+                    actor is None
+                    or not actor.is_active
+                    or (actor.role, actor.is_superuser, actor.auth_epoch)
+                    != actor_snapshot
+                ):
+                    raise HTTPException(status_code=403, detail="Доступ изменился")
+            if patient_user_id is not None and patient_user_id not in users_by_id:
+                raise HTTPException(status_code=409, detail="Связь пациента изменилась")
+            patient = (
+                self.db.query(Patient)
+                .filter(Patient.id == patient_id)
+                .with_for_update(of=Patient)
+                .populate_existing()
+                .first()
+            )
+            if patient is None or patient.user_id != patient_user_id:
+                raise HTTPException(status_code=409, detail="Связь пациента изменилась")
+
+            hinted_visit_ids = [
+                row[0]
+                for row in self.db.query(Visit.id)
+                .filter(Visit.patient_id == patient_id)
+                .order_by(Visit.id)
+                .all()
+            ]
+            visits = (
+                self.db.query(Visit)
+                .filter(Visit.id.in_(hinted_visit_ids))
+                .order_by(Visit.id)
+                .with_for_update(of=Visit)
+                .populate_existing()
+                .all()
+            )
+            if [visit.id for visit in visits] != hinted_visit_ids or any(
+                visit.patient_id != patient_id for visit in visits
+            ):
+                raise HTTPException(status_code=409, detail="Состав визитов изменился")
+            # Recheck after locks; additions/ownership changes must not be
+            # silently accepted from the original routing hint.
+            current_visit_ids = [
+                row[0]
+                for row in self.db.query(Visit.id)
+                .filter(Visit.patient_id == patient_id)
+                .order_by(Visit.id)
+                .all()
+            ]
+            if current_visit_ids != hinted_visit_ids:
+                raise HTTPException(status_code=409, detail="Состав визитов изменился")
+
+            self.db.info["registrar_edit_lock_context"] = _EditLockContext(
+                transaction=self.db.get_transaction(),
+                nested_transaction=self.db.get_nested_transaction(),
+                patient_id=patient_id,
+                actor_id=actor_id,
+                visit_ids=set(hinted_visit_ids),
+                entry_visits={},
+                catalog_ids=set(),
+                queue_ready=False,
+            )
+        if lock_queues:
+            self.lock_queue_context(service_ids, catalog_prelocked=False)
+        return patient
+
+    def lock_queue_context(
+        self, service_ids: tuple[int, ...] | list[int], *, catalog_prelocked: bool
+    ) -> None:
+        """Acquire catalog before queue rows, preserving quote's lock order."""
+        context = self.db.info.get("registrar_edit_lock_context")
+        if (
+            context is None
+            or context.transaction is not self.db.get_transaction()
+            or context.nested_transaction is not self.db.get_nested_transaction()
+        ):
+            raise HTTPException(
+                status_code=409, detail="Контекст редактирования изменился"
+            )
+        ids = sorted({int(ident) for ident in service_ids})
+        if context.queue_ready:
+            if not set(ids).issubset(context.catalog_ids):
+                raise HTTPException(status_code=409, detail="Состав услуг изменился")
+            return
+        with self.db.no_autoflush:
+            if not catalog_prelocked and ids:
+                (
+                    self.db.query(Service)
+                    .filter(Service.id.in_(ids))
+                    .order_by(Service.id)
+                    .with_for_update(of=Service)
+                    .populate_existing()
+                    .all()
+                )
+            patient_id = context.patient_id
+            hinted_entry_ids = [
+                row[0]
+                for row in self.db.query(OnlineQueueEntry.id)
+                .filter(OnlineQueueEntry.patient_id == patient_id)
+                .order_by(OnlineQueueEntry.id)
+                .all()
+            ]
+            entries = (
+                self.db.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.id.in_(hinted_entry_ids))
+                .order_by(OnlineQueueEntry.id)
+                .with_for_update(of=OnlineQueueEntry)
+                .populate_existing()
+                .all()
+            )
+            if [entry.id for entry in entries] != hinted_entry_ids or any(
+                entry.patient_id != patient_id for entry in entries
+            ):
+                raise HTTPException(status_code=409, detail="Состав очереди изменился")
+            current_entry_ids = [
+                row[0]
+                for row in self.db.query(OnlineQueueEntry.id)
+                .filter(OnlineQueueEntry.patient_id == patient_id)
+                .order_by(OnlineQueueEntry.id)
+                .all()
+            ]
+            if current_entry_ids != hinted_entry_ids:
+                raise HTTPException(status_code=409, detail="Состав очереди изменился")
+            queue_ids = sorted(
+                {entry.queue_id for entry in entries if entry.queue_id is not None}
+            )
+            queues = (
+                (
+                    self.db.query(DailyQueue)
+                    .filter(DailyQueue.id.in_(queue_ids))
+                    .order_by(DailyQueue.id)
+                    .with_for_update(of=DailyQueue)
+                    .populate_existing()
+                    .all()
+                )
+                if queue_ids
+                else []
+            )
+            if [queue.id for queue in queues] != queue_ids:
+                raise HTTPException(
+                    status_code=409, detail="Контекст очереди изменился"
+                )
+            context.entry_visits = {entry.id: entry.visit_id for entry in entries}
+            context.catalog_ids = set(ids)
+            context.queue_ready = True
+
+    def _validate_locked_entry(self, entry: OnlineQueueEntry) -> OnlineQueueEntry:
+        context = self.db.info.get("registrar_edit_lock_context")
+        if (
+            context is None
+            or context.transaction is not self.db.get_transaction()
+            or context.nested_transaction is not self.db.get_nested_transaction()
+        ):
+            return entry  # Read-only preview has no edit lock context.
+        if not context.queue_ready:
+            raise HTTPException(
+                status_code=409, detail="Контекст очереди не заблокирован"
+            )
+        if (
+            entry.patient_id != context.patient_id
+            or entry.id not in context.entry_visits
+            or context.entry_visits[entry.id] != entry.visit_id
+        ):
+            raise HTTPException(
+                status_code=409, detail="Контекст записи очереди изменился"
+            )
+        if entry.visit_id is not None and entry.visit_id not in context.visit_ids:
+            raise ValueError(
+                "Queue entry visit does not belong to the requested patient"
+            )
+        return entry
 
     def apply(
         self,
@@ -79,9 +341,13 @@ class RegistrarEditDeltaService:
         expected_entry_updated_at: dict[int, str] | None = None,
         current_user: User | None = None,
     ) -> dict[str, Any]:
-        patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
-        if not patient:
-            raise ValueError(f"Patient {patient_id} not found")
+        if not all_free and str(discount_mode or "").strip().casefold() == "benefit":
+            raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
+        patient = self.lock_edit_context(
+            patient_id,
+            current_user,
+            service_ids=tuple(item.service_id for item in services),
+        )
 
         queue_entry_ids = set(existing_queue_entry_ids or [])
 
@@ -741,7 +1007,7 @@ class RegistrarEditDeltaService:
                     specialist_id
                 ):
                     return None
-            return named_entry
+            return self._validate_locked_entry(named_entry)
         query = self.db.query(OnlineQueueEntry).join(
             DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
         )
@@ -774,8 +1040,8 @@ class RegistrarEditDeltaService:
                 and entry.queue.specialist_id is not None
                 and int(entry.queue.specialist_id) == int(specialist_id)
             ]
-            return same_specialist[0] if same_specialist else None
-        return entries[0] if entries else None
+            return self._validate_locked_entry(same_specialist[0]) if same_specialist else None
+        return self._validate_locked_entry(entries[0]) if entries else None
 
     def _assert_doctor_eligibility_for_addition(
         self,
@@ -1083,6 +1349,11 @@ class RegistrarEditDeltaService:
             commit=False,
         )
         entry.updated_at = queue_service.get_local_timestamp(self.db)
+        context = self.db.info.get("registrar_edit_lock_context")
+        if (context is not None and context.transaction is self.db.get_transaction() and
+                context.nested_transaction is self.db.get_nested_transaction()):
+            context.visit_ids.add(visit.id)
+            context.entry_visits[entry.id] = visit.id
         return self._delta_result(
             entry=entry,
             service=service,
@@ -1126,6 +1397,11 @@ class RegistrarEditDeltaService:
         )
         entry.visit_id = visit.id
         entry.updated_at = queue_service.get_local_timestamp(self.db)
+        context = self.db.info.get("registrar_edit_lock_context")
+        if (context is not None and context.transaction is self.db.get_transaction() and
+                context.nested_transaction is self.db.get_nested_transaction()):
+            context.visit_ids.add(visit.id)
+            context.entry_visits[entry.id] = visit.id
         return visit
 
     def _create_visit(

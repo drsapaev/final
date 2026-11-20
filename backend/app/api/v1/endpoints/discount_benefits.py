@@ -5,18 +5,32 @@ API endpoints для системы скидок и льгот
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.api.trusted_financial_auth import financial_admin
 from app.models.discount_benefits import BenefitType, DiscountType
 from app.models.user import User
 from app.services.discount_benefits_api_service import (
     DiscountBenefitsApiDomainError,
     DiscountBenefitsApiService,
 )
-from app.services.discount_benefits_service import DiscountBenefitsService
+from app.services.discount_benefits_service import (
+    DiscountBenefitsService,
+    EncounterBenefitAuthorityRequired,
+)
+from app.services.encounter_benefit_decision import (
+    EncounterBenefitDecision,
+    EncounterBenefitDecisionError,
+    approve_registrar_benefit,
+)
+from app.services.profile_contact_security import (
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+)
 
 router = APIRouter()
 
@@ -130,6 +144,13 @@ class ApplyBenefitRequest(BaseModel):
     appointment_id: int | None = None
     visit_id: int | None = None
     invoice_id: int | None = None
+
+
+class ApproveRegistrarBenefitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    invoice_id: int = Field(strict=True, ge=1, le=2147483647)
+    patient_benefit_id: int = Field(strict=True, ge=1, le=2147483647)
 
 
 class EarnPointsRequest(BaseModel):
@@ -444,8 +465,45 @@ async def apply_benefit(
                 "final_amount": application.final_amount,
             },
         }
+    except EncounterBenefitAuthorityRequired as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
+
+
+@router.post(
+    "/benefits/encounter/apply",
+    response_model=EncounterBenefitDecision,
+    responses={
+        401: {"description": "Для решения нужна действующая сессия сотрудника"},
+        403: {"description": "Решение доступно администратору"},
+        409: {"description": "Счёт, обращение или право на льготу требует сверки"},
+        503: {"description": "Подтверждение льготы временно недоступно"},
+    },
+)
+def apply_registrar_encounter_benefit(
+    approval: ApproveRegistrarBenefitRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(financial_admin),
+) -> EncounterBenefitDecision:
+    """Подтвердить одну льготу для всех услуг исходного оформления."""
+    try:
+        bearer = capture_profile_bearer(request, current_user)
+        result = approve_registrar_benefit(
+            db, invoice_id=approval.invoice_id, assignment_id=approval.patient_benefit_id, bearer=bearer,
+        )
+        db.commit()
+        return result
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сессия недоступна") from None
+    except EncounterBenefitDecisionError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Подтверждение льготы временно недоступно") from None
 
 
 # === ПРОГРАММЫ ЛОЯЛЬНОСТИ ===
@@ -609,6 +667,8 @@ async def calculate_total_discount(
         )
 
         return {"success": True, "calculation": result}
+    except EncounterBenefitAuthorityRequired as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception:
         raise HTTPException(status_code=400, detail="Ошибка операции")
 

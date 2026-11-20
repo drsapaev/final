@@ -2,11 +2,13 @@
 Интеграционные тесты для API подтверждения визитов
 """
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 
 from app.models.online_queue import OnlineQueueEntry
 from app.models.telegram_config import TelegramUser
+from app.models.visit import VisitService
 from app.services.visit_confirmation_service import (
     VisitConfirmationDomainError,
     VisitConfirmationService,
@@ -17,6 +19,23 @@ from app.services.visit_confirmation_service import (
 @pytest.fixture(autouse=True)
 def _future_telegram_start(monkeypatch):
     monkeypatch.setattr("app.tasks.worker._appointment_start_utc", lambda visit: datetime.now(UTC) + timedelta(days=1))
+
+
+@pytest.fixture(autouse=True)
+def _currency_for_positive_visit_fixture(request):
+    if "test_visit" not in request.fixturenames:
+        return
+    visit = request.getfixturevalue("test_visit")
+    db = request.getfixturevalue("db_session")
+    token, expires_at = visit.confirmation_token, visit.confirmation_expires_at
+    db.add(VisitService(visit_id=visit.id, service_id=123, name="SYNTHETIC",
+                        price=Decimal("1.00"), qty=1, currency="UZS"))
+    db.flush()
+    db.refresh(visit)
+    # A migrated trigger may invalidate the pre-existing synthetic bearer
+    # when the service is added; mint the fixture bearer after that change.
+    visit.confirmation_token, visit.confirmation_expires_at = token, expires_at
+    db.commit()
 
 
 def _link_patient_chat(db, visit):
@@ -56,6 +75,13 @@ def _trusted_confirm(db, token, user_agent="telegram"):
 class TestVisitConfirmationAPI:
     """Интеграционные тесты для API подтверждения визитов"""
 
+    def test_dirty_same_session_is_not_silently_discarded(self, db_session, test_visit):
+        test_visit.notes = "synthetic unflushed update"
+        with pytest.raises(VisitConfirmationDomainError) as error:
+            VisitConfirmationService(db_session).get_visit_info(test_visit.confirmation_token)
+        assert error.value.status_code == 409
+        assert test_visit.notes == "synthetic unflushed update"
+
     def test_get_visit_info_success(self, client, test_visit):
         """Тест получения информации о визите по токену"""
         response = client.get(f"/api/v1/visits/info/{test_visit.confirmation_token}")
@@ -77,10 +103,11 @@ class TestVisitConfirmationAPI:
         data = response.json()
         assert data["detail"] == "Визит не найден"
 
-    def test_get_visit_info_expired_token(self, client, test_visit):
+    def test_get_visit_info_expired_token(self, client, db_session, test_visit):
         """Тест получения информации с истекшим токеном"""
         # Устанавливаем время истечения в прошлом
         test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(hours=1)
+        db_session.flush()
 
         response = client.get(f"/api/v1/visits/info/{test_visit.confirmation_token}")
 
@@ -88,7 +115,7 @@ class TestVisitConfirmationAPI:
         data = response.json()
         assert "истек" in data["detail"]
 
-    def test_post_visit_info_matches_legacy_get(self, client, test_visit):
+    def test_post_visit_info_matches_legacy_get(self, client, db_session, test_visit):
         """The token moves to the request body; the card keeps its fields.
 
         PR 3407 delta review P2: BOTH the POST and the legacy GET are
@@ -98,6 +125,7 @@ class TestVisitConfirmationAPI:
         """
         token = test_visit.confirmation_token
         test_visit.notes = "diagnosis: private clinical note"
+        db_session.flush()
         post_response = client.post("/api/v1/visits/info", json={"token": token})
         get_response = client.get(f"/api/v1/visits/info/{token}")
 
@@ -106,7 +134,7 @@ class TestVisitConfirmationAPI:
         assert "notes" not in get_response.json()
         assert token not in post_response.request.url.path
 
-    def test_post_visit_info_omits_internal_notes(self, client, test_visit):
+    def test_post_visit_info_omits_internal_notes(self, client, db_session, test_visit):
         """PR 3390 review P2: the public POST card must not leak Visit.notes.
 
         ``Visit.notes`` carries clinical/admin text (the same marker the
@@ -118,6 +146,7 @@ class TestVisitConfirmationAPI:
         read it in the Network response.
         """
         test_visit.notes = "diagnosis: private clinical note"
+        db_session.flush()
         response = client.post(
             "/api/v1/visits/info", json={"token": test_visit.confirmation_token}
         )
@@ -136,7 +165,7 @@ class TestVisitConfirmationAPI:
         assert "notes" not in legacy.json()
         assert "private clinical note" not in legacy.text
 
-    def test_legacy_get_visit_info_omits_internal_notes(self, client, test_visit):
+    def test_legacy_get_visit_info_omits_internal_notes(self, client, db_session, test_visit):
         """PR 3407 delta review P2: legacy GET is patient-safe too.
 
         The old per-route fix filtered ``notes`` only on the POST via the
@@ -148,6 +177,7 @@ class TestVisitConfirmationAPI:
         same patient-safe model.
         """
         test_visit.notes = "diagnosis: private clinical note"
+        db_session.flush()
         response = client.get(
             f"/api/v1/visits/info/{test_visit.confirmation_token}"
         )
@@ -164,9 +194,10 @@ class TestVisitConfirmationAPI:
         assert post_response.status_code == get_response.status_code == 404
         assert post_response.json() == get_response.json()
 
-    def test_post_visit_info_expired_token_matches_legacy_get(self, client, test_visit):
+    def test_post_visit_info_expired_token_matches_legacy_get(self, client, db_session, test_visit):
         """Error bodies stay identical between POST and legacy GET."""
         test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(hours=1)
+        db_session.flush()
         token = test_visit.confirmation_token
         post_response = client.post("/api/v1/visits/info", json={"token": token})
         get_response = client.get(f"/api/v1/visits/info/{token}")
@@ -334,9 +365,10 @@ class TestVisitConfirmationAPI:
         assert test_visit.status == "pending_confirmation"
         assert test_visit.confirmation_token == token
 
-    def test_confirm_visit_pwa_success(self, client, test_visit, test_daily_queue):
+    def test_confirm_visit_pwa_success(self, client, db_session, test_visit, test_daily_queue):
         """Тест успешного подтверждения визита через PWA"""
         test_visit.confirmation_channel = "pwa"
+        db_session.flush()
 
         response = client.post("/api/v1/patient/visits/confirm", json={
             "token": test_visit.confirmation_token,
@@ -349,9 +381,10 @@ class TestVisitConfirmationAPI:
         assert data["success"] is True
         assert data["visit_id"] == test_visit.id
 
-    def test_confirm_visit_pwa_phone_mismatch(self, client, test_visit):
+    def test_confirm_visit_pwa_phone_mismatch(self, client, db_session, test_visit):
         """Тест подтверждения PWA с неправильным телефоном"""
         test_visit.confirmation_channel = "pwa"
+        db_session.flush()
 
         response = client.post("/api/v1/patient/visits/confirm", json={
             "token": test_visit.confirmation_token,

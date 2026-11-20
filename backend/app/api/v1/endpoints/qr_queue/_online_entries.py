@@ -2108,6 +2108,11 @@ def full_update_online_entry(
     - Список услуг
     - Расчет итоговой суммы с учетом скидок
     """
+    if not (request.all_free or request.discount_mode == "all_free") and (
+        str(request.discount_mode or "").strip().casefold() == "benefit"
+        or str(request.visit_type or "").strip().casefold() == "benefit"
+    ):
+        raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
     # Codex R7 #3095 (P1): нормализуем режим All Free ОДИН РАЗ до всех
     # секций — квота резолвит эффективный режим из ПАРЫ
     # (all_free, discount_mode), а команды ценили только по булеву флагу.

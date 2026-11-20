@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from fastapi import HTTPException
+
 from app.models.enums import PaymentStatus
 from app.repositories.payment_test_init_repository import PaymentTestInitRepository
 from app.services.billing_service import BillingService
@@ -15,7 +17,7 @@ from app.services.payment_invariant_service import PaymentInvariantService
 @dataclass
 class PaymentTestInitDomainError(Exception):
     status_code: int
-    detail: str
+    detail: Any
 
 
 class PaymentTestInitService:
@@ -116,6 +118,9 @@ class PaymentTestInitService:
             )
         except PaymentTestInitDomainError:
             raise
+        except HTTPException as exc:
+            self.repository.rollback()
+            raise PaymentTestInitDomainError(status_code=exc.status_code, detail=exc.detail) from exc
         except Exception as exc:
             self.repository.rollback()
             raise PaymentTestInitDomainError(

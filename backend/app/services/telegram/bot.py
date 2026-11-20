@@ -14,6 +14,7 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from starlette.concurrency import run_in_threadpool
 
 from ...core.config import settings
+from ...core.logging_config import protect_telegram_preview_logs
 from ...db.session import SessionLocal
 from ..appointment_rsvp import (
     apply_appointment_decision,
@@ -443,11 +444,13 @@ class ClinicTelegramBot:
             if not preview:
                 await callback.answer("Визит недоступен", show_alert=True)
                 return
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"confirm_visit:{preview['action_token']}"),
-                InlineKeyboardButton(text="❌ Отменить", callback_data=f"cancel_visit:{preview['action_token']}"),
-            ]])
-            await callback.message.answer(text=preview["text"], parse_mode=None, reply_markup=keyboard)
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Открыть визит", url=preview["view_url"])],
+                [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"confirm_visit:{preview['action_token']}"),
+                 InlineKeyboardButton(text="❌ Отменить", callback_data=f"cancel_visit:{preview['action_token']}")],
+            ])
+            with protect_telegram_preview_logs():
+                await callback.message.answer(text=preview["text"], parse_mode=None, reply_markup=keyboard)
             await callback.answer()
         except Exception as exc:
             logger.error("Visit preview failed error_type=%s", type(exc).__name__)

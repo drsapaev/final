@@ -11,7 +11,7 @@ GQL-AUDIT-28 follow-up:
 
 import logging
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import Context, Decimal, localcontext
 from zoneinfo import ZoneInfo
 
 import strawberry
@@ -104,6 +104,179 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit
+
+
+def _create_standard_visit(info, input: VisitInput, discount_mode: str) -> VisitMutationResponse:
+    """Create a normal or repeat visit from locked server-owned prices."""
+    from sqlalchemy.exc import DBAPIError
+
+    from app.api.deps import require_active_roles, require_roles
+    from app.core.config import settings
+    from app.crud.clinic import clinic_today
+    from app.db.trusted_schema import TrustedSchemaUnavailable, pin_application_schema
+    from app.models.user import User
+    from app.services.doctor_repeat_discount import (
+        RepeatPolicyError,
+        prepare_repeat_discount,
+    )
+    from app.services.encounter_creation import create_standalone_encounter
+    from app.services.money_input import MAX_MONEY, MoneyInputError, parse_money
+    from app.services.patient_access_audit import _build_patient_access_entry
+    from app.services.patient_subject_lock import (
+        PatientSubjectLockError,
+        lock_patient_subject,
+    )
+    from app.services.profile_contact_security import (
+        ProfileBearerInvalid,
+        capture_profile_bearer,
+        check_bearer_expiry,
+        check_profile_bearer,
+    )
+    from app.services.service_mapping import get_service_code
+
+    actor_context = getattr(info.context, "user", None) if info.context else None
+    request = getattr(info.context, "request", None) if info.context else None
+    if actor_context is None or request is None:
+        return VisitMutationResponse(success=False, message=t("error.unauthorized"), errors=["UNAUTHENTICATED"])
+
+    try:
+        bearer = capture_profile_bearer(request, actor_context)
+        if bearer.patient_id is not None:
+            raise ProfileBearerInvalid("Bearer session unavailable")
+        with get_db_session() as db:
+            pin_application_schema(
+                db, schema=settings.TRUSTED_DB_SCHEMA,
+                expected_owner=settings.TRUSTED_DB_SCHEMA_OWNER,
+                expected_runtime_role=settings.TRUSTED_DB_RUNTIME_ROLE,
+                trusted_owner_members=settings.TRUSTED_DB_OWNER_MEMBERS,
+                expected_auth_owner=settings.TRUSTED_AUTH_TABLE_OWNER,
+                trusted_auth_owner_members=settings.TRUSTED_AUTH_OWNER_MEMBERS,
+                trusted_auth_read_roles=settings.TRUSTED_AUTH_READ_ROLES,
+                trusted_auth_write_roles=settings.TRUSTED_AUTH_WRITE_ROLES,
+                expected_users_owner=settings.TRUSTED_AUTH_USERS_OWNER,
+                trusted_users_owner_members=settings.TRUSTED_AUTH_USERS_OWNER_MEMBERS,
+                trusted_users_write_roles=settings.TRUSTED_AUTH_USERS_WRITE_ROLES,
+            )
+            # Probe only to determine which User rows to lock. Recheck the
+            # Doctor after both actor and owner are locked in stable order.
+            doctor_user_id = db.query(Doctor.user_id).filter(Doctor.id == input.doctor_id).scalar() if input.doctor_id else None
+            user_ids = {bearer.user_id}
+            if doctor_user_id is not None:
+                user_ids.add(doctor_user_id)
+            users = (db.query(User).filter(User.id.in_(user_ids))
+                     .order_by(User.id).with_for_update(nowait=True).populate_existing().all())
+            users_by_id = {user.id: user for user in users}
+            actor, owner = users_by_id.get(bearer.user_id), users_by_id.get(doctor_user_id)
+            if actor is None:
+                raise ProfileBearerInvalid("Bearer session unavailable")
+            check_profile_bearer(db, actor, bearer)
+            gated = require_roles("Admin")(current_user=actor, db=db)
+            require_active_roles("Admin")(current_user=actor, db=db, _role_gated=gated)
+            doctor = None
+            if input.doctor_id:
+                doctor = (db.query(Doctor).filter(Doctor.id == input.doctor_id)
+                          .with_for_update(nowait=True).populate_existing().first())
+                if (doctor is None or not doctor.active or doctor.user_id != doctor_user_id
+                        or owner is None or not owner.is_active):
+                    return VisitMutationResponse(success=False, message=t("doctor.not_found"), errors=["DOCTOR_NOT_FOUND"])
+            elif discount_mode == "repeat":
+                raise RepeatPolicyError("Повторный визит требует назначенного врача")
+            if not lock_patient_subject(db, input.patient_id):
+                return VisitMutationResponse(success=False, message=t("patient.not_found"), errors=["PATIENT_NOT_FOUND"])
+
+            today = clinic_today(db)
+            visit_date = input.visit_date or today
+            snapshot = (prepare_repeat_discount(
+                db, patient_id=input.patient_id, doctor_id=doctor.id,
+                doctor_user_id=doctor_user_id, target_date=visit_date, clinic_today=today,
+            ) if discount_mode == "repeat" else None)
+            ids = input.service_ids or []
+            if ((discount_mode == "repeat" and not ids)
+                    or any(type(item) is not int or item <= 0 for item in ids)
+                    or len(set(ids)) != len(ids)):
+                raise RepeatPolicyError("Услуги повторного визита недоступны")
+            services = (db.query(Service).filter(Service.id.in_(ids)).order_by(Service.id)
+                        .with_for_update(nowait=True).populate_existing().all()) if ids else []
+            by_id = {service.id: service for service in services if service.active}
+            if len(by_id) != len(ids):
+                return VisitMutationResponse(success=False, message="Одна или несколько услуг не найдены", errors=["SERVICES_NOT_FOUND"])
+            if snapshot is not None:
+                snapshot.require_eligible(db, by_id, ids)
+            total = Decimal("0.00")
+            services_data = []
+            currencies = {}
+            for service_id in ids:
+                service = by_id[service_id]
+                currency = service.currency
+                if (not isinstance(currency, str) or len(currency) != 3
+                        or not currency.isascii() or not currency.isalpha() or not currency.isupper()):
+                    raise MoneyInputError("Валюта услуги недоступна")
+                currencies[service_id] = currency
+                base_price = parse_money(service.price)
+                amount = snapshot.price(base_price, bool(service.is_consultation)) if snapshot else base_price
+                # The surrounding worker's Decimal settings must not round
+                # or trap a valid catalog sum before the database bound check.
+                with localcontext(Context(prec=40)):
+                    total += amount
+                if total > MAX_MONEY:
+                    raise MoneyInputError("Некорректная денежная сумма")
+                services_data.append({"service_id": service.id,
+                    "code": service.service_code or get_service_code(service.id, db),
+                    "name": service.name, "qty": 1, "price": amount})
+            if len(set(currencies.values())) > 1:
+                raise MoneyInputError("Валюты услуг не совпадают")
+            encounter = create_standalone_encounter(db, patient_id=input.patient_id)
+            visit = create_visit(
+                db=db, patient_id=input.patient_id, doctor_id=doctor.id if doctor else None,
+                visit_date=visit_date, visit_time=input.visit_time, discount_mode=discount_mode,
+                notes=input.notes, services=services_data, status="pending_confirmation",
+                approval_status="approved", auto_status=False, notify=False, log=True,
+                commit=False, encounter_id=encounter.id,
+                trusted_currency_by_service=currencies,
+            )
+            db.flush()
+            projected = visit_to_type(visit)
+            # Non-blocking audit is isolated by a savepoint; it must not
+            # commit the clinical transaction or trigger post-commit reads.
+            try:
+                with db.begin_nested():
+                    entry = _build_patient_access_entry(
+                        db, actor_user=actor, subject_patient_id=input.patient_id,
+                        resource_type="visit", action="view", request=request,
+                    )
+                    if entry is not None:
+                        db.add(entry)
+                    _, new_data = extract_model_changes(None, visit)
+                    log_critical_change(db=db, user_id=actor.id, action="CREATE",
+                        table_name="visits", row_id=visit.id, old_data=None,
+                        new_data=mask_pii(new_data), request=request,
+                        description="Создание визита (GraphQL createVisit)")
+                    db.flush()
+            except Exception as exc:  # audit remains non-blocking
+                logger.warning("GraphQL repeat visit audit unavailable (%s)", type(exc).__name__)
+            check_bearer_expiry(bearer)
+            db.commit()
+            return VisitMutationResponse(success=True, message="Визит успешно создан", visit=projected)
+    except RepeatPolicyError as exc:
+        return VisitMutationResponse(success=False, message=str(exc),
+            errors=["REPEAT_VISIT_NOT_ELIGIBLE" if discount_mode == "repeat" else "SERVICES_NOT_FOUND"])
+    except (ProfileBearerInvalid, HTTPException):
+        return VisitMutationResponse(success=False, message=t("error.unauthorized"), errors=["UNAUTHENTICATED"])
+    except PatientSubjectLockError as exc:
+        code = "RETRYABLE_CONFLICT" if exc.status_code == 409 else "SERVICE_UNAVAILABLE"
+        return VisitMutationResponse(success=False, message="Сервис записи временно недоступен", errors=[code])
+    except (TrustedSchemaUnavailable, MoneyInputError):
+        return VisitMutationResponse(success=False, message="Сервис записи временно недоступен", errors=["SERVICE_UNAVAILABLE"])
+    except DBAPIError as exc:
+        code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        sqlite_code = getattr(exc.orig, "sqlite_errorcode", None)
+        if code in {"55P03", "40P01"} or (sqlite_code is not None and sqlite_code & 0xff in {5, 6}):
+            return VisitMutationResponse(success=False, message="Повторите запрос", errors=["RETRYABLE_CONFLICT"])
+        logger.error("GraphQL repeat visit database error (%s)", type(exc.orig).__name__)
+        return VisitMutationResponse(success=False, message=t("error.internal"), errors=["INTERNAL_ERROR"])
+    except Exception as exc:
+        logger.error("GraphQL repeat visit unavailable (%s)", type(exc).__name__)
+        return VisitMutationResponse(success=False, message=t("error.internal"), errors=["INTERNAL_ERROR"])
 
 
 @strawberry.type
@@ -586,234 +759,22 @@ class Mutation:
         self, info: strawberry.Info, input: VisitInput
     ) -> VisitMutationResponse:
         """Создать новый визит"""
-        try:
-            with get_db_session() as db:
-                # Проверяем существование пациента и врача
-                patient = (
-                    db.query(Patient)
-                    .filter(
-                        Patient.id == input.patient_id,
-                        Patient.is_deleted.is_(False),
-                    )
-                    .first()
-                )
-                if not patient:
-                    return VisitMutationResponse(
-                        success=False,
-                        message=t("patient.not_found"),
-                        errors=["PATIENT_NOT_FOUND"],
-                    )
+        from app.api.v1.endpoints.registrar_wizard._helpers import (
+            _normalize_registration_discount_mode,
+        )
 
-                doctor = None
-                if input.doctor_id:
-                    doctor = (
-                        db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
-                    )
-                    if not doctor:
-                        return VisitMutationResponse(
-                            success=False,
-                            message=t("doctor.not_found"),
-                            errors=["DOCTOR_NOT_FOUND"],
-                        )
-
-                # Проверяем услуги
-                services = []
-                if input.service_ids:
-                    services = (
-                        db.query(Service)
-                        .filter(Service.id.in_(input.service_ids))
-                        .all()
-                    )
-                    if len(services) != len(input.service_ids):
-                        return VisitMutationResponse(
-                            success=False,
-                            message="Одна или несколько услуг не найдены",
-                            errors=["SERVICES_NOT_FOUND"],
-                        )
-
-                # Подготавливаем услуги для SSOT create_visit.
-                # Codex P1: цены считаются КАНОНИЧЕСКИМ прайсингом регистратуры
-                # (_apply_service_discount из registrar_wizard/_helpers — тот же
-                # путь, что в /registrar/cart) ДО персистенса, а не постфактум
-                # в биллинге. Иначе VisitService хранит базовую цену и потом
-                # нельзя отличить «скидка не применена» от «скидка потеряна».
-                # AGENTS.md L155-158: нет второго источника прайсинга.
-                from app.api.v1.endpoints.registrar_wizard._helpers import (
-                    _apply_service_discount,
-                    _check_repeat_visit_eligibility,
-                    _load_registration_discount_settings,
-                    _normalize_registration_discount_mode,
-                )
-                from app.services.service_mapping import get_service_code
-
-                discount_mode = _normalize_registration_discount_mode(
-                    input.discount_mode
-                )
-                registration_settings = _load_registration_discount_settings(db)
-
-                if discount_mode == "repeat":
-                    # Канонический guard корзины: повторный визит возможен
-                    # только при консультации у этого врача за N дней
-                    repeat_days = int(registration_settings["repeat_visit_days"])
-                    if not _check_repeat_visit_eligibility(
-                        db,
-                        input.patient_id,
-                        input.doctor_id,
-                        [s.id for s in services],
-                        days_window=repeat_days,
-                    ):
-                        return VisitMutationResponse(
-                            success=False,
-                            message=(
-                                "Повторный визит недоступен: нет консультации "
-                                f"у этого врача за последние {repeat_days} дней"
-                            ),
-                            errors=["REPEAT_VISIT_NOT_ELIGIBLE"],
-                        )
-
-                services_data = []
-                for service in services:
-                    base_price = Decimal(str(service.price or 0))
-                    item_price = _apply_service_discount(
-                        base_price,
-                        discount_mode,
-                        registration_settings,
-                        service.is_consultation,
-                    )
-                    services_data.append(
-                        {
-                            "service_id": service.id,
-                            # SSOT: canonical service_code helper (как в /registrar/cart)
-                            "code": service.service_code
-                            or get_service_code(service.id, db),
-                            "name": service.name,
-                            "qty": 1,
-                            "price": float(item_price),
-                        }
-                    )
-
-                # SSOT: единая функция create_visit
-                # Codex P1 (round-15): опущенный visitDate на UTC-хосте между
-                # 19:00 и полуночью должен дефолтиться на день КЛИНИКИ по
-                # конфигурированной таймзоне — normalize_visit_payload
-                # подставляет host date.today(), который в этом окне уже
-                # «вчера» для клиники (Asia/Tashkent), и визит попадает на
-                # неверный день (подтверждение раскидает его по очередям
-                # прошедшего дня). Считаем дефолт здесь, до делегации.
-                visit_date = input.visit_date
-                if visit_date is None:
-                    visit_date = datetime.now(
-                        ZoneInfo(
-                            get_queue_settings(db).get("timezone", "Asia/Tashkent")
-                        )
-                    ).date()
-                visit = create_visit(
-                    db=db,
-                    patient_id=input.patient_id,
-                    doctor_id=input.doctor_id,
-                    visit_date=visit_date,
-                    visit_time=input.visit_time,
-                    discount_mode=discount_mode,
-                    notes=input.notes,
-                    services=services_data,
-                    # SSOT: канонический стартовый статус жизненного цикта
-                    status="pending_confirmation",
-                    # Каноническое правило корзины: all_free требует
-                    # подтверждения, если не включён all_free_auto_approve
-                    approval_status=(
-                        "approved"
-                        if discount_mode != "all_free"
-                        or registration_settings["all_free_auto_approve"]
-                        else "pending"
-                    ),
-                    auto_status=False,
-                    notify=False,
-                    log=True,
-                )
-
-                # Codex P1 (round-14): create_visit уже ЗАКОММИТИЛ визит
-                # (SSOT crud) — отказ read-trail/аудита/второго коммита
-                # НЕ должен возвращать INTERNAL_ERROR: клиентский ретрай
-                # создал бы дубликат клинической/биллинговой записи.
-                # Неблокирующая семантика: rollback + warning + success.
-                try:
-                    # M4-P0-1: visit_to_type включает patient (PHI) — read-trail
-                    if visit.patient_id:
-                        _audit_patient_access(info, db, [visit.patient_id], "visit")
-
-                    # Codex P1 (round-8): канонический /visits writer
-                    # (VisitsApiService.create_visit) пишет CREATE критичный
-                    # аудит — GraphQL-визиты не выпадают из обязательной
-                    # истории мутаций. (PHI read-trail выше — view, не CREATE.)
-                    actor_visit = getattr(info.context, "user", None)
-                    # Codex P1 (round-11): снапшот визита может содержать
-                    # клинический текст (notes — full-redact по AGENTS.md) —
-                    # маскируем каноническим pii_masker ДО записи аудита.
-                    _, visit_new_data = extract_model_changes(None, visit)
-                    visit_new_data = mask_pii(visit_new_data)
-                    log_critical_change(
-                        db=db,
-                        user_id=actor_visit.id if actor_visit else None,
-                        action="CREATE",
-                        table_name="visits",
-                        row_id=visit.id,
-                        old_data=None,
-                        new_data=visit_new_data,
-                        request=getattr(info.context, "request", None),
-                        description="Создание визита (GraphQL createVisit)",
-                    )
-                    db.commit()
-                except Exception as audit_error:  # noqa: BLE001
-                    logger.warning(
-                        "GraphQL createVisit: post-commit audit failed "
-                        "(visit %s is durable): %s",
-                        visit.id,
-                        audit_error,
-                    )
-                    db.rollback()
-
-                # Codex P2 (round-12): заявка All Free требует сигнала
-                # аппруверам — каноническая корзина шлёт
-                # send_all_free_request_notification после коммита;
-                # резолвер исполняется в worker-треде (offloop), поэтому
-                # asyncio.run доступен, как в REST-пути.
-                if (
-                    discount_mode == "all_free"
-                    and not registration_settings["all_free_auto_approve"]
-                ):
-                    try:
-                        import asyncio
-
-                        from app.services.notifications import (
-                            notification_sender_service,
-                        )
-
-                        asyncio.run(
-                            notification_sender_service.send_all_free_request_notification(
-                                db=db,
-                                visit=visit,
-                                actor_user=actor_visit,
-                            )
-                        )
-                    except Exception as notify_error:  # noqa: BLE001
-                        logger.warning(
-                            "GraphQL createVisit: all_free notification failed: %s",
-                            notify_error,
-                        )
-
-                return VisitMutationResponse(
-                    success=True,
-                    message="Визит успешно создан",
-                    visit=visit_to_type(visit),
-                )
-
-        except Exception:
+        discount_mode = _normalize_registration_discount_mode(input.discount_mode)
+        if discount_mode in {"none", "repeat"}:
+            return _create_standard_visit(info, input, discount_mode)
+        if discount_mode in {"benefit", "all_free"}:
+            # WIP safety barrier: restore these modes only through the shared
+            # benefit ledger/all-free policy, request and audit transaction.
+            # This is not an implementation of the configured auto-approval.
             return VisitMutationResponse(
                 success=False,
-                message=t("error.internal"),
-                errors=["INTERNAL_ERROR"],
+                message="Оформите льготу или бесплатный визит через регистратуру",
+                errors=["REVIEW_WORKFLOW_REQUIRED"],
             )
-
     @strawberry.mutation
     @offloop
     def update_visit_status(
@@ -829,14 +790,6 @@ class Mutation:
             )
         try:
             with get_db_session() as db:
-                visit = db.query(Visit).filter(Visit.id == id).first()
-                if not visit:
-                    return VisitMutationResponse(
-                        success=False,
-                        message=t("visit.not_found"),
-                        errors=["VISIT_NOT_FOUND"],
-                    )
-
                 # Codex P1 (round-12): 'confirmed' — канонический
                 # confirmation-workflow, а не обычный переход state machine:
                 # expire-guard, confirmed_at/confirmed_by, номера очередей
@@ -844,20 +797,38 @@ class Mutation:
                 if status == "confirmed":
                     from app.api.v1.endpoints.registrar_wizard._visits import (
                         ConfirmVisitRequest,
-                        confirm_visit_by_registrar,
+                        _confirm_visit_by_staff,
                     )
 
-                    confirm_visit_by_registrar(
+                    _, snapshot = _confirm_visit_by_staff(
                         visit_id=id,
                         request=ConfirmVisitRequest(
                             confirmed_by=f"admin_{actor.id}",
                         ),
+                        http_request=info.context.request,
                         db=db,
                         current_user=actor,
+                        projector=lambda visit: (visit_to_type(visit), visit.patient_id),
                     )
-                    updated = db.query(Visit).filter(Visit.id == id).first()
-                    message = "Визит подтвержден (канонический confirmation-workflow)"
+                    projected, patient_id = snapshot
+                    if patient_id:
+                        try:
+                            _audit_patient_access(info, db, [patient_id], "visit")
+                        except Exception as exc:
+                            logger.warning("GraphQL visit confirmation audit unavailable (%s)", type(exc).__name__)
+                    return VisitMutationResponse(
+                        success=True,
+                        message="Визит подтвержден (канонический confirmation-workflow)",
+                        visit=projected,
+                    )
                 else:
+                    visit = db.query(Visit).filter(Visit.id == id).first()
+                    if not visit:
+                        return VisitMutationResponse(
+                            success=False,
+                            message=t("visit.not_found"),
+                            errors=["VISIT_NOT_FOUND"],
+                        )
                     # SSOT: state machine жизненного цикла (терминальные
                     # статусы закрыты; timestamps и аудит ведёт сервис)
                     updated = VisitLifecycleService(db).transition_status(
@@ -879,7 +850,8 @@ class Mutation:
             return VisitMutationResponse(
                 success=False,
                 message=str(exc.detail),
-                errors=["INVALID_STATUS_TRANSITION"],
+                errors=["VISIT_NOT_FOUND" if status == "confirmed" and exc.status_code == 404
+                        else "INVALID_STATUS_TRANSITION"],
             )
         except Exception:
             return VisitMutationResponse(

@@ -129,6 +129,7 @@ class RefundRequest(Base):
         Numeric(12, 2), default=0, nullable=False,
         comment="Комиссия за возврат (банковская и т.д.)"
     )
+    payment_currency_snapshot: Mapped[str | None] = mapped_column(String(3), nullable=True)
 
     # Тип возврата
     refund_type: Mapped[str] = mapped_column(

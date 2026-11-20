@@ -13,11 +13,12 @@ This file pins that contract with fail-first coverage so any future
 """
 
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
-from app.models.patient import Patient
 from app.models.payment import Payment
+from app.models.refund_deposit import DepositTransaction, PatientDeposit
 from app.models.visit import Visit, VisitService
 
 pytestmark = pytest.mark.integration
@@ -34,6 +35,7 @@ def _make_visit(db_session, patient, amount, *, status="open"):
             name="SYNTHETIC-csh-fe-036",
             qty=1,
             price=amount,
+            currency="UZS",
         )
     )
     db_session.commit()
@@ -44,6 +46,7 @@ def _make_paid_payment(db_session, visit, amount, *, method="cash"):
     payment = Payment(
         visit_id=visit.id,
         amount=Decimal(str(amount)),
+        currency="UZS",
         method=method,
         status="paid",
     )
@@ -56,7 +59,7 @@ def _refund(client, headers, payment_id, amount):
     response = client.post(
         f"/api/v1/cashier/payments/{payment_id}/refund",
         headers=headers,
-        json={"amount": amount, "reason": "SYNTHETIC-csh-fe-036 refund"},
+        json={"amount": amount, "reason": "SYNTHETIC-csh-fe-036 refund", "client_request_id": str(uuid4())},
     )
     assert response.status_code == 200, response.text
     return response.json()
@@ -302,22 +305,21 @@ def test_completed_bank_request_nets_and_pending_one_does_not(
 def test_over_refunded_payment_caps_net_at_zero(
     client, db_session, test_patient, admin_user, admin_auth_headers
 ):
-    """Anomaly guard (parity with ``PaymentInvariantService.
-    _net_settled_amount``): a 100 000 payment with a 30 000 direct partial
-    refund and a full FM deposit credit (the FM leg credits
-    ``payment.amount``) must not push net receipts below zero — the payment
-    contributes exactly 0 net, never a negative one."""
+    """A historical over-refund contributes zero net receipts."""
     visit = _make_visit(db_session, test_patient, 100000)
     payment = _make_paid_payment(db_session, visit, 100000, method="cash")
     _refund(client, admin_auth_headers, payment.id, 30000)
-    _fm_deposit_credit(
-        db_session,
-        patient_id=test_patient.id,
-        payment_id=payment.id,
-        visit_id=visit.id,
-        amount=100000,
+    # Seed the historical double-credit anomaly without going through the
+    # current refund writer, which enforces a shared remaining budget.
+    deposit = PatientDeposit(patient_id=test_patient.id, balance=Decimal("100000"), currency="UZS")
+    db_session.add(deposit)
+    db_session.flush()
+    db_session.add(DepositTransaction(
+        deposit_id=deposit.id, transaction_type="credit", payment_id=payment.id,
+        visit_id=visit.id, amount=Decimal("100000"), balance_after=Decimal("100000"),
         performed_by=admin_user.id,
-    )
+    ))
+    db_session.commit()
 
     stats = _stats(client, admin_auth_headers)
 

@@ -12,6 +12,7 @@ from enum import Enum
 from typing import Any
 
 from app.core.config import settings
+from app.core.logging_config import protect_sms_transport_logs
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,7 @@ class EskizSMSProvider(BaseSMSProvider):
                 _log_provider_failure("eskiz", "auth", exc)
                 raise RuntimeError(SMS_PROVIDER_AUTH_ERROR) from exc
 
+    @protect_sms_transport_logs
     async def send_sms(self, message: SMSMessage) -> SMSResponse:
         """Отправить SMS через Eskiz"""
         try:
@@ -257,6 +259,7 @@ class PlayMobileSMSProvider(BaseSMSProvider):
         super().__init__(api_key, api_secret, **kwargs)
         self.base_url = "https://send.playmobile.uz/api"
 
+    @protect_sms_transport_logs
     async def send_sms(self, message: SMSMessage) -> SMSResponse:
         """Отправить SMS через PlayMobile"""
         try:

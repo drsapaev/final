@@ -36,6 +36,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -267,6 +268,21 @@ class OnlineQueueEntry(Base):
     """Записи в онлайн-очереди"""
 
     __tablename__ = "queue_entries"
+    __table_args__ = (
+        CheckConstraint(
+            "encounter_id IS NULL OR patient_id IS NOT NULL",
+            name="ck_queue_encounter_patient_present",
+        ).ddl_if(dialect="postgresql"),
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"], ["encounters.id", "encounters.patient_id"],
+            name="fk_queue_encounter_patient", deferrable=True, initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id", "encounter_id"],
+            ["visits.id", "visits.patient_id", "visits.encounter_id"],
+            name="fk_queue_visit_encounter", deferrable=True, initially="DEFERRED",
+        ),
+    )
 
     # RQ-14.a.1: the per-queue UNIQUE (queue_id, number) is declared ONLY
     # in the Alembic revision (DEFERRABLE INITIALLY DEFERRED): reorder/
@@ -292,6 +308,9 @@ class OnlineQueueEntry(Base):
     patient_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("patients.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve queue history for analytics and audit
+    encounter_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("encounters.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     patient_name: Mapped[str | None] = mapped_column(
         String(200), nullable=True
     )  # Если пациент не зарегистрирован

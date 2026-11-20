@@ -242,6 +242,10 @@ def gql_data(test_db, gql_session_factory, monkeypatch):
                 cleanup.query(Visit).filter(Visit.id.in_(visit_ids)).delete(
                     synchronize_session=False
                 )
+            from app.models.encounter import Encounter
+            cleanup.query(Encounter).filter(Encounter.patient_id.in_(patient_ids)).delete(
+                synchronize_session=False
+            )
             if queue_ids:
                 cleanup.query(OnlineQueueEntry).filter(
                     OnlineQueueEntry.queue_id.in_(queue_ids)
@@ -282,6 +286,10 @@ def gql_data(test_db, gql_session_factory, monkeypatch):
 
 def _execute(query: str, variables: dict | None = None):
     """execute через event loop: callNextPatient — async-мутация."""
+    from starlette.requests import Request
+
+    from tests.conftest import mint_access_token
+
     admin = gql_data_ctx["admin_user"]
     context = GraphQLContext(
         user=SimpleNamespace(
@@ -290,8 +298,11 @@ def _execute(query: str, variables: dict | None = None):
             full_name=admin.full_name,
             role="Admin",
             is_active=True,
+            auth_epoch=admin.auth_epoch,
         )
     )
+    token = mint_access_token(admin)
+    context.request = Request({"type": "http", "headers": [(b"authorization", f"Bearer {token}".encode())]})
 
     async def _run():
         return await schema.execute(
@@ -521,7 +532,7 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
 
     data = _execute(
         "mutation($id: Int!) { updateVisitStatus(id: $id, status: \"confirmed\") "
-        "{ success visit { status } } }",
+        "{ success message errors visit { status } } }",
         {"id": visit_id},
     )
     # Codex P1 (round-12): 'confirmed' идёт через канонический
@@ -553,13 +564,20 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
 
     # --- Codex P1 (раунд 5): канонический прайсинг ДО персистенса.
     # repeat: repeat_visit_discount=20 (ClinicSettings) → 80% от 100000.
-    # benefit: benefit_consultation_free=True (дефолт) → 0.
+    # benefit waits for the shared administrator-approved ledger workflow.
     settings_owned = False
     # gql_session_factory уже пропатчил SessionLocal на тестовую БД —
     # саму фикстуру вызывать напрямую нельзя (pytest forbids).
     from app.db import session as db_session_module
 
     with db_session_module.SessionLocal() as s:
+        # A repeat discount now requires immutable completion-time evidence;
+        # the earlier open visit is intentionally insufficient.
+        s.add(Visit(patient_id=linked_patient_id, doctor_id=d["doctor"].id,
+                    visit_date=_queue_day(), status="completed", discount_mode="none",
+                    repeat_evidence_generation=1, repeat_proof_generation=1,
+                    repeat_proof_consultation=True,
+                    repeat_proof_doctor_user_id=d["user"].id))
         row = (
             s.query(ClinicSettings)
             .filter(ClinicSettings.key == "repeat_visit_discount")
@@ -576,7 +594,7 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
         data = _execute(
             """
             mutation($input: VisitInput!) {
-              createVisit(input: $input) { success visit { id } }
+              createVisit(input: $input) { success errors visit { id } }
             }
             """,
             {
@@ -594,7 +612,7 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
         data = _execute(
             """
             mutation($input: VisitInput!) {
-              createVisit(input: $input) { success visit { id } }
+              createVisit(input: $input) { success errors visit { id } }
             }
             """,
             {
@@ -606,8 +624,8 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
                 }
             },
         )
-        assert data["createVisit"]["success"] is True, data["createVisit"]
-        benefit_visit_id = data["createVisit"]["visit"]["id"]
+        assert data["createVisit"]["success"] is False, data["createVisit"]
+        assert data["createVisit"]["errors"] == ["REVIEW_WORKFLOW_REQUIRED"]
 
         with db_session_module.SessionLocal() as s:
             repeat_vs = (
@@ -617,13 +635,6 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
             )
             assert repeat_vs is not None
             assert float(repeat_vs.price) == 80000.0  # 100000 - 20%
-            benefit_vs = (
-                s.query(VisitService)
-                .filter(VisitService.visit_id == benefit_visit_id)
-                .first()
-            )
-            assert benefit_vs is not None
-            assert float(benefit_vs.price) == 0.0  # льгота: консультация 0
     finally:
         # не контаминировать общую session-scoped БД
         with db_session_module.SessionLocal() as s:
@@ -1596,7 +1607,8 @@ def test_graphql_round12(gql_data, monkeypatch):
     # вызван #5 из базовой очереди, а не свежий #1 tagged-очереди
     assert call["queueEntry"]["id"] == base_entry_id
 
-    # --- 2) all_free без автоаппрува -> approver-нотификация после коммита
+    # --- 2) Пока GraphQL не подключён к all-free ledger, нет ни записи,
+    # ни уведомления; рабочую авто-политику необходимо восстановить до merge.
     all_free_calls: list[dict] = []
 
     async def _stub_all_free(**kwargs):
@@ -1612,7 +1624,7 @@ def test_graphql_round12(gql_data, monkeypatch):
     data = _execute(
         """
         mutation($input: VisitInput!) {
-          createVisit(input: $input) { success visit { id } }
+          createVisit(input: $input) { success errors visit { id } }
         }
         """,
         {
@@ -1624,10 +1636,9 @@ def test_graphql_round12(gql_data, monkeypatch):
             }
         },
     )
-    assert data["createVisit"]["success"] is True, data["createVisit"]
-    created_visit_id = data["createVisit"]["visit"]["id"]
-    assert len(all_free_calls) == 1, all_free_calls
-    assert all_free_calls[0]["visit"].id == created_visit_id
+    assert data["createVisit"]["success"] is False, data["createVisit"]
+    assert data["createVisit"]["errors"] == ["REVIEW_WORKFLOW_REQUIRED"]
+    assert all_free_calls == []
 
 
 def test_graphql_round13(gql_data, monkeypatch):
@@ -2191,6 +2202,11 @@ def test_graphql_round15(gql_data, monkeypatch, caplog):
     assert data["updatePatient"]["success"] is True, data["updatePatient"]
 
     # --- 5) createVisit без visitDate -> день конфигурированной таймзоны
+    # Шаг 1 намеренно деактивировал врача; для новой записи его нужно
+    # вернуть в активное состояние, а не обходить проверку профиля.
+    with S() as s:
+        s.get(Doctor, d["doctor"].id).active = True
+        s.commit()
     data = _execute(
         """
         mutation($input: VisitInput!) {

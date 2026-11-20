@@ -90,15 +90,17 @@ import json
 import logging
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, localcontext
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.provider_attempt import ProviderActiveVisitReservation
 from app.models.refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
@@ -109,6 +111,14 @@ from app.models.visit import Visit
 from app.services.all_free_approval import (
     ALL_FREE_DECISION_REQUIRED,
     awaits_all_free_decision,
+)
+from app.services.all_free_guard import AllFreeGuardError
+from app.services.encounter_financial_fence import (
+    FinancialFenceError,
+    LockedPaymentRecord,
+    preflight_payment_groups,
+    preflight_payment_record,
+    require_preflighted_payment_visits,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,6 +139,42 @@ class PaymentInvariantService:
 
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    def preflight_payment_groups(self, visit_ids: list[int]) -> None:
+        """Check every affected group before payment writes or visit locks."""
+        try:
+            preflight_payment_groups(self.db, visit_ids)
+        except FinancialFenceError as exc:
+            # A grouped caller may have already flushed earlier legs. Never
+            # leave a partially guarded financial transaction commit-able.
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except AllFreeGuardError:
+            self.db.rollback()
+            raise
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate != "55P03":
+                raise
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail="Обращение занято, повторите оплату") from exc
+
+    def preflight_payment_record(self, payment_id: int) -> LockedPaymentRecord:
+        """Acquire and verify all PaymentVisit links before staff mutation."""
+        try:
+            return preflight_payment_record(self.db, payment_id)
+        except FinancialFenceError as exc:
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except AllFreeGuardError:
+            self.db.rollback()
+            raise
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate != "55P03":
+                raise
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail="Обращение занято, повторите оплату") from exc
 
     # ─── Visit loading + locking ──────────────────────────────────────
 
@@ -191,7 +237,6 @@ class PaymentInvariantService:
             )
             .filter(
                 PaymentInvoiceVisit.visit_id.in_(set(visit_ids)),
-                PaymentInvoiceVisit.visit_amount > 0,
                 PaymentInvoice.status == "processing",
             )
         )
@@ -216,8 +261,15 @@ class PaymentInvariantService:
 
     # ─── Calculations (single source of truth — remove duplication) ───
 
-    def compute_total_cost(self, visit: Visit) -> Decimal:
-        """Compute the total cost of a visit's services.
+    @staticmethod
+    def _compute_unadjusted_total(visit: Visit, *, empty_services: bool = False) -> Decimal:
+        with localcontext() as context:
+            context.prec = 40
+            return PaymentInvariantService._compute_unadjusted_total_inner(visit, empty_services=empty_services)
+
+    @staticmethod
+    def _compute_unadjusted_total_inner(visit: Visit, *, empty_services: bool = False) -> Decimal:
+        """Validate a legacy, unadjusted in-memory amount.
 
         This is the canonical implementation — replaces the duplicated
         ``_cashier_visit_total_amount`` in ``cashier/_helpers.py`` and
@@ -226,29 +278,159 @@ class PaymentInvariantService:
 
         Logic:
         1. Sum ``price * qty`` for all VisitService rows attached to the visit.
-        2. If services not loaded or sum is 0, fall back to ``visit.total_price``.
+        2. Only when no service rows exist, fall back to ``visit.total_price``.
         3. If that is also empty, fall back to ``visit.total_amount``.
         4. If all are empty, return Decimal("0").
         """
-        total_cost = Decimal("0")
-        if hasattr(visit, "services") and visit.services:
-            for vs in visit.services:
-                price = (
-                    Decimal(str(vs.price))
-                    if hasattr(vs, "price") and vs.price
-                    else Decimal("0")
-                )
-                qty = vs.qty if hasattr(vs, "qty") and vs.qty else 1
-                total_cost += price * qty
+        def checked_money(value: Any) -> Decimal:
+            try:
+                if value is None or isinstance(value, bool):
+                    raise ValueError
+                amount = Decimal(str(value))
+                if (not amount.is_finite() or amount < 0
+                        or amount > Decimal("9999999999.99")
+                        or amount != amount.quantize(Decimal("0.01"))):
+                    raise ValueError
+                return amount
+            except (ArithmeticError, ValueError, TypeError, InvalidOperation) as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Стоимость услуг визита требует проверки",
+                ) from exc
 
-        if total_cost == Decimal("0"):
-            # Fallback: if services not loaded, use visit.total_price
-            if hasattr(visit, "total_price") and visit.total_price:
-                total_cost = Decimal(str(visit.total_price))
-            elif hasattr(visit, "total_amount") and visit.total_amount:
-                total_cost = Decimal(str(visit.total_amount))
+        services = None if empty_services else getattr(visit, "services", None)
+        if services:
+            total = Decimal("0.00")
+            for line in services:
+                price = checked_money(getattr(line, "price", None))
+                qty = getattr(line, "qty", None)
+                if type(qty) is not int or not 0 < qty <= 2147483647:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Количество услуг визита требует проверки",
+                    )
+                total += price * qty
+                if total > Decimal("9999999999.99"):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Стоимость услуг визита превышает допустимую сумму",
+                    )
+            return total
 
-        return total_cost
+        # Legacy amount fields are consulted only when there are no lines.
+        for attribute in ("total_price", "total_amount"):
+            value = getattr(visit, attribute, None)
+            if value is not None:
+                amount = checked_money(value)
+                if amount:
+                    return amount
+        return Decimal("0.00")
+
+    def compute_visit_quote(self, visit: Visit):
+        """Read one complete benefit-aware snapshot with exact line totals.
+
+        Each line total is an aggregate over quantity, so callers must not
+        derive a rounded unit price from it. ``currency=None`` means unknown,
+        not a default: currency-sensitive callers must refuse it or use an
+        explicit audited reconciliation. Financial writes still require their
+        separate group preflight and locks.
+        """
+        from app.services.encounter_benefit_net import (
+            BenefitQuoteError,
+            BenefitVisitQuote,
+            visit_financial_quote,
+        )
+
+        visit_id = getattr(visit, "id", None)
+        if self.db is None or type(visit_id) is not int or visit_id <= 0:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Стоимость визита требует проверки")
+        # SQLite refreshes objects in the identity map while building its
+        # snapshot. Preserve the caller's context before that refresh.
+        original_identity = (getattr(visit, "patient_id", None), getattr(visit, "encounter_id", None),
+                             getattr(visit, "confirmation_context_epoch", None))
+        try:
+            quote = visit_financial_quote(self.db, visit_id)
+        except BenefitQuoteError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Стоимость визита требует проверки") from exc
+        if original_identity != (quote.patient_id, quote.encounter_id, quote.visit_context_epoch):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Контекст визита изменился")
+        if not quote.line_totals:
+            # The canonical Visit model has no persisted total columns. Keep
+            # the pre-existing legacy in-memory fallback only when the shared
+            # snapshot proved there are no service rows for this visit.
+            legacy_total = self._compute_unadjusted_total(visit, empty_services=True)
+            if legacy_total:
+                if quote.has_benefit:
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Стоимость визита требует проверки")
+                return BenefitVisitQuote(legacy_total, quote.line_totals, patient_id=quote.patient_id,
+                                         encounter_id=quote.encounter_id, visit_context_epoch=quote.visit_context_epoch,
+                                         snapshot_digest=quote.snapshot_digest, currency=quote.currency)
+        return quote
+
+    def compute_total_cost(self, visit: Visit) -> Decimal:
+        """Return the exact total from the benefit-aware Visit quote."""
+        return self.compute_visit_quote(visit).total
+
+    def _require_payment_currency(self, visit: Visit, currency: str):
+        """Bind a payment to the proven quote and all linked ledger currencies.
+
+        The caller must already hold the full payment-group preflight locks.
+        Unknown historic currencies need audited reconciliation; no currency
+        is inferred from today's catalog or silently converted.
+        """
+        quote = self.compute_visit_quote(visit)
+        if (type(currency) is not str or quote.currency is None or currency != quote.currency):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Валюта визита требует сверки")
+        mismatch_payment = (
+            self.db.query(Payment.id)
+            .outerjoin(PaymentVisit, PaymentVisit.payment_id == Payment.id)
+            .filter(or_(Payment.visit_id == visit.id, PaymentVisit.visit_id == visit.id))
+            .filter(or_(Payment.currency.is_(None), Payment.currency != currency))
+            .first()
+        )
+        mismatch_invoice = (
+            self.db.query(PaymentInvoice.id)
+            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+            .filter(PaymentInvoiceVisit.visit_id == visit.id)
+            .filter(or_(PaymentInvoice.currency.is_(None), PaymentInvoice.currency != currency))
+            .first()
+        )
+        if mismatch_payment or mismatch_invoice:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Валюта платежной истории требует сверки")
+        return quote
+
+    def _has_unresolved_payment_intent(self, visit_id: int) -> bool:
+        # The caller owns the Visit lock and has verified full RLS visibility.
+        # The reservation's non-deferrable Visit FK prevents a concurrent
+        # insertion from passing that lock until this transaction finishes.
+        if self.db.query(ProviderActiveVisitReservation.visit_id).filter_by(visit_id=visit_id).first() is not None:
+            return True
+        return (
+            self.db.query(Payment.id)
+            .outerjoin(PaymentVisit, PaymentVisit.payment_id == Payment.id)
+            .filter(
+                or_(Payment.visit_id == visit_id, PaymentVisit.visit_id == visit_id),
+                or_(Payment.status.in_(["pending", "processing"]),
+                    (Payment.status == "failed") & Payment.provider_payment_id.is_not(None)),
+            )
+            .first()
+        ) is not None
+
+    def assert_no_unresolved_payment_intent(self, visit_id: int) -> None:
+        """Reject manual settlement while any locked closure Visit has an intent."""
+        try:
+            visit_ids = require_preflighted_payment_visits(self.db, visit_id)
+            if any(self._has_unresolved_payment_intent(item) for item in visit_ids):
+                raise FinancialFenceError("Существующая попытка оплаты требует проверки")
+        except FinancialFenceError as exc:
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate != "55P03":
+                raise
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail="Обращение занято, повторите оплату") from exc
 
     def compute_paid_amount(self, visit_id: int) -> Decimal:
         """Compute the total paid amount for a visit.
@@ -394,9 +576,19 @@ class PaymentInvariantService:
                 settled_by_visit.setdefault(payment.visit_id, []).append(payment)
 
         rows = []
+        currencies: set[str] = set()
+        quote_contexts = []
         for visit in visits:
-            total = self.compute_total_cost(visit)
+            quote = self.compute_visit_quote(visit)
+            total = quote.total
+            quote_contexts.append((visit.id, quote.snapshot_digest))
             settled = settled_by_visit.get(visit.id, [])
+            if quote.currency is None and (quote.line_totals or total or settled):
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Валюта визита требует сверки")
+            if quote.currency is not None:
+                currencies.add(quote.currency)
+                if any(payment.currency != quote.currency for payment in settled):
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Валюта платежа требует сверки")
             paid = sum(
                 (self._net_settled_amount(payment) for payment in settled),
                 Decimal("0"),
@@ -416,11 +608,14 @@ class PaymentInvariantService:
                     "payment_type": settled[-1].method if settled else None,
                 }
             )
+        if len(currencies) > 1:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Визиты в разных валютах требуют сверки")
         total = sum((row["total_amount"] for row in rows), Decimal("0"))
         paid = sum((row["paid_amount"] for row in rows), Decimal("0"))
         remaining = sum((row["remaining_amount"] for row in rows), Decimal("0"))
         ledger = {
             "visits": rows,
+            "quote_contexts": quote_contexts,
             "payments": [
                 (p.id, p.visit_id, p.amount, p.status, p.refunded_amount, p.updated_at)
                 for p in payments
@@ -433,6 +628,7 @@ class PaymentInvariantService:
             "total_amount": total,
             "paid_amount": paid,
             "remaining_amount": remaining,
+            "currency": next(iter(currencies)) if currencies else None,
             "payment_status": "paid"
             if (total > 0 or paid > 0) and remaining == 0
             else "partial"
@@ -494,6 +690,7 @@ class PaymentInvariantService:
         Lock the complete visit set in ID order before reading balances. The
         allocation order is oldest visit first, matching cashier group payments.
         """
+        self.preflight_payment_groups(visit_ids)
         visits = (
             self.db.query(Visit)
             .options(selectinload(Visit.services))
@@ -667,6 +864,7 @@ class PaymentInvariantService:
                 detail="Payment amount must be positive",
             )
 
+        self.preflight_payment_groups([visit_id])
         # Acquire row lock — serializes concurrent payment attempts.
         # This is the critical concurrency control: any other endpoint
         # that calls create_payment_for_visit on the same visit will
@@ -679,7 +877,10 @@ class PaymentInvariantService:
             exclude_invoice_id=settling_invoice_id,
         )
 
-        total_cost = self.compute_total_cost(visit)
+        total_cost = self._require_payment_currency(visit, currency).total
+        if method in {"cash", "card"} and self._has_unresolved_payment_intent(visit_id):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail="Существующая попытка оплаты требует проверки до приёма платежа")
         paid_amount = self.compute_paid_amount(visit_id)
         remaining_debt = total_cost - paid_amount
 
@@ -860,36 +1061,23 @@ class PaymentInvariantService:
                 detail=f"Unknown provider: {provider!r}",
             )
 
+        # Preflight the full encounter before the Visit/payment mutation.
+        # Post-debit settlement also requires a durable provider receipt.
+        self.preflight_payment_groups([visit_id])
+
         # Acquire row lock — serializes concurrent pending payment attempts.
         visit = self._load_visit_for_update(visit_id)
         self.assert_all_free_decided((visit,))
         self.assert_no_processing_invoice_reservation([visit_id])
+        self._require_payment_currency(visit, currency)
 
         # B1/B4 coordination: check for existing pending payment with
         # the same provider. This prevents uncontrolled duplicates —
         # if the user already has a pending PayMe payment, don't create
         # another one for the same provider.
-        existing_pending = (
-            self.db.query(Payment)
-            .filter(
-                Payment.visit_id == visit_id,
-                Payment.provider == provider,
-                Payment.status == "pending",
-            )
-            .first()
-        )
-        if existing_pending:
-            logger.info(
-                "payment.pending_already_exists payment_id=%s visit_id=%s "
-                "provider=%s — returning existing pending payment",
-                existing_pending.id,
-                visit_id,
-                provider,
-            )
-            # Return the existing pending payment — idempotent behavior.
-            # The caller can resume the provider redirect with the
-            # existing payment_id.
-            return existing_pending
+        if self._has_unresolved_payment_intent(visit_id):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail="Существующая попытка оплаты требует проверки до повторного запуска")
 
         # Create the pending payment.
         new_payment = Payment(

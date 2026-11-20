@@ -30,6 +30,31 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_openapi_cashier_refund_requires_a_durable_operation_id(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/cashier/payments/{payment_id}/refund"]["post"]
+    body_ref = operation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+    request = schema["components"]["schemas"][body_ref.rsplit("/", 1)[1]]
+    assert "client_request_id" in request["required"]
+    assert request["properties"]["client_request_id"]["format"] == "uuid"
+
+
+def test_openapi_registrar_benefit_approval_takes_identifiers_and_returns_exact_money(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/discount-benefits/benefits/encounter/apply"]["post"]
+    components = schema["components"]["schemas"]
+    request_ref = operation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+    request = components[request_ref.rsplit("/", 1)[1]]
+    assert set(request["required"]) == set(request["properties"]) == {"invoice_id", "patient_benefit_id"}
+    assert request["additionalProperties"] is False
+    assert operation["security"]
+    assert set(operation["responses"]) == {"200", "401", "403", "409", "422", "503"}
+    response_ref = operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+    response = components[response_ref.rsplit("/", 1)[1]]
+    for field in ("gross_total", "benefit_total", "total_amount"):
+        assert response["properties"][field]["type"] == "string"
+
+
 def test_openapi_notification_templates_document_error_and_update_contract(
     client: TestClient,
 ) -> None:

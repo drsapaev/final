@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -30,12 +31,19 @@ class PaymentReadService:
 
     @staticmethod
     def _format_amount(value: Any) -> str:
-        if value is None:
-            return "0"
         try:
-            return f"{value:,.0f}".replace(",", " ")
-        except Exception:
-            return f"{float(value):,.0f}".replace(",", " ")
+            amount = Decimal(str(value))
+            if not amount.is_finite() or amount != amount.quantize(Decimal("0.01")):
+                raise ValueError("Invalid receipt amount")
+        except (InvalidOperation, TypeError, ValueError):
+            raise PaymentReadDomainError(status_code=409, detail="Сумма платежа требует сверки") from None
+        return f"{amount:,.2f}".replace(",", " ")
+
+    @staticmethod
+    def _receipt_currency(value: Any) -> str:
+        if isinstance(value, str) and len(value) == 3 and value.isascii() and value.isalpha() and value.isupper():
+            return value
+        return "валюта не указана"
 
     @staticmethod
     def _format_payment_method(method: str | None) -> str:
@@ -323,7 +331,7 @@ class PaymentReadService:
             f"Визит ID: {context['visit'].id if context['visit'] else context['payment'].visit_id or 'N/A'}",
             "",
             "ПЛАТЕЖНАЯ ИНФОРМАЦИЯ:",
-            f"Сумма: {context['amount_display']} {context['payment'].currency or 'UZS'}",
+            f"Сумма: {context['amount_display']} {self._receipt_currency(context['payment'].currency)}",
             f"Способ оплаты: {context['method_display']}",
             f"Статус: {context['status_display']}",
         ]
@@ -332,7 +340,7 @@ class PaymentReadService:
             lines.extend(
                 [
                     "",
-                    f"Возврат: {context['refund_amount_display']} UZS",
+                    f"Возврат: {context['refund_amount_display']} {self._receipt_currency(context['payment'].currency)}",
                 ]
             )
         if context["payment"].refund_reason:
@@ -362,7 +370,7 @@ class PaymentReadService:
 
 Номер платежа: {payment.id}
 Дата: {context["paid_at_display"]}
-Сумма: {context["amount_display"]} {payment.currency}
+Сумма: {context["amount_display"]} {self._receipt_currency(payment.currency)}
 Провайдер: {provider}
 Статус: {context["status_display"]}
 

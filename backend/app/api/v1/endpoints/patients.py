@@ -1,19 +1,33 @@
 
+import hashlib
+import hmac
+import json
+import time
+from datetime import date
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
+from pydantic import BaseModel, Field, StrictBool, field_validator
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import deps
 from app.core.audit import log_critical_change
+from app.core.config import settings
 from app.core.i18n import t  # noqa: F401
-from app.core.roles import DOCTOR_FAMILY_GATE_ROLES
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, normalize_role_value
 from app.crud.patient import patient as patient_crud
+from app.models.audit import AuditLog
+from app.models.patient import Patient, PatientBirthDateEvidence
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
 from app.schemas import lab as lab_schemas
 from app.schemas import patient as patient_schemas
 from app.services.patient_access_audit import (
+    _build_patient_access_entry,
     log_patient_access,
     log_patient_access_many,
 )
@@ -22,6 +36,12 @@ from app.services.patient_portal_service import (
     PatientPortalService,
 )
 from app.services.patient_service import PatientReadAccessDenied, PatientService
+from app.services.profile_contact_security import (
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+    check_bearer_expiry,
+    check_profile_bearer,
+)
 
 router = APIRouter()
 
@@ -519,4 +539,181 @@ def get_primary_contact(
         }
 
     return {"has_primary_contact": False, "contact": None}
+
+
+# Historical birth dates lack reliable provenance. An administrator may attest
+# the exact current value after reviewing a real record; the capability is
+# bound to the full patient context and current date generation.
+_BIRTH_REVIEW_TTL = 600
+_BIRTH_NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
+
+
+class _BirthReviewRoute(APIRoute):
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def safe_handler(request: Request):
+            try:
+                response = await handler(request)
+            except RequestValidationError:
+                return JSONResponse(
+                    status_code=422,
+                    content={"error": "validation_error", "message": "Ошибка валидации запроса", "detail": []},
+                    headers=_BIRTH_NO_STORE,
+                )
+            except StarletteHTTPException as exc:
+                exc.headers = {**(exc.headers or {}), **_BIRTH_NO_STORE}
+                raise
+            response.headers.update(_BIRTH_NO_STORE)
+            return response
+
+        return safe_handler
+
+
+class BirthDateReviewResponse(BaseModel):
+    patient_id: int
+    birth_date: date
+    precision: str
+    generation: int
+    review_expires_at: int
+    token: str
+
+
+class BirthDateAttestation(BaseModel):
+    confirmed_exact_date: StrictBool
+    expected_generation: int = Field(gt=0, strict=True)
+    review_expires_at: int = Field(gt=0, strict=True)
+    token: str = Field(min_length=64, max_length=64)
+
+    @field_validator("confirmed_exact_date")
+    @classmethod
+    def require_review(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Необходимо подтвердить точную дату рождения")
+        return value
+
+
+birth_review_router = APIRouter(route_class=_BirthReviewRoute)
+
+
+def _birth_review_context(db: Session, bearer, patient_id: int):
+    actor = db.query(User).filter(User.id == bearer.user_id).with_for_update().populate_existing().first()
+    if not actor or not actor.is_active or (
+        not actor.is_superuser and normalize_role_value(actor.role) != "admin"
+    ):
+        raise HTTPException(status_code=403, detail="Доступ запрещён", headers=_BIRTH_NO_STORE)
+    check_profile_bearer(db, actor, bearer)
+    patient = db.query(Patient).filter(Patient.id == patient_id).with_for_update().populate_existing().first()
+    if patient is None or patient.is_deleted:
+        raise HTTPException(status_code=404, detail="Пациент не найден", headers=_BIRTH_NO_STORE)
+    if patient.birth_date is None or not patient.birth_date_generation or patient.birth_date_generation < 1:
+        raise HTTPException(status_code=409, detail="Дата рождения недоступна для проверки", headers=_BIRTH_NO_STORE)
+    return actor, patient
+
+
+def _birth_review_token(actor: User, patient: Patient, expires_at: int) -> str:
+    if not settings.SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Проверка недоступна", headers=_BIRTH_NO_STORE)
+    values = [
+        "patient-birth-review-v1", actor.id, actor.auth_epoch, patient.id, patient.user_id,
+        patient.birth_date.isoformat(), patient.birth_date_generation, patient.birth_date_precision, expires_at,
+    ]
+    key = hmac.new(settings.SECRET_KEY.encode(), b"patient-birth-review-v1", hashlib.sha256).digest()
+    return hmac.new(key, json.dumps(values, separators=(",", ":")).encode(), hashlib.sha256).hexdigest()
+
+
+@birth_review_router.post("/{patient_id}/birth-date/review", response_model=BirthDateReviewResponse)
+def review_birth_date(
+    patient_id: int, request: Request, response: Response,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_active_roles("Admin")),
+) -> BirthDateReviewResponse:
+    try:
+        bearer = capture_profile_bearer(request, current_user)
+        actor, patient = _birth_review_context(db, bearer, patient_id)
+        existing = db.query(PatientBirthDateEvidence.id).filter_by(
+            patient_id=patient.id, birth_date_generation=patient.birth_date_generation
+        ).first()
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Дата уже подтверждена", headers=_BIRTH_NO_STORE)
+        expires_at = int(time.time()) + _BIRTH_REVIEW_TTL
+        result = BirthDateReviewResponse(
+            patient_id=patient.id, birth_date=patient.birth_date, precision=patient.birth_date_precision,
+            generation=patient.birth_date_generation, review_expires_at=expires_at,
+            token=_birth_review_token(actor, patient, expires_at),
+        )
+        audit = _build_patient_access_entry(
+            db, actor_user=actor, subject_patient_id=patient.id, resource_type="patient",
+            resource_id=str(patient.id), action="view", request=request,
+        )
+        if audit is None:
+            raise RuntimeError("patient access audit unavailable")
+        db.add(audit)
+        check_bearer_expiry(bearer)
+        db.commit()
+        response.headers.update(_BIRTH_NO_STORE)
+        return result
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сеанс недоступен", headers=_BIRTH_NO_STORE) from None
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Не удалось проверить дату", headers=_BIRTH_NO_STORE) from None
+
+
+@birth_review_router.post("/{patient_id}/birth-date/attest")
+def attest_birth_date(
+    patient_id: int, payload: BirthDateAttestation, request: Request, response: Response,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_active_roles("Admin")),
+) -> dict[str, Any]:
+    try:
+        bearer = capture_profile_bearer(request, current_user)
+        actor, patient = _birth_review_context(db, bearer, patient_id)
+        now = int(time.time())
+        if (
+            payload.expected_generation != patient.birth_date_generation
+            or payload.review_expires_at <= now
+            or payload.review_expires_at > now + _BIRTH_REVIEW_TTL
+            or not payload.token.isascii()
+            or not hmac.compare_digest(payload.token, _birth_review_token(actor, patient, payload.review_expires_at))
+        ):
+            raise HTTPException(status_code=409, detail="Контекст проверки устарел", headers=_BIRTH_NO_STORE)
+        existing = db.query(PatientBirthDateEvidence.id).filter_by(
+            patient_id=patient.id, birth_date_generation=patient.birth_date_generation
+        ).first()
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Дата уже подтверждена", headers=_BIRTH_NO_STORE)
+        role = str(getattr(actor.role, "value", actor.role))
+        db.add(PatientBirthDateEvidence(
+            patient_id=patient.id, patient_id_snapshot=patient.id,
+            birth_date_generation=patient.birth_date_generation, actor_user_id_snapshot=actor.id,
+            actor_role=role,
+        ))
+        db.add(AuditLog(
+            action="patient_birth_date_attested", event_type="patient_birth_date_attested",
+            entity_type="patient", entity_id=patient.id, actor_user_id=actor.id,
+            actor_role=role, actor_type="staff", outcome="success",
+            payload={"birth_date_generation": patient.birth_date_generation},
+            reason_code={"code": "admin_reviewed_historical_record"},
+        ))
+        check_bearer_expiry(bearer)
+        db.commit()
+        response.headers.update(_BIRTH_NO_STORE)
+        return {"success": True, "patient_id": patient_id}
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сеанс недоступен", headers=_BIRTH_NO_STORE) from None
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Не удалось сохранить подтверждение", headers=_BIRTH_NO_STORE) from None
+
+
+router.include_router(birth_review_router)
 

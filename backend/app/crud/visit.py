@@ -2,7 +2,9 @@
 CRUD операции для работы с визитами
 """
 
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import and_, desc
@@ -13,7 +15,37 @@ from app.models.visit import Visit, VisitService
 from app.services.appointment_duration_snapshot import (
     duration_snapshot_for_service_id,
 )
+from app.services.encounter_creation import resolve_new_encounter
 from app.services.service_mapping import normalize_service_code
+
+
+def _validated_currency_map(
+    services: list[dict[str, Any]] | None, trusted_currency_by_service: Mapping[int, str] | None,
+) -> dict[int, str] | None:
+    """Validate a server-owned catalog snapshot before creating any rows.
+
+    Callers must obtain this map from a locked and authorized catalog, never
+    from request data. Missing maps preserve the historical unknown currency.
+    """
+    if trusted_currency_by_service is None:
+        return None
+    if not isinstance(trusted_currency_by_service, Mapping):
+        raise ValueError("Invalid trusted service currencies")
+    expected: set[int] = set()
+    for item in services or []:
+        if not isinstance(item, dict):
+            raise ValueError("Invalid service identity")
+        service_id = item.get("service_id") or item.get("id")
+        if type(service_id) is not int or service_id <= 0:
+            raise ValueError("Invalid service identity")
+        expected.add(service_id)
+    currencies = dict(trusted_currency_by_service)
+    if set(currencies) != expected or any(type(key) is not int for key in currencies):
+        raise ValueError("Incomplete trusted service currencies")
+    if any(type(value) is not str or len(value) != 3 or not value.isascii() or not value.isalpha()
+           or not value.isupper() for value in currencies.values()):
+        raise ValueError("Invalid trusted service currency")
+    return currencies
 
 
 def get_visit(db: Session, visit_id: int) -> Visit | None:
@@ -106,6 +138,8 @@ def create_visit(
     # Fix C (cart atomicity): владелец транзакции может отключить внутренний
     # commit и закоммитить композицию сам (см. /registrar/cart).
     commit: bool = True,
+    encounter_id: int | None = None,
+    trusted_currency_by_service: Mapping[int, str] | None = None,
 ) -> Visit:
     """
     Создать новый визит - единая функция для всего проекта.
@@ -128,10 +162,14 @@ def create_visit(
             строит многосущную транзакцию (визиты + invoice + очередь),
             передаёт commit=False и коммитит сам — иначе частичный сбой
             композиции оставляет уже закоммиченные визиты в БД (неатомарно).
+        encounter_id: новое server-owned оформление, созданное в этой же
+            корневой транзакции для того же пациента; отсутствие оставляет
+            неопределённую связь до её безопасного согласования.
 
     Returns:
         Созданный Visit
     """
+    currencies = _validated_currency_map(services, trusted_currency_by_service)
     # Нормализуем данные визита
     visit_data = normalize_visit_payload(
         {
@@ -166,8 +204,15 @@ def create_visit(
             if dept:
                 department_id_value = dept.id
 
+    encounter = (
+        resolve_new_encounter(
+            db, patient_id=visit_data["patient_id"], encounter_id=encounter_id
+        )
+        if encounter_id is not None else None
+    )
     visit = Visit(
         patient_id=visit_data["patient_id"],
+        encounter_id=encounter.id if encounter is not None else None,
         doctor_id=visit_data.get("doctor_id"),
         visit_date=visit_data["visit_date"],
         visit_time=visit_data.get("visit_time"),
@@ -200,6 +245,8 @@ def create_visit(
                 ),
                 qty=service_data.get("quantity", service_data.get("qty", 1)),
                 price=service_data.get("price", 0),
+                currency=(currencies[service_data.get("service_id") or service_data.get("id")]
+                          if currencies is not None else None),
                 code=(
                     normalize_service_code(service_data.get("code"))
                     if service_data.get("code")
@@ -246,7 +293,9 @@ def add_visit_service(
     visit_id: int,
     service_id: int,
     quantity: int = 1,
-    custom_price: float | None = None,
+    custom_price: Decimal | float | None = None,
+    *,
+    trusted_currency: str | None = None,
 ) -> VisitService:
     """Добавить услугу к визиту.
 
@@ -276,6 +325,7 @@ def add_visit_service(
         ),
         quantity=quantity,
         price=price,
+        currency=trusted_currency,
         code=service_code,
         name=service.name if service else "",
     )

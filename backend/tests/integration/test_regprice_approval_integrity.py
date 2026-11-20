@@ -55,6 +55,7 @@ import pytest
 from app.core.security import get_password_hash
 from app.models.clinic import Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
+from app.models.encounter import Encounter
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -94,7 +95,7 @@ def _create_user(db_session, *, role: str, label: str, password: str = "doctor12
 
 
 def _create_doctor(db_session, user: User, *, specialty: str) -> Doctor:
-    doctor = Doctor(user_id=user.id, specialty=specialty, active=True)
+    doctor = Doctor(user_id=user.id, specialty=specialty, active=True, repeat_owner_generation=42)
     db_session.add(doctor)
     db_session.commit()
     db_session.refresh(doctor)
@@ -132,13 +133,18 @@ def _create_service(db_session, *, label: str, price: Decimal) -> Service:
 def _create_visit_with_service(
     db_session, *, patient: Patient, doctor: Doctor, service: Service, price: Decimal
 ) -> tuple[Visit, VisitService]:
+    encounter = Encounter(patient_id=patient.id, provenance="new")
+    db_session.add(encounter)
+    db_session.flush()
     visit = Visit(
         patient_id=patient.id,
+        encounter_id=encounter.id,
         doctor_id=doctor.id,
         visit_date=date.today(),
         status="open",
         source="desk",
         department="dermatology",
+        confirmation_context_epoch=43,
     )
     db_session.add(visit)
     db_session.flush()
@@ -149,6 +155,7 @@ def _create_visit_with_service(
         name=service.name,
         qty=1,
         price=price,
+        currency="UZS",
     )
     db_session.add(visit_service)
     db_session.commit()
@@ -478,13 +485,10 @@ def test_stale_override_is_refused_at_approval_time(
     assert mirror is None, "stale approval must not write the JSON mirror"
 
 
-def test_legacy_null_before_price_remains_approvable(
+def test_legacy_null_before_price_requires_a_new_bound_request(
     client, db_session, admin_user, admin_auth_headers
 ):
-    """REGPRICE-BE-003: overrides created before the visit_price_before
-    snapshot existed carry NULL — their staleness is not verifiable, so the
-    approval proceeds (documented policy) and the canonical outcome is
-    still applied."""
+    """A price correction with an unknown prior price requires a fresh request."""
     derma_user = _create_user(db_session, role="derma", label="legacy1")
     derma_doctor = _create_doctor(db_session, derma_user, specialty="dermatology")
     patient = _create_patient(db_session)
@@ -515,11 +519,12 @@ def test_legacy_null_before_price_remains_approvable(
         headers=admin_auth_headers,
         json={"action": "approve"},
     )
-    assert response.status_code == 200, response.text
+    assert response.status_code == 409, response.text
 
     db_session.expire_all()
     refreshed = db_session.get(VisitService, visit_service.id)
-    assert refreshed.price == Decimal("95000")
+    assert refreshed.price == Decimal("80000")
+    assert db_session.get(DoctorPriceOverride, legacy.id).status == "pending"
 
 
 # ---------------------------------------------------------------------------

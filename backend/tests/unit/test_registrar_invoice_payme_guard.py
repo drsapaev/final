@@ -10,7 +10,7 @@ from app.api.v1.endpoints.registrar_wizard import _invoice as invoice_module
 from app.api.v1.endpoints.registrar_wizard._helpers import InvoicePaymentRequest
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
-from app.models.visit import VisitService
+from app.models.visit import Visit, VisitService
 from app.services.payment_invariant_service import PaymentInvariantService
 
 
@@ -32,6 +32,7 @@ def _create_invoice(
                 name="SYNTHETIC-registrar invoice checkout",
                 qty=1,
                 price=service_amount if service_amount is not None else amount,
+                currency="UZS",
             )
         )
     invoice = PaymentInvoice(
@@ -70,6 +71,20 @@ def _manager(*, supported: set[str]) -> Mock:
 
 def _registrar() -> SimpleNamespace:
     return SimpleNamespace(id=7, role="Registrar")
+
+
+def _observed_checkout(invoice: PaymentInvoice, *, outcome: str = "completed", **overrides) -> SimpleNamespace:
+    provider_data = {
+        "merchant_trans_id": invoice.provider_payment_id,
+        "status": {"completed": 2, "failed": -1, "cancelled": -2}[outcome],
+        "amount": str(invoice.total_amount),
+        "currency": "UZS",
+        "click_trans_id": "10203",
+    }
+    provider_data.update(overrides)
+    return SimpleNamespace(
+        success=True, status=outcome, payment_id=invoice.provider_payment_id, provider_data=provider_data,
+    )
 
 
 @pytest.mark.unit
@@ -306,6 +321,66 @@ def test_processing_invoice_reserves_visit_from_counter_payment(
     assert db_session.query(Payment).count() == 0
 
 
+def test_zero_amount_processing_link_still_reserves_visit(db_session, test_visit):
+    invoice = _create_invoice(db_session, test_visit)
+    invoice.status = "processing"
+    invoice.provider = "click"
+    invoice.provider_payment_id = "synthetic-checkout"
+    invoice.visits[0].visit_amount = Decimal("0.00")
+    db_session.commit()
+    with pytest.raises(invoice_module.HTTPException) as exc_info:
+        PaymentInvariantService(db_session).assert_no_processing_invoice_reservation([test_visit.id])
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["reason"] == "invoice_payment_in_progress"
+
+
+def test_checkout_context_locks_zero_link_and_detects_per_visit_staleness(db_session, test_visit):
+    invoice = _create_invoice(db_session, test_visit, amount=100)
+    second = Visit(patient_id=test_visit.patient_id, status="open", confirmation_context_epoch=1)
+    db_session.add(second)
+    db_session.flush()
+    line = VisitService(
+        visit_id=second.id, service_id=2, name="SYNTHETIC",
+        qty=1, price=Decimal("0.00"), currency="UZS",
+    )
+    link = PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=second.id, visit_amount=Decimal("0.00"))
+    db_session.add_all([line, link])
+    db_session.commit()
+    _, visits, links = invoice_module._lock_invoice_settlement_context(db_session, invoice.id)
+    assert {visit.id for visit in visits} == {test_visit.id, second.id}
+    assert {item.visit_id for item in links} == {test_visit.id, second.id}
+    # Aggregate remains 100 while each allocation is now wrong.
+    line.price = Decimal("10.00")
+    next(item for item in invoice.visits if item.visit_id == test_visit.id).visit_amount = Decimal("90.00")
+    link.visit_amount = Decimal("10.00")
+    db_session.flush()
+    with pytest.raises(invoice_module.HTTPException) as error:
+        invoice_module._lock_invoice_settlement_context(db_session, invoice.id)
+    assert error.value.status_code == 409
+
+
+def test_checkout_checks_pending_all_free_in_zero_allocation(db_session, test_visit, monkeypatch):
+    invoice = _create_invoice(db_session, test_visit)
+    pending = Visit(
+        patient_id=test_visit.patient_id, status="pending_confirmation",
+        discount_mode="all_free", approval_status="pending", confirmation_context_epoch=1,
+    )
+    db_session.add(pending)
+    db_session.flush()
+    db_session.add(PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=pending.id, visit_amount=Decimal("0")))
+    db_session.commit()
+    manager_factory = Mock()
+    monkeypatch.setattr(invoice_module, "get_payment_manager", manager_factory)
+
+    with pytest.raises(invoice_module.HTTPException) as error:
+        invoice_module.init_invoice_payment(
+            InvoicePaymentRequest(invoice_id=invoice.id, provider="click"), db_session, _registrar(),
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail == "Визит All Free ожидает решения администратора"
+    manager_factory.assert_not_called()
+
+
 @pytest.mark.unit
 def test_pending_invoice_cannot_start_while_same_visit_checkout_is_processing(
     db_session,
@@ -381,10 +456,7 @@ def test_completed_invoice_records_delta_even_with_historical_payment(
     invoice.provider_payment_id = "click-delta-settlement"
     db_session.commit()
     manager = _manager(supported={"click"})
-    manager.check_payment_status.return_value = SimpleNamespace(
-        success=True,
-        status="completed",
-    )
+    manager.check_payment_status.return_value = _observed_checkout(invoice)
     monkeypatch.setattr(
         invoice_module,
         "get_payment_manager",
@@ -406,6 +478,7 @@ def test_completed_invoice_records_delta_even_with_historical_payment(
     assert len(provider_receipts) == 1
     assert provider_receipts[0].amount == Decimal("20000")
     assert provider_receipts[0].provider == "click"
+    assert provider_receipts[0].provider_transaction_id == "10203"
 
     second_response = invoice_module.check_invoice_status(
         invoice_id=invoice.id,
@@ -435,10 +508,7 @@ def test_completed_invoice_rejects_allocation_mismatch_before_recording_receipts
     invoice.visits[0].visit_amount = 100_000
     db_session.commit()
     manager = _manager(supported={"click"})
-    manager.check_payment_status.return_value = SimpleNamespace(
-        success=True,
-        status="completed",
-    )
+    manager.check_payment_status.return_value = _observed_checkout(invoice)
     monkeypatch.setattr(
         invoice_module,
         "get_payment_manager",
@@ -480,10 +550,7 @@ def test_completed_invoice_aggregates_duplicate_visit_allocations(
     )
     db_session.commit()
     manager = _manager(supported={"click"})
-    manager.check_payment_status.return_value = SimpleNamespace(
-        success=True,
-        status="completed",
-    )
+    manager.check_payment_status.return_value = _observed_checkout(invoice)
     monkeypatch.setattr(
         invoice_module,
         "get_payment_manager",
@@ -504,3 +571,131 @@ def test_completed_invoice_aggregates_duplicate_visit_allocations(
     )
     assert len(receipts) == 1
     assert receipts[0].amount == Decimal("125000")
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"merchant_trans_id": None},
+        {"amount": "124999.99"},
+        {"currency": "USD"},
+        {"status": 0},
+        {"click_trans_id": None},
+    ],
+)
+def test_completed_status_without_exact_receipt_evidence_leaves_invoice_unsettled(
+    db_session, test_visit, monkeypatch, overrides,
+):
+    invoice = _create_invoice(db_session, test_visit)
+    invoice.status = "processing"
+    invoice.provider = "click"
+    invoice.provider_payment_id = "synthetic-status-binding"
+    db_session.commit()
+    manager = _manager(supported={"click"})
+    manager.check_payment_status.return_value = _observed_checkout(invoice, **overrides)
+    monkeypatch.setattr(invoice_module, "get_payment_manager", lambda: manager)
+
+    with pytest.raises(invoice_module.HTTPException) as rejected:
+        invoice_module.check_invoice_status(invoice.id, db_session, _registrar())
+
+    assert rejected.value.status_code == 409
+    assert db_session.query(Payment).count() == 0
+    assert invoice.status == "processing"
+
+
+def test_stale_provider_cancellation_cannot_change_the_current_checkout(
+    db_session, test_visit, monkeypatch,
+):
+    invoice = _create_invoice(db_session, test_visit)
+    invoice.status = "processing"
+    invoice.provider = "click"
+    invoice.provider_payment_id = "synthetic-before-refresh"
+    db_session.commit()
+    old_observation = _observed_checkout(invoice, outcome="cancelled")
+    manager = _manager(supported={"click"})
+
+    def status_after_checkout_changed(*_):
+        invoice.provider_payment_id = "synthetic-new-checkout"
+        db_session.commit()
+        return old_observation
+
+    manager.check_payment_status.side_effect = status_after_checkout_changed
+    monkeypatch.setattr(invoice_module, "get_payment_manager", lambda: manager)
+
+    with pytest.raises(invoice_module.HTTPException) as rejected:
+        invoice_module.check_invoice_status(invoice.id, db_session, _registrar())
+
+    assert rejected.value.status_code == 409
+    assert invoice.status == "processing"
+    assert invoice.provider_payment_id == "synthetic-new-checkout"
+
+
+def test_captured_group_records_positive_visits_only(db_session, test_visit, monkeypatch):
+    invoice = _create_invoice(db_session, test_visit, amount=60_000)
+    invoice.status = "processing"
+    invoice.provider = "click"
+    invoice.provider_payment_id = "synthetic-group-settlement"
+    invoice.total_amount = Decimal("100000.00")
+    second = Visit(
+        patient_id=test_visit.patient_id, doctor_id=test_visit.doctor_id,
+        visit_date=test_visit.visit_date, status="pending_confirmation", confirmation_context_epoch=1,
+    )
+    zero = Visit(
+        patient_id=test_visit.patient_id, status="pending_confirmation", confirmation_context_epoch=1,
+        discount_mode="all_free", approval_status="pending",
+    )
+    db_session.add_all([second, zero])
+    db_session.flush()
+    db_session.add_all([
+        VisitService(
+            visit_id=second.id, service_id=1, name="SYNTHETIC second visit",
+            qty=1, price=Decimal("40000.00"), currency="UZS",
+        ),
+        PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=second.id, visit_amount=Decimal("40000.00")),
+        PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=zero.id, visit_amount=Decimal("0.00")),
+    ])
+    db_session.commit()
+    manager = _manager(supported={"click"})
+    manager.check_payment_status.return_value = _observed_checkout(invoice)
+    monkeypatch.setattr(invoice_module, "get_payment_manager", lambda: manager)
+
+    assert invoice_module.check_invoice_status(invoice.id, db_session, _registrar())["status"] == "paid"
+    assert invoice.provider_transaction_id == "10203"
+    amounts = {
+        receipt.visit_id: receipt.amount
+        for receipt in db_session.query(Payment).filter_by(provider_payment_id=invoice.provider_payment_id)
+    }
+    assert amounts == {test_visit.id: Decimal("60000.00"), second.id: Decimal("40000.00")}
+    assert zero.status == "pending_confirmation"
+
+
+def test_provider_completion_does_not_apply_redistributed_allocation(db_session, test_visit, monkeypatch):
+    invoice = _create_invoice(db_session, test_visit)
+    invoice.status = "processing"
+    invoice.provider = "click"
+    invoice.provider_payment_id = "synthetic-redistributed-allocation"
+    second = Visit(patient_id=test_visit.patient_id, status="open", confirmation_context_epoch=1)
+    db_session.add(second)
+    db_session.flush()
+    link = PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=second.id, visit_amount=Decimal("0.00"))
+    db_session.add(link)
+    db_session.commit()
+    observed = _observed_checkout(invoice)
+    manager = _manager(supported={"click"})
+
+    def change_allocation_during_check(*_):
+        primary = next(item for item in invoice.visits if item.visit_id == test_visit.id)
+        primary.visit_amount -= Decimal("1.00")
+        link.visit_amount += Decimal("1.00")
+        db_session.commit()
+        return observed
+
+    manager.check_payment_status.side_effect = change_allocation_during_check
+    monkeypatch.setattr(invoice_module, "get_payment_manager", lambda: manager)
+
+    with pytest.raises(invoice_module.HTTPException) as rejected:
+        invoice_module.check_invoice_status(invoice.id, db_session, _registrar())
+
+    assert rejected.value.status_code == 409
+    assert invoice.status == "processing"
+    assert db_session.query(Payment).count() == 0

@@ -380,6 +380,22 @@ def is_sensitive_verification_path(value: object) -> bool:
     )
 
 
+def is_sensitive_payment_evidence_path(value: object) -> bool:
+    """Recognize only Click callback and admin evidence-review routes."""
+    if not isinstance(value, str) or not value:
+        return False
+    if re.match(r"^(?:GET|POST|PUT|PATCH|DELETE) ", value, flags=re.IGNORECASE):
+        value = value.split(" ", 1)[1]
+    try:
+        path = unquote(urlsplit(value).path).lower().rstrip("/")
+    except ValueError:
+        return False
+    return bool(re.fullmatch(
+        r"/api/v1/payments/(?:webhook/click|reconcile/click/receipts/(?:[0-9]+|\{receipt_id(?::int)?\})/(?:review|attest))",
+        path,
+    ))
+
+
 # ---------------------------------------------------------------------------
 # Per-field maskers
 # ---------------------------------------------------------------------------

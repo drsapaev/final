@@ -3,12 +3,13 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.api.trusted_financial_auth import _authenticate
 from app.core.i18n import t  # noqa: F401
 from app.models.clinic import Doctor
 from app.models.derma_history import DermaHistoryEntry
@@ -25,6 +26,11 @@ from app.schemas.derma import (
     DermaProcedureOut,
 )
 from app.services.derma_api_service import DermaApiDomainError, DermaApiService
+from app.services.money_input import parse_exact_json, parse_money
+from app.services.profile_contact_security import (
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+)
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 logger = logging.getLogger(__name__)
@@ -35,16 +41,27 @@ DERMA_ROLES = ("Admin", "Doctor", "derma", "dermatology", "dermatologist")
 DERMA_ADMIN_ROLES = {"Admin"}
 
 
+async def _price_override_issuer(
+    token: str = Depends(deps.oauth2_scheme), db: Session = Depends(deps.get_db),
+) -> User:
+    return await _authenticate(token, db, DERMA_ROLES)
+
+
 class PriceOverrideRequest(BaseModel):
     visit_id: int
     service_id: int
-    # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
-    new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
+    target_visit_service_id: int | None = Field(default=None, gt=0)
+    new_price: Decimal = Field(..., ge=0, le=Decimal("9999999999.99"))
     # DERMAPRICE-BE-003 (audit #3892, group 15): non-null does not mean
     # non-empty — the justification is canonicalized (stripped) and must be
     # meaningful, bounded by the String(255) DB contract.
     reason: str = Field(..., min_length=1, max_length=255)
     details: str | None = None
+
+    @field_validator("new_price", mode="before")
+    @classmethod
+    def _valid_money(cls, value):
+        return parse_money(value)
 
     @field_validator("reason")
     @classmethod
@@ -66,8 +83,7 @@ class PriceOverrideResponse(BaseModel):
     # DERMAPRICE-BE-002: visit-level before-price captured at creation —
     # additive truth alongside the immutable catalogue reference.
     visit_price_before: Decimal | None = None
-    # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
-    new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
+    new_price: Decimal = Field(..., ge=0, le=Decimal("9999999999.99"))
     reason: str
     details: str | None
     status: str
@@ -365,17 +381,27 @@ async def create_cosmetic_procedure(
 )
 async def create_price_override(
     override_data: PriceOverrideRequest,
+    request: Request,
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
+    user: User = Depends(_price_override_issuer),
 ) -> PriceOverrideResponse:
     """
     Дерматолог изменяет цену процедуры с указанием причины
     """
     try:
+        try:
+            override_data = PriceOverrideRequest.model_validate(parse_exact_json(await request.body()))
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=422, detail="Некорректный формат запроса") from None
+        try:
+            bearer = capture_profile_bearer(request, user)
+        except ProfileBearerInvalid:
+            raise HTTPException(status_code=401, detail="Сессия недействительна") from None
         service = DermaApiService(db)
         price_override = service.create_price_override(
             override_data=override_data,
             user_id=user.id,
+            bearer=bearer,
         )
 
         return PriceOverrideResponse(

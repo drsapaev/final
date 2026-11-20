@@ -26,6 +26,43 @@
   backdrop-filter: blur(16px);
 }
 
+.registrar-benefit-review {
+  display: grid;
+  gap: var(--mac-spacing-4);
+  padding: var(--mac-spacing-4);
+}
+
+.registrar-benefit-review p,
+.registrar-benefit-review__totals,
+.registrar-benefit-review__totals dd {
+  margin: 0;
+}
+
+.registrar-benefit-review__totals {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--mac-spacing-2);
+}
+
+.registrar-benefit-review__totals dd {
+  font-weight: var(--mac-font-weight-semibold);
+  text-align: end;
+}
+
+.registrar-benefit-review__choice {
+  display: grid;
+  gap: var(--mac-spacing-2);
+}
+
+.registrar-benefit-review__choice select {
+  width: 100%;
+  padding: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+}
+
 .wizard-container-v2 {
   display: flex;
   flex-direction: column;

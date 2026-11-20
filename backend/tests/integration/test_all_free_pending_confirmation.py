@@ -1,6 +1,6 @@
 """Confirmation and registration behavior while an All Free request waits."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.registrar_wizard import _cart, _invoice
+from app.crud.clinic import clinic_today
 from app.models.online_queue import OnlineQueueEntry
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
@@ -19,11 +20,20 @@ from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
 from app.services.visit_lifecycle_service import VisitLifecycleService
 from tests.integration.test_all_free_decision_concurrency_pg import (  # noqa: F401
     approval_case,
+    decision_engines,
+)
+from tests.integration.test_all_free_registrar_workflow import (
+    migrated_visit_confirmation_context,  # noqa: F401
+)
+from tests.integration.test_registrar_benefit_decision_pg import (  # noqa: F401
+    benefit_client,
+    configured_benefit_db,
 )
 
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.usefixtures("migrated_visit_confirmation_context")
 def test_registrar_stages_requested_visit_without_confirmation_or_queue(
     client,
     db_session,
@@ -37,6 +47,8 @@ def test_registrar_stages_requested_visit_without_confirmation_or_queue(
     monkeypatch.setattr(
         _cart.notification_sender_service, "send_all_free_request_notification", notify
     )
+    test_service.currency = "UZS"
+    db_session.commit()
     response = client.post(
         "/api/v1/registrar/cart",
         headers=registrar_auth_headers,
@@ -48,7 +60,7 @@ def test_registrar_stages_requested_visit_without_confirmation_or_queue(
             "visits": [
                 {
                     "doctor_id": test_doctor.id,
-                    "visit_date": date.today().isoformat(),
+                    "visit_date": clinic_today(db_session).isoformat(),
                     "visit_time": "10:30",
                     "department": "cardiology",
                     "services": [{"service_id": test_service.id, "quantity": 1}],
@@ -64,6 +76,7 @@ def test_registrar_stages_requested_visit_without_confirmation_or_queue(
     assert visit.confirmed_at is None
     assert visit.confirmation_token is None
     assert data["created_visits"][0]["confirmation_required"] is False
+    assert data["created_visits"][0]["confirmation_token"] is None
     assert data["message"] == ALL_FREE_DECISION_REQUIRED
     assert data["queue_numbers"] == {}
     assert db_session.query(OnlineQueueEntry).filter_by(visit_id=visit.id).count() == 0
@@ -91,12 +104,16 @@ def test_staff_confirmation_and_status_transition_wait_for_approval(
 
 
 def test_existing_pwa_invitation_waits_for_all_free_decision(
-    client, db_session, test_visit
+    client, db_session, test_visit, test_service,
 ):
     test_visit.discount_mode = "all_free"
     test_visit.approval_status = "pending"
     test_visit.confirmation_channel = "pwa"
     test_visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
+    db_session.add(VisitService(
+        visit_id=test_visit.id, service_id=test_service.id,
+        name="Synthetic consultation", qty=1, price=Decimal("50000.00"), currency="UZS",
+    ))
     db_session.commit()
 
     response = client.post(
@@ -137,6 +154,7 @@ def test_captured_invoice_is_recorded_without_confirming_pending_all_free(
                 name="Synthetic service",
                 price=amount,
                 qty=1,
+                currency="UZS",
             ),
         ]
     )
@@ -150,7 +168,14 @@ def test_captured_invoice_is_recorded_without_confirming_pending_all_free(
     manager = Mock()
     manager.supports_registrar_invoice_payment.return_value = True
     manager.check_payment_status.return_value = SimpleNamespace(
-        success=True, status="completed"
+        success=True, status="completed", payment_id=invoice.provider_payment_id,
+        provider_data={
+            "merchant_trans_id": invoice.provider_payment_id,
+            "status": 2,
+            "amount": str(amount),
+            "currency": "UZS",
+            "click_trans_id": "10401",
+        },
     )
     monkeypatch.setattr(_invoice, "get_payment_manager", lambda: manager)
 
@@ -169,14 +194,14 @@ def test_captured_invoice_is_recorded_without_confirming_pending_all_free(
 
 
 def test_staff_confirmation_checks_fresh_approval_on_postgres(approval_case):
-    engine, visit_id, admin_ids = approval_case
+    engine, runtime, _, visit_id, _, _, admin_ids = approval_case
     with Session(engine) as db:
         visit = db.get(Visit, visit_id)
         visit.approval_status = "approved"
         visit.status = "pending_confirmation"
         db.commit()
 
-    with Session(engine) as confirmation_db:
+    with Session(runtime) as confirmation_db:
         cached_visit = confirmation_db.get(Visit, visit_id)
         assert cached_visit.approval_status == "approved"
         with Session(engine) as request_db:

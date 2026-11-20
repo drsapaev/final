@@ -10,6 +10,7 @@ the same number as ``PaymentInvariantService.compute_paid_amount`` implies.
 """
 
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -22,7 +23,7 @@ pytestmark = pytest.mark.integration
 
 
 def _make_visit(db_session, patient, amount, *, status="open"):
-    visit = Visit(patient_id=patient.id, status=status, discount_mode="none")
+    visit = Visit(patient_id=patient.id, status=status, discount_mode="none", confirmation_context_epoch=1)
     db_session.add(visit)
     db_session.flush()
     db_session.add(
@@ -32,6 +33,7 @@ def _make_visit(db_session, patient, amount, *, status="open"):
             name="SYNTHETIC-csh-fe-028",
             qty=1,
             price=amount,
+            currency="UZS",
         )
     )
     db_session.commit()
@@ -42,6 +44,7 @@ def _make_paid_payment(db_session, visit, amount):
     payment = Payment(
         visit_id=visit.id,
         amount=Decimal(str(amount)),
+        currency="UZS",
         method="cash",
         status="paid",
     )
@@ -54,7 +57,7 @@ def _refund(client, headers, payment_id, amount):
     response = client.post(
         f"/api/v1/cashier/payments/{payment_id}/refund",
         headers=headers,
-        json={"amount": amount, "reason": "SYNTHETIC-csh-fe-028 partial refund"},
+        json={"amount": amount, "reason": "SYNTHETIC-csh-fe-028 partial refund", "client_request_id": str(uuid4())},
     )
     assert response.status_code == 200, response.text
     return response.json()

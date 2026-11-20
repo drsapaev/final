@@ -419,7 +419,11 @@ class ForceMajeureApiService:
                     400,
                     "Можно одобрить только заявки со статусом pending",
                 )
-            req.status = RefundRequestStatus.APPROVED.value
+            # The historical request does not bind its original currency or
+            # settlement evidence. A current Payment currency is insufficient
+            # to establish what the operator is approving.
+            self.repository.rollback()
+            raise ForceMajeureApiDomainError(409, "Для подтверждения возврата требуется сверка валюты")
         elif action == "reject":
             if req.status not in [
                 RefundRequestStatus.PENDING.value,
@@ -448,7 +452,10 @@ class ForceMajeureApiService:
                     400,
                     "Можно завершить только одобренные заявки",
                 )
-            req.status = RefundRequestStatus.COMPLETED.value
+            # Completion may record money already sent externally. Preserve
+            # the request for the audited reconciliation path, never guess.
+            self.repository.rollback()
+            raise ForceMajeureApiDomainError(409, "Для завершения возврата требуется сверка валюты")
         else:
             raise ForceMajeureApiDomainError(400, f"Неизвестное действие: {action}")
 
@@ -469,9 +476,9 @@ class ForceMajeureApiService:
     def _refund_request_available_actions(status: str | None) -> list[str]:
         normalized_status = (status or "").strip().lower()
         if normalized_status == RefundRequestStatus.PENDING.value:
-            return ["approve", "reject"]
+            return ["reject"]
         if normalized_status == RefundRequestStatus.APPROVED.value:
-            return ["reject", "complete"]
+            return ["reject"]
         return []
 
     def get_deposits(

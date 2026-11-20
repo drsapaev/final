@@ -99,6 +99,8 @@ def db_engine():
         cur.close()
 
     Base.metadata.create_all(engine)
+    from tests.synthetic_reconciliation import install_reconciliation_fence
+    install_reconciliation_fence(engine)
     yield engine
 
     Base.metadata.drop_all(engine)
@@ -189,6 +191,8 @@ def _setup_visit_with_cost(session, total_cost=5000):
         visit_time="10:00",
         discount_mode="none",
         department="cardiology",
+        # Metadata-only tests do not run 0102, which assigns a positive epoch.
+        confirmation_context_epoch=1,
         created_at=datetime.now(UTC),
     )
     session.add(visit)

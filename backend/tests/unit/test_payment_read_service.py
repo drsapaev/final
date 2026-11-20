@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from app.models.payment import Payment
@@ -147,3 +149,38 @@ class TestPaymentReadService:
 
         assert pdf_bytes.startswith(b"%PDF")
         assert len(pdf_bytes) > 500
+
+    @pytest.mark.parametrize("currency,label", [
+        ("USD", "USD"), ("UZS", "UZS"), (None, "валюта не указана"), ("usd", "валюта не указана"),
+    ])
+    def test_pdf_uses_payment_currency_and_exact_cents_for_refund(
+        self, db_session, test_visit, monkeypatch, currency, label,
+    ):
+        from reportlab.pdfgen import canvas
+
+        payment = Payment(visit_id=test_visit.id, amount=Decimal("10.25"), currency="USD", method="cash",
+                          status="paid", refunded_amount=Decimal("1.75"))
+        db_session.add(payment)
+        db_session.commit()
+        service = PaymentReadService(db_session)
+        context = service._load_receipt_context(payment_id=payment.id)
+        context["payment"].currency = currency
+        monkeypatch.setattr(service, "_load_receipt_context", lambda **_: context)
+        lines = []
+        original_draw = canvas.Canvas.drawString
+
+        def record_draw(instance, x, y, text, *args, **kwargs):
+            lines.append(text)
+            return original_draw(instance, x, y, text, *args, **kwargs)
+
+        monkeypatch.setattr(canvas.Canvas, "drawString", record_draw)
+        assert service.build_receipt_pdf(payment_id=payment.id).startswith(b"%PDF")
+        assert f"Сумма: 10.25 {label}" in lines
+        assert f"Возврат: 1.75 {label}" in lines
+        assert f"Сумма: 10.25 {label}" in service.build_receipt_content(payment_id=payment.id)
+
+    @pytest.mark.parametrize("amount", ["NaN", "1.001"])
+    def test_receipt_rejects_amounts_that_cannot_be_rendered_exactly(self, amount):
+        with pytest.raises(PaymentReadDomainError) as error:
+            PaymentReadService._format_amount(Decimal(amount))
+        assert error.value.status_code == 409

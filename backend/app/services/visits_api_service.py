@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import extract_model_changes
 from app.models.visit import Visit
 from app.repositories.visits_api_repository import VisitsApiRepository
+from app.services.encounter_creation import EncounterCreationError
 from app.services.service_mapping import normalize_service_code
 
 # PR-1 (Codex round 11+13, P1): shared lease-coordination refusal detail
@@ -126,6 +127,24 @@ class VisitsApiService:
         payload,
         current_user,
     ) -> dict[str, Any]:
+        try:
+            return self._create_visit(request=request, payload=payload, current_user=current_user)
+        except EncounterCreationError as exc:
+            self.repository.rollback()
+            raise HTTPException(status_code=422, detail="Пациент недоступен для оформления визита") from exc
+        except Exception:
+            # Encounter, Visit and audit are one unit, even if an insert or
+            # the audit write fails after encounter allocation.
+            self.repository.rollback()
+            raise
+
+    def _create_visit(
+        self,
+        *,
+        request,
+        payload,
+        current_user,
+    ) -> dict[str, Any]:
         use_crud = os.getenv("USE_CRUD_VISITS", "false").lower() == "true"
 
         if use_crud:
@@ -164,8 +183,10 @@ class VisitsApiService:
             }
 
         table = self._visits()
+        encounter_id = self.repository.create_standalone_encounter_id(payload.patient_id)
         ins_values = {
             "patient_id": payload.patient_id,
+            "encounter_id": encounter_id,
             "doctor_id": payload.doctor_id,
             "status": "open",
             "notes": payload.notes,

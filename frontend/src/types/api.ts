@@ -190,6 +190,8 @@ export type QueueJoinResponse = Schemas['app__api__v1__endpoints__queue__QueueJo
 
 export type PaymentHistoryItem = Schemas['PaymentHistoryItem'];
 export type PaymentInvoiceCreateDto = Schemas['PaymentInvoiceCreateRequest'];
+export type RegistrarBenefitApprovalDto = Schemas['ApproveRegistrarBenefitRequest'];
+export type RegistrarBenefitDecisionDto = Schemas['EncounterBenefitDecision'];
 export type PaymentInitRequest = Schemas['PaymentInitRequest'];
 export type PaymentInitResponse = Schemas['PaymentInitResponse'];
 export type PaymentStatusResponse = Schemas['PaymentStatusResponse'];

@@ -19,7 +19,7 @@ from app.services.force_majeure_api_service import (
     ForceMajeureApiDomainError,
     ForceMajeureApiService,
 )
-from app.services.payment_init_service import PaymentInitService
+from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
 from app.services.payment_invariant_service import PaymentInvariantService
 from tests.integration.test_all_free_decision_concurrency_pg import (  # noqa: F401
     approval_case,
@@ -38,6 +38,7 @@ def _add_charge(db, visit, service):
             name="Synthetic consultation",
             qty=1,
             price=AMOUNT,
+            currency="UZS",
         )
     )
 
@@ -79,20 +80,21 @@ def test_provider_initialization_waits_without_creating_a_payment(
     manager = Mock()
     manager.get_providers_for_currency.return_value = ["click"]
 
-    result = PaymentInitService(db_session, manager).init_payment(
-        request=SimpleNamespace(state=None),
-        current_user_id=admin_user.id,
-        visit_id=test_visit.id,
-        provider="click",
-        amount=float(AMOUNT),
-        currency="UZS",
-        description=None,
-        return_url=None,
-        cancel_url=None,
-    )
+    with pytest.raises(PaymentInitDomainError) as error:
+        PaymentInitService(db_session, manager).init_payment(
+            request=SimpleNamespace(state=None),
+            current_user_id=admin_user.id,
+            visit_id=test_visit.id,
+            provider="click",
+            amount=float(AMOUNT),
+            currency="UZS",
+            description=None,
+            return_url=None,
+            cancel_url=None,
+        )
 
-    assert result["success"] is False
-    assert ALL_FREE_DECISION_REQUIRED in result["error_message"]
+    assert error.value.status_code == 409
+    assert error.value.detail == ALL_FREE_DECISION_REQUIRED
     manager.create_payment.assert_not_called()
     assert db_session.query(Payment).filter_by(visit_id=test_visit.id).count() == 0
 
@@ -106,6 +108,7 @@ def test_invoice_initialization_checks_pending_zero_price_member(
         status="pending_confirmation",
         discount_mode="all_free",
         approval_status="pending",
+        confirmation_context_epoch=1,
     )
     invoice = PaymentInvoice(
         patient_id=test_visit.patient_id,

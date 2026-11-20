@@ -9,6 +9,7 @@ import logging  # noqa: F401
 import re  # noqa: F401
 import uuid  # noqa: F401
 from datetime import UTC, date, datetime, timedelta  # noqa: F401
+from decimal import Decimal
 from typing import Any  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
@@ -282,10 +283,62 @@ def _ensure_schedule_next_patient_access(
         )
 
 
+def _probe_schedule_next_patient_evidence(
+    db: Session, *, patient_id: int, doctor: Doctor
+) -> tuple[str, int]:
+    """Find an ownership candidate; it has NO authority until locked/rechecked.
+
+    Historical rows whose doctor_id merely equals users.id are intentionally
+    excluded: an absent Doctor row at that id is not a lockable identity.
+    """
+    visit_id = (
+        db.query(Visit.id)
+        .filter(Visit.patient_id == patient_id, Visit.doctor_id == doctor.id)
+        .order_by(Visit.id).first()
+    )
+    if visit_id is not None:
+        return ("visit", visit_id[0])
+    appointment_id = (
+        db.query(Appointment.id)
+        .filter(Appointment.patient_id == patient_id, Appointment.doctor_id == doctor.id)
+        .order_by(Appointment.id).first()
+    )
+    if appointment_id is not None:
+        return ("appointment", appointment_id[0])
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+
+def _lock_schedule_next_patient_evidence(
+    db: Session, *, patient_id: int, doctor: Doctor, candidate: tuple[str, int]
+) -> None:
+    """Hold and recheck the exact current assignment through the root commit.
+
+    A Visit candidate must have been included in sorted repeat Visit locks
+    before this call. Appointment uses NOWAIT to avoid reverse wait against
+    writers that acquire Appointment before Visit. Caller rolls back 55P03.
+    """
+    kind, row_id = candidate
+    if kind == "visit":
+        row = (db.query(Visit).filter(Visit.id == row_id)
+               .with_for_update(nowait=True).populate_existing().first())
+    elif kind == "appointment":
+        query = db.query(Appointment).filter(Appointment.id == row_id).populate_existing()
+        if db.get_bind().dialect.name == "postgresql":
+            query = query.with_for_update(nowait=True)
+        row = query.first()
+    else:
+        row = None
+    if row is None or row.patient_id != patient_id or row.doctor_id != doctor.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Назначение пациента изменилось; повторите запрос")
+
+
 class ScheduleNextVisitService(BaseModel):
     service_id: int
     quantity: int = 1
-    custom_price: float | None = None
+    # Non-finite values are rejected by the endpoint's money validator.
+    # Let them reach it so the 422 response does not try to serialize a
+    # non-JSON NaN/Infinity in a Pydantic validation-error payload.
+    custom_price: Decimal | None = Field(default=None, allow_inf_nan=True)
 
 
 class ScheduleNextVisitRequest(BaseModel):
@@ -348,12 +401,9 @@ class ScheduleNextVisitResponse(BaseModel):
     # из СОХРАНЁННОГО визита (второй визит/токен не создавались).
     idempotent_replay: bool = Field(
         default=False,
-        description=(
-            "True, когда идентичный intent уже был зафиксирован в окне "
-            "дедупликации и ответ перестроен из СОХРАНЁННОГО визита "
-            "(второй визит/токен не создавались)."
-        ),
+        description="True при авторизованном повторе ранее сохранённого намерения.",
     )
+    price_override_requests: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # ===================== ОЧЕРЕДЬ ВРАЧА =====================

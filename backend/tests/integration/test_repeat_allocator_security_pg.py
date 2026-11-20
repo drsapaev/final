@@ -53,6 +53,66 @@ def _revision(db, direction, schema):
     getattr(module, direction)()
 
 
+@pytest.mark.parametrize("row_security", ["on", "off"])
+def test_transaction_settings_restored_after_upgrade_and_downgrade(database, row_security):
+    engine, schema = database
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        db.execute(sa.text("CREATE TEMP TABLE doctors (id integer)"))
+        original_path = f'pg_temp, {quote(schema)}, pg_catalog'
+        db.execute(sa.text("SELECT pg_catalog.set_config('search_path', :path, true), "
+                           "pg_catalog.set_config('row_security', :rls, true)"),
+                   {"path": original_path, "rls": row_security})
+        for direction in ("upgrade", "downgrade"):
+            _revision(db, direction, schema)
+            settings = db.execute(sa.text("SELECT current_setting('search_path'), "
+                                          "current_setting('row_security')")).one()
+            assert settings == (original_path, row_security)
+
+
+def test_python_preflight_error_restores_settings_without_committing(database):
+    engine, schema = database
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        db.execute(sa.text("CREATE SEQUENCE repeat_evidence_generation_seq START 1"))
+        path = f'pg_temp, {quote(schema)}, pg_catalog'
+        db.execute(sa.text("SELECT pg_catalog.set_config('search_path', :path, true), "
+                           "pg_catalog.set_config('row_security', 'on', true)"), {"path": path})
+        with pytest.raises(RuntimeError, match="allocator sequence configuration"):
+            _revision(db, "upgrade", schema)
+        assert db.execute(sa.text("SELECT current_setting('search_path'), "
+                                  "current_setting('row_security')")).one() == (path, "on")
+
+
+def test_closed_connection_preserves_original_operation_error(database):
+    engine, schema = database
+    path = Path(__file__).resolve().parents[2] / "alembic/versions/0103_visit_consultation_completion.py"
+    spec = importlib.util.spec_from_file_location("repeat_restore_error", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with engine.connect() as db:
+        module.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": schema}))
+
+        def fail_after_disconnect():
+            db.close()
+            raise RuntimeError("original operation error")
+
+        with pytest.raises(RuntimeError, match="original operation error"):
+            module._run_with_restored_pg_settings(fail_after_disconnect)
+
+
+def test_restore_failure_after_success_is_not_hidden(database):
+    engine, schema = database
+    path = Path(__file__).resolve().parents[2] / "alembic/versions/0103_visit_consultation_completion.py"
+    spec = importlib.util.spec_from_file_location("repeat_restore_failure", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with engine.connect() as db:
+        module.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": schema}))
+        with pytest.raises(sa.exc.ResourceClosedError):
+            module._run_with_restored_pg_settings(db.close)
+
+
 def test_rejects_preexisting_low_sequence(database):
     engine, schema = database
     with engine.begin() as db:

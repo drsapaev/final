@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -134,6 +134,7 @@ async def get_patient_entries(
     },
 )
 async def batch_update_patient_entries(
+    http_request: Request,
     patient_id: int = Path(..., description="ID пациента"),
     date: str = Path(..., description="Дата в формате YYYY-MM-DD"),
     request: BatchUpdateRequest = ...,
@@ -185,8 +186,22 @@ async def batch_update_patient_entries(
     # QF-1 (operator attribution, Codex round-2 P1): thread the operator so
     # batch status updates (e.g. the documented {"action":"update",
     # "status":"called"} example) attribute the caller.
+    confirmation_bearer = None
+    if any(a.action == "update" and a.status == "confirmed" and a.entry_type != "online_queue"
+           for a in request.entries):
+        from app.services.profile_contact_security import (
+            ProfileBearerInvalid,
+            capture_profile_bearer,
+        )
+
+        try:
+            confirmation_bearer = capture_profile_bearer(http_request, current_user)
+        except ProfileBearerInvalid:
+            db.rollback()
+            raise HTTPException(status_code=401, detail="Сеанс недоступен") from None
     result = service.batch_update(
-        patient_id, target_date, request, actor_user_id=current_user.id
+        patient_id, target_date, request, actor_user_id=current_user.id,
+        confirmation_bearer=confirmation_bearer,
     )
 
     if not result.success:

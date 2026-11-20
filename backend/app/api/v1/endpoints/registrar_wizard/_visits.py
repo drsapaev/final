@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
+
+from fastapi import Request
 
 from app.api.v1.endpoints.registrar_wizard._cart import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
@@ -1508,26 +1511,31 @@ class ConfirmVisitResponse(BaseModel):
     print_tickets: list[dict[str, Any]] | None = None
 
 
-@router.post(
-    "/registrar/visits/{visit_id}/confirm", response_model=ConfirmVisitResponse
-)
-def confirm_visit_by_registrar(
+def _confirm_visit_by_staff(
     visit_id: int,
     request: ConfirmVisitRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
-):
+    http_request: Request,
+    db: Session,
+    current_user: User,
+    projector: Callable[[Visit], Any] | None = None,
+) -> tuple[ConfirmVisitResponse, Any]:
     """
     Подтверждение визита регистратором (по телефону)
     Присваивает номера в очередях если визит на сегодня
     """
+    from app.services.profile_contact_security import (
+        ProfileBearerInvalid,
+        capture_profile_bearer,
+        check_bearer_expiry,
+    )
+    from app.services.staff_confirmation_guard import lock_staff_confirmation_subjects
+
     try:
-        # Находим визит
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
-        if not visit:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("visit.not_found")
-            )
+        bearer = capture_profile_bearer(http_request, current_user)
+        current_user, visits = lock_staff_confirmation_subjects(
+            db, bearer=bearer, visit_ids=[visit_id]
+        )
+        visit = visits[0]
 
         # Проверяем что визит ожидает подтверждения
         if visit.status != "pending_confirmation":
@@ -1583,10 +1591,7 @@ def confirm_visit_by_registrar(
                 commit=False,  # Gate D fix: composition — single commit at end
             )
 
-        db.commit()
-        db.refresh(visit)
-
-        return ConfirmVisitResponse(
+        response = ConfirmVisitResponse(
             success=True,
             message=f"Визит подтвержден. {'Номера в очередях присвоены.' if queue_numbers else 'Номера будут присвоены утром в день визита.'}",
             visit_id=visit.id,
@@ -1594,8 +1599,16 @@ def confirm_visit_by_registrar(
             queue_numbers=queue_numbers,
             print_tickets=print_tickets,
         )
+        projected = projector(visit) if projector is not None else None
+        check_bearer_expiry(bearer)
+        db.commit()
+        return response, projected
 
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сеанс недоступен") from None
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
         db.rollback()
@@ -1603,6 +1616,20 @@ def confirm_visit_by_registrar(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
+
+@router.post(
+    "/registrar/visits/{visit_id}/confirm", response_model=ConfirmVisitResponse
+)
+def confirm_visit_by_registrar(
+    visit_id: int,
+    request: ConfirmVisitRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+):
+    response, _ = _confirm_visit_by_staff(visit_id, request, http_request, db, current_user)
+    return response
 
 
 def _assign_queue_numbers_on_confirmation(

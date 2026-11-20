@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any, Final
 
-from sqlalchemy import func, insert
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy import func, insert, text
+from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.orm import Session, lazyload
 
 from app.crud.clinic import clinic_today
 from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
@@ -409,10 +410,6 @@ class ForceMajeureService:
                 # Получаем связанный платёж
                 payment = self._get_payment_for_entry(entry)
 
-                # Отмечаем запись как отменённую
-                entry.status = "cancelled"
-                entry.incomplete_reason = f"Форс-мажор: {reason}"
-
                 refund_info = None
 
                 if payment and payment.status == "paid" and payment.amount > 0:
@@ -480,6 +477,11 @@ class ForceMajeureService:
                         else:
                             refund_requests.append(refund_info)
 
+                # Do not mark the queue entry cancelled until a requested
+                # refund has succeeded. A rejected refund must leave both
+                # the visit and its financial evidence intact.
+                entry.status = "cancelled"
+                entry.incomplete_reason = f"Форс-мажор: {reason}"
                 cancelled.append(
                     {
                         "entry_id": entry.id,
@@ -955,7 +957,52 @@ class ForceMajeureService:
             }
         return int(result.inserted_primary_key[0])
 
+    def _lock_payment_refund_budget(self, payment_id: int, visit_id: int | None, amount: Decimal) -> Payment:
+        # Use the same row lock as the cashier. NO KEY UPDATE is compatible
+        # with the refund claim's foreign-key lock. Keep it until commit.
+        payment_query = (self.db.query(Payment).options(lazyload(Payment.payment_visits))
+                         .filter(Payment.id == payment_id).populate_existing())
+        if self.db.get_bind().dialect.name == "postgresql":
+            self.db.execute(text("SET LOCAL lock_timeout='2s'"))
+            payment_query = payment_query.with_for_update(key_share=True)
+        try:
+            with self.db.connection().begin_nested():
+                payment = payment_query.first()
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate in {"55P03", "40001"}:
+                raise ForceMajeureError("Платёж изменяется, повторите операцию") from None
+            raise
+        refund = payment.refunded_amount if payment is not None else None
+        refunded = refund if refund is not None else Decimal("0")
+        if (payment is None or payment.status != "paid" or refunded < 0 or not 0 < amount <= payment.amount - refunded
+                or (visit_id is not None and payment.visit_id != visit_id)):
+            raise ForceMajeureError("Доступная сумма возврата или состояние платежа требуют сверки")
+        return payment
+
     def _add_to_deposit(
+        self,
+        patient_id: int,
+        amount: float,
+        reason: str,
+        payment_id: int,
+        visit_id: int | None,
+        performed_by_id: int,
+    ) -> dict[str, Any]:
+        """Credit one refund atomically even when its caller handles errors."""
+        try:
+            with self.db.begin_nested():
+                return self._add_to_deposit_checked(
+                    patient_id=patient_id, amount=amount, reason=reason,
+                    payment_id=payment_id, visit_id=visit_id, performed_by_id=performed_by_id,
+                )
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate == "55P03":
+                raise ForceMajeureError("Платёж изменяется, повторите операцию") from None
+            raise
+
+    def _add_to_deposit_checked(
         self,
         patient_id: int,
         amount: float,
@@ -982,8 +1029,6 @@ class ForceMajeureService:
         Право на возврат атомарно занимается в ``payment_refund_claims``
         (миграция 0088) ДО первого денежного изменения.
         """
-        from decimal import Decimal
-
         amount_decimal = Decimal(str(amount))
 
         existing_credit = (
@@ -1028,6 +1073,9 @@ class ForceMajeureService:
                 "prior_request_id": prior_request.id,
             }
 
+        payment = self._lock_payment_refund_budget(payment_id, visit_id, amount_decimal)
+        if payment.currency != "UZS" or payment.amount != amount_decimal:
+            raise ForceMajeureError("Валюта или состояние платежа требуют сверки")
         claim_id = self._claim_payment_refund(
             payment_id, self.REFUND_CHANNEL_DEPOSIT, reason=reason
         )
@@ -1049,6 +1097,7 @@ class ForceMajeureService:
             self.db.query(PatientDeposit)
             .filter(PatientDeposit.patient_id == patient_id)
             .with_for_update()
+            .populate_existing()
             .first()
         )
 
@@ -1066,6 +1115,7 @@ class ForceMajeureService:
                         insert(PatientDeposit).values(
                             patient_id=patient_id,
                             balance=amount_decimal,
+                            currency="UZS",
                         )
                     )
                 deposit_id = int(result.inserted_primary_key[0])
@@ -1076,12 +1126,17 @@ class ForceMajeureService:
                     self.db.query(PatientDeposit)
                     .filter(PatientDeposit.patient_id == patient_id)
                     .with_for_update()
+                    .populate_existing()
                     .one()
                 )
+                if deposit.currency != "UZS":
+                    raise ForceMajeureError("Валюта депозита требует сверки")
                 deposit.balance += amount_decimal
             else:
                 deposit = self.db.get(PatientDeposit, deposit_id)
         else:
+            if deposit.currency != "UZS":
+                raise ForceMajeureError("Валюта депозита требует сверки")
             deposit.balance += amount_decimal
 
         self.db.flush()
@@ -1146,8 +1201,6 @@ class ForceMajeureService:
         заявка (например, с исправленными реквизитами) создаётся
         свободно, а её claim займёт освободившийся слот платежа.
         """
-        from decimal import Decimal
-
         amount_decimal = Decimal(str(amount))
 
         existing_request = (
@@ -1170,7 +1223,8 @@ class ForceMajeureService:
                 "prior_channel": self.REFUND_CHANNEL_REFUND_REQUEST,
             }
 
-        claim_id: int | None = None
+        currency_snapshot = None
+        original_amount = amount_decimal
         if is_automatic:
             # 3808 round 4: кросс-канальная проверка — платёж уже
             # зачислен на депозит (строка могла быть создана до 0088).
@@ -1192,31 +1246,45 @@ class ForceMajeureService:
                     "prior_deposit_transaction_id": prior_credit.id,
                 }
 
-            claim_id = self._claim_payment_refund(
-                payment_id, self.REFUND_CHANNEL_REFUND_REQUEST, reason=reason
+            payment = self._lock_payment_refund_budget(payment_id, visit_id, amount_decimal)
+            if refund_type == RefundType.BANK_TRANSFER:
+                currency = payment.currency
+                if not (isinstance(currency, str) and len(currency) == 3 and currency.isascii()
+                        and currency.isalpha() and currency.isupper()):
+                    raise ForceMajeureError("Валюта банковского возврата требует сверки")
+                if self.db.query(Visit.patient_id).filter(Visit.id == payment.visit_id).scalar() != patient_id:
+                    raise ForceMajeureError("Пациент банковского возврата требует сверки")
+                currency_snapshot = currency
+                original_amount = payment.amount
+
+        # Publish the claim and its evidence together, even when a caller
+        # continues after an individual refund fails.
+        with self.db.begin_nested():
+            claim_id: int | None = None
+            if is_automatic:
+                claim_id = self._claim_payment_refund(
+                    payment_id, self.REFUND_CHANNEL_REFUND_REQUEST, reason=reason
+                )
+                if isinstance(claim_id, dict):
+                    return {"type": "refund_request", **claim_id}
+            refund_request = RefundRequest(
+                patient_id=patient_id,
+                payment_id=payment_id,
+                visit_id=visit_id,
+                original_amount=original_amount,
+                refund_amount=amount_decimal,
+                commission_amount=Decimal("0"),
+                payment_currency_snapshot=currency_snapshot,
+                refund_type=refund_type.value,
+                status=RefundRequestStatus.PENDING.value,
+                reason=reason,
+                is_automatic=is_automatic,
             )
-            if isinstance(claim_id, dict):
-                return {"type": "refund_request", **claim_id}
-
-        refund_request = RefundRequest(
-            patient_id=patient_id,
-            payment_id=payment_id,
-            visit_id=visit_id,
-            original_amount=amount_decimal,
-            refund_amount=amount_decimal,
-            commission_amount=Decimal("0"),
-            refund_type=refund_type.value,
-            status=RefundRequestStatus.PENDING.value,
-            reason=reason,
-            is_automatic=is_automatic,
-        )
-        self.db.add(refund_request)
-        self.db.flush()
-
-        # Аудит единого claim-а: какая заявка осуществила возврат
-        if claim_id is not None:
-            claim_row = self.db.get(PaymentRefundClaim, claim_id)
-            claim_row.refund_request_id = refund_request.id
+            self.db.add(refund_request)
+            self.db.flush()
+            if claim_id is not None:
+                claim_row = self.db.get(PaymentRefundClaim, claim_id)
+                claim_row.refund_request_id = refund_request.id
 
         return {
             "type": "refund_request",

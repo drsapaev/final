@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.crud.queue_owner_policy import (
@@ -40,6 +41,7 @@ from app.services.service_mapping import (
     normalize_service_code,
     normalize_specialty,
 )
+from app.services.visit_completion_evidence import RepeatEvidenceBusy
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +179,7 @@ class BatchPatientService:
         request: BatchUpdateRequest,
         *,
         actor_user_id: int | None = None,
+        confirmation_bearer=None,
     ) -> BatchUpdateResponse:
         """
         Выполняет batch-обновление записей пациента.
@@ -189,6 +192,38 @@ class BatchPatientService:
         visit branches (_BatchActor) finally get a real actor instead of
         the latent always-None _actor_user_id.
         """
+        from fastapi import HTTPException
+
+        from app.services.profile_contact_security import (
+            ProfileBearerInvalid,
+            check_bearer_expiry,
+        )
+        from app.services.staff_confirmation_guard import (
+            lock_staff_confirmation_actor,
+            lock_staff_confirmation_subjects,
+        )
+
+        # Resolve and lock every potentially confirmed Visit before any batch
+        # mutation. Entry IDs may overlap across tables; keep the established
+        # ambiguity handling and never infer a Visit from an online entry.
+        confirmation_actions = [a for a in request.entries if a.action == "update"
+                                and a.status == "confirmed" and a.entry_type != "online_queue"]
+        if confirmation_actions:
+            if confirmation_bearer is None or confirmation_bearer.user_id != actor_user_id:
+                raise HTTPException(status_code=401, detail="Сеанс недоступен")
+            lock_staff_confirmation_actor(self.db, confirmation_bearer)
+            visit_ids = []
+            for action in confirmation_actions:
+                kind, target, error = self._resolve_existing_entry_target(
+                    patient_id=patient_id, target_date=target_date, action=action
+                )
+                if error is None and kind == "visit":
+                    visit_ids.append(target.id)
+            if visit_ids:
+                lock_staff_confirmation_subjects(
+                    self.db, bearer=confirmation_bearer, visit_ids=visit_ids,
+                    patient_id=patient_id,
+                )
         self._actor_user_id = actor_user_id
         results: list[EntryResult] = []
 
@@ -217,6 +252,10 @@ class BatchPatientService:
                             error=f"Unknown action: {entry_action.action}"
                         )
                     results.append(result)
+                except (DBAPIError, RepeatEvidenceBusy):
+                    # A failed database transaction must not be reused for
+                    # later batch items or expose SQL/clinical values.
+                    raise
                 except Exception as e:
                     logger.error(f"Error processing entry {entry_action.id}: {e}")
                     results.append(EntryResult(
@@ -251,6 +290,8 @@ class BatchPatientService:
                 )
 
             # Коммитим транзакцию
+            if confirmation_actions:
+                check_bearer_expiry(confirmation_bearer)
             self.db.commit()
 
             # Получаем обновлённые агрегированные данные
@@ -264,6 +305,18 @@ class BatchPatientService:
                 aggregated_row=updated_data.get("aggregated")
             )
 
+        except ProfileBearerInvalid:
+            self.db.rollback()
+            raise HTTPException(status_code=401, detail="Сеанс недоступен") from None
+        except RepeatEvidenceBusy:
+            self.db.rollback()
+            raise
+        except DBAPIError as exc:
+            self.db.rollback()
+            code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if code in {"40P01", "55P03"} or getattr(exc.orig, "sqlite_errorcode", None) in {5, 6}:
+                raise HTTPException(status_code=409, detail="Запись занята, повторите запрос") from None
+            raise
         except Exception as e:
             logger.error(f"Batch update failed for patient {patient_id}: {e}")
             self.db.rollback()
@@ -449,6 +502,8 @@ class BatchPatientService:
                         current_user=_BatchActor(getattr(self, "_actor_user_id", None)),
                         commit=False,  # CRITICAL: batch owns the transaction
                     )
+                except (DBAPIError, RepeatEvidenceBusy):
+                    raise
                 except Exception as exc:
                     # State machine rejected the transition — record as
                     # error but do NOT raise (batch continues with other items).
@@ -574,6 +629,8 @@ class BatchPatientService:
                 id=created_entry.id,
                 status="created"
             )
+        except DBAPIError:
+            raise
         except Exception as e:
             logger.error(f"Failed to create entry: {e}")
             return EntryResult(

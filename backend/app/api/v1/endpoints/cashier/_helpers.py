@@ -102,15 +102,29 @@ def _cashier_payment_status(payment: Payment) -> str:
     return str(payment.status or "").strip().lower()
 
 
+def _cashier_payment_currency(value: Any) -> str | None:
+    """Expose a stored currency code without inventing one for legacy data."""
+    if isinstance(value, str) and len(value) == 3 and value.isascii() and value.isalpha() and value.isupper():
+        return value
+    return None
+
+
 def _cashier_payment_available_amount(payment: Payment) -> Decimal:
     return Decimal(str(payment.amount or 0)) - Decimal(str(payment.refunded_amount or 0))
+
+
+def _cashier_refund_requires_reconciliation(payment: Payment) -> bool:
+    return (bool(payment.provider or payment.provider_payment_id)
+            or payment.method not in CASHIER_IMMEDIATE_PAID_METHODS
+            or _cashier_payment_currency(payment.currency) is None)
 
 
 def _cashier_payment_action_contract(payment: Payment) -> dict[str, Any]:
     payment_status = _cashier_payment_status(payment)
     can_confirm = payment_status not in {"paid", "completed", "cancelled", "refunded", "void"}
     can_cancel = payment_status in {"pending", "processing"}
-    can_refund = payment_status in {"paid", "completed"} and _cashier_payment_available_amount(payment) > 0
+    can_refund = (payment_status in {"paid", "completed"} and _cashier_payment_available_amount(payment) > 0
+                  and not _cashier_refund_requires_reconciliation(payment))
     can_print_receipt = True
 
     action_flags = {
@@ -165,6 +179,7 @@ class PaymentHistoryItem(BaseModel):
     patient_name: str
     visit_id: int | None = None
     amount: Decimal
+    currency: str | None = None
     method: str
     status: str
     created_at: datetime
@@ -304,6 +319,7 @@ class PaymentResponse(BaseModel):
     visit_id: int | None = None
     patient_id: int | None = None
     amount: Decimal
+    currency: str | None = None
     method: str
     status: str
     created_at: datetime
@@ -363,6 +379,7 @@ class GroupedPaymentResponse(BaseModel):
     """Response for backend-owned grouped cashier payment allocation."""
     patient_id: int
     amount: Decimal
+    currency: str | None = None
     method: str
     status: str
     created_at: datetime
@@ -379,12 +396,14 @@ class RefundRequest(BaseModel):
     """Запрос на возврат средств"""
     amount: Decimal = Field(..., gt=0, description="Сумма возврата")
     reason: str = Field(..., min_length=3, description="Причина возврата")
+    client_request_id: UUID = Field(..., description="Постоянный ключ одной операции возврата")
 
 
 class RefundResponse(BaseModel):
     """Ответ на запрос возврата"""
     id: int
     original_amount: Decimal
+    currency: str | None = None
     refunded_amount: Decimal
     remaining_amount: Decimal
     reason: str

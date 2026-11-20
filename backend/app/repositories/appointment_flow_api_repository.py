@@ -9,6 +9,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment as AppointmentModel
+from app.models.encounter import Encounter
 from app.models.enums import AppointmentStatus
 from app.models.visit import Visit
 
@@ -21,6 +22,23 @@ class AppointmentFlowApiRepository:
 
     def get_visit(self, visit_id: int) -> Visit | None:
         return self.db.query(Visit).filter(Visit.id == visit_id).first()
+
+    def get_locked_visit(self, visit_id: int) -> Visit | None:
+        return (self.db.query(Visit).filter(Visit.id == visit_id)
+                .with_for_update(of=Visit).populate_existing().first())
+
+    def lock_visit_encounter(self, visit: Visit) -> bool:
+        if visit.encounter_id is None:
+            return True
+        encounter = (self.db.query(Encounter).filter(Encounter.id == visit.encounter_id)
+                     .with_for_update(of=Encounter).populate_existing().first())
+        return encounter is not None and encounter.patient_id == visit.patient_id
+
+    def get_source_appointments(self, visit_id: int) -> list[AppointmentModel]:
+        return (self.db.query(AppointmentModel)
+                .filter(AppointmentModel.source_visit_id == visit_id)
+                .order_by(AppointmentModel.id).with_for_update(of=AppointmentModel)
+                .populate_existing().all())
 
     def get_locked_appointment(self, appointment_id: int) -> AppointmentModel | None:
         return (
@@ -38,6 +56,8 @@ class AppointmentFlowApiRepository:
             self.db.query(AppointmentModel)
             .filter(
                 and_(
+                    AppointmentModel.source_visit_id.is_(None),
+                    AppointmentModel.encounter_id.is_(None),
                     AppointmentModel.patient_id == visit.patient_id,
                     AppointmentModel.appointment_date
                     == (visit.visit_date or date.today()),
@@ -63,6 +83,8 @@ class AppointmentFlowApiRepository:
 
         appointment = AppointmentModel(
             patient_id=visit.patient_id,
+            source_visit_id=visit.id,
+            encounter_id=visit.encounter_id,
             appointment_date=visit.visit_date or date.today(),
             appointment_time=visit.visit_time or "09:00",
             status=(

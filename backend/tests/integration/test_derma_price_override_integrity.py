@@ -43,6 +43,7 @@ import pytest
 from app.core.security import get_password_hash
 from app.models.clinic import Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
+from app.models.encounter import Encounter
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -79,7 +80,9 @@ def _create_user(db_session, *, role: str, label: str, password: str = "doctor12
 
 
 def _create_doctor(db_session, user: User, *, specialty: str) -> Doctor:
-    doctor = Doctor(user_id=user.id, specialty=specialty, active=True)
+    # The lightweight create_all fixture does not install migration 0103's
+    # generation trigger; give this synthetic profile a valid generation.
+    doctor = Doctor(user_id=user.id, specialty=specialty, active=True, repeat_owner_generation=42)
     db_session.add(doctor)
     db_session.commit()
     db_session.refresh(doctor)
@@ -117,13 +120,18 @@ def _create_service(db_session, *, label: str, price: Decimal) -> Service:
 def _create_visit_with_service(
     db_session, *, patient: Patient, doctor: Doctor, service: Service, price: Decimal
 ) -> tuple[Visit, VisitService]:
+    encounter = Encounter(patient_id=patient.id, provenance="new")
+    db_session.add(encounter)
+    db_session.flush()
     visit = Visit(
         patient_id=patient.id,
+        encounter_id=encounter.id,
         doctor_id=doctor.id,
         visit_date=date.today(),
         status="open",
         source="desk",
         department="dermatology",
+        confirmation_context_epoch=43,
     )
     db_session.add(visit)
     db_session.flush()
@@ -134,6 +142,7 @@ def _create_visit_with_service(
         name=service.name,
         qty=1,
         price=price,
+        currency="UZS",
     )
     db_session.add(visit_service)
     db_session.commit()

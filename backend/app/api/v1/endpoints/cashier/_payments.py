@@ -4,6 +4,13 @@ Split from cashier.py (1787 LOC god file → modular).
 """
 from __future__ import annotations
 
+import hashlib
+import json
+
+from sqlalchemy import or_
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import lazyload
+
 from app.api.v1.endpoints.cashier._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     CancelPaymentRequest,
@@ -23,8 +30,9 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     _cashier_paid_amounts_by_visit_id,
     _cashier_payment_action_contract,
     _cashier_payment_available_amount,
+    _cashier_payment_currency,
     _cashier_payment_status,
-    _cashier_visit_total_amount,
+    _cashier_refund_requires_reconciliation,
     _decimal_to_float,
     _emit_payment_notification,
     _preserve_cashier_visit_status,
@@ -32,6 +40,14 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     router,
 )
 from app.models.payment import PaymentClientRequest
+from app.models.refund_deposit import DepositTransaction
+from app.models.refund_deposit import RefundRequest as ExternalRefundRequest
+from app.services.cashier_stats_snapshot import require_visible_external_refunds
+from app.services.encounter_financial_fence import (
+    FinancialFenceError,
+    _financial_schema,
+)
+from app.services.money_input import MoneyInputError, parse_money
 
 
 def _payment_intent_fingerprint(
@@ -144,9 +160,9 @@ def _replay_payment_client_request(
             },
         )
     if (
-        request_fingerprint is not None
-        and stored.request_fingerprint is not None
-        and stored.request_fingerprint != request_fingerprint
+        (endpoint == "refund" and not stored.request_fingerprint)
+        or (request_fingerprint is not None and stored.request_fingerprint is not None
+            and stored.request_fingerprint != request_fingerprint)
     ):
         logger.warning(
             "payment.client_request_intent_mismatch client_request_id=%s "
@@ -248,6 +264,13 @@ def _commit_with_client_request(
         return None
     except IntegrityError:
         db.rollback()
+        if endpoint == "refund":
+            replay = _replay_payment_client_request(
+                db, client_request_id, endpoint, request_fingerprint=request_fingerprint, current_user_id=created_by,
+            )
+            if replay is not None:
+                return replay
+            raise HTTPException(status_code=409, detail="Запись возврата требует сверки") from None
         stored = _find_payment_client_request(db, client_request_id)
         if (
             stored is not None
@@ -377,6 +400,9 @@ async def get_pending_payments(
         # partial refunds.
         visit_ids = [v.id for v in all_visits]
         net_paid_by_visit = _cashier_paid_amounts_by_visit_id(db, visit_ids)
+        from app.services.payment_invariant_service import PaymentInvariantService
+
+        payment_service = PaymentInvariantService(db)
 
         # =====================================================
         # ГРУППИРОВКА ПО ПАЦИЕНТУ
@@ -425,10 +451,12 @@ async def get_pending_payments(
 
             # Обработка услуг визита
             if hasattr(visit, 'services') and visit.services:
+                # Validate and sum as Decimal before rendering prices as floats.
+                group["total_amount"] += payment_service.compute_total_cost(visit)
                 for vs in visit.services:
                     service_name = vs.name if hasattr(vs, 'name') and vs.name else "Услуга"
-                    service_price = float(vs.price) if hasattr(vs, 'price') and vs.price else 0
-                    service_qty = vs.qty if hasattr(vs, 'qty') and vs.qty else 1
+                    service_price = float(vs.price)
+                    service_qty = vs.qty
 
                     group["services"].append({
                         "id": vs.service_id if hasattr(vs, 'service_id') else vs.id,
@@ -437,7 +465,6 @@ async def get_pending_payments(
                         "price": service_price,
                         "quantity": service_qty,
                     })
-                    group["total_amount"] += Decimal(str(service_price)) * service_qty
 
             # Оплаченная сумма для этого визита — net of refunds (CSH-FE-028)
             group["paid_amount"] += net_paid_by_visit.get(visit.id, Decimal("0"))
@@ -521,6 +548,8 @@ async def get_pending_payments(
             "pages": math.ceil(total_count / size) if size > 0 else 0
         }
 
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Unhandled cashier endpoint error")
         raise HTTPException(
@@ -619,6 +648,7 @@ async def get_payments(
                 patient_name=patient_name,
                 visit_id=payment.visit_id,
                 amount=payment.amount,
+                currency=_cashier_payment_currency(payment.currency),
                 method=payment.method if hasattr(payment, 'method') else 'cash',
                 status=payment.status,
                 created_at=payment.created_at,
@@ -695,6 +725,14 @@ async def create_grouped_payment(
             detail="visit_ids is required",
         )
 
+    # Lock the complete union of groups before balance reads or any payment
+    # leg. One request may span several encounters; do not extend this batch
+    # after acquiring its locks.
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    payment_service = PaymentInvariantService(db)
+    payment_service.preflight_payment_groups(normalized_visit_ids)
+
     visits = db.query(Visit).options(joinedload(Visit.services)).filter(
         Visit.id.in_(normalized_visit_ids)
     ).all()
@@ -720,11 +758,21 @@ async def create_grouped_payment(
             detail="Grouped cashier payment patient_id does not match visit ownership",
         )
 
-    paid_amounts = _cashier_paid_amounts_by_visit_id(db, normalized_visit_ids)
+    try:
+        quote_summary = payment_service.summarize_visits(visits)
+        payment_currency = quote_summary["currency"]
+        if payment_currency is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Валюта визитов требует сверки")
+        if payment_currency != "UZS":
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Эта валюта пока недоступна в интерфейсе кассы")
+    except HTTPException:
+        db.rollback()
+        raise
+    summary_by_visit = {row["visit_id"]: row for row in quote_summary["visits"]}
     allocation_candidates = []
     for visit in visits:
-        total_amount = _cashier_visit_total_amount(visit)
-        paid_amount = paid_amounts.get(visit.id, Decimal("0"))
+        total_amount = summary_by_visit[visit.id]["total_amount"]
+        paid_amount = summary_by_visit[visit.id]["paid_amount"]
         remaining_amount = total_amount - paid_amount
         if remaining_amount > 0:
             allocation_candidates.append({
@@ -760,10 +808,6 @@ async def create_grouped_payment(
     allocation_rows: list[tuple[Payment, Visit, Decimal, Decimal, Decimal]] = []
 
     try:
-        from app.services.payment_invariant_service import PaymentInvariantService
-
-        payment_service = PaymentInvariantService(db)
-
         for candidate in allocation_candidates:
             if remaining_to_allocate <= 0:
                 break
@@ -783,6 +827,7 @@ async def create_grouped_payment(
             payment = payment_service.create_payment_for_visit(
                 visit_id=visit.id,
                 amount=allocation_amount,
+                currency=payment_currency,
                 method=payment_data.method,
                 note=payment_data.note,
                 current_user=current_user,
@@ -829,6 +874,7 @@ async def create_grouped_payment(
             staged_response = GroupedPaymentResponse(
                 patient_id=patient_id,
                 amount=payment_data.amount,
+                currency=payment_currency,
                 method=payment_data.method,
                 status="paid",
                 created_at=created_at,
@@ -838,6 +884,7 @@ async def create_grouped_payment(
                         visit_id=staged_payment.visit_id,
                         patient_id=patient_id,
                         amount=staged_payment.amount,
+                        currency=_cashier_payment_currency(staged_payment.currency),
                         method=staged_payment.method,
                         status=staged_payment.status,
                         created_at=staged_payment.created_at,
@@ -908,6 +955,7 @@ async def create_grouped_payment(
         return GroupedPaymentResponse(
             patient_id=patient_id,
             amount=payment_data.amount,
+            currency=payment_currency,
             method=payment_data.method,
             status="paid",
             created_at=created_at,
@@ -917,6 +965,7 @@ async def create_grouped_payment(
                     visit_id=payment.visit_id,
                     patient_id=patient_id,
                     amount=payment.amount,
+                    currency=_cashier_payment_currency(payment.currency),
                     method=payment.method,
                     status=payment.status,
                     created_at=payment.created_at,
@@ -997,6 +1046,10 @@ async def create_payment(
         visit = None
 
         if payment_data.visit_id:
+            from app.services.payment_invariant_service import PaymentInvariantService
+
+            PaymentInvariantService(db).preflight_payment_groups([payment_data.visit_id])
+
             def _ensure_appointment_matches_visit() -> None:
                 if not payment_data.appointment_id:
                     return
@@ -1006,6 +1059,7 @@ async def create_payment(
                     resolved_visit_id = CanonicalVisitService(db).resolve_canonical_visit(
                         payment_data.appointment_id,
                         create_if_missing=False,
+                        expected_visit_id=visit.id,
                     )
                 except CanonicalVisitResolutionError as exc:
                     raise HTTPException(
@@ -1067,29 +1121,20 @@ async def create_payment(
                 )
             patient_id = visit.patient_id
 
-            # === ВАЛИДАЦИЯ ПЕРЕПЛАТЫ ===
-            # 1. Считаем общую стоимость услуг
-            total_cost = Decimal("0")
-            if hasattr(visit, 'services') and visit.services:
-                for vs in visit.services:
-                    price = Decimal(str(vs.price)) if hasattr(vs, 'price') and vs.price else Decimal("0")
-                    qty = vs.qty if hasattr(vs, 'qty') and vs.qty else 1
-                    total_cost += price * qty
-
-            # Fallback: если услуги не загружены, используем visit.total_price (если есть)
-            if total_cost == Decimal("0"):
-                if hasattr(visit, 'total_price') and visit.total_price:
-                    total_cost = Decimal(str(visit.total_price))
-                elif hasattr(visit, 'total_amount') and visit.total_amount:
-                    total_cost = Decimal(str(visit.total_amount))
+            # Use the same validated service sum as the locked invariant.
+            quote_summary = PaymentInvariantService(db).summarize_visits([visit])
+            payment_currency = quote_summary["currency"]
+            if payment_currency is None:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Валюта визита требует сверки")
+            if payment_currency != "UZS":
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Эта валюта пока недоступна в интерфейсе кассы")
+            total_cost = quote_summary["total_amount"]
 
             # 2. Считаем уже оплаченное — net of refunds via the canonical
             # invariant service (CSH-FE-028): a partially refunded payment
             # re-opens debt that the cashier must be able to accept here,
             # matching what the service check below computes.
-            paid_amount = _cashier_paid_amounts_by_visit_id(db, [visit.id]).get(
-                visit.id, Decimal("0")
-            )
+            paid_amount = quote_summary["paid_amount"]
 
             # 3. Проверяем остаток
             remaining_debt = total_cost - paid_amount
@@ -1155,11 +1200,10 @@ async def create_payment(
         # is preserved for UX clarity (nicer error messages) and runs
         # BEFORE the service call. The service's own check is the
         # authoritative runtime guard.
-        from app.services.payment_invariant_service import PaymentInvariantService
-
         new_payment = PaymentInvariantService(db).create_payment_for_visit(
             visit_id=payment_data.visit_id,
             amount=payment_data.amount,
+            currency=payment_currency,
             method=payment_data.method,
             note=payment_data.note,
             current_user=current_user,
@@ -1194,6 +1238,7 @@ async def create_payment(
                 visit_id=new_payment.visit_id,
                 patient_id=patient_id,
                 amount=new_payment.amount,
+                currency=_cashier_payment_currency(new_payment.currency),
                 method=new_payment.method,
                 status=new_payment.status,
                 created_at=new_payment.created_at,
@@ -1246,6 +1291,7 @@ async def create_payment(
             visit_id=new_payment.visit_id,
             patient_id=patient_id,
             amount=new_payment.amount,
+            currency=_cashier_payment_currency(new_payment.currency),
             method=new_payment.method,
             status=new_payment.status,
             created_at=new_payment.created_at,
@@ -1389,6 +1435,7 @@ async def get_payment_by_id(
         visit_id=payment.visit_id,
         patient_id=patient_id,
         amount=payment.amount,
+        currency=_cashier_payment_currency(payment.currency),
         method=payment.method if hasattr(payment, 'method') else 'cash',
         status=payment.status,
         created_at=payment.created_at,
@@ -1479,6 +1526,13 @@ async def confirm_payment(
         raise HTTPException(status_code=404, detail="Платеж не найден")
 
     expected_visit_id = payment_reference.visit_id
+    # This payment can contain additional Visit links in other encounters.
+    # Lock/recheck their complete union before the Payment row or any status
+    # change; provider callbacks follow their separate receipt-first path.
+    locked_record = invariant_service.preflight_payment_record(payment_id)
+    if locked_record.payment_id != payment_id or locked_record.primary_visit_id != expected_visit_id:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Связи платежа изменились; повторите операцию")
     visit = None
     if expected_visit_id is not None:
         visit = invariant_service.lock_visit_for_payment_change(expected_visit_id)
@@ -1563,36 +1617,79 @@ async def refund_payment(
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
 ):
     """
-    Частичный или полный возврат средств по платежу.
+    Частичный или полный возврат кассового платежа с постоянным ключом операции.
     """
     try:
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        from sqlalchemy import DateTime, Numeric, bindparam
+        from sqlalchemy import text as sql_text
 
-        if not payment:
+        try:
+            refund_amount_decimal = parse_money(refund_data.amount)
+        except MoneyInputError as exc:
+            raise HTTPException(status_code=422, detail="Некорректная сумма возврата") from exc
+        client_request_id = str(refund_data.client_request_id)
+        actor_id = current_user.id
+        intent = json.dumps([payment_id, format(refund_amount_decimal, "f"), refund_data.reason, actor_id],
+                            ensure_ascii=True, separators=(",", ":"))
+        fingerprint = hashlib.sha256(intent.encode("utf-8")).hexdigest()
+        replay_options = {"request_fingerprint": fingerprint, "current_user_id": actor_id}
+
+        if db.get_bind().dialect.name == "postgresql":
+            if db.execute(sql_text("SHOW transaction_isolation")).scalar_one() != "read committed":
+                raise FinancialFenceError("История возвратов временно недоступна")
+            require_visible_external_refunds(db, _financial_schema(db))
+        else:
+            db.execute(sql_text("UPDATE payments SET id=id WHERE 0"))
+        replay = _replay_payment_client_request(db, client_request_id, "refund", **replay_options)
+        if replay is not None:
+            return RefundResponse(**replay, reason=refund_data.reason)
+
+        reference = db.query(Payment.visit_id).filter(Payment.id == payment_id).first()
+        if reference is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Платеж не найден"
             )
 
-        if payment.status not in ["paid", "completed"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Невозможно выполнить возврат для платежа со статусом '{payment.status}'"
-            )
-
         from app.services.payment_invariant_service import PaymentInvariantService
 
         invariant_service = PaymentInvariantService(db)
-        if payment.visit_id:
-            invariant_service.lock_visit_for_payment_change(payment.visit_id)
+        visit_id = reference.visit_id
+        if visit_id:
+            invariant_service.lock_visit_for_payment_change(visit_id)
+        payment = (db.query(Payment).options(lazyload(Payment.payment_visits))
+                   .filter(Payment.id == payment_id).populate_existing()
+                   .with_for_update(nowait=True, key_share=True).first())
+        if payment is None or payment.visit_id != visit_id:
+            raise HTTPException(status_code=409, detail="Платёж изменился. Повторите операцию")
+        replay = _replay_payment_client_request(db, client_request_id, "refund", **replay_options)
+        if replay is not None:
+            return RefundResponse(**replay, reason=refund_data.reason)
+        if payment.status not in {"paid", "completed"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Невозможно выполнить возврат для платежа со статусом '{payment.status}'",
+            )
+        if _cashier_refund_requires_reconciliation(payment):
+            raise HTTPException(status_code=409, detail="Для возврата требуется сверка платежа")
+
+        # These writers hold the same Payment lock until their evidence commits.
+        # A live external request or credit requires reconciliation before a
+        # cashier may spend any of the same payment's balance.
+        external_request = db.query(ExternalRefundRequest.id).filter(
+            ExternalRefundRequest.payment_id == payment_id,
+            or_(ExternalRefundRequest.status.is_(None), ExternalRefundRequest.status.not_in(("rejected", "cancelled"))),
+        ).first()
+        deposit_credit = db.query(DepositTransaction.id).filter(
+            DepositTransaction.payment_id == payment_id,
+            or_(DepositTransaction.transaction_type.is_(None), DepositTransaction.transaction_type != "debit"),
+        ).first()
+        if external_request is not None or deposit_credit is not None:
+            raise HTTPException(status_code=409, detail="По платежу есть возврат другим способом. Требуется сверка")
 
         # Atomic refund: use SQL UPDATE with WHERE guard to prevent race condition.
         # Two concurrent requests could both read refunded_amount=0 and both pass
         # the available_for_refund check. This atomic UPDATE ensures only one wins.
-        from sqlalchemy import DateTime, Numeric, bindparam
-        from sqlalchemy import text as sql_text
-
-        refund_amount_decimal = Decimal(str(refund_data.amount))
         atomic_update = sql_text("""
                 UPDATE payments
                 SET refunded_amount = COALESCE(refunded_amount, 0) + :refund_amount,
@@ -1610,7 +1707,7 @@ async def refund_payment(
             "refund_amount": refund_amount_decimal,
             "reason": refund_data.reason,
             "now": datetime.now(UTC),
-            "user_id": current_user.id if hasattr(current_user, 'id') else None,
+            "user_id": actor_id,
             "payment_id": payment_id,
         })
 
@@ -1634,49 +1731,6 @@ async def refund_payment(
         db.refresh(payment)
 
         new_refunded_amount = payment.refunded_amount or Decimal("0")
-
-        # PAY-REAUDIT-28 P0-4: вызываем API провайдера для фактического возврата
-        # средств. Раньше локальные проводки обновлялись, но деньги оставались
-        # у провайдера (Click/PayMe/Kaspi). Пациент не получал возврат.
-        if payment.provider and payment.provider_payment_id:
-            try:
-                from app.services.payment_provider_manager_factory import (
-                    get_payment_manager,
-                )
-                _manager = get_payment_manager()
-                _refund_result = _manager.refund_payment(
-                    payment.provider,
-                    payment.provider_payment_id,
-                    refund_amount_decimal,
-                )
-                if not _refund_result or not getattr(_refund_result, "success", False):
-                    # Откатываем локальный UPDATE — деньги у провайдера не вернулись.
-                    db.rollback()
-                    # Перезагружаем payment из БД (после rollback)
-                    db.refresh(payment)
-                    _err = getattr(_refund_result, "error_message", "Unknown provider error") if _refund_result else "Provider refund returned None"
-                    logger.error(
-                        "Provider refund failed for payment_id=%s provider=%s: %s",
-                        payment_id, payment.provider, _err,
-                    )
-                    raise HTTPException(
-                        status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail=f"Провайдер отклонил возврат: {_err}. Локальные проводки откачены, статус платежа не изменён.",
-                    )
-            except HTTPException:
-                raise
-            except Exception as prov_err:
-                # Если провайдер недоступен/не реализует refund — откатываем локал.
-                db.rollback()
-                db.refresh(payment)
-                logger.exception(
-                    "Provider refund call raised for payment_id=%s provider=%s",
-                    payment_id, payment.provider,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"Не удалось выполнить возврат через провайдера: {type(prov_err).__name__}. Локальные проводки откачены.",
-                )
 
         # Если возвращена вся сумма — статус "refunded"
         if new_refunded_amount >= payment.amount:
@@ -1711,8 +1765,24 @@ async def refund_payment(
                 visit_id=payment.visit_id,
             )
 
-        db.commit()
-        db.refresh(payment)
+        receipt = RefundResponse(
+            id=payment.id,
+            original_amount=payment.amount,
+            currency=_cashier_payment_currency(payment.currency),
+            refunded_amount=new_refunded_amount,
+            remaining_amount=payment.amount - new_refunded_amount,
+            reason=refund_data.reason,
+            refunded_at=payment.refunded_at,
+            status=payment.status,
+        )
+        snapshot = receipt.model_dump(mode="json", exclude={"reason"})
+        snapshot["operation_amount"] = format(refund_amount_decimal, "f")
+        replay = _commit_with_client_request(
+            db, client_request_id=client_request_id, endpoint="refund", response_payload=snapshot,
+            created_by=actor_id, request_fingerprint=fingerprint,
+        )
+        if replay is not None:
+            return RefundResponse(**replay, reason=refund_data.reason)
 
         refund_change_type = "full_refund" if payment.status == "refunded" else "partial_refund"
         refund_visit = db.query(Visit).filter(Visit.id == payment.visit_id).first() if payment.visit_id else None
@@ -1725,22 +1795,26 @@ async def refund_payment(
             visit=refund_visit,
             reason=refund_data.reason,
             extra_metadata={
-                "refund_amount": _decimal_to_float(refund_data.amount),
-                "remaining_amount": _decimal_to_float(payment.amount - new_refunded_amount),
+                "refund_amount": _decimal_to_float(refund_amount_decimal),
+                "remaining_amount": _decimal_to_float(receipt.remaining_amount),
             },
         )
 
-        return RefundResponse(
-            id=payment.id,
-            original_amount=payment.amount,
-            refunded_amount=new_refunded_amount,
-            remaining_amount=payment.amount - new_refunded_amount,
-            reason=refund_data.reason,
-            refunded_at=payment.refunded_at,
-            status=payment.status
-        )
+        return receipt
 
+    except FinancialFenceError:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="История возвратов временно недоступна") from None
+    except DBAPIError as exc:
+        db.rollback()
+        code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        if code in {"55P03", "40001"}:
+            raise HTTPException(status_code=409, detail="Платёж изменяется. Повторите операцию") from None
+        if code == "42501":
+            raise HTTPException(status_code=503, detail="История возвратов временно недоступна") from None
+        raise
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
         db.rollback()

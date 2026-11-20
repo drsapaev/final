@@ -5,9 +5,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
+from app.core.config import settings
 from app.models.telegram_config import TelegramUser
 from app.models.visit import Visit, VisitService
 from app.services.visit_confirmation_service import (
@@ -18,7 +20,8 @@ from app.services.visit_confirmation_service import (
 
 
 @pytest.fixture
-def telegram_visit(db_session, test_visit):
+def telegram_visit(db_session, test_visit, monkeypatch):
+    monkeypatch.setattr(settings, "FRONTEND_URL", "https://synthetic.example")
     # Keep the identity explicit: callback actor and chat are equal in a
     # private Telegram chat, and the database link owns this patient's visit.
     test_visit.confirmation_token = "SYNTHETIC-visit-actor-token"
@@ -61,8 +64,8 @@ def test_view_disambiguates_visits_and_action_requires_preview(db_session, teleg
     db_session.add(other)
     db_session.flush()
     db_session.add_all([
-        VisitService(visit_id=visit.id, service_id=1, name="УЗИ"),
-        VisitService(visit_id=other.id, service_id=2, name="ЭКГ"),
+        VisitService(visit_id=visit.id, service_id=1, name="УЗИ", price=1, currency="UZS"),
+        VisitService(visit_id=other.id, service_id=2, name="ЭКГ", price=1, currency="UZS"),
     ])
     db_session.commit()
     service = VisitConfirmationService(db_session)
@@ -71,9 +74,13 @@ def test_view_disambiguates_visits_and_action_requires_preview(db_session, teleg
         service.cancel_by_telegram(token=view_token, telegram_user_id=str(link.chat_id), source_ip=None, user_agent="telegram")
     first = service.preview_by_telegram(token=view_token, telegram_user_id=str(link.chat_id))
     second = service.preview_by_telegram(token=_view_capability(other, link), telegram_user_id=str(link.chat_id))
-    assert "09:30" in first["text"] and "09:30" in second["text"]
-    assert f"№{visit.id}" in first["text"] and "УЗИ" in first["text"]
-    assert f"№{other.id}" in second["text"] and "ЭКГ" in second["text"]
+    assert first["text"] == second["text"] == "У вас новое уведомление."
+    first_info = service.get_visit_info(parse_qs(urlsplit(first["view_url"]).fragment)["token"][0])
+    second_info = service.get_visit_info(parse_qs(urlsplit(second["view_url"]).fragment)["token"][0])
+    assert first_info["visit_id"] == visit.id and first_info["visit_time"] == "09:30"
+    assert second_info["visit_id"] == other.id and second_info["visit_time"] == "09:30"
+    assert [item["name"] for item in first_info["services"]] == ["УЗИ"]
+    assert [item["name"] for item in second_info["services"]] == ["ЭКГ"]
     assert first["action_token"] != second["action_token"]
     service.cancel_by_telegram(token=second["action_token"], telegram_user_id=str(link.chat_id), source_ip=None, user_agent="telegram")
     db_session.refresh(visit)
@@ -92,6 +99,38 @@ def test_preview_refuses_revoked_link_and_wrong_actor(db_session, telegram_visit
     db_session.commit()
     with pytest.raises(VisitConfirmationDomainError):
         service.preview_by_telegram(token=token, telegram_user_id=str(link.chat_id))
+
+
+@pytest.mark.parametrize("field,revoked", [("active", False), ("blocked", True), ("notifications_enabled", False)])
+def test_protected_review_rechecks_link_and_does_not_revive_after_aba(db_session, telegram_visit, field, revoked):
+    visit, link = telegram_visit
+    token = _view_capability(visit, link)
+    service = VisitConfirmationService(db_session)
+    assert service.get_visit_info(token)["visit_id"] == visit.id
+    db_session.rollback()
+    initial = getattr(link, field)
+    setattr(link, field, revoked)
+    db_session.commit()
+    with pytest.raises(VisitConfirmationDomainError):
+        service.get_visit_info(token)
+    db_session.rollback()
+    setattr(link, field, initial)
+    db_session.commit()
+    with pytest.raises(VisitConfirmationDomainError):
+        service.get_visit_info(token)
+
+
+def test_http_signed_review_is_no_store_and_rejects_revoked_link(client, db_session, telegram_visit):
+    visit, link = telegram_visit
+    token = _view_capability(visit, link)
+    response = client.post("/api/v1/visits/info", json={"token": token})
+    assert response.status_code == 200
+    assert response.json()["visit_id"] == visit.id
+    assert "no-store" in response.headers["cache-control"]
+    link.blocked = True
+    db_session.commit()
+    response = client.post("/api/v1/visits/info", json={"token": token})
+    assert response.status_code in {403, 404}
 
 
 @pytest.mark.parametrize("state", ["past_day", "started_today", "missing_date", "missing_time", "bad_time"])
@@ -185,8 +224,13 @@ def test_untrusted_or_stale_invitation_never_mutates_visit(db_session, telegram_
 
 
 @pytest.mark.parametrize("operation", ["confirm", "cancel"])
-def test_trusted_linked_actor_succeeds_once(db_session, telegram_visit, operation):
+def test_trusted_linked_actor_succeeds_once(db_session, telegram_visit, test_service, operation):
     visit, link = telegram_visit
+    db_session.add(VisitService(
+        visit_id=visit.id, service_id=test_service.id, name="SYNTHETIC linked-chat visit",
+        qty=1, price=1, currency="UZS",
+    ))
+    db_session.commit()
     service = VisitConfirmationService(db_session)
     result = getattr(service, f"{operation}_by_telegram")(
         token=_capability(visit, link), telegram_user_id=str(link.chat_id),

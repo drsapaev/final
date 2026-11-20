@@ -29,6 +29,10 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
+from app.services.encounter_creation import (
+    EncounterCreationError,
+    resolve_new_encounter,
+)
 from app.services.queue_claim_service import (
     QueueClaimConflictError,
     lock_and_resolve_active_tag_claim,
@@ -50,6 +54,7 @@ class MorningAssignmentCreateBranchHandoff:
     queue_tag: str
     daily_queue: DailyQueue
     create_entry_kwargs: dict[str, Any]
+    encounter_id: int | None = None
 
     def build_assigned_payload(self, *, number: int) -> dict[str, Any]:
         return {
@@ -78,6 +83,7 @@ class MorningAssignmentReusedEntryBinding:
     entry_id: int
     previous_patient_id: int | None
     previous_visit_id: int | None
+    previous_encounter_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -967,6 +973,18 @@ class MorningAssignmentService:
             }
 
         existing_entry = existing_claim.entry if existing_claim is not None else None
+        # Only a same-root, server-created encounter is eligible. A visit
+        # from a previous transaction remains unresolved on this path.
+        cart_encounter_id = None
+        if visit.encounter_id is not None:
+            try:
+                resolve_new_encounter(
+                    self.db, patient_id=visit.patient_id, encounter_id=visit.encounter_id
+                )
+            except EncounterCreationError:
+                pass
+            else:
+                cart_encounter_id = visit.encounter_id
         daily_queue = (
             existing_claim.daily_queue
             if existing_claim is not None
@@ -1012,6 +1030,10 @@ class MorningAssignmentService:
                     "Active queue claim is already bound to another "
                     f"visit for queue_tag={queue_tag}"
                 )
+            if existing_entry.encounter_id not in (None, visit.encounter_id):
+                raise MorningAssignmentClaimError(
+                    f"Active queue claim is already bound to another encounter for queue_tag={queue_tag}"
+                )
             # QD-2E review P1 (2c5ea05ce, external report): snapshot the
             # pre-binding links BEFORE mutating the committed row. The
             # wizard's compensating cleanup deletes only entries the
@@ -1024,7 +1046,14 @@ class MorningAssignmentService:
                 entry_id=existing_entry.id,
                 previous_patient_id=existing_entry.patient_id,
                 previous_visit_id=existing_entry.visit_id,
+                previous_encounter_id=existing_entry.encounter_id,
             )
+            # Anonymous phone/name claims do not prove encounter provenance.
+            # QR tickets use source="online"; retain that source on reuse.
+            if (cart_encounter_id is not None
+                    and existing_entry.patient_id == visit.patient_id
+                    and existing_entry.source in ("online", "desk")):
+                existing_entry.encounter_id = cart_encounter_id
             if existing_entry.patient_id is None:
                 existing_entry.patient_id = visit.patient_id
             if existing_entry.visit_id is None:
@@ -1120,6 +1149,7 @@ class MorningAssignmentService:
             create_handoff=MorningAssignmentCreateBranchHandoff(
                 queue_tag=queue_tag,
                 daily_queue=daily_queue,
+                encounter_id=cart_encounter_id if source == "desk" else None,
                 create_entry_kwargs={
                     "daily_queue": daily_queue,
                     "patient_id": visit.patient_id,

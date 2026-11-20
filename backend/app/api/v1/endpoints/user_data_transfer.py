@@ -18,6 +18,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+def _require_atomic_transfer_protocol() -> None:
+    # The legacy implementation commits separate parts of the patient graph
+    # and cannot fence existing notification recipients. Keep every issuer
+    # closed until a single transactional transfer and ownership protocol is
+    # available. This is a temporary safety boundary, not a transfer flow.
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Передача временно недоступна: требуется безопасная сверка данных",
+    )
+
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
 
@@ -145,6 +156,7 @@ def transfer_user_data(
     Передать данные от одного пользователя к другому
     Доступно только администраторам
     """
+    _require_atomic_transfer_protocol()
     try:
         service = get_user_data_transfer_service()
 
@@ -195,6 +207,7 @@ def request_transfer_confirmation(
     Запросить подтверждение передачи данных
     Создает токен подтверждения и отправляет уведомления пользователям
     """
+    _require_atomic_transfer_protocol()
     try:
         service = get_user_data_transfer_service()
 
@@ -352,6 +365,7 @@ def validate_transfer_request(
     """
     Валидировать возможность передачи данных между пользователями
     """
+    _require_atomic_transfer_protocol()
     try:
         service = get_user_data_transfer_service()
 

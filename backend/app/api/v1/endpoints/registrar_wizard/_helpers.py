@@ -369,6 +369,7 @@ class CartQuoteItemResponse(BaseModel):
 class CartQuoteResponse(BaseModel):
     items: list[CartQuoteItemResponse]
     total_amount: Decimal
+    currency: str | None  # null when the route cannot yet establish one
     approval_status: str  # "approved" | "pending" (all_free без автоодобрения)
     # Codex R3 #3095 (P1): привязка подтверждённой квоты к команде сохранения.
     # /registrar/cart пересчитывает квоту на текущих ценах/настройках и
@@ -666,11 +667,11 @@ def _apply_service_discount(
         return Decimal("0")
 
     if discount_mode == "repeat" and is_consultation:
+        from app.services.doctor_repeat_discount import RepeatDiscountSnapshot
+
         repeat_discount = Decimal(str(settings.get("repeat_visit_discount", 0) or 0))
         repeat_discount = max(Decimal("0"), min(repeat_discount, Decimal("100")))
-        return (
-            base_price * (Decimal("100") - repeat_discount) / Decimal("100")
-        ).quantize(Decimal("0.01"))
+        return RepeatDiscountSnapshot(repeat_discount, (), ()).price(base_price, True)
 
     if discount_mode == "benefit" and is_consultation:
         if settings.get("benefit_consultation_free", True):
@@ -748,7 +749,7 @@ def _build_repeat_eligibility_preview_item(
             repeat_discount_percent=repeat_discount_percent,
         )
 
-    if not service.is_consultation:
+    if not service.active or not service.is_consultation:
         return RepeatEligibilityPreviewItem(
             candidate_key=candidate.candidate_key,
             service_id=candidate.service_id,
@@ -772,12 +773,23 @@ def _build_repeat_eligibility_preview_item(
             repeat_discount_percent=repeat_discount_percent,
         )
 
-    eligible = _check_repeat_visit_eligibility(
-        db,
-        patient_id,
-        candidate.doctor_id,
-        [candidate.service_id],
-        days_window=repeat_visit_days,
+    # This read-only preview is advisory. A save must independently lock and
+    # revalidate the same evidence; a preview is never authorization to price.
+    from app.services.doctor_repeat_discount import repeat_candidate_ids
+
+    doctor = (
+        db.query(Doctor)
+        .join(User, User.id == Doctor.user_id)
+        .filter(Doctor.id == candidate.doctor_id, Doctor.active.is_(True), User.is_active.is_(True))
+        .first()
+    )
+    eligible = bool(
+        doctor and doctor.user_id and 1 <= repeat_visit_days <= 365
+        and repeat_candidate_ids(
+            db, patient_id=patient_id, doctor_id=doctor.id, doctor_user_id=doctor.user_id,
+            earliest=candidate.visit_date - timedelta(days=repeat_visit_days),
+            latest=min(candidate.visit_date, crud_clinic.clinic_today(db)),
+        )
     )
 
     reason = (

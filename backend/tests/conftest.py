@@ -109,6 +109,8 @@ def test_db():
     # app.db.base уже импортирует все модели через app.models.__init__
     # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
+    from tests.synthetic_reconciliation import install_reconciliation_fence
+    install_reconciliation_fence(engine)
 
     # Проверяем, что таблицы созданы (для отладки)
     from sqlalchemy import inspect
@@ -364,6 +366,8 @@ def test_visit(db_session, test_patient, test_doctor):
         visit_date=clinic_today(db_session),
         visit_time="10:00",
         status="pending_confirmation",
+        # create_all-based tests skip 0102, which sets a positive epoch.
+        confirmation_context_epoch=1,
         discount_mode="none",
         department="cardiology",
         confirmation_token="test-token-123",

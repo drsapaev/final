@@ -115,10 +115,13 @@ class RegistrarWizardQueueAssignmentService:
         self._lock_cart_tag_claim_scopes(
             assignment_service, visits, target_day
         )
+        assignment_transaction = self.db.get_transaction()
 
         for visit in visits:
             if visit.visit_date != target_day or visit.status != "confirmed":
                 continue
+
+            visit_id = visit.id
 
             try:
                 queue_assignments = self._assign_same_day_queues_for_visit(
@@ -166,9 +169,13 @@ class RegistrarWizardQueueAssignmentService:
                 )
                 raise
             except Exception as exc:
+                if self.db.get_transaction() is not assignment_transaction:
+                    raise RuntimeError(
+                        "Queue assignment ended the registration transaction"
+                    ) from exc
                 logger.warning(
                     "REGISTRATION: Queue assignment failed for visit %d (source=%s): %s",
-                    visit.id,
+                    visit_id,
                     source,
                     str(exc),
                     exc_info=True,
@@ -673,6 +680,7 @@ class RegistrarWizardQueueAssignmentService:
             # между привязкой и сбоем её очищает).
             entry.patient_id = binding.previous_patient_id
             entry.visit_id = binding.previous_visit_id
+            entry.encounter_id = binding.previous_encounter_id
             restored_count += 1
 
         # DELETE the created entries the DB already knows about.
@@ -721,7 +729,18 @@ class RegistrarWizardQueueAssignmentService:
         if create_handoff is None:
             return None
 
+        transaction = self.db.get_transaction()
         queue_entry = self._create_entry_allocator(create_handoff)
+        if self.db.get_transaction() is not transaction:
+            raise RuntimeError("Queue allocator ended the registration transaction")
+        if create_handoff.encounter_id is not None:
+            expected = create_handoff.create_entry_kwargs
+            if (queue_entry.patient_id != expected["patient_id"]
+                    or queue_entry.visit_id != expected["visit_id"]
+                    or queue_entry.source != expected["source"]
+                    or queue_entry.encounter_id not in (None, create_handoff.encounter_id)):
+                raise QueueOwnerConfigurationError("Queue entry has conflicting registration links")
+            queue_entry.encounter_id = create_handoff.encounter_id
         return create_handoff.build_assigned_payload(number=queue_entry.number)
 
     def _allocate_create_branch_handoff(

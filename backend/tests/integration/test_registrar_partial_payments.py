@@ -1,6 +1,8 @@
 """Registrar receipts must represent money received, not a paid checkbox."""
 
 from decimal import Decimal
+from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import event
@@ -14,8 +16,8 @@ from app.services.payment_invariant_service import PaymentInvariantService
 @pytest.fixture
 def payment_visits(db_session, test_patient):
     visits = [
-        Visit(patient_id=test_patient.id, status="open", discount_mode="none"),
-        Visit(patient_id=test_patient.id, status="open", discount_mode="none"),
+        Visit(patient_id=test_patient.id, status="open", discount_mode="none", confirmation_context_epoch=1)
+        for _ in range(2)
     ]
     db_session.add_all(visits)
     db_session.flush()
@@ -27,9 +29,10 @@ def payment_visits(db_session, test_patient):
                 name="SYNTHETIC-payment",
                 qty=1,
                 price=amount,
+                currency="UZS",
             )
         )
-    invoice = PaymentInvoice(patient_id=test_patient.id, total_amount=100000)
+    invoice = PaymentInvoice(patient_id=test_patient.id, total_amount=100000, currency="UZS")
     db_session.add(invoice)
     db_session.flush()
     for visit, amount in zip(visits, (60000, 40000), strict=True):
@@ -129,7 +132,7 @@ def test_partial_refund_reopens_debt_and_allows_top_up(
     refund_response = client.post(
         f"/api/v1/cashier/payments/{first_payment.id}/refund",
         headers=admin_auth_headers,
-        json={"amount": 10000, "reason": "SYNTHETIC-partial-refund"},
+        json={"amount": 10000, "reason": "SYNTHETIC-partial-refund", "client_request_id": str(uuid4())},
     )
     assert refund_response.status_code == 200, refund_response.text
     db_session.refresh(invoice)
@@ -165,7 +168,7 @@ def test_partial_refund_reopens_debt_and_allows_top_up(
     assert invoice.status == "paid"
 
 
-def test_failed_provider_refund_rolls_back_amount_and_invoice(
+def test_provider_refund_requires_reconciliation_before_amount_and_invoice_change(
     client,
     db_session,
     admin_auth_headers,
@@ -173,8 +176,6 @@ def test_failed_provider_refund_rolls_back_amount_and_invoice(
     payment_visits,
     monkeypatch,
 ):
-    from types import SimpleNamespace
-
     from app.services import payment_provider_manager_factory
 
     visits, invoice = payment_visits
@@ -194,24 +195,16 @@ def test_failed_provider_refund_rolls_back_amount_and_invoice(
     payment.provider_payment_id = "SYNTHETIC-provider-payment"
     db_session.commit()
 
-    manager = SimpleNamespace(
-        refund_payment=lambda *_args, **_kwargs: SimpleNamespace(
-            success=False,
-            error_message="SYNTHETIC-provider-rejection",
-        )
-    )
-    monkeypatch.setattr(
-        payment_provider_manager_factory,
-        "get_payment_manager",
-        lambda: manager,
-    )
+    get_manager = Mock()
+    monkeypatch.setattr(payment_provider_manager_factory, "get_payment_manager", get_manager)
 
     response = client.post(
         f"/api/v1/cashier/payments/{payment.id}/refund",
         headers=admin_auth_headers,
-        json={"amount": 10000, "reason": "SYNTHETIC-provider-failure"},
+        json={"amount": 10000, "reason": "SYNTHETIC-provider-failure", "client_request_id": str(uuid4())},
     )
-    assert response.status_code == 502, response.text
+    assert response.status_code == 409, response.text
+    get_manager.assert_not_called()
 
     db_session.expire_all()
     persisted_payment = db_session.get(Payment, payment.id)
@@ -227,6 +220,7 @@ def test_payment_summary_loads_payment_ledger_once(db_session, payment_visits):
         Payment(
             visit_id=visit.id,
             amount=10000,
+            currency="UZS",
             method="cash",
             status="paid",
         )

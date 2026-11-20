@@ -9,11 +9,9 @@ Fail-first coverage for the doctor schedule-next visit-creation plane:
   (same visit_id/token, ``idempotent_replay: true``) without
   re-dispatching the patient invitation; a changed intent (or a replay
   after the window lapses) still creates a new visit.
-* **DOCSCHED-BE-002 (P1)** — ``discount_mode='all_free'`` was accepted
-  while preserving non-zero service prices: the stored visit claimed
-  all_free but billing/confirmation kept catalogue totals. The business
-  field is now canonical — ``all_free`` mode OR flag both zero every
-  line and persist ``discount_mode='all_free'``.
+* **DOCSCHED-BE-002 (P1)** — payment and confirmation track the actual
+  pricing decision. The All Free approval contract is tested separately in
+  ``test_doctor_all_free_workflow.py``.
 * **DOCSCHED-BE-003 (P2)** — past-date validation used the HOST's
   ``date.today()``; between 19:00–24:00 UTC the clinic (Asia/Tashkent)
   calendar day has already advanced and a past clinic-local date was
@@ -39,17 +37,25 @@ from __future__ import annotations
 import json
 import math
 from datetime import date, timedelta
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
-from app.models.clinic import Doctor
+from app.models.clinic import ClinicSettings, Doctor
+from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
-from app.services.notification_service import NotificationService
 from tests.conftest import mint_access_token
+from tests.integration.doctor_schedule_fixtures import (
+    keyed_schedule_headers,
+    mock_invitations,  # noqa: F401
+    observe_invitation_staging,
+)
+
+pytestmark = pytest.mark.usefixtures("mock_invitations")
 
 
 def _clinic_today(db_session) -> date:
@@ -149,16 +155,7 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
     не второй визит и не второй токен подтверждения."""
 
     def _spy_invitation(self, monkeypatch) -> list[tuple[int, str]]:
-        calls: list[tuple[int, str]] = []
-
-        async def _spy(self, db, visit_id, channel="auto", expected_context=None):
-            calls.append((visit_id, channel))
-            return {"success": True, "channel": channel}
-
-        monkeypatch.setattr(
-            NotificationService, "send_visit_confirmation_invitation", _spy
-        )
-        return calls
+        return observe_invitation_staging(monkeypatch)
 
     def test_replayed_identical_request_returns_original_visit(
         self,
@@ -176,11 +173,12 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         calls = self._spy_invitation(monkeypatch)
         visit_date = _clinic_today(db_session) + timedelta(days=1)
         payload = _schedule_payload(patient, test_service, visit_date=visit_date)
+        schedule_headers = keyed_schedule_headers(cardio_auth_headers)
 
         first = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json=payload,
-            headers=cardio_auth_headers,
+            headers=schedule_headers,
         )
         assert first.status_code == 200, first.text
         first_data = first.json()
@@ -188,7 +186,7 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         second = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json=payload,
-            headers=cardio_auth_headers,
+            headers=schedule_headers,
         )
         assert second.status_code == 200, second.text
         second_data = second.json()
@@ -205,25 +203,17 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         pending = _pending_visits(db_session, patient_id=patient.id)
         assert len(pending) == 1, "повторный запрос создал второй визит"
 
-        # Приглашение пациенту отправлено ровно один раз.
-        assert len(calls) == 1, "replay повторно отправил приглашение"
+        assert len(calls) == 1, "replay повторно подготовил приглашение"
 
-    def test_replay_after_dedup_window_creates_new_visit(
+    def test_new_visit_at_same_time_requires_an_explicit_new_intent(
         self,
         client,
         db_session,
         cardio_auth_headers,
         test_doctor,
         test_service,
-        monkeypatch,
     ):
-        """Окно dedup истекло — тот же intent уже не replay: у клиента
-        осталась возможность СОЗНАТЕЛЬНО записать пациента повторно."""
-        from app.api.v1.endpoints.doctor_integration import _visits as visits_mod
-
-        monkeypatch.setattr(
-            visits_mod, "_SCHEDULE_NEXT_DEDUP_WINDOW_SECONDS", -1
-        )
+        """An explicitly new request can book the same schedule slot."""
         patient = _make_patient(db_session)
         _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
         visit_date = _clinic_today(db_session) + timedelta(days=1)
@@ -237,7 +227,11 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         second = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json=payload,
-            headers=cardio_auth_headers,
+            headers={
+                **cardio_auth_headers,
+                "Idempotency-Key": f"synthetic-{uuid4()}",
+                "Idempotency-Intent": "new",
+            },
         )
         assert first.status_code == 200
         assert second.status_code == 200
@@ -268,7 +262,11 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
             json=_schedule_payload(
                 patient, test_service, visit_date=visit_date, visit_time="11:30"
             ),
-            headers=cardio_auth_headers,
+            headers={
+                **cardio_auth_headers,
+                "Idempotency-Key": f"synthetic-{uuid4()}",
+                "Idempotency-Intent": "new",
+            },
         )
         assert first.status_code == 200
         assert second.status_code == 200
@@ -285,33 +283,30 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         test_service,
         monkeypatch,
     ):
-        """RETRO-3960-01 (post-merge review #3968): изменённый канал
-        подтверждения — другой intent, а не replay.
-
-        Первый запрос записывает визит с каналом ``phone``; немедленный
-        повтор тех же условий с ``telegram`` НЕ может быть replay'ем: иначе
-        ответ объявляет ``confirmation.channel=telegram``, который не
-        сохранён и по которому приглашение не отправлялось. Изменённый
-        канал создаёт НОВЫЙ визит, у которого сохранённый канал и канал в
-        ответе совпадают и приглашение реально отправлено в этот канал."""
+        """An explicit new intent stores and stages its own confirmation channel."""
         patient = _make_patient(db_session)
         _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
         calls = self._spy_invitation(monkeypatch)
         visit_date = _clinic_today(db_session) + timedelta(days=1)
+        first_headers = keyed_schedule_headers(cardio_auth_headers)
 
         first = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json=_schedule_payload(
                 patient, test_service, visit_date=visit_date, confirmation_channel="phone"
             ),
-            headers=cardio_auth_headers,
+            headers=first_headers,
         )
         second = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json=_schedule_payload(
                 patient, test_service, visit_date=visit_date, confirmation_channel="telegram"
             ),
-            headers=cardio_auth_headers,
+            headers={
+                **cardio_auth_headers,
+                "Idempotency-Key": f"synthetic-{uuid4()}",
+                "Idempotency-Intent": "new",
+            },
         )
         assert first.status_code == 200, first.text
         assert second.status_code == 200, second.text
@@ -323,8 +318,6 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         assert second_data["visit_id"] != first_data["visit_id"]
         assert len(_pending_visits(db_session, patient_id=patient.id)) == 2
 
-        # Ответ честен: заявленный канал == сохранённому каналу второго
-        # визита, и приглашение реально ушло в этот канал.
         second_visit = (
             db_session.query(Visit)
             .filter(Visit.id == second_data["visit_id"])
@@ -333,9 +326,9 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         assert second_visit.confirmation_channel == "telegram"
         assert second_data["confirmation"]["channel"] == "telegram"
         assert ("telegram" in [channel for _, channel in calls]), (
-            "приглашение не отправлено в изменённый канал"
+            "приглашение не подготовлено для изменённого канала"
         )
-        assert len(calls) == 2, "второй intent должен отправить своё приглашение"
+        assert len(calls) == 2, "второй intent должен подготовить своё приглашение"
 
         # Контроль: идентичный повтор ИСХОДНОГО запроса по-прежнему replay
         # исходного phone-визита (дедуп по полному intent'у не сломан).
@@ -344,14 +337,14 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
             json=_schedule_payload(
                 patient, test_service, visit_date=visit_date, confirmation_channel="phone"
             ),
-            headers=cardio_auth_headers,
+            headers=first_headers,
         )
         assert third.status_code == 200
         third_data = third.json()
         assert third_data.get("idempotent_replay") is True
         assert third_data["visit_id"] == first_data["visit_id"]
         assert third_data["confirmation"]["channel"] == "phone"
-        assert len(calls) == 2, "replay повторно отправил приглашение"
+        assert len(calls) == 2, "replay повторно подготовил приглашение"
 
     def test_replayed_replay_reports_persisted_channel_not_requested(
         self,
@@ -369,16 +362,17 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
         payload = _schedule_payload(
             patient, test_service, visit_date=visit_date, confirmation_channel="pwa"
         )
+        schedule_headers = keyed_schedule_headers(cardio_auth_headers)
 
         first = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json=payload,
-            headers=cardio_auth_headers,
+            headers=schedule_headers,
         )
         second = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json=payload,
-            headers=cardio_auth_headers,
+            headers=schedule_headers,
         )
         assert first.status_code == 200
         assert second.status_code == 200
@@ -394,9 +388,8 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
 
 @pytest.mark.integration
 @pytest.mark.confirmation
-class TestDOCSCHEDBE002AllFreeCanonicalPricing:
-    """DOCSCHED-BE-002: 'all_free' каноничен — визит, строки услуг,
-    подтверждение и биллинг обязаны соглашаться."""
+class TestDOCSCHEDBE002RepeatCanonicalPricing:
+    """The repeat rate reflects current policy and completed consultations."""
 
     def _schedule(
         self, client, headers, patient, service, visit_date, **overrides
@@ -410,78 +403,32 @@ class TestDOCSCHEDBE002AllFreeCanonicalPricing:
         )
         assert response.status_code == 200, response.text
         visit_id = response.json()["visit_id"]
-        db_visit = None
         return response.json(), visit_id
 
-    def test_all_free_mode_zeroes_every_service_price(
+    def test_repeat_discount_zeroes_consultation_only_when_configured(
         self, client, db_session, cardio_auth_headers, test_doctor, test_service
     ):
+        """A completed consultation and a configured 100% discount are required."""
         patient = _make_patient(db_session)
-        _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
-        paid_service = _make_service(db_session, price=150000.0)
-        visit_date = _clinic_today(db_session) + timedelta(days=1)
-
-        data, visit_id = self._schedule(
-            client,
-            cardio_auth_headers,
-            patient,
-            test_service,
-            visit_date,
-            services=[
-                {"service_id": test_service.id, "quantity": 1},
-                {"service_id": paid_service.id, "quantity": 2},
-            ],
-            discount_mode="all_free",
-            all_free=False,
-        )
-
-        visit = db_session.get(Visit, visit_id)
-        assert visit.discount_mode == "all_free"
-        lines = (
-            db_session.query(VisitService)
-            .filter(VisitService.visit_id == visit_id)
-            .all()
-        )
-        assert len(lines) == 2
-        assert all(line.price == 0 for line in lines), (
-            "discount_mode='all_free' сохраняет ненулевые цены услуг"
-        )
-        assert data["confirmation"]["total_amount"] == 0
-
-    def test_all_free_flag_normalizes_stored_discount_mode(
-        self, client, db_session, cardio_auth_headers, test_doctor, test_service
-    ):
-        """Комплементарный кейс: discount_mode='none' + all_free=True."""
-        patient = _make_patient(db_session)
-        _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
-        visit_date = _clinic_today(db_session) + timedelta(days=1)
-
-        data, visit_id = self._schedule(
-            client,
-            cardio_auth_headers,
-            patient,
-            test_service,
-            visit_date,
-            discount_mode="none",
-            all_free=True,
-        )
-
-        visit = db_session.get(Visit, visit_id)
-        assert visit.discount_mode == "all_free"
-        lines = (
-            db_session.query(VisitService)
-            .filter(VisitService.visit_id == visit_id)
-            .all()
-        )
-        assert all(line.price == 0 for line in lines)
-        assert data["confirmation"]["total_amount"] == 0
-
-    def test_repeat_discount_zeroes_consultation_only(
-        self, client, db_session, cardio_auth_headers, test_doctor, test_service
-    ):
-        """Позитивный контроль: режим repeat применяется только к консультациям."""
-        patient = _make_patient(db_session)
-        _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
+        prior = _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
+        prior.status = "completed"
+        test_service.is_consultation = True
+        db_session.add(VisitService(
+            visit_id=prior.id, service_id=test_service.id, name=test_service.name,
+            qty=1, price=test_service.price,
+        ))
+        # Metadata-only test DB has no migration triggers; represent the
+        # verified synthetic completion explicitly in this focused fixture.
+        prior.repeat_proof_generation = prior.repeat_evidence_generation
+        prior.repeat_proof_consultation = True
+        prior.repeat_proof_doctor_user_id = test_doctor.user_id
+        setting = db_session.query(ClinicSettings).filter_by(key="repeat_visit_discount").first()
+        if setting is None:
+            setting = ClinicSettings(key="repeat_visit_discount", value=100)
+            db_session.add(setting)
+        else:
+            setting.value = 100
+        db_session.commit()
         paid_service = _make_service(db_session, price=150000.0)
         visit_date = _clinic_today(db_session) + timedelta(days=1)
 
@@ -533,8 +480,8 @@ def test_schedule_next_routes_encounter_benefits_to_registration(
         "/api/v1/doctor/visits/schedule-next", json=payload, headers=cardio_auth_headers
     )
 
-    assert response.status_code == 403, response.text
-    assert "регистратура" in response.json()["detail"]
+    assert response.status_code == 409, response.text
+    assert "регистра" in response.json()["detail"]
     visit_ids = db_session.query(Visit.id).filter(Visit.patient_id == patient.id).all()
     assert visit_ids == [(prior_visit.id,)]
 
@@ -813,10 +760,10 @@ class TestDOCSCHEDServiceInputValidation:
         )
         assert _pending_visits(db_session, patient_id=patient.id) == []
 
-    def test_zero_custom_price_is_intended_free_not_catalogue_fallback(
+    def test_explicit_zero_is_recorded_for_review_at_the_regular_price(
         self, client, db_session, cardio_auth_headers, test_doctor
     ):
-        """``custom_price or catalogue`` превращал явный ноль в цену каталога."""
+        """A proposed zero is exact and remains pending review."""
         override_service = _make_service(db_session, price=150000.0)
         override_service.allow_doctor_price_override = True
         db_session.commit()
@@ -846,11 +793,16 @@ class TestDOCSCHEDServiceInputValidation:
             .filter(VisitService.visit_id == visit_id, VisitService.service_id == override_service.id)
             .one()
         )
-        assert line.price == 0, (
-            "явный custom_price=0 заменён ценой каталога (0 — falsy в `or`)"
-        )
+        assert line.price == Decimal("150000.00")
+        override = db_session.query(DoctorPriceOverride).filter_by(
+            visit_id=visit_id, target_visit_service_id=line.id,
+        ).one()
+        assert (override.new_price, override.status) == (Decimal("0.00"), "pending")
+        assert response.json()["price_override_requests"] == [
+            {"id": override.id, "visit_service_id": line.id, "status": "pending"},
+        ]
         assert math.isclose(
-            response.json()["confirmation"]["total_amount"], 80000.0
+            response.json()["confirmation"]["total_amount"], 230000.0
         )
 
 
@@ -866,6 +818,8 @@ def test_schedule_next_issues_usable_token_after_initial_service_rows(
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
 
+    from app.api.v1.endpoints.doctor_integration import _visits
+
     path = Path(__file__).resolve().parents[2] / "alembic/versions/0102_visit_confirmation_context.py"
     spec = importlib.util.spec_from_file_location("context_schedule_migration", path)
     migration = importlib.util.module_from_spec(spec)
@@ -878,12 +832,15 @@ def test_schedule_next_issues_usable_token_after_initial_service_rows(
     migration.upgrade()
     seen_tokens = []
 
-    async def record_invitation(self, db, visit_id, channel="auto", expected_context=None):
-        visit = db.query(Visit).filter(Visit.id == visit_id).populate_existing().one()
-        seen_tokens.append(visit.confirmation_token)
-        return {"success": True, "channel": channel}
+    stage = _visits.stage_visit_invitation
 
-    monkeypatch.setattr(NotificationService, "send_visit_confirmation_invitation", record_invitation)
+    def record_invitation(db, **kwargs):
+        visit = db.query(Visit).filter(Visit.id == kwargs["visit_id"]).populate_existing().one()
+        assert db.query(VisitService).filter_by(visit_id=visit.id).count() == 1
+        seen_tokens.append(visit.confirmation_token)
+        return stage(db, **kwargs)
+
+    monkeypatch.setattr(_visits, "stage_visit_invitation", record_invitation)
     try:
         patient = _make_patient(db_session)
         _prior_context_visit(db_session, patient=patient, doctor=test_doctor)

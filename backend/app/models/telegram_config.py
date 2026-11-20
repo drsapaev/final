@@ -167,6 +167,10 @@ class TelegramUser(Base):
     __tablename__ = "telegram_users"
     __table_args__ = (
         CheckConstraint("patient_link_epoch >= 0", name="ck_telegram_user_patient_link_epoch"),
+        CheckConstraint(
+            "patient_owner_generation_snapshot IS NULL OR patient_owner_generation_snapshot>0",
+            name="ck_telegram_patient_owner_generation",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -180,6 +184,7 @@ class TelegramUser(Base):
         BigInteger, nullable=False, default=lambda: secrets.randbits(52) + 1,
         server_default=text("0")
     )
+    patient_owner_generation_snapshot: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve Telegram link
@@ -223,15 +228,23 @@ class TelegramUser(Base):
 
 
 @event.listens_for(TelegramUser, "before_update")
-def _advance_patient_link_epoch_for_orm(_mapper, _connection, target: TelegramUser) -> None:
+def _advance_patient_link_epoch_for_orm(_mapper, connection, target: TelegramUser) -> None:
     """Keep ORM-created SQLite test databases consistent with the PG trigger.
 
     PostgreSQL remains authoritative for bulk updates and external writers.
     """
+    if connection.dialect.name == "sqlite" and connection.exec_driver_sql(
+        "SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='trg_telegram_patient_link_epoch'"
+    ).first():
+        # Migrated SQLite assigns the generation in its trigger. The random
+        # fallback is only for isolated metadata.create_all test databases.
+        return
     state = inspect(target)
+    if any(state.attrs[field].history.has_changes() for field in ("patient_id", "user_id", "chat_id")):
+        target.patient_owner_generation_snapshot = None
     fields = (
-        "patient_id", "chat_id", "active", "blocked",
-        "notifications_enabled", "appointment_reminders",
+        "patient_id", "chat_id", "user_id", "active", "blocked",
+        "notifications_enabled", "appointment_reminders", "patient_owner_generation_snapshot",
     )
     if any(state.attrs[field].history.has_changes() for field in fields):
         target.patient_link_epoch = secrets.randbits(52) + 1
@@ -239,13 +252,16 @@ def _advance_patient_link_epoch_for_orm(_mapper, _connection, target: TelegramUs
 
 @event.listens_for(TelegramUser, "after_insert")
 @event.listens_for(TelegramUser, "after_update")
-def _refresh_patient_link_epoch_after_update(_mapper, connection, target: TelegramUser) -> None:
-    """Read the trigger-assigned value, including after an uncommitted flush."""
-    value = connection.execute(
-        TelegramUser.__table__.select().with_only_columns(TelegramUser.patient_link_epoch)
+def _refresh_patient_link_evidence(_mapper, connection, target: TelegramUser) -> None:
+    """Read the trigger-assigned values after the link has been flushed."""
+    epoch, owner_snapshot = connection.execute(
+        TelegramUser.__table__.select().with_only_columns(
+            TelegramUser.patient_link_epoch, TelegramUser.patient_owner_generation_snapshot,
+        )
         .where(TelegramUser.id == target.id)
-    ).scalar_one()
-    attributes.set_committed_value(target, "patient_link_epoch", value)
+    ).one()
+    attributes.set_committed_value(target, "patient_link_epoch", epoch)
+    attributes.set_committed_value(target, "patient_owner_generation_snapshot", owner_snapshot)
 
 
 class TelegramStaffLinkToken(Base):
