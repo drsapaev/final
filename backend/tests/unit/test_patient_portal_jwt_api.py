@@ -44,6 +44,8 @@ from app.models.patient import Patient
 from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.user import User
 
+pytestmark = pytest.mark.usefixtures("patient_ownership_epochs")
+
 _FRONTEND_API_TS = (
     Path(__file__).resolve().parents[3]
     / "frontend"

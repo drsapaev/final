@@ -46,6 +46,8 @@ from app.services.public_booking_request_service import (
 from app.services.registrar_notification_service import RegistrarNotificationService
 from tests.conftest import mint_access_token
 
+pytestmark = pytest.mark.usefixtures("patient_ownership_epochs")
+
 PATIENT_REQUESTS = "/api/v1/patients/booking-requests"
 PATIENT_CONFIRMED_APPOINTMENTS = "/api/v1/patients/public-booking/appointments"
 STAFF_REQUESTS = "/api/v1/admin/public-booking-requests"
