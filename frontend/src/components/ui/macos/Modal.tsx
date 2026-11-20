@@ -33,10 +33,6 @@ interface ModalTitleProps extends Omit<React.HTMLAttributes<HTMLHeadingElement>,
   style?: CSSProperties;
 }
 
-interface FocusableElement extends HTMLElement {
-  focus: () => void;
-}
-
 interface StyleWithBackdrop extends CSSProperties {
   WebkitBackdropFilter?: string;
 }
@@ -72,37 +68,27 @@ const Modal = ({
   // PR-37 / P0-B: unique id for aria-labelledby — avoids collisions when
   // multiple modals are rendered simultaneously.
   const titleId = useId();
-  // PR-37 / P0-A: track the previously-focused element to restore focus on close.
-  const previouslyFocusedRef: RefObject<FocusableElement | null> = useRef<FocusableElement | null>(null);
-
-  // Focus belongs to an open/close session, not to the identity of callbacks
-  // supplied by a parent that may rerender while the modal is open.
+  // Focus belongs to the open session. Updating the keyboard callback must
+  // not return focus to the trigger while the modal is still open.
   useEffect(() => {
-    if (!isOpen) return;
+    const modal = modalRef.current;
+    if (!isOpen || !modal) return;
 
-    previouslyFocusedRef.current = document.activeElement as FocusableElement | null;
+    const trigger = document.activeElement;
     const focusFrame = requestAnimationFrame(() => {
-      if (modalRef.current) {
-        const focusables = modalRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusables.length > 0) {
-          focusables[0].focus();
-        } else {
-          modalRef.current.focus();
-        }
-      }
+      const first = modal.querySelector<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      (first ?? modal).focus();
     });
 
     return () => {
       cancelAnimationFrame(focusFrame);
-      if (previouslyFocusedRef.current && typeof previouslyFocusedRef.current.focus === 'function') {
-        previouslyFocusedRef.current.focus();
-      }
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
     };
   }, [isOpen]);
 
-  // Keyboard options can change while open without restarting focus handling.
+  // Escape and Tab use the latest options without resetting the focus session.
   useEffect(() => {
     if (!isOpen) return;
 
