@@ -123,12 +123,6 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
             WHERE c.oid=ANY(:tables) AND a.privilege_type='TRIGGER' AND a.grantee<>ALL(:owners))
         """), {"tables": [tables["patients"]["oid"], tables["visits"]["oid"]], "owners": list(trusted_owners)}).scalar_one(),
                  "Untrusted TRIGGER grant exists")
-        if not booking_lock_only:
-            _require(not db.execute(text("""
-              SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
-                WHERE t.tgrelid=ANY(:tables) AND NOT t.tgisinternal AND p.proowner<>ALL(:owners))
-            """), {"tables": [tables["patients"]["oid"], tables["visits"]["oid"]], "owners": list(trusted_owners | {cap["oid"]})}).scalar_one(),
-                     "Untrusted existing trigger function")
         _require(not db.execute(text("""
           SELECT pg_catalog.has_table_privilege(:role,:visits,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
             OR pg_catalog.has_table_privilege(:role,:patients,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -174,7 +168,10 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
         """), {"name": function}).mappings().first()
         migration_schema = engine.dialect.identifier_preparer.quote_schema(schema)
         confirmation = _reviewed_migration("0116_patient_owner_confirmation.py")
-        _require(fn is not None and fn["prosrc"] == confirmation.owner_function_body(migration_schema, private),
+        compatibility = _reviewed_migration("0141_confirmation_financial_trigger.py")
+        original_body = confirmation.owner_function_body(migration_schema, private)
+        revised_body = compatibility.owner_function_body(original_body, migration_schema, private)
+        _require(fn is not None and fn["prosrc"] in (original_body, revised_body),
                  "Trigger capability body differs from reviewed migration")
         _require(fn["proowner"] in trusted_owners | {cap["oid"]}, "Unexpected trigger function owner")
         expected_base = {"search_path=pg_catalog", "standard_conforming_strings=on"}
@@ -182,6 +179,18 @@ def provision(engine: Engine, schema: str, capability_role: str, runtime_role: s
         _require((not fn["prosecdef"] and config == expected_base | {"row_security=off"})
                  or (fn["prosecdef"] and config == expected_base | {"row_security=on"}),
                  "Trigger capability configuration differs from reviewed policy")
+        if not booking_lock_only:
+            allowed_finance_trigger = ""
+            if fn["prosrc"] == revised_body:
+                reviewed_trigger = compatibility.reviewed_financial_trigger(migration_schema, private)
+                allowed_finance_trigger = f"AND NOT COALESCE(({reviewed_trigger}),false)"
+            _require(not db.execute(text(f"""
+              SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
+                WHERE t.tgrelid=ANY(:tables) AND NOT t.tgisinternal AND p.proowner<>ALL(:owners)
+                {allowed_finance_trigger})
+            """), {"tables": [tables["patients"]["oid"], tables["visits"]["oid"]],
+                   "owners": list(trusted_owners | {cap["oid"]})}).scalar_one(),
+                     "Untrusted existing trigger function")
         patient_locks = {}
         for signature in (patient_lock, booking_lock):
             lock_fn = db.execute(text("""

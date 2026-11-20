@@ -57,6 +57,7 @@ from app.services.registrar_cart_replay import (
 )
 from app.services.staff_confirmation_guard import lock_staff_confirmation_subjects
 from app.services.visit_lifecycle_service import VisitLifecycleService
+from tests._pg_admin_guard import is_local_admin_dsn
 
 
 def _module(path: Path):
@@ -69,9 +70,12 @@ def _module(path: Path):
 
 @pytest.fixture
 def guarded_pg(monkeypatch):
-    url = make_url(os.getenv("DATABASE_URL", "sqlite://"))
-    if url.get_backend_name() != "postgresql" or not (url.database or "").startswith("clinic_test"):
-        pytest.skip("requires disposable clinic_test PostgreSQL")
+    raw_url = os.getenv("DATABASE_URL", "")
+    if not is_local_admin_dsn(raw_url):
+        pytest.skip("requires local disposable clinic_test PostgreSQL")
+    url = make_url(raw_url)
+    if url.query or not (url.database or "").startswith("clinic_test"):
+        pytest.skip("requires local disposable clinic_test PostgreSQL")
     with isolated_staff_guard_postgres(url, monkeypatch) as database:
         yield database
 
@@ -257,6 +261,77 @@ def test_booking_subject_lock_preserves_fk_compatibility_without_runtime_update(
         deleted_id = deleted.id
     with Session(runtime) as db:
         assert PublicBookingRequestRepository(db).lock_patient_for_booking(patient_id=deleted_id) is None
+
+
+@pytest.fixture
+def compatible_confirmation_pg(guarded_pg):
+    owner, runtime, ids = guarded_pg
+    root = Path(__file__).resolve().parents[3]
+    schema = owner.dialect.default_schema_name
+    private = capability_schema_name(schema)
+    with owner.begin() as db:
+        configuration = sa.text("""
+          SELECT oid,proowner,proacl,prosecdef
+          FROM pg_catalog.pg_proc WHERE oid=pg_catalog.to_regprocedure(:name)
+        """)
+        name = {"name": f"{private}.invalidate_patient_owner_confirmations()"}
+        before = db.execute(configuration, name).one()
+        migration = _module(root / "backend/alembic/versions/0141_confirmation_financial_trigger.py")
+        migration.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": schema}))
+        migration.upgrade()
+        assert db.execute(configuration, name).one() == before
+        expected_owner = db.scalar(sa.text("SELECT CURRENT_USER"))
+        capability = db.scalar(sa.text("SELECT pg_catalog.pg_get_userbyid(CAST(:owner AS oid))"), {
+            "owner": before.proowner,
+        })
+    provisioner = _module(root / "scripts/provision_confirmation_subject_role.py")
+    provisioner.provision(owner, schema, capability, runtime.url.username, expected_owner=expected_owner)
+    return owner, ids, private
+
+
+def test_patient_deactivation_invalidates_confirmation_with_finance_fence(compatible_confirmation_pg):
+    owner, ids, _ = compatible_confirmation_pg
+    with Session(owner, expire_on_commit=False) as db:
+        visit = db.get(Visit, ids["visit"])
+        visit.confirmation_token = "SYNTHETIC-OLD-CONFIRMATION"
+        visit.confirmation_expires_at = datetime.now(UTC) + timedelta(minutes=10)
+        db.commit()
+        old_epoch = visit.confirmation_context_epoch
+        old_reminder = visit.reminder_generation
+        generation = db.get(Encounter, visit.encounter_id).generation
+
+        db.get(Patient, ids["patient"]).is_deleted = True
+        db.commit()
+        db.refresh(visit)
+
+        assert visit.confirmation_token is None
+        assert visit.confirmation_expires_at is None
+        assert visit.confirmation_context_epoch > old_epoch
+        assert visit.reminder_generation == old_reminder + 1
+        assert db.get(Encounter, visit.encounter_id, populate_existing=True).generation == generation
+
+
+@pytest.mark.parametrize("changed_binding", [True, False], ids=["unexpected-trigger", "changed-body"])
+def test_patient_deactivation_refuses_unreviewed_financial_trigger(compatible_confirmation_pg, changed_binding):
+    owner, ids, private = compatible_confirmation_pg
+    quote = owner.dialect.identifier_preparer.quote_identifier
+    function = f"{quote(private)}.financial_visit_membership_fence()"
+    with owner.begin() as db:
+        if changed_binding:
+            db.exec_driver_sql(
+                f"CREATE TRIGGER synthetic_extra_fence AFTER UPDATE ON visits "
+                f"FOR EACH ROW EXECUTE FUNCTION {function}"
+            )
+        else:
+            db.exec_driver_sql(f"""
+              CREATE OR REPLACE FUNCTION {function} RETURNS trigger LANGUAGE plpgsql
+              SECURITY DEFINER SET search_path=pg_catalog SET row_security=on
+              AS $$ BEGIN RETURN NEW; END $$
+            """)
+        with pytest.raises(DBAPIError, match="confirmation visibility policy is unavailable"), db.begin_nested():
+            db.execute(sa.update(Patient).where(Patient.id == ids["patient"]).values(is_deleted=True))
+        assert db.scalar(sa.select(Patient.is_deleted).where(Patient.id == ids["patient"])) is False
+        assert db.scalar(sa.select(Visit.confirmation_context_epoch).where(Visit.id == ids["visit"])) == ids["epoch"]
 
 
 def test_cart_receipt_requires_the_issuer_and_current_financial_membership(guarded_pg):
