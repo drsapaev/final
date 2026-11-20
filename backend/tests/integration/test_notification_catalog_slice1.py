@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
 from app.core.security import get_password_hash
+from app.crud.clinic import clinic_today
+from app.models.all_free_request import AllFreeRequest
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.user import User
@@ -15,6 +17,7 @@ from app.models.user_profile import (
 )
 from app.models.visit import Visit
 from app.services.notification_platform_service import NotificationPlatformService
+from tests.integration.doctor_schedule_fixtures import mock_invitations  # noqa: F401
 
 
 def _event_deliveries(db_session, event_type: str):
@@ -179,8 +182,37 @@ def test_notification_policy_endpoint_forbids_non_admin_access_to_other_user(
     assert response.json()["detail"] == "Нет прав доступа"
 
 
+@pytest.fixture
+def stage_all_free_cart(client, db_session, mock_invitations):
+    def stage(*, headers, patient_id, doctor_id, service_id, visit_time):
+        response = client.post(
+            "/api/v1/registrar/cart",
+            headers=headers,
+            json={
+                "patient_id": patient_id,
+                "discount_mode": "all_free",
+                "all_free": True,
+                "payment_method": "cash",
+                "visits": [{
+                    "doctor_id": doctor_id,
+                    "visit_date": (clinic_today(db_session) + timedelta(days=1)).isoformat(),
+                    "visit_time": visit_time,
+                    "department": "cardiology",
+                    "services": [{"service_id": service_id, "quantity": 1}],
+                }],
+            },
+        )
+        assert response.status_code == 200, response.text
+        [visit_id] = response.json()["visit_ids"]
+        request = db_session.query(AllFreeRequest).filter_by(visit_id=visit_id).one()
+        assert request.status == "pending" and request.baseline_total > 0
+        return db_session.get(Visit, visit_id)
+
+    return stage
+
+
 def test_registrar_cart_creates_all_free_request_notification(
-    client,
+    stage_all_free_cart,
     db_session,
     registrar_auth_headers,
     registrar_user,
@@ -189,37 +221,11 @@ def test_registrar_cart_creates_all_free_request_notification(
     test_doctor,
     test_service,
 ):
-    _ = registrar_user
-    _ = admin_user
-
-    payload = {
-        "patient_id": test_patient.id,
-        "discount_mode": "all_free",
-        "all_free": True,
-        "payment_method": "cash",
-        "visits": [
-            {
-                "doctor_id": test_doctor.id,
-                "visit_date": date.today().isoformat(),
-                "visit_time": "10:30",
-                "department": "cardiology",
-                "services": [
-                    {
-                        "service_id": test_service.id,
-                        "quantity": 1,
-                    }
-                ],
-            }
-        ],
-    }
-
-    response = client.post(
-        "/api/v1/registrar/cart",
-        json=payload,
-        headers=registrar_auth_headers,
+    stage_all_free_cart(
+        headers=registrar_auth_headers, patient_id=test_patient.id,
+        doctor_id=test_doctor.id, service_id=test_service.id, visit_time="10:30",
     )
 
-    assert response.status_code == 200, response.text
     deliveries = _event_deliveries(db_session, "all_free_requested")
     assert len(deliveries) == 1
 
@@ -231,13 +237,18 @@ def test_registrar_cart_creates_all_free_request_notification(
     assert event.payload_snapshot["metadata"]["requested_by"] == registrar_user.id
 
 
-def test_admin_all_free_approval_creates_registrar_and_patient_notifications(
+@pytest.mark.parametrize("requester_active", [True, False], ids=["active", "disabled"])
+def test_admin_all_free_approval_notifies_only_current_recipients(
     client,
     db_session,
     auth_headers,
     admin_user,
     registrar_user,
     test_doctor,
+    test_service,
+    registrar_auth_headers,
+    stage_all_free_cart,
+    requester_active,
 ):
     patient_user = User(
         username="all_free_patient_user",
@@ -263,21 +274,13 @@ def test_admin_all_free_approval_creates_registrar_and_patient_notifications(
     db_session.commit()
     db_session.refresh(patient)
 
-    visit = Visit(
-        patient_id=patient.id,
-        doctor_id=test_doctor.id,
-        visit_date=date.today(),
-        visit_time="11:00",
-        status="confirmed",
-        discount_mode="all_free",
-        approval_status="pending",
-        department="cardiology",
-        confirmed_by=f"registrar_{registrar_user.id}",
-        source="desk",
+    visit = stage_all_free_cart(
+        headers=registrar_auth_headers, patient_id=patient.id,
+        doctor_id=test_doctor.id, service_id=test_service.id, visit_time="11:00",
     )
-    db_session.add(visit)
-    db_session.commit()
-    db_session.refresh(visit)
+    if not requester_active:
+        registrar_user.is_active = False
+        db_session.commit()
 
     response = client.post(
         "/api/v1/admin/all-free-approve",
@@ -289,7 +292,10 @@ def test_admin_all_free_approval_creates_registrar_and_patient_notifications(
     deliveries = _event_deliveries(db_session, "all_free_approved")
     recipient_ids = {delivery.recipient_id for delivery, _ in deliveries}
 
-    assert recipient_ids == {registrar_user.id, patient_user.id}
+    expected_recipients = {patient_user.id}
+    if requester_active:
+        expected_recipients.add(registrar_user.id)
+    assert recipient_ids == expected_recipients
     for _, event in deliveries:
         assert event.entity_type == "visit"
         assert event.actor_id == admin_user.id
@@ -303,6 +309,9 @@ def test_admin_all_free_reject_creates_rejected_notifications_with_reason(
     admin_user,
     registrar_user,
     test_doctor,
+    test_service,
+    registrar_auth_headers,
+    stage_all_free_cart,
 ):
     patient_user = User(
         username="all_free_patient_reject_user",
@@ -328,21 +337,10 @@ def test_admin_all_free_reject_creates_rejected_notifications_with_reason(
     db_session.commit()
     db_session.refresh(patient)
 
-    visit = Visit(
-        patient_id=patient.id,
-        doctor_id=test_doctor.id,
-        visit_date=date.today(),
-        visit_time="11:30",
-        status="confirmed",
-        discount_mode="all_free",
-        approval_status="pending",
-        department="cardiology",
-        confirmed_by=f"registrar_{registrar_user.id}",
-        source="desk",
+    visit = stage_all_free_cart(
+        headers=registrar_auth_headers, patient_id=patient.id,
+        doctor_id=test_doctor.id, service_id=test_service.id, visit_time="11:30",
     )
-    db_session.add(visit)
-    db_session.commit()
-    db_session.refresh(visit)
 
     response = client.post(
         "/api/v1/admin/all-free-approve",
@@ -375,13 +373,12 @@ def test_all_free_requested_updates_inbox_and_unread_when_realtime_suppressed(
     monkeypatch,
     registrar_auth_headers,
     auth_headers,
-    registrar_user,
+    stage_all_free_cart,
     admin_user,
     test_patient,
     test_doctor,
     test_service,
 ):
-    _ = registrar_user
     _ensure_notification_policy_settings(
         db_session,
         user=admin_user,
@@ -395,33 +392,10 @@ def test_all_free_requested_updates_inbox_and_unread_when_realtime_suppressed(
         lambda: fake_ws_manager,
     )
 
-    payload = {
-        "patient_id": test_patient.id,
-        "discount_mode": "all_free",
-        "all_free": True,
-        "payment_method": "cash",
-        "visits": [
-            {
-                "doctor_id": test_doctor.id,
-                "visit_date": date.today().isoformat(),
-                "visit_time": "12:15",
-                "department": "cardiology",
-                "services": [
-                    {
-                        "service_id": test_service.id,
-                        "quantity": 1,
-                    }
-                ],
-            }
-        ],
-    }
-
-    response = client.post(
-        "/api/v1/registrar/cart",
-        json=payload,
-        headers=registrar_auth_headers,
+    stage_all_free_cart(
+        headers=registrar_auth_headers, patient_id=test_patient.id,
+        doctor_id=test_doctor.id, service_id=test_service.id, visit_time="12:15",
     )
-    assert response.status_code == 200, response.text
 
     deliveries = _event_deliveries(db_session, "all_free_requested")
     assert len(deliveries) == 1

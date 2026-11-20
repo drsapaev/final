@@ -141,19 +141,6 @@ class CoreMixin(NotificationSenderMixinBase):
 
 
     @staticmethod
-    def _extract_prefixed_user_id(actor_ref: str | None, prefix: str) -> int | None:
-        normalized = str(actor_ref or "").strip().lower()
-        expected_prefix = prefix.lower()
-        if not normalized.startswith(expected_prefix):
-            return None
-
-        raw_value = normalized[len(expected_prefix):].strip()
-        if not raw_value.isdigit():
-            return None
-
-        return int(raw_value)
-
-    @staticmethod
 
 
     def _payload_snapshot(

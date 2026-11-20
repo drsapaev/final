@@ -4,6 +4,7 @@ Split from notifications.py.
 """
 from __future__ import annotations
 
+from app.core.roles import normalize_role_value
 from app.services.notifications_pkg._base import (
     Any,
     NotificationSenderMixinBase,
@@ -131,27 +132,43 @@ class SystemMixin(NotificationSenderMixinBase):
         *,
         db: Session,
         visit: Any,
+        request_id: int,
         actor_user: User,
         rejection_reason: str | None = None,
     ) -> bool:
         """Create canonical inbox signals for All Free approve/reject decisions."""
         try:
+            from app.models.all_free_request import AllFreeRequest
             from app.models.patient import Patient
+
+            decision_status = visit.approval_status
+            if decision_status not in {"approved", "rejected"}:
+                return False
+            request = (
+                db.query(AllFreeRequest.requested_by_user_id, AllFreeRequest.requested_by_role_snapshot)
+                .filter(
+                    AllFreeRequest.id == request_id,
+                    AllFreeRequest.visit_id == visit.id,
+                    AllFreeRequest.patient_id == visit.patient_id,
+                    AllFreeRequest.status == decision_status,
+                    AllFreeRequest.decided_by_user_id == actor_user.id,
+                )
+                .one_or_none()
+            )
+            if request is None:
+                return False
 
             platform_service = self._platform_service(db)
             recipients: dict[int, User] = {}
 
-            registrar_user_id = self._extract_prefixed_user_id(
-                getattr(visit, "confirmed_by", None),
-                "registrar_",
-            )
-            if registrar_user_id:
+            registrar_user_id = request.requested_by_user_id
+            if registrar_user_id and normalize_role_value(request.requested_by_role_snapshot) == "registrar":
                 registrar_user = (
                     db.query(User)
                     .filter(User.id == registrar_user_id, User.is_active.is_(True))
                     .first()
                 )
-                if registrar_user:
+                if registrar_user and normalize_role_value(registrar_user.role) == "registrar":
                     recipients[registrar_user.id] = registrar_user
 
             patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
@@ -171,7 +188,7 @@ class SystemMixin(NotificationSenderMixinBase):
                 )
                 return False
 
-            approved = str(getattr(visit, "approval_status", "")).lower() == "approved"
+            approved = decision_status == "approved"
             event_type = "all_free_approved" if approved else "all_free_rejected"
             title = "Заявка All Free одобрена" if approved else "Заявка All Free отклонена"
             body = (

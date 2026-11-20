@@ -1847,6 +1847,7 @@ def approve_all_free_request(
                 notification_sender_service.send_all_free_decision_notification(
                     db=db,
                     visit=visit,
+                    request_id=decision.request_id,
                     actor_user=current_user,
                     rejection_reason=approval_data.rejection_reason,
                 )
