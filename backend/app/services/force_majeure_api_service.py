@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from hashlib import sha256
 from json import dumps
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -35,6 +36,7 @@ from app.services.force_majeure_service import (
     get_force_majeure_service,
 )
 from app.services.money_input import MAX_MONEY, MoneyInputError, parse_money
+from app.services.payment_invariant_service import PaymentInvariantService
 
 
 @dataclass
@@ -587,16 +589,24 @@ class ForceMajeureApiService:
         if stored is not None:
             return stored
 
+        payment_service = None
         if visit_id is not None:
-            visit = self.repository.get_visit(visit_id)
+            visit = self.repository.get_visit(visit_id, lock=False)
             if not visit:
                 raise ForceMajeureApiDomainError(404, "Visit not found")
             if visit.patient_id != request.patient_id:
                 raise ForceMajeureApiDomainError(400, "Visit does not belong to deposit patient")
             if awaits_all_free_decision(visit):
                 raise ForceMajeureApiDomainError(409, ALL_FREE_DECISION_REQUIRED)
+            payment_service = PaymentInvariantService(self.repository.db)
+            payment_service.preflight_payment_groups([visit_id])
+            visit = self.repository.get_visit(visit_id)
+            if visit is None or visit.patient_id != request.patient_id:
+                raise ForceMajeureApiDomainError(409, "Привязка визита изменилась")
+            if awaits_all_free_decision(visit):
+                raise ForceMajeureApiDomainError(409, ALL_FREE_DECISION_REQUIRED)
 
-        # Keep the lock order used by refunds. Start a new deposit at zero
+        # Lock the visit group before the balance. A new deposit starts at zero
         # so this command and its journal row own the entire balance change.
         if credit:
             deposit, _ = self.repository.get_or_create_patient_deposit_for_update(
@@ -622,9 +632,30 @@ class ForceMajeureApiService:
         if not 0 <= balance_after <= MAX_MONEY:
             raise ForceMajeureApiDomainError(409, "Баланс депозита требует сверки")
         try:
-            deposit.balance = balance_after
-            self.repository.flush()
-            payload = self._serialize_deposit(deposit)
+            payment_id = None
+            if payment_service is not None:
+                if deposit.currency != "UZS":
+                    raise ForceMajeureApiDomainError(409, "Валюта депозитной оплаты требует сверки")
+                # A deposit is a local tender. A pending external intent
+                # still needs reconciliation before accepting any funds.
+                payment_service.assert_no_unresolved_payment_intent(visit_id)
+                payment = payment_service.create_payment_for_visit(
+                    visit_id=visit_id,
+                    amount=amount,
+                    method="deposit",
+                    note=None,
+                    current_user=SimpleNamespace(id=current_user_id),
+                    currency=deposit.currency,
+                    allow_overpayment=False,
+                    client_request_id=str(request_id),
+                    commit=False,
+                )
+                payment_id = payment.id
+            native_debit = payment_id is not None and self.repository.db.get_bind().dialect.name == "postgresql"
+            if not native_debit:
+                deposit.balance = balance_after
+                self.repository.flush()
+                payload = self._serialize_deposit(deposit)
             self.repository.add(DepositTransaction(
                 deposit_id=deposit.id,
                 transaction_type=kind.value,
@@ -632,12 +663,19 @@ class ForceMajeureApiService:
                 balance_after=balance_after,
                 description=description,
                 visit_id=visit_id,
+                payment_id=payment_id,
                 performed_by=current_user_id,
                 client_request_id=request_id,
                 command_fingerprint=fingerprint,
                 command_currency=deposit.currency,
                 command_is_active=deposit.is_active,
             ))
+            if native_debit:
+                self.repository.flush()
+                self.repository.refresh(deposit)
+                if deposit.balance != balance_after:
+                    raise ForceMajeureApiDomainError(409, "Проведение оплаты с депозита временно недоступно")
+                payload = self._serialize_deposit(deposit)
             self.repository.commit()
         except IntegrityError:
             # Different deposits do not share a row lock. The unique key
@@ -647,6 +685,9 @@ class ForceMajeureApiService:
             if stored is None:
                 raise
             return stored
+        except Exception:
+            self.repository.rollback()
+            raise
         return payload
 
     def _serialize_refund_request(self, req) -> dict[str, Any]:

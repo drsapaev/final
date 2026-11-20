@@ -1513,7 +1513,7 @@ class TestForceMajeureApiService:
             def get_patient_deposit_for_update(self, *, patient_id):
                 return deposit
 
-            def get_visit(self, visit_id):
+            def get_visit(self, visit_id, *, lock=True):
                 return SimpleNamespace(id=visit_id, patient_id=99)
 
             def flush(self):
