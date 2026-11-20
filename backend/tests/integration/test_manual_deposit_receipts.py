@@ -1,7 +1,7 @@
 """Verify durable manual deposit commands using synthetic staff and ledger data."""
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from json import dumps
 from threading import Barrier
@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.endpoints.force_majeure import AddDepositRequest, UseDepositRequest
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
 from app.models.refund_deposit import (
     DepositTransaction,
     PatientDeposit,
@@ -264,8 +264,12 @@ def visit_deposit_pg(pg_cashier):
     owner, runtime, _ = pg_cashier
     _install_manual_deposit_runtime(owner, runtime)
     quote = owner.dialect.identifier_preparer.quote_identifier
-    schema, role = quote(owner.dialect.default_schema_name), quote(runtime.url.username)
+    schema_name = owner.dialect.default_schema_name
+    schema, role = quote(schema_name), quote(runtime.url.username)
     with owner.begin() as conn:
+        revision = _migration("0142_deposit_visit_payment.py")
+        revision.op = Operations(MigrationContext.configure(conn, opts={"version_table_schema": schema_name}))
+        revision.upgrade()
         for table in ("refund_requests", "payment_refund_claims"):
             conn.exec_driver_sql(f"GRANT SELECT ON {schema}.{table} TO {role}")
         for table in ("payments", "payment_refund_claims"):
@@ -311,6 +315,63 @@ def test_linked_deposit_conserves_ledger_and_returns_to_same_deposit_on_postgres
         claim = db.scalars(select(PaymentRefundClaim).filter_by(payment_id=payment_id)).one()
         assert claim.deposit_transaction_id == incoming.id and claim.channel == "deposit"
         assert db.scalar(select(func.count()).select_from(RefundRequest)) == 0
+
+        for record, reason in (
+            (PaymentVisit(payment_id=payment_id, visit_id=visit_id, amount=Decimal("10.00")), "single visit"),
+            (RefundRequest(patient_id=patient_id, payment_id=payment_id, visit_id=visit_id,
+                           original_amount=Decimal("10.00"), refund_amount=Decimal("10.00"),
+                           refund_type="bank_transfer", status="pending"), "requires a deposit refund"),
+        ):
+            with pytest.raises(DBAPIError, match=reason), db.begin_nested():
+                db.add(record)
+                db.flush()
+
+        with pytest.raises(DBAPIError, match="evidence is immutable"), db.begin_nested():
+            db.get(Payment, payment_id).amount = Decimal("11.00")
+            db.flush()
+
+    schema_name = owner.dialect.default_schema_name
+    revision = _migration("0142_deposit_visit_payment.py")
+    with pytest.raises(DBAPIError, match="evidence prevents downgrade"), owner.begin() as conn:
+        revision.op = Operations(MigrationContext.configure(conn, opts={"version_table_schema": schema_name}))
+        revision.downgrade()
+
+
+def test_postgres_rejects_deposit_payment_without_a_debit_receipt(visit_deposit_pg):
+    owner, runtime, ids = visit_deposit_pg
+    with Session(runtime) as db:
+        db.add(Payment(
+            visit_id=ids["visit"], amount=Decimal("10.00"), currency="UZS", method="deposit",
+            status="paid", paid_at=datetime.now(UTC), client_request_id=str(uuid4()),
+        ))
+        db.flush()
+        with pytest.raises(DBAPIError, match="requires a debit receipt"):
+            db.commit()
+        db.rollback()
+    with Session(owner) as db:
+        assert db.scalar(select(func.count()).select_from(Payment)) == 0
+        assert db.scalar(select(func.count()).select_from(DepositTransaction)) == 0
+
+
+def test_postgres_deposit_tender_requires_the_atomic_balance_trigger(visit_deposit_pg):
+    owner, runtime, ids = visit_deposit_pg
+    actor_id, patient_id, visit_id = ids["stage"], ids["patient"], ids["visit"]
+    with Session(runtime) as db:
+        funded = ForceMajeureApiService(db).add_to_deposit(
+            request=AddDepositRequest(**_body(patient_id, "10.00")), current_user_id=actor_id,
+        )
+    with owner.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE deposit_transactions DISABLE TRIGGER trg_apply_visit_deposit_transaction")
+    with Session(runtime) as db:
+        with pytest.raises(ForceMajeureApiDomainError) as error:
+            ForceMajeureApiService(db).use_deposit_for_payment(
+                request=UseDepositRequest(**_body(patient_id, "10.00"), visit_id=visit_id), current_user_id=actor_id,
+            )
+        assert error.value.status_code == 409
+    with Session(owner) as db:
+        assert db.get(PatientDeposit, funded["id"]).balance == Decimal("10.00")
+        assert db.scalar(select(func.count()).select_from(Payment)) == 0
+        assert db.scalar(select(func.count()).select_from(DepositTransaction)) == 1
 
 
 def test_concurrent_retries_create_only_one_deposit_credit(manual_deposit_pg):

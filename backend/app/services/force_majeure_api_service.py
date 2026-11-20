@@ -651,9 +651,11 @@ class ForceMajeureApiService:
                     commit=False,
                 )
                 payment_id = payment.id
-            deposit.balance = balance_after
-            self.repository.flush()
-            payload = self._serialize_deposit(deposit)
+            native_debit = payment_id is not None and self.repository.db.get_bind().dialect.name == "postgresql"
+            if not native_debit:
+                deposit.balance = balance_after
+                self.repository.flush()
+                payload = self._serialize_deposit(deposit)
             self.repository.add(DepositTransaction(
                 deposit_id=deposit.id,
                 transaction_type=kind.value,
@@ -668,6 +670,12 @@ class ForceMajeureApiService:
                 command_currency=deposit.currency,
                 command_is_active=deposit.is_active,
             ))
+            if native_debit:
+                self.repository.flush()
+                self.repository.refresh(deposit)
+                if deposit.balance != balance_after:
+                    raise ForceMajeureApiDomainError(409, "Проведение оплаты с депозита временно недоступно")
+                payload = self._serialize_deposit(deposit)
             self.repository.commit()
         except IntegrityError:
             # Different deposits do not share a row lock. The unique key
