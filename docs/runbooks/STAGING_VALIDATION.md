@@ -47,7 +47,7 @@ neither path inherits the other's settings automatically.
 | Frontend Sentry | `STAGING_VITE_SENTRY_DSN` → build argument `VITE_SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
 | Backend Sentry | `STAGING_SENTRY_DSN` → backend runtime `SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
 | Telegram token | `STAGING_TELEGRAM_BOT_TOKEN`, a host-only network secret for `api.telegram.org`; use the authorized proxy injection, not a raw token | Same name as an Actions secret scoped to protected Environment `staging-integrations` |
-| Telegram destination | `STAGING_TELEGRAM_CHAT_ID` is a logical input, not currently provisioned; resolve only through an approved destination source | Also not provisioned; do not guess or assume a default |
+| Telegram destination | `STAGING_TELEGRAM_CHAT_ID` is provisioned as a Personal Vault environment variable scoped to `final` for the verified private staging chat. Start a fresh task in the published environment and check that the input is available. | Not provisioned in `staging-integrations`; do not assume the Cloud input carries over or guess a default. |
 
 Verify settings are available in the selected executor before asking for
 anything. If a specific input is missing, report its **name and scope**, not
@@ -117,8 +117,12 @@ Delivery readback, pre-transport masking, hosted masking readback, and
 full release admission remain separate results scoped to the tested SHA.
 
 **Telegram:** `@kosmed_staging_bot` and the closed **KosMed Staging Alerts**
-group are the designated test resources. A private chat requires distinct
-explicit authorization. Do not use `getUpdates` to find a recipient or verify
+group are the designated test resources. The Cloud destination input is for
+private worker delivery, not the group. In a fresh `final` task, verify the
+configured staging bot and use a targeted `getChat` to confirm the expected
+private destination without printing the ID. Provisioning is not permission to
+send: use the private target only when explicit authorization covers that
+recipient and test. Do not use `getUpdates` to find a recipient or verify
 delivery, change the webhook, or guess a chat ID. Without a verified,
 authorized destination, mark live delivery `BLOCKED` and continue checks
 that do not send.
