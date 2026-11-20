@@ -437,6 +437,11 @@ class ForceMajeureApiService:
                     400,
                     "Нельзя отклонить заявку с текущим статусом",
                 )
+            if not self._refund_request_available_actions(req.status, req.refund_type):
+                # A legacy approval can precede an external transfer whose
+                # completion was never recorded. Preserve its payment claim.
+                self.repository.rollback()
+                raise ForceMajeureApiDomainError(409, "Для отклонения одобренного возврата требуется сверка выплаты")
             if not process_request.rejection_reason:
                 raise ForceMajeureApiDomainError(400, "Укажите причину отклонения")
             req.status = RefundRequestStatus.REJECTED.value
@@ -477,11 +482,11 @@ class ForceMajeureApiService:
         return payload
 
     @staticmethod
-    def _refund_request_available_actions(status: str | None) -> list[str]:
+    def _refund_request_available_actions(status: str | None, refund_type: str | None) -> list[str]:
         normalized_status = (status or "").strip().lower()
         if normalized_status == RefundRequestStatus.PENDING.value:
             return ["reject"]
-        if normalized_status == RefundRequestStatus.APPROVED.value:
+        if normalized_status == RefundRequestStatus.APPROVED.value and refund_type == RefundType.DEPOSIT.value:
             return ["reject"]
         return []
 
@@ -647,7 +652,7 @@ class ForceMajeureApiService:
 
     def _serialize_refund_request(self, req) -> dict[str, Any]:
         processed_by_name = req.processor.full_name if req.processor else None
-        available_actions = self._refund_request_available_actions(req.status)
+        available_actions = self._refund_request_available_actions(req.status, req.refund_type)
         return {
             "id": req.id,
             "patient_id": req.patient_id,

@@ -1109,10 +1109,10 @@ def _run_cashier_action(
         session.close()
 
 
-def test_reject_wins_over_unverified_bank_completion_race(
+def test_concurrent_unverified_bank_transitions_keep_the_refund_claim(
     db_engine, session_factory
 ):
-    """A legacy bank request cannot be completed without proof while it is being rejected."""
+    """An approved external payout keeps its claim until reconciliation."""
     seed = session_factory()
     try:
         world = _seed_two_queue_world(seed)
@@ -1167,12 +1167,11 @@ def test_reject_wins_over_unverified_bank_completion_race(
         thread.join(timeout=20)
         assert not thread.is_alive(), "кассирское действие зависло на блокировке заявки"
 
-    assert outcomes["A"] == ("ok", "rejected"), outcomes
-    # Completion sees either the absence of evidence or a committed rejection.
-    assert outcomes["B"] in (("domain_error", 409), ("domain_error", 400)), outcomes
+    assert outcomes == {"A": ("domain_error", 409), "B": ("domain_error", 409)}, outcomes
     with session_factory() as verify:
-        assert verify.get(RefundRequest, request_id).status == "rejected"
-        assert verify.query(PaymentRefundClaim).filter_by(payment_id=world["payment_id"]).count() == 0
+        assert verify.get(RefundRequest, request_id).status == "approved"
+        claim = verify.query(PaymentRefundClaim).filter_by(payment_id=world["payment_id"]).one()
+        assert claim.refund_request_id == request_id
 
     second = _cancel_once(
         session_factory,
@@ -1183,7 +1182,9 @@ def test_reject_wins_over_unverified_bank_completion_race(
     )
     assert second["cancelled"] == 1, second
     refund_info = second["details"][0]["refund_info"]
-    assert not refund_info.get("already_refunded"), second
+    assert refund_info["already_refunded"] and refund_info["prior_channel"] == "refund_request"
+    with session_factory() as verify:
+        assert verify.query(DepositTransaction.id).filter_by(payment_id=world["payment_id"]).count() == 0
 
 
 def test_cashier_reject_waits_for_the_request_row_lock(db_engine, session_factory):
