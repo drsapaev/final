@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 import pytest
@@ -29,6 +30,8 @@ from app.api.v1.endpoints.cashier._helpers import (
     CreateGroupedPaymentRequest,
     CreatePaymentRequest,
 )
+from app.models.payment import Payment
+from app.models.visit import VisitService
 
 
 def _single(method: str) -> None:
@@ -117,3 +120,47 @@ def test_hosted_methods_rejection_names_the_exact_method() -> None:
     with pytest.raises(ValidationError) as excinfo:
         _single("payme")
     assert "payme" in str(excinfo.value)
+
+
+@pytest.fixture
+def priced_cashier_visit(db_session, test_visit, test_service):
+    db_session.add(VisitService(visit_id=test_visit.id, service_id=test_service.id,
+                                name="SYNTHETIC", qty=1, price=Decimal("10.00"), currency="USD"))
+    db_session.commit()
+    return test_visit
+
+
+@pytest.mark.parametrize("method", ["cash", " CaRd "])
+def test_legacy_cashier_preserves_currency_and_staff_identity(
+    client, db_session, admin_user, admin_auth_headers, priced_cashier_visit, method, caplog,
+):
+    ledger_logger = "app.services.payment_invariant_service"
+    with caplog.at_level(logging.INFO, logger=ledger_logger):
+        response = client.post("/api/v1/payments/", headers=admin_auth_headers, json={
+            "visit_id": priced_cashier_visit.id, "amount": "4.00", "currency": "USD", "method": method,
+        })
+    assert response.status_code == 200, response.text
+    payment = db_session.get(Payment, response.json()["payment_id"])
+    assert payment.currency == response.json()["currency"] == "USD"
+    assert payment.amount == Decimal("4.00") and payment.method == method.strip().lower()
+    assert any(record.name == ledger_logger and f"cashier_id={admin_user.id} " in record.getMessage()
+               for record in caplog.records)
+
+
+@pytest.mark.parametrize("method", [*sorted(CASHIER_HOSTED_PROVIDER_METHODS), "deposit"])
+def test_legacy_cashier_rejects_methods_requiring_funding_evidence(
+    client, db_session, admin_auth_headers, priced_cashier_visit, method,
+):
+    response = client.post("/api/v1/payments/", headers=admin_auth_headers, json={
+        "visit_id": priced_cashier_visit.id, "amount": "4.00", "currency": "USD", "method": method,
+    })
+    assert response.status_code == 422, response.text
+    assert db_session.query(Payment.id).filter_by(visit_id=priced_cashier_visit.id).first() is None
+
+
+def test_legacy_cashier_returns_currency_conflict(client, db_session, admin_auth_headers, priced_cashier_visit):
+    response = client.post("/api/v1/payments/", headers=admin_auth_headers, json={
+        "visit_id": priced_cashier_visit.id, "amount": "4.00", "currency": "UZS", "method": "cash",
+    })
+    assert response.status_code == 409, response.text
+    assert db_session.query(Payment.id).filter_by(visit_id=priced_cashier_visit.id).first() is None

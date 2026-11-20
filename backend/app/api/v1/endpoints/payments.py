@@ -341,9 +341,12 @@ def create_payment(
             currency=payment_request.currency,
             method=payment_request.method,
             note=payment_request.note,
+            current_user=current_user,
         )
     except PaymentCreateDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
