@@ -483,8 +483,12 @@ def test_billing_receipt_replays_to_its_owner_and_exact_intent(
     assert anchor.created_by == admin_user.id
     assert anchor.response_payload["id"] == first.json()["id"]
     assert "recorded_by" not in first.json()
-    recorded = [record for record in caplog.records if "payment.client_request_committed" in record.message]
-    assert len(recorded) == 1
+    recorded = [record for record in caplog.records if record.name == "app.services.payment_client_requests"]
+    messages = [record.getMessage() for record in recorded]
+    assert messages.count("payment.client_request_committed") == 1
+    assert {"payment.client_request_replayed", "payment.client_request_owner_mismatch",
+            "payment.client_request_intent_mismatch"} <= set(messages)
+    assert all(not record.args for record in recorded)
 
 
 def test_sqlite_billing_receipt_guard_preserves_committed_audit():

@@ -68,14 +68,7 @@ def replay_payment_client_request(
             },
         )
     if stored.created_by != current_user_id:
-        logger.warning(
-            "payment.client_request_owner_mismatch client_request_id=%s "
-            "endpoint=%s stored_owner=%s requesting_user=%s",
-            client_request_id,
-            endpoint,
-            stored.created_by,
-            current_user_id,
-        )
+        logger.warning("payment.client_request_owner_mismatch")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -87,13 +80,7 @@ def replay_payment_client_request(
             },
         )
     if stored.endpoint != endpoint:
-        logger.warning(
-            "payment.client_request_endpoint_mismatch client_request_id=%s "
-            "stored_endpoint=%s requested_endpoint=%s",
-            client_request_id,
-            stored.endpoint,
-            endpoint,
-        )
+        logger.warning("payment.client_request_endpoint_mismatch")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -109,14 +96,7 @@ def replay_payment_client_request(
         or (request_fingerprint is not None and stored.request_fingerprint is not None
             and stored.request_fingerprint != request_fingerprint)
     ):
-        logger.warning(
-            "payment.client_request_intent_mismatch client_request_id=%s "
-            "endpoint=%s stored_fingerprint=%s requested_fingerprint=%s",
-            client_request_id,
-            endpoint,
-            stored.request_fingerprint,
-            request_fingerprint,
-        )
+        logger.warning("payment.client_request_intent_mismatch")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -136,12 +116,7 @@ def replay_payment_client_request(
             payload = None
     if not isinstance(payload, dict):
         raise HTTPException(status_code=409, detail="Запись платежа требует сверки")
-    logger.info(
-        "payment.client_request_replayed client_request_id=%s endpoint=%s payment_id=%s",
-        client_request_id,
-        endpoint,
-        payload.get("id"),
-    )
+    logger.info("payment.client_request_replayed")
     return payload
 
 
@@ -182,13 +157,7 @@ def commit_with_client_request(
     )
     try:
         db.commit()
-        logger.info(
-            "payment.client_request_committed client_request_id=%s endpoint=%s user_id=%s payment_id=%s",
-            client_request_id,
-            endpoint,
-            created_by,
-            response_payload.get("id"),
-        )
+        logger.info("payment.client_request_committed")
         return None
     except IntegrityError:
         db.rollback()
@@ -200,12 +169,7 @@ def commit_with_client_request(
             current_user_id=created_by,
         )
         if replay is not None:
-            logger.info(
-                "payment.client_request_race_recovered client_request_id=%s "
-                "endpoint=%s",
-                client_request_id,
-                endpoint,
-            )
+            logger.info("payment.client_request_race_recovered")
             return replay
         if endpoint == "refund":
             raise HTTPException(status_code=409, detail="Запись возврата требует сверки") from None
