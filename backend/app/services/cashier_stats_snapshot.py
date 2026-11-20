@@ -39,6 +39,7 @@ from app.services.payment_refund_guard import require_visible_external_refunds
 
 _DEPOSIT_TRIGGERS = {"trg_protect_deposit_refund_evidence": 31, "trg_bind_deposit_refund_claim": 5}
 _DEPOSIT_GUARD_SHA256 = "4bb9c48268f38083e1c7588bb29cdcdc6057de29a82eea2671f21722f29599ab"
+_MANUAL_DEPOSIT_GUARD_SHA256 = "4d05d9630c65e8fd855e5a85a091184cb9e12cdefc0e81b0ea6af22adfd681f1"
 
 
 def _money(value: object) -> Decimal:
@@ -80,6 +81,30 @@ def _require_deposit_refund_guard(db: Session, schema: str) -> None:
         raise FinancialFenceError("История возвратов временно недоступна")
 
 
+def _has_verified_manual_deposit_guard(db: Session) -> bool:
+    # 0137 bars converting a legacy credit into a manual receipt and
+    # requires keyed credits to be free of payment, visit and refund links.
+    body = db.execute(text("""
+      SELECT p.prosrc
+      FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+      JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid AND a.attname='client_request_id'
+      JOIN pg_catalog.pg_trigger t ON t.tgrelid=c.oid
+      JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
+      WHERE n.nspname=:name AND c.relname='deposit_transactions' AND c.relkind='r'
+        AND c.relowner=n.nspowner AND a.attnum>0 AND NOT a.attisdropped
+        AND a.atttypid='pg_catalog.uuid'::pg_catalog.regtype
+        AND pg_catalog.has_column_privilege(CURRENT_USER,c.oid,a.attnum,'SELECT')
+        AND t.tgname='trg_protect_manual_deposit_receipt' AND t.tgtype=31
+        AND NOT t.tgisinternal AND t.tgenabled='O' AND t.tgqual IS NULL AND t.tgnargs=0
+        AND t.tgattr=''::pg_catalog.int2vector AND t.tgconstraint=0
+        AND p.proname='protect_manual_deposit_receipt' AND p.pronamespace=n.oid
+        AND p.proowner=n.nspowner AND NOT p.prosecdef AND p.prokind='f' AND p.provolatile='v'
+        AND p.pronargs=0 AND p.prorettype='pg_catalog.trigger'::pg_catalog.regtype
+        AND p.proconfig=ARRAY['search_path=pg_catalog']
+    """), {"name": db.get_bind().dialect.default_schema_name}).scalar_one_or_none()
+    return isinstance(body, str) and sha256(body.strip().encode()).hexdigest() == _MANUAL_DEPOSIT_GUARD_SHA256
+
+
 def _postgres_snapshot(db: Session, start: datetime | None, end: datetime | None, excluded: list[str]) -> dict:
     try:
         schema = _financial_schema(db)
@@ -88,6 +113,10 @@ def _postgres_snapshot(db: Session, start: datetime | None, end: datetime | None
         db.execute(text(f"SELECT amount FROM {schema}.payment_visits WHERE false"))
         require_visible_external_refunds(db, schema)
         _require_deposit_refund_guard(db, schema)
+        manual_credit_exclusion = (
+            "AND (t.transaction_type IS DISTINCT FROM 'credit' OR t.client_request_id IS NULL)"
+            if _has_verified_manual_deposit_guard(db) else ""
+        )
         private = require_postgres_quote_capability(db)
     except (FinancialFenceError, BenefitQuoteError):
         raise HTTPException(status_code=503, detail="Статистика временно недоступна") from None
@@ -150,7 +179,8 @@ def _postgres_snapshot(db: Session, start: datetime | None, end: datetime | None
           WHERE (r.status IS NULL OR r.status NOT IN ('pending','rejected','cancelled')) AND p.id IS NULL)
           OR EXISTS (SELECT 1 FROM {schema}.deposit_transactions t
             LEFT JOIN {schema}.payments p ON p.id=t.payment_id
-            WHERE (t.transaction_type IS NULL OR t.transaction_type<>'debit') AND p.id IS NULL)
+            WHERE (t.transaction_type IS NULL OR t.transaction_type<>'debit') AND p.id IS NULL
+              {manual_credit_exclusion})
       )
     """)
     result = db.execute(query, {"start_at": start, "end_at": end, "excluded": excluded}).scalar_one()
@@ -189,6 +219,13 @@ def _sqlite_snapshot_report(db: Session, start: datetime | None, end: datetime |
     proven = []
     unproven = list(refunds)
     for credit in credits:
+        if (credit.transaction_type == "credit" and credit.client_request_id is not None
+                and credit.payment_id is None and credit.visit_id is None
+                and credit.refund_request_id is None and credit.refund_currency_snapshot is None
+                and len(credit.command_fingerprint or "") == 64
+                and 1 <= len(credit.command_currency or "") <= 8 and credit.command_is_active is not None
+                and credit.amount > 0 and credit.balance_after >= 0):
+            continue
         if credit.refund_currency_snapshot is not None and (credit.payment_id, credit.id) in bound_claims:
             proven.append(credit)
         else:

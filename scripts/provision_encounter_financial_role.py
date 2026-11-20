@@ -147,6 +147,12 @@ def provision(engine: Engine, *, schema: str, backend_role: str, capability_role
         """), {"owner": namespace["nspowner"], "function": deposit_guard}).scalar_one_or_none() is True:
             db.exec_driver_sql(f"GRANT EXECUTE ON FUNCTION {deposit_guard} TO {qb}")
             db.exec_driver_sql(f"GRANT SELECT (amount, visit_id, refund_currency_snapshot) ON {qs}.deposit_transactions TO {qb}")
+        if db.execute(text("""
+          SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+            WHERE a.attrelid=pg_catalog.to_regclass(:table) AND a.attname='client_request_id'
+              AND a.attnum>0 AND NOT a.attisdropped AND a.atttypid='pg_catalog.uuid'::pg_catalog.regtype)
+        """), {"table": f"{qs}.deposit_transactions"}).scalar_one():
+            db.exec_driver_sql(f"GRANT SELECT (client_request_id) ON {qs}.deposit_transactions TO {qb}")
         db.exec_driver_sql(f"GRANT UPDATE (status) ON {qs}.payments TO {qb}")
         if tables["payments"]["relrowsecurity"]:
             _ensure_policy(db, f"{qs}.payments", "financial_backend_update", "UPDATE", qb, "true", "true", backend["oid"])

@@ -1,6 +1,7 @@
 """Daily cashier totals are exact, currency-scoped and evidence-backed."""
 from datetime import datetime
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -39,6 +40,22 @@ def test_proven_uzs_gross_net_and_pending_keep_legacy_contract(client, db_sessio
     assert Decimal(str(data["net_total_amount"])) == Decimal("70.00")
     assert Decimal(str(data["pending_amount"])) == Decimal("30.00")
     assert data["paid_count"] == 1 and data["pending_count"] == 1
+
+
+def test_manual_topup_preserves_daily_totals(client, db_session, test_patient, admin_auth_headers):
+    visit = _visit(db_session, test_patient, "10.00", "UZS")
+    _payment(db_session, visit, "4.00", "UZS")
+    path = "/api/v1/cashier/stats/by-currency"
+    before = client.get(path, headers=admin_auth_headers)
+    assert before.status_code == 200, before.text
+
+    credit = client.post("/api/v1/force-majeure/deposits/add", headers=admin_auth_headers, json={
+        "patient_id": test_patient.id, "amount": "2.00", "client_request_id": str(uuid4()),
+    })
+    assert credit.status_code == 200 and credit.json()["balance"] == 2, credit.text
+    after = client.get(path, headers=admin_auth_headers)
+    assert after.status_code == 200 and after.json() == before.json(), after.text
+    assert client.get("/api/v1/cashier/stats", headers=admin_auth_headers).status_code == 200
 
 
 def test_currency_buckets_do_not_sum_unknown_or_foreign(client, db_session, test_patient, admin_auth_headers):
@@ -336,6 +353,50 @@ def test_daily_http_nonowner_unbound_credit_requires_reconciliation(guarded_pg, 
     assert unknown["currency"] is None and unknown["requires_reconciliation"] is True
     assert uzs["currency"] == "UZS" and uzs["requires_reconciliation"] is True
     assert uzs["total_amount"] is None and uzs["paid_count"] is None
+
+
+@pytest.mark.parametrize("evidence_loss", ["disabled guard", "missing column grant"])
+def test_daily_http_nonowner_separates_only_verified_manual_credits(guarded_pg, monkeypatch, evidence_loss):
+    from fastapi.testclient import TestClient
+    from sqlalchemy import text
+    from sqlalchemy.orm import Session
+
+    from app.api.v1.endpoints.force_majeure import AddDepositRequest
+    from app.services.force_majeure_api_service import ForceMajeureApiService
+
+    engine, runtime, ids, app, headers, schema, runtime_role, _ = _daily_pg_app(guarded_pg, monkeypatch)
+    with Session(engine) as db:
+        credit = ForceMajeureApiService(db).add_to_deposit(
+            request=AddDepositRequest(patient_id=ids["patient"], amount=Decimal("2.00"), client_request_id=uuid4()),
+            current_user_id=ids["stage"],
+        )
+        assert credit["balance"] == 2
+    with runtime.connect() as conn:
+        assert conn.execute(text("""
+            SELECT pg_catalog.has_column_privilege(CURRENT_USER,'deposit_transactions','client_request_id','SELECT')
+              AND NOT pg_catalog.has_table_privilege(CURRENT_USER,'deposit_transactions','SELECT')
+              AND NOT pg_catalog.has_column_privilege(CURRENT_USER,'deposit_transactions','description','SELECT')
+        """)).scalar_one()
+
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    table = f"{quote(schema)}.deposit_transactions"
+    path = "/api/v1/cashier/stats/by-currency"
+    with TestClient(app) as http:
+        response = http.get(path, headers=headers)
+        assert response.status_code == 200, response.text
+        [item] = response.json()
+        assert item["total_amount"] == "4.00" and item["pending_amount"] == "6.00"
+        assert item["refunded_amount"] == "0.00" and item["requires_reconciliation"] is False
+        with engine.begin() as conn:
+            if evidence_loss == "disabled guard":
+                conn.exec_driver_sql(f"ALTER TABLE {table} DISABLE TRIGGER trg_protect_manual_deposit_receipt")
+            else:
+                conn.exec_driver_sql(f"REVOKE SELECT (client_request_id) ON {table} FROM {quote(runtime_role)}")
+        response = http.get(path, headers=headers)
+        assert response.status_code == 200, response.text
+        unknown, proved_currency = response.json()
+        assert unknown["currency"] is None and unknown["requires_reconciliation"] is True
+        assert proved_currency["currency"] == "UZS" and proved_currency["total_amount"] is None
 
 
 def test_daily_report_uses_one_postgres_snapshot_during_concurrent_writes(guarded_pg, monkeypatch):
