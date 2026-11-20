@@ -143,13 +143,15 @@ def _is_provider_webhook_idempotency_exempt(method: str, path: str) -> bool:
     return method.upper() == "POST" and bool(_PROVIDER_WEBHOOK_PATH.fullmatch(path))
 
 
-# These routes publish typed refusals for an absent or deleted patient card.
-_PATIENT_BOOKING_COMMANDS = frozenset({
-    "POST:/api/v1/patients/booking",
-    "POST:/api/v1/patients/booking/preview",
-    "POST:/api/v1/patients/booking-requests",
-    "POST:/api/v1/patients/public-booking/appointments",
-})
+# Endpoint, result kind and persisted identifier field for each scoped result.
+_PATIENT_BOOKING_COMMANDS = {
+    "POST:/api/v1/patients/booking": ("create_patient_portal_booking", "appointment", "appointment_id"),
+    "POST:/api/v1/patients/booking/preview": ("preview_patient_portal_booking", "preview", None),
+    "POST:/api/v1/patients/booking-requests": ("create_patient_public_booking_request", "public_booking_request", "id"),
+    "POST:/api/v1/patients/public-booking/appointments": (
+        "create_patient_confirmed_public_booking_appointment", "appointment", "id",
+    ),
+}
 
 
 # Round-6 (owner P1, PR #3340): the in-process scope-binding mirror is
@@ -421,6 +423,7 @@ def _user_authorized_in_db(
     patient_scope_id: int | None = None,
     patient_scope_generation: int | None = None,
     token_epoch: int = 0,
+    patient_booking_result: tuple[str, int | uuid.UUID] | None = None,
 ) -> tuple[bool, str | None, bool]:
     """Pure DB-backed authorization query — fails CLOSED (Codex R3/R4 #3092).
 
@@ -448,6 +451,7 @@ def _user_authorized_in_db(
         or (user_id is None and not username)
         or type(token_epoch) is not int
         or not 0 <= token_epoch <= (1 << 63) - 1
+        or (patient_booking_result is not None and patient_scope_id is None)
     ):
         return False, None, False
     try:
@@ -491,6 +495,22 @@ def _user_authorized_in_db(
             ]
             if patient_scope_generation is not None:
                 patient_conditions.append(Patient.notification_owner_generation == patient_scope_generation)
+            if patient_booking_result is not None:
+                kind, result_id = patient_booking_result
+                if kind == "appointment":
+                    from app.models.appointment import Appointment
+
+                    resource_id, resource_patient_id = Appointment.id, Appointment.patient_id
+                elif kind == "public_booking_request":
+                    from app.models.public_booking_request import PublicBookingRequest
+
+                    resource_id, resource_patient_id = PublicBookingRequest.id, PublicBookingRequest.patient_id
+                else:
+                    return False, None, False
+                patient_conditions.append(
+                    select(resource_id).where(resource_id == result_id, resource_patient_id == Patient.id)
+                    .correlate(Patient).exists()
+                )
             patient_binding = select(Patient.id).where(*patient_conditions).exists()
             stmt = stmt.add_columns(patient_binding.label("patient_binding"))
         row = db.execute(stmt).first()
@@ -1064,6 +1084,7 @@ def _check_principal_authorized_sync(
     patient_scope_id: int | None = None,
     patient_scope_generation: int | None = None,
     token_epoch: int = 0,
+    patient_booking_result: tuple[str, int | uuid.UUID] | None = None,
 ) -> tuple[bool, str | None, bool]:
     """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
 
@@ -1108,6 +1129,8 @@ def _check_principal_authorized_sync(
             if patient_scope_id is not None:
                 kwargs["patient_scope_id"] = patient_scope_id
                 kwargs["patient_scope_generation"] = patient_scope_generation
+            if patient_booking_result is not None:
+                kwargs["patient_booking_result"] = patient_booking_result
             result = _user_authorized_in_db(db, user_id, username, jti, **kwargs)
             if not result[0] and patient_scope_id is None and user_id is not None:
                 _audit_inactive_principal(db, request, user_id, jti, token_epoch)
@@ -2704,7 +2727,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # запускается, снапшот не эвиктится (восстановление после
                 # реактивации по тому же ключу).
                 return _principal_refusal_response()
-            permitted = self._role_permitted_for_replay(request, cached_role, current_role, current_superuser)
+            permitted = await self._cached_replay_permission(
+                request, principal_payload, cached, cached_role, current_role, current_superuser,
+            )
             if permitted is True:
                 logger.info(
                     "Idempotency hit: user=%s key_fingerprint=%s method=%s path=%s — returning cached response",
@@ -2756,7 +2781,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
                     # Codex R8 #3092 (P1): неисполняющий отказ, снапшот хранится.
                     return _principal_refusal_response()
-                permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
+                permitted = await self._cached_replay_permission(
+                    request, principal_payload, replayed, stored_role, current_role, current_superuser,
+                )
                 if permitted is True:
                     logger.info(
                         "Idempotency distributed replay: user=%s key_fingerprint=%s path=%s",
@@ -3183,6 +3210,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         authorized, current_role, current_superuser = await self._principal_authorized(
                             request, principal_payload, require_active_doctor_profile=True
                         )
+                        permitted = await self._cached_replay_permission(
+                            request, principal_payload, replayed, stored_role, current_role, current_superuser,
+                        ) if authorized else None
                     except BaseException:
                         _release_legacy_fence()
                         raise
@@ -3193,7 +3223,6 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         )
                         _release_legacy_fence()
                         return _principal_refusal_response()
-                    permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
                     if permitted is not True:
                         logger.warning(
                             "Idempotency post-inflight replay refused (role not permitted): user=%s key_fingerprint=%s path=%s",
@@ -3274,6 +3303,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     authorized, current_role, current_superuser = await self._principal_authorized(
                         request, principal_payload, require_active_doctor_profile=True
                     )
+                    permitted = await self._cached_replay_permission(
+                        request, principal_payload, replayed, stored_role, current_role, current_superuser,
+                    ) if authorized else None
                 except BaseException:
                     claim.release(user_id, idempotency_key, claim_token)
                     _release_legacy_fence()
@@ -3287,7 +3319,6 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     claim.release(user_id, idempotency_key, claim_token)
                     _release_legacy_fence()
                     return _principal_refusal_response()
-                permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
                 if permitted is True:
                     logger.info(
                         "Idempotency distributed replay (post-acquire): user=%s key_fingerprint=%s path=%s",
@@ -3546,7 +3577,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             # исполнение без владения ключом запрещено: 409, и
                             # повтор с тем же ключом разрешит роль штатным
                             # replay-путём.
-                            permitted = self._role_permitted_for_replay(request, stored_role, replay_role, _replay_superuser)
+                            permitted = await self._cached_replay_permission(
+                                request, principal_payload, replayed, stored_role, replay_role, _replay_superuser,
+                            )
                             if permitted is True:
                                 logger.info(
                                     "Idempotency replay after lease lapse (outcome stored by the new owner): user=%s key_fingerprint=%s path=%s",
@@ -4304,6 +4337,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         require_active_doctor_profile: bool = False,
         *,
         allow_unbound_patient_denial: bool = False,
+        patient_booking_result: tuple[str, int | uuid.UUID] | None = None,
     ) -> tuple[bool, str | None, bool]:
         """DB-backed authorization before any replay (Codex R3/R4/R6 #3092).
 
@@ -4336,7 +4370,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             token_epoch = parse_user_auth_epoch(principal_payload)
             if token_epoch is None:
                 return False, None, False
-            scope_kwargs = (
+            scope_kwargs: dict[str, Any] = (
                 {"patient_scope_id": principal_payload["patient_id"]}
                 if principal_payload.get("scope") == "patient_portal"
                 else {}
@@ -4350,6 +4384,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 scope_kwargs["patient_scope_generation"] = generation
             if token_epoch:
                 scope_kwargs["token_epoch"] = token_epoch
+            if patient_booking_result is not None:
+                scope_kwargs["patient_booking_result"] = patient_booking_result
             authorized, role, is_superuser = await asyncio.to_thread(
                 _check_principal_authorized_sync,
                 request,
@@ -4487,3 +4523,62 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if not current_role:
             return False
         return current_role.strip().lower() in allowed
+
+    async def _cached_replay_permission(
+        self,
+        request: Request,
+        principal_payload: dict[str, Any],
+        cached_response: Response,
+        stored_role: str | None,
+        current_role: str | None,
+        is_superuser: bool,
+    ) -> bool | None:
+        op_scope = f"{request.method.upper()}:{_normalize_idem_path(request.url.path)}"
+        policy = _PATIENT_BOOKING_COMMANDS.get(op_scope)
+        if policy is None:
+            return self._role_permitted_for_replay(request, stored_role, current_role, is_superuser)
+
+        context = getattr(request.state, "idempotency_patient_scope", None)
+        if (context is None or is_superuser
+            or (stored_role or "").strip().casefold() != "patient"
+            or (current_role or "").strip().casefold() != "patient"):
+            return None
+        endpoint_name, kind, result_field = policy
+        selected = self._matched_audit_request(request)
+        endpoint = selected.scope.get("endpoint") if selected else None
+        from app.api.v1.endpoints import patient_portal
+
+        if endpoint is not getattr(patient_portal, endpoint_name):
+            return None
+        if cached_response.status_code != (200 if kind == "preview" else 201):
+            return None
+        patient_id, _generation = context
+        try:
+            body = json.loads(cached_response.body)
+            if not isinstance(body, dict):
+                return None
+            if kind == "preview" or result_field == "appointment_id":
+                preview = body if kind == "preview" else body["preview"]
+                if (preview["scope"] != {"type": "patient", "patient_id": patient_id}
+                    or preview["appointment"]["patient_id"] != patient_id):
+                    return None
+            result = None
+            if result_field:
+                result_id = body[result_field]
+                if kind == "public_booking_request":
+                    if not isinstance(result_id, str):
+                        return None
+                    result_id = uuid.UUID(result_id)
+                elif type(result_id) is not int or result_id <= 0:
+                    return None
+                result = (kind, result_id)
+        except (KeyError, TypeError, ValueError, RecursionError):
+            return None
+
+        try:
+            authorized, _, _ = await self._principal_authorized(
+                request, principal_payload, patient_booking_result=result,
+            )
+        except IdempotencyAuthorizationUnavailable:
+            return None
+        return True if authorized else None
