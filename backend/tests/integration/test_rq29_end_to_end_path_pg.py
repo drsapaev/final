@@ -265,6 +265,8 @@ def pg_engine():
 
     engine = None
     try:
+        with psycopg.connect(psycopg_dsn, autocommit=True) as scratch:
+            scratch.execute("ALTER SCHEMA public OWNER TO CURRENT_USER")
         env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
         import subprocess
 
