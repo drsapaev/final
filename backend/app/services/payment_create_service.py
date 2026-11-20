@@ -35,7 +35,7 @@ class PaymentCreateService:
         *,
         visit_id: int | None,
         appointment_id: int | None,
-        amount: float,
+        amount: Decimal | float,
         currency: str,
         method: str,
         note: str | None,

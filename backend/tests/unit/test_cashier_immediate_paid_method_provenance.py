@@ -164,3 +164,14 @@ def test_legacy_cashier_returns_currency_conflict(client, db_session, admin_auth
     })
     assert response.status_code == 409, response.text
     assert db_session.query(Payment.id).filter_by(visit_id=priced_cashier_visit.id).first() is None
+
+
+@pytest.mark.parametrize("amount", ["4.001", "4.00000000000000000001", "true"])
+def test_legacy_cashier_requires_exact_money(client, db_session, admin_auth_headers, priced_cashier_visit, amount):
+    response = client.post(
+        "/api/v1/payments/",
+        headers=admin_auth_headers | {"Content-Type": "application/json"},
+        content=f'{{"visit_id": {priced_cashier_visit.id}, "amount": {amount}, "currency": "USD"}}',
+    )
+    assert response.status_code == 422, response.text
+    assert db_session.query(Payment.id).filter_by(visit_id=priced_cashier_visit.id).first() is None

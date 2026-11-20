@@ -3,6 +3,7 @@ API endpoints для платежной системы
 """
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -15,6 +16,7 @@ from app.db.session import get_db
 from app.models.clinic import Doctor
 from app.models.payment import Payment
 from app.models.visit import Visit
+from app.services.money_input import MoneyInputError, parse_exact_json, parse_money
 from app.services.payment_cancel_service import (
     PaymentCancelDomainError,
     PaymentCancelService,
@@ -324,12 +326,23 @@ class PaymentCreateRequest(BaseModel):
     note: str | None = Field(None, description="Примечание")
 
 
+async def _cashier_exact_amount(request: Request) -> Decimal:
+    try:
+        payload = parse_exact_json(await request.body())
+        amount = parse_money(payload.get("amount") if isinstance(payload, dict) else None)
+    except MoneyInputError:
+        raise HTTPException(status_code=422, detail="Некорректная сумма платежа") from None
+    if amount <= 0:
+        raise HTTPException(status_code=422, detail="Сумма платежа должна быть больше нуля")
+    return amount
+
+
 @router.post("/", response_model=dict[str, Any])
 def create_payment(
-    request: Request,
     payment_request: PaymentCreateRequest,
     db: Session = Depends(get_db),
     current_user=Depends(deps.require_roles("Admin", "Cashier")),
+    exact_amount: Decimal = Depends(_cashier_exact_amount),
 ) -> dict[str, Any]:
     """Создание платежа (для кассы)"""
     try:
@@ -337,7 +350,7 @@ def create_payment(
         return service.create_payment(
             visit_id=payment_request.visit_id,
             appointment_id=payment_request.appointment_id,
-            amount=float(payment_request.amount),
+            amount=exact_amount,
             currency=payment_request.currency,
             method=payment_request.method,
             note=payment_request.note,
