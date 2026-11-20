@@ -22,7 +22,7 @@ from app.models.appointment import Appointment
 from app.models.lab import LabReportInstance
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.payment_invariant_service import PaymentInvariantService
@@ -77,6 +77,48 @@ def test_legacy_payment_projection_uses_postgres_quote(guarded_pg, payment_curre
         else:
             with pytest.raises(HTTPException) as refused:
                 invariant.compute_paid_amount(ids["visit"])
+            assert refused.value.status_code == 409
+
+
+@pytest.mark.parametrize("allocation", ["mirror", "split", "duplicate"])
+def test_postgres_visit_balances_require_verified_payment_allocation(guarded_pg, allocation):
+    owner, runtime, ids = guarded_pg
+    source_id = ids["visit"]
+    amount = Decimal("10.00")
+    with Session(owner, expire_on_commit=False) as db:
+        target = Visit(patient_id=ids["patient"], visit_date=_clinic_today(db), status="waiting", source="desk")
+        payment = Payment(visit_id=source_id, amount=amount, currency="UZS", status="paid", method="cash")
+        db.add_all([target, payment])
+        db.flush()
+        target_id = target.id
+        link_amount = amount / 2 if allocation == "split" else amount
+        db.add(PaymentVisit(payment_id=payment.id, visit_id=source_id, amount=link_amount))
+        if allocation != "mirror":
+            other_id = target_id if allocation == "split" else source_id
+            db.add(PaymentVisit(payment_id=payment.id, visit_id=other_id, amount=link_amount))
+        db.commit()
+
+    with Session(runtime) as db:
+        invariant = PaymentInvariantService(db)
+        source, target = db.get(Visit, source_id), db.get(Visit, target_id)
+        if allocation == "mirror":
+            assert invariant.recorded_payment_states([source, target]) == {source_id: ("paid", "cash")}
+            assert invariant.compute_net_paid_amounts_by_visit_id([source_id, target_id]) == {
+                source_id: amount, target_id: Decimal("0"),
+            }
+            return
+
+        affected = [source, target] if allocation == "split" else [source]
+        assert invariant.recorded_payment_states([source, target]) == {
+            visit.id: ("reconciliation_required", None) for visit in affected
+        }
+        for visit in affected:
+            assert invariant.recorded_payment_states([visit]) == {visit.id: ("reconciliation_required", None)}
+            with pytest.raises(HTTPException, match="Распределение платежей требует сверки") as refused:
+                invariant.compute_paid_amount(visit.id)
+            assert refused.value.status_code == 409
+            with pytest.raises(HTTPException, match="Распределение платежей требует сверки") as refused:
+                invariant.summarize_visits([visit])
             assert refused.value.status_code == 409
 
 

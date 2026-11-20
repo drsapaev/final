@@ -91,10 +91,11 @@ import logging
 from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation, localcontext
+from itertools import groupby
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -459,21 +460,11 @@ class PaymentInvariantService:
         """
         if not visit_ids:
             return {}
-        self._require_complete_payment_ledger()
-        payments = (
-            self.db.query(Payment.visit_id, Payment.amount, Payment.refunded_amount)
-            .filter(
-                Payment.visit_id.in_(list(visit_ids)),
-                Payment.status.in_(["paid", "completed"]),
-            )
-            .all()
-        )
+        payments, _ = self._read_payment_ledger(visit_ids)
         net_by_visit: dict[int, Decimal] = dict.fromkeys(visit_ids, Decimal("0"))
         for payment in payments:
-            net_by_visit[payment.visit_id] = (
-                net_by_visit.get(payment.visit_id, Decimal("0"))
-                + self._net_settled_amount(payment)
-            )
+            if payment.status in {"paid", "completed"}:
+                net_by_visit[payment.visit_id] += self._net_settled_amount(payment)
         return net_by_visit
 
     def compute_completed_refunds_by_payment_id(
@@ -554,25 +545,56 @@ class PaymentInvariantService:
             except FinancialFenceError as exc:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
-    def _read_summary_payments(self, visit_ids: list[int]) -> Sequence[Row]:
+    def _read_payment_ledger(
+        self, visit_ids: list[int], *, require_resolved: bool = True,
+    ) -> tuple[list[Row], set[int]]:
+        """Read receipts and their complete allocation links in one snapshot."""
         if not visit_ids:
-            return ()
+            return [], set()
         self._require_complete_payment_ledger()
-        return (
+        requested = set(visit_ids)
+        linked_payment_ids = select(PaymentVisit.payment_id).where(PaymentVisit.visit_id.in_(requested))
+        rows = (
             self.db.query(
                 Payment.id, Payment.visit_id, Payment.amount, Payment.status,
                 Payment.refunded_amount, Payment.currency, Payment.method,
+                PaymentVisit.visit_id.label("linked_visit_id"),
+                PaymentVisit.amount.label("linked_amount"),
             )
-            .filter(Payment.visit_id.in_(visit_ids))
-            .order_by(Payment.id)
+            .outerjoin(PaymentVisit, PaymentVisit.payment_id == Payment.id)
+            .filter(or_(Payment.visit_id.in_(requested), Payment.id.in_(linked_payment_ids)))
+            .order_by(Payment.id, PaymentVisit.id)
             .all()
         )
+        direct_payments: list[Row] = []
+        unresolved: set[int] = set()
+        for _, entries in groupby(rows, key=lambda row: row.id):
+            links = list(entries)
+            payment = links[0]
+            if payment.visit_id in requested:
+                direct_payments.append(payment)
+            # A complete same-visit mirror is equivalent to the direct row.
+            # Other legacy allocations need reconciliation before they affect debt.
+            if (
+                payment.status in {"paid", "completed"}
+                and payment.linked_visit_id is not None
+                and (len(links) != 1 or payment.linked_visit_id != payment.visit_id
+                     or payment.linked_amount != payment.amount)
+            ):
+                unresolved.add(payment.visit_id)
+                unresolved.update(link.linked_visit_id for link in links)
+        unresolved.intersection_update(requested)
+        if unresolved and require_resolved:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Распределение платежей требует сверки")
+        return direct_payments, unresolved
 
     def recorded_payment_states(self, visits: list[Visit]) -> dict[int, tuple[str, str | None]]:
         """Project each visit's receipt status independently for registrar lists."""
         reconciliation = (PAYMENT_RECONCILIATION_REQUIRED, None)
         try:
-            payments = self._read_summary_payments([visit.id for visit in visits])
+            payments, unresolved = self._read_payment_ledger(
+                [visit.id for visit in visits], require_resolved=False,
+            )
         except HTTPException as exc:
             if exc.status_code != status.HTTP_409_CONFLICT:
                 raise
@@ -582,10 +604,10 @@ class PaymentInvariantService:
         for payment in payments:
             payments_by_visit.setdefault(payment.visit_id, []).append(payment)
 
-        states: dict[int, tuple[str, str | None]] = {}
+        states = dict.fromkeys(unresolved, reconciliation)
         for visit in visits:
             visit_payments = payments_by_visit.get(visit.id)
-            if not visit_payments:
+            if visit.id in unresolved or not visit_payments:
                 continue
             try:
                 row = self._summarize_visits([visit], visit_payments)["visits"][0]
@@ -603,7 +625,7 @@ class PaymentInvariantService:
         while holding the visit locks detects changes since the preview.
         """
         ordered_visits = sorted(visits, key=lambda visit: visit.id)
-        payments = self._read_summary_payments([visit.id for visit in ordered_visits])
+        payments, _ = self._read_payment_ledger([visit.id for visit in ordered_visits])
         return self._summarize_visits(ordered_visits, payments)
 
     def _summarize_visits(self, visits: list[Visit], payments: Sequence[Row]) -> dict[str, Any]:
