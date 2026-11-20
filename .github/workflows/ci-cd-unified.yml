@@ -1167,6 +1167,10 @@ jobs:
                     raise
                 print(f"Attempt {i + 1}/30: {e}")
                 time.sleep(2)
+        # Alembic assigns financial triggers to the application schema's
+        # owner. In this disposable service that owner also owns the tables.
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER SCHEMA public OWNER TO CURRENT_USER")
         PY
         alembic upgrade head
         alembic current
