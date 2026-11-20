@@ -21,6 +21,7 @@ from app.services.notification_subject_intent_service import (
 )
 from tests.integration.test_invitation_subject_nonowner_pg import (
     install_invitation_subject_fence,
+    is_disposable_subject_test_database,
 )
 from tests.integration.test_notification_subject_transfer_sqlite import (
     _intent,
@@ -32,10 +33,8 @@ from tests.integration.test_notification_subject_transfer_sqlite import (
 @pytest.fixture
 def notification_pg_engine(monkeypatch):
     url = make_url(os.getenv("DATABASE_URL", "sqlite://"))
-    if url.get_backend_name() != "postgresql":
-        pytest.skip("requires disposable PostgreSQL")
-    if not os.getenv("CI") and not (url.database or "").startswith("clinic_test"):
-        pytest.skip("requires explicitly disposable clinic_test database")
+    if not is_disposable_subject_test_database(url):
+        pytest.skip("requires a disposable subject-test PostgreSQL database")
     suffix = uuid4().hex
     schema, login, cap = "test_notification_subject_" + suffix, "notify_login_" + suffix, "notify_cap_" + suffix
     password = "synthetic-" + suffix
@@ -94,7 +93,7 @@ def notification_pg_engine(monkeypatch):
         engine.dispose()
         with admin.begin() as conn:
             conn.execute(DropSchema(schema, cascade=True))
-            conn.execute(DropSchema(capability_schema_name(schema), cascade=True))
+            conn.execute(DropSchema(capability_schema_name(schema), cascade=True, if_exists=True))
             conn.exec_driver_sql(f'DROP ROLE "{login}"')
             conn.exec_driver_sql(f'DROP ROLE "{cap}"')
         admin.dispose()

@@ -15,7 +15,7 @@ import pytest
 import sqlalchemy as sa
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
@@ -26,6 +26,7 @@ from app.models.clinic import Doctor
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from tests._pg_admin_guard import is_local_admin_dsn
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -38,6 +39,18 @@ def _module(path: Path):
     return result
 
 
+def is_disposable_subject_test_database(url: URL) -> bool:
+    if url.get_backend_name() != "postgresql":
+        return False
+    database = url.database or ""
+    return database.startswith("clinic_test") or (
+        database == "clinicdb"
+        and os.getenv("GITHUB_ACTIONS", "").lower() == "true"
+        and not url.query
+        and is_local_admin_dsn(url.render_as_string(hide_password=False))
+    )
+
+
 def install_invitation_subject_fence(owner_engine, *, schema: str, owner_name: str,
                                      runtime_role: str, subject_cap_role: str, monkeypatch) -> None:
     """Install real subject triggers and role profile into an empty test schema.
@@ -47,8 +60,8 @@ def install_invitation_subject_fence(owner_engine, *, schema: str, owner_name: s
     Caller owns 0117/0126/0128 installation/provision and schema/role cleanup.
     Never use this helper against non-test databases or nonempty subject tables.
     """
-    if owner_engine.dialect.name != "postgresql" or not (owner_engine.url.database or "").startswith("clinic_test"):
-        raise RuntimeError("A disposable clinic_test PostgreSQL database is required")
+    if not is_disposable_subject_test_database(owner_engine.url):
+        raise RuntimeError("A disposable subject-test PostgreSQL database is required")
     if schema in {"public", "pg_catalog", "information_schema"} or not schema:
         raise RuntimeError("An isolated synthetic schema is required")
     quote = owner_engine.dialect.identifier_preparer.quote_identifier
