@@ -1,6 +1,7 @@
 """Synthetic PG barriers for billing auto-invoice creation."""
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -17,6 +18,7 @@ from app.models.billing import (
     Invoice,
     InvoiceItem,
     PaymentReminder,
+    RecurrenceType,
 )
 from app.models.patient import Patient
 from app.models.service import Service
@@ -251,13 +253,16 @@ def test_first_settings_creation_does_not_release_visit_or_line_locks(auto_case)
         event.remove(engine, "after_cursor_execute", pause_after_settings)
 
 
-def test_manual_invoice_creation_serializes_the_existing_number_counter(pg_case):
+@pytest.mark.parametrize("initialized", [True, False], ids=["existing-counter", "first-counter"])
+def test_manual_invoice_creation_serializes_the_number_counter(pg_case, initialized):
     engine, ids = pg_case
     assert engine.dialect.name == "postgresql"
+    initial_number = 17 if initialized else 1
     with Session(engine) as db:
         patient_id = db.get(Visit, ids["visit"]).patient_id
-        db.add(BillingSettings(next_invoice_number=17))
-        db.commit()
+        if initialized:
+            db.add(BillingSettings(next_invoice_number=initial_number))
+            db.commit()
 
     lines = [{"description": "Synthetic consultation", "quantity": 1, "unit_price": 25}]
     ready, pids = threading.Event(), []
@@ -275,10 +280,10 @@ def test_manual_invoice_creation_serializes_the_existing_number_counter(pg_case)
     with Session(engine) as first, ThreadPoolExecutor(max_workers=1) as pool:
         staged = BillingService(first).create_invoice(patient_id, lines, commit=False, send_reminders=False)
         first.flush()
-        assert staged.invoice_number.endswith("-000017")
+        assert staged.invoice_number.endswith(f"-{initial_number:06d}")
         with Session(engine) as reader:
             assert reader.query(Invoice).count() == 0
-            assert reader.query(BillingSettings.next_invoice_number).scalar() == 17
+            assert reader.query(BillingSettings.next_invoice_number).scalar() == (17 if initialized else None)
         second = pool.submit(issue)
         try:
             assert ready.wait(5)
@@ -287,10 +292,52 @@ def test_manual_invoice_creation_serializes_the_existing_number_counter(pg_case)
             first.commit()
         response = second.result(timeout=12)
 
-    assert response.invoice_number.endswith("-000018")
+    assert response.invoice_number.endswith(f"-{initial_number + 1:06d}")
     with Session(engine) as db:
         assert db.query(Invoice).count() == 2
         assert db.query(InvoiceItem).count() == 2
         assert db.query(PaymentReminder).count() == 0
         assert db.get(Invoice, response.id).send_reminders is False
-        assert db.query(BillingSettings.next_invoice_number).scalar() == 19
+        assert db.query(BillingSettings).one().next_invoice_number == initial_number + 2
+
+
+def test_recurring_workers_do_not_issue_the_same_overdue_occurrence_twice(pg_case):
+    engine, ids = pg_case
+    due = datetime(2020, 7, 8)
+    with Session(engine, expire_on_commit=False) as db:
+        parent = Invoice(
+            invoice_number="SYNTHETIC-RECURRING-PARENT",
+            patient_id=db.get(Visit, ids["visit"]).patient_id,
+            total_amount=10,
+            is_recurring=True,
+            recurrence_type=RecurrenceType.DAILY,
+            next_invoice_date=due,
+        )
+        db.add_all([parent, BillingSettings(next_invoice_number=90)])
+        db.commit()
+        parent_id = parent.id
+
+    selected = threading.Barrier(2)
+
+    def after_select(_conn, _cursor, statement, _params, _context, _many):
+        sql = statement.lower()
+        if "invoices.next_invoice_date as invoices_next_invoice_date" in sql and "for update" not in sql:
+            selected.wait(timeout=7)
+
+    def process():
+        with Session(engine) as db:
+            return BillingService(db).create_recurring_invoices()
+
+    event.listen(engine, "after_cursor_execute", after_select)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            jobs = [pool.submit(process) for _ in range(2)]
+            assert sorted(job.result(timeout=12) for job in jobs) == [0, 1]
+    finally:
+        event.remove(engine, "after_cursor_execute", after_select)
+
+    with Session(engine) as db:
+        child = db.query(Invoice).filter_by(parent_invoice_id=parent_id).one()
+        assert child.invoice_number.endswith("-000090")
+        assert db.get(Invoice, parent_id).next_invoice_date == due + timedelta(days=1)
+        assert db.query(BillingSettings).one().next_invoice_number == 91

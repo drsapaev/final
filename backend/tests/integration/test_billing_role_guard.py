@@ -15,6 +15,7 @@ from app.models.billing import (
     InvoiceItem,
     InvoiceStatus,
     PaymentReminder,
+    RecurrenceType,
 )
 from app.models.patient import Patient
 from app.models.payment import Payment
@@ -104,6 +105,43 @@ def test_invoice_response_error_rolls_back_first_time_settings(
     assert db_session.query(InvoiceItem).count() == 0
     assert db_session.query(PaymentReminder).count() == 0
     assert db_session.query(BillingSettings).count() == 0
+
+
+def test_recurring_processing_advances_existing_counter_and_skips_invalid_parent(
+    client, db_session, admin_auth_headers, test_patient,
+):
+    due = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=12)
+    settings = BillingSettings(invoice_number_format="SYN-{number:06d}", next_invoice_number=17)
+    invalid = Invoice(
+        invoice_number="SYN-INVALID-PARENT", patient_id=test_patient.id,
+        is_recurring=True, recurrence_type=RecurrenceType.DAILY,
+        recurrence_interval=0, next_invoice_date=due,
+    )
+    parents = [
+        Invoice(
+            invoice_number=f"SYN-PARENT-{i}", patient_id=test_patient.id, total_amount=10,
+            is_recurring=True, recurrence_type=RecurrenceType.WEEKLY,
+            recurrence_interval=1, next_invoice_date=due,
+        )
+        for i in range(2)
+    ]
+    db_session.add_all([settings, invalid, *parents])
+    db_session.flush()
+    db_session.add(Invoice(
+        invoice_number="SYN-000017", patient_id=test_patient.id, parent_invoice_id=parents[0].id,
+    ))
+    db_session.commit()
+
+    for _ in range(2):
+        response = client.post("/api/v1/billing/process-recurring", headers=admin_auth_headers)
+        assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    children = db_session.query(Invoice).filter(Invoice.parent_invoice_id.is_not(None)).order_by(Invoice.id).all()
+    assert [child.invoice_number for child in children] == ["SYN-000017", "SYN-000018", "SYN-000019"]
+    assert [child.parent_invoice_id for child in children[1:]] == [parent.id for parent in parents]
+    assert all(parent.next_invoice_date == due + timedelta(weeks=1) for parent in parents)
+    assert invalid.next_invoice_date == due and settings.next_invoice_number == 20
 
 
 def test_patient_cannot_read_legacy_billing_invoice(

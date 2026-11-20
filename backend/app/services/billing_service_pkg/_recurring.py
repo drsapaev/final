@@ -4,6 +4,9 @@ Split from billing_service.py.
 """
 from __future__ import annotations
 
+from fastapi import HTTPException
+from sqlalchemy import text
+
 from app.services.billing_service_pkg._base import *  # noqa: F401, F403
 from app.services.billing_service_pkg._base import BillingServiceMixinBase
 
@@ -12,52 +15,65 @@ class RecurringMixin(BillingServiceMixinBase):
     """Recurring methods for BillingService."""
 
     def create_recurring_invoices(self) -> int:
-        """Создать периодические счета"""
+        """Issue each observed due occurrence in its own transaction."""
 
         now = self._get_local_timestamp_naive()
-
-        # Получаем счета для создания периодических
-        recurring_invoices = (
-            self.db.query(Invoice)
-            .filter(
-                Invoice.is_recurring == True,
-                Invoice.next_invoice_date <= now,
-                Invoice.status != InvoiceStatus.CANCELLED,
-            )
+        due = (
+            Invoice.is_recurring.is_(True),
+            Invoice.next_invoice_date <= now,
+            Invoice.status != InvoiceStatus.CANCELLED,
+        )
+        occurrences = (
+            self.db.query(Invoice.id, Invoice.next_invoice_date)
+            .filter(*due)
+            .order_by(Invoice.id)
             .all()
         )
 
         created_count = 0
-
-        for parent_invoice in recurring_invoices:
+        for parent_id, due_at in occurrences:
             try:
-                # Создаем новый счет на основе родительского
+                parent = (
+                    self.db.query(Invoice)
+                    .filter(*due, Invoice.id == parent_id, Invoice.next_invoice_date == due_at)
+                    .with_for_update()
+                    .populate_existing()
+                    .first()
+                )
+                if parent is None:
+                    self.db.rollback()
+                    continue
+                interval = parent.recurrence_interval
+                if not isinstance(interval, int) or interval < 1:
+                    raise ValueError("Invalid recurring invoice interval")
+                next_due_at = self._calculate_next_recurrence_date(
+                    due_at, parent.recurrence_type, interval
+                )
+                settings = self._lock_invoice_settings()
                 new_invoice = Invoice(
-                    invoice_number=self._generate_invoice_number(
-                        self.get_billing_settings()
-                    ),
-                    patient_id=parent_invoice.patient_id,
-                    invoice_type=parent_invoice.invoice_type,
-                    subtotal=parent_invoice.subtotal,
-                    tax_rate=parent_invoice.tax_rate,
-                    tax_amount=parent_invoice.tax_amount,
-                    total_amount=parent_invoice.total_amount,
-                    balance=parent_invoice.total_amount,
+                    invoice_number=self._reserve_invoice_number(settings),
+                    patient_id=parent.patient_id,
+                    invoice_type=parent.invoice_type,
+                    subtotal=parent.subtotal,
+                    tax_rate=parent.tax_rate,
+                    tax_amount=parent.tax_amount,
+                    total_amount=parent.total_amount,
+                    balance=parent.total_amount,
                     issue_date=now,
                     due_date=now + timedelta(days=30),
-                    description=parent_invoice.description,
-                    payment_terms=parent_invoice.payment_terms,
+                    description=parent.description,
+                    payment_terms=parent.payment_terms,
                     is_auto_generated=True,
-                    auto_send=parent_invoice.auto_send,
-                    send_reminders=parent_invoice.send_reminders,
-                    parent_invoice_id=parent_invoice.id,
+                    auto_send=parent.auto_send,
+                    send_reminders=parent.send_reminders,
+                    parent_invoice_id=parent_id,
                 )
 
                 self.db.add(new_invoice)
                 self.db.flush()
 
                 # Копируем позиции
-                for item in parent_invoice.invoice_items:
+                for item in parent.invoice_items:
                     new_item = InvoiceItem(
                         invoice_id=new_invoice.id,
                         service_id=item.service_id,
@@ -73,33 +89,22 @@ class RecurringMixin(BillingServiceMixinBase):
                     )
                     self.db.add(new_item)
 
-                # Обновляем дату следующего счета
-                next_invoice_date = self._normalize_datetime(
-                    parent_invoice.next_invoice_date
-                )
-                if not next_invoice_date:
-                    next_invoice_date = now
-                parent_invoice.next_invoice_date = self._calculate_next_recurrence_date(
-                    next_invoice_date,
-                    parent_invoice.recurrence_type,
-                    parent_invoice.recurrence_interval,
-                )
+                parent.next_invoice_date = next_due_at
+                new_id, auto_send = new_invoice.id, new_invoice.auto_send
+                self.db.commit()
+            except Exception as exc:
+                self.db.rollback()
+                logger.error("Recurring invoice creation failed error_type=%s", type(exc).__name__)
+                continue
 
-                created_count += 1
+            created_count += 1
+            if auto_send:
+                try:
+                    self.send_invoice(new_id)
+                except Exception as exc:
+                    self.db.rollback()
+                    logger.warning("Recurring invoice delivery failed error_type=%s", type(exc).__name__)
 
-                # Автоматически отправляем если нужно
-                if new_invoice.auto_send:
-                    self.send_invoice(new_invoice.id)
-
-            except Exception as e:
-                logger.error(
-                    "Ошибка создания периодического счета для %d: %s",
-                    parent_invoice.id,
-                    e,
-                    exc_info=True,
-                )
-
-        self.db.commit()
         return created_count
 
     # === Утилиты ===
@@ -125,13 +130,55 @@ class RecurringMixin(BillingServiceMixinBase):
 
     def get_billing_settings(self) -> BillingSettings:
         """Получить настройки биллинга"""
-        settings = self.db.query(BillingSettings).first()
-        if not settings:
-            # Создаем настройки по умолчанию
-            settings = BillingSettings()
-            self.db.add(settings)
+        settings = self.db.query(BillingSettings).order_by(BillingSettings.id).first()
+        if settings is None:
+            settings = self._lock_invoice_settings()
             self.db.commit()
             self.db.refresh(settings)
         return settings
+
+    def _lock_invoice_settings(self, *, nowait: bool = False) -> BillingSettings:
+        """Lock the number counter, creating its initial row in this transaction."""
+        dialect = self.db.get_bind().dialect.name
+        query = self.db.query(BillingSettings).order_by(BillingSettings.id).populate_existing()
+        if dialect == "sqlite":
+            self.db.execute(text("UPDATE billing_settings SET id=id WHERE 0"))
+        if dialect == "postgresql":
+            query = query.with_for_update(nowait=nowait)
+        settings = query.first()
+        if settings is not None:
+            return settings
+
+        if dialect == "postgresql":
+            if self.db.execute(text("SHOW transaction_isolation")).scalar_one() != "read committed":
+                raise HTTPException(status_code=409, detail="Инициализация счётчика требует READ COMMITTED")
+            # There is no row to lock until the first successful creation.
+            # Scope the initialization lock to this database relation.
+            lock = "pg_try_advisory_xact_lock" if nowait else "pg_advisory_xact_lock"
+            acquired = self.db.execute(text(f"""
+                SELECT pg_catalog.{lock}(pg_catalog.hashtextextended(
+                    'clinic.billing_settings.init:' ||
+                    'billing_settings'::pg_catalog.regclass::pg_catalog.oid::pg_catalog.text, 0
+                ))
+            """)).scalar_one()
+            if nowait and acquired is not True:
+                raise HTTPException(status_code=409, detail="Настройки биллинга заняты, повторите запрос")
+            settings = query.first()
+            if settings is not None:
+                return settings
+
+        settings = BillingSettings()
+        self.db.add(settings)
+        self.db.flush()
+        return settings
+
+    def _reserve_invoice_number(self, settings: BillingSettings) -> str:
+        """Advance the locked counter past a number used by the old recurring writer."""
+        number = self._generate_invoice_number(settings)
+        if self.db.query(Invoice.id).filter(Invoice.invoice_number == number).first() is not None:
+            settings.next_invoice_number += 1
+            number = self._generate_invoice_number(settings)
+        settings.next_invoice_number += 1
+        return number
 
 

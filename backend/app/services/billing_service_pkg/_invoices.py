@@ -70,22 +70,7 @@ class InvoicesMixin(BillingServiceMixinBase):
                     "Invoice patient_id does not match appointment ownership"
                 )
 
-        if _visit_snapshot_exact or not commit:
-            # Keep first-time settings creation and the number increment in
-            # the invoice transaction. Refresh the counter after a PG wait.
-            settings_query = self.db.query(BillingSettings).order_by(BillingSettings.id).populate_existing()
-            if self.db.get_bind().dialect.name == "postgresql":
-                settings_query = settings_query.with_for_update(nowait=_visit_snapshot_exact)
-            settings = settings_query.first()
-            if settings is None:
-                settings = BillingSettings()
-                self.db.add(settings)
-                self.db.flush()
-        else:
-            settings = self.get_billing_settings()
-
-        # Генерируем номер счета
-        invoice_number = self._generate_invoice_number(settings)
+        settings = self._lock_invoice_settings(nowait=_visit_snapshot_exact)
 
         # Рассчитываем суммы
         if _visit_snapshot_exact:
@@ -117,7 +102,7 @@ class InvoicesMixin(BillingServiceMixinBase):
 
         # Создаем счет
         invoice = Invoice(
-            invoice_number=invoice_number,
+            invoice_number=self._reserve_invoice_number(settings),
             patient_id=patient_id,
             visit_id=visit_id,
             appointment_id=appointment_id,
@@ -160,9 +145,6 @@ class InvoicesMixin(BillingServiceMixinBase):
                 sort_order=i,
             )
             self.db.add(item)
-
-        # Обновляем номер счета в настройках
-        settings.next_invoice_number += 1
 
         if commit:
             self.db.commit()
