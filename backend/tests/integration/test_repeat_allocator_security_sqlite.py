@@ -17,7 +17,9 @@ def db():
     engine = sa.create_engine("sqlite://")
     with engine.begin() as conn:
         conn.execute(sa.text("CREATE TABLE users (id integer PRIMARY KEY)"))
-        conn.execute(sa.text("CREATE TABLE doctors (id integer PRIMARY KEY, user_id integer)"))
+        conn.execute(sa.text(
+            "CREATE TABLE doctors (id integer PRIMARY KEY, user_id integer REFERENCES users(id) ON DELETE SET NULL)"
+        ))
         conn.execute(sa.text("CREATE TABLE visits (id integer PRIMARY KEY, patient_id integer, doctor_id integer, visit_date date, status text)"))
         conn.execute(sa.text("CREATE TABLE visit_services (id integer PRIMARY KEY, visit_id integer, service_id integer, qty integer)"))
         conn.execute(sa.text("INSERT INTO doctors VALUES (1,NULL)"))
@@ -84,6 +86,23 @@ def test_doctor_reassignment_during_care_cannot_create_owner_provenance(db):
     assert db.execute(sa.text("SELECT repeat_assigned_doctor_user_id FROM visits WHERE id=3")).scalar_one() == 2
     db.execute(sa.text("UPDATE visits SET doctor_id=1 WHERE id=2"))
     assert db.execute(sa.text("SELECT repeat_assigned_doctor_user_id FROM visits WHERE id=2")).scalar_one() is None
+
+
+def test_deleting_assigned_user_clears_repeat_owner(db):
+    db.exec_driver_sql("PRAGMA foreign_keys=ON")
+    _revision(db, "upgrade")
+    db.execute(sa.text("INSERT INTO users VALUES (1)"))
+    db.execute(sa.text("UPDATE doctors SET user_id=1 WHERE id=1"))
+    db.execute(sa.text(
+        "INSERT INTO visits (id,patient_id,doctor_id,visit_date,status) VALUES (2,1,1,'2030-01-02','open')"
+    ))
+    snapshot = sa.text(
+        "SELECT repeat_assigned_doctor_user_id, repeat_assigned_owner_generation FROM visits WHERE id=2"
+    )
+    actor, generation = db.execute(snapshot).one()
+    assert actor == 1 and generation > FLOOR
+    db.execute(sa.text("DELETE FROM users WHERE id=1"))
+    assert db.execute(snapshot).one() == (None, None)
 
 
 def test_direct_assignment_injection_and_restore_after_rebind_are_refused(db):

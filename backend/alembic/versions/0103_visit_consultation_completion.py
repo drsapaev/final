@@ -177,6 +177,8 @@ def _pg_allocator_preflight(*, require_complete: bool = False) -> tuple[str, str
 
 
 def upgrade() -> None:
+    if op.get_context().as_sql:
+        raise RuntimeError("Repeat evidence migration requires a live database preflight")
     dialect = op.get_context().dialect.name
     if dialect == "postgresql":
         sequence, schema_owner, sequence_users = _pg_allocator_preflight()
@@ -381,6 +383,9 @@ def upgrade() -> None:
         WHEN (NEW.repeat_assigned_doctor_user_id IS NOT OLD.repeat_assigned_doctor_user_id
               OR NEW.repeat_assigned_owner_generation IS NOT OLD.repeat_assigned_owner_generation)
           AND (NEW.repeat_assigned_doctor_user_id IS NOT NULL OR NEW.repeat_assigned_owner_generation IS NOT NULL)
+          -- ON DELETE SET NULL may clear the actor before the doctor rebind.
+          AND NOT (NEW.repeat_assigned_doctor_user_id IS NULL
+                   AND NEW.repeat_assigned_owner_generation IS OLD.repeat_assigned_owner_generation)
           AND (NEW.repeat_evidence_generation IS OLD.repeat_evidence_generation
                OR NEW.repeat_evidence_generation IS NOT (SELECT value FROM repeat_evidence_generation_clock WHERE id=1)
                OR NEW.status IS NULL OR NEW.status NOT IN ('open', 'confirmed', 'pending_confirmation', 'confirmation_processing', 'waiting', 'scheduled')
@@ -489,6 +494,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if op.get_context().as_sql:
+        raise RuntimeError("Repeat evidence migration requires a live database preflight")
     dialect = op.get_context().dialect.name
     if dialect == "postgresql":
         # Apply the same trusted namespace, owner, ACL and retained-allocator
