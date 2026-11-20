@@ -1,12 +1,13 @@
 """Currency-separated cashier totals from one verified financial snapshot.
 
-External refund records currently have no immutable currency evidence. They
-are reported as requiring reconciliation and are never silently subtracted.
+New deposit refunds use an immutable credit tied to the original payment.
+Unproven external refunds require reconciliation.
 """
 from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, localcontext
+from hashlib import sha256
 
 from fastapi import HTTPException
 from sqlalchemy import or_, text
@@ -14,7 +15,11 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.models.payment import Payment, PaymentVisit
-from app.models.refund_deposit import DepositTransaction, RefundRequest
+from app.models.refund_deposit import (
+    DepositTransaction,
+    PaymentRefundClaim,
+    RefundRequest,
+)
 from app.models.visit import Visit
 from app.services.encounter_benefit_net import (
     BenefitQuoteError,
@@ -32,6 +37,8 @@ _EXTERNAL_REFUND_READS = {
     "refund_requests": ("id", "payment_id", "status"),
     "deposit_transactions": ("id", "payment_id", "transaction_type"),
 }
+_DEPOSIT_TRIGGERS = {"trg_protect_deposit_refund_evidence": 31, "trg_bind_deposit_refund_claim": 5}
+_DEPOSIT_GUARD_SHA256 = "4bb9c48268f38083e1c7588bb29cdcdc6057de29a82eea2671f21722f29599ab"
 
 
 def _money(value: object) -> Decimal:
@@ -74,6 +81,35 @@ def require_visible_external_refunds(db: Session, schema: str) -> None:
         raise FinancialFenceError("История возвратов временно недоступна")
 
 
+def _require_deposit_refund_guard(db: Session, schema: str) -> None:
+    # Hold the same relation lock through validation and snapshot collection.
+    db.execute(text(f"SELECT amount, visit_id, refund_currency_snapshot FROM {schema}.deposit_transactions WHERE false"))
+    rows = db.execute(text("""
+      SELECT t.tgname,t.tgtype,p.prosrc
+      FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+      JOIN pg_catalog.pg_trigger t ON t.tgrelid=c.oid
+      JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
+      WHERE n.nspname=:name AND c.relname='deposit_transactions' AND c.relkind='r'
+        AND c.relowner=n.nspowner AND t.tgname=ANY(:triggers)
+        AND NOT t.tgisinternal AND t.tgenabled='O' AND t.tgqual IS NULL AND t.tgnargs=0
+        AND p.proname='protect_deposit_refund_evidence' AND p.pronamespace=n.oid
+        AND p.proowner=n.nspowner AND p.prosecdef AND p.prokind='f' AND p.provolatile='v'
+        AND p.pronargs=0 AND p.prorettype='pg_catalog.trigger'::pg_catalog.regtype
+        AND p.proconfig=ARRAY['search_path=pg_catalog','row_security=off']
+        AND NOT pg_catalog.has_table_privilege(CURRENT_USER,c.oid,'TRUNCATE,TRIGGER')
+        AND pg_catalog.has_function_privilege(CURRENT_USER,p.oid,'EXECUTE')
+        AND NOT EXISTS (
+          SELECT 1 FROM pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
+          WHERE a.grantee NOT IN (p.proowner,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname=CURRENT_USER))
+            OR (a.grantee<>p.proowner AND a.is_grantable)
+        )
+    """), {"name": db.get_bind().dialect.default_schema_name, "triggers": list(_DEPOSIT_TRIGGERS)}).all()
+    if ({name: kind for name, kind, _ in rows} != _DEPOSIT_TRIGGERS
+            or any(sha256(body.strip().replace(f"{schema}.", "@schema@.").encode()).hexdigest()
+                   != _DEPOSIT_GUARD_SHA256 for _, _, body in rows)):
+        raise FinancialFenceError("История возвратов временно недоступна")
+
+
 def _postgres_snapshot(db: Session, start: datetime | None, end: datetime | None, excluded: list[str]) -> dict:
     try:
         schema = _financial_schema(db)
@@ -81,12 +117,13 @@ def _postgres_snapshot(db: Session, start: datetime | None, end: datetime | None
         db.execute(text(f"SELECT method, refunded_amount FROM {schema}.payments WHERE false"))
         db.execute(text(f"SELECT amount FROM {schema}.payment_visits WHERE false"))
         require_visible_external_refunds(db, schema)
+        _require_deposit_refund_guard(db, schema)
         private = require_postgres_quote_capability(db)
     except (FinancialFenceError, BenefitQuoteError):
         raise HTTPException(status_code=503, detail="Статистика временно недоступна") from None
     except DBAPIError as exc:
         code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
-        if code != "42501":
+        if code not in {"42501", "42703"}:
             raise
         db.rollback()
         raise HTTPException(status_code=503, detail="Статистика временно недоступна") from None
@@ -130,8 +167,14 @@ def _postgres_snapshot(db: Session, start: datetime | None, end: datetime | None
           UNION ALL
           SELECT t.payment_id FROM {schema}.deposit_transactions t
             WHERE (t.transaction_type IS NULL OR t.transaction_type<>'debit')
+              AND t.refund_currency_snapshot IS NULL
               AND t.payment_id IN (SELECT id FROM selected_payments)
         ) x),'[]'::jsonb),
+        'deposit_refunds',COALESCE((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+          'payment',t.payment_id,'visit',t.visit_id,'currency',t.refund_currency_snapshot,'amount',t.amount::text))
+          FROM {schema}.deposit_transactions t
+          WHERE t.refund_currency_snapshot IS NOT NULL
+            AND t.payment_id IN (SELECT id FROM selected_payments)),'[]'::jsonb),
         'orphan_external', EXISTS (SELECT 1 FROM {schema}.refund_requests r
           LEFT JOIN {schema}.payments p ON p.id=r.payment_id
           WHERE (r.status IS NULL OR r.status NOT IN ('pending','rejected','cancelled')) AND p.id IS NULL)
@@ -168,8 +211,18 @@ def _sqlite_snapshot_report(db: Session, start: datetime | None, end: datetime |
     refunds = db.query(RefundRequest.id, RefundRequest.payment_id).filter(or_(
         RefundRequest.status.is_(None), ~RefundRequest.status.in_(("pending", "rejected", "cancelled")),
     )).all()
-    credits = db.query(DepositTransaction.id, DepositTransaction.payment_id).filter(
+    credits = db.query(DepositTransaction).filter(
         or_(DepositTransaction.transaction_type.is_(None), DepositTransaction.transaction_type != "debit")).all()
+    bound_claims = set(db.query(PaymentRefundClaim.payment_id, PaymentRefundClaim.deposit_transaction_id)
+                       .filter(PaymentRefundClaim.channel == "deposit",
+                               PaymentRefundClaim.refund_request_id.is_(None)).all())
+    proven = []
+    unproven = list(refunds)
+    for credit in credits:
+        if credit.refund_currency_snapshot is not None and (credit.payment_id, credit.id) in bound_claims:
+            proven.append(credit)
+        else:
+            unproven.append((credit.id, credit.payment_id))
     patient_by_visit = {v.id: v.patient_id for v in db.query(Visit.id, Visit.patient_id).all()}
     return {
         "visits": [{"id": v.id, "patient": v.patient_id, "quote": _sqlite_snapshot(db, v.id)} for v in visit_rows],
@@ -180,8 +233,11 @@ def _sqlite_snapshot_report(db: Session, start: datetime | None, end: datetime |
                      for p in selected],
         "links": [{"payment": link.payment_id, "visit": link.visit_id, "patient": patient_by_visit.get(link.visit_id),
                    "amount": link.amount} for link in links if link.payment_id in payment_ids],
-        "external": [payment_id for _, payment_id in [*refunds, *credits] if payment_id in payment_ids],
-        "orphan_external": any(payment_id not in all_payment_ids for _, payment_id in [*refunds, *credits]),
+        "external": [payment_id for _, payment_id in unproven if payment_id in payment_ids],
+        "deposit_refunds": [{"payment": credit.payment_id, "visit": credit.visit_id,
+                             "currency": credit.refund_currency_snapshot, "amount": credit.amount}
+                            for credit in proven if credit.payment_id in payment_ids],
+        "orphan_external": any(payment_id not in all_payment_ids for _, payment_id in unproven),
     }
 
 
@@ -196,7 +252,8 @@ def _blank(currency: str | None) -> dict:
 
 def daily_stats_from_snapshot(snapshot: object) -> list[dict]:
     if (not isinstance(snapshot, dict) or not all(isinstance(snapshot.get(k), list)
-            for k in ("visits", "payments", "links", "external")) or type(snapshot.get("orphan_external")) is not bool):
+            for k in ("visits", "payments", "links", "external", "deposit_refunds"))
+            or type(snapshot.get("orphan_external")) is not bool):
         raise HTTPException(status_code=503, detail="Статистика временно недоступна")
     buckets: dict[str | None, dict] = {}
 
@@ -216,6 +273,11 @@ def daily_stats_from_snapshot(snapshot: object) -> list[dict]:
     external = set(snapshot["external"])
     if any(type(item) is not int for item in external):
         raise HTTPException(status_code=409, detail="Возвраты требуют сверки")
+    deposit_refunds = {}
+    for receipt in snapshot["deposit_refunds"]:
+        if not isinstance(receipt, dict) or type(receipt.get("payment")) is not int or receipt["payment"] in deposit_refunds:
+            raise HTTPException(status_code=409, detail="Возвраты требуют сверки")
+        deposit_refunds[receipt["payment"]] = receipt
     paid_by_visit: dict[int, Decimal] = {}
     currencies_by_visit: dict[int, set[str | None]] = {}
     uncertain_visits: set[int] = set()
@@ -236,11 +298,21 @@ def daily_stats_from_snapshot(snapshot: object) -> list[dict]:
                 item["cancelled_count"] += 1
                 if currency is None:
                     unknown_cancelled_period = True
+                if payment["id"] in deposit_refunds:
+                    item["_net_unknown"] = True
+                    item["requires_reconciliation"] = True
             if status not in ("paid", "completed"):
                 continue
             if type(payment.get("visit")) is int:
                 currencies_by_visit.setdefault(payment["visit"], set()).add(currency)
             invalid_refund = refund > amount or payment["id"] in external
+            settled_refund = refund
+            receipt = deposit_refunds.get(payment["id"])
+            if receipt is not None:
+                credit = _money(receipt.get("amount"))
+                invalid_refund |= (refund != 0 or credit <= 0 or credit != amount
+                                   or receipt.get("currency") != currency or receipt.get("visit") != payment.get("visit"))
+                settled_refund += credit
             linked = links.get(payment["id"], [])
             valid_link = not linked or (len(linked) == 1 and linked[0].get("visit") == payment.get("visit")
                                         and linked[0].get("patient") == payment.get("patient")
@@ -259,17 +331,19 @@ def daily_stats_from_snapshot(snapshot: object) -> list[dict]:
                         item["_net_unknown"] = True
                         item["requires_reconciliation"] = True
                     else:
-                        item["refunded_amount"] += refund
-                        item["net_total_amount"] += amount - refund
+                        item["refunded_amount"] += settled_refund
+                        item["net_total_amount"] += amount - settled_refund
                         if payment.get("method") == "cash":
-                            item["net_cash_amount"] += amount - refund
+                            item["net_cash_amount"] += amount - settled_refund
                         elif payment.get("method") == "card":
-                            item["net_card_amount"] += amount - refund
+                            item["net_card_amount"] += amount - settled_refund
             relevant_ids = {payment.get("visit"), *(link.get("visit") for link in linked)}
             if invalid_refund or not valid_link or currency is None or payment.get("patient") is None:
                 uncertain_visits.update(visit_id for visit_id in relevant_ids if type(visit_id) is int)
             elif type(payment.get("visit")) is int:
                 visit_id = payment["visit"]
+                # A force-majeure transfer to a deposit does not reopen
+                # the visit's receivable. Only a direct cashier refund does.
                 paid_by_visit[visit_id] = paid_by_visit.get(visit_id, Decimal("0.00")) + amount - refund
 
         for visit in snapshot["visits"]:

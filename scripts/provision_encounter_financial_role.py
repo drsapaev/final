@@ -138,6 +138,15 @@ def provision(engine: Engine, *, schema: str, backend_role: str, capability_role
                     _ensure_policy(db, qt, "financial_cap_update", "UPDATE", qc, "true", check, cap["oid"])
                 if table in BACKEND_TABLES or table in BACKEND_COLUMN_TABLES:
                     _ensure_policy(db, qt, "financial_backend_select", "SELECT", qb, "true", None, backend["oid"])
+        # 0136 keeps deposit settlement inside its verified trigger. The
+        # existing role setup may also run before this revision is applied.
+        deposit_guard = f"{qs}.protect_deposit_refund_evidence()"
+        if db.execute(text("""
+          SELECT p.proowner=:owner AND p.prosecdef AND p.prorettype='pg_catalog.trigger'::pg_catalog.regtype
+          FROM pg_catalog.pg_proc p WHERE p.oid=pg_catalog.to_regprocedure(:function)
+        """), {"owner": namespace["nspowner"], "function": deposit_guard}).scalar_one_or_none() is True:
+            db.exec_driver_sql(f"GRANT EXECUTE ON FUNCTION {deposit_guard} TO {qb}")
+            db.exec_driver_sql(f"GRANT SELECT (amount, visit_id, refund_currency_snapshot) ON {qs}.deposit_transactions TO {qb}")
         db.exec_driver_sql(f"GRANT UPDATE (status) ON {qs}.payments TO {qb}")
         if tables["payments"]["relrowsecurity"]:
             _ensure_policy(db, f"{qs}.payments", "financial_backend_update", "UPDATE", qb, "true", "true", backend["oid"])

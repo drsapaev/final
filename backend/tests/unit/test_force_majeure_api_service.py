@@ -1446,15 +1446,15 @@ class TestForceMajeureApiService:
         approved = service._serialize_refund_request(make_request("approved"))
         rejected = service._serialize_refund_request(make_request("rejected"))
 
-        assert pending["available_actions"] == ["approve", "reject"]
-        assert pending["can_approve"] is True
+        assert pending["available_actions"] == ["reject"]
+        assert pending["can_approve"] is False
         assert pending["can_reject"] is True
         assert pending["can_complete"] is False
 
-        assert approved["available_actions"] == ["reject", "complete"]
+        assert approved["available_actions"] == ["reject"]
         assert approved["can_approve"] is False
         assert approved["can_reject"] is True
-        assert approved["can_complete"] is True
+        assert approved["can_complete"] is False
 
         assert rejected["available_actions"] == []
         assert rejected["can_approve"] is False

@@ -167,6 +167,12 @@ def db_engine():
         setup.execute(text(f'CREATE SCHEMA "{schema}"'))
     Base.metadata.create_all(engine)
     try:
+        from tests.integration.test_deposit_refund_evidence_pg import (
+            install_deposit_guards,
+        )
+
+        with engine.begin() as setup:
+            install_deposit_guards(setup, schema)
         yield engine
     finally:
         _assert_drop_safe(schema)

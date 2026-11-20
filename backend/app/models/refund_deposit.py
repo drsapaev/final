@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -259,6 +260,10 @@ class DepositTransaction(Base):
     # partial predicate pins exactly the force-majeure refund leg and
     # never the manual deposit surfaces.
     __table_args__ = (
+        CheckConstraint(
+            "refund_currency_snapshot IS NULL OR refund_currency_snapshot = 'UZS'",
+            name="ck_deposit_refund_currency",
+        ),
         Index(
             "uq_deposit_transactions_credit_payment",
             "payment_id",
@@ -285,6 +290,9 @@ class DepositTransaction(Base):
     transaction_type: Mapped[str] = mapped_column(
         String(10), nullable=False
     )  # credit / debit
+
+    # Only new payment-linked deposit refunds carry settlement evidence.
+    refund_currency_snapshot: Mapped[str | None] = mapped_column(String(3), nullable=True)
 
     # Сумма
     amount: Mapped[Decimal] = mapped_column(

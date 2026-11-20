@@ -29,7 +29,7 @@ from app.crud.queue_resource_routing import (
 )
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
 from app.models.refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
@@ -1000,6 +1000,10 @@ class ForceMajeureService:
             sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
             if sqlstate == "55P03":
                 raise ForceMajeureError("Платёж изменяется, повторите операцию") from None
+            if sqlstate == "23514":
+                raise ForceMajeureError("Доказательство возврата требует сверки") from None
+            if sqlstate == "42501":
+                raise ForceMajeureError("Проведение возврата временно недоступно") from None
             raise
 
     def _add_to_deposit_checked(
@@ -1030,6 +1034,11 @@ class ForceMajeureService:
         (миграция 0088) ДО первого денежного изменения.
         """
         amount_decimal = Decimal(str(amount))
+        postgres = self.db.get_bind().dialect.name == "postgresql"
+        if not postgres:
+            # Keep the visit's subject and the currency check in one SQLite
+            # write transaction, including metadata-only test schemas.
+            self.db.execute(text("UPDATE visits SET id=id WHERE 0"))
 
         existing_credit = (
             self.db.query(DepositTransaction)
@@ -1076,6 +1085,12 @@ class ForceMajeureService:
         payment = self._lock_payment_refund_budget(payment_id, visit_id, amount_decimal)
         if payment.currency != "UZS" or payment.amount != amount_decimal:
             raise ForceMajeureError("Валюта или состояние платежа требуют сверки")
+        if not postgres:
+            if self.db.query(Visit.patient_id).filter(Visit.id == payment.visit_id).scalar() != patient_id:
+                raise ForceMajeureError("Пациент возврата требует сверки")
+            allocations = self.db.query(PaymentVisit.visit_id, PaymentVisit.amount).filter_by(payment_id=payment.id).all()
+            if allocations and allocations != [(payment.visit_id, amount_decimal)]:
+                raise ForceMajeureError("Распределение платежа требует сверки")
         claim_id = self._claim_payment_refund(
             payment_id, self.REFUND_CHANNEL_DEPOSIT, reason=reason
         )
@@ -1114,7 +1129,7 @@ class ForceMajeureService:
                     result = self.db.execute(
                         insert(PatientDeposit).values(
                             patient_id=patient_id,
-                            balance=amount_decimal,
+                            balance=Decimal("0.00") if postgres else amount_decimal,
                             currency="UZS",
                         )
                     )
@@ -1131,17 +1146,21 @@ class ForceMajeureService:
                 )
                 if deposit.currency != "UZS":
                     raise ForceMajeureError("Валюта депозита требует сверки")
-                deposit.balance += amount_decimal
+                if not postgres:
+                    deposit.balance += amount_decimal
             else:
                 deposit = self.db.get(PatientDeposit, deposit_id)
         else:
             if deposit.currency != "UZS":
                 raise ForceMajeureError("Валюта депозита требует сверки")
-            deposit.balance += amount_decimal
+            if not postgres:
+                deposit.balance += amount_decimal
 
         self.db.flush()
 
-        # Создаём транзакцию
+        # PostgreSQL credits the balance while inserting the evidence and
+        # binds the existing claim before that INSERT can succeed.
+        expected_balance = deposit.balance + amount_decimal if postgres else deposit.balance
         transaction = DepositTransaction(
             deposit_id=deposit.id,
             transaction_type=DepositTransactionType.CREDIT.value,
@@ -1149,21 +1168,28 @@ class ForceMajeureService:
             balance_after=deposit.balance,
             description=f"Возврат (форс-мажор): {reason}",
             payment_id=payment_id,
-            visit_id=visit_id,
+            visit_id=payment.visit_id,
             performed_by=performed_by_id,
+            refund_currency_snapshot=payment.currency,
         )
         self.db.add(transaction)
         self.db.flush()  # нужен id транзакции для аудита claim-а
 
-        # Аудит единого claim-а: какая строка осуществила возврат
         claim_row = self.db.get(PaymentRefundClaim, claim_id)
-        claim_row.deposit_transaction_id = transaction.id
+        if postgres:
+            self.db.refresh(transaction, ["balance_after"])
+            if claim_row is None or (claim_row.deposit_transaction_id != transaction.id
+                                     or transaction.balance_after != expected_balance):
+                raise ForceMajeureError("Доказательство возврата требует сверки")
+            self.db.expire(deposit, ["balance", "updated_at"])
+        else:
+            claim_row.deposit_transaction_id = transaction.id
 
         return {
             "type": "deposit",
             "deposit_id": deposit.id,
             "amount": float(amount_decimal),
-            "new_balance": float(deposit.balance),
+            "new_balance": float(transaction.balance_after),
             "refund_claim_id": claim_id,
         }
 

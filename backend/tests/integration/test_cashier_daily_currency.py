@@ -150,7 +150,7 @@ def test_sqlite_refreshes_cached_allocation_before_report(tmp_path):
 def test_orphan_refund_makes_even_known_currency_totals_incomplete():
     from app.services.cashier_stats_snapshot import daily_stats_from_snapshot
 
-    snapshot = {"visits": [], "links": [], "external": [], "orphan_external": True,
+    snapshot = {"visits": [], "links": [], "external": [], "deposit_refunds": [], "orphan_external": True,
                 "payments": [{"id": 1, "visit": 2, "patient": 3, "amount": "10.00", "refund": "0.00",
                               "currency": "UZS", "method": "cash", "status": "paid", "period": True}]}
     unknown, uzs = daily_stats_from_snapshot(snapshot)
@@ -244,6 +244,7 @@ def _daily_pg_app(guarded_pg, monkeypatch):
     from app.db.capability_namespace import capability_schema_name
     from app.models.user import User
     from tests.conftest import mint_access_token
+    from tests.integration.test_deposit_refund_evidence_pg import install_deposit_guards
 
     engine, runtime, ids = guarded_pg
     schema, runtime_role = engine.dialect.default_schema_name, runtime.url.username
@@ -253,6 +254,7 @@ def _daily_pg_app(guarded_pg, monkeypatch):
                 "INVITATION_DB_SCHEMA", "INVITATION_DB_SCHEMA_OWNER"):
         monkeypatch.setattr(settings, key, None)
     with engine.begin() as conn:
+        install_deposit_guards(conn, schema)
         owner = conn.execute(text("SELECT current_user")).scalar_one()
         private = quote(capability_schema_name(schema))
         capability = conn.execute(text("""

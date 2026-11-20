@@ -84,7 +84,7 @@ def configured_benefit_db():
     runtime = create_engine(runtime_url, hide_parameters=True)
     try:
         with admin.begin() as conn:
-            assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == "0135_registrar_benefit_decision"
+            assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == "0136_deposit_refund_evidence"
             assert conn.exec_driver_sql("SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='public'").scalar_one() == OWNER
             can_execute = conn.execute(text("SELECT has_function_privilege(:role,:function,'EXECUTE')"), {
                 "role": RUNTIME, "function": f"{PRIVATE}.approve_registrar_benefit(integer,integer,integer,bigint,text)",

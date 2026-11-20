@@ -256,13 +256,10 @@ def test_fm_deposit_credit_is_a_completed_refund_for_net_stats(
     assert stats["pending_count"] == 0
 
 
-def test_completed_bank_request_nets_and_pending_one_does_not(
+def test_completed_bank_request_without_settlement_stays_in_reconciliation(
     client, db_session, test_patient, admin_auth_headers
 ):
-    """PR #3830 review P1: only a COMPLETED bank refund request returned the
-    money (``RefundRequest.status == 'completed'`` — the single change the
-    FM API 'complete' action makes); a still-pending request has sent
-    nothing yet and must not reduce net receipts."""
+    """A historical completion label and purchase currency do not prove a payout."""
     from app.models.refund_deposit import RefundRequest as RefundRequestRow
     from app.models.refund_deposit import RefundRequestStatus
 
@@ -275,7 +272,7 @@ def test_completed_bank_request_nets_and_pending_one_does_not(
         visit_id=visit_done.id,
         amount=100000,
     )
-    # Exactly what force_majeure_api_service 'complete' does: status only.
+    # Recreate the old status-only completion, without settlement evidence.
     request_done = (
         db_session.query(RefundRequestRow).filter_by(payment_id=payment_done.id).one()
     )
@@ -292,20 +289,19 @@ def test_completed_bank_request_nets_and_pending_one_does_not(
         amount=60000,
     )  # stays pending — money not sent yet
 
-    stats = _stats(client, admin_auth_headers)
-
+    assert client.get("/api/v1/cashier/stats", headers=admin_auth_headers).status_code == 409
+    buckets = client.get("/api/v1/cashier/stats/by-currency", headers=admin_auth_headers)
+    assert buckets.status_code == 200, buckets.text
+    [stats] = buckets.json()
     assert _dec(stats["total_amount"]) == Decimal("160000")
-    # Completed bank claim counts; the pending one does not.
-    assert _dec(stats["refunded_amount"]) == Decimal("100000")
-    assert _dec(stats["net_total_amount"]) == Decimal("60000")
-    assert _dec(stats["net_card_amount"]) == Decimal("0")
-    assert _dec(stats["net_cash_amount"]) == Decimal("60000")
+    assert stats["requires_reconciliation"] is True
+    assert stats["refunded_amount"] is None and stats["net_total_amount"] is None
 
 
-def test_over_refunded_payment_caps_net_at_zero(
+def test_historical_over_refund_requires_reconciliation(
     client, db_session, test_patient, admin_user, admin_auth_headers
 ):
-    """A historical over-refund contributes zero net receipts."""
+    """Capping a historical double credit would hide an unreconciled refund."""
     visit = _make_visit(db_session, test_patient, 100000)
     payment = _make_paid_payment(db_session, visit, 100000, method="cash")
     _refund(client, admin_auth_headers, payment.id, 30000)
@@ -321,14 +317,13 @@ def test_over_refunded_payment_caps_net_at_zero(
     ))
     db_session.commit()
 
-    stats = _stats(client, admin_auth_headers)
-
+    assert client.get("/api/v1/cashier/stats", headers=admin_auth_headers).status_code == 409
+    buckets = client.get("/api/v1/cashier/stats/by-currency", headers=admin_auth_headers)
+    assert buckets.status_code == 200, buckets.text
+    [stats] = buckets.json()
     assert _dec(stats["total_amount"]) == Decimal("100000")
-    # 30 000 direct + 100 000 deposit credit would be 130 000 — capped at
-    # the payment's unrefunded remainder (100 000 total effective refund).
-    assert _dec(stats["refunded_amount"]) == Decimal("100000")
-    assert _dec(stats["net_total_amount"]) == Decimal("0")
-    assert _dec(stats["net_cash_amount"]) == Decimal("0")
+    assert stats["requires_reconciliation"] is True
+    assert all(stats[field] is None for field in ("refunded_amount", "net_total_amount", "net_cash_amount"))
 
 
 def test_openapi_documents_gross_and_net_fields(client: object = None) -> None:
