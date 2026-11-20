@@ -233,15 +233,15 @@ def test_prior_invoice_settlement_can_record_already_received_funds(
 
 
 def test_payment_rereads_committed_approval_under_postgres_lock(approval_case):
-    engine, visit_id, _ = approval_case
-    with Session(engine) as db:
+    owner, runtime, _client, visit_id, *_ = approval_case
+    with Session(owner) as db:
         db.get(Visit, visit_id).approval_status = "approved"
         db.commit()
 
-    with Session(engine) as payment_db:
+    with Session(runtime) as payment_db:
         cached_visit = payment_db.get(Visit, visit_id)
         assert cached_visit.approval_status == "approved"
-        with Session(engine) as request_db:
+        with Session(owner) as request_db:
             request_db.get(Visit, visit_id).approval_status = "pending"
             request_db.commit()
 
