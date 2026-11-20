@@ -15,9 +15,9 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Final
 
-from sqlalchemy import func, insert, text
+from sqlalchemy import func, insert, or_, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
-from sqlalchemy.orm import Session, lazyload
+from sqlalchemy.orm import Session, lazyload, load_only
 
 from app.crud.clinic import clinic_today
 from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
@@ -411,10 +411,12 @@ class ForceMajeureService:
                 payment = self._get_payment_for_entry(entry)
 
                 refund_info = None
+                entry_refund_type = refund_type
 
                 if payment and payment.status == "paid" and payment.amount > 0:
-                    # Создаём заявку на возврат
-                    if refund_type == RefundType.DEPOSIT:
+                    if payment.method == "deposit":
+                        entry_refund_type = RefundType.DEPOSIT
+                    if entry_refund_type == RefundType.DEPOSIT:
                         refund_info = self._add_to_deposit(
                             patient_id=entry.patient_id,
                             amount=payment.amount,
@@ -453,7 +455,7 @@ class ForceMajeureService:
                             visit_id=entry.visit_id,
                             amount=payment.amount,
                             reason=reason,
-                            refund_type=refund_type,
+                            refund_type=entry_refund_type,
                             is_automatic=True,
                         )
                         # 3808 review round 7 (P2): already_refunded —
@@ -487,7 +489,7 @@ class ForceMajeureService:
                         "entry_id": entry.id,
                         "patient_name": entry.patient_name,
                         "phone": entry.phone,
-                        "refund_type": refund_type.value if refund_type else None,
+                        "refund_type": entry_refund_type.value if entry_refund_type else None,
                         "refund_amount": float(payment.amount) if payment else 0,
                         "refund_info": refund_info,
                     }
@@ -500,7 +502,7 @@ class ForceMajeureService:
                             "phone": entry.phone,
                             "telegram_id": entry.telegram_id,
                             "patient_name": entry.patient_name,
-                            "refund_type": refund_type.value if refund_type else None,
+                            "refund_type": entry_refund_type.value if entry_refund_type else None,
                             "refund_amount": float(payment.amount) if payment else 0,
                         }
                     )
@@ -803,11 +805,25 @@ class ForceMajeureService:
                 "Queue entry visit does not belong to the queue patient"
             )
 
-        return (
+        payments = (
             self.db.query(Payment)
-            .filter(Payment.visit_id == entry.visit_id, Payment.status == "paid")
-            .first()
+            .options(load_only(Payment.id, Payment.visit_id, Payment.amount, Payment.status, Payment.method),
+                     lazyload(Payment.payment_visits))
+            .filter(
+                or_(Payment.visit_id == entry.visit_id,
+                    Payment.payment_visits.any(PaymentVisit.visit_id == entry.visit_id)),
+                Payment.status.in_(("paid", "completed")),
+                Payment.amount > 0,
+            )
+            .order_by(Payment.id)
+            .all()
         )
+        if any(payment.method == "deposit" for payment in payments) and (
+            len(payments) != 1 or payments[0].visit_id != entry.visit_id or payments[0].status != "paid"
+        ):
+            raise ForceMajeureError("Распределение оплаты с депозита требует сверки")
+        return next((payment for payment in payments
+                     if payment.visit_id == entry.visit_id and payment.status == "paid"), None)
 
     @staticmethod
     def _already_refunded_by_claim(
@@ -960,8 +976,14 @@ class ForceMajeureService:
     def _lock_payment_refund_budget(self, payment_id: int, visit_id: int | None, amount: Decimal) -> Payment:
         # Use the same row lock as the cashier. NO KEY UPDATE is compatible
         # with the refund claim's foreign-key lock. Keep it until commit.
-        payment_query = (self.db.query(Payment).options(lazyload(Payment.payment_visits))
-                         .filter(Payment.id == payment_id).populate_existing())
+        payment_query = (
+            self.db.query(Payment)
+            .options(load_only(Payment.id, Payment.status, Payment.visit_id, Payment.amount,
+                               Payment.refunded_amount, Payment.currency, Payment.method, Payment.client_request_id),
+                     lazyload(Payment.payment_visits))
+            .filter(Payment.id == payment_id)
+            .populate_existing()
+        )
         if self.db.get_bind().dialect.name == "postgresql":
             self.db.execute(text("SET LOCAL lock_timeout='2s'"))
             payment_query = payment_query.with_for_update(key_share=True)
@@ -1085,6 +1107,23 @@ class ForceMajeureService:
         payment = self._lock_payment_refund_budget(payment_id, visit_id, amount_decimal)
         if payment.currency != "UZS" or payment.amount != amount_decimal:
             raise ForceMajeureError("Валюта или состояние платежа требуют сверки")
+        original_deposit_id = None
+        if payment.method == "deposit":
+            debits = (
+                self.db.query(DepositTransaction)
+                .filter_by(payment_id=payment.id, transaction_type=DepositTransactionType.DEBIT.value)
+                .limit(2)
+                .all()
+            )
+            if len(debits) != 1:
+                raise ForceMajeureError("Исходное списание с депозита требует сверки")
+            debit = debits[0]
+            if (debit.visit_id != payment.visit_id or debit.amount != amount_decimal
+                or debit.command_currency != payment.currency or not debit.command_is_active
+                or not debit.command_fingerprint or debit.client_request_id is None
+                or str(debit.client_request_id) != payment.client_request_id):
+                raise ForceMajeureError("Исходное списание с депозита требует сверки")
+            original_deposit_id = debit.deposit_id
         if not postgres:
             if self.db.query(Visit.patient_id).filter(Visit.id == payment.visit_id).scalar() != patient_id:
                 raise ForceMajeureError("Пациент возврата требует сверки")
@@ -1115,6 +1154,8 @@ class ForceMajeureService:
             .populate_existing()
             .first()
         )
+        if original_deposit_id is not None and (deposit is None or deposit.id != original_deposit_id):
+            raise ForceMajeureError("Исходный депозит требует сверки")
 
         if deposit is None:
             # Конкурентное СОЗДАНИЕ: unique(patient_id) в БД есть, но
@@ -1273,6 +1314,8 @@ class ForceMajeureService:
                 }
 
             payment = self._lock_payment_refund_budget(payment_id, visit_id, amount_decimal)
+            if payment.method == "deposit":
+                raise ForceMajeureError("Оплата с депозита возвращается на исходный депозит")
             if refund_type == RefundType.BANK_TRANSFER:
                 currency = payment.currency
                 if not (isinstance(currency, str) and len(currency) == 3 and currency.isascii()

@@ -261,15 +261,14 @@ class ForceMajeureApiRepository:
         assert created is not None
         return created, True
 
-    def get_visit(self, visit_id: int) -> Visit | None:
-        """Load the deposit debit target under its canonical visit lock."""
-        return (
+    def get_visit(self, visit_id: int, *, lock: bool = True) -> Visit | None:
+        """Load the live deposit debit target, optionally acquiring the visit lock."""
+        query = (
             self.db.query(Visit)
             .filter(Visit.id == visit_id)
-            .with_for_update(of=Visit)
             .populate_existing()
-            .first()
         )
+        return (query.with_for_update(of=Visit) if lock else query).first()
 
     def find_manual_deposit_receipt(self, client_request_id: UUID) -> DepositTransaction | None:
         return (
