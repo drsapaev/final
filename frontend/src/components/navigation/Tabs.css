@@ -32,6 +32,7 @@
 /* Кнопка "Все отделения" в стиле Edge */
 .tab-button.all-departments {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
@@ -62,6 +63,7 @@
 
 /* Разделитель в стиле Edge */
 .tabs-divider {
+  flex: 0 0 auto;
   width: 1px;
   height: 32px;
   margin: 0 8px;
@@ -76,7 +78,7 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  flex: 1;
+  flex: 1 0 auto;
 }
 
 /* Анимированный индикатор в стиле Edge */
@@ -94,6 +96,7 @@
 .tab-button.department {
   position: relative;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   padding: 12px 16px;
   border: none;
@@ -273,17 +276,15 @@
   }
 
   .tab-button.all-departments {
+    min-height: 44px;
     padding: 6px 12px;
     font-size: 13px;
   }
 
   .tab-button.department {
+    min-height: 44px;
     padding: 6px 8px;
     font-size: 13px;
-  }
-
-  .tab-label {
-    display: none;
   }
 
   .tab-icon {
@@ -328,16 +329,11 @@
   flex: 0 0 auto;
 }
 
-/* Doctor identity remains visible on compact screens; the strip scrolls
-   horizontally instead of collapsing every doctor to the same icon. */
+/* All labels remain visible on compact screens; the strip scrolls. */
 @media (max-width: 768px) {
   .tab-button.department.doctor {
     min-height: 44px;
     padding: 8px 12px;
-  }
-
-  .tab-button.department.doctor .tab-label {
-    display: inline;
   }
 }
 

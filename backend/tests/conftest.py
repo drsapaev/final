@@ -156,7 +156,15 @@ def db_session(test_db):
     @event.listens_for(session, "after_transaction_end")
     def restart_savepoint(sess, trans):  # type: ignore[no-untyped-def]
         nonlocal nested
-        if trans.nested and not getattr(trans._parent, "nested", False):
+        # The application may itself use Session.begin_nested() for a real
+        # per-operation SAVEPOINT. Do not replace our still-live connection
+        # savepoint when one of those inner transactions ends: doing so leaves
+        # teardown pointing at a savepoint that SQLAlchemy has already closed.
+        if (
+            trans.nested
+            and not getattr(trans._parent, "nested", False)
+            and not nested.is_active
+        ):
             nested = connection.begin_nested()
 
     try:

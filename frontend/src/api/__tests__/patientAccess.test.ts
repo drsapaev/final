@@ -15,6 +15,7 @@ import {
   requestActivationOtp,
   requestPatientOtp,
   verifyPatientOtp,
+  verifyPatientTwoFactor,
 } from '../patientAccess';
 
 const mockedPost = vi.mocked(api.post);
@@ -94,6 +95,29 @@ describe('patientAccess API module (Phase 0 PR-B)', () => {
       verification_grant: 'grant',
     });
     expect(result.user.role).toBe('Patient');
+  });
+
+  it('returns a token-free pending challenge and exchanges a backup code without changing it', async () => {
+    const pending = { requires_2fa: true, two_factor_method: 'totp', pending_2fa_token: 'pending', user: SESSION.user };
+    mockedPost.mockResolvedValueOnce({ data: pending } as never);
+    expect(await patientLogin({ phone: '+998901234567', verification_grant: 'grant' })).toEqual(pending);
+    mockedPost.mockResolvedValueOnce({ data: { success: true, access_token: 'patient-jwt', token_type: 'bearer', refresh_token: null } } as never);
+    expect(await verifyPatientTwoFactor({ pending_2fa_token: 'pending', backup_code: 'aBcd-123' })).toEqual({ success: true, access_token: 'patient-jwt', token_type: 'bearer' });
+    expect(mockedPost).toHaveBeenLastCalledWith('/2fa/verify', { pending_2fa_token: 'pending', backup_code: 'aBcd-123' });
+  });
+
+  it.each([
+    { requires_2fa: true, two_factor_method: 'totp', pending_2fa_token: '', user: SESSION.user },
+    { requires_2fa: true, two_factor_method: 'totp', pending_2fa_token: 'pending', user: SESSION.user, access_token: 'premature' },
+    { requires_2fa: true, two_factor_method: 'totp', pending_2fa_token: 'pending', user: { ...SESSION.user, role: 'Admin' } },
+  ])('rejects malformed or privileged pending challenges', async (data) => {
+    mockedPost.mockResolvedValueOnce({ data } as never);
+    await expect(patientLogin({ phone: '+998901234567', verification_grant: 'grant' })).rejects.toThrow();
+  });
+
+  it('never accepts a refresh token from the patient factor exchange', async () => {
+    mockedPost.mockResolvedValueOnce({ data: { success: true, access_token: 'patient', token_type: 'bearer', refresh_token: 'staff' } } as never);
+    await expect(verifyPatientTwoFactor({ pending_2fa_token: 'pending', totp_code: '123456' })).rejects.toThrow();
   });
 
   it('posts activation OTP request to the canonical PR-A2 endpoint', async () => {

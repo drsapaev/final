@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     CheckConstraint,
     Date,
     DateTime,
@@ -96,6 +97,11 @@ class Visit(Base):
     confirmed_by: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )  # user_id, telegram_id, или phone
+
+    # Server-owned generation binds Telegram actions to this clinical context.
+    confirmation_context_epoch: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default="0"
+    )
 
     # ✅ Идемпотентность reminder-пайплайна (arq job send_visit_reminder):
     # штампуется воркером после успешной отправки напоминания; повторные

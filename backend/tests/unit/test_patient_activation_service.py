@@ -105,10 +105,10 @@ def issued_token(db_session, svc, patient) -> str:
 # ------------------------------------------------------------ masking
 def test_mask_phone_canonical_last_three_digits_only():
     """Codex P1 (PR #3320 round 1): the repo-canonical PII mask keeps only
-    the LAST THREE digits (+998901•••233, AGENTS.md / app/core/pii_masker).
+    the LAST THREE digits (AGENTS.md / app.core.pii_masker).
     The local 4-digit mask was a policy violation."""
     masked = mask_phone(PHONE)
-    assert masked == "+998900•••001"
+    assert masked == "•••001"
     assert PHONE not in masked
     assert "0001" not in masked  # no fourth trailing digit
     assert mask_phone("") == "***"

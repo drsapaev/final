@@ -709,6 +709,28 @@ def start_queue_visit(
                             status_code=status.HTTP_403_FORBIDDEN,
                             detail="Queue entry belongs to another specialist",
                         )
+                else:
+                    # REGSTART-BE-001 residual (group95 correction): valid
+                    # resource-owned DailyQueue rows use specialist_id=NULL
+                    # (queue_resource_id XOR) and previously BYPASSED the
+                    # ownership guard entirely, letting Doctor/specialty/Lab
+                    # callers start a resource queue entry and its linked
+                    # Visit. The canonical doctor-panel route denies
+                    # non-Admin/Registrar there too — mirror that here.
+                    # Admin/Registrar operators keep the legacy workflow.
+                    logger.warning(
+                        "start_queue_visit: non-operator denied on resource "
+                        "queue entry_id=%d caller_user_id=%d",
+                        queue_entry.id,
+                        current_user.id,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=(
+                            "Записи ресурсной очереди может начать только "
+                            "Админ или Регистратор"
+                        ),
+                    )
             linked_visit = None
             if queue_entry.visit_id:
                 linked_visit = (

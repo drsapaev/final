@@ -252,3 +252,84 @@ class TestDoctorStartVisitPatientBinding:
         )
         assert response.status_code == 200, response.text
         assert _visit_state(db_session, v1.id) == "in_progress"
+
+
+@pytest.mark.integration
+class TestRegistrarStartVisitResourceQueue:
+    """REGSTART-BE-001 residual (group95 correction): resource-owned
+    DailyQueue rows use specialist_id=NULL (queue_resource_id XOR) and
+    previously BYPASSED the #4088 non-operator guard — Doctor/Lab could
+    start a resource queue entry and its linked Visit. The canonical
+    doctor-panel route denies non-Admin/Registrar there too."""
+
+    def _mk_resource_queue(self, db):
+        from app.models.online_queue import QueueResource
+
+        suffix = uuid4().hex[:8]
+        resource = QueueResource(
+            code=f"res_{suffix}",
+            queue_tag=f"rtag_{suffix}",
+            display_name="Тестовый ресурс",
+            active=True,
+        )
+        db.add(resource)
+        db.flush()
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=f"tag_{suffix}",
+            active=True,
+        )
+        db.add(queue)
+        db.flush()
+        return queue
+
+    def test_resource_queue_denies_doctor_and_lab(self, client, db_session):
+        """RED: Doctor and Lab must get 403 on a resource-owned queue
+        entry — no queue or visit mutation."""
+        user_a = _mk_user(db_session)
+        doctor_a = _mk_doctor(db_session, user_a, "cardiology")
+        user_lab = _mk_user(db_session, role="Lab")
+        patient = _mk_patient(db_session)
+        visit_doc = _mk_visit(db_session, patient, doctor_a)
+        visit_lab = _mk_visit(db_session, patient, doctor_a)
+        queue = self._mk_resource_queue(db_session)
+        entry_doc = _mk_entry(db_session, queue, patient, visit=visit_doc, number=1)
+        entry_lab = _mk_entry(db_session, queue, patient, visit=visit_lab, number=2)
+        db_session.commit()
+
+        headers_doc = _login(client, user_a)
+        response = client.post(
+            f"/api/v1/registrar/queue/{entry_doc.id}/start-visit", headers=headers_doc
+        )
+        assert response.status_code == 403, (response.status_code, response.text)
+        assert _entry_state(db_session, entry_doc.id) == "called"
+        assert _visit_state(db_session, visit_doc.id) == "open"
+
+        headers_lab = _login(client, user_lab)
+        response = client.post(
+            f"/api/v1/registrar/queue/{entry_lab.id}/start-visit", headers=headers_lab
+        )
+        assert response.status_code == 403, (response.status_code, response.text)
+        assert _entry_state(db_session, entry_lab.id) == "called"
+        assert _visit_state(db_session, visit_lab.id) == "open"
+
+    def test_resource_queue_allows_registrar(self, client, db_session):
+        """Positive: Registrar keeps the legacy operator workflow on
+        resource-owned queues."""
+        registrar = _mk_user(db_session, role="Registrar")
+        doctor = _mk_doctor(db_session, _mk_user(db_session), "cardiology")
+        patient = _mk_patient(db_session)
+        visit = _mk_visit(db_session, patient, doctor)
+        queue = self._mk_resource_queue(db_session)
+        entry = _mk_entry(db_session, queue, patient, visit=visit, number=1)
+        db_session.commit()
+
+        headers = _login(client, registrar)
+        response = client.post(
+            f"/api/v1/registrar/queue/{entry.id}/start-visit", headers=headers
+        )
+        assert response.status_code == 200, response.text
+        assert _entry_state(db_session, entry.id) == "in_progress"
+        assert _visit_state(db_session, visit.id) == "in_progress"

@@ -109,7 +109,7 @@ describe('CARDAI-FE-001: a specialty-only mount is honestly inert, not a false a
 describe('CARDAI-FE-002: non-MCP AI transport uses the versioned client without a duplicated /api/v1 prefix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    apiMocks.post.mockResolvedValue({ data: [] });
+    apiMocks.post.mockResolvedValue({ data: { data: [], ai_safety_meta: { requires_doctor_confirmation: true } } });
   });
 
   const clickRefresh = () => {

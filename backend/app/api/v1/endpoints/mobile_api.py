@@ -9,7 +9,8 @@ import gzip
 # the module of the same name). Using importlib avoids the shadowing.
 import importlib
 import json
-from datetime import UTC, date, datetime
+import logging
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -51,11 +52,11 @@ from app.services.appointment_duration_snapshot import (
 )
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
-from app.services.mobile_api_service import MobileApiService
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # Функция для сжатия JSON ответов (будет использоваться в endpoints)
@@ -111,16 +112,46 @@ def _get_mobile_notification_rows(
     return items[offset : offset + limit] if items else []
 
 
-@router.post("/auth/login", response_model=MobileLoginResponse)
-def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db)):
-    """
-    Мобильная аутентификация
+_MOBILE_LOGIN_ERROR = {
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "required": ["detail"],
+                "properties": {"detail": {"type": "string"}},
+            }
+        }
+    }
+}
 
-    Поддерживает:
-    - Вход по номеру телефона и паролю
-    - Вход через Telegram ID
-    - Регистрация нового пользователя
-    """
+
+@router.post(
+    "/auth/login",
+    response_model=MobileLoginResponse,
+    responses={
+        200: {
+            "headers": {
+                "Cache-Control": {
+                    "required": True,
+                    "schema": {"type": "string", "const": "no-store"},
+                }
+            }
+        },
+        400: {"description": "Unsupported login method", **_MOBILE_LOGIN_ERROR},
+        401: {
+            "description": "Invalid credentials or second factor",
+            **_MOBILE_LOGIN_ERROR,
+        },
+        500: {
+            "description": "Authentication service unavailable",
+            **_MOBILE_LOGIN_ERROR,
+        },
+    },
+)
+def mobile_login(
+    credentials: MobileLoginRequest, response: Response, db: Session = Depends(get_db)
+):
+    """Authenticate a linked active patient by phone/password and configured 2FA."""
     try:
         # Поиск пользователя по телефону или Telegram ID
         user = None
@@ -137,60 +168,105 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        # QD-1.1 (queue resource role cleanup, Codex round-1): the phone-based
-        # mobile login must reject internal-only sentinel roles exactly like
-        # the web funnels — synthetic queue-resource accounts are structural
-        # non-logins on every credential surface.
-        if is_login_blocked_role(getattr(user, "role", None)):
+        if (
+            not credentials.password
+            or not user.hashed_password
+            or not crud_user.verify_password(credentials.password, user.hashed_password)
+        ):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not credentials.password or not user.hashed_password:
+        # The password lookup and Patient relationship are hints until the
+        # account and card have been locked and re-read in revocation order.
+        expected_user_id, expected_patient_id = user.id, patient.id
+        expected_hash, expected_epoch = user.hashed_password, user.auth_epoch
+        from uuid import uuid4
+
+        from app.models.authentication import RefreshToken
+        from app.models.patient import Patient
+        from app.models.two_factor_auth import TwoFactorAuth
+        from app.models.user import User
+        from app.services.authentication_service import get_authentication_service
+        from app.services.two_factor_service import get_two_factor_service
+
+        user = (
+            db.query(User)
+            .filter(User.id == expected_user_id)
+            .with_for_update(key_share=True)
+            .populate_existing()
+            .first()
+        )
+        if (
+            user is None
+            or not user.is_active
+            or user.is_superuser
+            or user.role != "Patient"
+            or is_login_blocked_role(user.role)
+            or user.hashed_password != expected_hash
+            or user.auth_epoch != expected_epoch
+        ):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        patient = (
+            db.query(Patient)
+            .filter(Patient.id == expected_patient_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if (
+            patient is None
+            or patient.is_deleted is not False
+            or patient.user_id != user.id
+            or patient.phone != credentials.phone
+        ):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not crud_user.verify_password(credentials.password, user.hashed_password):
+        two_factor = (
+            db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user.id).first()
+        )
+        if two_factor and bool(two_factor.totp_enabled) != bool(
+            two_factor.totp_verified
+        ):
             raise HTTPException(status_code=401, detail="Invalid credentials")
+        if two_factor and two_factor.totp_enabled:
+            if not two_factor.totp_verified or not (
+                credentials.totp_code or credentials.backup_code
+            ):
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            success, _, _ = get_two_factor_service().verify_two_factor(
+                db,
+                user.id,
+                totp_code=credentials.totp_code,
+                backup_code=credentials.backup_code,
+                commit=False,
+            )
+            if not success:
+                raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        # Генерируем access token
-        access_token = crud_user.create_access_token(data={"sub": user.username})
-
-        # Issue refresh token so the mobile client can use /mobile/auth/refresh
-        # after the access token expires (default 30 min). Uses the same
-        # AuthenticationService.create_refresh_token() as web login, but does
-        # NOT call login_user() — mobile login has its own auth flow (phone
-        # search, no 2FA, no session fixation revocation).
-        refresh_token = None
-        try:
-            import uuid as _uuid
-            from datetime import UTC, datetime, timedelta
-
-            from app.models.authentication import RefreshToken
-            from app.services.authentication_service import get_authentication_service
-
-            auth_service = get_authentication_service()
-            jti = str(_uuid.uuid4())
-            refresh_token = auth_service.create_refresh_token(user.id, jti)
-            refresh_token_obj = RefreshToken(
+        # Rotate old sessions and consume a backup code in the same commit as
+        # the refresh-token record. A failure never returns a usable bearer.
+        auth_service = get_authentication_service()
+        auth_service.revoke_all_for_new_login_locked(db, user)
+        access_token = auth_service.create_access_token(
+            {"sub": str(user.id), "auth_epoch": user.auth_epoch}
+        )
+        jti = str(uuid4())
+        refresh_token = auth_service.create_refresh_token(
+            user.id, jti, auth_epoch=user.auth_epoch
+        )
+        db.add(
+            RefreshToken(
                 user_id=user.id,
                 token=refresh_token,
                 jti=jti,
                 expires_at=datetime.now(UTC)
                 + timedelta(days=auth_service.refresh_token_expire_days),
             )
-            db.add(refresh_token_obj)
-            db.commit()
-        except Exception as exc:
-            # If refresh token creation fails, still return access_token —
-            # the mobile client works for 30 min, just cannot refresh.
-            log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-
-        # Обновляем токен устройства
+        )
         if credentials.device_token:
-            MobileApiService(db).update_user_device_token(
-                user=user,
-                device_token=credentials.device_token,
-            )
+            user.device_token = credentials.device_token
+            user.push_notifications_enabled = True
 
-        return MobileLoginResponse(
+        result = MobileLoginResponse(
             access_token=access_token,
             refresh_token=refresh_token,
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -203,11 +279,16 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
             },
             permissions=crud_user.get_user_permissions(user),
         )
+        db.commit()
+        response.headers["Cache-Control"] = "no-store"
+        return result
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as exc:
-        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
+        db.rollback()
+        logger.error("Mobile login failed: %s", type(exc).__name__)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
