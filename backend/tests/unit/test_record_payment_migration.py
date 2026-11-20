@@ -299,13 +299,9 @@ class TestRecordPaymentMigration:
         assert call_kwargs["amount"] == Decimal("10000")
 
 
-@pytest.mark.parametrize("reject_response", [False, True])
-def test_billing_route_validates_the_receipt_before_commit(
-    client, db_session, admin_auth_headers, test_visit, test_service, monkeypatch, reject_response,
-):
-    from app.api.v1.endpoints import billing
-    from app.models.billing import BillingSettings, Invoice, InvoiceStatus
-    from app.models.payment import Payment
+@pytest.fixture
+def billing_payment_invoice(db_session, test_visit, test_service):
+    from app.models.billing import BillingSettings, Invoice
     from app.models.visit import VisitService
 
     visit_id = test_visit.id
@@ -322,7 +318,20 @@ def test_billing_route_validates_the_receipt_before_commit(
         ),
     ])
     db_session.commit()
+    return invoice
+
+
+@pytest.mark.parametrize("reject_response", [False, True])
+def test_billing_route_validates_the_receipt_before_commit(
+    client, db_session, admin_auth_headers, billing_payment_invoice, monkeypatch, reject_response,
+):
+    from app.api.v1.endpoints import billing
+    from app.models.billing import Invoice, InvoiceStatus
+    from app.models.payment import Payment
+
+    invoice = billing_payment_invoice
     invoice_id, patient_id = invoice.id, invoice.patient_id
+    visit_id = invoice.visit_id
     if reject_response:
         response_model = billing.PaymentResponse
 
@@ -357,3 +366,65 @@ def test_billing_route_validates_the_receipt_before_commit(
     assert payload["reference_number"] == "SYNTHETIC-REF" and payload["is_confirmed"] is True
     assert stored_invoice.paid_amount == 100 and stored_invoice.balance == 0
     assert stored_invoice.status == InvoiceStatus.PAID
+
+
+@pytest.mark.parametrize(
+    ("amount_token", "invoice_total", "invoice_status", "expected_status"),
+    [
+        ("10.0000000000000001", 100, "draft", 422),
+        ("true", 100, "draft", 422),
+        ("90.01", 90, "draft", 400),
+        ("100.01", 200, "draft", 400),
+        ("10", 100, "cancelled", 409),
+        ("10", 100.125, "draft", 409),
+    ],
+    ids=["sub-cent", "boolean", "invoice-balance", "visit-balance", "closed-invoice", "legacy-fraction"],
+)
+def test_billing_route_rejects_invalid_settlement_without_mutations(
+    client, db_session, admin_auth_headers, billing_payment_invoice,
+    amount_token, invoice_total, invoice_status, expected_status,
+):
+    from app.models.billing import Invoice, InvoiceStatus
+    from app.models.payment import Payment
+
+    invoice = billing_payment_invoice
+    invoice.total_amount = invoice.balance = invoice_total
+    invoice.status = InvoiceStatus(invoice_status)
+    db_session.commit()
+    invoice_id, visit_id = invoice.id, invoice.visit_id
+    response = client.post(
+        "/api/v1/billing/payments",
+        headers={**admin_auth_headers, "content-type": "application/json"},
+        content=f'{{"invoice_id":{invoice_id},"amount":{amount_token},"payment_method":"cash"}}',
+    )
+
+    assert response.status_code == expected_status, response.text
+    db_session.expire_all()
+    assert db_session.query(Payment).filter_by(visit_id=visit_id).count() == 0
+    stored = db_session.get(Invoice, invoice_id)
+    assert stored.paid_amount == 0 and stored.balance == invoice_total
+    assert stored.status == InvoiceStatus(invoice_status)
+
+
+def test_billing_route_accepts_exact_cents_with_legacy_float_noise(
+    client, db_session, admin_auth_headers, billing_payment_invoice,
+):
+    from app.models.billing import Invoice, InvoiceStatus
+    from app.models.payment import Payment
+
+    invoice = billing_payment_invoice
+    invoice.total_amount = invoice.balance = 0.1 + 0.2
+    db_session.commit()
+    invoice_id, visit_id = invoice.id, invoice.visit_id
+    response = client.post(
+        "/api/v1/billing/payments", headers=admin_auth_headers,
+        json={"invoice_id": invoice_id, "amount": "0.30", "payment_method": "cash"},
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    receipt = db_session.query(Payment).filter_by(visit_id=visit_id).one()
+    assert receipt.amount == Decimal("0.30")
+    stored = db_session.get(Invoice, invoice_id)
+    assert stored.paid_amount == 0.30 and stored.balance == 0
+    assert stored.status == InvoiceStatus.PAID

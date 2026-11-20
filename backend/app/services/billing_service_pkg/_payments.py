@@ -4,12 +4,24 @@ Split from billing_service.py.
 """
 from __future__ import annotations
 
+import math
 from decimal import Decimal
 
 from fastapi import HTTPException
 
 from app.services.billing_service_pkg._base import *  # noqa: F401, F403
 from app.services.billing_service_pkg._base import BillingServiceMixinBase
+from app.services.money_input import MoneyInputError, parse_money
+
+
+def _legacy_invoice_amount(value: float | None) -> Decimal:
+    """Remove only binary float noise from historical invoice values."""
+    if value is None or not math.isfinite(value) or value < 0:
+        raise MoneyInputError("Invalid invoice amount")
+    rounded = round(value, 2)
+    if abs(value - rounded) > 2 * math.ulp(value):
+        raise MoneyInputError("Invoice amount is not exact to cents")
+    return parse_money(rounded)
 
 
 class PaymentsMixin(BillingServiceMixinBase):
@@ -407,7 +419,7 @@ class PaymentsMixin(BillingServiceMixinBase):
     def record_payment(
         self,
         invoice_id: int,
-        amount: float,
+        amount: Decimal | float,
         payment_method: PaymentMethod,
         reference_number: str = None,
         description: str = None,
@@ -447,6 +459,13 @@ class PaymentsMixin(BillingServiceMixinBase):
             HTTPException: 400/409 from PaymentInvariantService (overpayment,
                 concurrent payment race, etc.).
         """
+        try:
+            exact_amount = parse_money(amount)
+        except MoneyInputError:
+            raise HTTPException(status_code=422, detail="Некорректная сумма платежа") from None
+        if exact_amount <= 0:
+            raise HTTPException(status_code=422, detail="Сумма платежа должна быть больше нуля")
+
         reference = self.db.query(Invoice.visit_id).filter(Invoice.id == invoice_id).one_or_none()
         if reference is None:
             raise ValueError("Счет не найден")
@@ -500,14 +519,27 @@ class PaymentsMixin(BillingServiceMixinBase):
             self.db.rollback()
             raise HTTPException(status_code=409, detail="Контекст счёта требует сверки")
 
+        try:
+            total = _legacy_invoice_amount(invoice.total_amount)
+            paid = _legacy_invoice_amount(invoice.paid_amount)
+        except MoneyInputError:
+            raise HTTPException(status_code=409, detail="Суммы счёта требуют сверки") from None
+        if invoice.status in {InvoiceStatus.CANCELLED, InvoiceStatus.REFUNDED}:
+            raise HTTPException(status_code=409, detail="Счёт закрыт для оплаты")
+        if paid > total:
+            raise HTTPException(status_code=409, detail="Суммы счёта требуют сверки")
+        if exact_amount > total - paid:
+            raise HTTPException(status_code=400, detail="Сумма платежа превышает остаток счёта")
+
         payment = payment_service.create_payment_for_visit(
             visit_id=visit_id,
-            amount=Decimal(str(amount)),
+            amount=exact_amount,
             method=method_str,
             note=description,
             current_user=current_user,
             currency=currency,
             provider=None,
+            allow_overpayment=False,
             commit=False,
         )
 
@@ -516,8 +548,8 @@ class PaymentsMixin(BillingServiceMixinBase):
         payment.receipt_no = payment_number
         payment.provider_payment_id = reference_number
 
-        invoice.paid_amount += amount
-        invoice.balance = invoice.total_amount - invoice.paid_amount
+        invoice.paid_amount = float(paid + exact_amount)
+        invoice.balance = float(total - paid - exact_amount)
 
         if invoice.balance <= 0:
             invoice.status = InvoiceStatus.PAID

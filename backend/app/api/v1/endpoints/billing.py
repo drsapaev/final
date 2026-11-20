@@ -4,9 +4,10 @@ API endpoints для автоматического выставления сч�
 
 import logging
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,7 @@ from app.models.billing import (
 from app.models.user import User
 from app.services.billing_api_service import BillingApiDomainError, BillingApiService
 from app.services.billing_service import BillingService
+from app.services.money_input import MoneyInputError, parse_exact_json, parse_money
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -344,11 +346,23 @@ def send_invoice(
     return {"message": "Счет добавлен в очередь отправки"}
 
 
+async def _exact_payment_amount(request: Request) -> Decimal:
+    try:
+        payload = parse_exact_json(await request.body())
+        amount = parse_money(payload.get("amount") if isinstance(payload, dict) else None)
+    except MoneyInputError:
+        raise HTTPException(status_code=422, detail="Некорректная сумма платежа") from None
+    if amount <= 0:
+        raise HTTPException(status_code=422, detail="Сумма платежа должна быть больше нуля")
+    return amount
+
+
 @router.post("/payments", response_model=PaymentResponse)
 def record_payment(
     payment_data: PaymentCreate,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
+    exact_amount: Decimal = Depends(_exact_payment_amount),
 ):
     """Записать платеж"""
     service = BillingService(db)
@@ -356,7 +370,7 @@ def record_payment(
     try:
         payment = service.record_payment(
             invoice_id=payment_data.invoice_id,
-            amount=payment_data.amount,
+            amount=exact_amount,
             payment_method=payment_data.payment_method,
             reference_number=payment_data.reference_number,
             description=payment_data.description,
@@ -386,6 +400,9 @@ def record_payment(
     except ValidationError as exc:
         db.rollback()
         raise _billing_http_error(exc, "record_payment_response") from exc
+    except HTTPException:
+        db.rollback()
+        raise
     except ValueError:
         db.rollback()
         raise HTTPException(status_code=404, detail="Internal server error")

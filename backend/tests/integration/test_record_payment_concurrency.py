@@ -108,7 +108,7 @@ def legacy_invoice_pg(monkeypatch):
         yield owner, runtime, invoice_id, ids
 
 
-def _record(db: Session, *, invoice_id: int, actor_id: int, amount: int) -> int:
+def _record(db: Session, *, invoice_id: int, actor_id: int, amount: int | Decimal) -> int:
     payment = BillingService(db).record_payment(
         invoice_id=invoice_id,
         amount=amount,
@@ -150,13 +150,13 @@ def test_concurrent_partial_payment_reloads_the_invoice_balance(legacy_invoice_p
     with Session(runtime) as first, Session(runtime, expire_on_commit=False) as second:
         cached_invoice = second.get(Invoice, invoice_id)
         assert cached_invoice.paid_amount == 0
-        first_receipt = _record(first, invoice_id=invoice_id, actor_id=ids["stage"], amount=4)
+        first_receipt = _record(first, invoice_id=invoice_id, actor_id=ids["stage"], amount=Decimal("4.13"))
         first.commit()
         assert cached_invoice.paid_amount == 0
-        second_receipt = _record(second, invoice_id=invoice_id, actor_id=ids["cashier"], amount=6)
+        second_receipt = _record(second, invoice_id=invoice_id, actor_id=ids["cashier"], amount=Decimal("5.87"))
         assert second_receipt != first_receipt
         second.commit()
-    _assert_settled(owner, invoice_id, ids["visit"], [Decimal("4.00"), Decimal("6.00")])
+    _assert_settled(owner, invoice_id, ids["visit"], [Decimal("4.13"), Decimal("5.87")])
 
 
 def test_record_payment_persists_across_sessions(legacy_invoice_pg):
