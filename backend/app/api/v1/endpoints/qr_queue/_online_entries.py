@@ -1506,6 +1506,8 @@ def _full_update_create_independent_entries(
         )
 
     elif is_first_fill_qr:
+        from app.services.payment_refund_guard import recorded_payment_currency
+
         # ⭐ FIX 13: Первое заполнение QR-записи
         # ТОЛЬКО ОДНА услуга-консультация (is_consultation=True) получает QR время
         # ВСЕ остальные услуги получают ТЕКУЩЕЕ время и создаются как Independent Queue Entries
@@ -1518,10 +1520,26 @@ def _full_update_create_independent_entries(
         # ⭐ FIX 13: Ищем РОВНО ОДНУ консультационную услугу
         consultation_service_id = None
         additional_service_ids = []
+        services_for_visit = []
+        currencies = {}
+        should_create_visit = entry.patient_id is not None and entry.visit_id is None
 
         for service_item in request.services:
             svc_id = service_item["service_id"]
             service = db.query(Service).filter(Service.id == svc_id).first()
+
+            if service and should_create_visit:
+                currency = recorded_payment_currency(service.currency)
+                if currency is None:
+                    raise HTTPException(status_code=409, detail="Валюта услуги недоступна")
+                currencies[service.id] = currency
+                services_for_visit.append({
+                    "service_id": service.id,
+                    "name": service.name,
+                    "code": service.code,
+                    "price": service.price if service.price is not None else 0,
+                    "quantity": service_item.get("quantity", 1),
+                })
 
             # ⭐ Консультация определяется ТОЛЬКО явным флагом is_consultation
             if service and service.is_consultation and consultation_service_id is None:
@@ -1546,6 +1564,9 @@ def _full_update_create_independent_entries(
                     service.name if service else "?",
                     svc_id,
                 )
+
+        if len(set(currencies.values())) > 1:
+            raise HTTPException(status_code=409, detail="Услуги визита имеют разные валюты")
 
         # ⭐ new_service_ids содержит ТОЛЬКО дополнительные услуги (НЕ консультации)
         # Они будут созданы как Independent Queue Entries с текущим временем
@@ -1594,56 +1615,29 @@ def _full_update_create_independent_entries(
                 )
 
         # ⭐ FIX 2: Создаём Visit для QR-записи при первом заполнении
-        if entry.patient_id and entry.visit_id is None and request.services:
-            try:
-                from app.services.qr_queue_service import QRQueueService
+        if services_for_visit:
+            from app.services.qr_queue_service import QRQueueService
 
-                qr_service = QRQueueService(db)
-
-                # Подготавливаем услуги для Visit
-                services_for_visit = []
-                for svc_item in request.services:
-                    svc = (
-                        db.query(Service)
-                        .filter(Service.id == svc_item["service_id"])
-                        .first()
-                    )
-                    if svc:
-                        services_for_visit.append(
-                            {
-                                "service_id": svc.id,
-                                "name": svc.name,
-                                "code": svc.code,
-                                "price": float(svc.price) if svc.price else 0,
-                                "quantity": svc_item.get("quantity", 1),
-                            }
-                        )
-
-                if services_for_visit:
-                    visit = qr_service._create_visit_for_qr(
-                        patient_id=entry.patient_id,
-                        doctor_id=(
-                            entry.queue.specialist_id
-                            if consultation_service_id is not None
-                            else None
-                        ),
-                        visit_date=date.today(),
-                        services=services_for_visit,
-                        visit_type=entry.visit_type or "paid",
-                        discount_mode=request.discount_mode or "none",
-                        notes=f"QR-регистрация: {entry.patient_name}",
-                    )
-                    entry.visit_id = visit.id
-                    logger.info(
-                        "[full_update_online_entry] ⭐ FIX 2: Создан Visit ID=%d для QR-записи ID=%d",
-                        visit.id,
-                        entry.id,
-                    )
-            except Exception as visit_err:
-                logger.warning(
-                    "[full_update_online_entry] ⚠️ Не удалось создать Visit для QR-записи: %s",
-                    str(visit_err),
-                )
+            visit = QRQueueService(db)._create_visit_for_qr(
+                patient_id=entry.patient_id,
+                doctor_id=(
+                    entry.queue.specialist_id
+                    if consultation_service_id is not None
+                    else None
+                ),
+                visit_date=date.today(),
+                services=services_for_visit,
+                trusted_currency_by_service=currencies,
+                visit_type=entry.visit_type or "paid",
+                discount_mode=request.discount_mode or "none",
+                notes=f"QR-регистрация: {entry.patient_name}",
+            )
+            entry.visit_id = visit.id
+            logger.info(
+                "[full_update_online_entry] ⭐ FIX 2: Создан Visit ID=%d для QR-записи ID=%d",
+                visit.id,
+                entry.id,
+            )
 
     else:
         # Редактирование - обновляем текущую entry ТОЛЬКО со старыми услугами
@@ -2270,13 +2264,15 @@ def full_update_online_entry(
         )
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         logger.error("[full_update_online_entry] Ошибка: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
-        )
+        ) from None
 
 
 @router.post(

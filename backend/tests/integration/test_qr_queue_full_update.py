@@ -743,6 +743,72 @@ def test_full_update_frontend_aggregated_ids_ignore_unrelated_queue_entry(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize(
+    ("catalog_currency", "fail_after_staging", "expected_status"),
+    [("USD", False, 200), (None, False, 409), ("USD", True, 500)],
+    ids=["known-currency", "unknown-currency", "write-failure"],
+)
+def test_first_qr_fill_records_the_catalog_currency(
+    client, db_session, registrar_auth_headers, test_patient, test_service, test_daily_queue,
+    monkeypatch, catalog_currency, fail_after_staging, expected_status,
+):
+    test_service.currency = catalog_currency
+    test_service.price = Decimal("123.45")
+    test_service.is_consultation = True
+    entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=11,
+        queue_time=datetime.now(UTC),
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        source="online",
+        status="waiting",
+    )
+    db_session.add(entry)
+    db_session.commit()
+    entry_id = entry.id
+
+    if fail_after_staging:
+        from app.services.qr_queue_service import QRQueueService
+
+        create_visit = QRQueueService._create_visit_for_qr
+
+        def fail_create(self, **kwargs):
+            create_visit(self, **kwargs)
+            raise RuntimeError("synthetic failure after staging the visit")
+
+        monkeypatch.setattr(QRQueueService, "_create_visit_for_qr", fail_create)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{entry_id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": test_patient.short_name(),
+                "phone": test_patient.phone,
+                "birth_year": 1990,
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [{"service_id": test_service.id, "quantity": 1}],
+            "all_free": False,
+        },
+    )
+
+    assert response.status_code == expected_status, response.text
+    db_session.refresh(entry)
+    if expected_status != 200:
+        assert entry.visit_id is None
+        assert db_session.query(Visit).filter_by(patient_id=test_patient.id).count() == 0
+        return
+
+    line = db_session.query(VisitService).filter_by(visit_id=entry.visit_id).one()
+    assert line.currency == catalog_currency
+    assert line.price == Decimal("123.45")
+
+
+@pytest.mark.integration
 def test_full_update_all_free_preserves_paid_visit_payment_state(
     client,
     db_session,

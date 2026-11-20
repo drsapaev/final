@@ -760,11 +760,11 @@ async def create_grouped_payment(
         raise
     except Exception as exc:
         db.rollback()
-        logger.exception("Grouped cashier payment allocation failed")
+        logger.error("Grouped cashier payment allocation failed error_type=%s", type(exc).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Grouped cashier payment allocation failed: {str(exc)}",
-        )
+            detail="Grouped cashier payment allocation failed",
+        ) from None
 
 
 @router.post("/payments", response_model=PaymentResponse)

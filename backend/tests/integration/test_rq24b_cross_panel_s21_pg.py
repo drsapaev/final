@@ -69,6 +69,8 @@ SCRATCH_DB = f"rq24b_check_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
+from tests._rq_cashier_runtime import cashier_request  # noqa: E402
+
 pytestmark = pytest.mark.integration
 
 # ---- canonical routes under test (S-21 participants) ----
@@ -1225,32 +1227,38 @@ def test_cashier_sees_and_collects_the_payment(pg_client, pg_session, world):
     )
     assert resp.status_code == 200, resp.text
 
-    # Cashier surface: the payable card for the walk-in.
-    pending = pg_client.get(CASHIER_PENDING, headers=_auth_headers(world["cashier"]))
-    assert pending.status_code == 200, pending.text
-    rows = pending.json().get("items") or pending.json().get("payments") or []
-    target = next(
-        (r for r in rows if r.get("patient_id") == entry.patient_id),
-        None,
-    )
-    assert target is not None, f"cashier must see the walk-in bill; got {rows}"
-    visit_ids = target["visit_ids"]
-    assert visit_ids, "pending payment must reference payable visits"
+    patient_id = entry.patient_id
+    cashier_headers = _auth_headers(world["cashier"])
+    with cashier_request(pg_client, pg_session) as runtime_client:
+        # Read pending debt through the same restricted role as allocation.
+        pending = runtime_client.get(CASHIER_PENDING, headers=cashier_headers)
+        assert pending.status_code == 200, pending.text
+        rows = pending.json().get("items") or pending.json().get("payments") or []
+        target = next((row for row in rows if row.get("patient_id") == patient_id), None)
+        assert target is not None, "cashier must see the walk-in bill"
+        visit_ids = target["visit_ids"]
+        assert visit_ids, "pending payment must reference payable visits"
 
-    # Server-side allocation (oldest visit first), one grouped payment.
-    resp = pg_client.post(
-        CASHIER_GROUPED,
-        json={
+        command = {
             "visit_ids": visit_ids,
-            "patient_id": entry.patient_id,
+            "patient_id": patient_id,
             "amount": 50000,
             "method": "cash",
-        },
-        headers=_auth_headers(world["cashier"]),
-    )
-    assert resp.status_code in (200, 201), resp.text
+            "client_request_id": str(uuid.uuid4()),
+        }
+        resp = runtime_client.post(CASHIER_GROUPED, json=command, headers=cashier_headers)
+        assert resp.status_code in (200, 201), resp.text
+        replay = runtime_client.post(CASHIER_GROUPED, json=command, headers=cashier_headers)
+        assert replay.status_code == 200, replay.text
+        assert replay.json() == resp.json()
     payment = resp.json()
     assert payment["allocations"] and payment["payments"]
+    stored_payments = (
+        pg_session.query(Payment)
+        .filter(Payment.client_request_id == command["client_request_id"])
+        .count()
+    )
+    assert stored_payments == len(payment["payments"])
 
     # The payment landed exactly on the walk-in's visit — no leakage.
     other_payments = (

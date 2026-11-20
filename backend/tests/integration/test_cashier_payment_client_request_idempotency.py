@@ -235,6 +235,33 @@ def test_grouped_same_client_request_id_replays_without_second_allocation(
     assert total_rows == 2, f"grouped retry must not re-allocate, got {total_rows} rows"
 
 
+def test_grouped_receipt_failure_rolls_back_and_redacts_internal_details(
+    client, db_session, admin_auth_headers, monkeypatch, caplog,
+):
+    patient = _make_patient(db_session)
+    visit = _make_visit(db_session, patient, 100000)
+    key = str(uuid4())
+    diagnostic = "SYNTHETIC-PRIVATE-ALLOCATION-DIAGNOSTIC"
+
+    def fail_receipt(*args, **kwargs):
+        raise RuntimeError(diagnostic)
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.cashier._payments.commit_with_client_request",
+        fail_receipt,
+    )
+    response = client.post(GROUPED_URL, headers=admin_auth_headers, json={
+        "visit_ids": [visit.id], "amount": 40000, "method": "cash", "client_request_id": key,
+    })
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Grouped cashier payment allocation failed"}
+    assert "Grouped cashier payment allocation failed error_type=RuntimeError" in caplog.text
+    assert diagnostic not in caplog.text
+    assert not _paid_rows(db_session, visit)
+    assert db_session.query(PaymentClientRequest).filter_by(client_request_id=key).count() == 0
+
+
 def test_grouped_missing_client_request_id_keeps_legacy_behavior(
     client, db_session, admin_auth_headers
 ):
