@@ -317,6 +317,6 @@ def _sqlite_upgrade() -> None:
 
 def downgrade() -> None:
     # Never restore a weaker fence or reset the generation allocator while
-    # its capabilities could remain live. A deeper rollback requires a
-    # traffic-drained, audited credential invalidation procedure.
-    pass
+    # its capabilities could remain live. Refuse before Alembic lowers its
+    # revision while the 0118 objects still exist.
+    raise RuntimeError("Encounter financial fence requires an audited rollback")

@@ -99,7 +99,8 @@ def test_membership_and_encounter_identity_never_reuse_generation(case):
             conn.execute(text("UPDATE encounters SET generation=:old WHERE id=1"), {"old": before})
         migration = _migration("0118_encounter_financial_fence.py")
         migration.op = Operations(MigrationContext.configure(conn))
-        migration.downgrade()
+        with pytest.raises(RuntimeError, match="requires an audited rollback"):
+            migration.downgrade()
         migration.upgrade()
         conn.execute(text("INSERT INTO visits VALUES (3,1,1)"))
         assert conn.execute(text("SELECT generation FROM encounters WHERE id=1")).scalar_one() > changed
