@@ -908,30 +908,10 @@ async def create_payment(
             # 3. Проверяем остаток
             remaining_debt = total_cost - paid_amount
 
-            # === ВАЛИДАЦИЯ ПЕРЕПЛАТЫ С AUDIT-TRAIL ===
-            # Кассир может принять сумму, превышающую остаток (аванс/депозит),
-            # но это должно быть явно залогировано для финансового аудита.
             try:
                 payment_amount_decimal = Decimal(str(payment_data.amount))
             except (ArithmeticError, ValueError):
                 payment_amount_decimal = Decimal("0")
-
-            overpayment_amount = payment_amount_decimal - remaining_debt
-            if overpayment_amount > Decimal("0"):
-                # Авансовый платёж/переплата: разрешаем, но записываем в audit log.
-                logger.warning(
-                    "Cashier overpayment accepted: visit_id=%s patient_id=%s "
-                    "total_cost=%s paid_amount=%s remaining_debt=%s "
-                    "payment_amount=%s overpayment=%s cashier_id=%s",
-                    visit.id,
-                    patient_id,
-                    str(total_cost),
-                    str(paid_amount),
-                    str(remaining_debt),
-                    str(payment_amount_decimal),
-                    str(overpayment_amount),
-                    getattr(current_user, "id", None),
-                )
 
             # Запрещаем приём платежа, когда услуги уже полностью оплачены
             # и кассир пытается принять ещё один (без явного намерения аванса).
@@ -965,10 +945,8 @@ async def create_payment(
         #   3. overpayment-as-deposit policy (logged at WARNING)
         #   4. IntegrityError defense-in-depth (409, not 500)
         #
-        # The application-level overpayment check ABOVE (lines 656-701)
-        # is preserved for UX clarity (nicer error messages) and runs
-        # BEFORE the service call. The service's own check is the
-        # authoritative runtime guard.
+        # The early settled-visit check supplies the cashier-facing error.
+        # The service rechecks the debt under lock before recording the payment.
         new_payment = PaymentInvariantService(db).create_payment_for_visit(
             visit_id=payment_data.visit_id,
             amount=payment_data.amount,

@@ -231,6 +231,27 @@ def test_cashier_create_payment_rejects_mismatched_visit_and_appointment(
     ) == []
 
 
+def test_cashier_overpayment_does_not_log_the_patient_identifier(
+    client, db_session, auth_headers, test_service, caplog,
+):
+    patient, visit = _create_patient_visit(db_session, suffix="0112")
+    _add_visit_service(db_session, visit, price="10.00", service_id=test_service.id)
+
+    with caplog.at_level("WARNING"):
+        response = client.post(
+            "/api/v1/cashier/payments",
+            headers=auth_headers,
+            json={"patient_id": patient.id, "visit_id": visit.id, "amount": 12.5, "method": "cash"},
+        )
+
+    assert response.status_code == 200, response.text
+    payment = db_session.query(Payment).filter_by(visit_id=visit.id).one()
+    assert payment.status == "paid" and payment.amount == Decimal("12.50")
+    records = [record.getMessage() for record in caplog.records if "overpayment" in record.getMessage()]
+    assert len(records) == 1 and records[0].startswith("payment.overpayment_accepted")
+    assert "patient_id" not in records[0]
+
+
 def test_cashier_create_payment_rejects_mismatched_patient_and_visit(
     client,
     db_session,
