@@ -38,12 +38,18 @@ def _gross_payment_report(
     verified_department = and_(Visit.id.is_not(None), ~mismatched_link, link_count <= 1)
     # Match the receipt timestamp, including the fallback for historical payments.
     posted_at = func.coalesce(Payment.paid_at, Payment.created_at)
+    # A full refund changes the current status but preserves the original receipt.
+    # Refunded rows require a recorded posting time to establish that receipt.
+    settled_receipt = or_(
+        Payment.status.in_(("paid", "completed")),
+        and_(Payment.status == "refunded", Payment.paid_at.is_not(None)),
+    )
     query = db.query(
         Payment.amount, Payment.currency, Payment.provider, Payment.method,
         posted_at.label("posted_at"), Payment.visit_id, Visit.department,
         verified_department.label("verified_department"),
     ).outerjoin(Visit, Visit.id == Payment.visit_id).filter(
-        Payment.status.in_(("paid", "completed")),
+        settled_receipt,
         posted_at >= start_date,
         posted_at <= end_date,
     )

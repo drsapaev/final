@@ -273,6 +273,77 @@ def test_revenue_groups_payments_by_posting_day(
     ]
 
 
+def test_gross_receipt_keeps_original_posting_day_after_a_full_refund(
+    client: TestClient,
+    admin_token: str,
+    db_session,
+    test_patient,
+    monkeypatch,
+) -> None:
+    posted_at = datetime(2034, 9, 12, 11, tzinfo=UTC)
+    ordered_at = posted_at - timedelta(days=1)
+    refunded_at = posted_at + timedelta(days=1)
+    visit = Visit(
+        patient_id=test_patient.id, visit_date=ordered_at.date(), department="cardiology"
+    )
+    db_session.add(visit)
+    db_session.flush()
+    payment = Payment(
+        visit_id=visit.id, amount=Decimal("31.25"), currency="UZS", status="paid",
+        method="click", provider="click", created_at=ordered_at, paid_at=posted_at,
+    )
+    db_session.add_all([
+        payment,
+        Payment(
+            visit_id=visit.id, amount=Decimal("80.00"), currency="UZS", status="refunded",
+            refunded_amount=Decimal("80.00"), created_at=ordered_at, refunded_at=refunded_at,
+        ),
+        Payment(
+            visit_id=visit.id, amount=Decimal("70.00"), currency="UZS", status="pending",
+            created_at=ordered_at, paid_at=posted_at,
+        ),
+    ])
+    db_session.commit()
+
+    def report() -> dict[str, Any]:
+        response = client.get(
+            "/api/v1/analytics/revenue-breakdown",
+            headers=_auth_headers(admin_token),
+            params={
+                "start_date": ordered_at.date().isoformat(),
+                "end_date": refunded_at.date().isoformat(),
+                "department": "cardiology",
+            },
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    before = report()
+    assert before["basis"] == "gross_settled_payments"
+    assert before["total_revenue"] == 31.25
+    assert before["total_transactions"] == 1
+    assert before["daily_revenue"] == [{"date": "2034-09-12", "amount": 31.25}]
+
+    payment.refunded_amount = payment.amount
+    payment.refunded_at = refunded_at
+    BillingService(db_session).update_payment_status(payment.id, "refunded", commit=False)
+    db_session.commit()
+
+    assert report() == before
+    monkeypatch.setattr(
+        queue_service, "get_local_timestamp", lambda db: refunded_at + timedelta(days=1)
+    )
+    response = client.get(
+        "/api/v1/analytics/trends", headers=_auth_headers(admin_token), params={"days": 3}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["revenue_trend"] == [
+        {"date": "2034-09-11", "revenue": 0.0},
+        {"date": "2034-09-12", "revenue": 31.25},
+        {"date": "2034-09-13", "revenue": 0.0},
+    ]
+
+
 def test_revenue_trends_match_clinic_calendar_dates(
     client: TestClient,
     admin_token: str,
