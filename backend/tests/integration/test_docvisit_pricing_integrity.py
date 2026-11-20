@@ -59,6 +59,7 @@ from app.models.service import Service
 from app.models.telegram_config import TelegramUser
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services.payment_invariant_service import PaymentInvariantService
 
 pytestmark = pytest.mark.integration
 
@@ -618,6 +619,46 @@ def test_delete_service_on_paid_visit_rejected(client, db_session):
     assert response.status_code == 409, response.text
     db_session.expire_all()
     assert db_session.get(VisitService, visit_service.id) is not None
+
+
+@pytest.mark.parametrize("change, has_payment", [("visit", False), ("doctor_owner", True)])
+def test_delete_service_checks_the_locked_visit_assignment(client, db_session, monkeypatch, change, has_payment):
+    current = _create_user(db_session, role="doctor", label="previousowner")
+    previous_doctor = _create_doctor(db_session, current, specialty="stomatology")
+    replacement = _create_user(db_session, role="doctor", label="newowner")
+    previous_doctor_id, replacement_user_id = previous_doctor.id, replacement.id
+    replacement_doctor_id = (
+        _create_doctor(db_session, replacement, specialty="stomatology").id
+        if change == "visit" else None
+    )
+    service = _create_service(db_session, label="reassigned", price=Decimal("30000"))
+    visit, line = _create_visit_with_service(
+        db_session, patient=_create_patient(db_session), doctor=previous_doctor,
+        service=service, price=Decimal("30000"),
+    )
+    visit_id, line_id = visit.id, line.id
+    if has_payment:
+        db_session.add(Payment(visit_id=visit_id, amount=Decimal("30000"), currency="UZS", status="paid"))
+        db_session.commit()
+    original_lock = PaymentInvariantService.lock_visit_for_payment_change
+
+    def lock_current_assignment(invariant, requested_visit_id):
+        assert requested_visit_id == visit_id
+        if replacement_doctor_id is not None:
+            changed = invariant.db.query(Visit).filter_by(id=visit_id).update(
+                {Visit.doctor_id: replacement_doctor_id}, synchronize_session=False,
+            )
+        else:
+            changed = invariant.db.query(Doctor).filter_by(id=previous_doctor_id).update(
+                {Doctor.user_id: replacement_user_id}, synchronize_session=False,
+            )
+        assert changed == 1
+        return original_lock(invariant, requested_visit_id)
+
+    monkeypatch.setattr(PaymentInvariantService, "lock_visit_for_payment_change", lock_current_assignment)
+    denied = _delete(client, _login_headers(client, current), visit_id=visit_id, visit_service_id=line_id)
+    assert denied.status_code == 403, denied.text
+    assert db_session.get(VisitService, line_id) is not None
 
 
 def test_add_service_on_processing_invoice_rejected(client, db_session):

@@ -248,17 +248,21 @@ def _schedule_next_confirmation_data(
 # amounts) instead of silently re-basing paid visits.
 
 
-def _assert_visit_services_mutable(db: Session, visit_id: int) -> None:
+def _assert_visit_services_mutable(db: Session, visit_id: int, current_user: User) -> None:
     """DOCVISIT-BE-003: guard visit-service mutations against the payment
     ledger.
 
     Locks the visit row first (the same ``visits`` → invoice order payment
-    flows use), rejects in-flight ``processing`` invoice reservations and
-    fails closed when the visit has a net settled amount (paid minus
-    completed refunds). Unpaid and fully refunded visits stay mutable.
+    flows use), rechecks the current assignment and fails closed when the
+    visit has a processing invoice or a net settled amount. Unpaid and
+    fully refunded visits stay mutable.
     """
     invariant = PaymentInvariantService(db)
-    invariant.lock_visit_for_payment_change(visit_id)
+    visit = invariant.lock_visit_for_payment_change(visit_id)
+    db.expire(visit, ["doctor"])
+    if visit.doctor is not None:
+        db.expire(visit.doctor, ["user_id"])
+    _ensure_visit_doctor_access(visit, current_user)
     net_settled = invariant.compute_paid_amount(visit_id)
     if net_settled > 0:
         raise HTTPException(
@@ -1010,9 +1014,7 @@ def add_service_to_visit(
 
         # Lock the visit first, as payment paths do, then lock and refresh the
         # catalog row. Both locks stay held until the line is committed.
-        _assert_visit_services_mutable(db, visit_id)
-        db.expire(visit, ["doctor"])
-        _ensure_visit_doctor_access(visit, current_user)
+        _assert_visit_services_mutable(db, visit_id, current_user)
         service = (
             db.query(Service).filter(Service.id == service_id)
             .with_for_update().populate_existing().first()
@@ -1162,13 +1164,17 @@ def remove_service_from_visit(
         # Проверяем права доступа
         _ensure_visit_doctor_access(visit, current_user)
 
-        # Удаляем услугу
+        # Use the same Visit lock and refreshed owner as add-service before
+        # acting on the line currently attached to this Visit.
+        _assert_visit_services_mutable(db, visit_id, current_user)
+
         visit_service = (
             db.query(VisitService)
             .filter(
                 VisitService.id == visit_service_id,
                 VisitService.visit_id == visit.id,
             )
+            .populate_existing()
             .first()
         )
 
@@ -1177,10 +1183,6 @@ def remove_service_from_visit(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Услуга в визите не найдена",
             )
-
-        # DOCVISIT-BE-003: coordinate with the payment ledger before the
-        # destructive mutation.
-        _assert_visit_services_mutable(db, visit_id)
 
         db.delete(visit_service)
         db.commit()
