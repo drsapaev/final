@@ -58,6 +58,8 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 sys.path.insert(0, str(BACKEND_DIR))
 
+from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
+
 
 def _candidate_admin_urls() -> list[str]:
     urls: list[str] = []
@@ -91,7 +93,7 @@ def _run_alembic(sa_url: str, *args: str) -> subprocess.CompletedProcess:
 def _admin_url() -> str:
     for candidate in _candidate_admin_urls():
         try:
-            if make_url(candidate).host not in {"localhost", "127.0.0.1", "::1"}:
+            if not is_local_admin_dsn(candidate):
                 continue
             with psycopg.connect(candidate, connect_timeout=5, autocommit=True) as c:
                 c.execute("SELECT 1")

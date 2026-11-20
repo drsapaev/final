@@ -34,6 +34,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from psycopg import sql
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -42,6 +43,8 @@ from sqlalchemy.orm import sessionmaker
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 sys.path.insert(0, str(BACKEND_DIR))
+
+from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
 
 
 def _candidate_admin_urls() -> list[str]:
@@ -76,65 +79,62 @@ def _run_alembic(sa_url: str, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def _provision(db_name: str, target: str) -> str:
-    """Create a scratch DB and upgrade it to `target`; returns its URL."""
-    last_error: Exception | None = None
+def _provision(db_name: str, target: str) -> tuple[str, str]:
+    """Create a local scratch database and return its URL and allocator connection."""
     admin_url = None
     for candidate in _candidate_admin_urls():
+        if not is_local_admin_dsn(candidate):
+            continue
         try:
             with psycopg.connect(candidate, connect_timeout=5, autocommit=True) as c:
                 c.execute("SELECT 1")
             admin_url = candidate
             break
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
+        except Exception:  # noqa: BLE001
+            continue
     if admin_url is None:
-        pytest.skip(
-            f"disposable PostgreSQL unavailable — A+ migration acceptance "
-            f"NOT_RUN (last error: {last_error})"
-        )
+        pytest.skip("disposable PostgreSQL unavailable for lab lineage migration acceptance")
 
-    u = make_url(admin_url)
+    scratch = make_url(admin_url).set(database=db_name)
     try:
-        with psycopg.connect(admin_url, autocommit=True) as c:
-            c.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
-            c.execute(f'CREATE DATABASE "{db_name}"')
+        with psycopg.connect(admin_url, autocommit=True) as conn:
+            conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name)))
     except Exception as exc:  # noqa: BLE001 - нет прав CREATE DATABASE и т.п.
         pytest.skip(
             f"cannot create a scratch database on this PostgreSQL server "
             f"({type(exc).__name__}); run against a server with CREATEDB"
         )
-    sa_url = (
-        f"postgresql+psycopg://{u.username}:{u.password}"
-        f"@{u.host}:{u.port}/{db_name}"
-    )
-    r = _run_alembic(sa_url, "upgrade", target)
-    assert r.returncode == 0, r.stderr[-1500:]
-    return sa_url
+    try:
+        with psycopg.connect(scratch.render_as_string(hide_password=False), autocommit=True) as conn:
+            conn.execute("ALTER SCHEMA public OWNER TO CURRENT_USER")
+        sa_url = scratch.set(drivername="postgresql+psycopg").render_as_string(hide_password=False)
+        result = _run_alembic(sa_url, "upgrade", target)
+        assert result.returncode == 0, result.stderr[-1500:]
+        return sa_url, admin_url
+    except Exception:
+        _drop(db_name, admin_url)
+        raise
 
 
-def _drop(db_name: str) -> None:
-    for candidate in _candidate_admin_urls():
-        try:
-            with psycopg.connect(candidate, autocommit=True) as c:
-                c.execute(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)')
-            return
-        except Exception:  # noqa: BLE001
-            continue
+def _drop(db_name: str, admin_url: str) -> None:
+    with psycopg.connect(admin_url, autocommit=True) as conn:
+        conn.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(db_name)))
 
 
 @pytest.fixture(scope="module")
 def fresh_head_url():
     db_name = f"lab_a1_fresh_{uuid.uuid4().hex[:8]}"
-    sa_url = _provision(db_name, "head")
-    yield sa_url
-    _drop(db_name)
+    sa_url, admin_url = _provision(db_name, "head")
+    try:
+        yield sa_url
+    finally:
+        _drop(db_name, admin_url)
 
 
-def _seed_history_and_upgrade() -> str:
+def _seed_history_and_upgrade() -> tuple[str, str]:
     """0069 schema + one historical lab_results row → upgrade to head."""
     db_name = f"lab_a1_upgrade_{uuid.uuid4().hex[:8]}"
-    sa_url = _provision(db_name, "0069_sentinel_pair_retirement")
+    sa_url, admin_url = _provision(db_name, "0069_sentinel_pair_retirement")
     engine = create_engine(sa_url, future=True)
     try:
         with engine.begin() as conn:
@@ -155,10 +155,10 @@ def _seed_history_and_upgrade() -> str:
             )
         r = _run_alembic(sa_url, "upgrade", "head")
         assert r.returncode == 0, r.stderr[-1500:]
-        return sa_url
+        return sa_url, admin_url
     except Exception:
         engine.dispose()
-        _drop(db_name)
+        _drop(db_name, admin_url)
         raise
     finally:
         engine.dispose()
@@ -245,7 +245,7 @@ def test_fresh_install_schema_shape(fresh_head_url):
 
 @pytest.mark.integration
 def test_upgrade_keeps_historical_rows_and_allows_lineage_less_duplicates():
-    sa_url = _seed_history_and_upgrade()
+    sa_url, admin_url = _seed_history_and_upgrade()
     engine = create_engine(sa_url, future=True)
     db_name = make_url(sa_url).database
     try:
@@ -275,7 +275,7 @@ def test_upgrade_keeps_historical_rows_and_allows_lineage_less_duplicates():
             )
     finally:
         engine.dispose()
-        _drop(db_name)
+        _drop(db_name, admin_url)
 
 
 @pytest.mark.integration
