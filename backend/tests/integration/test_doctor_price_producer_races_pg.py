@@ -66,17 +66,18 @@ def provisioned_database():
         assert revision == "0117_visit_invitation_delivery"
         schema_owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(nspowner) FROM pg_catalog.pg_namespace WHERE nspname='public'")).scalar_one()
         table_owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class WHERE oid='public.visit_invitation_deliveries'::pg_catalog.regclass")).scalar_one()
-        migration = _module("synthetic_direct_price_access_0121", root / "backend/alembic/versions/0121_doctor_price_runtime_access.py")
-        migration.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": "public"}))
-        migration.upgrade()
-        # The complete 0118..0125 migration chain is not frozen yet. This
-        # separate direct upgrade is preliminary evidence for 0126 only.
-        issuer = _module("synthetic_direct_invitation_issuer_0126", root / "backend/alembic/versions/0126_invitation_issuer_auth.py")
-        issuer.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": "public"}))
-        issuer.upgrade()
-        approval = _module("synthetic_direct_invitation_approval_0128", root / "backend/alembic/versions/0128_invitation_price_approval.py")
-        approval.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": "public"}))
-        approval.upgrade()
+        # Apply the price and invitation pieces used by this focused fixture.
+        # The standard invitation provisioner checks the trigger body from 0130.
+        operations = Operations(MigrationContext.configure(db, opts={"version_table_schema": "public"}))
+        for revision in (
+            "0121_doctor_price_runtime_access",
+            "0126_invitation_issuer_auth",
+            "0128_invitation_price_approval",
+            "0130_invitation_nonce_guard",
+        ):
+            migration = _module(f"synthetic_{revision}", root / "backend/alembic/versions" / f"{revision}.py")
+            migration.op = operations
+            migration.upgrade()
         # Synthetic-only clinical permissions make the full route executable;
         # production grants for clinical tables require their own review.
         protected = {"doctor_price_hmac_key_versions", "doctor_price_intents", "doctor_price_intent_keys",
@@ -422,19 +423,23 @@ def test_hidden_blacklisted_jti_fails_closed_before_any_issuer_write(migrated_en
     quote = admin_engine.dialect.identifier_preparer.quote_identifier
     claims = jwt.decode(auth["Authorization"].removeprefix("Bearer "), options={"verify_signature": False})
     with admin_engine.begin() as db:
+        had_rls, had_force = db.execute(text(
+            "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class "
+            "WHERE oid='public.token_blacklist'::pg_catalog.regclass"
+        )).one()
         db.execute(text("INSERT INTO public.token_blacklist (jti,user_id,expires_at,reason) "
                         "VALUES (:jti,:user_id,:expires,'logout')"),
                    {"jti": claims["jti"], "user_id": actor_id, "expires": datetime.now(UTC) + timedelta(hours=1)})
         db.execute(text("ALTER TABLE public.token_blacklist ENABLE ROW LEVEL SECURITY"))
         db.execute(text("ALTER TABLE public.token_blacklist FORCE ROW LEVEL SECURITY"))
-        db.exec_driver_sql(f"CREATE POLICY synthetic_auth_hidden ON public.token_blacklist FOR SELECT TO {quote(runtime_role)} USING (false)")
+        db.exec_driver_sql(f"CREATE POLICY synthetic_auth_hidden ON public.token_blacklist AS RESTRICTIVE FOR SELECT TO {quote(runtime_role)} USING (false)")
     headers = {**auth, "Idempotency-Key": f"synthetic-{uuid4()}", "Idempotency-Intent": "new"}
     payload = _payload(patient_id, service_id, "0.00")
     try:
         hidden = client.post("/api/v1/doctor/visits/schedule-next", json=payload, headers=headers)
         assert hidden.status_code == 503, hidden.text
         with admin_engine.begin() as db:
-            db.execute(text("ALTER POLICY synthetic_auth_hidden ON public.token_blacklist USING (true)"))
+            db.execute(text("DROP POLICY synthetic_auth_hidden ON public.token_blacklist"))
         visible = client.post("/api/v1/doctor/visits/schedule-next", json=payload, headers=headers)
         assert visible.status_code == 401, visible.text
         with sessions() as db:
@@ -442,8 +447,10 @@ def test_hidden_blacklisted_jti_fails_closed_before_any_issuer_write(migrated_en
     finally:
         with admin_engine.begin() as db:
             db.execute(text("DROP POLICY IF EXISTS synthetic_auth_hidden ON public.token_blacklist"))
-            db.execute(text("ALTER TABLE public.token_blacklist NO FORCE ROW LEVEL SECURITY"))
-            db.execute(text("ALTER TABLE public.token_blacklist DISABLE ROW LEVEL SECURITY"))
+            if not had_force:
+                db.execute(text("ALTER TABLE public.token_blacklist NO FORCE ROW LEVEL SECURITY"))
+            if not had_rls:
+                db.execute(text("ALTER TABLE public.token_blacklist DISABLE ROW LEVEL SECURITY"))
 
 
 def test_schedule_dependency_tree_has_no_early_auth_dependency():
