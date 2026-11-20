@@ -1,3 +1,9 @@
+## Текущая точка — T18 после merge #4133 — 2026-11-20
+
+PR #4133 слит 20 ноября 2026 по Asia/Tashkent, squash-коммит `2012a80cbba254782ac5e0c93fb3654ac67eca65`. Проверенный финальный HEAD `8d70d556dae91943aca308259518e1c0e92483ed` совпадает со слитым деревом. **T18 и Tier‑2 остаются PARTIAL.** T19 / #4117 слит на `e33adf5e9`. Task memory `bd2f7564-bd3d-449d-8d85-5a9325722a80`.
+
+На слитом дереве: автономный Chromium-тест активации и Cache Storage — 1/1 PASS, Vitest `sw-nocache.test.ts` — 45/45 PASS, тесты манифеста и безопасного teardown — 12 PASS (284 вне выборки). Синтаксис `smoke_test_staging.sh` и две чистые проверки маскирования телефона — PASS. По указанию пользователя синтетический staging разрешён только в Codex Cloud. Доступная конфигурация `final` содержит `drsapaev/final`; сохранённая ревизия отличается от `2012a80cb`. Для запуска требуется отдельный облачный чат. В нём получить и сверить внедряемый SHA, подтвердить Docker и изоляцию, затем проверить доставку и активацию SW и оставшиеся сценарии T18 с отчётом и teardown. В этом цикле staging не запускался. См. [EVIDENCE.md](EVIDENCE.md).
+
 ## Текущая точка — T18 после #4132 — 2026-11-19
 
 PR #4132 слит в `main` коммитом `b94e7b8f0da3b3476f14b414f95087713fd51df8`. Дерево совпадает с проверенным HEAD `554d0abfb`. **T18 и Tier‑2 остаются PARTIAL.** Локальный fix установки SW в ветке `codex/aqs-t18-worker-install-nostore`. Fail-first и post-fix — `node --test frontend/e2e-manual/sw-install-nostore-check.mjs`, юнит-набор SW 45/45 PASS. Доказательства и границы в [EVIDENCE.md](EVIDENCE.md).
