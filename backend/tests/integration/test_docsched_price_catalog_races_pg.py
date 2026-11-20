@@ -25,8 +25,10 @@ from fastapi import HTTPException, Request
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.api.v1.endpoints.doctor_integration import _visits as endpoint
+from app.db.base_class import Base
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -56,6 +58,32 @@ def _catalog_test_url():
     if not ci_service and not (url.database or "").startswith("clinic_test"):
         pytest.skip("use an explicitly disposable clinic_test database")
     return url
+
+
+@pytest.fixture(scope="module")
+def catalog_pg_engine():
+    """Isolate the metadata tests that exercise repeat-visit completion."""
+    url = _catalog_test_url()
+    schema = "test_docsched_catalog_" + uuid4().hex
+    admin = create_engine(url, pool_pre_ping=True)
+    with admin.begin() as conn:
+        conn.execute(CreateSchema(schema))
+    engine = create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=8,
+        connect_args={"options": f"-csearch_path={schema} -cstatement_timeout=15000 -clock_timeout=10000"},
+    )
+    try:
+        import app.db.base  # noqa: F401
+
+        Base.metadata.create_all(engine)
+        yield engine
+    finally:
+        engine.dispose()
+        with admin.begin() as conn:
+            conn.execute(DropSchema(schema, cascade=True))
+        admin.dispose()
 
 
 @pytest.fixture(scope="module")
