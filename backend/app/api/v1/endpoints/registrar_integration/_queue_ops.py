@@ -651,7 +651,11 @@ def start_queue_visit(
         from app.models.visit import Visit
 
         queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.id == entry_id)
+            .with_for_update(of=OnlineQueueEntry)
+            .populate_existing()
+            .first()
         )
         if not queue_entry:
             # This legacy queue route must not fall back to Visit or Appointment IDs:
@@ -747,15 +751,18 @@ def start_queue_visit(
                         detail="Queue entry visit does not belong to the queue patient",
                     )
 
-            # REGSTART-BE-002 (audit 3892 group 24): terminal queue
-            # entries are terminal — cancelled/no_show/served must not
-            # resurrect to in_progress even for a legitimate Registrar
-            # when the ticket carries no linked Visit to gate the
-            # transition (fail-closed, zero mutation).
-            if queue_entry.status in ("cancelled", "no_show", "served"):
+            queue_status = str(queue_entry.status or "").strip().lower()
+            terminal_statuses = (
+                REGISTRAR_CANCEL_BLOCKED_STATUSES
+                | REGISTRAR_HIDDEN_QUEUE_STATUSES
+                | {"incomplete"}
+            )
+            if queue_status in terminal_statuses or (
+                linked_visit is None and queue_status not in REGISTRAR_START_STATUSES
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Queue entry is terminal ({queue_entry.status}) and cannot be restarted",
+                    detail="Queue entry cannot be started from the current status",
                 )
 
             changed_at = datetime.now(UTC)

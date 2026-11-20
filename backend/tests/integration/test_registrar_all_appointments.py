@@ -920,19 +920,33 @@ class TestRegistrarAllAppointments:
         assert entry.status == "in_progress"
         assert unrelated_visit.status == "pending_confirmation"
 
-    def test_start_queue_visit_rejects_terminal_entries_without_visit(
+    @pytest.mark.parametrize(
+        ("initial_status", "expected_http_status"),
+        [
+            ("waiting", 200),
+            ("queued", 200),
+            ("canceled", 409),
+            ("cancelled", 409),
+            ("served", 409),
+            ("no_show", 409),
+            ("completed", 409),
+            ("done", 409),
+            ("incomplete", 409),
+            ("diagnostics", 409),
+            ("in_progress", 409),
+            ("called", 409),
+        ],
+    )
+    def test_start_queue_visit_checks_unlinked_status(
         self,
         client,
         db_session,
         auth_headers,
         test_patient,
         test_doctor,
+        initial_status,
+        expected_http_status,
     ):
-        """REGSTART-BE-002 (audit 3892 group 24): the legacy registrar start
-        route must not resurrect terminal queue entries — cancelled,
-        no_show and served are terminal even for a legitimate Registrar
-        when the ticket has no linked Visit to gate the transition.
-        Direct desk-start from a waiting ticket stays supported."""
         queue = DailyQueue(
             day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
@@ -940,54 +954,29 @@ class TestRegistrarAllAppointments:
             active=True,
         )
         db_session.add(queue)
-        db_session.commit()
-        db_session.refresh(queue)
-
-        entries = {}
-        for number, terminal in enumerate(("cancelled", "served", "no_show"), start=1):
-            entries[terminal] = OnlineQueueEntry(
-                queue_id=queue.id,
-                number=number,
-                patient_id=test_patient.id,
-                patient_name=test_patient.short_name(),
-                phone=test_patient.phone,
-                visit_id=None,
-                source="desk",
-                status=terminal,
-            )
-        waiting_entry = OnlineQueueEntry(
+        db_session.flush()
+        entry = OnlineQueueEntry(
             queue_id=queue.id,
-            number=4,
+            number=1,
             patient_id=test_patient.id,
             patient_name=test_patient.short_name(),
             phone=test_patient.phone,
             visit_id=None,
             source="desk",
-            status="waiting",
+            status=initial_status,
         )
-        db_session.add_all(list(entries.values()) + [waiting_entry])
+        db_session.add(entry)
         db_session.commit()
-        for e in entries.values():
-            db_session.refresh(e)
-        db_session.refresh(waiting_entry)
 
-        for terminal, entry in entries.items():
-            response = client.post(
-                f"/api/v1/registrar/queue/{entry.id}/start-visit",
-                headers=auth_headers,
-            )
-            assert response.status_code == 409, (terminal, response.text)
-            db_session.refresh(entry)
-            assert entry.status == terminal, terminal
-
-        # positive control: the legacy direct desk-start from waiting stays
         response = client.post(
-            f"/api/v1/registrar/queue/{waiting_entry.id}/start-visit",
+            f"/api/v1/registrar/queue/{entry.id}/start-visit",
             headers=auth_headers,
         )
-        assert response.status_code == 200, response.text
-        db_session.refresh(waiting_entry)
-        assert waiting_entry.status == "in_progress"
+
+        assert response.status_code == expected_http_status, response.text
+        db_session.refresh(entry)
+        assert entry.status == ("in_progress" if expected_http_status == 200 else initial_status)
+        assert entry.visit_id is None
 
     def test_start_queue_visit_rejects_entry_linked_to_other_patient_visit(
         self,
