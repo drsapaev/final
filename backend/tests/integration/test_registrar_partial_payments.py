@@ -1,16 +1,25 @@
 """Registrar receipts must represent money received, not a paid checkbox."""
 
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import event
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
+from sqlalchemy import event, text
 
+from app.db.capability_namespace import capability_schema_name
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit, VisitService
 from app.services.payment_invariant_service import PaymentInvariantService
+from tests.integration.test_encounter_migration_pg import _migration
+from tests.integration.test_staff_confirmation_guard_pg import (
+    _module,
+    guarded_pg,  # noqa: F401
+)
 
 
 @pytest.fixture
@@ -411,53 +420,56 @@ def test_does_not_round_or_overallocate_submitted_amount(
 
 
 @pytest.fixture
-def payment_engine():
-    import os
-    from uuid import uuid4
-
-    from sqlalchemy import create_engine
-    from sqlalchemy.engine import make_url
-    from sqlalchemy.schema import CreateSchema, DropSchema
-
-    from app.db.base_class import Base
-
-    url = make_url(os.environ["DATABASE_URL"])
-    if url.get_backend_name() != "postgresql" or not (url.database or "").startswith(
-        "clinic_test"
-    ):
-        pytest.fail("Use an explicitly disposable clinic_test PostgreSQL database")
-    schema = "test_partial_payment_" + uuid4().hex
-    admin = create_engine(url)
+def payment_engines(guarded_pg):
+    """Use the deployed guards for independent receipt writer sessions."""
+    admin, runtime, _ = guarded_pg
+    quote = admin.dialect.identifier_preparer.quote_identifier
+    schema_name, runtime_name = admin.dialect.default_schema_name, runtime.url.username
+    schema, role = map(quote, (schema_name, runtime_name))
+    private = quote(capability_schema_name(schema_name))
     with admin.begin() as conn:
-        conn.execute(CreateSchema(schema))
-    engine = create_engine(
-        url,
-        connect_args={"options": f"-csearch_path={schema} -cstatement_timeout=8000"},
-    )
-    try:
-        Base.metadata.create_all(engine)
-        yield engine
-    finally:
-        engine.dispose()
-        with admin.begin() as conn:
-            conn.execute(DropSchema(schema, cascade=True))
-        admin.dispose()
+        migration = _migration("0123_reconciliation_fence.py")
+        migration.op = Operations(MigrationContext.configure(conn, opts={"version_table_schema": schema_name}))
+        migration.upgrade()
+        conn.exec_driver_sql(f"ALTER TABLE {schema}.click_callback_receipts ENABLE ROW LEVEL SECURITY")
+        conn.exec_driver_sql(f"ALTER TABLE {schema}.click_callback_receipts FORCE ROW LEVEL SECURITY")
+        owner = conn.scalar(text("SELECT CURRENT_USER"))
+        capability = conn.scalar(text("""
+            SELECT pg_catalog.pg_get_userbyid(p.proowner) FROM pg_catalog.pg_proc p
+            WHERE p.oid=pg_catalog.to_regprocedure(:signature)
+        """), {"signature": f"{private}.financial_lock_rows(text,integer[])"})
+        conn.exec_driver_sql(f"GRANT SELECT, INSERT ON {schema}.payments TO {role}")
+        conn.exec_driver_sql(f"GRANT SELECT ON {schema}.payment_visits TO {role}")
+        conn.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {schema}.payments_id_seq TO {role}")
+        conn.exec_driver_sql(
+            f"CREATE POLICY receipt_insert ON {schema}.payments FOR INSERT TO {role} WITH CHECK (true)"
+        )
+        conn.exec_driver_sql(
+            f"GRANT UPDATE (status, payment_method, paid_at, updated_at) ON {schema}.payment_invoices TO {role}"
+        )
+        conn.exec_driver_sql(
+            f"CREATE POLICY receipt_invoice_status ON {schema}.payment_invoices FOR UPDATE TO {role} "
+            "USING (true) WITH CHECK (true)"
+        )
+        conn.exec_driver_sql(f"GRANT SELECT ON {schema}.queue_entries TO {role}")
+    root = Path(__file__).resolve().parents[3]
+    reconciler = _module(root / "scripts/provision_reconciliation_fence_role.py")
+    reconciler.provision(admin, schema=schema_name, expected_owner=owner,
+                         backend_role=runtime_name, capability_role=capability)
+    return admin, runtime
 
 
 @pytest.mark.gate_d
 @pytest.mark.parametrize("use_snapshot", [True, False])
-def test_concurrent_payment_rechecks_locked_balance(payment_engine, use_snapshot):
-    import threading
-    import time
-
+def test_concurrent_payment_rechecks_locked_balance(payment_engines, use_snapshot):
     from fastapi import HTTPException
-    from sqlalchemy import text
     from sqlalchemy.orm import Session
 
     from app.models.patient import Patient
     from app.services.payment_invariant_service import PaymentInvariantService
 
-    with Session(payment_engine) as seed:
+    admin, runtime = payment_engines
+    with Session(admin) as seed:
         patient = Patient(last_name="SYNTHETIC-Payment", first_name="SYNTHETIC-Test")
         seed.add(patient)
         seed.flush()
@@ -471,14 +483,14 @@ def test_concurrent_payment_rechecks_locked_balance(payment_engine, use_snapshot
                 name="SYNTHETIC-payment",
                 qty=1,
                 price=100000,
+                currency="UZS",
             )
         )
         seed.commit()
         visit_id = visit.id
 
-    ready, finished = threading.Event(), threading.Event()
-    observed = {}
-    with Session(payment_engine) as first:
+    with Session(runtime) as first, Session(runtime) as second:
+        second.get(Visit, visit_id)  # A stale identity map must refresh after the conflict.
         service = PaymentInvariantService(first)
         snapshot = service.summarize_visits([first.get(Visit, visit_id)])["snapshot"]
         service.receive_grouped_payment(
@@ -489,62 +501,34 @@ def test_concurrent_payment_rechecks_locked_balance(payment_engine, use_snapshot
             snapshot=snapshot,
         )
 
-        def second_payment():
-            with Session(payment_engine) as second:
-                observed["pid"] = second.scalar(text("SELECT pg_backend_pid()"))
-                second.get(
-                    Visit, visit_id
-                )  # stale identity map must refresh after waiting
-                ready.set()
-                try:
-                    PaymentInvariantService(second).receive_grouped_payment(
-                        visit_ids=[visit_id],
-                        amount=Decimal(30000 if use_snapshot else 80000),
-                        method="cash",
-                        current_user=None,
-                        snapshot=snapshot if use_snapshot else None,
-                    )
-                    second.commit()
-                    observed["status"] = 200
-                except HTTPException as exc:
-                    observed["status"] = exc.status_code
-                    second.rollback()
-                except Exception as exc:
-                    observed["error"] = type(exc).__name__
-                finally:
-                    finished.set()
+        competing = {
+            "visit_ids": [visit_id],
+            "amount": Decimal(30000 if use_snapshot else 80000),
+            "method": "cash",
+            "current_user": None,
+            "snapshot": snapshot if use_snapshot else None,
+        }
+        with pytest.raises(HTTPException) as busy:
+            PaymentInvariantService(second).receive_grouped_payment(**competing)
+        assert busy.value.status_code == 409
+        assert busy.value.detail == "Обращение занято, повторите оплату"
+        assert not second.in_transaction()
+        first.commit()
 
-        worker = threading.Thread(target=second_payment)
-        worker.start()
-        try:
-            assert ready.wait(5)
-            deadline = time.monotonic() + 5
-            blocked = False
-            with payment_engine.connect() as observer:
-                while time.monotonic() < deadline and not finished.is_set():
-                    if observer.scalar(
-                        text("SELECT cardinality(pg_blocking_pids(:pid))"),
-                        {"pid": observed["pid"]},
-                    ):
-                        blocked = True
-                        break
-                    finished.wait(0.01)
-            assert blocked, observed
-            first.commit()
-        finally:
-            first.rollback()
-            worker.join(10)
-        assert not worker.is_alive()
-        assert observed.get("status") == (409 if use_snapshot else 400), observed
-    with Session(payment_engine) as check:
+        with pytest.raises(HTTPException) as rejected:
+            PaymentInvariantService(second).receive_grouped_payment(**competing)
+        assert rejected.value.status_code == (409 if use_snapshot else 400)
+        assert rejected.value.detail != busy.value.detail
+    with Session(admin) as check:
         assert check.query(Payment).one().amount == 30000
 
 
 @pytest.mark.gate_d
-def test_concurrent_visits_close_their_shared_invoice(payment_engine, monkeypatch):
+def test_concurrent_visits_close_their_shared_invoice(payment_engines, monkeypatch):
     import threading
     from types import SimpleNamespace
 
+    from fastapi import HTTPException
     from sqlalchemy.orm import Session
 
     from app.api.v1.endpoints.registrar_wizard._helpers import (
@@ -555,7 +539,8 @@ def test_concurrent_visits_close_their_shared_invoice(payment_engine, monkeypatc
     from app.models.patient import Patient
     from app.services.payment_invariant_service import PaymentInvariantService
 
-    with Session(payment_engine) as seed:
+    admin, runtime = payment_engines
+    with Session(admin) as seed:
         patient = Patient(last_name="SYNTHETIC-Invoice", first_name="SYNTHETIC-Test")
         seed.add(patient)
         seed.flush()
@@ -573,6 +558,7 @@ def test_concurrent_visits_close_their_shared_invoice(payment_engine, monkeypatc
                     name="SYNTHETIC-payment",
                     qty=1,
                     price=100,
+                    currency="UZS",
                 )
             )
             seed.add(
@@ -583,38 +569,50 @@ def test_concurrent_visits_close_their_shared_invoice(payment_engine, monkeypatc
         seed.commit()
         visit_ids, invoice_id = [v.id for v in visits], invoice.id
 
-    staged = threading.Barrier(2, timeout=5)
+    first_received = threading.Event()
+    release_first = threading.Event()
+    worker_errors = []
     original = PaymentInvariantService.receive_grouped_payment
 
     def synchronize(self, **kwargs):
         result = original(self, **kwargs)
-        staged.wait()  # Both independent receipts exist before either invoice sync.
+        if kwargs["visit_ids"] == [visit_ids[0]]:
+            first_received.set()
+            assert release_first.wait(5)
         return result
 
     monkeypatch.setattr(PaymentInvariantService, "receive_grouped_payment", synchronize)
-    failures = []
 
-    def receive(visit_id):
-        with Session(payment_engine) as session:
+    def pay_visit(session, visit_id):
+        return _receive_registrar_payment(
+            session, SimpleNamespace(role="Registrar", id=None),
+            [RegistrarRecordRef(record_kind="visit", record_id=visit_id)],
+            MarkPaidRequest(amount=100, method="cash"),
+        )
+
+    def receive_first_visit():
+        with Session(runtime) as session:
             try:
-                _receive_registrar_payment(
-                    session,
-                    SimpleNamespace(role="Registrar", id=None),
-                    [RegistrarRecordRef(record_kind="visit", record_id=visit_id)],
-                    MarkPaidRequest(amount=100, method="cash"),
-                )
+                assert pay_visit(session, visit_ids[0]).success
             except Exception as exc:
-                failures.append(type(exc).__name__)
+                worker_errors.append(exc)
 
-    workers = [
-        threading.Thread(target=receive, args=(visit_id,)) for visit_id in visit_ids
-    ]
-    for worker in workers:
-        worker.start()
-    for worker in workers:
-        worker.join(12)
-        assert not worker.is_alive()
-    assert not failures, failures
-    with Session(payment_engine) as check:
+    first = threading.Thread(target=receive_first_visit)
+    first.start()
+    try:
+        assert first_received.wait(5), worker_errors
+        with Session(runtime) as second:
+            with pytest.raises(HTTPException) as busy:
+                pay_visit(second, visit_ids[1])
+            assert busy.value.status_code == 409
+            assert busy.value.detail == "Обращение занято, повторите оплату"
+    finally:
+        release_first.set()
+        first.join(8)
+    assert not first.is_alive()
+    assert not worker_errors, worker_errors
+    with Session(runtime) as retry:
+        assert pay_visit(retry, visit_ids[1]).success
+    with Session(admin) as check:
         assert check.query(Payment).count() == 2
         assert check.get(PaymentInvoice, invoice_id).status == "paid"

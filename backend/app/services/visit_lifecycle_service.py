@@ -899,6 +899,9 @@ class VisitLifecycleService:
             if commit:
                 self.db.commit()
                 self.db.refresh(visit)
+            else:
+                # The caller can read invoice debt before committing.
+                self.db.flush([visit])
 
         # If the visit has a valid operational status, no change needed.
         # The payment state is tracked separately in the Payment table.

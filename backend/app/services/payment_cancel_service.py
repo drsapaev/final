@@ -6,6 +6,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from fastapi import HTTPException
+
 from app.db.transactions import transaction as transaction_ctx
 from app.models.enums import PaymentStatus
 from app.repositories.payment_cancel_repository import PaymentCancelRepository
@@ -118,13 +120,20 @@ class PaymentCancelService:
             ``payment_create_service.py:117``).
         """
         with transaction_ctx(self.db):
-            # Lock order is Visit -> Payment -> PaymentTransaction -> Invoice,
-            # matching the other cashier payment mutations.
-            if expected_visit_id is not None:
-                self.emr_facade.restore_operational_status_after_payment_change(
-                    expected_visit_id,
-                    commit=False,
+            # Check every linked visit and invoice before touching the payment,
+            # using the same lock order as manual confirmation.
+            try:
+                record = self.payment_invariant_service.preflight_payment_record(payment_id)
+            except HTTPException as exc:
+                raise PaymentCancelDomainError(exc.status_code, str(exc.detail)) from exc
+            if record.primary_visit_id != expected_visit_id:
+                raise PaymentCancelDomainError(
+                    409, "Визит платежа изменился; повторите операцию",
                 )
+            self.emr_facade.restore_operational_status_after_payment_change(
+                record.primary_visit_id,
+                commit=False,
+            )
 
             locked_payment = self.repository.get_payment_for_update(payment_id)
             if not locked_payment:
