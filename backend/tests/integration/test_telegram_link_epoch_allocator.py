@@ -107,7 +107,8 @@ def test_migrated_sqlite_orm_listener_and_real_rsvp_aba(db_session, test_patient
     _apply(db_session.connection(), "0122_telegram_link_epoch.py")
     appointment = Appointment(patient_id=test_patient.id, appointment_date=(datetime.now(UTC) + timedelta(days=5)).date(),
                               appointment_time="12:00", status="pending", occurrence_revision=0)
-    link = TelegramUser(patient_id=test_patient.id, chat_id=987654321, active=True, blocked=False,
+    chat_id = uuid.uuid4().int % (1 << 48) + 1
+    link = TelegramUser(patient_id=test_patient.id, chat_id=chat_id, active=True, blocked=False,
                         notifications_enabled=True, appointment_reminders=True)
     db_session.add_all([appointment, link])
     db_session.commit()
