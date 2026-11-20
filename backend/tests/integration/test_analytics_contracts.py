@@ -13,6 +13,7 @@ from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.analytics import AnalyticsService
+from app.services.queue_service import queue_service
 
 
 @pytest.fixture
@@ -64,7 +65,7 @@ def test_analytics_legacy_contracts_exist(
 
 
 def test_revenue_counts_settled_payments_once_and_keeps_currencies_separate(
-    client: TestClient, admin_token: str, db_session, test_patient,
+    client: TestClient, admin_token: str, db_session, test_patient, monkeypatch,
 ) -> None:
     created_at = datetime(2032, 6, 7, 12, tzinfo=UTC)
     cardio = Visit(patient_id=test_patient.id, visit_date=created_at.date(), department="cardiology")
@@ -143,6 +144,14 @@ def test_revenue_counts_settled_payments_once_and_keeps_currencies_separate(
     assert filtered["provider_breakdown"]["click"]["total_amount"] == 44.25
     assert filtered["department_breakdown"] == {"cardiology": {"visits": 1, "total_revenue": 169.75}}
     assert filtered["daily_revenue"] == [{"date": "2032-06-07", "amount": 169.75}]
+
+    monkeypatch.setattr(queue_service, "get_local_timestamp", lambda db: created_at + timedelta(days=1))
+    trends = client.get("/api/v1/analytics/trends", headers=_auth_headers(admin_token), params={"days": 2})
+    assert trends.status_code == 200, trends.text
+    assert trends.json()["revenue_trend"] == [
+        {"date": "2032-06-06", "revenue": 0.0},
+        {"date": "2032-06-07", "revenue": 1293.75},
+    ]
 
     providers = client.get(
         "/api/v1/analytics/payment-providers",

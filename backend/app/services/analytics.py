@@ -1,5 +1,6 @@
 import calendar
 import statistics
+from bisect import bisect_right
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -572,27 +573,21 @@ class AnalyticsService:
                 {"date": date.strftime("%Y-%m-%d"), "visits": visit_count}
             )
 
-        # Тренд доходов
-        revenue_trend = []
-        for i in range(days):
-            date = start_date + timedelta(days=i)
-            next_date = date + timedelta(days=1)
-
-            daily_revenue = (
-                db.query(PaymentWebhook)
-                .filter(
-                    and_(
-                        PaymentWebhook.status == "success",
-                        PaymentWebhook.created_at >= date,
-                        PaymentWebhook.created_at < next_date,
-                    )
-                )
-                .all()
-            )
-
-            total = sum(float(p.amount) / 100 for p in daily_revenue)
-
-            revenue_trend.append({"date": date.strftime("%Y-%m-%d"), "revenue": total})
+        # Compare absolute times to the existing clinic-local day windows.
+        windows = [(start_date + timedelta(days=i)).astimezone(UTC) for i in range(days + 1)]
+        payments, _ = _gross_payment_report(db, windows[0], windows[-1], None)
+        totals = [_ZERO] * days
+        for payment in payments:
+            created_at = payment.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=UTC)
+            index = bisect_right(windows, created_at) - 1
+            if 0 <= index < days:
+                totals[index] += payment.amount
+        revenue_trend = [
+            {"date": item["date"], "revenue": float(total)}
+            for item, total in zip(visit_trend, totals, strict=True)
+        ]
 
         return {
             "period_days": days,
