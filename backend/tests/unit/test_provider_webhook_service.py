@@ -6,7 +6,60 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from app.services.payment_providers.click import ClickProvider
 from app.services.provider_webhook_service import ProviderWebhookService
+
+
+@pytest.fixture
+def click_provider():
+    return ClickProvider({
+        "service_id": "synthetic-service",
+        "merchant_id": "synthetic-merchant",
+        "secret_key": "synthetic-config",
+    })
+
+
+@pytest.mark.parametrize(
+    ("signature", "reason"),
+    [(None, "Missing signature"), ("SYNTHETIC_RECEIVED", "Signature mismatch")],
+)
+def test_click_signature_diagnostics_omit_callback_and_signatures(
+    click_provider, monkeypatch, caplog, signature, reason,
+):
+    payload = {"error_note": "SYNTHETIC_CALLBACK"}
+    monkeypatch.setattr(
+        click_provider, "_generate_webhook_signature", Mock(return_value="SYNTHETIC_EXPECTED")
+    )
+
+    assert not click_provider.validate_webhook_signature(payload, signature)
+    assert reason in caplog.text
+    assert "SYNTHETIC_CALLBACK" not in caplog.text
+    assert "SYNTHETIC_EXPECTED" not in caplog.text
+    assert "SYNTHETIC_RECEIVED" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("failure", "error_message", "logged_reason"),
+    [
+        (None, "Неверная подпись webhook", "Неверная подпись"),
+        (RuntimeError("SYNTHETIC_EXCEPTION_DETAIL"), "Внутренняя ошибка", "Internal error type=RuntimeError"),
+    ],
+)
+def test_click_adapter_errors_omit_callback_and_exception_details(
+    click_provider, monkeypatch, caplog, failure, error_message, logged_reason,
+):
+    payload = {"error_note": "SYNTHETIC_CALLBACK", "sign_string": "SYNTHETIC_RECEIVED"}
+    monkeypatch.setattr(
+        click_provider, "_generate_webhook_signature",
+        Mock(return_value="SYNTHETIC_EXPECTED", side_effect=failure),
+    )
+
+    result = click_provider.process_webhook(payload)
+
+    assert not result.success
+    assert result.error_message == error_message
+    assert logged_reason in caplog.text
+    assert "SYNTHETIC_" not in caplog.text
 
 
 @pytest.mark.unit

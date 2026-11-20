@@ -168,7 +168,7 @@ class ClickProvider(BasePaymentProvider):
             # Валидация подписи
             expected_sign = self._generate_webhook_signature(webhook_data)
             if sign_string != expected_sign:
-                self.log_error("process_webhook", "Неверная подпись", webhook_data)
+                self.log_error("process_webhook", "Неверная подпись")
                 return PaymentResult(
                     success=False, error_message="Неверная подпись webhook"
                 )
@@ -223,7 +223,7 @@ class ClickProvider(BasePaymentProvider):
             )
 
         except Exception as e:
-            self.log_error("process_webhook", str(e), webhook_data)
+            self.log_error("process_webhook", f"Internal error type={type(e).__name__}")
             return PaymentResult(
                 success=False, error_message="Внутренняя ошибка"
             )
@@ -259,16 +259,13 @@ class ClickProvider(BasePaymentProvider):
     ) -> bool:
         """Валидация подписи webhook"""
         if not signature:
-            self.log_error("validate_webhook_signature", "Missing signature", webhook_data)
+            self.log_error("validate_webhook_signature", "Missing signature")
             return False
 
         expected_signature = self._generate_webhook_signature(webhook_data)
         is_valid = hmac.compare_digest(signature, expected_signature)
 
         if not is_valid:
-            self.log_error("validate_webhook_signature", "Signature mismatch", {
-                "received": signature[:20] if signature else None,
-                "expected": expected_signature[:20] if expected_signature else None
-            })
+            self.log_error("validate_webhook_signature", "Signature mismatch")
 
         return is_valid
