@@ -35,7 +35,7 @@ def transaction(db: Session) -> Generator[Session, None, None]:
         logger.debug("Transaction committed successfully")
     except Exception as e:
         db.rollback()
-        logger.error(f"Transaction rolled back due to error: {e}")
+        logger.error("Transaction rolled back due to error type=%s", type(e).__name__)
         raise
 
 

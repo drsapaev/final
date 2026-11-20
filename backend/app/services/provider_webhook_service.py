@@ -107,6 +107,16 @@ class ProviderWebhookService:
         provider_amount = (getattr(result, "provider_data", None) or {}).get("amount")
         return self._amounts_match(getattr(payment, "amount", None), provider_amount)
 
+    @staticmethod
+    def _click_payment_matches_order(payment: Any, order_id: Any) -> bool:
+        return (
+            payment is not None
+            and isinstance(order_id, str)
+            and payment.provider == "click"
+            and payment.currency == "UZS"
+            and payment.provider_payment_id == order_id
+        )
+
     def _payme_params_amount_matches_payment(
         self,
         payment: Any,
@@ -176,6 +186,16 @@ class ProviderWebhookService:
             )
 
             if existing_transaction:
+                payment_id = existing_transaction.payment_id
+                payment = (
+                    self.repository.get_payment_by_id(payment_id)
+                    if payment_id is not None
+                    else None
+                )
+                if not self._click_payment_matches_order(payment, transaction_id):
+                    return {"error": -1, "error_note": "Payment order mismatch"}
+                if not self._amounts_match(existing_transaction.amount, webhook_data.get("amount")):
+                    return {"error": -1, "error_note": "Payment amount mismatch"}
                 logger.info(
                     "Click webhook: Transaction %s already processed (idempotent)",
                     click_trans_id,
@@ -186,7 +206,7 @@ class ProviderWebhookService:
                     "merchant_prepare_id": existing_transaction.webhook_id or 0,
                     "error": 0,
                     "error_note": "Already processed",
-                    "payment_id": getattr(existing_transaction, "payment_id", None),
+                    "payment_id": payment_id,
                     "payment_status": None,
                     "payment_provider": "click",
                 }
@@ -213,128 +233,103 @@ class ProviderWebhookService:
                 raw_data=webhook_data,
                 signature=signature,
             )
-            # P2-3 Finding C: commit the webhook record in a separate transaction.
-            # In production, this persists the webhook even if the business
-            # transaction rolls back. In unit tests with mock sessions, we
-            # wrap in try/except because mock objects may not be mappable.
-            try:
-                self.db.commit()
-                self.db.refresh(webhook)
-            except Exception:
-                # Unit tests with mock sessions may not support commit/refresh.
-                # In production, this always succeeds.
-                self.db.rollback()
+            self.db.commit()
 
             with transaction_ctx(self.db):
                 result = manager.process_webhook("click", webhook_data)
+                webhook.processed_at = datetime.now(UTC)
 
-                if result.success:
-                    webhook.status = "processed"
-                    webhook.processed_at = datetime.now(UTC)
+                payment = None
+                if isinstance(transaction_id, str) and transaction_id == result.payment_id:
+                    payment_id_from_order = self._extract_payment_id_from_order(transaction_id)
+                    if payment_id_from_order:
+                        candidate = self.repository.get_payment_by_id_for_update(payment_id_from_order)
+                        if self._click_payment_matches_order(candidate, transaction_id):
+                            payment = candidate
 
-                    payment = None
-                    mapped_status = None
-                    if result.payment_id:
-                        payment_id_from_order = self._extract_payment_id_from_order(
-                            result.payment_id
-                        )
-                        if payment_id_from_order:
-                            # FOLLOWUP-10: lock Payment row before mutation.
-                            # Prevents TOCTOU race against concurrent
-                            # PaymentCancelService.cancel_payment() (which
-                            # acquires SELECT Payment ... FOR UPDATE via
-                            # billing_service.update_payment_status).
-                            payment = self.repository.get_payment_by_id_for_update(
-                                payment_id_from_order
-                            )
+                if payment is None and (result.success or result.payment_id):
+                    webhook.status = "failed"
+                    webhook.error_message = "provider_order_mismatch"
+                    return {
+                        "click_trans_id": click_trans_id,
+                        "merchant_trans_id": transaction_id,
+                        "merchant_prepare_id": webhook.id,
+                        "error": -1,
+                        "error_note": "Payment order mismatch",
+                        "payment_id": None,
+                        "payment_status": None,
+                        "payment_provider": "click",
+                    }
 
-                    if payment:
-                        if not self._result_amount_matches_payment(payment, result):
-                            webhook.status = "failed"
-                            webhook.error_message = "provider_amount_mismatch"
-                            return {
-                                "click_trans_id": webhook_data.get("click_trans_id"),
-                                "merchant_trans_id": webhook_data.get(
-                                    "merchant_trans_id"
-                                ),
-                                "merchant_prepare_id": webhook.id,
-                                "error": -1,
-                                "error_note": "Payment amount mismatch",
-                                "payment_id": payment.id,
-                                "payment_status": None,
-                                "payment_provider": "click",
-                            }
-                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
-                        # mapped_status with billing_service.update_payment_status()
-                        # to enforce payment state machine validation.
-                        #
-                        # The lock is already acquired above via
-                        # get_payment_by_id_for_update(). update_payment_status()
-                        # will re-acquire it (idempotent within same transaction)
-                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
-                        #
-                        # commit=False because this is inside a larger webhook
-                        # transaction (PaymentTransaction + webhook record +
-                        # visit projection all committed together by the caller).
-                        mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment = self._update_payment_status(
-                            payment_id=payment.id,
-                            new_status=mapped_status,
-                            commit=False,
-                        )
-                        if payment.status == "paid" and not payment.paid_at:
-                            payment.paid_at = datetime.now(UTC)
-
-                        payment.provider_data = {
-                            **(payment.provider_data or {}),
-                            **result.provider_data,
+                if result.success and payment is not None:
+                    if not self._result_amount_matches_payment(payment, result):
+                        webhook.status = "failed"
+                        webhook.error_message = "provider_amount_mismatch"
+                        return {
+                            "click_trans_id": click_trans_id,
+                            "merchant_trans_id": transaction_id,
+                            "merchant_prepare_id": webhook.id,
+                            "error": -1,
+                            "error_note": "Payment amount mismatch",
+                            "payment_id": payment.id,
+                            "payment_status": None,
+                            "payment_provider": "click",
                         }
+                    # The canonical transition, receipt and provider transaction
+                    # share this transaction and the payment row lock above.
+                    mapped_status = self._map_provider_status_to_payment_status(result.status)
+                    payment = self._update_payment_status(
+                        payment_id=payment.id,
+                        new_status=mapped_status,
+                        commit=False,
+                    )
+                    if payment.status == "paid" and not payment.paid_at:
+                        payment.paid_at = datetime.now(UTC)
 
-                        webhook.payment_id = payment.id
-                        webhook.visit_id = payment.visit_id
+                    payment.provider_data = {
+                        **(payment.provider_data or {}),
+                        **result.provider_data,
+                    }
 
-                        self.repository.create_transaction(
-                            transaction_id=webhook_data.get("click_trans_id", webhook_id),
-                            provider="click",
-                            amount=webhook_data.get("amount", 0),
-                            currency="UZS",
-                            status=result.status,
-                            payment_id=payment.id,
-                            webhook_id=webhook.id,
-                            visit_id=payment.visit_id,
-                            provider_data=result.provider_data,
-                        )
+                    webhook.status = "processed"
+                    webhook.payment_id = payment.id
+                    webhook.visit_id = payment.visit_id
+
+                    self.repository.create_transaction(
+                        transaction_id=webhook_data.get("click_trans_id", webhook_id),
+                        provider="click",
+                        amount=webhook_data.get("amount", 0),
+                        currency="UZS",
+                        status=result.status,
+                        payment_id=payment.id,
+                        webhook_id=webhook.id,
+                        visit_id=payment.visit_id,
+                        provider_data=result.provider_data,
+                    )
 
                     error = 0 if result.status == "completed" else -1
                     return {
-                        "click_trans_id": webhook_data.get("click_trans_id"),
-                        "merchant_trans_id": webhook_data.get("merchant_trans_id"),
+                        "click_trans_id": click_trans_id,
+                        "merchant_trans_id": transaction_id,
                         "merchant_prepare_id": webhook.id,
                         "error": error,
                         "error_note": "" if error == 0 else "Payment processing error",
-                        "payment_id": payment.id if payment else None,
+                        "payment_id": payment.id,
                         "payment_status": mapped_status,
                         "payment_provider": "click",
                     }
 
                 webhook.status = "failed"
                 webhook.error_message = result.error_message
-                webhook.processed_at = datetime.now(UTC)
-
-                failed_payment = None
-                if result.payment_id:
-                    payment_id_from_order = self._extract_payment_id_from_order(result.payment_id)
-                    if payment_id_from_order:
-                        failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
-                if failed_payment:
+                if payment is not None:
                     # Issue #06 Phase 4b B2: use canonical update_payment_status
-                    failed_payment = self._update_payment_status(
-                        payment_id=failed_payment.id,
+                    payment = self._update_payment_status(
+                        payment_id=payment.id,
                         new_status="failed",
                         commit=False,
                     )
-                    failed_payment.provider_data = {
-                        **(failed_payment.provider_data or {}),
+                    payment.provider_data = {
+                        **(payment.provider_data or {}),
                         "webhook_error": result.error_message,
                     }
 
@@ -344,12 +339,13 @@ class ProviderWebhookService:
                     "merchant_prepare_id": webhook.id,
                     "error": -1,
                     "error_note": result.error_message or "Processing error",
-                    "payment_id": failed_payment.id if failed_payment else None,
-                    "payment_status": "failed" if failed_payment else None,
+                    "payment_id": payment.id if payment else None,
+                    "payment_status": "failed" if payment else None,
                     "payment_provider": "click",
                 }
 
         except Exception as exc:
+            self.db.rollback()
             logger.error("Click webhook error type=%s", type(exc).__name__)
             return {"error": -1, "error_note": "Internal server error"}
 

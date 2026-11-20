@@ -262,6 +262,9 @@ class TestClickTerminalStatePreservation:
             id=44,
             visit_id=10,
             amount=Decimal("1000"),
+            provider="click",
+            currency="UZS",
+            provider_payment_id="clinic_44_1700000000",
             status=payment_status,
             paid_at=None,
             provider_data=payment_provider_data or {"order_id": "clinic_44_1700000000"},
@@ -305,7 +308,7 @@ class TestClickTerminalStatePreservation:
         return {
             "click_trans_id": "click_trans_123",
             "merchant_trans_id": "clinic_44_1700000000",
-            "amount": 1000,
+            "amount": 100000,
             "action": action,
             "sign_string": "valid_signature",
         }
@@ -318,7 +321,7 @@ class TestClickTerminalStatePreservation:
             payment_id=payment_id,
             amount=Decimal("1000"),
             error_message=None,
-            provider_data={"method": "Click", "transaction_id": "click_trans_123"},
+            provider_data={"method": "Click", "transaction_id": "click_trans_123", "amount": "1000"},
         )
         return SimpleNamespace(
             get_provider=Mock(return_value=SimpleNamespace(
@@ -466,7 +469,14 @@ class TestClickTerminalStatePreservation:
         assert payment.status == "cancelled"
         billing_mock.update_payment_status.assert_not_called()
 
-    def test_click_duplicate_webhook_returns_already_processed(self, db_session):
+    @pytest.mark.parametrize(("callback_override", "error", "note"), [
+        ({}, 0, "Already processed"),
+        ({"merchant_trans_id": "clinic_44_1700000001"}, -1, "Payment order mismatch"),
+        ({"amount": 101000}, -1, "Payment amount mismatch"),
+    ])
+    def test_click_duplicate_webhook_requires_matching_order_and_amount(
+        self, db_session, callback_override, error, note,
+    ):
         """Click duplicate webhook (same click_trans_id) returns 'Already processed'
         without re-evaluating payment status.
 
@@ -478,10 +488,12 @@ class TestClickTerminalStatePreservation:
             payment_id=44,
             webhook_id=33,
             status="completed",
+            amount=100000,
         )
         payment = SimpleNamespace(
             id=44, visit_id=10, amount=Decimal("1000"),
             status="refunded", paid_at=None, provider_data={},
+            provider="click", currency="UZS", provider_payment_id="clinic_44_1700000000",
         )
         repository = SimpleNamespace(
             get_existing_transaction=Mock(return_value=existing_tx),
@@ -495,24 +507,27 @@ class TestClickTerminalStatePreservation:
         billing_mock = Mock()
         billing_mock.update_payment_status = Mock()
 
+        manager = self._mock_provider_manager()
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
-            return_value=self._mock_provider_manager(),
+            return_value=manager,
         ), patch(
             "app.services.billing_service.BillingService",
             return_value=billing_mock,
         ):
-            result = service.process_click_webhook(self._click_webhook_data())
+            callback = {**self._click_webhook_data(), **callback_override}
+            result = service.process_click_webhook(callback)
 
         # ─── THE REGRESSION ASSERTIONS ─────────────────────────────
-        assert result["error"] == 0
-        assert result["error_note"] == "Already processed"
+        assert result["error"] == error
+        assert result["error_note"] == note
         # Payment status NOT re-evaluated.
         assert payment.status == "refunded"
         # BillingService NOT called (idempotent short-circuit).
         billing_mock.update_payment_status.assert_not_called()
         # No new webhook record created.
         repository.create_webhook.assert_not_called()
+        manager.process_webhook.assert_not_called()
 
 
 @pytest.mark.unit
