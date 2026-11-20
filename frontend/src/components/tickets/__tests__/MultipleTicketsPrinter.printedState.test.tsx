@@ -123,6 +123,26 @@ describe('MultipleTicketsPrinter — QUEUEPRINT-FE-001 single-print state', () =
     await advanceCountdownToEnd(7);
     expect(batchFillMock.mock.calls[0][1]).toHaveLength(2);
   });
+
+  it('keeps batch printing disabled while a single ticket is preparing', async () => {
+    singlePrintMock.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      return { opened: true, success: true };
+    });
+    render(<MultipleTicketsPrinter
+      tickets={[{ queue_id: 17, queue_number: 4 }, { queue_id: 17, queue_number: 5 }]}
+      onClose={() => {}}
+    />);
+
+    fireEvent.click(singlePrintButtons()[0]);
+    const batchButton = screen.getByRole('button', { name: /Печать всех/ });
+    expect(batchButton).toBeDisabled();
+    fireEvent.click(batchButton);
+    expect(batchOpenMock).not.toHaveBeenCalled();
+
+    await advanceCountdownToEnd(1);
+    expect(screen.getByRole('button', { name: 'Печать всех (1)' })).toBeEnabled();
+  });
 });
 
 describe('MultipleTicketsPrinter — QUEUEPRINT-FE-002 per-ticket identity', () => {
@@ -169,5 +189,39 @@ describe('MultipleTicketsPrinter — QUEUEPRINT-FE-002 per-ticket identity', () 
     expect(onAllPrinted).toHaveBeenCalledTimes(1);
     // Обе напечатаны: кнопка «Печать всех» исчезла (hasUnprinted=false).
     expect(screen.queryByRole('button', { name: /Печать всех/ })).toBeNull();
+  });
+
+  it('counts the pending tickets present after the list changes', async () => {
+    const { rerender } = render(
+      <MultipleTicketsPrinter tickets={sameQueueTickets} onClose={() => {}} />,
+    );
+    fireEvent.click(singlePrintButtons()[0]);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    rerender(<MultipleTicketsPrinter tickets={[sameQueueTickets[1]]} onClose={() => {}} />);
+
+    expect(screen.getByRole('button', { name: 'Печать всех (1)' })).toBeEnabled();
+  });
+
+  it('holds both print controls until an in-flight batch settles', async () => {
+    batchFillMock.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      return { opened: true, success: false };
+    });
+    render(<MultipleTicketsPrinter tickets={sameQueueTickets} onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Печать всех/ }));
+    expect(singlePrintButtons()[0]).toBeDisabled();
+    await advanceCountdownToEnd(5);
+    expect(batchFillMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Печать всех/ })).toBeDisabled();
+    expect(singlePrintButtons()[0]).toBeDisabled();
+    expect(singlePrintMock).not.toHaveBeenCalled();
+
+    await advanceCountdownToEnd(1);
+    expect(screen.getByRole('button', { name: 'Печать всех (2)' })).toBeEnabled();
+    expect(singlePrintButtons()[0]).toBeEnabled();
   });
 });

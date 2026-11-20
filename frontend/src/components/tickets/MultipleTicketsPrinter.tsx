@@ -17,15 +17,12 @@ type TFunc = (key: string, options?: Record<string, unknown>) => string;
 // the shared DailyQueue id (queue_id) collides for same-queue tickets
 // ({queue_id:17,queue_number:4} vs {queue_id:17,queue_number:5}): a Set over
 // queue_id produced mutually inconsistent allPrinted/hasUnprinted and could
-// silently treat a new same-queue ticket as printed. Composite
-// queue_id#queue_number fixes it; the bare-queue_id fallback keeps legacy
-// payloads without a queue_number on the old identity.
+// silently treat a new same-queue ticket as printed. Legacy payloads without
+// a queue number retain their queue-level fallback.
 const ticketIdentity = (ticket: Ticket): string => {
   const num = ticket.queue_number;
-  if (num === undefined || num === null || num === '') {
-    return String(ticket.queue_id);
-  }
-  return `${String(ticket.queue_id)}#${String(num)}`;
+  const queueNumber = num === undefined || num === null || num === '' ? null : String(num);
+  return JSON.stringify([String(ticket.queue_id), queueNumber]);
 };
 
 interface Ticket {
@@ -47,6 +44,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const [printedTickets, setPrintedTickets] = useState<Set<string>>(new Set());
   const [currentPrinting, setCurrentPrinting] = useState<string | null>(null);
+  const [batchPrinting, setBatchPrinting] = useState(false);
   const [countdown, setCountdown] = useState(0);
   // CSH-FE-045 (follow-up audit 2026-11-02): окно пакетной печати открывается
   // синхронно в прямом жесте клика «Печать всех» (ДО сетевых запросов и
@@ -55,7 +53,9 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   // единым документом (по .ticket-page на талон) — попап на каждый талон
   // больше не открывается вовсе.
   const batchWindowRef = useRef<Window | null>(null);
+  const printInProgress = useRef(false);
   const [batchError, setBatchError] = useState<string | null>(null);
+  const pendingTickets = tickets.filter((ticket) => !printedTickets.has(ticketIdentity(ticket)));
 
   // Функция печати одного талона (кнопка на карточке — прямой жест).
   // QUEUEPRINT-FE-001 (audit group97): успешный одиночный вывод помечает
@@ -63,6 +63,8 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   // mark = честный сигнал браузер-уровня: окно открыто и наполнено);
   // провал оставляет талон в очереди пакетной печати.
   const printSingleTicket = async (ticket: Ticket) => {
+    if (printInProgress.current) return false;
+    printInProgress.current = true;
     const identity = ticketIdentity(ticket);
     setCurrentPrinting(identity);
 
@@ -82,6 +84,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
       logger.error('Browser ticket print failed', error);
       return false;
     } finally {
+      printInProgress.current = false;
       setCurrentPrinting(null);
     }
   };
@@ -91,31 +94,32 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   // порядком .ticket-page; искусственная пауза 800мс на талон удалена.
   const printAllTickets = async () => {
     const batchWindow = batchWindowRef.current;
-    if (!batchWindow) {
-      setBatchError('Окно пакетной печати не открыто — нажмите «Печать всех» ещё раз.');
-      return;
-    }
+    if (!batchWindow) return;
+    batchWindowRef.current = null;
 
-    const pending = tickets.filter((ticket) => !printedTickets.has(ticketIdentity(ticket)));
-    if (pending.length === 0) {
-      onAllPrinted && onAllPrinted();
-      return;
-    }
+    try {
+      if (pendingTickets.length === 0) {
+        batchWindow.close();
+        onAllPrinted?.();
+        return;
+      }
 
-    const result = await printPanelTicketsBatchInExistingWindow(
-      batchWindow,
-      pending.map((ticket) => buildPanelTicketPayload(ticket))
-    );
+      const result = await printPanelTicketsBatchInExistingWindow(
+        batchWindow,
+        pendingTickets.map((ticket) => buildPanelTicketPayload(ticket))
+      );
 
-    if (result.success) {
-      setPrintedTickets((prev) => new Set([...prev, ...pending.map((ticket) => ticketIdentity(ticket))]));
-      setBatchError(null);
-      onAllPrinted && onAllPrinted();
-    } else {
-      // Честный провал: ничего не помечаем напечатанным — кнопка
-      // «Печать всех» остаётся пользователю как путь восстановления.
-      logger.warn('Batch ticket print failed', result.error);
+      if (!result.opened || !result.success) {
+        throw new Error('Browser batch ticket print failed', { cause: result.error });
+      }
+      setPrintedTickets((prev) => new Set([...prev, ...pendingTickets.map(ticketIdentity)]));
+      onAllPrinted?.();
+    } catch (error) {
+      logger.warn('Batch ticket print failed', error);
       setBatchError('Не удалось подготовить печать: повторите «Печать всех» или напечатайте талоны по одному.');
+    } finally {
+      printInProgress.current = false;
+      setBatchPrinting(false);
     }
   };
 
@@ -133,6 +137,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   }, [countdown]);
 
   const startCountdown = () => {
+    if (printInProgress.current) return;
     // ШАГ 1 (синхронно, в жесте): открыть окно-плейсхолдер. Если браузер
     // заблокировал — честное сообщение, отсчёт не начинается.
     setBatchError(null);
@@ -142,13 +147,14 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
       setBatchError('Браузер заблокировал окно печати. Разрешите всплывающие окна для приложения и повторите.');
       return;
     }
+    printInProgress.current = true;
     batchWindowRef.current = batchWindow;
+    setBatchPrinting(true);
     // ШАГ 2: отсчёт до заполнения/печати (окно уже открыто).
     setCountdown(5);
   };
 
-  const allPrinted = tickets.length > 0 && tickets.every((ticket) => printedTickets.has(ticketIdentity(ticket)));
-  const hasUnprinted = tickets.some((ticket) => !printedTickets.has(ticketIdentity(ticket)));
+  const allPrinted = tickets.length > 0 && pendingTickets.length === 0;
   return (
     <div className="multiple-tickets-printer">
       <div className="printer-header">
@@ -160,8 +166,9 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
 
       <div className="tickets-grid">
         {tickets.map((ticket, index) => {
-          const isPrinted = printedTickets.has(ticketIdentity(ticket));
-          const isPrinting = currentPrinting === ticketIdentity(ticket);
+          const identity = ticketIdentity(ticket);
+          const isPrinted = printedTickets.has(identity);
+          const isPrinting = currentPrinting === identity;
 
           return (
             <div
@@ -197,6 +204,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
 
                 <button
                   className="print-single-btn"
+                  disabled={batchPrinting || currentPrinting !== null}
                   onClick={() => printSingleTicket(ticket)}>
                   
                     <Printer size={16} />
@@ -229,13 +237,14 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
                 <Clock size={16} />
                 Печать через {countdown}с
               </button> :
-          hasUnprinted ?
+          pendingTickets.length > 0 ?
           <button
             className="print-all-btn"
+            disabled={batchPrinting || currentPrinting !== null}
             onClick={startCountdown}>
             
                 <Printer size={16} />
-                Печать всех ({tickets.length - printedTickets.size})
+                Печать всех ({pendingTickets.length})
               </button> :
           null}
           </div>
