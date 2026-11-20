@@ -716,14 +716,19 @@ def _resolve_payment_truth(
     legacy_paid_at: datetime | None = None,
 ) -> tuple[str, str | None]:
     if visit_id:
-        from app.models.payment import Payment
         from app.models.visit import Visit
         from app.services.payment_invariant_service import PaymentInvariantService
 
         visit = db.get(Visit, visit_id)
-        if visit and db.query(Payment.id).filter(Payment.visit_id == visit_id).first():
-            row = PaymentInvariantService(db).summarize_visits([visit])["visits"][0]
-            return row["payment_status"], row["payment_type"]
+        if visit:
+            try:
+                row = PaymentInvariantService(db).summarize_recorded_visit_payment(visit)
+            except HTTPException as exc:
+                if exc.status_code != status.HTTP_409_CONFLICT:
+                    raise
+                return "reconciliation_required", None
+            if row is not None:
+                return row["payment_status"], row["payment_type"]
     return ("paid", None) if legacy_paid_at else ("pending", None)
 
 

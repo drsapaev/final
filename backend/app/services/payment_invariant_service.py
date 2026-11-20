@@ -88,13 +88,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation, localcontext
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
+from sqlalchemy.engine import Row
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -116,6 +117,8 @@ from app.services.all_free_guard import AllFreeGuardError
 from app.services.encounter_financial_fence import (
     FinancialFenceError,
     LockedPaymentRecord,
+    _financial_schema,
+    _verify_complete_backend_reads,
     preflight_payment_groups,
     preflight_payment_record,
     require_preflighted_payment_visits,
@@ -439,19 +442,7 @@ class PaymentInvariantService:
         payments. This is the canonical implementation — replaces the duplicated
         ``_cashier_paid_amounts_by_visit_id`` in ``cashier/_helpers.py``.
         """
-        payments = (
-            self.db.query(Payment)
-            .filter(
-                Payment.visit_id == visit_id,
-                Payment.status.in_(["paid", "completed"]),
-            )
-            .populate_existing()
-            .all()
-        )
-        return sum(
-            (self._net_settled_amount(payment) for payment in payments),
-            Decimal("0"),
-        )
+        return self.compute_net_paid_amounts_by_visit_id([visit_id])[visit_id]
 
     def compute_net_paid_amounts_by_visit_id(
         self, visit_ids: list[int]
@@ -467,13 +458,13 @@ class PaymentInvariantService:
         """
         if not visit_ids:
             return {}
+        self._require_complete_payment_ledger()
         payments = (
-            self.db.query(Payment)
+            self.db.query(Payment.visit_id, Payment.amount, Payment.refunded_amount)
             .filter(
                 Payment.visit_id.in_(list(visit_ids)),
                 Payment.status.in_(["paid", "completed"]),
             )
-            .populate_existing()
             .all()
         )
         net_by_visit: dict[int, Decimal] = dict.fromkeys(visit_ids, Decimal("0"))
@@ -549,28 +540,50 @@ class PaymentInvariantService:
         return completed
 
     @staticmethod
-    def _net_settled_amount(payment: Payment) -> Decimal:
+    def _net_settled_amount(payment: Row) -> Decimal:
         """Return money still settled after partial or full refunds."""
         amount = Decimal(str(payment.amount or 0))
         refunded = Decimal(str(payment.refunded_amount or 0))
         return max(amount - refunded, Decimal("0"))
 
+    def _require_complete_payment_ledger(self) -> None:
+        if self.db.get_bind().dialect.name == "postgresql":
+            try:
+                _verify_complete_backend_reads(self.db, _financial_schema(self.db))
+            except FinancialFenceError as exc:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    def _read_summary_payments(self, visit_ids: list[int]) -> Sequence[Row]:
+        if not visit_ids:
+            return ()
+        self._require_complete_payment_ledger()
+        return (
+            self.db.query(
+                Payment.id, Payment.visit_id, Payment.amount, Payment.status,
+                Payment.refunded_amount, Payment.currency, Payment.method,
+            )
+            .filter(Payment.visit_id.in_(visit_ids))
+            .order_by(Payment.id)
+            .all()
+        )
+
+    def summarize_recorded_visit_payment(self, visit: Visit) -> dict[str, Any] | None:
+        """Return the canonical row only when the visit has ledger records."""
+        payments = self._read_summary_payments([visit.id])
+        return self._summarize_visits([visit], payments)["visits"][0] if payments else None
+
     def summarize_visits(self, visits: list[Visit]) -> dict[str, Any]:
         """Read receipt-backed balances using the same totals as payment creation.
 
-        A snapshot identifies the displayed ledger. Submitting it while holding
-        the visit locks prevents a retry from silently becoming another receipt.
-        It is a concurrency token, not an authorization credential.
+        A snapshot identifies the displayed financial state. Submitting it
+        while holding the visit locks detects changes since the preview.
         """
-        visits = sorted(visits, key=lambda visit: visit.id)
-        payments = (
-            self.db.query(Payment)
-            .filter(Payment.visit_id.in_([visit.id for visit in visits]))
-            .order_by(Payment.id)
-            .populate_existing()
-            .all()
-        )
-        settled_by_visit: dict[int, list[Payment]] = {}
+        ordered_visits = sorted(visits, key=lambda visit: visit.id)
+        payments = self._read_summary_payments([visit.id for visit in ordered_visits])
+        return self._summarize_visits(ordered_visits, payments)
+
+    def _summarize_visits(self, visits: list[Visit], payments: Sequence[Row]) -> dict[str, Any]:
+        settled_by_visit: dict[int, list[Row]] = {}
         for payment in payments:
             if payment.status in {"paid", "completed"}:
                 settled_by_visit.setdefault(payment.visit_id, []).append(payment)
@@ -617,7 +630,7 @@ class PaymentInvariantService:
             "visits": rows,
             "quote_contexts": quote_contexts,
             "payments": [
-                (p.id, p.visit_id, p.amount, p.status, p.refunded_amount, p.updated_at)
+                (p.id, p.visit_id, p.amount, p.status, p.refunded_amount, p.currency, p.method)
                 for p in payments
             ],
         }
