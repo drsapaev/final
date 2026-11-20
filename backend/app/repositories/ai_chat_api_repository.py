@@ -46,4 +46,6 @@ class AIChatApiRepository:
         )
 
     def get_user(self, user_id: int) -> User | None:
-        return self.db.query(User).filter(User.id == user_id).first()
+        # WebSockets can keep one Session open for a long time. Refresh the
+        # existing identity-map entry from the database on every check.
+        return self.db.query(User).filter(User.id == user_id).populate_existing().first()

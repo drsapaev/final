@@ -12,26 +12,29 @@ from app.services.authentication_api_service import (
 
 @pytest.mark.unit
 class TestAuthenticationApiService:
-    def test_update_user_profile_updates_fields_and_returns_profile(self):
-        calls = {"commit": 0, "refresh": 0}
-        repository = SimpleNamespace(
-            commit=lambda: calls.__setitem__("commit", calls["commit"] + 1),
-            refresh_user=lambda user: calls.__setitem__("refresh", calls["refresh"] + 1),
-            rollback=lambda: None,
-            get_user_session=lambda session_id: None,
+    def test_update_user_profile_updates_fields_and_returns_profile(self, db_session):
+        import uuid
+
+        from app.models.user import User
+        from app.services.profile_contact_security import ProfileBearerContext
+
+        current_user = User(
+            username=f"SYNTHETIC_profile_{uuid.uuid4().hex}",
+            email=f"{uuid.uuid4().hex}@example.test",
+            full_name="Old", hashed_password="synthetic-not-used", is_active=True,
         )
-        current_user = SimpleNamespace(id=1, full_name="Old", phone=None)
-        service = AuthenticationApiService(db=None, repository=repository)
+        db_session.add(current_user)
+        db_session.commit()
+        service = AuthenticationApiService(db_session)
 
         profile = service.update_user_profile(
             current_user=current_user,
             update_data={"full_name": "New"},
             profile_loader=lambda user_id: {"id": user_id, "full_name": "New"},
+            bearer_context=ProfileBearerContext(current_user.id, current_user.auth_epoch, None, None, None),
         )
 
         assert current_user.full_name == "New"
-        assert calls["commit"] == 1
-        assert calls["refresh"] == 1
         assert profile["full_name"] == "New"
 
     def test_ensure_session_access_raises_when_missing(self):

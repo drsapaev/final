@@ -175,11 +175,9 @@ function extractQueueNumberCandidate(value: unknown): string | null {
 
   if (typeof value === 'object' && value !== null) {
     const obj = value as Record<string, unknown>;
-    // QUEUEPRINT-FE-003 (audit group97): the global queue-entry PK (obj.id)
-    // is NOT a queue number — the previous fallback printed it as
-    // «Очередь №42» when no true issued number existed. Only honest
-    // number-shaped fields are candidates; a payload without one renders
-    // no queue-number line at all.
+    // QUEUEPRINT-FE-003: a generic `obj.id` is the record's PK (the backend
+    // contract keeps a distinct pair OnlineQueueEntry.id vs .number) — a
+    // missing issued number cannot be derived from it.
     const direct = getFirstDefined(
       obj.queue_number,
       obj.number,
@@ -193,12 +191,12 @@ function extractQueueNumberCandidate(value: unknown): string | null {
       return String(direct);
     }
 
-    // QUEUEPRINT-FE-003 (audit group97): the nested walk may enter nested
-    // CONTAINERS only (objects/arrays hunting an honest number-shaped
-    // field) — bare scalars are skipped, so the entry PK inside {id: 42}
-    // is never printed as a queue number.
-    for (const nestedValue of Object.values(value)) {
-      if (nestedValue === null || typeof nestedValue !== 'object') {
+    for (const [nestedKey, nestedValue] of Object.entries(value)) {
+      // QUEUEPRINT-FE-003: identifier-keyed values (`id`, `queue_id`,
+      // `appointment_id`, `visit_id`, …) are never issued per-queue
+      // numbers — printing them as «Очередь №…» fabricates ticket identity
+      // from unrelated internal PKs.
+      if (nestedKey === 'id' || nestedKey.endsWith('_id')) {
         continue;
       }
       const nestedCandidate = extractQueueNumberCandidate(nestedValue);
@@ -398,7 +396,7 @@ function normalizeTicketSources(row: Record<string, unknown>, overrides: Record<
   return [];
 }
 
-function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> | null {
+function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): unknown {
   const directPrice = getFirstDefined(
     overrides.servicePrice,
     source?.service_price,
@@ -407,7 +405,7 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
     source?.amount
   );
   if (directPrice !== null && directPrice !== undefined && directPrice !== '') {
-    return directPrice as Record<string, unknown>;
+    return directPrice;
   }
 
   const normalizedCandidates = [
@@ -446,13 +444,10 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
         service?.service_price,
         service?.amount,
         service?.cost
-      ) as Record<string, unknown>;
+      );
     }
   }
 
-  // QUEUEPRINT-FE-004 (audit group97): a label mismatch means UNKNOWN
-  // price — null (honest absence), never a truthy {} placeholder that
-  // Number() coerces to NaN and formatMoney() labels as a false «0 UZS».
   return null;
 }
 
@@ -558,12 +553,14 @@ function buildPanelTicketPayloadForSource(row: Record<string, unknown>, source: 
       row?.queue_number
     ),
     queue_numbers: source ? [source] : row?.queue_numbers,
-    service_price: resolveServicePriceForTicket(row, source, overrides),
-    price: resolveServicePriceForTicket(row, source, overrides),
-    cost: resolveServicePriceForTicket(row, source, overrides),
   };
 
-  return buildPanelTicketPayload(mergedRow, overrides);
+  // An individual ticket needs its own charge. A parent amount can cover
+  // multiple tickets, so keep the ticket price empty when its service is unknown.
+  return {
+    ...buildPanelTicketPayload(mergedRow, overrides),
+    service_price: resolveServicePriceForTicket(row, source, overrides),
+  };
 }
 
 export function resolvePanelTicketPayloads(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown>[] {
@@ -599,12 +596,14 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
   const queueNumber = resolveQueueNumber(row);
   if (!queueNumber) {
     // Desk/laboratory visits never join the queue machinery (prod:
-    // queue_entries is empty by workflow — visits carry their own id), so
-    // a missing queue number is EXPECTED there. Fall back to the visit
-    // identifier instead of failing the print: "В-<id>" identifies the
-    // talon just as well for these flows. Only rows with no identifier at
-    // all still fail.
-    const visitFallback = getFirstDefined(row?.visit_id, row?.id);
+    // queue_entries is empty by workflow), so a missing queue number is
+    // EXPECTED there. QUEUEPRINT-FE-003: only an EXPLICIT `visit_id` proves
+    // the row is a queue-less VISIT — the visit identifier falls back to
+    // "В-<visit_id>" just as well for these flows. A generic `row.id` is
+    // NOT proven to be a Visit PK (appointment / payment / aggregate rows)
+    // and must never be fabricated into a visit talon; such rows fail
+    // honestly with a recoverable lookup instead.
+    const visitFallback = getFirstDefined(row?.visit_id);
     if (visitFallback === null || visitFallback === undefined || visitFallback === '') {
       logger.warn('[PanelPrint] Queue number missing in row payload', {
         rowKeys: row && typeof row === 'object' ? Object.keys(row) : [],
@@ -739,13 +738,13 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
   const clinicName = resolveClinicName(payload, {}, branding);
   const logoUrl = resolveClinicLogo(payload, {}, branding);
   const servicePrice = resolveServicePrice(payload);
+  const numericPrice = typeof servicePrice === 'string' && servicePrice.trim() !== ''
+    ? Number(servicePrice)
+    : servicePrice;
   const qrPayload = payload?.qr_payload;
-  // QUEUEPRINT-FE-004 (audit group97): show an honest finite price — a
-  // GENUINE 0 stays visible («0 UZS»), an unknown/nonfinite value
-  // (NaN from a {} placeholder upstream) hides the price line instead of
-  // being labeled free.
-  const showPriceValue = settings.show_price && servicePrice !== null && servicePrice !== undefined && String(servicePrice) !== '' && Number.isFinite(Number(servicePrice));
-  const priceValue = showPriceValue ? formatMoney(servicePrice, 'UZS') : null;
+  const priceValue = settings.show_price && typeof numericPrice === 'number' && Number.isFinite(numericPrice)
+    ? formatMoney(numericPrice, 'UZS')
+    : null;
 
   // REG-FE-082: блок бренда рендерится только при честном имени/логотипе
   // (реальные настройки или снапшот строки); пустые значения не
@@ -762,9 +761,7 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
       ` : ''}
       ${settings.show_service_name ? `<div class="center service-name">${escapeHtml(payload.specialty_name)}</div>` : ''}
       <div class="line"></div>
-      // QUEUEPRINT-FE-003 (audit group97): a missing true number renders
-      // NO queue-number line — never a placeholder like «Очередь №null».
-      ${settings.show_queue_number && payload.queue_number ? `<div class="center queue-number">Очередь №${escapeHtml(payload.queue_number)}</div>` : ''}
+      ${settings.show_queue_number ? `<div class="center queue-number">Очередь №${escapeHtml(payload.queue_number)}</div>` : ''}
       <div class="line"></div>
       ${renderTicketMetadata('Пациент', payload.patient_name, settings.show_patient_name)}
       ${renderTicketMetadata('Врач', payload.doctor_name, settings.show_doctor_name)}

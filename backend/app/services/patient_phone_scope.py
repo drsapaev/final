@@ -57,8 +57,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import unicodedata
 
-from sqlalchemy import func, select, text
+from sqlalchemy import or_, text, true
 from sqlalchemy.orm import Session
 
 from app.core.roles import Roles
@@ -67,6 +68,69 @@ from app.models.user_profile import UserProfile
 from app.services.patient_otp_service import normalize_phone
 
 logger = logging.getLogger(__name__)
+
+# A corrupt/hostile legacy dataset must not turn an account recovery lookup
+# into an unbounded application-side scan. Exhaustion denies the operation.
+_VERIFIED_PHONE_SCAN_LIMIT = 10_000
+
+
+def canonical_phone_identity(raw: str) -> str | None:
+    """Canonicalize legacy decimal digits before applying the phone SSOT."""
+    ascii_digits = "".join(
+        str(unicodedata.decimal(char)) if char.isdecimal() else char for char in (raw or "")
+    )
+    return normalize_phone(ascii_digits)
+
+
+def _verified_phone_query(db: Session, phone: str):
+    """Prefilter without excluding formatted or Unicode legacy numbers."""
+    dialect = db.get_bind().dialect.name
+    if dialect == "postgresql":
+        has_non_ascii = UserProfile.phone.op("~")(r"[^ -~]")
+    elif dialect == "sqlite":
+        has_non_ascii = UserProfile.phone.op("GLOB")("*[^ -~]*")
+    else:
+        # Unknown dialects must not silently miss legacy representations.
+        has_non_ascii = true()
+    pattern = "%" + "%".join(phone) + "%"
+    return (
+        db.query(User.id, User.auth_epoch, User.is_active, UserProfile.phone)
+        .join(UserProfile, UserProfile.user_id == User.id)
+        .filter(
+            UserProfile.phone_verified.is_(True),
+            or_(UserProfile.phone.like(pattern), has_non_ascii),
+        )
+    )
+
+
+def verified_phone_candidates(
+    db: Session, phone: str, *, exclude_user_id: int | None = None
+) -> list[tuple[int, int, bool]] | None:
+    """Return up to two verified matching identities, or None if indeterminate.
+
+    `phone` must be a canonical ASCII +998 number. The SQL prefilter has no
+    false negatives for formatted ASCII and permits every non-ASCII profile;
+    Python then applies exact canonicalization. All account states count so
+    activation of an inactive verified duplicate cannot race this check.
+    Callers performing writes must already hold the shared phone advisory lock.
+    """
+    if not isinstance(phone, str) or not phone.isascii() or normalize_phone(phone) != phone:
+        return None
+    query = _verified_phone_query(db, phone)
+    if exclude_user_id is not None:
+        query = query.filter(User.id != exclude_user_id)
+    matches: list[tuple[int, int, bool]] = []
+    for index, (user_id, epoch, active, raw) in enumerate(query.yield_per(100)):
+        if index >= _VERIFIED_PHONE_SCAN_LIMIT:
+            return None
+        if canonical_phone_identity(raw or "") != phone:
+            continue
+        if type(user_id) is not int or type(epoch) is not int or type(active) is not bool:
+            return None
+        matches.append((user_id, epoch, active))
+        if len(matches) == 2:
+            break
+    return matches
 
 # Admin-facing conflict message: the admin surface MAY name the conflict
 # (the operator just attempted it — this is not an anti-enum surface).
@@ -94,7 +158,10 @@ def phone_lock_key(normalized: str) -> int:
 
     MUST stay byte-identical to the activation-flow key so both write
     paths serialize on the SAME lock."""
-    digest = hashlib.sha256(b"patact:phone-lock:" + normalized.encode("utf-8")).digest()
+    canonical = canonical_phone_identity(normalized)
+    if canonical is None:
+        raise ValueError("Invalid phone scope")
+    digest = hashlib.sha256(b"patact:phone-lock:" + canonical.encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big", signed=True)
 
 
@@ -160,27 +227,25 @@ def lock_candidate_state_rows(db: Session, user_ids: list[int]) -> None:
 def count_active_verified_patient_users(
     db: Session, normalized: str, *, exclude_user_id: int | None = None
 ) -> int:
-    """Mirror of the login-resolver candidate criteria as a COUNT.
+    """Count active verified Patient identities, including legacy spellings.
 
-    The resolver is fail-closed and returns None for BOTH 0 and >1
-    candidates — ambiguous for a guard that must fire on >= 1. Counting
-    the SAME WHERE-clause answers "would this mutation create candidate
-    #2?". ``exclude_user_id`` removes the mutated record itself (an admin
-    reactivating or re-pointing a user must not trip over their own row)."""
-    stmt = (
-        select(func.count())
-        .select_from(User)
-        .join(UserProfile, UserProfile.user_id == User.id)
-        .where(
-            UserProfile.phone == normalized,
-            UserProfile.phone_verified.is_(True),
-            User.role == Roles.PATIENT,
-            User.is_active.is_(True),
-        )
+    Exhausting the bounded scan is treated as a conflict, never as zero.
+    """
+    phone = canonical_phone_identity(normalized)
+    if phone is None:
+        return 0
+    query = _verified_phone_query(db, phone).filter(
+        User.role == Roles.PATIENT, User.is_active.is_(True)
     )
     if exclude_user_id is not None:
-        stmt = stmt.where(User.id != exclude_user_id)
-    return int(db.execute(stmt).scalar_one())
+        query = query.filter(User.id != exclude_user_id)
+    count = 0
+    for index, (_, _, _, raw) in enumerate(query.yield_per(100)):
+        if index >= _VERIFIED_PHONE_SCAN_LIMIT:
+            return max(count, 1)
+        if canonical_phone_identity(raw or "") == phone:
+            count += 1
+    return count
 
 
 def ensure_phone_scope_free(
@@ -194,7 +259,7 @@ def ensure_phone_scope_free(
     second candidate; returns the normalized phone ("" for values that
     can never enter the resolver predicate — the caller proceeds).
     The lock lives until the caller's commit/rollback."""
-    normalized = normalize_phone(phone or "")
+    normalized = canonical_phone_identity(phone or "")
     if not normalized:
         return ""
     acquire_phone_scope_lock(db, normalized)

@@ -196,7 +196,7 @@ def test_concurrent_reminder_jobs_send_exactly_once(
     calls: list[dict] = []
     started = threading.Barrier(2)
 
-    async def _spy(self, db, vid, hours_before=24, channel=None):
+    async def _spy(self, db, vid, hours_before=24, channel=None, expected_context=None):
         calls.append({"visit_id": vid, "hours_before": hours_before})
         # Simulate slow provider I/O AFTER the claim committed — the window
         # an unguarded second reader would exploit to double-send.
@@ -248,3 +248,88 @@ def test_concurrent_reminder_jobs_send_exactly_once(
         assert row is not None and row.reminder_sent_at is not None
     finally:
         fresh.close()
+
+
+@pytest.mark.parametrize("change", ["transfer", "phone"])
+def test_transfer_between_claim_and_token_issue_never_sends_old_patient(
+    pg_engine, cleanup_rows, monkeypatch: pytest.MonkeyPatch, change
+):
+    """A committed patient transfer must make the stale issuer's UPDATE lose."""
+    import sqlalchemy
+    from sqlalchemy import event, update
+
+    from app.models.clinic import Doctor
+    from app.models.patient import Patient
+    from app.models.user import User
+    from app.models.visit import Visit
+    from app.services.notifications_pkg._reminders import RemindersMixin
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    suffix = uuid.uuid4().hex[:8]
+    session = sessionmaker(bind=pg_engine)()
+    try:
+        user = User(username=f"race_{suffix}", email=f"race_{suffix}@test.invalid",
+                    full_name="Synthetic", hashed_password="test", role="Doctor",
+                    is_active=True, is_superuser=False)
+        session.add(user)
+        session.flush()
+        doctor = Doctor(user_id=user.id, specialty="Synthetic", active=True)
+        session.add(doctor)
+        session.flush()
+        patients = [Patient(first_name="Synthetic", last_name=f"{suffix}_{i}",
+                            phone=f"+998000{int(uuid.uuid4().int % 10**6):06d}",
+                            birth_date=date(1990, 1, 1), address="SYNTHETIC")
+                    for i in range(2)]
+        session.add_all(patients)
+        session.flush()
+        visit = Visit(patient_id=patients[0].id, doctor_id=doctor.id,
+                      visit_date=date.today() + timedelta(days=2), visit_time="10:00",
+                      status="pending_confirmation", discount_mode="none",
+                      department="cardiology", confirmation_token=None,
+                      confirmation_channel="pwa")
+        session.add(visit)
+        session.commit()
+        visit_id, patient_a, patient_b = visit.id, patients[0].id, patients[1].id
+        version = build_reminder_schedule_version(visit)
+        cleanup_rows.append((visit_id, patients[0].id, doctor.id, user.id))
+    finally:
+        session.close()
+
+    actual_create_engine = sqlalchemy.create_engine
+    transferred = []
+    calls = []
+
+    def create_worker_engine(*args, **kwargs):
+        engine = actual_create_engine(*args, **kwargs)
+
+        @event.listens_for(engine, "before_cursor_execute")
+        def transfer_before_issue(conn, cursor, statement, parameters, context, executemany):
+            if not transferred and statement.lstrip().upper().startswith("UPDATE VISITS SET CONFIRMATION_TOKEN"):
+                transferred.append(True)
+                with pg_engine.begin() as other:
+                    if change == "transfer":
+                        other.execute(update(Visit).where(Visit.id == visit_id).values(patient_id=patient_b))
+                    else:
+                        other.execute(update(Patient).where(Patient.id == patient_a).values(phone="+998000000000"))
+        return engine
+
+    async def spy(self, db, vid, hours_before=24, channel=None, expected_context=None):
+        calls.append(expected_context)
+        return {"success": True, "channel": channel}
+
+    monkeypatch.setattr(sqlalchemy, "create_engine", create_worker_engine)
+    monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", spy)
+    try:
+        asyncio.run(send_visit_reminder({}, visit_id=visit_id, schedule_version=version))
+        assert transferred and calls == []
+        with sessionmaker(bind=pg_engine)() as fresh:
+            current = fresh.get(Visit, visit_id)
+            assert current.patient_id == (patient_b if change == "transfer" else patient_a)
+            assert current.confirmation_token is None
+            assert current.reminder_claimed_at is None
+    finally:
+        # Restore owner so the common fixture can remove both patients in FK order.
+        with pg_engine.begin() as conn:
+            conn.execute(update(Visit).where(Visit.id == visit_id).values(patient_id=cleanup_rows[-1][1]))
+            conn.execute(Patient.__table__.delete().where(Patient.id == patient_b))

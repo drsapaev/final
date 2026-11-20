@@ -159,8 +159,8 @@ JSON result includes `teardown.status=PASS` only after those checks. An
 inherited `KEEP_STAGING=1` does not preserve a successful run.
 
 A failed `Start` or `Session` also attempts the same cleanup while its WSL
-session is still continuous. Cleanup eligibility begins immediately after
-the exact project and its owner/expiry labels are verified, so later failures
+session is still continuous, unless `KEEP_STAGING=1` is set. Cleanup eligibility
+begins immediately after the exact project and its owner/expiry labels are verified, so later failures
 in public-origin, Linux-storage or keeper-continuity checks do not leave that
 owned project behind. Before ownership and lifecycle verification succeeds,
 the helper does not delete resources. A changed owner/lifecycle label blocks
@@ -168,14 +168,40 @@ deletion. A lost WSL keeper or boot identity reports teardown `NOT_RUN`; the
 helper does not reboot WSL to retry or delete resources after continuity is
 lost. To preserve a failed environment for
 diagnosis, set `KEEP_STAGING=1` explicitly and record the project, expiry and
-reason in the task checkpoint. Inspect the recorded failure once, resolve
-the cause, and clean only that project. A process forcibly killed by the OS
+reason in the task checkpoint. A process forcibly killed by the OS
 cannot run its cleanup handler, so the expiry label and checkpoint remain
 necessary.
 
+### Recover a failed synthetic staging session
+
+For agent-run synthetic staging, set `$env:KEEP_STAGING='1'` in the launcher
+process before both `Start` and `Session`. Record that choice and the owned
+project, worktree, ports, lease expiry and safe failure reason in the task
+checkpoint. The launcher reads this flag from its process environment; merely
+putting it in the Compose env file is insufficient. Select a lease long enough
+for investigation within the existing seven-day limit.
+
+On failure, retain the same verified project, its private synthetic env and
+volumes while diagnosing and fixing the cause. Recheck ownership, ports, lease
+and source revision before resuming. Continue with targeted remaining checks in
+the same project; do not blindly reseed or reset a partially populated database.
+Use `Session -NoBuild` only if its existing images still match the intended
+source and no rebuild is needed. If a source fix requires a rebuild, verify the
+new revision and preserve the owned data only when the change is compatible.
+Previously passed checks remain evidence for their tested revision. Keep unrun
+checks marked `NOT_RUN`. If a required check is still incomplete, the validation
+command must exit nonzero so the launcher preserves the project for recovery.
+
+A successful `Session` still performs the normal owned-project teardown even
+with `KEEP_STAGING=1`. Verify containers, volumes, networks and ports, then
+remove that project's private synthetic env. Do not leave preserved projects
+untracked: monitor their lease and disk use until the failure is resolved or
+the owner explicitly ends the investigation. Never change existing ownership
+or expiry labels to bypass the launcher's checks.
+
 A successful `Start` returns `teardown=PENDING_SESSION`; it is not a completed
-validation run. Continue with one `Session`, rather than leaving a stack
-between tasks. An expired lease cannot be started or used for validation;
+validation run. Continue with `Session`; after a failure, use the recovery
+procedure above. An expired lease cannot be started or used for validation;
 an exactly matching owned project is cleaned on that failed invocation unless
 the explicit failure-preservation exception is set.
 

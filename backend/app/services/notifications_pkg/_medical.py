@@ -196,7 +196,8 @@ class MedicalMixin(NotificationSenderMixinBase):
 
 
     async def send_visit_confirmation_invitation(
-        self, db: Session, visit_id: int, channel: str = "auto"
+        self, db: Session, visit_id: int, channel: str = "auto", *,
+        expected_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Отправляет приглашение на подтверждение визита
@@ -205,11 +206,22 @@ class MedicalMixin(NotificationSenderMixinBase):
         from app.models.visit import Visit
 
         try:
-            visit = db.query(Visit).filter(Visit.id == visit_id).first()
+            # The scheduling request freezes its authorized context before
+            # commit. Never derive a recipient from a later transferred row.
+            required = {"patient_id", "confirmation_context_epoch", "confirmation_token"}
+            if (expected_context is None or set(expected_context) != required
+                or not isinstance(expected_context.get("confirmation_token"), str)
+                or not expected_context["confirmation_token"]):
+                return {"success": False, "error": "Контекст визита недоступен"}
+            visit = db.query(Visit).filter(Visit.id == visit_id).populate_existing().first()
             if not visit:
                 return {"success": False, "error": "Визит не найден"}
+            if visit.status != "pending_confirmation" or any(
+                getattr(visit, field) != expected_context[field] for field in required
+            ):
+                return {"success": False, "error": "Контекст визита изменился"}
 
-            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+            patient = db.query(Patient).filter(Patient.id == visit.patient_id).populate_existing().first()
             if not patient:
                 return {"success": False, "error": "Пациент не найден"}
 
@@ -219,6 +231,15 @@ class MedicalMixin(NotificationSenderMixinBase):
 
             # Формируем данные для уведомления
             notification_data = self._prepare_notification_data(db, visit, patient)
+
+            current = db.query(
+                Visit.patient_id, Visit.confirmation_context_epoch,
+                Visit.confirmation_token, Visit.status,
+            ).filter(Visit.id == visit_id).first()
+            if (current is None or current.status != "pending_confirmation" or any(
+                getattr(current, field) != expected_context[field] for field in required
+            )):
+                return {"success": False, "error": "Контекст визита изменился"}
 
             # Отправляем уведомление по выбранному каналу
             if channel == "telegram":
@@ -237,7 +258,7 @@ class MedicalMixin(NotificationSenderMixinBase):
                 return {"success": False, "error": f"Неподдерживаемый канал: {channel}"}
 
         except Exception as e:
-            logger.error(f"Ошибка отправки приглашения на подтверждение: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error("Ошибка отправки приглашения на подтверждение (%s)", type(e).__name__)
+            return {"success": False, "error": "Ошибка отправки приглашения"}
 
 
