@@ -237,11 +237,8 @@ def _commit_with_client_request(
     anchor) rolls back and the caller replays the winner's snapshot.
 
     RETRO-FIN-001: the anchor persists the request intent fingerprint.
-    In the concurrent-race recovery the WINNER's fingerprint must match
-    this request's fingerprint — a byte-equivalent duplicate recovers
-    into the winner's replay as before, while a same-key/different-intent
-    race (integration anomaly) is refused with 409 instead of replaying
-    an unrelated success.
+    Concurrent recovery applies the same endpoint, intent and owner
+    checks as an ordinary replay.
 
     Returns ``None`` on a clean commit, or the WINNER's stored payload
     when this request lost the concurrent race (the caller must replay it
@@ -261,55 +258,23 @@ def _commit_with_client_request(
         return None
     except IntegrityError:
         db.rollback()
-        if endpoint == "refund":
-            replay = _replay_payment_client_request(
-                db, client_request_id, endpoint, request_fingerprint=request_fingerprint, current_user_id=created_by,
-            )
-            if replay is not None:
-                return replay
-            raise HTTPException(status_code=409, detail="Запись возврата требует сверки") from None
-        stored = _find_payment_client_request(db, client_request_id)
-        if (
-            stored is not None
-            and stored.endpoint == endpoint
-            and (
-                request_fingerprint is None
-                or stored.request_fingerprint is None
-                or stored.request_fingerprint == request_fingerprint
-            )
-        ):
-            payload = stored.response_payload
-            if isinstance(payload, str):  # defensive: JSON round-trip
-                import json
-
-                payload = json.loads(payload)
+        replay = _replay_payment_client_request(
+            db,
+            client_request_id,
+            endpoint,
+            request_fingerprint=request_fingerprint,
+            current_user_id=created_by,
+        )
+        if replay is not None:
             logger.info(
                 "payment.client_request_race_recovered client_request_id=%s "
                 "endpoint=%s",
                 client_request_id,
                 endpoint,
             )
-            return payload
-        if stored is not None and stored.request_fingerprint is not None:
-            logger.warning(
-                "payment.client_request_intent_mismatch client_request_id=%s "
-                "endpoint=%s stored_fingerprint=%s requested_fingerprint=%s",
-                client_request_id,
-                endpoint,
-                stored.request_fingerprint,
-                request_fingerprint,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "reason": "client_request_id_intent_mismatch",
-                    "message": (
-                        "Ключ идемпотентности использован с другим платёжным "
-                        "назначением (пациент/визит/сумма/метод). Сгенерируйте "
-                        "новый ключ для новой операции."
-                    ),
-                },
-            )
+            return replay
+        if endpoint == "refund":
+            raise HTTPException(status_code=409, detail="Запись возврата требует сверки") from None
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
