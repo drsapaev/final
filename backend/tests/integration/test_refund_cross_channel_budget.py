@@ -11,6 +11,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.cashier import _payments
+from app.models.audit import AuditLog
 from app.models.payment import Payment, PaymentClientRequest
 from app.models.refund_deposit import (
     DepositTransaction,
@@ -19,7 +20,12 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.models.visit import Visit
+from app.services.encounter_financial_fence import FinancialFenceError
 from app.services.force_majeure_service import ForceMajeureError, ForceMajeureService
+from app.services.telegram_staff_action_adapter_service import (
+    TelegramStaffActionAdapterError,
+    TelegramStaffActionAdapterService,
+)
 from tests.integration.test_cashier_currency import _visit
 from tests.integration.test_cashier_daily_currency import _daily_pg_app
 from tests.integration.test_cashier_refund_idempotency import _apply_receipt_guard
@@ -83,6 +89,69 @@ def _external_refund(db, channel, payment, *, patient_id):
     if channel == "deposit":
         return service._add_to_deposit(**common, performed_by_id=None)
     return service._create_refund_request(**common, refund_type=RefundType.BANK_TRANSFER, is_automatic=True)
+
+
+@pytest.mark.parametrize("channel", ["deposit", "bank_transfer"])
+def test_protected_staff_refund_checks_the_same_external_evidence(
+    db_session, admin_user, test_patient, test_service, channel,
+):
+    visit = _visit(db_session, test_patient, test_service, "UZS")
+    payment = Payment(visit_id=visit.id, amount=Decimal("10.00"), currency="UZS", method="cash", status="paid")
+    db_session.add(payment)
+    db_session.flush()
+    _external_refund(db_session, channel, payment, patient_id=test_patient.id)
+    db_session.commit()
+
+    with pytest.raises(TelegramStaffActionAdapterError, match="payment_refund_already_routed"):
+        TelegramStaffActionAdapterService(db_session).staff_refund_payment(
+            payment_id=payment.id, amount="10.00", actor_user_id=admin_user.id,
+        )
+    assert payment.refunded_amount is None
+    assert db_session.query(PaymentRefundClaim.id).filter_by(payment_id=payment.id).count() == 1
+    audit = db_session.query(AuditLog).filter_by(entity_id=payment.id).one()
+    assert audit.action == "staff_action_failed"
+    assert audit.payload["domain_mutation"] is False
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("channel,evidence_table", [
+    ("deposit", "deposit_transactions"), ("bank_transfer", "refund_requests"),
+])
+def test_protected_staff_refund_refuses_hidden_postgresql_evidence(
+    guarded_pg, monkeypatch, channel, evidence_table,
+):
+    owner, runtime, ids, _, _, schema, role, _ = _daily_pg_app(guarded_pg, monkeypatch)
+    quote = owner.dialect.identifier_preparer.quote_identifier
+    qs, qr = quote(schema), quote(role)
+    with owner.begin() as conn:
+        conn.exec_driver_sql(f"GRANT SELECT ON {qs}.payments, {qs}.payment_visits TO {qr}")
+        conn.exec_driver_sql(f"GRANT INSERT, SELECT (id) ON {qs}.audit_logs TO {qr}")
+        conn.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {qs}.audit_logs_id_seq TO {qr}")
+    with Session(owner) as db:
+        payment = db.query(Payment).filter_by(visit_id=ids["visit"], status="paid").one()
+        payment_id = payment.id
+        _external_refund(db, channel, payment, patient_id=ids["patient"])
+        db.commit()
+
+    def request_refund():
+        with Session(runtime) as db:
+            return TelegramStaffActionAdapterService(db).staff_refund_payment(
+                payment_id=payment_id, amount="4.00", actor_user_id=ids["stage"],
+            )
+
+    with pytest.raises(TelegramStaffActionAdapterError, match="payment_refund_already_routed"):
+        request_refund()
+    with owner.begin() as conn:
+        conn.exec_driver_sql(f"ALTER POLICY financial_backend_select ON {qs}.{quote(evidence_table)} USING (false)")
+    with pytest.raises(FinancialFenceError, match="История возвратов временно недоступна"):
+        request_refund()
+
+    with Session(owner) as db:
+        assert db.get(Payment, payment_id).refunded_amount is None
+        assert db.query(PaymentRefundClaim.id).filter_by(payment_id=payment_id).count() == 1
+        audits = db.query(AuditLog).filter_by(entity_id=payment_id).all()
+        assert len(audits) == 2
+        assert all(row.action == "staff_action_failed" and not row.payload["domain_mutation"] for row in audits)
 
 
 @pytest.mark.integration

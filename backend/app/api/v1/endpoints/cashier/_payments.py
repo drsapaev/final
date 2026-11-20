@@ -40,14 +40,11 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     router,
 )
 from app.models.payment import PaymentClientRequest
-from app.models.refund_deposit import DepositTransaction
-from app.models.refund_deposit import RefundRequest as ExternalRefundRequest
-from app.services.cashier_stats_snapshot import require_visible_external_refunds
 from app.services.encounter_financial_fence import (
     FinancialFenceError,
-    _financial_schema,
 )
 from app.services.money_input import MoneyInputError, parse_money
+from app.services.payment_refund_guard import has_external_refund, lock_refund_evidence
 
 
 def _payment_intent_fingerprint(
@@ -1634,12 +1631,7 @@ async def refund_payment(
         fingerprint = hashlib.sha256(intent.encode("utf-8")).hexdigest()
         replay_options = {"request_fingerprint": fingerprint, "current_user_id": actor_id}
 
-        if db.get_bind().dialect.name == "postgresql":
-            if db.execute(sql_text("SHOW transaction_isolation")).scalar_one() != "read committed":
-                raise FinancialFenceError("История возвратов временно недоступна")
-            require_visible_external_refunds(db, _financial_schema(db))
-        else:
-            db.execute(sql_text("UPDATE payments SET id=id WHERE 0"))
+        lock_refund_evidence(db)
         replay = _replay_payment_client_request(db, client_request_id, "refund", **replay_options)
         if replay is not None:
             return RefundResponse(**replay, reason=refund_data.reason)
@@ -1676,15 +1668,7 @@ async def refund_payment(
         # These writers hold the same Payment lock until their evidence commits.
         # A live external request or credit requires reconciliation before a
         # cashier may spend any of the same payment's balance.
-        external_request = db.query(ExternalRefundRequest.id).filter(
-            ExternalRefundRequest.payment_id == payment_id,
-            or_(ExternalRefundRequest.status.is_(None), ExternalRefundRequest.status.not_in(("rejected", "cancelled"))),
-        ).first()
-        deposit_credit = db.query(DepositTransaction.id).filter(
-            DepositTransaction.payment_id == payment_id,
-            or_(DepositTransaction.transaction_type.is_(None), DepositTransaction.transaction_type != "debit"),
-        ).first()
-        if external_request is not None or deposit_credit is not None:
+        if has_external_refund(db, payment_id):
             raise HTTPException(status_code=409, detail="По платежу есть возврат другим способом. Требуется сверка")
 
         # Atomic refund: use SQL UPDATE with WHERE guard to prevent race condition.

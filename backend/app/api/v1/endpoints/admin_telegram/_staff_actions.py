@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from sqlalchemy.exc import DBAPIError
+
 from app.api.v1.endpoints.admin_telegram._helpers import *  # noqa
 from app.api.v1.endpoints.admin_telegram._helpers import (
     _normalize_staff_role,
@@ -8,6 +10,10 @@ from app.api.v1.endpoints.admin_telegram._helpers import (
     _validate_staff_action_target_binding,
     _validate_staff_action_target_request,
 )  # noqa: F401
+from app.services.encounter_financial_fence import FinancialFenceError
+from app.services.telegram_staff_action_adapter_service import (
+    TelegramStaffActionAdapterError,
+)
 from app.services.telegram_token_store import (  # noqa: F401
     decrypt_token,
     resolve_patient_bot_token,
@@ -260,14 +266,28 @@ def confirm_staff_action(
         }
 
     if command_key.lower() == "/refund":
-        action_result = TelegramStaffActionAdapterService(db).staff_refund_payment(
-            payment_id=int(request.payment_id),
-            amount=request.refund_amount,
-            reason=request.refund_reason,
-            actor_user_id=int(current_user.id),
-            telegram_chat_id=int(record.telegram_chat_id),
-            commit=True,
-        )
+        try:
+            action_result = TelegramStaffActionAdapterService(db).staff_refund_payment(
+                payment_id=int(request.payment_id),
+                amount=request.refund_amount,
+                reason=request.refund_reason,
+                actor_user_id=int(current_user.id),
+                telegram_chat_id=int(record.telegram_chat_id),
+                commit=True,
+            )
+        except TelegramStaffActionAdapterError as exc:
+            detail = str(exc)
+            code = 422 if detail == "payment_refund_amount_invalid" else 409
+            raise HTTPException(status_code=code, detail=detail) from None
+        except FinancialFenceError:
+            raise HTTPException(status_code=503, detail="История возвратов временно недоступна") from None
+        except DBAPIError as exc:
+            code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if code in {"55P03", "40001"}:
+                raise HTTPException(status_code=409, detail="Платёж изменяется. Повторите операцию") from None
+            if code == "42501":
+                raise HTTPException(status_code=503, detail="История возвратов временно недоступна") from None
+            raise
         return {
             "success": True,
             "confirmation_id": confirmation_id,

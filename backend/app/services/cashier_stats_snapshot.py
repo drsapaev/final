@@ -32,11 +32,11 @@ from app.services.encounter_financial_fence import (
     _financial_schema,
     _verify_complete_backend_reads,
 )
+from app.services.payment_refund_guard import (
+    recorded_payment_currency as _currency,
+)
+from app.services.payment_refund_guard import require_visible_external_refunds
 
-_EXTERNAL_REFUND_READS = {
-    "refund_requests": ("id", "payment_id", "status"),
-    "deposit_transactions": ("id", "payment_id", "transaction_type"),
-}
 _DEPOSIT_TRIGGERS = {"trg_protect_deposit_refund_evidence": 31, "trg_bind_deposit_refund_claim": 5}
 _DEPOSIT_GUARD_SHA256 = "4bb9c48268f38083e1c7588bb29cdcdc6057de29a82eea2671f21722f29599ab"
 
@@ -49,36 +49,6 @@ def _money(value: object) -> Decimal:
     except (InvalidOperation, TypeError, ValueError):
         raise HTTPException(status_code=409, detail="Финансовые данные требуют сверки") from None
     return result
-
-
-def _currency(value: object) -> str | None:
-    if isinstance(value, str) and len(value) == 3 and value.isascii() and value.isalpha() and value.isupper():
-        return value
-    return None
-
-
-def require_visible_external_refunds(db: Session, schema: str) -> None:
-    # The SELECTs acquire relation locks before RLS and privilege checks, so
-    # policy DDL cannot change the evidence visibility during this transaction.
-    for table, columns in _EXTERNAL_REFUND_READS.items():
-        db.execute(text(f"SELECT {', '.join(columns)} FROM {schema}.{table} WHERE false"))
-    valid = db.execute(text("""
-      SELECT count(*)=2 AND COALESCE(bool_and(NOT c.relrowsecurity OR (
-        EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=c.oid
-          AND p.polpermissive AND p.polcmd IN ('r','*')
-          AND (SELECT oid FROM pg_catalog.pg_roles WHERE rolname=CURRENT_USER)=ANY(p.polroles)
-          AND pg_catalog.pg_get_expr(p.polqual,p.polrelid)='true')
-        AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=c.oid
-          AND NOT p.polpermissive AND p.polcmd IN ('r','*') AND EXISTS (
-            SELECT 1 FROM pg_catalog.unnest(p.polroles) rid
-            WHERE CASE WHEN rid=0 THEN true ELSE pg_catalog.pg_has_role(CURRENT_USER,rid,'MEMBER') END))
-      )),false)
-      FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname=:schema AND c.relname=ANY(:tables) AND c.relkind IN ('r','p')
-    """), {"schema": db.get_bind().dialect.default_schema_name,
-           "tables": list(_EXTERNAL_REFUND_READS)}).scalar_one()
-    if valid is not True:
-        raise FinancialFenceError("История возвратов временно недоступна")
 
 
 def _require_deposit_refund_guard(db: Session, schema: str) -> None:

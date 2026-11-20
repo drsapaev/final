@@ -27,6 +27,13 @@ from app.services.canonical_visit_service import (  # noqa: F401
 )
 from app.services.notifications import notification_sender_service  # noqa: F401
 from app.services.payment_read_service import PaymentReadService  # noqa: F401
+from app.services.payment_refund_guard import CASHIER_IMMEDIATE_PAID_METHODS
+from app.services.payment_refund_guard import (
+    local_refund_requires_reconciliation as _cashier_refund_requires_reconciliation,
+)
+from app.services.payment_refund_guard import (
+    recorded_payment_currency as _cashier_payment_currency,  # noqa: F401
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,21 +109,8 @@ def _cashier_payment_status(payment: Payment) -> str:
     return str(payment.status or "").strip().lower()
 
 
-def _cashier_payment_currency(value: Any) -> str | None:
-    """Expose a stored currency code without inventing one for legacy data."""
-    if isinstance(value, str) and len(value) == 3 and value.isascii() and value.isalpha() and value.isupper():
-        return value
-    return None
-
-
 def _cashier_payment_available_amount(payment: Payment) -> Decimal:
     return Decimal(str(payment.amount or 0)) - Decimal(str(payment.refunded_amount or 0))
-
-
-def _cashier_refund_requires_reconciliation(payment: Payment) -> bool:
-    return (bool(payment.provider or payment.provider_payment_id)
-            or payment.method not in CASHIER_IMMEDIATE_PAID_METHODS
-            or _cashier_payment_currency(payment.currency) is None)
 
 
 def _cashier_payment_action_contract(payment: Payment) -> dict[str, Any]:
@@ -214,7 +208,6 @@ class PaginatedResponse(BaseModel, Generic[T]):
 # (click/payme/kaspi) обязаны идти через payment_init_service
 # (pending → провайдер → webhook → paid): кассир не может «провести» их
 # одним POST без доказательства списания провайдером.
-CASHIER_IMMEDIATE_PAID_METHODS = frozenset({"cash", "card"})
 CASHIER_HOSTED_PROVIDER_METHODS = frozenset({"click", "payme", "kaspi"})
 
 
