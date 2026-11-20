@@ -38,6 +38,12 @@ from app.services.all_free_approval import (
     all_free_decision_required_clause,
 )
 from app.services.confirmation_security import ConfirmationSecurityService
+from app.services.context_facades.billing_facade import quote_visit_for_confirmation
+from app.services.context_facades.patient_facade import (
+    PatientSubjectLockError,
+    lock_patient_subject,
+    require_patient_subject_visibility,
+)
 from app.services.context_facades.queue_facade import (
     QueueContextFacade,
     QueueDomainServiceContractAdapter,
@@ -45,11 +51,6 @@ from app.services.context_facades.queue_facade import (
 from app.services.encounter_financial_fence import (
     FinancialFenceError,
     lock_group_without_pending,
-)
-from app.services.patient_subject_lock import (
-    PatientSubjectLockError,
-    lock_patient_subject,
-    require_patient_subject_visibility,
 )
 from app.services.queue_claim_service import (
     QueueClaimConflictError,
@@ -991,10 +992,9 @@ class VisitConfirmationService:
                 )
 
             patient = self.repository.get_patient(visit.patient_id)
-            from app.services.payment_invariant_service import PaymentInvariantService
 
             try:
-                quote = PaymentInvariantService(self.repository.db).compute_visit_quote(visit)
+                quote = quote_visit_for_confirmation(self.repository.db, visit)
             except HTTPException as exc:
                 raise VisitConfirmationDomainError(status_code=exc.status_code,
                                                    detail="Стоимость визита требует проверки") from None
@@ -1069,10 +1069,8 @@ class VisitConfirmationService:
     ) -> dict[str, Any]:
         # The patient may view an unknown currency, but must not confirm an
         # ambiguous financial amount. Group and subject locks are held here.
-        from app.services.payment_invariant_service import PaymentInvariantService
-
         try:
-            quote = PaymentInvariantService(self.repository.db).compute_visit_quote(visit)
+            quote = quote_visit_for_confirmation(self.repository.db, visit)
         except HTTPException as exc:
             raise VisitConfirmationDomainError(status_code=exc.status_code, detail=exc.detail) from exc
         if quote.currency is None:

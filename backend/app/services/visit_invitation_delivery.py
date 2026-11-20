@@ -198,7 +198,7 @@ def pin_invitation_runtime(db: Session) -> None:
     Operators must drain traffic for schema/role/ACL changes. A table lock
     keeps the verified policies stable until this transaction ends.
     """
-    from app.services.patient_subject_lock import (
+    from app.services.context_facades.patient_facade import (
         PatientSubjectLockError,
         require_patient_subject_visibility,
     )
@@ -449,7 +449,7 @@ def _valid_visit(visit: Visit, patient: Patient) -> bool:
 
 def _lock_invitation_patient(db: Session, patient_id: int) -> Patient | None:
     """Lock the active subject without granting the backend Patient UPDATE."""
-    from app.services.patient_subject_lock import (
+    from app.services.context_facades.patient_facade import (
         PatientSubjectLockError,
         lock_patient_subject,
     )
