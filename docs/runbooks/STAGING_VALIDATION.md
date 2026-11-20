@@ -35,7 +35,8 @@ executed the checks in this runbook AND they all passed. Hallucinating
 ## Cloud staging integrations
 
 Use the published Codex Cloud environment **`final`** for isolated cloud
-validation. Start in a fresh checkout of the exact requested SHA, use only
+validation. Start a fresh Cloud task after the configuration is published;
+open a fresh checkout of the exact requested SHA. Use only
 synthetic fixtures and owned loopback services, and record teardown. Never
 copy a clinic database, access the production bot, or reuse production
 credentials. These settings have separate storage in the two execution paths;
@@ -57,13 +58,16 @@ bound to `staging-integrations` can consume its variables/secrets; their
 existence does not prove a workflow uses them.
 
 **Sentry:** Use only the dedicated `kosmed-staging-frontend` and
-`kosmed-staging-backend` projects in `kosmed-clinic`. For a Cloud run,
+`kosmed-staging-backend` projects in `kosmed-clinic` (IDs
+`4512459389730816` and `4512459393335296`, respectively). The configured
+ingest host is `o4511673323749376.ingest.us.sentry.io`. For a Cloud run,
 build the frontend with `VITE_SENTRY_ENV=staging` and
 `VITE_APP_VERSION=<full SHA>`; run the backend with `SENTRY_ENV=staging`
 and `APP_VERSION=<full SHA>`. Pass both values through the supported build
 or runtime path. Give the authorized reviewer each exact event ID, project
 and tested SHA for dashboard readback; ingest HTTP 200 is not readback.
-Do not resend or request broader access when readback is unavailable.
+If local readback is unavailable, continue independent checks; do not
+resend or request broader access.
 Delivery, pre-transport masking, hosted masking readback, and full release
 admission are separate results. Evidence applies only to the tested SHA.
 
