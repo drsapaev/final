@@ -190,11 +190,10 @@ def test_quote_unknown_service_is_404(
 # ===================== Codex R1 #3095 =====================
 
 
-def test_quote_honors_custom_price_in_cart_mode(
+def test_quote_rejects_unapproved_price_in_cart_mode(
     client: TestClient, db_session: Session, admin_user
 ):
-    """Codex R1 P2: custom_price зеркалится в квоту, иначе квота (каталог
-    100000) расходится с инвойсом /registrar/cart (врачебная цена 80000)."""
+    """The quote and the save path both require the approved catalog price."""
     service = _service(db_session, code="FIXD-CP", price=100000.00)
 
     response = client.post(
@@ -209,11 +208,8 @@ def test_quote_honors_custom_price_in_cart_mode(
             "pricing_mode": "cart",
         },
     )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert float(body["items"][0]["unit_price"]) == 80000
-    assert float(body["items"][0]["final_price"]) == 160000
-    assert float(body["total_amount"]) == 160000
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == "Изменение цены требует согласования"
 
 
 def test_quote_edit_delta_mode_ignores_repeat_discount(
@@ -330,12 +326,10 @@ def test_quote_edit_delta_all_free_reports_approved_like_the_command(
     assert cart_mode.json()["approval_status"] == "pending"
 
 
-def test_quote_cart_mode_allows_custom_price_when_catalog_price_missing(
+def test_quote_does_not_replace_missing_catalog_price_with_client_value(
     client: TestClient, db_session: Session, admin_user
 ):
-    """Codex R2 #3095 (P2): price=None + валидный custom_price — контракт
-    cart-пути сохранения (create_cart_appointments берёт custom_price
-    первым). Квота обязана считать по custom_price, а не отвечать 409."""
+    """A client-supplied value cannot stand in for a missing catalog price."""
     service = _service(db_session, code="FIXD-CP", price=None)
 
     quoted = client.post(
@@ -348,10 +342,8 @@ def test_quote_cart_mode_allows_custom_price_when_catalog_price_missing(
             "pricing_mode": "cart",
         },
     )
-    assert quoted.status_code == 200, quoted.text
-    body = quoted.json()
-    assert float(body["items"][0]["unit_price"]) == 15000
-    assert float(body["total_amount"]) == 30000
+    assert quoted.status_code == 409, quoted.text
+    assert "не указана цена" in quoted.json()["detail"]
 
     # Нет ни одной эффективной цены — 409 остаётся (отсутствие цены НЕ 0)
     both_missing = client.post(
@@ -985,7 +977,7 @@ def test_custom_price_rejected_beyond_two_decimal_places(
     сырое значение и полагался на Numeric(12,2) — 1.005 подтверждался как
     1.00, а сохранялся в счёт как 1.01. Единая точность DTO закрывает
     расхождение, не меняя контракт для корректных 2dp-цен."""
-    service = _service(db_session, code="R8-PREC-01", price=Decimal("100"))
+    service = _service(db_session, code="R8-PREC-01", price=Decimal("1.01"))
 
     # custom_price с 3 знаками — отвергается схемой quote
     quoted = client.post(
