@@ -1,23 +1,35 @@
 name: Mini App PR staging preflight
 
 on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/staging-miniapp-pr.yml']
   workflow_dispatch:
     inputs:
       source-sha:
         description: Full reviewed source SHA for PR 4118
         required: true
         type: string
+      runtime-smoke:
+        description: Also boot and remove the isolated token-free staging stack
+        type: boolean
+        default: false
 
 permissions: {}
 
 jobs:
   compose-preflight:
-    # Load the reviewed workflow from main, not from the PR source ref.
-    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/main'
+    # Manual runs use main; the scoped infra PR can also prove the token-free job.
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == 'drsapaev/final' &&
+        github.head_ref == 'ci/miniapp-pr-runtime-smoke-20261120'))
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 40
     env:
-      REQUESTED_SHA: ${{ inputs.source-sha }}
+      REQUESTED_SHA: ${{ github.event_name == 'pull_request' && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
       REVIEWED_SHA: 33f35996a1f86726b17f8caa819d1ed99aa1729a
     steps:
       - name: Check out the exact approved public source
@@ -105,5 +117,95 @@ jobs:
             printf '### Mini App staging preflight\n\n'
             printf 'Source SHA: `%s`\n\n' "$REVIEWED_SHA"
             printf 'Compose wiring: PASS (synthetic marker only)\n\n'
-            printf 'Native Telegram acceptance: NOT_RUN. No containers, secrets or tunnel were used.\n'
+            printf 'Native Telegram acceptance: NOT_RUN. No real bot token or tunnel was used.\n'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Boot and verify the token-free loopback stack
+        if: github.event_name == 'pull_request' || inputs.runtime-smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$(mktemp -d)"
+          project="miniapp-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          frontend=http://127.0.0.1:18080
+          backend=http://127.0.0.1:18001
+          docker_args=(docker compose --project-name "$project" --env-file "$d/runtime.env"
+            -f source/ops/compose.staging.yml)
+          cleanup() {
+            local result=$? teardown=PASS type residual image
+            local -a ls_options
+            trap - EXIT
+            if ! "${docker_args[@]}" down --volumes --remove-orphans --rmi local; then
+              teardown=FAIL
+            fi
+            for type in container network volume image; do
+              ls_options=(-q)
+              if [[ "$type" == container || "$type" == image ]]; then ls_options+=(-a); fi
+              if ! residual="$(docker "$type" ls "${ls_options[@]}" --filter "label=com.docker.compose.project=$project")"; then
+                teardown=FAIL
+              elif [[ -n "$residual" ]]; then
+                teardown=FAIL
+              fi
+            done
+            for image in "$project-backend" "$project-frontend"; do
+              if docker image inspect "$image" >/dev/null 2>&1; then teardown=FAIL; fi
+            done
+            printf '\nRuntime teardown: %s.\n' "$teardown" >> "$GITHUB_STEP_SUMMARY"
+            rm -rf -- "$d"
+            if [[ "$teardown" != PASS ]]; then exit 1; fi
+            exit "$result"
+          }
+
+          cat > "$d/runtime.env" <<ENV
+          STAGING_PUBLIC_BASE_URL=$frontend
+          STAGING_PUBLIC_WS_URL=ws://127.0.0.1:18080
+          STAGING_PUBLIC_WS_HOST=127.0.0.1:18080
+          CORS_ORIGINS=$frontend
+          APP_VERSION=$REVIEWED_SHA
+          VERCEL_GIT_COMMIT_SHA=$REVIEWED_SHA
+          CSRF_ENABLED=1
+          CLINIC_PURPOSE=miniapp-token-free-smoke
+          CLINIC_OWNER=github-actions
+          POSTGRES_USER=miniapp_synthetic
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          POSTGRES_DB=miniapp_synthetic
+          SECRET_KEY=$(openssl rand -hex 32)
+          ADMIN_USERNAME=miniapp_synthetic
+          ADMIN_PASSWORD=Aa1_$(openssl rand -hex 24)
+          ADMIN_EMAIL=miniapp@example.invalid
+          ADMIN_FULL_NAME=Synthetic Staging
+          TELEGRAM_BOT_TOKEN=
+          VITE_SENTRY_DSN=
+          SENTRY_DSN=
+          ENV
+          unset TELEGRAM_BOT_TOKEN VITE_SENTRY_DSN SENTRY_DSN
+          trap cleanup EXIT
+
+          "${docker_args[@]}" up --detach --build --wait --wait-timeout 280 postgres redis backend frontend
+
+          expected=$'backend\nfrontend\npostgres\nredis'
+          actual=$("${docker_args[@]}" ps --services --status running | LC_ALL=C sort)
+          test "$actual" = "$expected"
+          "${docker_args[@]}" exec -T backend sh -euc 'test -z "${TELEGRAM_BOT_TOKEN:-}"'
+          for service in postgres backend frontend; do
+            container=$("${docker_args[@]}" ps -q "$service")
+            docker inspect --format '{{json .NetworkSettings.Ports}}' "$container" |
+              python3 -c 'import json,sys; a=[b for row in json.load(sys.stdin).values() if row for b in row]; assert a and all(b["HostIp"] == "127.0.0.1" for b in a)'
+          done
+          "${docker_args[@]}" exec -T postgres psql -XAt --set ON_ERROR_STOP=on \
+            -U miniapp_synthetic -d miniapp_synthetic -c 'select count(*) from patients' |
+            grep -Fxq 0
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 "$backend/" |
+            python3 -c 'import json,sys; assert json.load(sys.stdin)["version"] == sys.argv[1]' "$REVIEWED_SHA"
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 "$frontend/api/v1/health" |
+            python3 -c 'import json,sys; assert json.load(sys.stdin)["db"] == "ok"'
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 \
+            -D "$d/miniapp.headers" -o /dev/null "$frontend/telegram/mini-app/patient"
+          grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/miniapp.headers" >/dev/null
+          status="$(curl --noproxy '*' --silent --show-error --max-time 10 -o "$d/csrf.json" \
+            -w '%{http_code}' -H 'Content-Type: application/json' --data '{}' \
+            "$frontend/api/v1/telegram/mini-app/auth/exchange")"
+          test "$status" = 403
+          python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["reason"] == "missing_cookie"' "$d/csrf.json"
+          printf '\nRuntime smoke: PASS (loopback, empty patient table, no worker or bot token, expected SHA, Mini App CSP and CSRF rejection).\n' >> "$GITHUB_STEP_SUMMARY"
