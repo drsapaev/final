@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .activation import Activation
+from .activation_rate_budget import ActivationRateBudget
 from .ai_chat import AIChatFeedback, AIChatMessage, AIChatSession
 from .ai_config import (
     AIPromptTemplate,
@@ -229,6 +230,7 @@ from .visit import Visit, VisitService
 
 # Make sure all models are available
 __all__ = [
+    "ActivationRateBudget",
     "User",
     "Patient",
     "PatientAccessAuditLog",  # M4-P0-1: PHI access audit trail

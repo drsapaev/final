@@ -118,12 +118,13 @@ def _stub_auth(
     doctor: SimpleNamespace | None,
 ) -> None:
     """Resolve any JWT to ``user`` and any user to ``doctor`` (synthetic)."""
+    user.auth_epoch = 0
     monkeypatch.setattr(ws_auth, "_resolve_websocket_user", lambda payload, db: user)
     monkeypatch.setattr(ws_auth, "_resolve_doctor_for_user", lambda db, u: doctor)
     monkeypatch.setattr(
         TokenBlacklistService,
         "is_token_blacklisted",
-        staticmethod(lambda db, jti, user_id=None: False),
+        staticmethod(lambda db, jti, user_id=None, *, auth_epoch=0: False),
     )
 
 

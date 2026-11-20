@@ -312,13 +312,7 @@ def test_idempotency_same_key_returns_cached_response_no_second_cart(
 def test_idempotency_key_survives_token_refresh_same_user(
     client: TestClient, db_session: Session, admin_user, test_patient
 ):
-    """Codex R11 #3092 (P1): mobile login tokens carry sub=username, while
-    /mobile/auth/refresh re-issues sub=user.id (+username claim). Hashing
-    the raw sub moved the same user's keys to another namespace after the
-    refresh: a lost-response retry with the SAME Idempotency-Key re-executed
-    the cart and created a duplicate. The namespace is derived from the
-    canonically resolved DB user id — the retry after the refresh REPLAYS
-    the stored outcome."""
+    """A retry after refresh uses the same user's idempotency namespace."""
     service = Service(
         code="FIXR11-NS",
         name="R11 Namespace Service",
@@ -335,10 +329,12 @@ def test_idempotency_key_survives_token_refresh_same_user(
     payload = _cart_payload(patient_id=test_patient.id, visits=[_visit(service.id)])
     key = "r11-namespace-refresh-key"
 
-    # Попытка 1 — токен формы mobile LOGIN (sub=username, без username-claim):
+    # Попытка 1 — токен входа с неизменяемым user id:
     from app.services.authentication_service import authentication_service
 
-    login_token = authentication_service.create_access_token({"sub": admin_user.username})
+    login_token = authentication_service.create_access_token(
+        {"sub": str(admin_user.id), "auth_epoch": admin_user.auth_epoch}
+    )
     first = client.post(
         "/api/v1/registrar/cart",
         headers={"Authorization": f"Bearer {login_token}", "Idempotency-Key": key},

@@ -74,7 +74,7 @@ async def test_send_email_failure_returns_masked_error(monkeypatch):
 
     assert ok is False
     assert RECIPIENT not in message
-    assert MASKED_LOCAL in message
+    assert message == "Не удалось отправить email"
 
 
 @pytest.mark.asyncio
@@ -87,7 +87,7 @@ async def test_send_email_failure_does_not_log_recipient(monkeypatch, caplog):
         )
 
     assert "drsapaev" not in caplog.text
-    assert MASKED_LOCAL in caplog.text
+    assert "SMTPRecipientsRefused" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -120,3 +120,16 @@ async def test_password_reset_send_failure_is_generic_to_client(
     # Сервер логирует причину замаскированной
     assert "drsapaev" not in caplog.text
     assert MASKED_LOCAL in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_send_email_failure_never_exposes_message_or_token(monkeypatch, caplog):
+    svc = _configured_service(monkeypatch)
+    secret = "SYNTHETIC-verification-token-with-sensitive-content"
+    def fail(_message):
+        raise RuntimeError(f"provider included {secret} and {RECIPIENT}")
+    monkeypatch.setattr(svc, "_smtp_send_message", fail)
+    with caplog.at_level(logging.ERROR):
+        ok, message = await svc.send_email_enhanced(to_email=RECIPIENT, subject="test", text_content=secret)
+    assert not ok and secret not in message and RECIPIENT not in message
+    assert secret not in caplog.text and RECIPIENT not in caplog.text

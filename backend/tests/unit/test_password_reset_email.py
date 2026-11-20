@@ -64,6 +64,7 @@ async def test_initiate_email_reset_sends_via_enhanced_sender(
     async def fake_send(to_email, subject, **kwargs):
         calls["to"] = to_email
         calls["subject"] = subject
+        calls.update(kwargs)
         return True, "sent"
 
     monkeypatch.setattr(
@@ -75,6 +76,9 @@ async def test_initiate_email_reset_sends_via_enhanced_sender(
 
     assert result["success"] is True
     assert calls["to"] == reset_user.email
+    for body in (calls["html_content"], calls["text_content"]):
+        assert "/reset-password#token=" in body
+        assert "/reset-password?token=" not in body
     # Токен сохранён в БД и помечен неиспользованным
     from app.models.authentication import PasswordResetToken
 
