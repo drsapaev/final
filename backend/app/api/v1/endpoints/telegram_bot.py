@@ -20,7 +20,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from ....api.deps import get_db, require_roles
+from ....core.roles import DOCTOR_FAMILY_GATE_ROLES
 from ....crud import telegram_config as crud_telegram
+from ....models.telegram_config import TelegramConfig
 from ....models.user import User
 from ....schemas.notifications import (
     SendAppointmentReminderRequest,
@@ -29,6 +31,14 @@ from ....schemas.notifications import (
     SetWebhookRequest,
 )
 from ....services.telegram.bot import telegram_bot
+from ....services.telegram_delivery_authorization import (
+    TelegramDeliveryError,
+    appointment_payload,
+    authorize_appointment,
+    authorize_generic_chat,
+    authorize_lab_result,
+    lab_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +46,22 @@ router = APIRouter()
 WEBHOOK_SECRET_HEADER = "x-telegram-bot-api-secret-token"
 INTERNAL_ERROR_DETAIL = "Internal server error"
 MAX_TELEGRAM_WEBHOOK_BODY_BYTES = 256 * 1024
+_PATIENT_DELIVERY_RESPONSES = {
+    400: {"model": TelegramDeliveryError, "description": "Missing or ambiguous resource identifier"},
+    403: {"model": TelegramDeliveryError, "description": "Staff role is not authorized"},
+    404: {"model": TelegramDeliveryError, "description": "Recipient or authorized resource is unavailable"},
+    409: {"model": TelegramDeliveryError, "description": "The clinical resource is not ready"},
+    502: {"model": TelegramDeliveryError, "description": "Telegram did not confirm delivery"},
+    503: {"model": TelegramDeliveryError, "description": "Telegram is unavailable"},
+}
+
+
+def _require_enabled_patient_bot(db: Session) -> None:
+    if not telegram_bot.bot:
+        raise HTTPException(status_code=503, detail="Telegram bot not configured")
+    config = db.query(TelegramConfig).populate_existing().first()
+    if config is not None and not config.active:
+        raise HTTPException(status_code=503, detail="Telegram bot is disabled")
 
 
 async def _read_telegram_webhook_json(request: Request) -> dict[str, Any]:
@@ -252,18 +278,21 @@ async def get_bot_info(current_user: User = Depends(require_roles("Admin"))):
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.post("/send-notification", response_model=dict[str, Any])
+@router.post("/send-notification", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def send_telegram_notification(
     notification_data: SendTelegramNotificationRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Отправка уведомления через Telegram бота"""
     try:
-        if not telegram_bot.bot:
-            raise HTTPException(status_code=503, detail="Telegram bot not configured")
+        _require_enabled_patient_bot(db)
 
         user_id = notification_data.user_id
         message = notification_data.message
+        # Arbitrary text cannot be classified as appointment, lab, or other
+        # content. Require both category opt-ins as well as global consent.
+        authorize_generic_chat(db, current_user, user_id, "unclassified_telegram_message")
         # Validation already done by Pydantic
 
         success = await telegram_bot.send_notification(user_id, message)
@@ -278,66 +307,67 @@ async def send_telegram_notification(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception(
-            "Send Telegram notification error",
-            extra={"error_class": e.__class__.__name__},
-        )
+        logger.error("Send Telegram notification error error_type=%s", type(e).__name__)
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.post("/send-appointment-reminder", response_model=dict[str, Any])
+@router.post("/send-appointment-reminder", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def send_appointment_reminder(
     reminder_data: SendAppointmentReminderRequest,
-    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     """Отправка напоминания о визите"""
     try:
-        if not telegram_bot.bot:
-            raise HTTPException(status_code=503, detail="Telegram bot not configured")
+        _require_enabled_patient_bot(db)
 
-        user_id = reminder_data.user_id
-        appointment_data = reminder_data.appointment.model_dump(exclude_none=True)
-        # Validation already done by Pydantic
-
-        await telegram_bot.send_appointment_reminder(user_id, appointment_data)
+        appointment, _, link = authorize_appointment(
+            db, current_user, reminder_data.appointment.model_dump(exclude_none=True),
+            chat_id=reminder_data.user_id,
+        )
+        payload = appointment_payload(db, appointment)
+        payload.update(telegram_link_id=link.id, patient_link_epoch=link.patient_link_epoch)
+        # Revocation after authorization can race the external Telegram send;
+        # the signed callback independently rechecks the live link and consent.
+        sent = await telegram_bot.send_appointment_reminder(link.chat_id, payload)
+        if not sent:
+            raise HTTPException(status_code=502, detail="Telegram delivery failed")
 
         return {"status": "success", "message": "Напоминание отправлено"}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception(
-            "Send Telegram reminder error",
-            extra={"error_class": e.__class__.__name__},
-        )
+        logger.error("Send Telegram reminder error error_type=%s", type(e).__name__)
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
-@router.post("/send-lab-notification", response_model=dict[str, Any])
+@router.post("/send-lab-notification", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def send_lab_results_notification(
     lab_data: SendLabNotificationRequest,
-    current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Lab", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     """Уведомление о готовности результатов анализов"""
     try:
-        if not telegram_bot.bot:
-            raise HTTPException(status_code=503, detail="Telegram bot not configured")
+        _require_enabled_patient_bot(db)
 
-        user_id = lab_data.user_id
-        results_info = lab_data.results.model_dump(exclude_none=True)
-        # Validation already done by Pydantic
-
-        await telegram_bot.send_lab_results_ready(user_id, results_info)
+        result, _, _, link = authorize_lab_result(
+            db, current_user, lab_data.results.model_dump(exclude_none=True),
+            chat_id=lab_data.user_id,
+        )
+        # As with appointment delivery, authorization and the external send
+        # cannot be atomic: revocation may commit while Telegram is in flight.
+        sent = await telegram_bot.send_lab_results_ready(link.chat_id, lab_payload(result))
+        if not sent:
+            raise HTTPException(status_code=502, detail="Telegram delivery failed")
 
         return {"status": "success", "message": "Уведомление о результатах отправлено"}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception(
-            "Send Telegram lab notification error",
-            extra={"error_class": e.__class__.__name__},
-        )
+        logger.error("Send Telegram lab notification error error_type=%s", type(e).__name__)
         raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 

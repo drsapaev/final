@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud import emr
 from app.models.user import User
+from app.schemas.medical_ai_safety import MedicalAIResultResponse
 from app.schemas.misc_endpoints import (
     EmrAiCurrentDataRequest,
     EmrAiDoctorPreferencesRequest,
@@ -17,6 +18,7 @@ from app.schemas.misc_endpoints import (
     EmrAiPatientDataRequest,
     EmrAiTemplateDataRequest,
 )
+from app.services.ai.medical_safety import medical_ai_safety_meta
 from app.services.ai_feature_gating import RequireAiFeature
 from app.services.emr_ai_enhanced import emr_ai_enhanced
 
@@ -25,6 +27,7 @@ router = APIRouter()
 
 def ai_safety_meta() -> dict[str, Any]:
     return {
+        "ai_safety_meta": medical_ai_safety_meta(),
         "decision_boundary": "suggestion_only",
         "requires_doctor_confirmation": True,
         "ai_notice": (
@@ -58,7 +61,7 @@ async def get_smart_suggestions(
     raise HTTPException(status_code=503, detail={"error": "ai_feature_unavailable"})
 
 
-@router.post("/auto-fill", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
+@router.post("/auto-fill", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=MedicalAIResultResponse)
 async def auto_fill_emr_fields(
     template_structure: EmrAiTemplateDataRequest,
     patient_data: EmrAiPatientDataRequest,
@@ -85,7 +88,7 @@ async def auto_fill_emr_fields(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/validate", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
+@router.post("/validate", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=MedicalAIResultResponse)
 async def validate_emr_data(
     emr_data: EmrAiEmrDataRequest,
     specialty: str = Query("general", description="Специализация врача"),
@@ -106,7 +109,7 @@ async def validate_emr_data(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/icd10-suggestions", dependencies=[Depends(RequireAiFeature("ai_icd10_suggestion"))], response_model=Any)
+@router.post("/icd10-suggestions", dependencies=[Depends(RequireAiFeature("ai_icd10_suggestion"))], response_model=MedicalAIResultResponse)
 async def get_icd10_suggestions(
     diagnosis_text: str = Query(..., description="Текст диагноза"),
     specialty: str = Query("general", description="Специализация врача"),
@@ -132,7 +135,7 @@ async def get_icd10_suggestions(
         )
 
 
-@router.post("/analyze-patient", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
+@router.post("/analyze-patient", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=MedicalAIResultResponse)
 async def analyze_patient_data(
     patient_data: EmrAiPatientDataRequest,
     db: Session = Depends(deps.get_db),
@@ -183,7 +186,7 @@ async def get_specialty_templates(
         )
 
 
-@router.post("/emr/{emr_id}/ai-enhance", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)
+@router.post("/emr/{emr_id}/ai-enhance", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=MedicalAIResultResponse)
 async def enhance_emr_with_ai(
     emr_id: int,
     enhancement_type: str = Query(

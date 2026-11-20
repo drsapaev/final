@@ -1,4 +1,8 @@
 import type { Page } from '@playwright/test';
+import type { components } from '../../src/types/generated/api';
+
+type RegistrarTabsResponse = components['schemas']['RegistrarTabsOut'];
+type ResolvedRegistrarTab = components['schemas']['ResolvedRegistrarTab'];
 
 const API_PREFIX = '/api/v1';
 
@@ -192,6 +196,42 @@ function collectionPayload() {
   };
 }
 
+// Explicit synthetic configuration for the Registrar role-home screenshots.
+// These rows are test data, not a fallback for an empty runtime catalog.
+const qaRegistrarTabs: ResolvedRegistrarTab[] = [
+  { target_id: 98011, profile_key: 'cardio', title: 'Cardiologist', title_ru: 'Кардиолог', queue_tags: ['cardio', 'cardiology'], icon: 'Heart', color: '#ef4444' },
+  { target_id: 98012, profile_key: 'ecg', title: 'ECG', title_ru: 'ЭКГ', queue_tags: ['ecg'], icon: 'Activity', color: '#3b82f6' },
+  { target_id: 98013, profile_key: 'derma', title: 'Dermatologist', title_ru: 'Дерматолог', queue_tags: ['derma', 'dermatology'], icon: 'UserCheck', color: '#a855f7' },
+  { target_id: 98014, profile_key: 'dental', title: 'Dentist', title_ru: 'Стоматолог', queue_tags: ['dental', 'dentistry', 'stomatology'], icon: 'Smile', color: '#22c55e' },
+  { target_id: 98015, profile_key: 'lab', title: 'Laboratory', title_ru: 'Лаборатория', queue_tags: ['lab', 'laboratory'], icon: 'FlaskConical', color: '#f97316' },
+  { target_id: 98016, profile_key: 'procedures', title: 'Procedures', title_ru: 'Процедуры', queue_tags: ['procedures'], icon: 'Syringe', color: '#64748b' },
+].map((tab) => ({
+  ...tab,
+  target_kind: 'profile',
+  custom_title: null,
+  visible: true,
+  available: true,
+  reason_code: null,
+}));
+
+export function createRegistrarTabsQaPayload(
+  tabs: ResolvedRegistrarTab[] = qaRegistrarTabs
+): RegistrarTabsResponse {
+  return {
+    mode: 'configured',
+    version: 1,
+    tabs,
+    profile_filters: tabs
+      .filter((tab) => tab.target_kind === 'profile' && tab.profile_key !== null)
+      .map((tab) => ({
+        key: tab.profile_key!,
+        title: tab.title,
+        title_ru: tab.title_ru,
+        queue_tags: tab.queue_tags,
+      })),
+  };
+}
+
 function buildQaApiPayload(pathname: string, profile: QaProfile, method: string) {
   const path = pathname.replace(API_PREFIX, '') || '/';
   const lowerPath = path.toLowerCase();
@@ -265,6 +305,10 @@ function buildQaApiPayload(pathname: string, profile: QaProfile, method: string)
 
   if (lowerPath === '/queues/profiles') {
     return { success: true, profiles: [] };
+  }
+
+  if (lowerPath === '/registrar/tabs') {
+    return createRegistrarTabsQaPayload();
   }
 
   if (lowerPath === '/webhooks' || lowerPath === '/webhooks/') {

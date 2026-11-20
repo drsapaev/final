@@ -82,6 +82,19 @@ type WsMessageHandler = ((data: unknown) => void) | null;
 /** Maximum WebSocket reconnect attempts before giving up. */
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+/** Medical stream frames are displayable only with the server's exact flag. */
+function hasMedicalSafetyMetadata(data: Record<string, unknown>): boolean {
+    const metadata = data.ai_safety_meta;
+    return metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
+        && (metadata as Record<string, unknown>).requires_doctor_confirmation === true;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+const unsafeAiResponseMessage = 'AI response cannot be displayed safely.';
+
 /**
  * Хук для AI чата
  *
@@ -127,6 +140,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     const currentSessionRef = useRef<ChatSession | null>(null);
     const loadSessionRequestRef = useRef(0);
     const contractVersionMismatchRef = useRef(false);
+    const unsafeStreamRef = useRef(false);
 
     useEffect(() => {
         currentSessionRef.current = currentSession;
@@ -213,9 +227,25 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 return sessionResponse.data;
             }
 
+            const history: unknown = messagesResponse.data;
+            const safeHistory = Array.isArray(history) && history.every(item =>
+                isRecord(item) && (item.role === 'user'
+                    || ((item.role === 'assistant' || item.role === 'system') && hasMedicalSafetyMetadata(item)))
+            );
             setCurrentSession(sessionResponse.data);
             currentSessionRef.current = sessionResponse.data;
-            setMessages(messagesResponse.data);
+            if (!safeHistory) {
+                // Keep the clinician's own messages, but never show a partial
+                // collection of unverified AI or system output.
+                const userMessages = Array.isArray(history)
+                    ? history.filter((item): item is AIAssistantMsg => isRecord(item) && item.role === 'user')
+                    : [];
+                setMessages(userMessages);
+                setSessionState(prev => applyStreamTransition(prev, 'idle'));
+                setRestError(unsafeAiResponseMessage);
+                return null;
+            }
+            setMessages(history as AIAssistantMsg[]);
             setSessionState(prev => applyStreamTransition(prev, 'idle'));
             setRestError(null);
 
@@ -276,7 +306,13 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             // Обновляем сообщения
             if (currentSessionRef.current?.id !== sessionId) {
                 setMessages(prev => prev.filter(m => m.id !== userMessage.id));
-                return response.data;
+                return null;
+            }
+            if (!isRecord(response.data) || response.data.role !== 'assistant'
+                || !hasMedicalSafetyMetadata(response.data)) {
+                setMessages(prev => prev.filter(m => m.id !== userMessage.id));
+                setRestError(unsafeAiResponseMessage);
+                return null;
             }
             setMessages(prev => {
                 const filtered = prev.filter(m => m.id !== userMessage.id);
@@ -347,8 +383,30 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     /**
      * Подключиться к WebSocket
      */
-    const connectWebSocket = useCallback(() => {
+    const connectWebSocket = useCallback((isRetry = false) => {
         if (!useWebSocket) return;
+
+        if (isRetry && !shouldReconnectRef.current) return;
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+        }
+        const previousSocket = wsRef.current;
+        if (previousSocket) {
+            // Prevent a replaced connection from mutating the new stream.
+            previousSocket.onclose = null;
+            previousSocket.onerror = null;
+            previousSocket.onopen = null;
+            previousSocket.onmessage = null;
+            wsRef.current = null;
+            try {
+                previousSocket.close(1000, 'Replaced');
+            } catch {
+                // A socket may already be closed.
+            }
+        }
+        setMessages(prev => prev.filter(message => !(message.role === 'assistant' && message._streaming)));
+        setSessionState(prev => applyStreamTransition(prev, 'idle'));
 
         const token = tokenManager.getAccessToken();
         if (!token) {
@@ -359,13 +417,16 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         }
 
         // audit/phase-final, BS-15: reset reconnect state on explicit connect.
-        shouldReconnectRef.current = true;
-        reconnectAttemptRef.current = 0;
+        if (!isRetry) {
+            shouldReconnectRef.current = true;
+            reconnectAttemptRef.current = 0;
+        }
+        unsafeStreamRef.current = false;
 
         // Transition idle/disconnected/reconnecting → connecting.
         // (connected → connecting is also allowed: explicit reconnect.)
         setSessionState(prev =>
-            applyConnectionTransition(prev, 'connecting', { resetReconnectAttempt: true })
+            applyConnectionTransition(prev, 'connecting', { resetReconnectAttempt: !isRetry })
         );
 
         // P0 security fix: JWT sent via Sec-WebSocket-Protocol subprotocol (bearer.<token>)
@@ -375,23 +436,35 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         const wsUrl = `${buildWsUrl('/api/v1/ai/chat/ws')}`;
 
         try {
-            wsRef.current = new WebSocket(wsUrl, [`bearer.${token}`]);
+            const socket = new WebSocket(wsUrl, [`bearer.${token}`]);
+            wsRef.current = socket;
 
-            wsRef.current.onopen = () => {
+            socket.onopen = () => {
+                if (wsRef.current !== socket) return;
                 logger.info('AI Chat WebSocket connected');
-                // F7 fix: Reset reconnect attempt ref on successful connect.
-                reconnectAttemptRef.current = 0;
-                // connecting → connected (clears any prior error, resets reconnect attempt).
+                // Do not reset attempts merely because an unstable server
+                // accepted a socket. A valid frame or explicit connect does.
                 setSessionState(prev =>
                     applyConnectionTransition(prev, 'connected', {
                         clearError: true,
-                        resetReconnectAttempt: true,
                     })
                 );
             };
 
-            wsRef.current.onclose = (event) => {
+            socket.onclose = (event) => {
+                if (wsRef.current !== socket) return;
                 logger.info('AI Chat WebSocket closed:', event.code, event.reason);
+
+                // Incomplete medical text must not survive a broken stream.
+                setMessages(prev => prev.filter(message => !(message.role === 'assistant' && message._streaming)));
+                setSessionState(prev => applyStreamTransition(prev, 'idle'));
+                if (event.code === 1011 && event.reason === 'Safety metadata required') {
+                    shouldReconnectRef.current = false;
+                    unsafeStreamRef.current = true;
+                    setSessionState(prev => setChatError(
+                        prev, chatError('contract_mismatch', unsafeAiResponseMessage, false)
+                    ));
+                }
 
                 // Decide next connection state based on close code + shouldReconnect flag.
                 // Code 1000 (normal) and 4001 (policy) are treated as terminal → disconnected.
@@ -442,7 +515,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 );
                 reconnectTimeoutRef.current = setTimeout(() => {
                     if (shouldReconnectRef.current) {
-                        connectWebSocket();
+                        connectWebSocket(true);
                     }
                 }, delay);
                 setSessionState(prev =>
@@ -450,7 +523,8 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 );
             };
 
-            wsRef.current.onerror = (error) => {
+            socket.onerror = (error) => {
+                if (wsRef.current !== socket) return;
                 logger.error('AI Chat WebSocket error:', error);
                 // Note: onerror is usually followed by onclose, which handles
                 // reconnect logic. We only surface the structured error here.
@@ -462,9 +536,15 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 );
             };
 
-            wsRef.current.onmessage = (event) => {
+            socket.onmessage = (event) => {
+                if (wsRef.current !== socket) return;
                 try {
                     const data = safeJsonParse(event.data);
+                    if (data === null || typeof data !== 'object' || Array.isArray(data)) return;
+                    if (data.type === 'pong' || hasMedicalSafetyMetadata(data)) {
+                        reconnectAttemptRef.current = 0;
+                        setSessionState(prev => applyConnectionTransition(prev, 'connected', { resetReconnectAttempt: true }));
+                    }
                     if (
                         data.contract_version &&
                         !isSupportedMessagingContractVersion(data.contract_version) &&
@@ -510,6 +590,27 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             data.session_id !== currentSessionRef.current.id &&
             data.type !== 'session'
         ) {
+            return;
+        }
+
+        const carriesMedicalContent = data.type === 'chunk' || data.type === 'done'
+            || data.type === 'error' || 'content' in data || 'message' in data;
+        if (carriesMedicalContent && unsafeStreamRef.current) return;
+        if (carriesMedicalContent && !hasMedicalSafetyMetadata(data)) {
+            // Do not display the frame or retain an earlier partial response.
+            // Block later frames on this socket even before the close event.
+            unsafeStreamRef.current = true;
+            shouldReconnectRef.current = false;
+            setMessages(prev => prev.filter(message => !(message.role === 'assistant' && message._streaming)));
+            setSessionState(prev => setChatError(
+                applyStreamTransition(prev, 'idle'),
+                chatError('contract_mismatch', unsafeAiResponseMessage, false)
+            ));
+            try {
+                wsRef.current?.close(1008, 'Safety metadata required');
+            } catch {
+                // The socket may already have closed; unsafe frames stay blocked.
+            }
             return;
         }
 
@@ -687,6 +788,8 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             wsRef.current = null;
         }
 
+        setMessages(prev => prev.filter(message => !(message.role === 'assistant' && message._streaming)));
+        setSessionState(prev => applyStreamTransition(prev, 'idle'));
         // connected/reconnecting/connecting → disconnected (terminal).
         setSessionState(prev => applyConnectionTransition(prev, 'disconnected'));
     }, []);

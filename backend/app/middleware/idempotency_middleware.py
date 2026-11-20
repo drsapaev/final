@@ -383,6 +383,8 @@ def _user_authorized_in_db(
     username: str | None,
     jti: Any,
     require_active_doctor_profile: bool = False,
+    patient_scope_id: int | None = None,
+    token_epoch: int = 0,
 ) -> tuple[bool, str | None, bool]:
     """Pure DB-backed authorization query — fails CLOSED (Codex R3/R4 #3092).
 
@@ -405,7 +407,12 @@ def _user_authorized_in_db(
     ownership stays endpoint-level — the middleware cannot resolve the
     request's resource.
     """
-    if db is None or (user_id is None and not username):
+    if (
+        db is None
+        or (user_id is None and not username)
+        or type(token_epoch) is not int
+        or not 0 <= token_epoch <= (1 << 63) - 1
+    ):
         return False, None, False
     try:
         from datetime import UTC, datetime
@@ -437,13 +444,35 @@ def _user_authorized_in_db(
             User.is_superuser,
             jti_bl.label("jti_bl"),
             sentinel_bl.label("sentinel_bl"),
-        ).where(subject_filter)
+        ).where(subject_filter, User.auth_epoch == token_epoch)
+        if patient_scope_id is not None:
+            from app.models.patient import Patient
+
+            patient_binding = (
+                select(Patient.id)
+                .where(
+                    Patient.id == patient_scope_id,
+                    Patient.user_id == User.id,
+                    Patient.is_deleted.is_not(True),
+                )
+                .exists()
+            )
+            stmt = stmt.add_columns(patient_binding.label("patient_binding"))
         row = db.execute(stmt).first()
         if row is None:
             return False, None, False
-        subject_id, is_active, role, is_superuser, jti_hit, sentinel_hit = row
+        subject_id, is_active, role, is_superuser, jti_hit, sentinel_hit = row[:6]
         role_label = str(role) if role is not None else None
-        authorized = bool(is_active) and not (jti_hit or sentinel_hit)
+        authorized = bool(is_active) and not (
+            jti_hit or (sentinel_hit and token_epoch == 0)
+        )
+        if patient_scope_id is not None:
+            authorized = (
+                authorized
+                and bool(row[6])
+                and (role_label or "").strip().lower() == "patient"
+                and is_superuser is False
+            )
         if authorized and require_active_doctor_profile and role_label == "Doctor":
             from app.models.clinic import Doctor
 
@@ -473,24 +502,14 @@ def _user_authorized_in_db(
 def _user_id_from_principal(principal_payload: dict[str, Any]) -> tuple[int | None, str | None]:
     """Subject selection mirrored from deps.py (Codex R9 #3092 P1).
 
-    The username claim is the canonical primary subject: numeric text
-    resolves by id, text by username. Without it, a numeric sub resolves
-    by id, a text sub by username. Shared by the namespace resolution
-    (Codex R11 #3092 P1) and the DB authorization check so both see the
-    SAME account for a given token.
+    Only a numeric signed sub identifies a User. Namespace resolution and
+    authorization must use the same immutable account identifier.
     """
-    username_claim = principal_payload.get("username")
-    if isinstance(username_claim, str) and username_claim:
-        user_id = int(username_claim) if username_claim.isdigit() else None
-        return (user_id, None) if user_id is not None else (None, username_claim)
     sub = principal_payload.get("sub")
-    if isinstance(sub, str) and sub:
-        user_id = int(sub) if sub.isdigit() else None
-        return (user_id, None) if user_id is not None else (None, sub)
-    if isinstance(sub, int):
-        # Legacy numeric (non-stringified) sub — get_current_user's
-        # fallback resolves it by id.
-        return sub, None
+    if isinstance(sub, str) and sub.isascii() and sub.isdigit() and len(sub) <= 19:
+        user_id = int(sub)
+        if 0 < user_id <= (1 << 63) - 1:
+            return user_id, None
     return None, None
 
 
@@ -802,6 +821,8 @@ def _check_principal_authorized_sync(
     username: str | None,
     jti: Any,
     require_active_doctor_profile: bool = False,
+    patient_scope_id: int | None = None,
+    token_epoch: int = 0,
 ) -> tuple[bool, str | None, bool]:
     """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
 
@@ -814,10 +835,13 @@ def _check_principal_authorized_sync(
         generator = _resolve_request_db(request)
         try:
             db = next(generator)
-            return _user_authorized_in_db(
-                db, user_id, username, jti,
-                require_active_doctor_profile=require_active_doctor_profile,
-            )
+            kwargs = {
+                "require_active_doctor_profile": require_active_doctor_profile,
+                "token_epoch": token_epoch,
+            }
+            if patient_scope_id is not None:
+                kwargs["patient_scope_id"] = patient_scope_id
+            return _user_authorized_in_db(db, user_id, username, jti, **kwargs)
         finally:
             try:
                 next(generator)
@@ -3879,11 +3903,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
             # No leeway — identical semantics to get_current_user's decode
             # (Codex R6 #3092 P2): an expired token is never a principal.
-            return jwt.decode(
+            payload = jwt.decode(
                 token.strip(),
                 settings.SECRET_KEY,
                 algorithms=[getattr(settings, "ALGORITHM", "HS256")],
             )
+            from app.core.user_token_claims import is_user_access_claims
+
+            return payload if is_user_access_claims(payload) else None
         except Exception as exc:
             logger.debug("Idempotency: no verifiable principal (%s)", type(exc).__name__)
             return None
@@ -3937,27 +3964,44 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         check never results in a replay (the request falls through to the
         endpoint, which re-authenticates anyway).
 
-        Codex R9 #3092 (P1): the SUBJECT SELECTION mirrors deps.py exactly —
-        canonical 2FA tokens carry BOTH a numeric ``sub`` and a ``username``
-        claim, and get_current_user resolves the account through
-        _subject_from_payload, which PREFERS the username claim (numeric
-        text subject → by id, else by username). Resolving only by the
-        numeric sub authorized replays for a registrar the endpoint itself
-        would refuse (e.g. after an admin rename the username no longer
-        exists → endpoint 401) — a cached PHI-bearing cart response could be
-        replayed under a token the canonical dependency rejects.
+        Subject selection mirrors deps.py: the signed ``sub`` takes priority
+        over the mutable username claim, preventing account substitution after
+        username reassignment. Namespace and endpoint identity stay aligned.
         """
         user_id, username = _user_id_from_principal(principal_payload)
         jti = principal_payload.get("jti")
         try:
-            return await asyncio.to_thread(
+            from app.core.user_token_claims import parse_user_auth_epoch
+
+            token_epoch = parse_user_auth_epoch(principal_payload)
+            if token_epoch is None:
+                return False, None, False
+            scope_kwargs = (
+                {"patient_scope_id": principal_payload["patient_id"]}
+                if principal_payload.get("scope") == "patient_portal"
+                else {}
+            )
+            if token_epoch:
+                scope_kwargs["token_epoch"] = token_epoch
+            authorized, role, is_superuser = await asyncio.to_thread(
                 _check_principal_authorized_sync,
                 request,
                 user_id,
                 username,
                 jti,
                 require_active_doctor_profile,
+                **scope_kwargs,
             )
+            from app.core.user_token_claims import is_user_allowed_for_claims
+
+            if not is_user_allowed_for_claims(
+                principal_payload,
+                role=role,
+                is_active=authorized,
+                is_superuser=is_superuser,
+            ):
+                return False, role, is_superuser
+            return authorized, role, is_superuser
         except Exception:  # pragma: no cover - to_thread failure is fail-closed
             logger.warning("Idempotency principal check crashed; refusing replay", exc_info=True)
             return False, None, False

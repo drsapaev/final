@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -52,6 +54,30 @@ class TwoFactorAuth(Base):
     recovery_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     recovery_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     recovery_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # TWOFACTOR-BE-001 (#4063): service-side brute-force defense. The endpoint
+    # limiter is per-IP and trivially bypassed, so the verify counter and the
+    # temporary lockout live on the 2FA record itself. See
+    # TwoFactorService.verify_two_factor and alembic
+    # 0095_two_factor_attempt_lockout.
+    failed_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sa_text("0")
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # Last TOTP time step accepted for a sensitive operation; NULL means unused.
+    last_sensitive_totp_step: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True
+    )
+    # Sensitive reauthentication attempts are separate from normal 2FA login.
+    sensitive_failed_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sa_text("0")
+    )
+    sensitive_locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Метаданные
     created_at: Mapped[datetime | None] = mapped_column(

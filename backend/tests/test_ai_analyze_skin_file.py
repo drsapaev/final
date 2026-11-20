@@ -64,6 +64,7 @@ class _RecordingGateway:
             provider="mock",
             model="mock",
             latency_ms=1,
+            ai_safety_meta={"requires_doctor_confirmation": True},
             ai_notice="AI suggestions are advisory only",
             requires_doctor_confirmation=True,
             decision_boundary="suggestion_only",
@@ -192,6 +193,7 @@ class TestAnalyzeSkinFile:
 
         # Mandatory safety envelope at the response root.
         assert body["requires_doctor_confirmation"] is True
+        assert body["ai_safety_meta"]["requires_doctor_confirmation"] is True
         assert body["decision_boundary"] == "suggestion_only"
         assert body["ai_notice"]
         assert body["status"] == "success"
@@ -447,5 +449,6 @@ class TestAnalyzeSkinFile:
         body = response.json()
         assert body["status"] == "error"
         assert body["requires_doctor_confirmation"] is True
+        assert body["ai_safety_meta"]["requires_doctor_confirmation"] is True
         assert body["decision_boundary"] == "suggestion_only"
         assert body["ai_notice"]

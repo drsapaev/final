@@ -329,8 +329,8 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                 version = conn.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-                # Head pin follows the latest migration (0094 — 2FA trust expiry/codes).
-                assert version == "0094_2fa_trust_expiry", version
+                # Head pin follows the notification template uniqueness migration.
+                assert version == "0102_visit_confirm_context", version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(

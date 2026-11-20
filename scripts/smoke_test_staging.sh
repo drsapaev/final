@@ -224,7 +224,7 @@ pii_check() {
         python -c "
 from app.core.pii_masker import mask_pii, mask_phone, mask_email, mask_name
 
-assert mask_phone('+998901234567') == '+998901•••567'
+assert mask_phone('+998901234567') == '•••567'
 assert mask_email('john@example.com').startswith('j')
 assert mask_name('Иван Иванов') == 'И.И.'
 
@@ -235,6 +235,7 @@ patient = {
 }
 masked = mask_pii(patient)
 assert masked['first_name'] == 'A.'
+assert masked['phone'] == '•••567'
 assert masked['iin'] == '[REDACTED]'
 assert masked['id'] == 42
 

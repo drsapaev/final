@@ -31,7 +31,7 @@ import os
 import sys
 import threading
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -48,28 +48,49 @@ os.environ.setdefault("ALLOW_SQLITE_DATABASE_URL", "1")
 os.environ.setdefault("TESTING", "1")
 
 from app.db.base_class import Base  # noqa: E402
-from app.models import (  # noqa: F401
-    audit, appointment, clinic, emr_v2, lab, online_queue,
-    payment, payment_invoice, payment_webhook, patient, user, visit,
-)
-from app.models import (  # noqa: F401
-    authentication, billing, department, emr, file_system,
-    role_permission, schedule, user_profile,
+from app.models import (  # noqa: F401  # noqa: F401
+    appointment,
+    audit,
+    authentication,
+    billing,
+    clinic,
+    department,
+    emr,
+    emr_v2,
+    file_system,
+    lab,
+    online_queue,
+    patient,
+    payment,
+    payment_invoice,
+    payment_webhook,
+    role_permission,
+    schedule,
+    user,
+    user_profile,
+    visit,
 )
 from app.models.clinic import Doctor  # noqa: E402
 from app.models.online_queue import DailyQueue  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.models.service import Service  # noqa: E402
+from app.models.telegram_config import TelegramUser  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.models.visit import Visit, VisitService  # noqa: E402
 from app.services.visit_confirmation_service import (  # noqa: E402
     VisitConfirmationDomainError,
     VisitConfirmationService,
+    build_telegram_visit_action_token,
 )
 from app.services.visit_lifecycle_service import VisitLifecycleService  # noqa: E402
 
-
 # ─── Fixtures ──────────────────────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+def _future_telegram_start(monkeypatch):
+    from datetime import UTC, datetime, timedelta
+    monkeypatch.setattr("app.tasks.worker._appointment_start_utc", lambda visit: datetime.now(UTC) + timedelta(days=1))
+
 
 @pytest.fixture(scope="module")
 def db_engine():
@@ -118,6 +139,7 @@ def clean_db(db_engine):
             "daily_queues",
             "services",
             "doctors",
+            "telegram_users",
             "patients",
             "users",
         ]:
@@ -193,11 +215,15 @@ def _setup_pending_visit(session, channel="telegram"):
         department="cardiology",
         confirmation_token=token,
         confirmation_channel=channel,
-        confirmation_expires_at=datetime.now(UTC).replace(hour=23, minute=59),
+        confirmation_expires_at=datetime.now(UTC) + timedelta(hours=2),
         created_at=datetime.now(UTC),
     )
     session.add(visit)
     session.flush()
+    if channel == "telegram":
+        session.add(TelegramUser(
+            chat_id=123456789, patient_id=patient.id, active=True, blocked=False
+        ))
 
     vs = VisitService(
         visit_id=visit.id,
@@ -212,6 +238,16 @@ def _setup_pending_visit(session, channel="telegram"):
     session.commit()
 
     return token, visit.id
+
+
+def _telegram_capability(session, token, visit_id):
+    visit = session.query(Visit).filter(Visit.id == visit_id).one()
+    link = session.query(TelegramUser).filter_by(chat_id=123456789).one()
+    return build_telegram_visit_action_token(
+        visit_id=visit_id, confirmation_token=token, link_id=link.id,
+        chat_id=link.chat_id, patient_id=visit.patient_id,
+        link_epoch=link.patient_link_epoch, visit_context_epoch=visit.confirmation_context_epoch,
+    )
 
 
 # ─── Regression Tests ──────────────────────────────────────────────────
@@ -325,13 +361,14 @@ class TestTelegramConfirmationFlow:
         """
         setup = session_factory()
         token, visit_id = _setup_pending_visit(setup, channel="telegram")
+        capability = _telegram_capability(setup, token, visit_id)
         setup.close()
 
         repro = session_factory()
         try:
             service = VisitConfirmationService(repro)
             result = service.confirm_by_telegram(
-                token=token,
+                token=capability,
                 telegram_user_id="123456789",
                 source_ip="127.0.0.1",
                 user_agent="Mozilla/5.0",
@@ -403,6 +440,7 @@ class TestConcurrentConfirmationClaim:
         """
         setup = session_factory()
         token, visit_id = _setup_pending_visit(setup, channel="telegram")
+        capability = _telegram_capability(setup, token, visit_id)
         setup.close()
 
         barrier = threading.Barrier(2)
@@ -417,7 +455,7 @@ class TestConcurrentConfirmationClaim:
                 service = VisitConfirmationService(session)
                 try:
                     result = service.confirm_by_telegram(
-                        token=token,
+                        token=capability,
                         telegram_user_id="123456789",
                         source_ip="127.0.0.1",
                         user_agent="Mozilla/5.0",

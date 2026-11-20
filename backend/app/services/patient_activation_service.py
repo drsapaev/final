@@ -115,7 +115,7 @@ class ActivationError(Exception):
 
 def mask_phone(phone: str) -> str:
     """Canonical repo-wide PII mask (AGENTS.md / app.core.pii_masker):
-    +998901112233 -> +998900•••001 — only the LAST THREE digits survive.
+    Only the final three digits survive, without the country prefix.
 
     Codex P1 (PR #3320 round 1): the previous local 4-digit mask emitted
     more of the number than the repository policy allows. Non-maskable
@@ -373,6 +373,11 @@ class PatientActivationService:
         )
         db.add(user)
         db.flush()  # staged: user.id available, NOT committed (correction #3)
+        issued_user_id, issued_patient_id, issued_epoch = (
+            user.id,
+            patient.id,
+            user.auth_epoch,
+        )
 
         profile = UserProfile(
             user_id=user.id,
@@ -415,9 +420,6 @@ class PatientActivationService:
                 "activation commit conflict (UNIQUE race backstop) -> generic 409"
             )
             raise ActivationError(409, ERR_ACTIVATION_GENERIC) from exc
-        db.refresh(patient)
-        db.refresh(user)
-
         # Token is single-use: consumed ONLY after a successful commit. A KV
         # outage here must NOT fail an already-committed activation — the
         # linked card makes the token unusable anyway (state revalidation).
@@ -431,12 +433,56 @@ class PatientActivationService:
         except Exception:  # noqa: BLE001 - post-commit cleanup is best-effort
             logger.warning("activation token cleanup skipped: KV unavailable")
 
+        # The account was committed before best-effort KV cleanup. Do not
+        # issue a token if revocation, deactivation, relinking, or a verified
+        # phone change happened during that gap.
+        user = (
+            db.query(User)
+            .filter(User.id == issued_user_id)
+            .with_for_update(key_share=True)
+            .populate_existing()
+            .first()
+        )
+        patient = (
+            db.query(Patient)
+            .filter(Patient.id == issued_patient_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        profile_state = (
+            db.query(UserProfile.phone, UserProfile.phone_verified)
+            .filter(UserProfile.user_id == issued_user_id)
+            .first()
+        )
+        if (
+            user is None
+            or not user.is_active
+            or user.is_superuser
+            or user.role != Roles.PATIENT
+            or user.auth_epoch != issued_epoch
+            or patient is None
+            or patient.is_deleted
+            or patient.user_id != issued_user_id
+            or profile_state is None
+            or not profile_state.phone_verified
+            or normalize_phone(profile_state.phone or "") != entry["phone"]
+        ):
+            db.rollback()
+            raise ActivationError(400, ERR_ACTIVATION_GENERIC)
+
         logger.info("patient activated: patient_id=%s user_id=%s", patient.id, user.id)
 
         from app.api.deps import create_access_token
+        from app.services.context_facades.iam_facade import (
+            revoke_all_for_new_login_locked,
+        )
 
-        access_token = create_access_token(data={"sub": str(user.id)})
-        return {
+        revoke_all_for_new_login_locked(db, user)
+        access_token = create_access_token(
+            data={"sub": str(user.id), "auth_epoch": user.auth_epoch}
+        )
+        result = {
             "access_token": access_token,
             "token_type": "bearer",
             "user": {
@@ -450,6 +496,8 @@ class PatientActivationService:
             },
             "patient_id": patient.id,
         }
+        db.commit()
+        return result
 
     # -- helpers ----------------------------------------------------------
     def _generate_unique_username(self, db: Session, patient_id: int) -> str:

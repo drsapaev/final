@@ -4,6 +4,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
+
 try:
     from jose import jwt
 except ImportError:
@@ -91,20 +92,21 @@ class TestAIChatApiService:
 
         assert exc_info.value.status_code == 404
 
-    def test_authenticate_websocket_user_decodes_token_and_loads_user(self):
-        user = SimpleNamespace(id=12, username="u12")
-        repository = SimpleNamespace(
-            get_session_for_user=lambda session_id, user_id: None,
-            get_message_for_user=lambda message_id, user_id: None,
-            get_user=lambda user_id: user if user_id == 12 else None,
-        )
-        service = AIChatApiService(db=None, repository=repository)
-        token = jwt.encode({"sub": "12"}, "secret", algorithm="HS256")
+    def test_authenticate_websocket_user_decodes_token_and_loads_user(self, db_session, admin_user):
+        from app.core.config import settings
+
+        service = AIChatApiService(db=db_session)
+        token = jwt.encode({"sub": str(admin_user.id)}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
         authenticated = service.authenticate_websocket_user(
             token=token,
-            secret_key="secret",
-            algorithm="HS256",
+            secret_key=settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM,
         )
 
-        assert authenticated.username == "u12"
+        assert authenticated.id == admin_user.id
+
+    def test_authenticate_websocket_user_fails_closed_without_db(self):
+        token = jwt.encode({"sub": "12"}, "secret", algorithm="HS256")
+        service = AIChatApiService(db=None, repository=SimpleNamespace(get_user=lambda _: None))
+        assert service.authenticate_websocket_user(token=token, secret_key="secret", algorithm="HS256") is None
