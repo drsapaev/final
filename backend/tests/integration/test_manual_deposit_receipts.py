@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.force_majeure import AddDepositRequest, UseDepositRequest
 from app.api.v1.endpoints.registrar_wizard import _invoice
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment, PaymentVisit
@@ -31,7 +32,7 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.models.user import User
-from app.models.visit import VisitService
+from app.models.visit import Visit, VisitService
 from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
 from app.services.force_majeure_api_service import (
     ForceMajeureApiDomainError,
@@ -467,6 +468,57 @@ def test_postgres_deposit_tender_requires_the_atomic_balance_trigger(visit_depos
         assert db.get(PatientDeposit, funded["id"]).balance == Decimal("10.00")
         assert db.scalar(select(func.count()).select_from(Payment)) == 0
         assert db.scalar(select(func.count()).select_from(DepositTransaction)) == 1
+
+
+def test_postgres_batch_failure_rolls_back_only_its_refund_and_redacts_details(
+    visit_deposit_pg, monkeypatch, caplog,
+):
+    owner, _, ids = visit_deposit_pg
+    with Session(owner, expire_on_commit=False) as db:
+        first_visit = db.get(Visit, ids["visit"])
+        other_visit = Visit(patient_id=ids["patient"], visit_date=first_visit.visit_date, status="open", source="desk")
+        doctor = Doctor(user_id=ids["stage"], specialty="general", active=True)
+        db.add(doctor)
+        db.flush()
+        queue = DailyQueue(day=first_visit.visit_date, specialist_id=doctor.id,
+                           queue_tag="synthetic-batch-refund", active=True)
+        db.add_all([other_visit, queue])
+        db.flush()
+        entries = []
+        payments = []
+        for number, visit in enumerate((first_visit, other_visit), start=1):
+            entry = OnlineQueueEntry(queue_id=queue.id, visit_id=visit.id, patient_id=ids["patient"],
+                                     patient_name="SYNTHETIC", number=number, status="waiting", source="desk")
+            payment = Payment(visit_id=visit.id, amount=Decimal(str(number)), currency="UZS",
+                              method="cash", status="paid")
+            entries.append(entry)
+            payments.append(payment)
+        db.add_all([*entries, *payments])
+        db.commit()
+
+        service = ForceMajeureService(db)
+        add_credit = service._add_to_deposit
+
+        def stage_then_fail(**kwargs):
+            credit = add_credit(**kwargs)
+            if kwargs["payment_id"] == payments[0].id:
+                raise RuntimeError("SYNTHETIC INTERNAL REFUND DETAIL")
+            return credit
+
+        monkeypatch.setattr(service, "_add_to_deposit", stage_then_fail)
+        result = service.cancel_entries_with_refund(
+            entries, reason="SYNTHETIC REFUND REASON", refund_type=RefundType.DEPOSIT,
+            performed_by_id=ids["stage"], send_notifications=False,
+        )
+        db.expire_all()
+        assert [entry.status for entry in entries] == ["waiting", "cancelled"]
+        assert result["cancelled"] == result["failed"] == result["deposit_credits_created"] == 1
+        assert result["errors"] == [{"entry_id": entries[0].id, "error": "Не удалось отменить запись"}]
+        assert "SYNTHETIC INTERNAL REFUND DETAIL" not in caplog.text
+        [receipt] = db.scalars(select(DepositTransaction)).all()
+        [claim] = db.scalars(select(PaymentRefundClaim)).all()
+        assert receipt.payment_id == claim.payment_id == payments[1].id
+        assert receipt.balance_after == receipt.deposit.balance == Decimal("2.00")
 
 
 def test_concurrent_retries_create_only_one_deposit_credit(manual_deposit_pg):

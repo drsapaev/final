@@ -15,7 +15,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Final
 
-from sqlalchemy import func, insert, or_, text
+from sqlalchemy import false, func, insert, or_, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, lazyload, load_only
 
@@ -394,133 +394,102 @@ class ForceMajeureService:
         skipped = []
         notification_targets = []
 
+        if self.db.get_bind().dialect.name == "sqlite":
+            # Keep all entry savepoints inside an active write transaction.
+            self.db.execute(update(OnlineQueueEntry).where(false()).values(id=OnlineQueueEntry.id))
+
         for entry in entries:
+            entry_id = entry.id
             try:
-                # 3808 review round 3 (P1 re-check): fresh statement per
-                # entry — READ COMMITTED re-read; an entry already processed
-                # by a concurrent writer is neither cancelled again nor
-                # refunded again (idempotent replay guard).
-                self.db.refresh(entry)
-                if entry.status not in self._PENDING_STATUSES:
-                    skipped.append(
-                        {"entry_id": entry.id, "status": entry.status}
-                    )
-                    continue
+                with self.db.begin_nested():
+                    # Re-read after selection. A concurrent cancellation is
+                    # skipped without producing another refund.
+                    self.db.refresh(entry)
+                    if entry.status not in self._PENDING_STATUSES:
+                        skipped.append({"entry_id": entry_id, "status": entry.status})
+                        continue
 
-                # Получаем связанный платёж
-                payment = self._get_payment_for_entry(entry)
-
-                refund_info = None
-                entry_refund_type = refund_type
-
-                if payment and payment.status == "paid" and payment.amount > 0:
-                    if payment.method == "deposit":
-                        entry_refund_type = RefundType.DEPOSIT
-                    if entry_refund_type == RefundType.DEPOSIT:
-                        refund_info = self._add_to_deposit(
-                            patient_id=entry.patient_id,
-                            amount=payment.amount,
-                            reason=reason,
-                            payment_id=payment.id,
-                            visit_id=entry.visit_id,
-                            performed_by_id=performed_by_id,
-                        )
-                        # 3808 review round 12 (P2): зачисления на депозит —
-                        # в собственные счётчики (идемпотентный повтор, как
-                        # у банковских заявок, — в existing, не в created).
-                        if refund_info.get("already_refunded"):
-                            # 3808 review round 13 (P2 prior_channel):
-                            # already_refunded говорит ТОЛЬКО «платёж уже
-                            # возвращён», но не каким каналом. Если ранее
-                            # оформлен БАНКОВСКИЙ возврат (prior_channel ==
-                            # refund_request), депозитного зачисления НЕ
-                            # существует — инкремент deposit_credits_existing
-                            # приписывал несуществующее зачисление (UI/аудит
-                            # видели «деньги уже на депозите», хотя они —
-                            # в pending-заявке). Честный счётчик для этого
-                            # случая — refund_requests_existing.
-                            if (
-                                refund_info.get("prior_channel")
-                                == self.REFUND_CHANNEL_REFUND_REQUEST
-                            ):
-                                refund_requests_existing += 1
-                            else:
-                                deposit_credits_existing += 1
+                    payment = self._get_payment_for_entry(entry)
+                    refund_info = None
+                    entry_refund_type = refund_type
+                    if payment and payment.status == "paid" and payment.amount > 0:
+                        if payment.method == "deposit":
+                            entry_refund_type = RefundType.DEPOSIT
+                        if entry_refund_type == RefundType.DEPOSIT:
+                            refund_info = self._add_to_deposit(
+                                patient_id=entry.patient_id, amount=payment.amount, reason=reason,
+                                payment_id=payment.id, visit_id=entry.visit_id, performed_by_id=performed_by_id,
+                            )
                         else:
-                            deposit_credits_created += 1
-                    else:
-                        refund_info = self._create_refund_request(
-                            patient_id=entry.patient_id,
-                            payment_id=payment.id,
-                            visit_id=entry.visit_id,
-                            amount=payment.amount,
-                            reason=reason,
-                            refund_type=entry_refund_type,
-                            is_automatic=True,
-                        )
-                        # 3808 review round 7 (P2): already_refunded —
-                        # идемпотентный повтор без новой строки: в счётчик
-                        # НОВЫХ заявок не входит (двухочередной визит:
-                        # второй банковский перенос создаёт 0 строк).
-                        if refund_info.get("already_refunded"):
-                            # 3808 review round 13 (P2 prior_channel):
-                            # симметрично депозитной ветке — платёж мог
-                            # быть возвращён ЗАЧИСЛЕНИЕМ НА ДЕПОЗИТ
-                            # (отменой другой очереди): банковской заявки
-                            # не существует, честный счётчик —
-                            # deposit_credits_existing, НЕ refund_requests_existing.
-                            if (
-                                refund_info.get("prior_channel")
-                                == self.REFUND_CHANNEL_DEPOSIT
-                            ):
-                                deposit_credits_existing += 1
-                            else:
-                                refund_requests_existing += 1
-                        else:
-                            refund_requests.append(refund_info)
+                            refund_info = self._create_refund_request(
+                                patient_id=entry.patient_id, payment_id=payment.id, visit_id=entry.visit_id,
+                                amount=payment.amount, reason=reason, refund_type=entry_refund_type, is_automatic=True,
+                            )
 
-                # Do not mark the queue entry cancelled until a requested
-                # refund has succeeded. A rejected refund must leave both
-                # the visit and its financial evidence intact.
-                entry.status = "cancelled"
-                entry.incomplete_reason = f"Форс-мажор: {reason}"
-                cancelled.append(
-                    {
-                        "entry_id": entry.id,
+                    # The refund evidence and queue transition share this
+                    # savepoint, including errors after staging a refund.
+                    entry.status = "cancelled"
+                    entry.incomplete_reason = f"Форс-мажор: {reason}"
+                    details = {
+                        "entry_id": entry_id,
                         "patient_name": entry.patient_name,
                         "phone": entry.phone,
                         "refund_type": entry_refund_type.value if entry_refund_type else None,
                         "refund_amount": float(payment.amount) if payment else 0,
                         "refund_info": refund_info,
                     }
+                    telegram_id = entry.telegram_id
+            except ForceMajeureError as exc:
+                failed.append({"entry_id": entry_id, "error": str(exc)})
+                continue
+            except Exception as exc:
+                logger.error(
+                    "force_majeure.cancel_entry_failed",
+                    extra={"entry_id": entry_id, "error_type": type(exc).__name__},
                 )
+                if not self.db.is_active:
+                    self.db.rollback()
+                    raise ForceMajeureError("Состояние отмены требует сверки") from None
+                failed.append({"entry_id": entry_id, "error": "Не удалось отменить запись"})
+                continue
 
-                # Добавляем в список для уведомлений
-                if entry.phone or entry.telegram_id:
-                    notification_targets.append(
-                        {
-                            "phone": entry.phone,
-                            "telegram_id": entry.telegram_id,
-                            "patient_name": entry.patient_name,
-                            "refund_type": entry_refund_type.value if entry_refund_type else None,
-                            "refund_amount": float(payment.amount) if payment else 0,
-                        }
-                    )
+            cancelled.append(details)
+            if details["phone"] or telegram_id:
+                notification_targets.append({
+                    "phone": details["phone"], "telegram_id": telegram_id,
+                    "patient_name": details["patient_name"], "refund_type": details["refund_type"],
+                    "refund_amount": details["refund_amount"],
+                })
+            if refund_info is not None:
+                deposit_refund = entry_refund_type == RefundType.DEPOSIT
+                if refund_info.get("already_refunded"):
+                    prior_channel = refund_info.get("prior_channel")
+                    if prior_channel == self.REFUND_CHANNEL_DEPOSIT or (
+                        deposit_refund and prior_channel != self.REFUND_CHANNEL_REFUND_REQUEST
+                    ):
+                        deposit_credits_existing += 1
+                    else:
+                        refund_requests_existing += 1
+                elif deposit_refund:
+                    deposit_credits_created += 1
+                else:
+                    refund_requests.append(refund_info)
 
-            except Exception as e:
-                logger.error(f"Ошибка при отмене записи {entry.id}: {e}")
-                failed.append({"entry_id": entry.id, "error": str(e)})
-
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception as exc:
+            self.db.rollback()
+            logger.error(
+                "force_majeure.cancel_commit_failed", extra={"error_type": type(exc).__name__},
+            )
+            raise ForceMajeureError("Состояние отмены требует сверки") from None
 
         # Отправляем уведомления
         if send_notifications and notification_targets:
             self._send_cancellation_notifications(notification_targets, reason)
 
-        logger.info(
-            f"Форс-мажор отмена: {len(cancelled)} записей отменено, "
-            f"{len(failed)} ошибок, {len(skipped)} пропущено. Причина: {reason}"
-        )
+        logger.info("Форс-мажор отмена: %s записей отменено, %s ошибок, %s пропущено",
+                    len(cancelled), len(failed), len(skipped))
 
         return {
             "success": True,
