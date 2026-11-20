@@ -80,6 +80,7 @@ from app.models.refund_deposit import (  # noqa: E402
     PatientDeposit,
     PaymentRefundClaim,
 )
+from app.models.user import User  # noqa: E402
 from app.models.visit import Visit  # noqa: E402
 from app.services.force_majeure_api_service import (  # noqa: E402
     ForceMajeureApiDomainError,
@@ -348,12 +349,20 @@ def _run_parallel_cancels(session_factory, world) -> dict:
     return outcomes
 
 
+def _deposit_test_actor(session) -> int:
+    actor = User(username=f"synthetic-deposit-{uuid.uuid4().hex}", hashed_password="!", role="Cashier")
+    session.add(actor)
+    session.flush()
+    return actor.id
+
+
 def _run_use_deposit(
     session_factory, *, patient_id, amount, outcomes, tag, barrier=None
 ):
     """Ручная нога: списание с депозита в оплату (use_deposit_for_payment)."""
     session = session_factory()
     try:
+        actor_id = _deposit_test_actor(session)
         service = ForceMajeureApiService(session)
         if barrier is not None:
             barrier.wait(timeout=10)
@@ -364,8 +373,9 @@ def _run_use_deposit(
                     amount=amount,
                     visit_id=None,
                     description="refund vs payment race probe",
+                    client_request_id=uuid.uuid4(),
                 ),
-                current_user_id=None,
+                current_user_id=actor_id,
             )
             outcomes[tag] = ("ok", payload)
         except ForceMajeureApiDomainError as exc:
@@ -384,6 +394,7 @@ def _run_add_deposit(
     """Ручная нога: пополнение депозита кассиром (add_to_deposit)."""
     session = session_factory()
     try:
+        actor_id = _deposit_test_actor(session)
         service = ForceMajeureApiService(session)
         if barrier is not None:
             barrier.wait(timeout=10)
@@ -393,8 +404,9 @@ def _run_add_deposit(
                     patient_id=patient_id,
                     amount=amount,
                     description="refund vs topup race probe",
+                    client_request_id=uuid.uuid4(),
                 ),
-                current_user_id=None,
+                current_user_id=actor_id,
             )
             outcomes[tag] = ("ok", payload)
         except ForceMajeureApiDomainError as exc:

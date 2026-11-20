@@ -9,6 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy import (
     Boolean,
@@ -20,6 +21,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Uuid,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -265,6 +267,13 @@ class DepositTransaction(Base):
             name="ck_deposit_refund_currency",
         ),
         Index(
+            "uq_deposit_manual_request",
+            "client_request_id",
+            unique=True,
+            postgresql_where=text("client_request_id IS NOT NULL"),
+            sqlite_where=text("client_request_id IS NOT NULL"),
+        ),
+        Index(
             "uq_deposit_transactions_credit_payment",
             "payment_id",
             unique=True,
@@ -293,6 +302,11 @@ class DepositTransaction(Base):
 
     # Only new payment-linked deposit refunds carry settlement evidence.
     refund_currency_snapshot: Mapped[str | None] = mapped_column(String(3), nullable=True)
+
+    client_request_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    command_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    command_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    command_is_active: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     # Сумма
     amount: Mapped[Decimal] = mapped_column(

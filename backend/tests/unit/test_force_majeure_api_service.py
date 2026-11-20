@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -1473,6 +1474,9 @@ class TestForceMajeureApiService:
         )
 
         class Repository:
+            def find_manual_deposit_receipt(self, client_request_id):
+                return None
+
             def get_patient_deposit_for_update(self, *, patient_id):
                 return deposit
 
@@ -1480,6 +1484,7 @@ class TestForceMajeureApiService:
         with pytest.raises(ForceMajeureApiDomainError) as exc_info:
             service.use_deposit_for_payment(
                 request=SimpleNamespace(
+                    client_request_id=uuid4(),
                     patient_id=2,
                     amount=100,
                     visit_id=None,
@@ -1502,6 +1507,9 @@ class TestForceMajeureApiService:
         state = {"flushed": False}
 
         class Repository:
+            def find_manual_deposit_receipt(self, client_request_id):
+                return None
+
             def get_patient_deposit_for_update(self, *, patient_id):
                 return deposit
 
@@ -1515,6 +1523,7 @@ class TestForceMajeureApiService:
         with pytest.raises(ForceMajeureApiDomainError) as exc_info:
             service.use_deposit_for_payment(
                 request=SimpleNamespace(
+                    client_request_id=uuid4(),
                     patient_id=2,
                     amount=40,
                     visit_id=9,
@@ -1547,6 +1556,9 @@ class TestForceMajeureApiService:
         state = {"flushed": 0, "added": []}
 
         class Repository:
+            def find_manual_deposit_receipt(self, client_request_id):
+                return None
+
             def get_patient_deposit_for_update(self, *, patient_id):
                 state["locked_patient_id"] = patient_id
                 return deposit
@@ -1560,12 +1572,10 @@ class TestForceMajeureApiService:
             def commit(self):
                 state["committed"] = True
 
-            def refresh(self, obj):
-                state["refreshed"] = obj
-
         service = ForceMajeureApiService(db=None, repository=Repository())
         payload = service.use_deposit_for_payment(
             request=SimpleNamespace(
+                client_request_id=uuid4(),
                 patient_id=2,
                 amount=40,
                 visit_id=None,
@@ -1583,7 +1593,6 @@ class TestForceMajeureApiService:
         assert debit.balance_after == Decimal("60")
         assert debit.performed_by == 7
         assert state["committed"] is True
-        assert state["refreshed"] is deposit
 
     def test_add_to_deposit_sums_into_locked_existing_row(self):
         """Пополнение существующего депозита: get_or_create... возвращает
@@ -1600,6 +1609,9 @@ class TestForceMajeureApiService:
         state = {"added": []}
 
         class Repository:
+            def find_manual_deposit_receipt(self, client_request_id):
+                return None
+
             def get_or_create_patient_deposit_for_update(
                 self, *, patient_id, initial_balance
             ):
@@ -1616,12 +1628,10 @@ class TestForceMajeureApiService:
             def commit(self):
                 pass
 
-            def refresh(self, obj):
-                pass
-
         service = ForceMajeureApiService(db=None, repository=Repository())
         payload = service.add_to_deposit(
             request=SimpleNamespace(
+                client_request_id=uuid4(),
                 patient_id=2,
                 amount=30,
                 description=None,
@@ -1637,12 +1647,9 @@ class TestForceMajeureApiService:
         assert credit.amount == Decimal("30")
         assert credit.balance_after == Decimal("130")
 
-    def test_add_to_deposit_uses_initial_balance_for_created_row(self):
-        """Создание депозита через конкурентно безопасную ветку: created=True
-        — строка уже создана с initial_balance, двойное прибавление
-        недопустимо (balance = amount, НЕ amount + amount)."""
+    def test_add_to_deposit_credits_new_row_exactly_once(self):
         deposit = SimpleNamespace(
-            balance=Decimal("30"),
+            balance=Decimal("0.00"),
             is_active=True,
             patient=None,
             id=9,
@@ -1653,6 +1660,9 @@ class TestForceMajeureApiService:
         state = {"added": []}
 
         class Repository:
+            def find_manual_deposit_receipt(self, client_request_id):
+                return None
+
             def get_or_create_patient_deposit_for_update(
                 self, *, patient_id, initial_balance
             ):
@@ -1668,12 +1678,10 @@ class TestForceMajeureApiService:
             def commit(self):
                 pass
 
-            def refresh(self, obj):
-                pass
-
         service = ForceMajeureApiService(db=None, repository=Repository())
         payload = service.add_to_deposit(
             request=SimpleNamespace(
+                client_request_id=uuid4(),
                 patient_id=2,
                 amount=30,
                 description=None,
@@ -1681,8 +1689,7 @@ class TestForceMajeureApiService:
             current_user_id=5,
         )
 
-        # initial_balance = amount, и НИКАКОГО повторного += поверх
-        assert state["initial_balance"] == Decimal("30")
+        assert state["initial_balance"] == Decimal("0.00")
         assert deposit.balance == Decimal("30"), "двойное зачисление!"
         assert payload["balance"] == 30.0
         [credit] = state["added"]

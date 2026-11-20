@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from uuid import UUID
 
 from sqlalchemy import insert
 from sqlalchemy.exc import IntegrityError
@@ -268,6 +269,13 @@ class ForceMajeureApiRepository:
             .with_for_update(of=Visit)
             .populate_existing()
             .first()
+        )
+
+    def find_manual_deposit_receipt(self, client_request_id: UUID) -> DepositTransaction | None:
+        return (
+            self.db.query(DepositTransaction)
+            .filter(DepositTransaction.client_request_id == client_request_id)
+            .one_or_none()
         )
 
     def list_deposit_transactions(

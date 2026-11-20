@@ -24908,9 +24908,15 @@ export type components = {
             /** Patient Id */
             patient_id: number;
             /** Amount */
-            amount: number;
+            amount: number | string;
             /** Description */
             description?: string | null;
+            /**
+             * Client Request Id
+             * Format: uuid
+             * @description Один идентификатор команды для всех её повторов
+             */
+            client_request_id: string;
         };
         /** AddUserToGroupRequest */
         AddUserToGroupRequest: {
@@ -42794,11 +42800,17 @@ export type components = {
             /** Patient Id */
             patient_id: number;
             /** Amount */
-            amount: number;
-            /** Visit Id */
-            visit_id?: number | null;
+            amount: number | string;
             /** Description */
             description?: string | null;
+            /**
+             * Client Request Id
+             * Format: uuid
+             * @description Один идентификатор команды для всех её повторов
+             */
+            client_request_id: string;
+            /** Visit Id */
+            visit_id?: number | null;
         };
         /**
          * UserActivityResponse
@@ -89303,6 +89315,13 @@ export interface operations {
                     "application/json": components["schemas"]["DepositResponse"];
                 };
             };
+            /** @description Конфликт команды пополнения */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -89335,6 +89354,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DepositResponse"];
                 };
+            };
+            /** @description Конфликт команды или решение по визиту ещё не принято */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

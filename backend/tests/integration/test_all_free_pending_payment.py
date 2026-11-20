@@ -3,6 +3,7 @@
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -23,6 +24,9 @@ from app.services.payment_init_service import PaymentInitDomainError, PaymentIni
 from app.services.payment_invariant_service import PaymentInvariantService
 from tests.integration.test_all_free_decision_concurrency_pg import (  # noqa: F401
     approval_case,
+    benefit_client,
+    configured_benefit_db,
+    decision_engines,
 )
 
 pytestmark = pytest.mark.integration
@@ -160,7 +164,8 @@ def test_deposit_debit_preserves_balance_until_decision(
     with pytest.raises(ForceMajeureApiDomainError) as error:
         ForceMajeureApiService(db_session).use_deposit_for_payment(
             request=UseDepositRequest(
-                patient_id=test_visit.patient_id, visit_id=test_visit.id, amount=AMOUNT
+                patient_id=test_visit.patient_id, visit_id=test_visit.id, amount=AMOUNT,
+                client_request_id=uuid4(),
             ),
             current_user_id=admin_user.id,
         )

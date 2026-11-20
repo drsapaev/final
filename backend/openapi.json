@@ -72792,6 +72792,9 @@
               }
             }
           },
+          "409": {
+            "description": "Конфликт команды пополнения"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -72838,6 +72841,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Конфликт команды или решение по визиту ещё не принято"
           },
           "422": {
             "description": "Validation Error",
@@ -77395,26 +77401,42 @@
             "title": "Patient Id"
           },
           "amount": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+              }
+            ],
             "title": "Amount"
           },
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 500
               },
               {
                 "type": "null"
               }
             ],
             "title": "Description"
+          },
+          "client_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Request Id",
+            "description": "Один идентификатор команды для всех её повторов"
           }
         },
         "type": "object",
         "required": [
           "patient_id",
-          "amount"
+          "amount",
+          "client_request_id"
         ],
         "title": "AddDepositRequest",
         "description": "Запрос на пополнение депозита"
@@ -125609,9 +125631,35 @@
             "title": "Patient Id"
           },
           "amount": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+              }
+            ],
             "title": "Amount"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "client_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Request Id",
+            "description": "Один идентификатор команды для всех её повторов"
           },
           "visit_id": {
             "anyOf": [
@@ -125623,23 +125671,13 @@
               }
             ],
             "title": "Visit Id"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
           }
         },
         "type": "object",
         "required": [
           "patient_id",
-          "amount"
+          "amount",
+          "client_request_id"
         ],
         "title": "UseDepositRequest",
         "description": "Запрос на использование депозита для оплаты"

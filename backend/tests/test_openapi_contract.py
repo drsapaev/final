@@ -39,6 +39,17 @@ def test_openapi_cashier_refund_requires_a_durable_operation_id(client: TestClie
     assert request["properties"]["client_request_id"]["format"] == "uuid"
 
 
+@pytest.mark.parametrize("action", ("add", "use"))
+def test_openapi_manual_deposit_requires_a_durable_operation_id(client: TestClient, action: str) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"][f"/api/v1/force-majeure/deposits/{action}"]["post"]
+    body_ref = operation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+    request = schema["components"]["schemas"][body_ref.rsplit("/", 1)[1]]
+    assert "client_request_id" in request["required"]
+    assert request["properties"]["client_request_id"]["format"] == "uuid"
+    assert "409" in operation["responses"]
+
+
 def test_openapi_registrar_benefit_approval_takes_identifiers_and_returns_exact_money(client: TestClient) -> None:
     schema = _get_openapi_schema(client)
     operation = schema["paths"]["/api/v1/discount-benefits/benefits/encounter/apply"]["post"]

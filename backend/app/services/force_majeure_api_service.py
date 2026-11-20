@@ -5,9 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from hashlib import sha256
+from json import dumps
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
@@ -30,6 +33,7 @@ from app.services.force_majeure_service import (
     ForceMajeureError,
     get_force_majeure_service,
 )
+from app.services.money_input import MAX_MONEY, MoneyInputError, parse_money
 
 
 @dataclass
@@ -529,89 +533,117 @@ class ForceMajeureApiService:
         ]
 
     def add_to_deposit(self, *, request, current_user_id: int) -> dict[str, Any]:
-        amount = Decimal(str(request.amount))
-        # 3808 review round 13 (residual P1 deposit balance race): ЕДИНЫЙ
-        # механизм конкурентной безопасности для ВСЕХ трёх операций с
-        # балансом (форс-мажорный возврат / ручное пополнение / списание
-        # в оплату) — строка депозита берётся FOR UPDATE до read-modify-write,
-        # конкурентное создание — в connection-level savepoint с перечитыванием
-        # строки победителя (раньше: необученный INSERT ломал всю операцию
-        # poisoned-сессией -> 500, а ``+=`` поверх неблокированного чтения
-        # терял параллельное зачисление). SQLite (unit) игнорирует FOR UPDATE.
-        deposit, created = self.repository.get_or_create_patient_deposit_for_update(
-            patient_id=request.patient_id,
-            initial_balance=amount,
-        )
-        if not created:
-            deposit.balance += amount
-
-        self.repository.flush()
-
-        transaction = DepositTransaction(
-            deposit_id=deposit.id,
-            transaction_type=DepositTransactionType.CREDIT.value,
-            amount=amount,
-            balance_after=deposit.balance,
-            description=request.description or "Пополнение депозита",
-            performed_by=current_user_id,
-        )
-        self.repository.add(transaction)
-        self.repository.commit()
-        self.repository.refresh(deposit)
-        return self._serialize_deposit(deposit)
+        return self._apply_manual_deposit(request, current_user_id, DepositTransactionType.CREDIT)
 
     def use_deposit_for_payment(self, *, request, current_user_id: int) -> dict[str, Any]:
-        amount = Decimal(str(request.amount))
-        if request.visit_id is not None:
-            visit = self.repository.get_visit(request.visit_id)
+        return self._apply_manual_deposit(request, current_user_id, DepositTransactionType.DEBIT)
+
+    def _apply_manual_deposit(
+        self, request, current_user_id: int, kind: DepositTransactionType,
+    ) -> dict[str, Any]:
+        try:
+            amount = parse_money(request.amount)
+        except MoneyInputError as exc:
+            raise ForceMajeureApiDomainError(422, "Некорректная сумма операции") from exc
+        if amount <= 0:
+            raise ForceMajeureApiDomainError(422, "Сумма операции должна быть больше нуля")
+
+        request_id = getattr(request, "client_request_id", None)
+        if not isinstance(request_id, UUID):
+            raise ForceMajeureApiDomainError(422, "Укажите UUID депозитной операции")
+        credit = kind == DepositTransactionType.CREDIT
+        visit_id = None if credit else request.visit_id
+        description = request.description or ("Пополнение депозита" if credit else "Оплата визита с депозита")
+        fingerprint = sha256(dumps(
+            [kind.value, current_user_id, request.patient_id, visit_id, str(amount), description],
+            separators=(",", ":"),
+        ).encode()).hexdigest()
+
+        def replay() -> dict[str, Any] | None:
+            receipt = self.repository.find_manual_deposit_receipt(request_id)
+            if receipt is None:
+                return None
+            if (
+                receipt.performed_by != current_user_id
+                or receipt.command_fingerprint != fingerprint
+                or receipt.deposit.patient_id != request.patient_id
+                or receipt.command_currency is None
+                or receipt.command_is_active is None
+            ):
+                raise ForceMajeureApiDomainError(409, "Параметры депозитной операции не совпадают")
+            payload = self._serialize_deposit(receipt.deposit)
+            payload.update(
+                balance=float(receipt.balance_after),
+                currency=receipt.command_currency,
+                is_active=receipt.command_is_active,
+            )
+            return payload
+
+        stored = replay()
+        if stored is not None:
+            return stored
+
+        if visit_id is not None:
+            visit = self.repository.get_visit(visit_id)
             if not visit:
                 raise ForceMajeureApiDomainError(404, "Visit not found")
             if visit.patient_id != request.patient_id:
-                raise ForceMajeureApiDomainError(
-                    400,
-                    "Visit does not belong to deposit patient",
-                )
+                raise ForceMajeureApiDomainError(400, "Visit does not belong to deposit patient")
             if awaits_all_free_decision(visit):
                 raise ForceMajeureApiDomainError(409, ALL_FREE_DECISION_REQUIRED)
 
-        # 3808 review round 13 (residual P1 deposit balance race): строка
-        # берётся FOR UPDATE ДО проверок и списания. Прежний разомкнутый
-        # check-then-act (``balance < amount`` на неблокированном чтении,
-        # затем ``-=``) проигрывал гонку параллельному форс-мажорному
-        # зачислению: проверка проходила по устаревшему балансу, списание
-        # перезаписывало чужое зачисление (или наоборот — зачисление
-        # затирало списание, а ``balance_after`` debit-строки расходился с
-        # фактическим балансом). Теперь списание сериализуется с
-        # зачислением на самой строке депозита.
-        deposit = self.repository.get_patient_deposit_for_update(
-            patient_id=request.patient_id
-        )
-        if not deposit:
+        # Keep the lock order used by refunds. Start a new deposit at zero
+        # so this command and its journal row own the entire balance change.
+        if credit:
+            deposit, _ = self.repository.get_or_create_patient_deposit_for_update(
+                patient_id=request.patient_id, initial_balance=Decimal("0.00"),
+            )
+        else:
+            deposit = self.repository.get_patient_deposit_for_update(patient_id=request.patient_id)
+        if deposit is None:
             raise ForceMajeureApiDomainError(404, "Депозит пациента не найден")
-        if deposit.balance < amount:
+
+        stored = replay()
+        if stored is not None:
+            return stored
+        if not credit and deposit.balance < amount:
             raise ForceMajeureApiDomainError(
                 400,
                 f"Недостаточно средств на депозите. Баланс: {deposit.balance}, запрошено: {amount}",
             )
-        if not deposit.is_active:
+        if not credit and not deposit.is_active:
             raise ForceMajeureApiDomainError(400, "Депозит деактивирован")
 
-        deposit.balance -= amount
-        self.repository.flush()
-
-        transaction = DepositTransaction(
-            deposit_id=deposit.id,
-            transaction_type=DepositTransactionType.DEBIT.value,
-            amount=amount,
-            balance_after=deposit.balance,
-            description=request.description or "Оплата визита с депозита",
-            visit_id=request.visit_id,
-            performed_by=current_user_id,
-        )
-        self.repository.add(transaction)
-        self.repository.commit()
-        self.repository.refresh(deposit)
-        return self._serialize_deposit(deposit)
+        balance_after = deposit.balance + (amount if credit else -amount)
+        if not 0 <= balance_after <= MAX_MONEY:
+            raise ForceMajeureApiDomainError(409, "Баланс депозита требует сверки")
+        try:
+            deposit.balance = balance_after
+            self.repository.flush()
+            payload = self._serialize_deposit(deposit)
+            self.repository.add(DepositTransaction(
+                deposit_id=deposit.id,
+                transaction_type=kind.value,
+                amount=amount,
+                balance_after=balance_after,
+                description=description,
+                visit_id=visit_id,
+                performed_by=current_user_id,
+                client_request_id=request_id,
+                command_fingerprint=fingerprint,
+                command_currency=deposit.currency,
+                command_is_active=deposit.is_active,
+            ))
+            self.repository.commit()
+        except IntegrityError:
+            # Different deposits do not share a row lock. The unique key
+            # decides a race and the loser's balance change is rolled back.
+            self.repository.rollback()
+            stored = replay()
+            if stored is None:
+                raise
+            return stored
+        return payload
 
     def _serialize_refund_request(self, req) -> dict[str, Any]:
         processed_by_name = req.processor.full_name if req.processor else None

@@ -24,10 +24,15 @@ from tests.integration.test_staff_confirmation_guard_pg import guarded_pg  # noq
 
 
 def install_deposit_guards(connection, schema: str) -> None:
-    """Install the real guard in schemas whose ORM already created the column."""
-    migration = _migration("0136_deposit_refund_evidence.py")
-    migration.op = Operations(MigrationContext.configure(connection, opts={"version_table_schema": schema}))
-    migration._install_postgres_guards(connection.dialect.identifier_preparer.quote_schema(schema))
+    """Install the real guards where ORM metadata already created the columns."""
+    operations = Operations(MigrationContext.configure(connection, opts={"version_table_schema": schema}))
+    quoted = connection.dialect.identifier_preparer.quote_schema(schema)
+    evidence = _migration("0136_deposit_refund_evidence.py")
+    evidence.op = operations
+    evidence._install_postgres_guards(quoted)
+    manual = _migration("0137_deposit_manual_receipts.py")
+    manual.op = operations
+    manual._install_postgresql_guard(quoted)
 
 
 @pytest.fixture
