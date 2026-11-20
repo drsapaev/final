@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 from unittest.mock import Mock
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -154,7 +155,7 @@ def test_revenue_counts_settled_payments_once_and_keeps_currencies_separate(
     assert trends.status_code == 200, trends.text
     assert trends.json()["revenue_trend"] == [
         {"date": "2032-06-06", "revenue": 0.0},
-        {"date": "2032-06-07", "revenue": 1293.75},
+        {"date": "2032-06-07", "revenue": 294.75},
     ]
 
     providers = client.get(
@@ -243,6 +244,49 @@ def test_revenue_groups_payments_by_posting_day(
     assert response.json()["revenue_trend"] == [
         {"date": order_day.date().isoformat(), "revenue": 5.00},
         {"date": posting_day.date().isoformat(), "revenue": 60.25},
+    ]
+
+
+def test_revenue_trends_match_clinic_calendar_dates(
+    client: TestClient,
+    admin_token: str,
+    db_session,
+    test_patient,
+    monkeypatch,
+) -> None:
+    now = datetime(2040, 8, 3, 14, tzinfo=ZoneInfo("Asia/Tashkent"))
+    today = now.replace(hour=0)
+    yesterday = today - timedelta(days=1)
+    visit = Visit(patient_id=test_patient.id, visit_date=yesterday.date())
+    db_session.add(visit)
+    db_session.flush()
+    for posted, amount in (
+        (yesterday - timedelta(microseconds=1), "10.25"),
+        (yesterday, "20.50"),
+        (today, "30.00"),
+    ):
+        db_session.add(
+            Payment(
+                visit_id=visit.id,
+                amount=Decimal(amount),
+                currency="UZS",
+                status="paid",
+                created_at=posted.astimezone(UTC),
+                paid_at=posted.astimezone(UTC),
+            )
+        )
+    db_session.commit()
+
+    monkeypatch.setattr(queue_service, "get_local_timestamp", lambda db: now)
+    response = client.get(
+        "/api/v1/analytics/trends",
+        headers=_auth_headers(admin_token),
+        params={"days": 2},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["revenue_trend"] == [
+        {"date": "2040-08-01", "revenue": 10.25},
+        {"date": "2040-08-02", "revenue": 20.50},
     ]
 
 

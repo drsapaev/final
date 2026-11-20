@@ -551,7 +551,9 @@ class AnalyticsService:
         db: Session, days: int = 30, *, include_revenue: bool
     ) -> dict[str, Any]:
         """Получение трендов за последние N дней"""
-        end_date = queue_service.get_local_timestamp(db)
+        end_date = queue_service.get_local_timestamp(db).replace(
+            hour=0, minute=0, second=0, microsecond=0, fold=0
+        )
         start_date = end_date - timedelta(days=days)
 
         # Тренд визитов
@@ -581,7 +583,7 @@ class AnalyticsService:
         if not include_revenue:
             return result
 
-        # Compare absolute times to the existing clinic-local day windows.
+        # Match the visit labels to complete clinic calendar days.
         windows = [(start_date + timedelta(days=i)).astimezone(UTC) for i in range(days + 1)]
         payments, _ = _gross_payment_report(db, windows[0], windows[-1], None)
         totals = [_ZERO] * days
