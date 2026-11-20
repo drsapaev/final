@@ -3,12 +3,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.core.roles import normalize_role_value
 from app.models.clinic import Doctor
 from app.models.lab import FINAL_INSTANCE_STATUSES
+from app.models.patient import Patient
+from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.lab_reporting import (
     LabCatalogAnalyteOut,
@@ -39,6 +42,7 @@ from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
 )
+from app.services.patient_access_audit import log_patient_access
 
 router = APIRouter(prefix="/lab", tags=["lab-reporting"])
 
@@ -597,6 +601,35 @@ def create_lab_report_instance(
         )
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
+
+
+def can_replay_lab_report_creation(
+    db: Session, *, instance_id: int, response_body: bytes, actor: User, request: Request,
+) -> bool:
+    if not actor.is_superuser and normalize_role_value(actor.role) not in {"admin", "lab"}:
+        return False
+
+    service = LabReportingService(db)
+    instance = service.repository.get_instance(instance_id)
+    if instance is None or db.query(Patient.id).filter(
+        Patient.id == instance.patient_id, Patient.is_deleted.is_(False),
+    ).first() is None:
+        return False
+    if instance.visit_id is not None and db.query(Visit.id).filter(
+        Visit.id == instance.visit_id, Visit.patient_id == instance.patient_id,
+    ).first() is None:
+        return False
+
+    current_body = _instance_out(service, instance).model_dump_json(by_alias=True).encode()
+    if current_body != response_body:
+        return False
+
+    log_patient_access(
+        db, actor_user=actor, subject_patient_id=instance.patient_id,
+        resource_type="lab_report", resource_id=str(instance.id), action="view",
+        request=request, extra_data={"operation": "lab_report_create_replay"},
+    )
+    return True
 
 
 @router.get("/report-instances/{instance_id}", response_model=LabReportInstanceOut)

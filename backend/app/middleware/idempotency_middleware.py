@@ -1089,6 +1089,7 @@ def _check_principal_authorized_sync(
     token_epoch: int = 0,
     patient_booking_result: tuple[str, int | uuid.UUID] | None = None,
     registrar_cart_result: RegistrarCartReceipt | None = None,
+    lab_report_result: tuple[int, bytes] | None = None,
 ) -> tuple[bool, str | None, bool]:
     """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
 
@@ -1146,6 +1147,17 @@ def _check_principal_authorized_sync(
                     return False, role, is_superuser
                 if not registrar_cart_receipt_is_current(db, actor_id=user_id, receipt=registrar_cart_result):
                     return False, role, is_superuser
+            if result[0] and lab_report_result is not None:
+                from app.api.v1.endpoints.lab_reporting import (
+                    can_replay_lab_report_creation,
+                )
+
+                actor = db.get(User, user_id) if user_id is not None else None
+                instance_id, response_body = lab_report_result
+                if actor is None or not can_replay_lab_report_creation(
+                    db, instance_id=instance_id, response_body=response_body, actor=actor, request=request,
+                ):
+                    return False, result[1], result[2]
             if not result[0] and patient_scope_id is None and user_id is not None:
                 _audit_inactive_principal(db, request, user_id, jti, token_epoch)
             return result
@@ -4353,6 +4365,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         allow_unbound_patient_denial: bool = False,
         patient_booking_result: tuple[str, int | uuid.UUID] | None = None,
         registrar_cart_result: RegistrarCartReceipt | None = None,
+        lab_report_result: tuple[int, bytes] | None = None,
     ) -> tuple[bool, str | None, bool]:
         """DB-backed authorization before any replay (Codex R3/R4/R6 #3092).
 
@@ -4403,6 +4416,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 scope_kwargs["patient_booking_result"] = patient_booking_result
             if registrar_cart_result is not None:
                 scope_kwargs["registrar_cart_result"] = registrar_cart_result
+            if lab_report_result is not None:
+                scope_kwargs["lab_report_result"] = lab_report_result
             authorized, role, is_superuser = await asyncio.to_thread(
                 _check_principal_authorized_sync,
                 request,
@@ -4551,6 +4566,29 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         is_superuser: bool,
     ) -> bool | None:
         op_scope = f"{request.method.upper()}:{_normalize_idem_path(request.url.path)}"
+        if op_scope == "POST:/api/v1/lab/report-instances":
+            from app.api.v1.endpoints.lab_reporting import create_lab_report_instance
+
+            selected = self._matched_audit_request(request)
+            if (
+                selected is None or selected.scope.get("endpoint") is not create_lab_report_instance
+                or cached_response.status_code != 200
+            ):
+                return None
+            try:
+                instance_id = json.loads(cached_response.body)["id"]
+                if type(instance_id) is not int or instance_id <= 0:
+                    return None
+            except (KeyError, TypeError, ValueError, RecursionError):
+                return None
+            try:
+                authorized, _, _ = await self._principal_authorized(
+                    selected, principal_payload, lab_report_result=(instance_id, cached_response.body),
+                )
+            except IdempotencyAuthorizationUnavailable:
+                return None
+            return True if authorized else None
+
         if op_scope == "POST:/api/v1/registrar/cart":
             from app.api.v1.endpoints.registrar_wizard import _cart
             from app.services.registrar_cart_replay import parse_registrar_cart_receipt
