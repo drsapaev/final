@@ -15,7 +15,7 @@ import type { CashierTranslationFn } from '../cashierPaymentContracts';
 interface CashierStatsCardProps {
   /** Metrics switch shape by tab (history shows the full grid). */
   isHistoryTab: boolean;
-  stats: CashierStatsSnapshot;
+  stats: CashierStatsSnapshot | null;
   /** CSH-FE-001: last stats-read failure (null = last load succeeded).
    * The previous snapshot stays visible under a warning banner — its
    * values are stale/unknown, not server-confirmed zeros. */
@@ -38,8 +38,6 @@ const formatMoneyOrDash = (value: number | undefined | null): string =>
   typeof value === 'number' && Number.isFinite(value) ? formatUZS(value) : '—';
 
 const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport, onHourlyStats, tI18n }: CashierStatsCardProps) => {
-  const format = formatUZS;
-
   return (
     <>
       {/* ✅ УЛУЧШЕНИЕ: Статистика платежей из API */}
@@ -49,13 +47,11 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
           Скрытые плитки (visibility:hidden) удалены — визуальный шум устранён. */}
       <Card variant="outlined" className="cashier-stats-card">
         {statsError !== null && statsError !== undefined &&
-        (/* CSH-FE-001: failed stats read — the tiles below stay from the
-            previous load (or the legacy zeros before the first success) and
-            must not read as freshly confirmed numbers. */
+        (
         <AppError
           severity="warning"
           title={tI18n('cashier.stats_load_error_title')}
-          description={[statsError, tI18n('cashier.stats_stale_note')].filter(Boolean).join(' ')}
+          description={[statsError, stats && tI18n('cashier.stats_stale_note')].filter(Boolean).join(' ')}
           action={
             <Button size="small" variant="outline" onClick={onRefresh}>
               {tI18n('cashier.retry_load_btn')}
@@ -69,7 +65,7 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
           <>
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-accent">
-                  {format(stats.total_amount)}
+                  {formatMoneyOrDash(stats?.total_amount)}
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.total_period')}
@@ -77,7 +73,7 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
               </div>
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-green">
-                  {format(stats.cash_amount)}
+                  {formatMoneyOrDash(stats?.cash_amount)}
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.method_cash')}
@@ -85,7 +81,7 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
               </div>
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-blue">
-                  {format(stats.card_amount)}
+                  {formatMoneyOrDash(stats?.card_amount)}
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.method_card')}
@@ -98,7 +94,7 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
                   без net-полей получает «—», а не ложный «0 сум». */}
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-danger">
-                  {formatMoneyOrDash(stats.refunded_amount)}
+                  {formatMoneyOrDash(stats?.refunded_amount)}
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.refunded_total')}
@@ -106,7 +102,7 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
               </div>
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-green">
-                  {formatMoneyOrDash(stats.net_total_amount)}
+                  {formatMoneyOrDash(stats?.net_total_amount)}
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.net_total')}
@@ -114,13 +110,13 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
               </div>
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-purple">
-                  {stats.paid_count}
+                  {stats?.paid_count ?? '—'}
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.status_paid')}
                 </div>
               </div>
-              {stats.cancelled_count > 0 &&
+              {stats && stats.cancelled_count > 0 &&
             <div className="cashier-text-center">
                   <div className="cashier-stat-num cashier-stat-danger">
                     {stats.cancelled_count}
@@ -135,10 +131,12 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
           <>
           <div className="cashier-text-center">
               <div className="cashier-stat-num-lg cashier-stat-orange">
-                {format(stats.pending_amount || 0)}
+                {formatMoneyOrDash(stats?.pending_amount)}
               </div>
               <div className="cashier-stat-cap-base">
-                {tI18n('cashier.pending_count_caption', { count: stats.pending_count })}
+                {stats
+                  ? tI18n('cashier.pending_count_caption', { count: stats.pending_count })
+                  : tI18n('cashier.pending_payment_badge')}
               </div>
             </div>
           </>
