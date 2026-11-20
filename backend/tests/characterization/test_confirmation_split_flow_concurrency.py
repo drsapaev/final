@@ -113,6 +113,22 @@ def _make_pending_confirmation_visit(
         session.close()
 
 
+def _remove_fixture(session_local, *, visit_id: int, patient_id: int, doctor_id: int, user_id: int) -> None:
+    with session_local.begin() as cleanup:
+        cleanup.query(OnlineQueueEntry).filter_by(visit_id=visit_id).delete()
+        cleanup.query(DailyQueue).filter_by(specialist_id=doctor_id).delete()
+        cleanup.query(TelegramUser).filter_by(patient_id=patient_id).delete()
+        line = cleanup.query(VisitService).filter_by(visit_id=visit_id).one()
+        service_id = line.service_id
+        cleanup.delete(line)
+        cleanup.flush()
+        cleanup.query(Service).filter_by(id=service_id).delete()
+        cleanup.query(Visit).filter_by(id=visit_id).delete()
+        cleanup.query(Patient).filter_by(id=patient_id).delete()
+        cleanup.query(Doctor).filter_by(id=doctor_id).delete()
+        cleanup.query(User).filter_by(id=user_id).delete()
+
+
 @pytest.mark.integration
 @pytest.mark.queue
 @pytest.mark.confirmation
@@ -151,16 +167,7 @@ def test_parallel_confirmation_validation_can_allow_same_pending_token(test_db):
 
         assert results == [True, True]
     finally:
-        cleanup = session_local()
-        try:
-            cleanup.query(TelegramUser).filter(TelegramUser.patient_id == patient_id).delete()
-            cleanup.query(Visit).filter(Visit.id == visit_id).delete()
-            cleanup.query(Patient).filter(Patient.id == patient_id).delete()
-            cleanup.query(Doctor).filter(Doctor.id == doctor_id).delete()
-            cleanup.query(User).filter(User.id == user_id).delete()
-            cleanup.commit()
-        finally:
-            cleanup.close()
+        _remove_fixture(session_local, visit_id=visit_id, patient_id=patient_id, doctor_id=doctor_id, user_id=user_id)
 
 
 @pytest.mark.integration
@@ -196,16 +203,7 @@ def test_parallel_confirmation_pending_lookup_can_observe_same_pending_visit(tes
 
         assert observed_visit_ids == [visit_id, visit_id]
     finally:
-        cleanup = session_local()
-        try:
-            cleanup.query(TelegramUser).filter(TelegramUser.patient_id == patient_id).delete()
-            cleanup.query(Visit).filter(Visit.id == visit_id).delete()
-            cleanup.query(Patient).filter(Patient.id == patient_id).delete()
-            cleanup.query(Doctor).filter(Doctor.id == doctor_id).delete()
-            cleanup.query(User).filter(User.id == user_id).delete()
-            cleanup.commit()
-        finally:
-            cleanup.close()
+        _remove_fixture(session_local, visit_id=visit_id, patient_id=patient_id, doctor_id=doctor_id, user_id=user_id)
 
 
 @pytest.mark.integration
@@ -265,19 +263,4 @@ def test_parallel_telegram_confirmation_claim_allows_only_one_mutation(test_db):
         finally:
             verify.close()
     finally:
-        cleanup = session_local()
-        try:
-            cleanup.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.visit_id == visit_id
-            ).delete()
-            cleanup.query(DailyQueue).filter(
-                DailyQueue.specialist_id == doctor_id
-            ).delete()
-            cleanup.query(TelegramUser).filter(TelegramUser.patient_id == patient_id).delete()
-            cleanup.query(Visit).filter(Visit.id == visit_id).delete()
-            cleanup.query(Patient).filter(Patient.id == patient_id).delete()
-            cleanup.query(Doctor).filter(Doctor.id == doctor_id).delete()
-            cleanup.query(User).filter(User.id == user_id).delete()
-            cleanup.commit()
-        finally:
-            cleanup.close()
+        _remove_fixture(session_local, visit_id=visit_id, patient_id=patient_id, doctor_id=doctor_id, user_id=user_id)
