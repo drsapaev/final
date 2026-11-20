@@ -12,7 +12,8 @@ permissions: {}
 
 jobs:
   compose-preflight:
-    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/codex/telegram-miniapp-sessions-20261116'
+    # Load the reviewed workflow from main, not from the PR source ref.
+    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:

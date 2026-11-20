@@ -69,11 +69,12 @@ or runtime path.
 ### Mini App pre-merge preflight and live acceptance
 
 Use the manual **Mini App PR staging preflight** as a credential-free check
-of the reviewed SHA. For PR #4118, dispatch it from
-`codex/telegram-miniapp-sessions-20261116` with
-`33f35996a1f86726b17f8caa819d1ed99aa1729a`. GitHub must first recognize
-the workflow on the default branch and the selected branch must include
-the reviewed workflow. The preflight checks Compose configuration with a
+of the reviewed SHA. Once this workflow is merged into `main`, dispatch it
+from `main` with the `source-sha` input set to
+`33f35996a1f86726b17f8caa819d1ed99aa1729a` (PR #4118). The workflow
+runs from `main` but fetches and validates that exact PR commit in a
+detached checkout; the PR branch does not need this workflow file.
+The preflight checks Compose configuration with a
 synthetic marker and does not start containers or use GitHub Environment
 secrets, HTTPS or the Telegram API. It cannot produce native acceptance.
 
