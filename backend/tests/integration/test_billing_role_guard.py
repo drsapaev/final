@@ -8,7 +8,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models.billing import Invoice, InvoiceStatus
+from app.api.v1.endpoints.billing import InvoiceResponse
+from app.models.billing import (
+    BillingSettings,
+    Invoice,
+    InvoiceItem,
+    InvoiceStatus,
+    PaymentReminder,
+)
 from app.models.patient import Patient
 from app.models.payment import Payment
 
@@ -36,6 +43,67 @@ def test_admin_can_list_legacy_billing_invoices(
 
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+def test_invoice_and_recurrence_roll_back_when_reminder_staging_fails(
+    client, db_session, admin_auth_headers, test_patient,
+):
+    settings = BillingSettings(next_invoice_number=17, reminder_days_before="7", reminder_days_after="invalid")
+    db_session.add(settings)
+    db_session.commit()
+    url = "/api/v1/billing/invoices"
+    payload = {
+        "patient_id": test_patient.id,
+        "items": [{"description": "Synthetic consultation", "quantity": 1, "unit_price": 25}],
+        "is_recurring": True,
+        "recurrence_type": "weekly",
+        "recurrence_interval": 2,
+        "send_reminders": True,
+    }
+
+    rejected = client.post(url, headers=admin_auth_headers, json=payload)
+    assert rejected.status_code == 400, rejected.text
+    assert db_session.query(Invoice).count() == 0
+    assert db_session.query(InvoiceItem).count() == 0
+    assert db_session.query(PaymentReminder).count() == 0
+    assert db_session.query(BillingSettings.next_invoice_number).scalar() == 17
+
+    settings.reminder_days_after = "1"
+    db_session.commit()
+    created = client.post(url, headers=admin_auth_headers, json=payload)
+    assert created.status_code == 200, created.text
+    db_session.expire_all()
+    invoice = db_session.query(Invoice).one()
+    assert created.json()["id"] == invoice.id
+    assert invoice.is_recurring and invoice.next_invoice_date == invoice.issue_date + timedelta(days=14)
+    assert invoice.invoice_number.endswith("-000017") and invoice.total_amount == 25
+    assert db_session.query(InvoiceItem).one().invoice_id == invoice.id
+    assert len(db_session.query(PaymentReminder).filter_by(invoice_id=invoice.id).all()) == 2
+    assert db_session.query(BillingSettings.next_invoice_number).scalar() == 18
+
+
+def test_invoice_response_error_rolls_back_first_time_settings(
+    client, db_session, admin_auth_headers, test_patient, monkeypatch,
+):
+    validate = InvoiceResponse.model_validate
+
+    def invalid_invoice_response(_invoice):
+        return validate({})
+
+    monkeypatch.setattr(InvoiceResponse, "model_validate", invalid_invoice_response)
+    response = client.post(
+        "/api/v1/billing/invoices",
+        headers=admin_auth_headers,
+        json={
+            "patient_id": test_patient.id,
+            "items": [{"description": "Synthetic consultation", "quantity": 1, "unit_price": 25}],
+        },
+    )
+    assert response.status_code == 500, response.text
+    assert db_session.query(Invoice).count() == 0
+    assert db_session.query(InvoiceItem).count() == 0
+    assert db_session.query(PaymentReminder).count() == 0
+    assert db_session.query(BillingSettings).count() == 0
 
 
 def test_patient_cannot_read_legacy_billing_invoice(

@@ -42,6 +42,7 @@ class BillingApiService:
         recurrence_interval: int,
         next_date_calculator: Callable,
     ) -> None:
+        """Stage the recurrence alongside the invoice in the caller's transaction."""
         invoice.is_recurring = True
         invoice.recurrence_type = recurrence_type
         invoice.recurrence_interval = recurrence_interval
@@ -50,7 +51,6 @@ class BillingApiService:
             recurrence_type,
             recurrence_interval,
         )
-        self.repository.commit()
 
     def list_invoices(
         self,

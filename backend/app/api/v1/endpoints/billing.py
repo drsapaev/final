@@ -232,6 +232,8 @@ def create_invoice(
             due_days=invoice_data.due_days,
             auto_send=invoice_data.auto_send,
             created_by=current_user.id,
+            send_reminders=invoice_data.send_reminders,
+            commit=False,
         )
 
         # Настраиваем периодичность если нужно
@@ -247,9 +249,23 @@ def create_invoice(
         if invoice_data.send_reminders:
             service.create_payment_reminders(invoice.id)
 
-        return invoice
+        db.flush()
+        response = InvoiceResponse.model_validate(invoice)
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        raise _billing_http_error(exc, "create_invoice_response") from exc
     except Exception:
-        raise HTTPException(status_code=400, detail="Internal server error")
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Internal server error") from None
+
+    if invoice_data.auto_send:
+        try:
+            service.send_invoice(response.id)
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Billing invoice delivery failed error_type=%s", type(exc).__name__)
+    return response
 
 
 @router.get("/invoices", response_model=list[InvoiceResponse])

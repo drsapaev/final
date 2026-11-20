@@ -41,8 +41,11 @@ class InvoicesMixin(BillingServiceMixinBase):
         auto_send: bool = False,
         created_by: int = None,
         _visit_snapshot_exact: bool = False,
+        *,
+        commit: bool = True,
+        send_reminders: bool = True,
     ) -> Invoice:
-        """Создать счет"""
+        """Create an invoice. With commit=False, the caller stages and commits it."""
 
         # Получаем настройки биллинга
         if visit_id is not None:
@@ -67,12 +70,12 @@ class InvoicesMixin(BillingServiceMixinBase):
                     "Invoice patient_id does not match appointment ownership"
                 )
 
-        if _visit_snapshot_exact:
-            # get_billing_settings() commits on first creation; that would
-            # release our visit and line locks before the invoice is written.
-            settings_query = self.db.query(BillingSettings)
+        if _visit_snapshot_exact or not commit:
+            # Keep first-time settings creation and the number increment in
+            # the invoice transaction. Refresh the counter after a PG wait.
+            settings_query = self.db.query(BillingSettings).order_by(BillingSettings.id).populate_existing()
             if self.db.get_bind().dialect.name == "postgresql":
-                settings_query = settings_query.with_for_update(nowait=True)
+                settings_query = settings_query.with_for_update(nowait=_visit_snapshot_exact)
             settings = settings_query.first()
             if settings is None:
                 settings = BillingSettings()
@@ -127,6 +130,7 @@ class InvoicesMixin(BillingServiceMixinBase):
             issue_date=now,
             due_date=now + timedelta(days=due_days),
             auto_send=auto_send,
+            send_reminders=send_reminders,
             is_auto_generated=True,
             created_by=created_by,
         )
@@ -160,12 +164,11 @@ class InvoicesMixin(BillingServiceMixinBase):
         # Обновляем номер счета в настройках
         settings.next_invoice_number += 1
 
-        self.db.commit()
-        self.db.refresh(invoice)
-
-        # Автоматически отправляем если нужно
-        if auto_send:
-            self.send_invoice(invoice.id)
+        if commit:
+            self.db.commit()
+            self.db.refresh(invoice)
+            if auto_send:
+                self.send_invoice(invoice.id)
 
         return invoice
 

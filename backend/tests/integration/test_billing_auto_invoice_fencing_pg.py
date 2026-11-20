@@ -2,6 +2,7 @@
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -9,7 +10,14 @@ from fastapi import HTTPException
 from sqlalchemy import event, text
 from sqlalchemy.orm import Session
 
-from app.models.billing import BillingRule, BillingSettings, Invoice, InvoiceItem
+from app.api.v1.endpoints.billing import InvoiceCreate, create_invoice
+from app.models.billing import (
+    BillingRule,
+    BillingSettings,
+    Invoice,
+    InvoiceItem,
+    PaymentReminder,
+)
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
@@ -241,3 +249,48 @@ def test_first_settings_creation_does_not_release_visit_or_line_locks(auto_case)
     finally:
         release.set()
         event.remove(engine, "after_cursor_execute", pause_after_settings)
+
+
+def test_manual_invoice_creation_serializes_the_existing_number_counter(pg_case):
+    engine, ids = pg_case
+    assert engine.dialect.name == "postgresql"
+    with Session(engine) as db:
+        patient_id = db.get(Visit, ids["visit"]).patient_id
+        db.add(BillingSettings(next_invoice_number=17))
+        db.commit()
+
+    lines = [{"description": "Synthetic consultation", "quantity": 1, "unit_price": 25}]
+    ready, pids = threading.Event(), []
+
+    def issue():
+        with Session(engine) as db:
+            pids.append(db.execute(text("SELECT pg_backend_pid()")).scalar_one())
+            ready.set()
+            return create_invoice(
+                InvoiceCreate(patient_id=patient_id, items=lines, send_reminders=False),
+                db=db,
+                current_user=SimpleNamespace(id=ids["user"]),
+            )
+
+    with Session(engine) as first, ThreadPoolExecutor(max_workers=1) as pool:
+        staged = BillingService(first).create_invoice(patient_id, lines, commit=False, send_reminders=False)
+        first.flush()
+        assert staged.invoice_number.endswith("-000017")
+        with Session(engine) as reader:
+            assert reader.query(Invoice).count() == 0
+            assert reader.query(BillingSettings.next_invoice_number).scalar() == 17
+        second = pool.submit(issue)
+        try:
+            assert ready.wait(5)
+            assert _is_blocked(engine, pids[0])
+        finally:
+            first.commit()
+        response = second.result(timeout=12)
+
+    assert response.invoice_number.endswith("-000018")
+    with Session(engine) as db:
+        assert db.query(Invoice).count() == 2
+        assert db.query(InvoiceItem).count() == 2
+        assert db.query(PaymentReminder).count() == 0
+        assert db.get(Invoice, response.id).send_reminders is False
+        assert db.query(BillingSettings.next_invoice_number).scalar() == 19
