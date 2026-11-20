@@ -25,7 +25,7 @@ BACKEND_COLUMN_TABLES = {
     "payment_visits": ("id", "payment_id", "visit_id", "amount"),
     "provider_active_visit_reservations": ("visit_id",),
     "refund_requests": ("id", "payment_id", "status"),
-    "deposit_transactions": ("id", "payment_id", "transaction_type"),
+    "deposit_transactions": ("id", "visit_id", "payment_id", "transaction_type"),
 }
 BACKEND_ONLY_TABLES = ("refund_requests", "deposit_transactions")
 LOCK_TABLES = ("visits", "encounters", "payment_invoices", "all_free_requests")
@@ -146,7 +146,7 @@ def provision(engine: Engine, *, schema: str, backend_role: str, capability_role
           FROM pg_catalog.pg_proc p WHERE p.oid=pg_catalog.to_regprocedure(:function)
         """), {"owner": namespace["nspowner"], "function": deposit_guard}).scalar_one_or_none() is True:
             db.exec_driver_sql(f"GRANT EXECUTE ON FUNCTION {deposit_guard} TO {qb}")
-            db.exec_driver_sql(f"GRANT SELECT (amount, visit_id, refund_currency_snapshot) ON {qs}.deposit_transactions TO {qb}")
+            db.exec_driver_sql(f"GRANT SELECT (amount, refund_currency_snapshot) ON {qs}.deposit_transactions TO {qb}")
         if db.execute(text("""
           SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
             WHERE a.attrelid=pg_catalog.to_regclass(:table) AND a.attname='client_request_id'

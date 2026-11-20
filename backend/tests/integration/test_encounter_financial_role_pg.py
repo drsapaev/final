@@ -197,6 +197,16 @@ def test_real_nonowner_with_forced_rls_detects_hidden_payment(monkeypatch):
         recon_provision.provision(engine, schema=schema, backend_role=backend, capability_role=recon_cap, expected_owner=owner)
         runtime_url = url.set(username=backend, password=password)
         runtime = create_engine(runtime_url, connect_args={"options": f"-csearch_path={schema} -clock_timeout=5000"})
+        with runtime.connect() as conn:
+            # The basic receipt path can check the visit's deposit history
+            # independently of the optional refund-settlement trigger.
+            assert conn.execute(text("""
+                SELECT id, visit_id, payment_id, transaction_type
+                FROM deposit_transactions WHERE false
+            """)).all() == []
+            assert not conn.scalar(text("""
+                SELECT pg_catalog.has_table_privilege('deposit_transactions', 'SELECT')
+            """))
         private = capability_schema_name(schema)
         with engine.begin() as conn:
             assert not conn.execute(text("""SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n,
