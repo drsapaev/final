@@ -64,12 +64,55 @@ ingest host is `o4511673323749376.ingest.us.sentry.io`. For a Cloud run,
 build the frontend with `VITE_SENTRY_ENV=staging` and
 `VITE_APP_VERSION=<full SHA>`; run the backend with `SENTRY_ENV=staging`
 and `APP_VERSION=<full SHA>`. Pass both values through the supported build
-or runtime path. Give the authorized reviewer each exact event ID, project
-and tested SHA for dashboard readback; ingest HTTP 200 is not readback.
-If local readback is unavailable, continue independent checks; do not
-resend or request broader access.
-Delivery, pre-transport masking, hosted masking readback, and full release
-admission are separate results. Evidence applies only to the tested SHA.
+or runtime path.
+
+### Verify Sentry canaries without asking the owner
+
+1. Resolve the full tested Git SHA from the validated checkout, then take
+   the exact frontend and backend event IDs from that run's evidence.
+   Do not search by issue title, use the latest event in an issue, or reuse
+   another run's IDs. If masking used separate events, track their IDs
+   separately from delivery canaries.
+2. Prefer an already authorized read-only Sentry connector for the two
+   staging projects. If unavailable, use an already authorized dashboard
+   session if the executor can access it. A Cloud send DSN permits ingest,
+   not event reads; a separate executor may have a different authorized
+   session. Do not assume those sessions are shared.
+3. Open the exact project/event redirect:
+   `https://sentry.io/organizations/kosmed-clinic/projects/<project-slug>/events/<event-id>/`.
+   Use `kosmed-staging-frontend` or `kosmed-staging-backend`, as applicable.
+   The redirect can resolve to the canonical exact issue event
+   `/issues/<issue-id>/events/<event-id>/` on the organization domain.
+   Confirm the returned event ID, project, `environment=staging`, and
+   `release=<full tested SHA>` before declaring readback `PASS`.
+4. For an authorized hosted masking check, inspect the exact event's JSON
+   in place, if accessible. Confirm `user.email` and `extra.diagnosis` are
+   absent and the synthetic exception value is `[REDACTED]`. Do not copy,
+   export, screenshot, or paste payloads, raw field values, or headers.
+   Report only field names and assertion outcomes. If only pre-transport
+   masking can be inspected, report that separately; it is not hosted proof.
+5. HTTP 200 at ingest is only send-side evidence. A mismatched event,
+   project, environment, release, or masking assertion is `FAIL` for that
+   check. A 404 for the exact ID is `NOT_VERIFIED (404)`, not proof of
+   deletion or an ingest failure. Missing authorization or inaccessible
+   dashboard/JSON is `BLOCKED (read access)` for the affected check only.
+   No event ID means `NOT_RUN` for readback. Never report a readback PASS
+   based on ingest alone.
+
+If no approved read path exists, do not block a separately authorized
+send-only preflight or other independent checks. Do not resend, ask for
+tokens, broaden access, or routinely ask the owner to open each event.
+If a handoff is needed and an approved route to an authorized reviewer
+exists, send only the following fields, one line per event. Otherwise
+record the same handoff in the task result without interrupting the owner:
+
+```text
+project=<slug> event_id=<id> tested_sha=<full SHA> expected_env=staging
+ingest=<status> readback=<status and reason> hosted_masking=<status and reason>
+```
+
+Delivery readback, pre-transport masking, hosted masking readback, and
+full release admission remain separate results scoped to the tested SHA.
 
 **Telegram:** `@kosmed_staging_bot` and the closed **KosMed Staging Alerts**
 group are the designated test resources. A private chat requires distinct
