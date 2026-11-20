@@ -237,6 +237,34 @@ def test_postgres_billing_report_uses_the_full_period_for_totals_and_statuses(le
     assert [item["status"] for item in report["status_breakdown"]] == [InvoiceStatus.PENDING]
 
 
+def test_postgres_billing_history_reads_only_its_granted_fields(legacy_invoice_pg):
+    owner, runtime, _, ids = legacy_invoice_pg
+    with owner.begin() as conn:
+        quote = conn.dialect.identifier_preparer.quote_identifier
+        schema, role = quote(conn.dialect.default_schema_name), quote(runtime.url.username)
+        conn.exec_driver_sql(f"GRANT SELECT (receipt_no,note,paid_at) ON {schema}.payments TO {role}")
+    report_day = date(2031, 3, 4)
+    midday = datetime(2031, 3, 4, 12, 30, tzinfo=UTC)
+    with Session(owner) as db:
+        db.add_all([
+            Payment(visit_id=ids["visit"], amount=Decimal("4.25"), currency="USD",
+                    receipt_no="SYNTHETIC-BILLING-HISTORY", created_at=midday),
+            Payment(visit_id=ids["visit"], amount=Decimal("5.75"), created_at=midday + timedelta(days=1)),
+        ])
+        db.commit()
+
+    with Session(runtime) as db:
+        assert db.get_bind().dialect.name == "postgresql"
+        db.execute(text("SET LOCAL TIME ZONE 'UTC'"))
+        assert db.scalar(text("SELECT pg_catalog.has_column_privilege(CURRENT_USER, 'payments', 'provider_data', 'SELECT')")) is False
+        service = BillingApiService(db)
+        [payment] = service.serialize_payments(service.list_payments(
+            skip=0, limit=100, date_from=report_day, date_to=report_day,
+        ))
+    assert payment["amount"] == 4.25 and payment["currency"] == "USD"
+    assert payment["receipt_no"] == "SYNTHETIC-BILLING-HISTORY"
+
+
 @pytest.mark.parametrize("amount", [Decimal("4.00"), Decimal("10.00")], ids=["partial", "fully-settled"])
 def test_duplicate_billing_operation_replays_after_a_missed_lookup(legacy_invoice_pg, monkeypatch, amount):
     owner, runtime, invoice_id, ids = legacy_invoice_pg

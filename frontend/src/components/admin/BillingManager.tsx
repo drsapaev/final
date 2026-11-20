@@ -35,7 +35,8 @@ import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import { generateCashierClientRequestId } from '../../pages/cashier/cashierPaymentContracts';
-import type { Invoice, Payment } from '../../types/domain/billing';
+import type { Invoice } from '../../types/domain/billing';
+import type { BillingPaymentListItem } from '../../types/api';
 import logger from '../../utils/logger';
 import { sanitizePrintableHtml } from '../../utils/printWindow';  // PR-35 / P0-7
 import { useTranslation } from '../../i18n/useTranslation';
@@ -108,7 +109,7 @@ const buildInvoicePayload = (form: InvoiceForm) => ({
 const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<BillingPaymentListItem[]>([]);
   const [analytics, setAnalytics] = useState<{ summary?: { total_invoices?: number; total_amount?: number; paid_amount?: number; overdue_amount?: number; recent_invoices?: unknown[]; [k: string]: unknown }; status_breakdown?: Array<{ status?: string; count?: number; [k: string]: unknown }>; [k: string]: unknown } | null>(null);
   const [, setSettings] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -124,9 +125,6 @@ const BillingManager = () => {
   const paymentMethodOptions = getPaymentMethodOptions(t);
   const invoiceTypeLabels = Object.fromEntries(
     invoiceTypeOptions.map((option) => [option.value, option.label])
-  );
-  const paymentMethodLabels = Object.fromEntries(
-    paymentMethodOptions.map((option) => [option.value, option.label])
   );
 
   // Форма для создания счета
@@ -163,8 +161,8 @@ const BillingManager = () => {
         const response = (await api.get('/billing/invoices')) as import('axios').AxiosResponse<unknown[]>;
         setInvoices(response.data as Invoice[]);
       } else if (activeTab === 'payments') {
-        const response = (await api.get('/billing/payments')) as import('axios').AxiosResponse<unknown[]>;
-        setPayments(response.data as Payment[]);
+        const response = await api.get<BillingPaymentListItem[]>('/billing/payments');
+        setPayments(response.data);
       } else if (activeTab === 'analytics') {
         const response = (await api.get('/billing/analytics')) as import('axios').AxiosResponse<Record<string, unknown>>;
         setAnalytics(response.data);
@@ -301,7 +299,7 @@ const BillingManager = () => {
     setInvoiceForm({ ...invoiceForm, items: newItems });
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, defaultToDraft = true) => {
     const statusConfig = {
       'draft': { variant: 'secondary', label: t('admin2.bill_status_draft'), icon: FileText },
       'pending': { variant: 'warning', label: t('admin2.bill_status_pending'), icon: Clock },
@@ -312,7 +310,11 @@ const BillingManager = () => {
       'refunded': { variant: 'warning', label: t('admin2.bill_status_refunded'), icon: AlertCircle }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['draft'];
+    const matching = Object.prototype.hasOwnProperty.call(statusConfig, status)
+      ? statusConfig[status as keyof typeof statusConfig]
+      : undefined;
+    if (!matching && !defaultToDraft) return <Badge variant="secondary">{status}</Badge>;
+    const config = matching ?? statusConfig.draft;
     const Icon = config.icon;
 
     return (
@@ -701,21 +703,15 @@ const BillingManager = () => {
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <h4 className="font-medium">{t('admin2.bill_pay_number', { number: payment.payment_number })}</h4>
-                  <Badge variant={payment.is_confirmed ? 'success' : 'warning'}>
-                    {payment.is_confirmed ? t('admin2.bill_pay_confirmed') : t('admin2.bill_pay_pending_confirm')}
-                  </Badge>
+                  <h4 className="font-medium">{t('admin2.bill_pay_number', { number: payment.receipt_no || payment.id })}</h4>
+                  {getStatusBadge(payment.status, false)}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                  <div>{t('admin2.bill_inv_id_short')} {payment.invoice_id}</div>
-                  <div>{t('admin2.bill_patient_id')} {payment.patient_id}</div>
-                  <div>{t('admin2.bill_amount')} {(payment.amount ?? 0).toLocaleString()} {t('admin2.bill_currency')}</div>
-                  <div>{t('admin2.bill_method_short')} {paymentMethodLabels[payment.payment_method ?? ''] || payment.payment_method}</div>
-                  <div>{t('admin2.bill_date')} {new Date(payment.payment_date || '').toLocaleDateString()}</div>
-                  {Boolean(payment.reference_number) &&
-              <div>{t('admin2.bill_ref_short')} {String(payment.reference_number ?? '')}</div>
-              }
+                  <div>{t('misc.srch_visit_id', { visitId: payment.visit_id })}</div>
+                  <div>{t('admin2.bill_amount')} {payment.amount.toLocaleString()} {payment.currency}</div>
+                  <div>{t('admin2.bill_method_short')} {paymentMethodOptions.find(({ value }) => value === payment.method)?.label ?? payment.method}</div>
+                  <div>{t('admin2.bill_date')} {new Date(payment.paid_at ?? payment.created_at).toLocaleDateString()}</div>
                 </div>
               </div>
             </div>

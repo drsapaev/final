@@ -123,6 +123,7 @@ class BillingApiService:
                 "id": payment.id,
                 "visit_id": payment.visit_id,
                 "amount": float(payment.amount),
+                "currency": payment.currency,
                 "method": payment.method,
                 "status": payment.status,
                 "receipt_no": payment.receipt_no,

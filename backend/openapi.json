@@ -69544,8 +69544,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BillingPaymentListItem"
+                  },
                   "title": "Response Get Payments Api V1 Billing Payments Get"
                 }
               }
@@ -81120,6 +81122,85 @@
         ],
         "title": "BenefitType",
         "description": "Типы льгот"
+      },
+      "BillingPaymentListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "receipt_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt No"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visit_id",
+          "amount",
+          "currency",
+          "method",
+          "status",
+          "created_at",
+          "paid_at"
+        ],
+        "title": "BillingPaymentListItem"
       },
       "BillingSettingsUpdate": {
         "properties": {

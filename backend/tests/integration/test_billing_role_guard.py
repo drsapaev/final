@@ -231,7 +231,8 @@ def test_billing_analytics_includes_the_end_date_and_filters_the_breakdown(
     outside.issue_date = midday + timedelta(days=1)
     outside.status = InvoiceStatus.OVERDUE
     db_session.add_all([
-        Payment(visit_id=test_visit.id, amount=Decimal("15.25"), created_at=midday.replace(tzinfo=UTC)),
+        Payment(visit_id=test_visit.id, amount=Decimal("15.25"), currency="USD",
+                status="refunded", created_at=midday.replace(tzinfo=UTC)),
         Payment(visit_id=test_visit.id, amount=Decimal("90.50"),
                 created_at=(midday + timedelta(days=1)).replace(tzinfo=UTC)),
     ])
@@ -246,6 +247,16 @@ def test_billing_analytics_includes_the_end_date_and_filters_the_breakdown(
     assert report["summary"]["total_payments"] == 1
     assert report["summary"]["payments_amount"] == "15.25"
     assert [entry["status"] for entry in report["status_breakdown"]] == ["pending"]
+
+    period = {"date_from": day.isoformat(), "date_to": day.isoformat()}
+    invoices = client.get("/api/v1/billing/invoices", headers=admin_auth_headers, params=period)
+    assert invoices.status_code == 200, invoices.text
+    assert [row["id"] for row in invoices.json()] == [inside.id]
+    payments = client.get("/api/v1/billing/payments", headers=admin_auth_headers, params=period)
+    assert payments.status_code == 200, payments.text
+    [payment] = payments.json()
+    assert payment["visit_id"] == test_visit.id and payment["paid_at"] is None
+    assert payment["amount"] == 15.25 and payment["currency"] == "USD" and payment["status"] == "refunded"
 
 
 def test_patient_cannot_run_legacy_billing_wide_actions(

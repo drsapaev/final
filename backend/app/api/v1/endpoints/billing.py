@@ -24,6 +24,7 @@ from app.models.billing import (
     RecurrenceType,
 )
 from app.models.user import User
+from app.schemas.payment import PaymentOut
 from app.services.billing_api_service import BillingApiDomainError, BillingApiService
 from app.services.billing_service import BillingService
 from app.services.money_input import MoneyInputError, parse_exact_json, parse_money
@@ -193,6 +194,11 @@ class PaymentResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BillingPaymentListItem(PaymentOut):
+    created_at: datetime
+    paid_at: datetime | None
 
 
 # === API endpoints ===
@@ -480,7 +486,7 @@ def record_payment(
         raise HTTPException(status_code=400, detail="Internal server error")
 
 
-@router.get("/payments", response_model=dict[str, Any])
+@router.get("/payments", response_model=list[BillingPaymentListItem])
 def get_payments(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),

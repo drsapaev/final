@@ -26224,6 +26224,32 @@ export type components = {
          * @enum {string}
          */
         BenefitType: "veteran" | "disabled" | "pensioner" | "student" | "child" | "large_family" | "low_income" | "employee";
+        /** BillingPaymentListItem */
+        BillingPaymentListItem: {
+            /** Id */
+            id: number;
+            /** Visit Id */
+            visit_id: number;
+            /** Amount */
+            amount: number;
+            /** Currency */
+            currency: string;
+            /** Method */
+            method: string;
+            /** Status */
+            status: string;
+            /** Receipt No */
+            receipt_no?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Paid At */
+            paid_at: string | null;
+        };
         /** BillingSettingsUpdate */
         BillingSettingsUpdate: {
             /** Invoice Number Prefix */
@@ -87430,9 +87456,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["BillingPaymentListItem"][];
                 };
             };
             /** @description Validation Error */

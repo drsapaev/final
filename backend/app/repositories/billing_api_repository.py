@@ -6,10 +6,18 @@ from datetime import date, datetime, time
 from typing import Any
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only, raiseload
 
 from app.models.billing import Invoice, InvoiceStatus, InvoiceType
 from app.models.payment import Payment
+
+
+def _within_days(query, timestamp, date_from: date | None, date_to: date | None):
+    if date_from is not None:
+        query = query.filter(timestamp >= datetime.combine(date_from, time.min))
+    if date_to is not None:
+        query = query.filter(timestamp <= datetime.combine(date_to, time.max))
+    return query
 
 
 class BillingApiRepository:
@@ -53,11 +61,7 @@ class BillingApiRepository:
             query = query.filter(Invoice.status == status)
         if invoice_type:
             query = query.filter(Invoice.invoice_type == invoice_type)
-        if date_from:
-            query = query.filter(Invoice.issue_date >= date_from)
-        if date_to:
-            query = query.filter(Invoice.issue_date <= date_to)
-
+        query = _within_days(query, Invoice.issue_date, date_from, date_to)
         return query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
 
     def list_payments(
@@ -68,14 +72,16 @@ class BillingApiRepository:
         date_from: date | None,
         date_to: date | None,
     ) -> list[Payment]:
-        query = self.db.query(Payment)
-
-        if date_from:
-            query = query.filter(Payment.created_at >= date_from)
-        if date_to:
-            query = query.filter(Payment.created_at <= date_to)
-
-        return query.order_by(Payment.created_at.desc()).offset(skip).limit(limit).all()
+        query = self.db.query(Payment).options(
+            load_only(
+                Payment.id, Payment.visit_id, Payment.amount, Payment.currency,
+                Payment.method, Payment.status, Payment.receipt_no, Payment.note,
+                Payment.created_at, Payment.paid_at, raiseload=True,
+            ),
+            raiseload(Payment.payment_visits),
+        )
+        query = _within_days(query, Payment.created_at, date_from, date_to)
+        return query.order_by(Payment.created_at.desc(), Payment.id.desc()).offset(skip).limit(limit).all()
 
     def get_billing_analytics_data(
         self,
@@ -83,17 +89,8 @@ class BillingApiRepository:
         date_from: date | None,
         date_to: date | None,
     ) -> dict:
-        invoice_query = self.db.query(Invoice)
-        payment_query = self.db.query(Payment)
-
-        if date_from:
-            start = datetime.combine(date_from, time.min)
-            invoice_query = invoice_query.filter(Invoice.issue_date >= start)
-            payment_query = payment_query.filter(Payment.created_at >= start)
-        if date_to:
-            end = datetime.combine(date_to, time.max)
-            invoice_query = invoice_query.filter(Invoice.issue_date <= end)
-            payment_query = payment_query.filter(Payment.created_at <= end)
+        invoice_query = _within_days(self.db.query(Invoice), Invoice.issue_date, date_from, date_to)
+        payment_query = _within_days(self.db.query(Payment), Payment.created_at, date_from, date_to)
 
         total_invoices = invoice_query.count()
         total_amount = (
