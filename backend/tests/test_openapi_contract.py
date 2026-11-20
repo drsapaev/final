@@ -39,6 +39,17 @@ def test_openapi_cashier_refund_requires_a_durable_operation_id(client: TestClie
     assert request["properties"]["client_request_id"]["format"] == "uuid"
 
 
+def test_openapi_legacy_billing_payment_requires_a_durable_operation_id(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/billing/payments"]["post"]
+    body_ref = operation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+    request = schema["components"]["schemas"][body_ref.rsplit("/", 1)[1]]
+    assert "client_request_id" in request["required"]
+    assert request["properties"]["client_request_id"]["format"] == "uuid"
+    assert {value["type"] for value in request["properties"]["amount"]["anyOf"]} == {"number", "string"}
+    assert "409" in operation["responses"]
+
+
 @pytest.mark.parametrize("action", ("add", "use"))
 def test_openapi_manual_deposit_requires_a_durable_operation_id(client: TestClient, action: str) -> None:
     schema = _get_openapi_schema(client)

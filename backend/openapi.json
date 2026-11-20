@@ -69424,7 +69424,7 @@
           "billing"
         ],
         "summary": "Record Payment",
-        "description": "Записать платеж",
+        "description": "Записать платёж с ключом для повторной выдачи исходной квитанции.",
         "operationId": "record_payment_api_v1_billing_payments_post",
         "security": [
           {
@@ -69451,6 +69451,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Payment conflict or reconciliation required"
           },
           "422": {
             "description": "Validation Error",
@@ -108023,12 +108026,25 @@
             "title": "Invoice Id"
           },
           "amount": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
             "title": "Amount"
           },
           "payment_method": {
             "$ref": "#/components/schemas/PaymentMethod"
+          },
+          "client_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Request Id"
           },
           "reference_number": {
             "anyOf": [
@@ -108069,7 +108085,8 @@
         "required": [
           "invoice_id",
           "amount",
-          "payment_method"
+          "payment_method",
+          "client_request_id"
         ],
         "title": "PaymentCreate"
       },

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Card,
@@ -34,6 +34,7 @@ import {
 import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
+import { generateCashierClientRequestId } from '../../pages/cashier/cashierPaymentContracts';
 import type { Invoice, Payment } from '../../types/domain/billing';
 import logger from '../../utils/logger';
 import { sanitizePrintableHtml } from '../../utils/printWindow';  // PR-35 / P0-7
@@ -58,7 +59,7 @@ type InvoiceForm = {
 
 type PaymentForm = {
   invoice_id: string | number;
-  amount: number | string;
+  amount: string;
   payment_method: string;
   reference_number: string;
   description: string;
@@ -104,12 +105,6 @@ const buildInvoicePayload = (form: InvoiceForm) => ({
   }))
 });
 
-const buildPaymentPayload = (form: PaymentForm) => ({
-  ...form,
-  invoice_id: toNullableInteger(form.invoice_id),
-  amount: Number(form.amount) || 0
-});
-
 const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -119,6 +114,9 @@ const BillingManager = () => {
   const [loading, setLoading] = useState(false);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
+  const [recordingPayment, setRecordingPayment] = useState(false);
+  const recordingPaymentRef = useRef(false);
+  const paymentRequests = useRef(new Map<number, { id: string; form: PaymentForm }>());
 
   const { t: rawT } = useTranslation();
   const t = rawT;
@@ -149,16 +147,9 @@ const BillingManager = () => {
   });
 
   // Форма для записи платежа
-  const [paymentForm, setPaymentForm] = useState<{
-    invoice_id: string | number;
-    amount: number;
-    payment_method: string;
-    reference_number: string;
-    description: string;
-    notes: string;
-  }>({
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>({
     invoice_id: '',
-    amount: 0,
+    amount: '',
     payment_method: 'cash',
     reference_number: '',
     description: '',
@@ -221,13 +212,31 @@ const BillingManager = () => {
   };
 
   const handleRecordPayment = async () => {
+    if (recordingPaymentRef.current) return;
+    const invoiceId = toNullableInteger(paymentForm.invoice_id);
+    if (invoiceId === null) {
+      toast.error(t('admin2.bill_pay_record_error'));
+      return;
+    }
+    const request = paymentRequests.current.get(invoiceId) ?? {
+      id: generateCashierClientRequestId(),
+      form: paymentForm,
+    };
+    paymentRequests.current.set(invoiceId, request);
+    recordingPaymentRef.current = true;
+    setRecordingPayment(true);
     try {
-      await api.post('/billing/payments', buildPaymentPayload(paymentForm));
+      await api.post('/billing/payments', {
+        ...paymentForm,
+        invoice_id: invoiceId,
+        client_request_id: request.id,
+      });
+      paymentRequests.current.delete(invoiceId);
       toast.success(t('admin2.bill_pay_recorded'));
       setShowRecordPayment(false);
       setPaymentForm({
         invoice_id: '',
-        amount: 0,
+        amount: '',
         payment_method: 'cash',
         reference_number: '',
         description: '',
@@ -237,6 +246,9 @@ const BillingManager = () => {
     } catch (error) {
       logger.error('Ошибка записи платежа:', error);
       toast.error(getErrorMessage(error) || t('admin2.bill_pay_record_error'));
+    } finally {
+      recordingPaymentRef.current = false;
+      setRecordingPayment(false);
     }
   };
 
@@ -398,9 +410,13 @@ const BillingManager = () => {
                   <Button
               variant="outline"
               onClick={() => {
-                setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance ?? 0 });
+                const pending = paymentRequests.current.get(Number(invoice.id));
+                setPaymentForm(pending?.form ?? {
+                  ...paymentForm, invoice_id: invoice.id, amount: (invoice.balance ?? 0).toFixed(2),
+                });
                 setShowRecordPayment(true);
               }}
+              disabled={recordingPayment}
               className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center-3"
               title={t('admin2.bill_record_pay_title')}
               type="button"
@@ -578,6 +594,7 @@ const BillingManager = () => {
             <Button
           variant="outline"
           onClick={() => setShowRecordPayment(false)}
+          disabled={recordingPayment}
           type="button"
           title={t('admin2.bill_close_pay_form_aria')}
           aria-label={t('admin2.bill_close_pay_form_aria')}
@@ -606,8 +623,9 @@ const BillingManager = () => {
               </label>
               <Input
             type="number"
+            step="0.01"
             value={paymentForm.amount}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
             placeholder="0" />
           
             </div>
@@ -651,12 +669,14 @@ const BillingManager = () => {
           <div className="admin-d-flex-jc-end-gap-8-2">
             <Button
           variant="outline"
-          onClick={() => setShowRecordPayment(false)}>
+          onClick={() => setShowRecordPayment(false)}
+          disabled={recordingPayment}>
           
               {t('admin2.bill_cancel_btn')}
             </Button>
             <Button
           onClick={handleRecordPayment}
+          disabled={recordingPayment}
           className="flex items-center justify-center gap-2">
           
               <Save size={16} />

@@ -870,6 +870,7 @@ class PaymentInvariantService:
         settling_invoice_id: int | None = None,
         commit: bool = True,
         cash_tender: dict[str, str] | None = None,
+        client_request_id: str | None = None,
     ) -> Payment:
         """Create a payment for a visit with race-condition protection.
 
@@ -907,6 +908,7 @@ class PaymentInvariantService:
                 документальное подтверждение кассира не теряется и попадает
                 в выгрузку/чек. Не влияет на ``amount``: «внесено» — НЕ
                 отдельная выручка, чистая сумма платежа остаётся ``amount``.
+            client_request_id: Durable payment request key, when available.
 
         Returns:
             The created Payment object (after refresh if committed, or
@@ -991,6 +993,7 @@ class PaymentInvariantService:
             method=method,
             status="paid",
             provider=provider,
+            client_request_id=client_request_id,
             note=note,
             # CSH-FE-040: кассовое «внесено/сдача» (только cash) —
             # сохраняется как документальное подтверждение; amount
@@ -1036,8 +1039,9 @@ class PaymentInvariantService:
             ) from integrity_exc
 
         logger.info(
-            "payment.created payment_id=%s visit_id=%s amount=%s method=%s "
+            "%s payment_id=%s visit_id=%s amount=%s method=%s "
             "cashier_id=%s paid_amount_before=%s paid_amount_after=%s",
+            "payment.created" if commit else "payment.staged",
             new_payment.id,
             visit_id,
             str(amount),

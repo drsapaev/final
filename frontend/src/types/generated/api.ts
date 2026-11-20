@@ -21864,7 +21864,7 @@ export type paths = {
         put?: never;
         /**
          * Record Payment
-         * @description Записать платеж
+         * @description Записать платёж с ключом для повторной выдачи исходной квитанции.
          */
         post: operations["record_payment_api_v1_billing_payments_post"];
         delete?: never;
@@ -36035,8 +36035,13 @@ export type components = {
             /** Invoice Id */
             invoice_id: number;
             /** Amount */
-            amount: number;
+            amount: number | string;
             payment_method: components["schemas"]["PaymentMethod"];
+            /**
+             * Client Request Id
+             * Format: uuid
+             */
+            client_request_id: string;
             /** Reference Number */
             reference_number?: string | null;
             /** Description */
@@ -87462,6 +87467,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["app__api__v1__endpoints__billing__PaymentResponse"];
                 };
+            };
+            /** @description Payment conflict or reconciliation required */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

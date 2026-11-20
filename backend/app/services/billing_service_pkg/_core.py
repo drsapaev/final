@@ -50,10 +50,10 @@ class CoreMixin(BillingServiceMixinBase):
         )
 
 
-    def _generate_payment_number(self) -> str:
+    def _generate_payment_number(self, payment_id: int) -> str:
         """Сгенерировать номер платежа"""
         now = self._get_local_timestamp_naive()
-        return f"PAY-{now.year}-{now.month:02d}-{now.day:02d}-{now.hour:02d}{now.minute:02d}{now.second:02d}"
+        return f"PAY-{now:%Y-%m-%d-%H%M%S}-{payment_id}"
 
 
     def _get_default_template(self) -> str:

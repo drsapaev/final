@@ -31,11 +31,11 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.cashier import _payments
 from app.models.patient import Patient
 from app.models.payment import Payment, PaymentClientRequest
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services import payment_client_requests
 from tests.conftest import mint_access_token
 from tests.integration.test_refund_cross_channel_budget import (
     _install_cashier_receipt_policy,
@@ -285,7 +285,7 @@ def test_concurrent_duplicate_checks_receipt_owner(
 
     # Both racers missed the row before either committed — but the
     # recovery re-read (after the IntegrityError) must see the winner.
-    real_find = _payments._find_payment_client_request
+    real_find = payment_client_requests.find_payment_client_request
     lookup_calls = {"n": 0}
 
     def miss_only_the_precheck(db_session_arg, key_arg):
@@ -294,7 +294,7 @@ def test_concurrent_duplicate_checks_receipt_owner(
             return None
         return real_find(db_session_arg, key_arg)
 
-    monkeypatch.setattr(_payments, "_find_payment_client_request", miss_only_the_precheck)
+    monkeypatch.setattr(payment_client_requests, "find_payment_client_request", miss_only_the_precheck)
 
     headers = admin_auth_headers if same_owner else other_cashier_headers
     response = client.post(SINGLE_URL, headers=headers, json=body)
@@ -330,7 +330,7 @@ def test_postgres_receipt_conflict_rolls_back_under_the_runtime_role(guarded_pg,
         "response_payload": payload,
     }
     with Session(runtime) as winner:
-        assert _payments._commit_with_client_request(winner, created_by=ids["stage"], **receipt) is None
+        assert payment_client_requests.commit_with_client_request(winner, created_by=ids["stage"], **receipt) is None
 
     with Session(runtime) as other:
         other.add(PaymentClientRequest(
@@ -340,12 +340,12 @@ def test_postgres_receipt_conflict_rolls_back_under_the_runtime_role(guarded_pg,
             created_by=ids["confirm"],
         ))
         with pytest.raises(HTTPException) as denied:
-            _payments._commit_with_client_request(other, created_by=ids["confirm"], **receipt)
+            payment_client_requests.commit_with_client_request(other, created_by=ids["confirm"], **receipt)
         assert denied.value.status_code == 409
         assert denied.value.detail["reason"] == "client_request_id_owner_mismatch"
 
     with Session(runtime) as retry:
-        assert _payments._commit_with_client_request(retry, created_by=ids["stage"], **receipt) == payload
+        assert payment_client_requests.commit_with_client_request(retry, created_by=ids["stage"], **receipt) == payload
         [stored] = retry.query(PaymentClientRequest).all()
         assert stored.client_request_id == key
         assert stored.created_by == ids["stage"]
@@ -355,7 +355,7 @@ def test_postgres_receipt_conflict_rolls_back_under_the_runtime_role(guarded_pg,
         stored.created_by = None
         archive.commit()
     with Session(runtime) as retry, pytest.raises(HTTPException) as unknown:
-        _payments._commit_with_client_request(retry, created_by=ids["stage"], **receipt)
+        payment_client_requests.commit_with_client_request(retry, created_by=ids["stage"], **receipt)
     assert unknown.value.status_code == 409
     assert unknown.value.detail["reason"] == "client_request_id_owner_unverified"
 

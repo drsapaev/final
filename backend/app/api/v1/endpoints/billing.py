@@ -2,10 +2,13 @@
 API endpoints для автоматического выставления счетов
 """
 
+import hashlib
+import json
 import logging
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -24,6 +27,10 @@ from app.models.user import User
 from app.services.billing_api_service import BillingApiDomainError, BillingApiService
 from app.services.billing_service import BillingService
 from app.services.money_input import MoneyInputError, parse_exact_json, parse_money
+from app.services.payment_client_requests import (
+    commit_with_client_request,
+    replay_payment_client_request,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,6 +39,7 @@ BILLING_PUBLIC_ERROR = "Internal server error"
 BILLING_VIEW_ROLES = ("Admin", "Registrar", "Cashier")
 BILLING_WRITE_ROLES = ("Admin", "Cashier")
 BILLING_ADMIN_ROLES = ("Admin",)
+BILLING_PAYMENT_ENDPOINT = "billing"
 
 
 def _billing_http_error(exc: Exception, operation: str) -> HTTPException:
@@ -85,8 +93,9 @@ class InvoiceUpdate(BaseModel):
 
 class PaymentCreate(BaseModel):
     invoice_id: int
-    amount: float = Field(..., gt=0)
+    amount: Decimal = Field(..., gt=0)
     payment_method: PaymentMethod
+    client_request_id: UUID
     reference_number: str | None = Field(None, max_length=100)
     description: str | None = None
     notes: str | None = None
@@ -357,27 +366,62 @@ async def _exact_payment_amount(request: Request) -> Decimal:
     return amount
 
 
-@router.post("/payments", response_model=PaymentResponse)
+@router.post(
+    "/payments",
+    response_model=PaymentResponse,
+    responses={409: {"description": "Payment conflict or reconciliation required"}},
+)
 def record_payment(
     payment_data: PaymentCreate,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
     exact_amount: Decimal = Depends(_exact_payment_amount),
 ):
-    """Записать платеж"""
+    """Записать платёж с ключом для повторной выдачи исходной квитанции."""
     service = BillingService(db)
+    client_request_id = str(payment_data.client_request_id)
+    intent = {
+        "invoice_id": payment_data.invoice_id,
+        "amount": format(exact_amount, ".2f"),
+        "method": payment_data.payment_method.value,
+        "reference": payment_data.reference_number,
+    }
+    canonical = json.dumps(intent, sort_keys=True, separators=(",", ":"))
+    fingerprint = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    replay_options = {
+        "request_fingerprint": fingerprint,
+        "current_user_id": current_user.id,
+    }
 
     try:
-        payment = service.record_payment(
-            invoice_id=payment_data.invoice_id,
-            amount=exact_amount,
-            payment_method=payment_data.payment_method,
-            reference_number=payment_data.reference_number,
-            description=payment_data.description,
-            created_by=current_user.id,
-            current_user=current_user,
-            commit=False,
+        replay = replay_payment_client_request(
+            db, client_request_id, BILLING_PAYMENT_ENDPOINT, **replay_options
         )
+        if replay is not None:
+            return PaymentResponse.model_validate(replay)
+
+        try:
+            payment = service.record_payment(
+                invoice_id=payment_data.invoice_id,
+                amount=exact_amount,
+                payment_method=payment_data.payment_method,
+                reference_number=payment_data.reference_number,
+                description=payment_data.description,
+                created_by=current_user.id,
+                current_user=current_user,
+                client_request_id=client_request_id,
+                commit=False,
+            )
+        except (HTTPException, ValueError):
+            # A competing request may finish between the lookup and lock.
+            # Use a new transaction to check its committed result.
+            db.rollback()
+            replay = replay_payment_client_request(
+                db, client_request_id, BILLING_PAYMENT_ENDPOINT, **replay_options
+            )
+            if replay is not None:
+                return PaymentResponse.model_validate(replay)
+            raise
         invoice = db.get(Invoice, payment_data.invoice_id)
         if invoice is None:
             raise RuntimeError("Payment invoice unavailable")
@@ -395,7 +439,16 @@ def record_payment(
             confirmed_at=payment.paid_at,
             created_at=payment.created_at,
         )
-        db.commit()
+        replay = commit_with_client_request(
+            db,
+            client_request_id=client_request_id,
+            endpoint=BILLING_PAYMENT_ENDPOINT,
+            response_payload={**response.model_dump(mode="json"), "recorded_by": current_user.id},
+            request_fingerprint=fingerprint,
+            created_by=current_user.id,
+        )
+        if replay is not None:
+            return PaymentResponse.model_validate(replay)
         return response
     except ValidationError as exc:
         db.rollback()

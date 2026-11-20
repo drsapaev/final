@@ -426,6 +426,7 @@ class PaymentsMixin(BillingServiceMixinBase):
         created_by: int = None,
         current_user: Any = None,
         *,
+        client_request_id: str | None = None,
         commit: bool = True,
     ) -> Payment:
         """
@@ -448,6 +449,7 @@ class PaymentsMixin(BillingServiceMixinBase):
             current_user: The User object creating the payment (required for
                 PaymentInvariantService audit logging). If None, a lightweight
                 wrapper with .id=created_by is used for backward compatibility.
+            client_request_id: Operation key linking the payment to its receipt.
             commit: Persist the receipt and the invoice together. HTTP callers
                 can validate their response before committing the transaction.
 
@@ -475,9 +477,6 @@ class PaymentsMixin(BillingServiceMixinBase):
             raise ValueError(
                 "Невозможно записать платеж: у счета нет связанного визита (invoice.visit_id)"
             )
-
-        # Генерируем номер платежа (используем как receipt_no)
-        payment_number = self._generate_payment_number()
 
         # Определяем валюту из настроек биллинга
         settings = self.get_billing_settings()
@@ -540,12 +539,13 @@ class PaymentsMixin(BillingServiceMixinBase):
             currency=currency,
             provider=None,
             allow_overpayment=False,
+            client_request_id=client_request_id,
             commit=False,
         )
 
         # Set fields that create_payment_for_visit() doesn't accept
         # (receipt_no and provider_payment_id were in the deprecated method)
-        payment.receipt_no = payment_number
+        payment.receipt_no = self._generate_payment_number(payment.id)
         payment.provider_payment_id = reference_number
 
         invoice.paid_amount = float(paid + exact_amount)
