@@ -58931,6 +58931,17 @@ export interface operations {
                     "application/json": components["schemas"]["CartQuoteResponse"];
                 };
             };
+            /** @description Условия расчёта требуют проверки или согласования */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58962,6 +58973,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EditDeltaResponse"];
+                };
+            };
+            /** @description Условия расчёта требуют проверки или согласования */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */

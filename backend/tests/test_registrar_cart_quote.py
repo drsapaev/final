@@ -252,10 +252,9 @@ def test_quote_edit_delta_mode_ignores_repeat_discount(
     assert body["items"][0]["discount_percent"] == 0
 
 
-def test_quote_edit_delta_mode_applies_all_free_zero(
+def test_quote_edit_delta_requires_an_all_free_request(
     client: TestClient, db_session: Session, admin_user
 ):
-    """edit_delta-режим: all_free → 0 (единственное правило edit-delta)."""
     service = _service(db_session, code="FIXD-ED2", price=100000.00)
     # R10 #3095: маршрутизируемая услуга (см. test_quote_edit_delta_rejects_…)
     service.queue_tag = "fixd_ed2_tag"
@@ -271,47 +270,21 @@ def test_quote_edit_delta_mode_applies_all_free_zero(
             "pricing_mode": "edit_delta",
         },
     )
-    assert edit_delta.status_code == 200
-    assert float(edit_delta.json()["total_amount"]) == 0
-    assert edit_delta.json()["approval_status"] in ("pending", "approved")
+    assert edit_delta.status_code == 409
+    assert "заявка на согласование" in edit_delta.json()["detail"]
 
 
 # ===================== Codex R2 #3095 =====================
 
 
-def test_quote_edit_delta_all_free_reports_approved_like_the_command(
+def test_quote_cart_all_free_reports_pending_when_auto_approval_is_off(
     client: TestClient, db_session: Session, admin_user
 ):
-    """Codex R2 #3095 (P2): RegistrarEditDeltaService._create_visit ВСЕГДА
-    пишет approval_status="approved" и не читает all_free_auto_approve —
-    квота edit_delta не должна предупреждать о согласовании, которого
-    команда не выполняет."""
     service = _service(db_session, code="FIXD-ED3", price=100000.00)
-    # R10 #3095: маршрутизируемая услуга (см. test_quote_edit_delta_rejects_…)
     service.queue_tag = "fixd_ed3_tag"
     db_session.commit()
-    # Явно выключаем авто-approve: раньше это давало "pending" в квоте,
-    # тогда как команда сохранения пишет "approved".
     _set_settings(db_session, all_free_auto_approve=False)
 
-    edit_delta = client.post(
-        "/api/v1/registrar/cart/quote",
-        headers=_auth_headers(admin_user),
-        json={
-            "items": [{"service_id": service.id, "quantity": 1}],
-            "discount_mode": "none",
-            "all_free": True,
-            "pricing_mode": "edit_delta",
-        },
-    )
-    assert edit_delta.status_code == 200
-    body = edit_delta.json()
-    assert float(body["total_amount"]) == 0
-    assert body["approval_status"] == "approved", (
-        "edit-delta command always writes approved — the quote must not claim pending"
-    )
-
-    # cart-режим с теми же настройками честно требует согласования
     cart_mode = client.post(
         "/api/v1/registrar/cart/quote",
         headers=_auth_headers(admin_user),

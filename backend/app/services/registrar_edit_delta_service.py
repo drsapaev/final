@@ -47,6 +47,18 @@ ACTIVE_APPEND_STATUSES = ("waiting", "called", "in_service", "diagnostics")
 VISIT_POSITION_BLOCKED_STATUSES = ("closed", "canceled", "paid", "expired")
 
 
+def require_edit_delta_discount_mode(discount_mode: str, *, all_free: bool) -> None:
+    """Keep discounts requiring a decision on the registration workflow."""
+    mode = str(discount_mode or "").strip().casefold()
+    if all_free or mode == "all_free":
+        raise HTTPException(
+            status_code=409,
+            detail="Для All Free нужна заявка на согласование через оформление визита",
+        )
+    if mode == "benefit":
+        raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
+
+
 @dataclass(frozen=True)
 class RegistrarEditDeltaItem:
     service_id: int
@@ -341,8 +353,7 @@ class RegistrarEditDeltaService:
         expected_entry_updated_at: dict[int, str] | None = None,
         current_user: User | None = None,
     ) -> dict[str, Any]:
-        if not all_free and str(discount_mode or "").strip().casefold() == "benefit":
-            raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
+        require_edit_delta_discount_mode(discount_mode, all_free=all_free)
         patient = self.lock_edit_context(
             patient_id,
             current_user,
@@ -442,7 +453,6 @@ class RegistrarEditDeltaService:
                     target_date=target_date,
                     specialist_id=item.specialist_id,
                     discount_mode=discount_mode,
-                    all_free=all_free,
                     current_user=current_user,
                 )
             else:
@@ -482,7 +492,6 @@ class RegistrarEditDeltaService:
                     target_date=target_date,
                     specialist_id=item.specialist_id,
                     discount_mode=discount_mode,
-                    all_free=all_free,
                     current_user=current_user,
                 )
 
@@ -1143,7 +1152,6 @@ class RegistrarEditDeltaService:
         target_date: date,
         specialist_id: int | None,
         discount_mode: str,
-        all_free: bool,
         current_user: User | None,
     ) -> dict[str, Any]:
         services = self._coerce_services(entry.services)
@@ -1177,7 +1185,7 @@ class RegistrarEditDeltaService:
         delta_qty = requested_qty - existing_qty if existing_payloads else requested_qty
         if delta_qty < 0:
             self._assert_decrease_allowed(entry=entry)
-        unit_price = Decimal("0") if all_free else Decimal(str(service.price or 0))
+        unit_price = Decimal(str(service.price or 0))
 
         # Codex R12 PR 3118 (P1): СЛОЕВОЕ (LIFO) представление позиции.
         # Каждая единица сохраняет свою записанную цену: рост ДОБАВЛЯЕТ строку
@@ -1302,7 +1310,6 @@ class RegistrarEditDeltaService:
         target_date: date,
         specialist_id: int | None,
         discount_mode: str,
-        all_free: bool,
         current_user: User | None,
     ) -> dict[str, Any]:
         queue_tag = service.queue_tag or service.department_key
@@ -1312,7 +1319,7 @@ class RegistrarEditDeltaService:
             queue_tag=queue_tag,
             target_date=target_date,
         )
-        unit_price = Decimal("0") if all_free else Decimal(str(service.price or 0))
+        unit_price = Decimal(str(service.price or 0))
         delta_amount = unit_price * Decimal(requested_qty)
         visit = self._create_visit(
             patient=patient,

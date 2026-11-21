@@ -51,6 +51,7 @@ from app.services.profile_contact_security import (
     check_bearer_expiry,
 )
 from app.services.registrar_doctor_eligibility import service_routes_to_resource_queue
+from app.services.registrar_edit_delta_service import require_edit_delta_discount_mode
 from app.services.registrar_wizard_queue_assignment_service import (
     DuplicateCartResourceQueueVisitsError,
 )
@@ -708,7 +709,6 @@ def _edit_delta_quote_context(
     specialist_id: int | None = None,
     queue_entry_id: int | None = None,
     lock: bool = False,
-    all_free: bool = False,
 ) -> tuple[int, Decimal | None]:
     """Codex R6 #3095 (P2): mirror the edit-delta command's billing quantity.
 
@@ -850,16 +850,13 @@ def _edit_delta_quote_context(
         # потреблённых слоёв (цена единицы слоя × единицы), ровно то, что
         # спишет команда. При многослойном потреблении единой цены за единицу
         # нет — возвращаем ГОТОВУЮ сумму (amount_override), а не единичную
-        # цену (см. вызов в _quote_core). Fallback строк без цены (легаси) —
-        # каталог/ноль при all_free, как в команде.
-        fallback_unit_price = (
-            Decimal("0") if all_free else Decimal(str(service.price or 0))
-        )
+        # цену (см. вызов в _quote_core). Для старых строк без сохранённой
+        # цены используем цену каталога, как в команде.
         consumption = edit_service._plan_lifo_consumption(
             entry=entry,
             payloads=payloads,
             units_to_remove=-delta,
-            fallback_unit_price=fallback_unit_price,
+            fallback_unit_price=Decimal(str(service.price or 0)),
         )
         decrease_amount = -sum(
             (charge * Decimal(units) for _, units, charge in consumption), Decimal("0")
@@ -889,7 +886,10 @@ def _quote_core(
     Отсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием
     услуги, чтобы регистратор увидел проблему до сохранения.
     """
-    if str(_resolve_effective_discount_mode(quote_req)).strip().casefold() == "benefit":
+    effective_discount_mode = _resolve_effective_discount_mode(quote_req)
+    if quote_req.pricing_mode == "edit_delta":
+        require_edit_delta_discount_mode(effective_discount_mode, all_free=quote_req.all_free)
+    elif str(effective_discount_mode).strip().casefold() == "benefit":
         raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
     # Codex R13 #3095 (P2): canonicalize duplicate service rows for the
     # full-update pricing mode. Pricing in this mode depends ONLY on
@@ -915,12 +915,7 @@ def _quote_core(
                 _first_by_service[sid].model_copy(update={"quantity": qty})
                 for sid, qty in _qty_by_service.items()
             ]
-    effective_discount_mode = _resolve_effective_discount_mode(quote_req)
     qr_all_free = quote_req.pricing_mode == "full_update" and effective_discount_mode == "all_free"
-    if str(effective_discount_mode).strip().casefold() == "benefit":
-        # A patient benefit needs an encounter-scoped administrator decision;
-        # do not preview a free consultation as if that decision already exists.
-        raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
     # Codex R6 #3095 (P2): the save-time revalidation passes ITS OWN locked
     # settings snapshot in — quote and save are then priced from the exact
     # same values even for settings rows that do not exist yet (FOR UPDATE
@@ -930,15 +925,8 @@ def _quote_core(
     if registration_settings is None:
         registration_settings = _load_registration_discount_settings(db, lock_rows=lock_pricing_rows)
 
-    # Codex R2 #3095 (P2): approval_status обязан отражать контракт
-    # ВЫБРАННОЙ команды сохранения. RegistrarEditDeltaService._create_visit
-    # всегда пишет approval_status="approved" и никогда не читает
-    # all_free_auto_approve — предупреждение «требуется согласование» в
-    # edit_delta-квоте вводило в заблуждение.
-    # Codex R3 #3095 (P2): full-update ОБРАТНО пишет approval_status="pending"
-    # для all_free (_full_update_handle_all_free_visit: и существующий
-    # неоплаченный визит, и новый визит) — квота обязана предупреждать о
-    # согласовании в этом случае, а не рапортовать «approved».
+    # Ordinary edit-delta items are approved at the catalogue price.
+    # QR All Free deliberately retains a pending decision and its baseline.
     if quote_req.pricing_mode == "edit_delta":
         approval_status = "approved"
     elif quote_req.pricing_mode == "full_update":
@@ -1078,18 +1066,15 @@ def _quote_core(
                 detail=f"Для услуги «{service.name}» не указана цена",
             )
 
-        # Codex R1 #3095 (P1): mode 'edit_delta' повторяет ценообразование
-        # RegistrarEditDeltaService один-в-один: только all_free→0,
-        # custom_price и repeat/benefit скидки НЕ применяются. Это гарантирует,
-        # что подтверждённая в edit-режиме сумма совпадает с тем, что
-        # edit-delta реально выставит в invoice.
+        # Edit-delta uses the same catalogue prices and stored layers as
+        # the invoice mutation in RegistrarEditDeltaService.
         # Codex R12 PR 3118 (P1): amount_override снижения (готовая знаковая
         # сумма LIFO-слоёв) — только в edit_delta; остальные режимы не имеют
         # слоёв и считаются unit × qty.
         decrease_amount: Decimal | None = None
         if quote_req.pricing_mode == "edit_delta":
             base_price = Decimal(str(service.price))
-            unit_final = Decimal("0") if effective_discount_mode == "all_free" else base_price
+            unit_final = base_price
             discount_percent = 0
             # Codex R10 #3095 (P2): the command's routing gate mirrors into
             # the quote for BOTH context paths — without the edit context the
@@ -1145,7 +1130,6 @@ def _quote_core(
                     specialist_id=item_req.specialist_id,
                     queue_entry_id=item_req.queue_entry_id,
                     lock=lock_pricing_rows,
-                    all_free=effective_discount_mode == "all_free",
                 )
             else:
                 billable_qty = _sequential_requested
@@ -1229,7 +1213,15 @@ def _quote_core(
     )
 
 
-@router.post("/registrar/cart/quote", response_model=CartQuoteResponse)
+_CART_CONFLICT_RESPONSE = {
+    "description": "Условия расчёта требуют проверки или согласования",
+    "content": {"application/json": {"schema": {
+        "type": "object", "properties": {"detail": {"type": "string"}}, "required": ["detail"],
+    }}},
+}
+
+
+@router.post("/registrar/cart/quote", response_model=CartQuoteResponse, responses={409: _CART_CONFLICT_RESPONSE})
 def quote_cart_prices(
     quote_req: CartQuoteRequest,
     db: Session = Depends(get_db),
@@ -1315,14 +1307,13 @@ def _assert_quote_token_matches(
     return settings_snapshot
 
 
-@router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse)
+@router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse, responses={409: _CART_CONFLICT_RESPONSE})
 def apply_registrar_cart_edit_delta(
     request: EditDeltaRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
-    if str(_resolve_effective_discount_mode(request)).strip().casefold() == "benefit":
-        raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
+    require_edit_delta_discount_mode(request.discount_mode, all_free=request.all_free)
     try:
         # Codex R4 #3095 (P1): bind the confirmed edit quote to the command —
         # revalidate BEFORE any mutation (the edit-delta pricing rules are
@@ -1377,12 +1368,7 @@ def apply_registrar_cart_edit_delta(
             target_date=request.target_date,
             payment_method=request.payment_method,
             discount_mode=request.discount_mode,
-            # Codex R7 #3095 (P1): команда получает тот же РЕЗОЛВНУТЫЙ режим,
-            # что использовала квота (_resolve_effective_discount_mode):
-            # агрегированная запись несёт discount_mode="all_free" без булева
-            # флага — голый all_free=False заставил бы команду выставить
-            # каталожные цены поверх токена, подтверждённого как All Free.
-            all_free=_resolve_effective_discount_mode(request) == "all_free",
+            all_free=request.all_free,
             patient_data=(
                 request.patient_data.model_dump(exclude_none=True)
                 if request.patient_data

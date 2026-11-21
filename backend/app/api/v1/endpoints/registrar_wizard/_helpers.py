@@ -336,12 +336,12 @@ class CartQuoteRequest(BaseModel):
     all_free: bool = Field(default=False)
     # Codex R1 #3095 (P1): 'cart' — правила пути сохранения /registrar/cart
     # (_apply_service_discount), 'edit_delta' — точные правила
-    # /registrar/cart/edit-delta (RegistrarEditDeltaService: только
-    # all_free→0, repeat/benefit скидки НЕ применяются).
+    # /registrar/cart/edit-delta (каталог и сохранённые цены строк).
+    # All Free и льготы требуют отдельного согласования.
     # Codex R2 #3095 (P1): 'full_update' — правила
     # /queue/online-entry/{id}/full-update
     # (_full_update_create_single_independent_entry: консультация при
-    # repeat/benefit → 0, all_free → 0, остальное — каталог-цена;
+    # repeat → 0, All Free сохраняет обычную цену до решения;
     # custom_price в контракте маршрута не участвует). Квота обязана
     # выбирать контракт по фактическому маршруту команды, а не по editMode.
     pricing_mode: str = Field(default="cart", pattern="^(cart|edit_delta|full_update)$")

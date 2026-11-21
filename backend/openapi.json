@@ -22113,6 +22113,24 @@
               }
             }
           },
+          "409": {
+            "description": "Условия расчёта требуют проверки или согласования",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -22155,6 +22173,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EditDeltaResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Условия расчёта требуют проверки или согласования",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
