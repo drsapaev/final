@@ -478,7 +478,16 @@ def test_full_update_visit_id_aggregation_ignores_other_patient_queue_entry(
         queue_time=current_queue_time,
         services=json.dumps([], ensure_ascii=False),
     )
-    db_session.add_all([other_entry, current_entry])
+    wrong_link_sibling = OnlineQueueEntry(
+        queue_id=test_daily_queue.id, number=82, patient_id=test_patient.id,
+        visit_id=other_visit.id, source="online", status="waiting",
+        queue_time=current_queue_time, services=json.dumps([]),
+    )
+    other_charge = VisitService(
+        visit_id=other_visit.id, service_id=test_service.id, name="SYNTHETIC-Other charge",
+        qty=2, price=Decimal("125.00"), currency="UZS",
+    )
+    db_session.add_all([other_entry, current_entry, wrong_link_sibling, other_charge])
     db_session.commit()
     db_session.refresh(current_entry)
 
@@ -512,6 +521,9 @@ def test_full_update_visit_id_aggregation_ignores_other_patient_queue_entry(
     )
     assert current_services[0]["queue_time"] != other_queue_time.isoformat()
     assert other_services[0]["queue_time"] == other_queue_time.isoformat()
+    db_session.refresh(wrong_link_sibling)
+    assert json.loads(wrong_link_sibling.services) == []
+    assert wrong_link_sibling.total_amount in (None, 0)
 
 
 @pytest.mark.integration
@@ -1050,6 +1062,17 @@ def test_qr_all_free_worklist_displays_the_decision_and_exact_ticket_prices(
             json={"visit_id": visit_id, "action": action},
         )
         assert decision.status_code == 200, decision.text
+
+    for ticket in (primary_ticket, secondary_ticket):
+        db_session.refresh(ticket)
+        snapshot = (ticket.visit_id, ticket.services, ticket.total_amount)
+        blocked = client.put(
+            f"/api/v1/queue/online-entry/{ticket.id}/full-update", headers=registrar_auth_headers,
+            json={"patient_data": {}, "visit_type": "paid", "discount_mode": "none", "services": []},
+        )
+        assert blocked.status_code == 409, blocked.text
+        db_session.refresh(ticket)
+        assert (ticket.visit_id, ticket.services, ticket.total_amount) == snapshot
 
     worklist = client.get(
         "/api/v1/registrar/queues/today", headers=admin_auth_headers, params={"target_date": day.isoformat()},

@@ -421,6 +421,35 @@ def test_qr_all_free_financial_fence_with_restricted_postgres_login(
             assert (posted.status, posted.amount, posted.currency) == ("paid", AMOUNT, "UZS")
 
 
+@pytest.mark.parametrize("lock_target", ("visit", "ticket"))
+def test_native_regular_qr_edit_waits_for_an_available_link(
+    qr_financial_engines, benefit_client, lock_target,
+):
+    owner, _ = qr_financial_engines
+    visit_id, line_id, entry_id, service_id, headers = _seed_qr_all_free(owner)
+    command = {
+        "patient_data": {}, "visit_type": "paid", "discount_mode": "none",
+        "services": [{"service_id": service_id, "quantity": 1}],
+    }
+    route = f"/api/v1/queue/online-entry/{entry_id}/full-update"
+    model, row_id = (Visit, visit_id) if lock_target == "visit" else (OnlineQueueEntry, entry_id)
+    with Session(owner) as blocker:
+        assert blocker.get(model, row_id, with_for_update=True) is not None
+        blocked = benefit_client.put(route, headers=headers, json=command)
+        assert blocked.status_code == 409, blocked.text
+        assert "занято" in blocked.json()["detail"]
+
+    saved = benefit_client.put(route, headers=headers, json=command)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["entry"]["total_amount"] == AMOUNT
+    with Session(owner) as db:
+        entry = db.get(OnlineQueueEntry, entry_id)
+        line = db.get(VisitService, line_id)
+        assert (entry.visit_id, entry.total_amount) == (visit_id, AMOUNT)
+        assert (line.visit_id, line.qty, line.price) == (visit_id, 1, AMOUNT)
+        assert db.scalar(select(AllFreeRequest.id).where(AllFreeRequest.visit_id == visit_id)) is None
+
+
 @pytest.mark.parametrize(("action", "final_status", "final_price"), (
     ("approve", "approved", Decimal("0.00")),
     ("reject", "rejected", AMOUNT),
@@ -441,6 +470,10 @@ def test_native_qr_all_free_decision_and_audit(
 
     repeated = benefit_client.put(route, headers=registrar_headers, json=command)
     assert repeated.status_code == 409, repeated.text
+    regular_command = {**command, "all_free": False, "services": [{"service_id": service_id, "quantity": 1}]}
+    regular_pending = benefit_client.put(route, headers=registrar_headers, json=regular_command)
+    assert regular_pending.status_code == 409, regular_pending.text
+    assert "корзину регистратуры" in regular_pending.json()["detail"]
 
     with Session(runtime) as db:
         entry = db.get(OnlineQueueEntry, entry_id)
@@ -471,12 +504,17 @@ def test_native_qr_all_free_decision_and_audit(
         json={"visit_id": visit_id, "action": action, "rejection_reason": "SYNTHETIC review"},
     )
     assert decision.status_code == 200, decision.text
+    regular_decided = benefit_client.put(route, headers=registrar_headers, json=regular_command)
+    assert regular_decided.status_code == 409, regular_decided.text
+    assert regular_decided.json() == regular_pending.json()
     with Session(owner) as db:
         visit = db.get(Visit, visit_id)
+        entry = db.get(OnlineQueueEntry, entry_id)
         line = db.scalars(select(VisitService).filter_by(visit_id=visit_id)).one()
         request = db.get(AllFreeRequest, request_id)
         assert (visit.status, visit.approval_status, visit.confirmed_at) == ("pending_confirmation", final_status, None)
         assert (line.qty, line.price, line.currency) == (2, final_price, "UZS")
+        assert (entry.visit_id, entry.discount_mode, entry.total_amount) == (visit_id, "all_free", 2 * AMOUNT)
         assert (request.status, request.baseline_total, request.decided_by_user_id) == (final_status, 2 * AMOUNT, admin.id)
         events = db.scalars(
             select(AllFreeRequestEvent.event_type).filter_by(request_id=request_id).order_by(AllFreeRequestEvent.id)

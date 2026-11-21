@@ -229,6 +229,36 @@ def _lock_all_free_qr_entry(
         raise
 
 
+def _lock_regular_qr_entry(
+    db: Session, entry: OnlineQueueEntry, current_user: User, request: FullUpdateOnlineEntryRequest,
+) -> OnlineQueueEntry:
+    """Keep the canonical visit and the QR link stable across the legacy write."""
+    entry_id, patient_id, visit_id = entry.id, entry.patient_id, entry.visit_id
+    expected_link = (patient_id, visit_id, entry.encounter_id, entry.queue_id, entry.session_id)
+    if visit_id is not None:
+        if patient_id is not None and not lock_patient_subject(db, patient_id):
+            raise HTTPException(status_code=409, detail="Карточка пациента недоступна")
+        visit = (
+            db.query(Visit.patient_id, Visit.discount_mode)
+            .filter(Visit.id == visit_id)
+            .with_for_update(of=Visit, read=True, nowait=True)
+            .first()
+        )
+        if visit is None:
+            raise HTTPException(status_code=409, detail="Связанный визит недоступен")
+        if visit.patient_id == patient_id and visit.discount_mode == "all_free":
+            raise HTTPException(
+                status_code=409,
+                detail="Измените услуги визита All Free через корзину регистратуры",
+            )
+
+    _full_update_check_quote(db, request)
+    locked = _full_update_find_and_validate_entry(db, entry_id, current_user, for_update=True)
+    if (locked.patient_id, locked.visit_id, locked.encounter_id, locked.queue_id, locked.session_id) != expected_link:
+        raise HTTPException(status_code=409, detail="Связь талона изменилась. Обновите список")
+    return locked
+
+
 def _full_update_patient_data(entry, patient_data: dict):
     """Update patient name, phone, birth_year, address on the queue entry."""
     if patient_data.get("patient_name"):
@@ -380,7 +410,8 @@ def _full_update_sync_patient_and_entries(
 
                         visit_services = (
                             db.query(VisitService)
-                            .filter(VisitService.visit_id == other_entry.visit_id)
+                            .join(Visit, Visit.id == VisitService.visit_id)
+                            .filter(VisitService.visit_id == other_entry.visit_id, Visit.patient_id == entry.patient_id)
                             .all()
                         )
 
@@ -2034,7 +2065,7 @@ def full_update_online_entry(
 
         _full_update_assert_doctor_services(db, entry, request)
         if not request.all_free:
-            _full_update_check_quote(db, request)
+            entry = _lock_regular_qr_entry(db, entry, current_user, request)
 
         _full_update_patient_data(entry, request.patient_data)
         _full_update_visit_type(entry, request)
