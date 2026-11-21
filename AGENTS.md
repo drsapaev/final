@@ -115,6 +115,12 @@ Consult [project memory](docs/devbrain/PROJECT_MEMORY.md), [status](docs/devbrai
 For local Python use `scripts/run_python.ps1`; for backend pytest use `scripts/run_backend_pytest.ps1`. For plans/dossiers/handoffs, produce repo-grounded artifacts directly; use verified `ai/langgraph/scripts/agent_gate.py` only at the execution boundary. Do not log routine gate runs; for an actual DevBrain evaluation include `gate_misroute`, `override_used`, and `known_root_cause_file` when applicable. Do not run historical DevBrain entrypoints unless restored and verified.
 
 
+## Codex PR review and merge
+
+- For an authorized PR, the owner delegates review, approval, and merge to Codex agents. Complete these steps through authorized GitHub access without requesting another participant or separate routine confirmation. Follow the [cyclic workflow](docs/runbooks/AGENT_CYCLIC_WORKFLOW.md#codex-review-and-merge).
+- Review the current PR head and record its commit SHA and verdict on the PR. Submit GitHub `APPROVE` from a distinct authorized GitHub identity when available. If Codex and the PR author share a GitHub identity, record an approving Codex verdict in a PR comment after resolving blocking findings.
+- Merge the reviewed head after required CI, scope and gate checks, and applicable smoke validation pass. Explicit task limits and existing publication and production authorization apply.
+
 ## Additional merge gate for ChatGPT-authored PRs (owner instruction, 2026-11-10)
 
 This **additional merge-time rule applies only to pull requests whose changes ChatGPT has authored**, not to every PR created by the owner's connected GitHub identity. Since connected actions can be attributed to the owner's account, identify in-scope PRs by an explicit `AI-authored by ChatGPT: yes` marker in their PR description, not by `github.actor`. It also applies to an assistant-created documentation-only PR if that PR is submitted for merge.
@@ -124,7 +130,7 @@ This **additional merge-time rule applies only to pull requests whose changes Ch
 - **No gate evidence or failed/misrouted gate => keep PR Draft and do not merge**; never promote a failing or unexecuted result to green. This is in addition to normal CI, code review, branch protection and role-specific smoke; it never substitutes for those.
 - The owner has explicitly allowed ChatGPT to stage *proposed, unverified* code in isolated, unmerged Draft PRs in this remote-GitHub-only workflow, even when the PowerShell launcher is unavailable. Such proposals must clearly state **`gate not run; do not merge or deploy`** and cannot alter `main` or a live environment. This narrowly scopes remote proposal staging; it does not certify execution of a mandatory implementation gate and is not permission to touch production/secrets/DB directly.
 - **All other PRs retain their existing applicable gate and validation obligations** under the task-execution rules above. This section does not add an assistant-specific merge requirement to human-authored PRs, nor relax the pre-edit sensitive-domain gate rules for their authors.
-- This section documents a **review/merge policy**, not a GitHub branch-protection rule; until a required-check integration is configured, a human reviewer must enforce it. Never claim GitHub technically blocks merge based on this document alone.
+- Before merging, a Codex agent verifies the launcher evidence and its coverage of the current PR head. GitHub enforces its configured branch rules and required checks. Until a required check validates the launcher evidence, Codex enforces this repository policy during the review and merge.
 
 
 ## Completion response

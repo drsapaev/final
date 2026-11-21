@@ -70,9 +70,10 @@ git diff --check
 commit
 push branch
 open PR
+review the current PR head with Codex and record the verdict and SHA on the PR
 wait for GitHub Actions
-if checks are red: fix in the same PR, push, wait again
-merge only after green checks
+if checks are red: fix in the same PR, push, review the new head, and wait again
+merge the reviewed head after required checks and gate evidence pass
 delete remote/local branch when appropriate
 clean up only the current task's branch/worktree, or record why it is retained
 sync production main only when safe; otherwise record synchronization as pending
@@ -95,11 +96,32 @@ recording scope or running a gate does not require a new confirmation.
 Ask when a consequential decision is missing, a required action would exceed an
 explicit user-imposed scope, an explicit approval requirement is not already
 satisfied, or an action differs materially from existing authorization.
-Do all authorized preparation before asking. Merge, publication and production
-operations still need their existing authorization and safeguards; this rule
-does not grant them. Stop only the dependent action and continue other safe
-work. Do not repeatedly report unchanged blockers instead of preparing what
-can safely be prepared.
+Do all authorized preparation before asking. Codex can finish review and merge
+for an authorized PR using the process below. Publication and production
+operations follow their existing authorization and safeguards. Stop only the
+dependent action and continue other safe work. Do not repeatedly report
+unchanged blockers instead of preparing what can safely be prepared.
+
+## Codex review and merge
+
+1. Have a Codex agent review the current PR head against the task scope, the
+   diff, and validation evidence. Fix blocking findings in the same PR and
+   review the new head after any update.
+2. Record the reviewed commit SHA, the verdict, and a short review summary on
+   the PR. GitHub accepts a formal **Approve** from a different GitHub identity
+   with review permission. If Codex is acting as the PR author, write
+   `Codex review: approved` with the reviewed SHA in a PR comment once the review
+   passes. [GitHub review rules](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/reviewing-proposed-changes-in-a-pull-request).
+3. Confirm the reviewed SHA is still the PR head and all required CI checks
+   and applicable validations are green. For a PR marked
+   `AI-authored by ChatGPT: yes`, verify the recorded launcher evidence under
+   the [additional merge gate](../../AGENTS.md#additional-merge-gate-for-chatgpt-authored-prs-owner-instruction-2026-11-10).
+   Squash-merge with `gh pr merge <number> --squash --match-head-commit <reviewed-sha>`.
+
+For this workflow, keep the required GitHub approving-review count at zero on
+`main`, with required code-owner and last-push approvals off. Required CI checks
+remain part of branch protection. If GitHub blocks a merge, inspect the
+applicable branch protection and rulesets before acting.
 
 ## Scope Gate
 
@@ -191,7 +213,9 @@ If CI fails:
 5. Wait for checks again.
 6. Continue only after green.
 
-Do not create unrelated PRs to escape a red check. Do not merge a red PR because a failure "looks unrelated" unless branch protection and a human maintainer explicitly approve that exception.
+Do not create unrelated PRs to escape a red check. A failing check blocks merge
+even when the failure looks unrelated. An exception requires explicit
+repository-owner authorization and compliance with branch protection.
 
 ## Fresh Main Rule
 
@@ -289,7 +313,7 @@ Stop and report instead of continuing silently when:
 - CI failure points to a broader architecture problem
 - migration chain has multi-head ambiguity
 - a task requires live production secrets or live DB access
-- branch protection needs human approval
+- an active GitHub rule blocks the merge, or the recorded review or gate evidence does not cover the current PR head
 - the user-owned dirty workspace blocks an action that cannot run in isolation
 - the task requires a consequential product/policy decision outside the authorized outcome
 
