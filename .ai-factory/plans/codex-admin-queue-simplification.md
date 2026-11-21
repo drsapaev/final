@@ -4,7 +4,7 @@
 
 **Статус на 19 ноября 2026:** T19 **MERGED** в [PR #4117](https://github.com/drsapaev/final/pull/4117), squash `e33adf5e949cdb5b6cad225aba36a200a8ebd44a`. Проверенный HEAD `4f95116c6`, CI 33 PASS / 12 SKIPPED после повтора Frontend E2E. Оба P2 закрыты. **Tier‑2 — PARTIAL**, новый live staging отложен по решению пользователя. Детали в [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
 
-**Текущий этап плана:** T00–T17 и T19 слиты. T18 остаётся **IN_PROGRESS / PARTIAL**. [PR #4133](https://github.com/drsapaev/final/pull/4133) с исправлением установки SW слит в `2012a80cb`; Chromium-регрессия повторно прошла на этом дереве. Оставшиеся live-проверки запускаются в Codex Cloud. См. [RESUME.md](admin-queue-simplification/RESUME.md).
+**Текущий этап плана на 21 ноября 2026:** T00–T17 и T19 слиты. T18 и Tier-2 остаются **IN_PROGRESS / PARTIAL**. Codex Cloud проверил `12f9d5dce`, последний прогон — `t18-cloud-4ee3e1ba98`. Штатная активация service worker и переключение очередей двух врачей одной специальности дали **FAIL**. Сверка байтов сборки, основное покрытие T18 и cleanup подтверждены в условиях прогона. Внешние интеграции остались **NOT_RUN**. См. [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md) и [RESUME.md](admin-queue-simplification/RESUME.md).
 
 Пользователь отверг разделение на две группы «Направления»/«Врачи»: все вкладки должны настраиваться в одном месте. Незакоммиченный grouped patch сохранён отдельно и не является итоговой реализацией.
 
@@ -120,7 +120,7 @@
 | T15 | MERGED | Восстанавливаемый URL-контекст; #3711, merge `ccbf519fdb0f9a32c3a71837202dfea296f13383` |
 | T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
 | T17 | MERGED | Bulk/CSV; PR #3721 merged after the user's confirmation |
-| T18 | IN_PROGRESS / PARTIAL | RQ-18 #4034 и fix установки SW #4133 слиты. Локальные проверки на `2012a80cb` прошли. Live-приёмка и точная обслуживаемая ревизия ждут прогона в Codex Cloud. |
+| T18 | IN_PROGRESS / PARTIAL | Cloud на `12f9d5dce`: RQ-18, сверка байтов сборки и cleanup PASS. Штатная активация worker и переключение очередей врачей одной специальности FAIL. Фиксы и целевые повторы остаются открытыми. |
 | T19 | MERGED / TIER-2 PARTIAL | PR #4117, merge `e33adf5e9`. Новый live staging отложен. |
 
 ### Неопределённости и условия их закрытия
@@ -809,19 +809,21 @@ Old counter/version-blind writers рядом с v1 запрещены. Versions 
 
 Актуальный docs/runbooks/STAGING_VALIDATION.md целиком, включая prerequisites/check0 и дополнительные обязательные пункты. Минимальные десять checks отдельными строками с SHA/env/result/evidence:
 
-| № | Check | Последнее целевое evidence / оставшийся deploy gate |
+Результаты ниже получены в Codex Cloud `final` на `12f9d5dce88e1b02827be96b8ce29e672ae8eed1`, прогон `t18-cloud-4ee3e1ba98`. Подробности в [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md). Предрелизная приёмка внедряемого commit остаётся открытой.
+
+| № | Check | Последнее целевое evidence |
 |---|---|---|
-| 0 | Doctor linkage prerequisite | Synthetic PASS на `4218b256` (повтор ранее на `aee51e3d`); final deploy commit NOT_RUN |
-| 1 | Sentry frontend/backend delivery | NOT_RUN: нужен безопасный hosted staging target/DSN |
-| 2 | DR backup restore | Synthetic backup/restore PASS на `4218b256`, disposable DB удалена; final deploy commit NOT_RUN |
-| 3 | AI kill-switch →503 | Последний retry PASS на `4218b256`; прежний seed/API mismatch не воспроизвёлся, root cause не объявлен исправленным; final deploy commit NOT_RUN |
-| 4 | AI requires_doctor_confirmation | NOT_RUN: безопасный external-provider контур не подготовлен |
-| 5 | arq enqueue/process | Synthetic PASS на `4218b256`, dedicated Redis DB 15; final deploy commit NOT_RUN |
-| 6 | Telegram delivery если используется | NOT_RUN; dedicated synthetic bot/applicability требуют решения |
-| 7 | PII code/logs/Sentry | PARTIAL: code/CI evidence есть; live telemetry NOT_RUN |
-| 8 | Local pre-commit hooks | Исторические normal-hook PASS; в deploy contour NOT_RUN |
-| 9 | Backend unit / targeted PG | Focused PG 10/10 на записанном T11 tree; hosted Backend PASS на `3e287ca8`; полный deploy staging gate NOT_RUN |
-| 10 | Frontend build/unit/browser | Focused browser 22/22 на `aee51e3d`; hosted build/unit PASS на `3e287ca8`; provenance PASS на `35717fa`; final deploy gate и три legacy specs NOT_RUN |
+| 0 | Doctor linkage prerequisite | PASS на синтетических привязках. |
+| 1 | Sentry frontend/backend delivery | NOT_RUN в этом срезе. |
+| 2 | DR backup restore | PASS на синтетической резервной копии. |
+| 3 | AI kill-switch →503 | PASS, флаг восстановлен. |
+| 4 | AI requires_doctor_confirmation | PASS 6/6 на локальном mock. Внешний провайдер NOT_RUN. |
+| 5 | arq enqueue/process | PARTIAL. Локальная обработка PASS, доставка напоминаний NOT_RUN. |
+| 6 | Telegram delivery если используется | NOT_RUN в этом срезе. |
+| 7 | PII code/logs/Sentry | PARTIAL. Локальные объекты, логи и before_send PASS. Hosted Sentry NOT_RUN. |
+| 8 | Local pre-commit hooks | PASS, оба отрицательных пробника. |
+| 9 | Backend unit / targeted PG | PASS, 3556 passed / 10 skipped / 2 xfailed. RBAC 24/24. |
+| 10 | Frontend build/unit/browser | Сборка, lint, полный повтор Vitest 4847/4847 и legacy specs на указанных фикстурах PASS. Штатная активация SW и переключение очередей врачей одной специальности FAIL. |
 
 CI/build checklist не заменяют. Не заявлять «система проверена/работает/deployment complete» без required PASS. Docs update не выполняет runtime checks.
 
