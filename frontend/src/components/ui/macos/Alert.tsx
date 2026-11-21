@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
+import Tooltip from './Tooltip';
 import { useTranslation } from '@/i18n/useTranslation';
 
 // SW-01 fix: merged MacOSAlert API into Alert.
@@ -97,21 +98,23 @@ const Alert = ({
           {children}
         </div>
         {dismissible && (
-          <button
-            onClick={onDismiss}
-            aria-label={t('common.close', { defaultValue: 'Close' })}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              padding: '4px',
-              flexShrink: 0,
-              color: 'inherit',
-              opacity: 0.6
-            }}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
+          <Tooltip content={t('common.close', { defaultValue: 'Close' })}>
+            <button
+              onClick={onDismiss}
+              aria-label={t('common.close', { defaultValue: 'Close' })}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                padding: '4px',
+                flexShrink: 0,
+                color: 'inherit',
+                opacity: 0.6
+              }}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </Tooltip>
         )}
       </div>
     );
