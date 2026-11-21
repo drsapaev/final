@@ -267,6 +267,10 @@ jobs:
             backend:
               ports: !reset []
               dns: [127.0.0.1]
+              # Run the pinned source baked into the staging image. Do not let
+              # this root-running container create files in the runner checkout.
+              volumes: !override
+                - staging_backend_data:/data
             frontend:
               ports: !reset []
             worker:
@@ -300,8 +304,12 @@ jobs:
               assert (marker in json.dumps(service)) == (name == "backend")
               if name in names:
                   assert set(service.get("networks", {})) == {"default"}
+                  assert all(mount["type"] == "volume" for mount in service.get("volumes", []))
                   assert set(service.get("depends_on", {})) <= names
-          print("PASS: marker goes only to backend; selected services are on one internal network with no published ports.")
+          assert [(m["source"], m["target"]) for m in services["backend"].get("volumes", [])] == [
+              ("staging_backend_data", "/data")
+          ]
+          print("PASS: marker goes only to backend; selected services have no host mounts or published ports and use one internal network.")
           PY
           TELEGRAM_BOT_TOKEN=synthetic-runtime-binding "${args[@]}" config --format json |
             python3 "$d/check-config.py"
@@ -362,16 +370,29 @@ jobs:
           if [[ -f "$d/runtime.env" && -f "$d/sealed.yml" ]]; then
             docker compose --project-name "$project" --env-file "$d/runtime.env" \
               -f "$d/source/ops/compose.staging.yml" -f "$d/sealed.yml" \
-              down --volumes --remove-orphans --rmi local || result=FAIL
+              down --volumes --remove-orphans --rmi local || {
+                echo "::error::Isolated project docker compose down failed."
+                result=FAIL
+              }
           fi
           for type in container network volume image; do
             ls_options=(-q)
             if [[ "$type" == container || "$type" == image ]]; then ls_options+=(-a); fi
-            if ! residual="$(docker "$type" ls "${ls_options[@]}" --filter "label=com.docker.compose.project=$project")" || [[ -n "$residual" ]]; then
+            if ! residual="$(docker "$type" ls "${ls_options[@]}" --filter "label=com.docker.compose.project=$project")"; then
+              echo "::error::Could not list remaining Docker resources of type $type."
+              result=FAIL
+            elif [[ -n "$residual" ]]; then
+              echo "::error::Isolated project still owns Docker resources of type $type."
               result=FAIL
             fi
           done
-          if docker image inspect "$project-backend" >/dev/null 2>&1; then result=FAIL; fi
-          rm -rf -- "$d"
+          if docker image inspect "$project-backend" >/dev/null 2>&1; then
+            echo "::error::The isolated backend image tag still exists."
+            result=FAIL
+          fi
+          if ! rm -rf -- "$d" || [[ -e "$d" || -L "$d" ]]; then
+            echo "::error::Could not remove the isolated runner workspace."
+            result=FAIL
+          fi
           printf 'Protected backend teardown: %s.\n' "$result" >> "$GITHUB_STEP_SUMMARY"
           test "$result" = PASS
