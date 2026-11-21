@@ -1,40 +1,77 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+const VITE_ORIGIN = 'http://localhost:5173';
 const PUBLIC_SITE_ORIGINS = [
-  { name: 'Vite', origin: 'http://localhost:5173', mockApi: true },
-  { name: 'Nitro', origin: 'http://127.0.0.1:5278', mockApi: false },
+  { name: 'Vite', origin: VITE_ORIGIN },
+  { name: 'Nitro', origin: 'http://127.0.0.1:5278' },
 ] as const;
+const FIXTURE_ORIGIN = 'http://127.0.0.1:' + Number(process.env.PUBLIC_SITE_FIXTURE_PORT || 5279);
 
-const LOCALIZED_SERVICE_ROUTES = [
+const LOCALES = [
   {
-    name: 'Uzbek',
-    path: '/services',
+    lang: 'uz-Latn',
+    prefix: '',
     skipLink: 'Asosiy mazmunga o‘tish',
     navigation: 'Sayt navigatsiyasi',
+    doctorName: 'Sintetik sinov profili',
   },
   {
-    name: 'Russian',
-    path: '/ru/services',
+    lang: 'ru',
+    prefix: '/ru',
     skipLink: 'Перейти к основному содержимому',
     navigation: 'Навигация сайта',
+    doctorName: 'Синтетический тестовый профиль',
   },
+] as const;
+type Locale = (typeof LOCALES)[number];
+
+const PAGES = [
+  { path: '', titles: { 'uz-Latn': 'SYNTHETIC QA CLINIC', ru: 'SYNTHETIC QA CLINIC' } },
+  { path: '/services', titles: { 'uz-Latn': 'Xizmatlar', ru: 'Услуги' } },
+  {
+    path: '/services/synthetic-service',
+    titles: { 'uz-Latn': 'Sintetik sinov xizmati', ru: 'Синтетическая тестовая услуга' },
+  },
+  { path: '/doctors', titles: { 'uz-Latn': 'Shifokorlar', ru: 'Врачи' } },
+  {
+    path: '/doctors/synthetic-profile',
+    titles: {
+      'uz-Latn': 'Sinov mutaxassisligi — Sintetik sinov profili',
+      ru: 'Тестовая специализация — Синтетический тестовый профиль',
+    },
+  },
+  { path: '/prices', titles: { 'uz-Latn': 'Narxlar', ru: 'Цены' } },
+  { path: '/contacts', titles: { 'uz-Latn': 'Kontaktlar', ru: 'Контакты' } },
 ] as const;
 
 const AXE_WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
-function jsonResponse(body: unknown) {
+function jsonResponse(body: unknown, status = 200) {
   return {
-    status: 200,
+    status,
     contentType: 'application/json; charset=utf-8',
     body: JSON.stringify(body),
   };
 }
 
-async function installSyntheticApi(page: Page, failPublicContent = false) {
+async function installSyntheticApi(
+  page: Page,
+  request: APIRequestContext,
+  failPublicContent = false,
+) {
   await page.routeWebSocket('**/*', (socket) => socket.close());
+  await page.route('**/*', (route) => {
+    const { origin } = new URL(route.request().url());
+    return PUBLIC_SITE_ORIGINS.some((runtime) => runtime.origin === origin)
+      ? route.continue()
+      : route.abort('blockedbyclient');
+  });
+
+  // Serve both clients from the same loopback catalog. Do not forward request
+  // headers or credentials from the browser to the fixture server.
   await page.route('**/api/v1/**', async (route) => {
-    const { pathname } = new URL(route.request().url());
+    const { pathname, search } = new URL(route.request().url());
 
     if (pathname.endsWith('/setup/status')) {
       await route.fulfill(jsonResponse({ initialized: true }));
@@ -42,95 +79,44 @@ async function installSyntheticApi(page: Page, failPublicContent = false) {
     }
 
     if (pathname.endsWith('/auth/me')) {
+      await route.fulfill(jsonResponse({ detail: 'synthetic unauthenticated request' }, 401));
+      return;
+    }
+
+    if (pathname.startsWith('/api/v1/public-site/')) {
+      if (failPublicContent) {
+        await route.fulfill(jsonResponse({ detail: 'synthetic upstream unavailable' }, 503));
+        return;
+      }
+
+      const fixtureUrl = new URL(FIXTURE_ORIGIN);
+      fixtureUrl.pathname = pathname;
+      fixtureUrl.search = search;
+      const fixture = await request.get(fixtureUrl.toString(), { maxRedirects: 0, timeout: 5000 });
       await route.fulfill({
-        status: 401,
+        status: fixture.status(),
         contentType: 'application/json; charset=utf-8',
-        body: JSON.stringify({ detail: 'synthetic unauthenticated request' }),
+        body: await fixture.text(),
       });
       return;
     }
 
-    if (pathname.includes('/api/v1/public-site/')) {
-      if (failPublicContent) {
-        await route.fulfill({
-          status: 503,
-          contentType: 'application/json; charset=utf-8',
-          body: JSON.stringify({ detail: 'synthetic upstream unavailable' }),
-        });
-        return;
-      }
-
-      if (pathname.endsWith('/clinic')) {
-        await route.fulfill(jsonResponse({
-          name: 'SYNTHETIC QA CLINIC',
-          address: null,
-          phone: null,
-          email: null,
-        }));
-        return;
-      }
-
-      if (pathname.endsWith('/services')) {
-        const isRussian = new URL(route.request().url()).searchParams.get('locale') === 'ru';
-        await route.fulfill(jsonResponse([{
-          slug: 'synthetic-service',
-          name: isRussian ? 'Синтетическая тестовая услуга' : 'Sintetik sinov xizmati',
-          description: isRussian
-            ? 'Синтетические данные для проверки доступности сайта.'
-            : 'Saytga kirish imkoniyatini tekshirish uchun sintetik ma’lumot.',
-          price: null,
-          currency: null,
-          category: isRussian ? 'Тестовая категория' : 'Sinov toifasi',
-        }]));
-        return;
-      }
-
-      if (pathname.endsWith('/doctors')) {
-        await route.fulfill(jsonResponse([]));
-        return;
-      }
-
-      if (pathname.endsWith('/categories')) {
-        const isRussian = new URL(route.request().url()).searchParams.get('locale') === 'ru';
-        await route.fulfill(jsonResponse([{ name: isRussian ? 'Тестовая категория' : 'Sinov toifasi' }]));
-        return;
-      }
-    }
-
-    await route.fulfill({
-      status: 404,
-      contentType: 'application/json; charset=utf-8',
-      body: JSON.stringify({ detail: 'synthetic endpoint not found' }),
-    });
+    await route.fulfill(jsonResponse({ detail: 'synthetic endpoint not found' }, 404));
   });
 }
 
-async function assertSkipNavigation(
-  page: Page,
-  expected: (typeof LOCALIZED_SERVICE_ROUTES)[number],
-) {
-  const skipLink = page.getByRole('link', { name: expected.skipLink, exact: true });
-  const navigation = page.getByRole('navigation', { name: expected.navigation, exact: true });
+async function assertSkipNavigation(page: Page, locale: Locale) {
+  const skipLink = page.getByRole('link', { name: locale.skipLink, exact: true });
+  const navigation = page.getByRole('navigation', { name: locale.navigation, exact: true });
   const main = page.getByRole('main');
 
-  await expect(skipLink).toHaveCount(1);
-  if (await navigation.count() === 0) {
-    const mobileMenu = page.locator('.public-site__mobile-menu summary');
-    await expect(mobileMenu).toBeVisible();
-    await mobileMenu.click();
-    await expect(navigation).toHaveCount(1);
-    await page.reload();
-    await expect(main).toBeVisible();
-  } else {
-    await expect(navigation).toHaveCount(1);
-  }
   await expect(main).toHaveCount(1);
-
+  await expect(skipLink).toHaveCount(1);
   const accessibleTree = await page.locator('body').ariaSnapshot();
-  const skipPosition = accessibleTree.indexOf(`link "${expected.skipLink}"`);
+  const skipPosition = accessibleTree.indexOf(`link "${locale.skipLink}"`);
   const mainPosition = accessibleTree.indexOf('main:');
   expect(skipPosition, 'the skip link should appear in the accessibility tree').toBeGreaterThanOrEqual(0);
-  expect(mainPosition, 'the main landmark should appear in the accessibility tree').toBeGreaterThan(skipPosition);
+  expect(mainPosition, 'the main landmark should appear after the skip link').toBeGreaterThan(skipPosition);
 
   await page.keyboard.press('Tab');
   await expect(skipLink).toBeFocused();
@@ -138,9 +124,20 @@ async function assertSkipNavigation(
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#main-content$/);
   await expect(main).toBeFocused();
+
+  const mobileMenu = page.locator('.public-site__mobile-menu summary');
+  if (await mobileMenu.isVisible()) {
+    await mobileMenu.focus();
+    await page.keyboard.press('Enter');
+    await expect(navigation).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(navigation).toBeHidden();
+  } else {
+    await expect(navigation).toBeVisible();
+  }
 }
 
-async function assertNoAxeViolations(page: Page, label: string) {
+async function assertNoAxeViolations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(AXE_WCAG_TAGS).analyze();
   const violations = results.violations.map(({ id, impact, help, nodes }) => ({
     id,
@@ -149,45 +146,84 @@ async function assertNoAxeViolations(page: Page, label: string) {
     nodes: nodes.map(({ target, failureSummary }) => ({ target, failureSummary })),
   }));
 
-  expect(violations, `${label}: Axe violations\n${JSON.stringify(violations, null, 2)}`).toEqual([]);
+  expect(violations).toEqual([]);
+}
+
+async function assertLocalizedCatalog(page: Page, request: APIRequestContext, width: number) {
+  await page.setViewportSize({ width, height: 900 });
+  await installSyntheticApi(page, request);
+
+  for (const runtime of PUBLIC_SITE_ORIGINS) {
+    for (const locale of LOCALES) {
+      for (const { path, titles } of PAGES) {
+        const url = new URL(locale.prefix + path || '/', runtime.origin);
+        await test.step(`${runtime.name} ${locale.lang} ${url.pathname}`, async () => {
+          await page.goto(url.toString());
+          const main = page.getByRole('main');
+          await expect(main.getByRole('heading', { level: 1 })).toHaveText(titles[locale.lang]);
+          await expect(page.locator('html')).toHaveAttribute('lang', locale.lang);
+
+          if (path === '/services/synthetic-service') {
+            await expect(main.getByRole('link', { name: locale.doctorName, exact: true }))
+              .toHaveAttribute('href', locale.prefix + '/doctors/synthetic-profile');
+          }
+
+          await expect.poll(() => page.evaluate(() => {
+            const { scrollWidth, clientWidth } = document.documentElement;
+            return scrollWidth - clientWidth;
+          }), { message: 'the public page should fit the viewport width' }).toBeLessThanOrEqual(1);
+
+          await assertSkipNavigation(page, locale);
+          await assertNoAxeViolations(page);
+        });
+      }
+    }
+  }
+}
+
+async function navigateInApp(page: Page, path: string) {
+  await page.evaluate((pathname) => {
+    // Use the SPA's history listener so a document reload cannot mask cleanup.
+    window.history.pushState(window.history.state, '', pathname);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+  }, path);
 }
 
 test.describe('public-site accessibility', () => {
-  test('keyboard skip navigation and accessible landmarks work in Vite and Nitro in both locales', async ({ page }) => {
-    for (const runtime of PUBLIC_SITE_ORIGINS) {
-      if (runtime.mockApi) await installSyntheticApi(page);
-
-      for (const route of LOCALIZED_SERVICE_ROUTES) {
-        await page.goto(new URL(route.path, runtime.origin).toString());
-        await expect(page.getByRole('main')).toBeVisible();
-        await expect(page.getByRole('heading', { name: /xizmatlar|услуг/i })).toBeVisible();
-        await assertSkipNavigation(page, route);
-      }
-    }
+  test('the localized Vite and Nitro catalog passes keyboard and Axe checks at 320px', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    await assertLocalizedCatalog(page, request, 320);
   });
 
-  test('Axe WCAG A/AA scans pass on localized public catalog pages in Vite and Nitro', async ({ page }) => {
-    for (const runtime of PUBLIC_SITE_ORIGINS) {
-      if (runtime.mockApi) await installSyntheticApi(page);
-
-      for (const route of LOCALIZED_SERVICE_ROUTES) {
-        const label = `${runtime.name} ${route.name} ${route.path}`;
-        await page.goto(new URL(route.path, runtime.origin).toString());
-        await expect(page.getByRole('main')).toBeVisible();
-        await expect(page.getByRole('heading', { name: /xizmatlar|услуг/i })).toBeVisible();
-
-        await assertNoAxeViolations(page, label);
-      }
-    }
+  test('the localized Vite and Nitro catalog passes keyboard and Axe checks at 1440px', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    await assertLocalizedCatalog(page, request, 1440);
   });
 
-  test('localized Vite error state keeps the keyboard bypass and has no Axe WCAG A/AA violations', async ({ page }) => {
-    await installSyntheticApi(page, true);
-    await page.goto('http://localhost:5173/ru/services');
+  test('the Vite error state uses the public locale and restores the app language on exit', async ({ page, request }) => {
+    await installSyntheticApi(page, request, true);
+    await page.goto(VITE_ORIGIN + '/login');
+    const login = page.locator('input[autocomplete="username"]');
+    await expect(login).toBeVisible();
+
+    await page.evaluate(() => {
+      document.documentElement.lang = 'fr';
+      document.documentElement.dataset.localeTest = 'same-document';
+    });
+    await navigateInApp(page, '/ru/services');
 
     await expect(page.getByRole('alert')).toContainText('Не удалось загрузить актуальную информацию клиники.');
-    await assertSkipNavigation(page, LOCALIZED_SERVICE_ROUTES[1]);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+    await assertSkipNavigation(page, LOCALES[1]);
+    await assertNoAxeViolations(page);
 
-    await assertNoAxeViolations(page, 'Vite Russian error state');
+    await navigateInApp(page, '/services');
+    await expect(page.getByRole('alert')).toContainText('Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'uz-Latn');
+
+    await navigateInApp(page, '/login');
+    await expect(login).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+    await expect(page.locator('html')).toHaveAttribute('data-locale-test', 'same-document');
   });
 });
