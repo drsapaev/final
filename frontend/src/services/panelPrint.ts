@@ -396,7 +396,7 @@ function normalizeTicketSources(row: Record<string, unknown>, overrides: Record<
   return [];
 }
 
-function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> | null {
+function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): unknown {
   const directPrice = getFirstDefined(
     overrides.servicePrice,
     source?.service_price,
@@ -405,7 +405,7 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
     source?.amount
   );
   if (directPrice !== null && directPrice !== undefined && directPrice !== '') {
-    return directPrice as Record<string, unknown>;
+    return directPrice;
   }
 
   const normalizedCandidates = [
@@ -444,11 +444,11 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
         service?.service_price,
         service?.amount,
         service?.cost
-      ) as Record<string, unknown>;
+      );
     }
   }
 
-  return {};
+  return null;
 }
 
 function resolveTicketCabinet(row: Record<string, unknown>, source: Record<string, unknown> | null = null, overrides: Record<string, unknown> = {}): unknown {
@@ -553,12 +553,14 @@ function buildPanelTicketPayloadForSource(row: Record<string, unknown>, source: 
       row?.queue_number
     ),
     queue_numbers: source ? [source] : row?.queue_numbers,
-    service_price: resolveServicePriceForTicket(row, source, overrides),
-    price: resolveServicePriceForTicket(row, source, overrides),
-    cost: resolveServicePriceForTicket(row, source, overrides),
   };
 
-  return buildPanelTicketPayload(mergedRow, overrides);
+  // An individual ticket needs its own charge. A parent amount can cover
+  // multiple tickets, so keep the ticket price empty when its service is unknown.
+  return {
+    ...buildPanelTicketPayload(mergedRow, overrides),
+    service_price: resolveServicePriceForTicket(row, source, overrides),
+  };
 }
 
 export function resolvePanelTicketPayloads(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown>[] {
@@ -736,9 +738,13 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
   const clinicName = resolveClinicName(payload, {}, branding);
   const logoUrl = resolveClinicLogo(payload, {}, branding);
   const servicePrice = resolveServicePrice(payload);
+  const numericPrice = typeof servicePrice === 'string' && servicePrice.trim() !== ''
+    ? Number(servicePrice)
+    : servicePrice;
   const qrPayload = payload?.qr_payload;
-  const showPriceValue = settings.show_price && servicePrice !== null && servicePrice !== undefined && String(servicePrice) !== '' && Number(servicePrice) !== 0;
-  const priceValue = showPriceValue ? formatMoney(servicePrice, 'UZS') : null;
+  const priceValue = settings.show_price && typeof numericPrice === 'number' && Number.isFinite(numericPrice)
+    ? formatMoney(numericPrice, 'UZS')
+    : null;
 
   // REG-FE-082: блок бренда рендерится только при честном имени/логотипе
   // (реальные настройки или снапшот строки); пустые значения не
