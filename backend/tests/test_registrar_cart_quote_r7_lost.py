@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 from app.models.online_queue import OnlineQueueEntry
 from app.models.payment_invoice import PaymentInvoice
 from app.models.service import Service
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 from app.services.registrar_edit_delta_service import (
     RegistrarEditDeltaItem,
     RegistrarEditDeltaService,
@@ -129,6 +129,7 @@ def test_edit_delta_all_free_requires_the_approval_workflow(
 
 
 @pytest.mark.usefixtures("migrated_visit_confirmation_context")
+@pytest.mark.parametrize("decision", (None, "approve", "reject"))
 def test_full_update_all_free_string_mode_keeps_price_pending_decision(
     client: TestClient,
     db_session: Session,
@@ -137,6 +138,7 @@ def test_full_update_all_free_string_mode_keeps_price_pending_decision(
     test_daily_queue,
     test_patient,
     test_doctor,
+    decision,
 ):
     """The string All Free mode and boolean mode use the same approval path."""
     from app.models.online_queue import DailyQueue
@@ -218,6 +220,55 @@ def test_full_update_all_free_string_mode_keeps_price_pending_decision(
     assert child.visit_id == entry.visit_id
     assert child.encounter_id == entry.encounter_id
     assert child.encounter_id is not None
+
+    if decision is not None:
+        decided = client.post(
+            "/api/v1/admin/all-free-approve", headers=_auth_headers(admin_user),
+            json={"visit_id": child.visit_id, "action": decision},
+        )
+        assert decided.status_code == 200, decided.text
+
+    db_session.expire_all()
+    visit_id = child.visit_id
+    original_ticket = (child.services, child.total_amount)
+    target_date = test_daily_queue.day.isoformat()
+    edit_line = {"service_id": service.id, "queue_entry_id": child.id, "quantity": 2}
+    edit_quote = {
+        "pricing_mode": "edit_delta", "patient_id": test_patient.id, "target_date": target_date,
+        "preferred_entry_ids": [child.id], "discount_mode": "none",
+    }
+    unchanged = client.post(
+        "/api/v1/registrar/cart/quote", headers=registrar_auth_headers,
+        json={**edit_quote, "items": [{**edit_line, "quantity": 1}]},
+    )
+    assert unchanged.status_code == 200, unchanged.text
+    assert Decimal(str(unchanged.json()["total_amount"])) == 0
+
+    adjusted = client.post(
+        "/api/v1/registrar/cart/quote", headers=registrar_auth_headers,
+        json={**edit_quote, "items": [edit_line]},
+    )
+    assert adjusted.status_code == (200 if decision == "reject" else 409), adjusted.text
+    changed = client.post(
+        "/api/v1/registrar/cart/edit-delta", headers=registrar_auth_headers,
+        json={
+            "patient_id": test_patient.id, "target_date": target_date, "discount_mode": "none",
+            "payment_method": "cash", "services": [edit_line], "existing_queue_entry_ids": [child.id],
+            "quote_token": adjusted.json().get("quote_token"),
+        },
+    )
+    db_session.expire_all()
+    charges = db_session.query(VisitService).filter_by(visit_id=visit_id, service_id=service.id).all()
+    if decision == "reject":
+        assert changed.status_code == 200, changed.text
+        assert sum(line.qty for line in charges) == 2
+        assert sum(line.qty * line.price for line in charges) == Decimal("50000.00")
+    else:
+        assert changed.status_code == 409, changed.text
+        assert changed.json() == adjusted.json()
+        assert (child.services, child.total_amount) == original_ticket
+        assert sum(line.qty for line in charges) == 1
+        assert sum(line.qty * line.price for line in charges) == (0 if decision else Decimal("25000.00"))
 
 
 # ===================== P2: дубликаты строк edit-delta =====================

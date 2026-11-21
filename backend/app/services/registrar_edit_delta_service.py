@@ -1142,6 +1142,23 @@ class RegistrarEditDeltaService:
                     ),
                 )
 
+    def require_editable_visit_prices(self, entry: OnlineQueueEntry) -> None:
+        """Protect the visit decision before mutating its locked service set."""
+        if entry.visit_id is None:
+            return
+        decision = (
+            self.db.query(Visit.discount_mode, Visit.approval_status)
+            .filter(Visit.id == entry.visit_id, Visit.patient_id == entry.patient_id)
+            .first()
+        )
+        if decision is None:
+            raise HTTPException(status_code=409, detail="Связанный визит недоступен")
+        if decision.discount_mode == "all_free" and decision.approval_status != "rejected":
+            raise HTTPException(
+                status_code=409,
+                detail="Изменение состава услуг All Free требует нового согласования",
+            )
+
     def _append_to_existing_entry(
         self,
         *,
@@ -1183,6 +1200,8 @@ class RegistrarEditDeltaService:
         # проглатывал уменьшение количества (сохранение «успешно», состояние
         # без изменений).
         delta_qty = requested_qty - existing_qty if existing_payloads else requested_qty
+        if delta_qty:
+            self.require_editable_visit_prices(entry)
         if delta_qty < 0:
             self._assert_decrease_allowed(entry=entry)
         unit_price = Decimal(str(service.price or 0))

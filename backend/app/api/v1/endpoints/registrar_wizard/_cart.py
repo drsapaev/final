@@ -830,9 +830,11 @@ def _edit_delta_quote_context(
                     ),
                 )
         return requested_qty, None
+    delta = requested_qty - existing_qty
+    if delta:
+        edit_service.require_editable_visit_prices(entry)
     if not payloads:
         return requested_qty, None
-    delta = requested_qty - existing_qty
     if delta < 0:
         # Codex R12 PR 3118 (P2): гвард НЕ-редактируемого состояния зеркалится
         # в квоту ДО выпуска токена. Оплаченный/processing счёт,

@@ -37,6 +37,7 @@ from app.services.force_majeure_api_service import (
 )
 from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
 from app.services.payment_invariant_service import PaymentInvariantService
+from app.services.registrar_edit_delta_service import RegistrarEditDeltaService
 from tests.conftest import mint_access_token
 from tests.integration.test_all_free_decision_concurrency_pg import (  # noqa: F401
     approval_case,
@@ -442,6 +443,10 @@ def test_native_qr_all_free_decision_and_audit(
     assert repeated.status_code == 409, repeated.text
 
     with Session(runtime) as db:
+        entry = db.get(OnlineQueueEntry, entry_id)
+        with pytest.raises(HTTPException) as pending_edit:
+            RegistrarEditDeltaService(db).require_editable_visit_prices(entry)
+        assert pending_edit.value.status_code == 409
         with pytest.raises(HTTPException) as pending_payment:
             PaymentInvariantService(db).check_payment_allowed(visit_id, 2 * AMOUNT)
         assert pending_payment.value.status_code == 409
@@ -483,6 +488,13 @@ def test_native_qr_all_free_decision_and_audit(
         assert audit == ["all_free_requested", "all_free_decided"]
 
     with Session(runtime) as db:
+        entry = db.get(OnlineQueueEntry, entry_id)
+        if action == "approve":
+            with pytest.raises(HTTPException) as approved_edit:
+                RegistrarEditDeltaService(db).require_editable_visit_prices(entry)
+            assert approved_edit.value.status_code == 409
+        else:
+            RegistrarEditDeltaService(db).require_editable_visit_prices(entry)
         payable = 2 * final_price
         assert PaymentInvariantService(db).check_payment_allowed(
             visit_id, payable, allow_overpayment=False,
