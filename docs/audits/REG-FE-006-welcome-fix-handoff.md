@@ -1,6 +1,14 @@
-# REG-FE-006 — fixing-agent handoff (BLOCKED: mandatory gate; NOT a fix)
+# REG-FE-006 — Registrar Welcome confirmation handoff
 
-**State:** `HANDOFF_READY / CODE_NOT_MODIFIED / GATE_NOT_RUN / TESTS_NOT_RUN / NO_SOURCE_PR / DO_NOT_MERGE`.
+**Status** The source fix is verified on #4099 and awaits an ordered merge into `main`. [Source PR](https://github.com/drsapaev/final/pull/4099)
+
+## Verified source
+
+- The published source commit `c3683e2cac654c09e42585e27b1c860cb10eae9c` sends Welcome's `in_cabinet` and `complete` actions through the shared confirmation callback. Its PowerShell gate completed on November 19, 2026 at 18:45:28 UTC with exit 0 and the documented narrow override. [Source commit](https://github.com/drsapaev/final/commit/c3683e2cac654c09e42585e27b1c860cb10eae9c) · [Gate evidence](https://github.com/drsapaev/final/pull/4099)
+- Unified CI passed on that commit. The source PR records focused Vitest, TypeScript, Vite and synthetic Chromium evidence. [Unified CI](https://github.com/drsapaev/final/actions/runs/43808227462) · [Source validation](https://github.com/drsapaev/final/pull/4099)
+
+## Original audit context
+
 **Priority:** P2. **Scope:** Registrar Welcome page only; confirmation for `in_cabinet` and `complete`.
 **Base:** `main` commit [`b93ea7117e2272d18c19fe1c4825695392c9b550`](https://github.com/drsapaev/final/commit/b93ea7117e2272d18c19fe1c4825695392c9b550), rechecked 2026-11-16; after previous main advanced, all four source/test blob SHAs below remained unchanged.
 **Existing finding:** [2026-10-29 registrar frontend review ledger REG-FE-006](https://github.com/drsapaev/final/blob/b93ea7117e2272d18c19fe1c4825695392c9b550/docs/audits/2026-10-29-registrar-frontend-review-ledger.md). **Audit:** [#4059 group98](https://github.com/drsapaev/final/pull/4059#issuecomment-6905825021). Do not create another finding ID or claim a source fix from this docs-only branch.
@@ -13,7 +21,7 @@
 
 **Desired behavior**: use the SAME parent `handleTableAction` callback from Welcome, without reimplementing the dialog logic. Cancel/decline => **zero status mutations**; confirm => **one mutation through canonical path**. No backend/API, queue identity, authorization, payment or clinical policy change. Preserve `view`, `edit`, `payment`, `print`, `call`, `more` behaviors.
 
-## Gate / execution boundary — MUST run BEFORE applying any source change
+## Original gate and execution plan
 
 **Chosen mode:** `gate_known_root_cause` (root cause proven, clinical workflow/queue status change = mandatory blocking gate under root `AGENTS.md`). Exact first-touch files:
 
@@ -32,9 +40,11 @@ From the agent's fresh isolated worktree, with working directory `ai/langgraph`,
 
 **Important prior correction:** the first audit handoff comment omitted the mandatory `task` positional argument, which would fail argument parsing. The command above includes it. **Fail closed** if `result != gate_ok`, `gate_misroute`, `override_used`, scope drift, required handoff missing, or any reported stop condition. If `handoff_required=true`, read the actual `execution_prompt` and perform/honor its handoff protocol before touching code. Never call bare `agent_gate.py` as a substitute, fake the gate, alter gate code or bypass the stop.
 
-## Prepared candidate (NOT applied)
+## Archived candidate
 
-The candidate diff is stored **in this same handoff branch** at [`docs/audits/patches/REG-FE-006-candidate.patch`](./patches/REG-FE-006-candidate.patch). It only changes the above four files; it is a **proposal** and must be independently rechecked against fresh current main after the gate, not blindly applied. Source changes not yet present in the branch:
+The archived diff records the first proposal against `b93ea711`. Use #4099 for the verified implementation and its test changes. [Archived candidate](./patches/REG-FE-006-candidate.patch) · [Verified source](https://github.com/drsapaev/final/pull/4099)
+
+The proposal included these four file changes.
 - Welcome `WelcomeViewProps` and destructuring: replace direct `updateAppointmentStatus` with typed `handleTableAction`.
 - Welcome `onActionClick('in_cabinet'|'complete')` delegates to parent callback rather than writing queue state.
 - `RegistrarPanel` passes `handleTableAction={handleTableAction}` to Welcome.
@@ -42,22 +52,22 @@ The candidate diff is stored **in this same handoff branch** at [`docs/audits/pa
 
 **Test-first instruction:** Prefer first applying only the regression test changes; confirm they fail against the old source, then apply the source changes and show they pass. If candidate patch no longer applies, reconcile against fresh source and re-run gate if actual scope changes. If no local test execution or gate launcher exists, **do not** claim success and leave the work as an unmerged handoff.
 
-## Validation and acceptance
+## Original validation and acceptance
 
 - Synthetic Welcome `in_cabinet` and `complete` actions dispatch **exactly once** to the existing `handleTableAction` with the same queue/visit record; no direct status mutation.
 - Under real hook `confirm=false` for either action => `updateAppointmentStatus` **never** called; `confirm=true` => correct status (`in_cabinet` / `done`) and record, exactly once. Existing `call`, `print`, `view`, `payment`, `more` unaffected.
 - Run targeted Vitest from `frontend`: `npm run test:run -- src/pages/registrar/views/__tests__/WelcomeView.honestStates.test.tsx src/pages/registrar/__tests__/useRegistrarRowActions.test.ts`. Run `npm run type-check`, scoped ESLint WITHOUT autofix, `git diff --check`, and current-head PR CI. Report what truly ran and outputs. Protect `ai/langgraph/scripts/run_agent_gate.ps1`.
-- Only a real source PR with passed gate + green checks + independently verified merged main may mark historical `REG-FE-006` fixed. Do **not** alter existing #4063 counts for this docs handoff. Keep this Draft handoff unmerged; add a new comment to existing audit [#4059](https://github.com/drsapaev/final/pull/4059) after source-fix submission or blocker resolution.
+- Keep `REG-FE-006` and the #4063 remediation count open until the source fix is independently verified in `main` after the applicable gate and CI pass. [Audit PR](https://github.com/drsapaev/final/pull/4059)
 
-## Handoff bookkeeping (actual actions by audit agent)
+## Handoff evidence from November 16, 2026
 
 **Completed:** source and parent/hook/test ownership inspected on current main; root skill `code-security` and `javascript-testing-patterns` consulted; four-file candidate diff prepared and statically parsed; candidate staged as non-executable reference **only in this handoff branch**; exact required gate invocation corrected; test/rollback plan recorded.
 
 **Not completed:** local project gate (no repo-execution PowerShell), red-to-green Vitest, TypeScript, ESLint, true `git apply --check` on a fresh checkout, clinical workflow browser regression, source edit or source PR, merge, production deployment. This branch contains **no application or test changes**. No PHI used. No tests or gate claimed as successful.
 
-**Fixing agent next action:** fresh isolated worktree from current origin/main → run gate exactly and read execution prompt → first tests (RED), then source patch (GREEN) → checks, separate source PR → follow-up review → merge only when allowed → update audit and old ID after independent main recheck. Branch owner must reconcile moving main and preserve user changes.
+The initial handoff led to a separate source branch. The verified commit and release status are recorded above.
 
-**Rollback:** revert the minimal source change of the future fix PR; no migration/data operation required.
+To roll back the source change after release, revert #4099. [Source PR](https://github.com/drsapaev/final/pull/4099)
 
 ## Documentation CI reconciliation (2026-11-16)
 
@@ -68,4 +78,3 @@ Initial handoff Draft PR #4097 `PR Review Quality Gate` failed **solely on PR-de
 - Actual patch in this branch [`docs/audits/patches/REG-FE-006-candidate.patch`](./patches/REG-FE-006-candidate.patch) now has **9 exact-context unified-diff hunks across 4 files**. The additional hunk updates the Welcome component header documentation to reference `handleTableAction` rather than its removed direct `updateAppointmentStatus` prop. An initial malformed diff context was corrected in the *patch document* only, not application source.
 - **Static exact-apply simulation passed** on all 9 hunks against four GitHub-fetched blobs of `main=b93ea7117e2272d18c19fe1c4825695392c9b550`: old/new context and declared hunk counts matched, new hunk offsets matched, removal of direct status calls and parent callback wiring matched, synthetic test insertions matched. This is **NOT** a real full-repo worktree `git apply --check`, nor Vitest/tsc/lint.
 - The earlier handoff commit `a31e3ccd83b88c74183926aaddc484dc6bb2584c` had all six PR CI checks SUCCESS (Unified, Security, Gitleaks, Agent Workflow Guards, PR Review Quality, Lifecycle). The *newest patch-document commit* has to be checked independently; no app runtime tests have run.
-- **Invariant:** mandatory gate not run, no source/test edits, no source fix PR, `REG-FE-006` still OPEN. All future clinical changes must happen in an isolated worktree after the actual `run_agent_gate.ps1` returns acceptable results and handoff prompt is honored.
