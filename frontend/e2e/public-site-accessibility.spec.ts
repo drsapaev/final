@@ -174,6 +174,22 @@ async function assertLocalizedCatalog(page: Page, request: APIRequestContext, wi
           }), { message: 'the public page should fit the viewport width' }).toBeLessThanOrEqual(1);
 
           await assertSkipNavigation(page, locale);
+
+          if (runtime.origin === VITE_ORIGIN && path === '') {
+            const scroll = await page.evaluate(() => {
+              const originalY = window.scrollY;
+              window.scrollTo({ top: 0, behavior: 'instant' });
+              const startY = window.scrollY;
+              window.scrollTo({ top: 100, behavior: 'instant' });
+              const documentMovement = window.scrollY - startY;
+              const bodyOffset = document.body.scrollTop;
+              window.scrollTo({ top: originalY, behavior: 'instant' });
+              return { documentMovement, bodyOffset };
+            });
+            expect(scroll.documentMovement, 'the home page should scroll the document').toBeGreaterThan(0);
+            expect(scroll.bodyOffset, 'the body should not scroll independently').toBe(0);
+          }
+
           await assertNoAxeViolations(page);
         });
       }
@@ -204,7 +220,9 @@ test.describe('public-site accessibility', () => {
     await installSyntheticApi(page, request, true);
     await page.goto(VITE_ORIGIN + '/login');
     const login = page.locator('input[autocomplete="username"]');
+    const body = page.locator('body');
     await expect(login).toBeVisible();
+    const appOverflowX = await body.evaluate((element) => getComputedStyle(element).overflowX);
 
     await page.evaluate(() => {
       document.documentElement.lang = 'fr';
@@ -214,16 +232,19 @@ test.describe('public-site accessibility', () => {
 
     await expect(page.getByRole('alert')).toContainText('Не удалось загрузить актуальную информацию клиники.');
     await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+    await expect(body).toHaveCSS('overflow-x', 'clip');
     await assertSkipNavigation(page, LOCALES[1]);
     await assertNoAxeViolations(page);
 
     await navigateInApp(page, '/services');
     await expect(page.getByRole('alert')).toContainText('Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.');
     await expect(page.locator('html')).toHaveAttribute('lang', 'uz-Latn');
+    await expect(body).toHaveCSS('overflow-x', 'clip');
 
     await navigateInApp(page, '/login');
     await expect(login).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
     await expect(page.locator('html')).toHaveAttribute('data-locale-test', 'same-document');
+    await expect(body).toHaveCSS('overflow-x', appOverflowX);
   });
 });
