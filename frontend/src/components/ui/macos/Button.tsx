@@ -230,7 +230,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
           animation: 'mac-spin 1s linear infinite'
         }}
         viewBox="0 0 24 24"
-        fill="none">
+        fill="none"
+        aria-hidden="true"
+        focusable="false">
 
           <circle
           cx="12"
