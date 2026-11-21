@@ -13,7 +13,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { adaptQueueEntry } from '../registrarQueueAdapter';
-import { hasBackendPatientGenderContract } from '../registrarHelpers';
+import { hasBackendAction, hasBackendPatientGenderContract } from '../registrarHelpers';
 
 const FALLBACK = 'Неизвестный пациент';
 
@@ -268,20 +268,36 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
     expect(row.source_kind).toBeNull();
   });
 
-  it('array fields default to empty arrays; can_* flags booleanized; scalar defaults applied', () => {
+  it('defaults service data without filling in absent cancellation and rescheduling permissions', () => {
     const row = adaptQueueEntry({ id: 11 }, baseQueue, baseData, '2026-08-29', FALLBACK) as Record<string, unknown>;
     expect(row.services).toEqual([]);
     expect(row.service_codes).toEqual([]);
     expect(row.service_details).toEqual([]);
-    expect(row.available_actions).toEqual([]);
+    expect(row.available_actions).toBeUndefined();
     expect(row.can_mark_paid).toBe(false);
     expect(row.can_start_visit).toBe(false);
-    expect(row.can_cancel).toBe(false);
+    expect(row.can_cancel).toBeUndefined();
+    expect(row.can_reschedule).toBeUndefined();
     expect(row.can_print_ticket).toBe(false);
     expect(row.can_complete).toBe(false);
     expect(row.cost).toBe(0);
     expect(row.source).toBe('desk');
     expect(row.payment_status).toBeNull();
+  });
+
+  it('keeps an explicit empty action list authoritative over legacy flags', () => {
+    const entry = { id: 12, can_cancel: true, can_reschedule: true };
+    const legacy = adaptQueueEntry(entry, baseQueue, baseData, '2026-08-29', FALLBACK);
+    const denied = adaptQueueEntry(
+      { ...entry, available_actions: [] }, baseQueue, baseData, '2026-08-29', FALLBACK,
+    );
+
+    expect(legacy?.available_actions).toBeUndefined();
+    expect(denied?.available_actions).toEqual([]);
+    expect(hasBackendAction(legacy, 'cancel')).toBe(true);
+    expect(hasBackendAction(legacy, 'reschedule')).toBe(true);
+    expect(hasBackendAction(denied, 'cancel')).toBe(false);
+    expect(hasBackendAction(denied, 'reschedule')).toBe(false);
   });
 
   it('available_actions and can_* flags pass through from backend', () => {
