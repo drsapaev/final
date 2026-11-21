@@ -3,6 +3,7 @@ import type { PublicSiteLocale } from './routing/publicSiteRouteEntries';
 
 export type PublicSiteClinic = components['schemas']['PublicSiteClinicOut'];
 export type PublicSiteService = components['schemas']['PublicSiteServiceOut'];
+export type PublicSiteServiceDetail = components['schemas']['PublicSiteServiceDetailOut'];
 export type PublicSiteDoctor = components['schemas']['PublicSiteDoctorOut'];
 
 export class PublicSiteApiError extends Error {
@@ -20,7 +21,7 @@ export type PublicSiteFetch = (
 export interface PublicSiteApi {
   getClinic(signal?: AbortSignal): Promise<PublicSiteClinic>;
   listServices(locale: PublicSiteLocale): Promise<PublicSiteService[]>;
-  getService(slug: string, locale: PublicSiteLocale): Promise<PublicSiteService | null>;
+  getService(slug: string, locale: PublicSiteLocale): Promise<PublicSiteServiceDetail | null>;
   listDoctors(locale: PublicSiteLocale): Promise<PublicSiteDoctor[]>;
   getDoctor(slug: string, locale: PublicSiteLocale): Promise<PublicSiteDoctor | null>;
 }
@@ -108,7 +109,7 @@ export function createPublicSiteApi(
       return requestList<PublicSiteService>(localized('services', locale));
     },
     async getService(slug, locale) {
-      return request<PublicSiteService>(
+      return request<PublicSiteServiceDetail>(
         localized(`services/${encodeURIComponent(slug)}`, locale),
         { missingIsNull: true },
       );

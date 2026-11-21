@@ -89,6 +89,54 @@ describe('public-site SSR request handler', () => {
     expect(html).toContain('hreflang="x-default"');
     expect(html).toContain('/assets/public-site.css');
     expect(html).not.toContain('/assets/clinic-app.js');
+    expect(html).not.toContain('Врачи, оказывающие услугу');
+    expect(html).toContain('href="/ru/contacts">Связаться с клиникой</a>');
+  });
+
+  it.each([
+    { locale: 'ru', prefix: '/ru', heading: 'Врачи, оказывающие услугу' },
+    { locale: 'uz-Latn', prefix: '', heading: 'Ushbu xizmat bo‘yicha shifokorlar' },
+  ])('renders links from a service to its published doctor profiles in $locale', async ({ locale, prefix, heading }) => {
+    const doctors = [
+      { slug: 'synthetic-doctor-a', name: 'SYNTHETIC Doctor A' },
+      { slug: 'synthetic-doctor-b', name: 'SYNTHETIC Doctor B' },
+    ];
+    const fetchImpl = createFetch((url) => {
+      if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
+      expect(url.pathname).toBe('/api/v1/public-site/services/synthetic-service');
+      expect(url.searchParams.get('locale')).toBe(locale);
+      return jsonResponse({
+        slug: 'synthetic-service',
+        name: 'SYNTHETIC Service',
+        description: 'SYNTHETIC public service',
+        price: '125000.00',
+        currency: 'UZS',
+        related_doctors: doctors,
+      });
+    });
+
+    const response = await handlePublicSiteRequest(
+      new Request(`https://preview.kosmed.test${prefix}/services/synthetic-service`),
+      {
+        apiOrigin: 'https://api.kosmed.test',
+        siteOrigin: 'https://www.kosmed.test',
+        deploymentEnvironment: 'preview',
+      },
+      assets,
+      fetchImpl,
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const article = document.querySelector('main article');
+    expect(article?.querySelector('section > h2')?.textContent).toBe(heading);
+    expect(Array.from(article?.querySelectorAll('section > ul > li > a') ?? [], (link) => [
+      link.getAttribute('href'), link.textContent,
+    ])).toEqual(doctors.map(({ slug, name }) => [`${prefix}/doctors/${slug}`, name]));
+    expect(article?.querySelector(`a[href="${prefix}/contacts"]`)).not.toBeNull();
+    expect(article?.textContent).not.toContain('125000');
+    expect(article?.textContent).not.toContain('UZS');
   });
 
   it.each(PUBLIC_SITE_ROUTE_DEFINITIONS)('renders the published clinic logo on $path and falls back when absent', async ({ path: routePath, locale }) => {

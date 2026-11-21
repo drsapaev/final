@@ -68,6 +68,23 @@ describe('loadPublicSitePageData', () => {
     expect(api.listServices).toHaveBeenCalledWith('ru');
   });
 
+  it('uses the doctor links from service detail without fetching a separate directory or profile', async () => {
+    const api = makeApi();
+    const detail = {
+      ...service,
+      related_doctors: [{ slug: doctor.slug, name: doctor.name }],
+    };
+    vi.mocked(api.getService).mockResolvedValue(detail);
+
+    await expect(loadPublicSitePageData(api, route('/ru/services/synthetic-service')))
+      .resolves.toEqual({ service: detail });
+
+    expect(api.getService).toHaveBeenCalledExactlyOnceWith('synthetic-service', 'ru');
+    expect(api.getClinic).toHaveBeenCalledOnce();
+    expect(api.listDoctors).not.toHaveBeenCalled();
+    expect(api.getDoctor).not.toHaveBeenCalled();
+  });
+
   it('starts the header logo and catalog reads together', async () => {
     const api = makeApi();
     const logoUrl = `https://api.kosmed.test/api/v1/public-site/media/${'b'.repeat(64)}`;

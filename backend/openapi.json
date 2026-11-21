@@ -4068,7 +4068,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PublicSiteServiceOut"
+                  "$ref": "#/components/schemas/PublicSiteServiceDetailOut"
                 }
               }
             }
@@ -112371,6 +112371,94 @@
           "detail"
         ],
         "title": "PublicSiteNotFoundOut"
+      },
+      "PublicSiteRelatedDoctorOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 160,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "PublicSiteRelatedDoctorOut"
+      },
+      "PublicSiteServiceDetailOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price",
+            "description": "Null means the localized site should display 'price on request'."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "related_doctors": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSiteRelatedDoctorOut"
+            },
+            "type": "array",
+            "title": "Related Doctors"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "description",
+          "price"
+        ],
+        "title": "PublicSiteServiceDetailOut"
       },
       "PublicSiteServiceOut": {
         "properties": {
