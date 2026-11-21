@@ -92,7 +92,6 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
 }, ref) => {
   useTheme();
   const { t } = useTranslation();
-  void t;
   void variant;
   // PR-49: persist collapse state in localStorage (was reset on every refresh)
   const STORAGE_KEY = 'mac-sidebar-collapsed';
@@ -189,7 +188,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
         <Button
           variant="ghost"
           size="small"
-          aria-label={isCollapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
+          aria-label={isCollapsed ? t('Expand sidebar', { defaultValue: 'Expand sidebar' }) : t('Collapse sidebar', { defaultValue: 'Collapse sidebar' })}
           onClick={toggleCollapsed}
           style={{
             width: '32px',
@@ -214,7 +213,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
         <Button
           variant="ghost"
           size="small"
-          aria-label={isCollapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
+          aria-label={isCollapsed ? t('Expand sidebar', { defaultValue: 'Expand sidebar' }) : t('Collapse sidebar', { defaultValue: 'Collapse sidebar' })}
           onClick={toggleCollapsed}
           style={{
             width: '32px',

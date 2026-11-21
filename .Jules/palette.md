@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-11-10 - Hardcoded localized strings in ARIA attributes
+**Learning:** Using hardcoded strings for `aria-label`s, especially in a specific language like Russian, breaks accessibility for users of other languages. Screen readers will mispronounce or fail to convey the correct meaning to non-Russian users.
+**Action:** Always use the `useTranslation()` hook (e.g., `t('key', { defaultValue: 'Fallback' })`) for all accessible text (like `aria-label` or `title`) inside components to ensure they properly adapt to the user's selected language.
