@@ -26,8 +26,10 @@ export default function PublicSiteAppRoute() {
     const root = document.documentElement;
     const previousLanguage = root.getAttribute('lang');
     root.lang = locale;
+    root.classList.add('public-site-document');
 
     return () => {
+      root.classList.remove('public-site-document');
       if (root.lang !== locale) return;
       if (previousLanguage === null) root.removeAttribute('lang');
       else root.lang = previousLanguage;

@@ -1,3 +1,8 @@
+html.public-site-document body {
+  /* Preserve document scrolling so Firefox reaches the skip link on the first Tab. */
+  overflow-x: clip;
+}
+
 .public-site {
   --public-site-nav-gap: clamp(14px, 2.5vw, 32px);
   --public-site-main-padding-block: 52px 78px;
