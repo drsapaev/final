@@ -264,6 +264,39 @@ html.public-site-document body {
   margin-bottom: 18px;
 }
 
+.public-site__catalog {
+  display: block;
+}
+
+.public-site__catalog-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-block-end: 16px;
+}
+
+.public-site__catalog-field {
+  display: grid;
+  flex: 1 1 190px;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.public-site__catalog-control {
+  min-width: 0;
+}
+
+.public-site__catalog-status {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.public-site__catalog [hidden] {
+  display: none;
+}
+
 .public-site__list {
   display: grid;
   gap: 12px;
@@ -353,6 +386,7 @@ html.public-site-document body {
   font-weight: 600;
 }
 
+.public-site__catalog-control,
 .public-site__booking-control {
   box-sizing: border-box;
   width: 100%;

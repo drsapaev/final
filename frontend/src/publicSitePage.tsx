@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createElement, useId, type ReactNode } from 'react';
 import './publicSiteStyles.css';
 import {
   getPublicSitePath,
@@ -41,6 +41,13 @@ interface Copy {
   emailClinic: string;
   address: string;
   specialty: string;
+  catalogSearchServices: string;
+  catalogSearchDoctors: string;
+  catalogCategory: string;
+  catalogAll: string;
+  catalogReset: string;
+  catalogCount: string;
+  catalogNoMatches: string;
   experience: (years: number) => string;
   workingHours: string;
   workingDays: string;
@@ -87,6 +94,13 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     emailClinic: 'Написать по электронной почте',
     address: 'Адрес',
     specialty: 'Специализация',
+    catalogSearchServices: 'Поиск услуг',
+    catalogSearchDoctors: 'Поиск врачей',
+    catalogCategory: 'Категория',
+    catalogAll: 'Все',
+    catalogReset: 'Сбросить фильтры',
+    catalogCount: 'Найдено',
+    catalogNoMatches: 'Ничего не найдено.',
     experience: (years) => {
       const mod100 = years % 100;
       const mod10 = years % 10;
@@ -142,6 +156,13 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     emailClinic: 'Elektron pochta yuborish',
     address: 'Manzil',
     specialty: 'Mutaxassisligi',
+    catalogSearchServices: 'Xizmatlarni qidirish',
+    catalogSearchDoctors: 'Shifokorlarni qidirish',
+    catalogCategory: 'Toifa',
+    catalogAll: 'Barchasi',
+    catalogReset: 'Filtrlarni tozalash',
+    catalogCount: 'Natijalar',
+    catalogNoMatches: 'Hech narsa topilmadi.',
     experience: (years) => `Ish tajribasi: ${years} yil`,
     workingHours: 'Ish vaqti',
     workingDays: 'Dushanba–shanba',
@@ -374,7 +395,7 @@ function ServiceList({ services, locale, copy, showPrices = false }: {
   return (
     <ul className="public-site__list">
       {services.map((service) => (
-        <li className="public-site__list-item" key={service.slug}>
+        <li className="public-site__list-item" key={service.slug} data-catalog-item="" data-catalog-group={service.category}>
           <div>
             <a className="public-site__list-title" href={localizePath('service', locale, service.slug)}>{service.name}</a>
             {service.category && <p className="public-site__muted">{service.category}</p>}
@@ -420,7 +441,7 @@ function DoctorList({ doctors, locale, copy, showPortraits = false }: {
   return (
     <ul className="public-site__list public-site__list--doctors">
       {doctors.map((doctor) => (
-        <li className="public-site__list-item" key={doctor.slug}>
+        <li className="public-site__list-item" key={doctor.slug} data-catalog-item="" data-catalog-group={doctor.specialty}>
           <div className="public-site__doctor-summary">
             {showPortraits && <DoctorPortrait src={doctor.portrait_url} />}
             <div>
@@ -434,6 +455,72 @@ function DoctorList({ doctors, locale, copy, showPortraits = false }: {
         </li>
       ))}
     </ul>
+  );
+}
+
+function CatalogFilter({ groups, groupLabel, searchLabel, locale, copy, children }: {
+  groups: (string | null | undefined)[];
+  groupLabel: string;
+  searchLabel: string;
+  locale: PublicSiteLocale;
+  copy: Copy;
+  children: ReactNode;
+}) {
+  const fieldId = useId();
+  if (groups.length === 0) return children;
+
+  const options = [...new Set(groups.filter((label): label is string => Boolean(label)))];
+  const queryId = `${fieldId}-query`;
+  const groupId = `${fieldId}-group`;
+  return (
+    <>
+      <script async src="/public-site-catalog-filter.js" />
+      {createElement('public-site-catalog-filter', { className: 'public-site__catalog' }, (
+        <>
+          <search
+            role="search"
+            aria-label={searchLabel}
+            className="public-site__catalog-controls"
+            data-catalog-controls=""
+            hidden
+          >
+            <div className="public-site__catalog-field">
+              <label id={`${queryId}-label`} htmlFor={queryId}>{searchLabel}</label>
+              <input
+                id={queryId}
+                aria-labelledby={`${queryId}-label`}
+                className="public-site__catalog-control"
+                type="search"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </div>
+            {options.length > 0 && (
+              <div className="public-site__catalog-field">
+                <label htmlFor={groupId}>{groupLabel}</label>
+                <select id={groupId} className="public-site__catalog-control" defaultValue="">
+                  <option value="">{copy.catalogAll}</option>
+                  {options.map((label) => <option key={label} value={label}>{label}</option>)}
+                </select>
+              </div>
+            )}
+            <button className="public-site__button" type="button" data-catalog-reset="">
+              {copy.catalogReset}
+            </button>
+            <p className="public-site__catalog-status" role="status">
+              {copy.catalogCount} <span data-catalog-count="">{groups.length}</span>
+            </p>
+          </search>
+          {children}
+          <div className="public-site__empty" data-catalog-empty="" hidden>
+            <p>{copy.catalogNoMatches}</p>
+            <a href={localizePath('contacts', locale)}>{copy.contactClinic}</a>
+          </div>
+        </>
+      ))}
+    </>
   );
 }
 
@@ -475,11 +562,41 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
       );
     }
     case 'services':
-      return <section className="public-site__section"><h1>{copy.services}</h1><ServiceList services={data.services ?? []} locale={locale} copy={copy} /></section>;
-    case 'prices':
-      return <section className="public-site__section"><h1>{copy.prices}</h1><ServiceList services={data.services ?? []} locale={locale} copy={copy} showPrices /></section>;
-    case 'doctors':
-      return <section className="public-site__section"><h1>{copy.doctors}</h1><DoctorList doctors={data.doctors ?? []} locale={locale} copy={copy} showPortraits /></section>;
+    case 'prices': {
+      const services = data.services ?? [];
+      const showPrices = route.kind === 'prices';
+      return (
+        <section className="public-site__section">
+          <h1>{showPrices ? copy.prices : copy.services}</h1>
+          <CatalogFilter
+            groups={services.map(({ category }) => category)}
+            searchLabel={copy.catalogSearchServices}
+            groupLabel={copy.catalogCategory}
+            locale={locale}
+            copy={copy}
+          >
+            <ServiceList services={services} locale={locale} copy={copy} showPrices={showPrices} />
+          </CatalogFilter>
+        </section>
+      );
+    }
+    case 'doctors': {
+      const doctors = data.doctors ?? [];
+      return (
+        <section className="public-site__section">
+          <h1>{copy.doctors}</h1>
+          <CatalogFilter
+            groups={doctors.map(({ specialty }) => specialty)}
+            searchLabel={copy.catalogSearchDoctors}
+            groupLabel={copy.specialty}
+            locale={locale}
+            copy={copy}
+          >
+            <DoctorList doctors={doctors} locale={locale} copy={copy} showPortraits />
+          </CatalogFilter>
+        </section>
+      );
+    }
     case 'contacts':
       return <section className="public-site__section"><h1>{copy.contacts}</h1><ContactLinks clinic={data.clinic} copy={copy} /></section>;
     case 'service': {
