@@ -1105,13 +1105,42 @@ class TestDoctorGeneralQueue:
         assert unrelated_visit.status == "open"
         assert appointment.status == "completed"
 
-    def test_complete_queue_entry_with_matching_appointment_persists_visit_and_appointment(
+    @pytest.mark.parametrize(
+        ("scenario", "appointment_status"),
+        [
+            ("linked", "completed"),
+            ("linked_explicit", "completed"),
+            ("foreign_source", "paid"),
+            ("generated_slot", "paid"),
+            ("unpaired_move", "paid"),
+            ("paired_move", "completed"),
+        ],
+    )
+    def test_completion_updates_only_a_proven_appointment(
         self,
         client,
         db_session,
         test_doctor_user,
         test_patient,
+        monkeypatch,
+        scenario,
+        appointment_status,
     ):
+        from datetime import UTC, datetime, time, timedelta
+
+        from app.api.v1.endpoints.doctor_integration import _queue_ops
+        from app.crud.clinic import clinic_today
+
+        if scenario in {"linked_explicit", "foreign_source"} and not hasattr(
+            Appointment, "source_visit_id"
+        ):
+            pytest.skip("Appointment source ownership requires the newer schema")
+
+        day = clinic_today(db_session)
+        original_day = day - timedelta(days=1) if scenario.endswith("_move") else day
+        monkeypatch.setattr(
+            _queue_ops, "_clinic_now", lambda _db: datetime.combine(day, time(13), tzinfo=UTC)
+        )
         doctor = Doctor(
             user_id=test_doctor_user.id,
             specialty="general",
@@ -1123,7 +1152,7 @@ class TestDoctorGeneralQueue:
         db_session.refresh(doctor)
 
         queue = DailyQueue(
-            day=date.today(),
+            day=day,
             specialist_id=doctor.id,
             queue_tag="general",
             active=True,
@@ -1131,6 +1160,35 @@ class TestDoctorGeneralQueue:
         db_session.add(queue)
         db_session.commit()
         db_session.refresh(queue)
+
+        linked_visit = None
+        if scenario != "generated_slot":
+            linked_visit = Visit(
+                patient_id=test_patient.id,
+                doctor_id=doctor.id,
+                visit_date=original_day,
+                visit_time="13:00",
+                department="general",
+                status="open",
+            )
+            db_session.add(linked_visit)
+            db_session.flush()
+
+        appointment_source_id = None
+        if scenario == "linked_explicit":
+            appointment_source_id = linked_visit.id
+        elif scenario == "foreign_source":
+            foreign_visit = Visit(
+                patient_id=test_patient.id,
+                doctor_id=doctor.id,
+                visit_date=day - timedelta(days=1),
+                visit_time="12:00",
+                department="general",
+                status="open",
+            )
+            db_session.add(foreign_visit)
+            db_session.flush()
+            appointment_source_id = foreign_visit.id
 
         entry = OnlineQueueEntry(
             id=9004,
@@ -1141,18 +1199,21 @@ class TestDoctorGeneralQueue:
             phone=test_patient.phone,
             source="registrar",
             status="diagnostics",
+            visit_id=linked_visit.id if linked_visit is not None else None,
         )
         appointment = Appointment(
             id=9104,
             patient_id=test_patient.id,
             doctor_id=doctor.id,
-            appointment_date=date.today(),
+            appointment_date=original_day if scenario == "paired_move" else day,
             appointment_time="13:00",
             status="paid",
             visit_type="paid",
             payment_type="cash",
             services=["consultation"],
         )
+        if appointment_source_id is not None:
+            appointment.source_visit_id = appointment_source_id
         db_session.add_all([entry, appointment])
         db_session.commit()
 
@@ -1181,14 +1242,15 @@ class TestDoctorGeneralQueue:
             .filter(
                 Visit.patient_id == test_patient.id,
                 Visit.doctor_id == doctor.id,
-                Visit.visit_date == date.today(),
+                Visit.visit_date == day,
             )
             .one()
         )
 
         assert entry.status == "served"
         assert visit.status == "completed"
-        assert appointment.status == "completed"
+        assert appointment.appointment_date == day
+        assert appointment.status == appointment_status
 
     def test_cardiologist_role_can_complete_queue_entry(
         self,
