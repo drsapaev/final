@@ -31,7 +31,6 @@ from __future__ import annotations
 import os
 import sys
 import uuid
-from datetime import date
 from pathlib import Path
 
 import psycopg
@@ -328,10 +327,11 @@ def _patient(pg_session, label: str):
 
 def _owned_queue(pg_session, doctor, *, queue_tag: str | None, number: int, label: str):
     """DailyQueue owned by this doctor (specialist_id match) + one entry."""
+    from app.crud.clinic import clinic_today
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
     queue = DailyQueue(
-        day=date.today(),
+        day=clinic_today(pg_session),
         specialist_id=doctor.id,
         queue_tag=queue_tag,
         active=True,

@@ -17,7 +17,7 @@ import asyncio
 import inspect
 import secrets
 import tempfile
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -368,7 +368,7 @@ def test_visit(db_session, test_patient, test_doctor):
         department="cardiology",
         confirmation_token="test-token-123",
         confirmation_channel="telegram",
-        confirmation_expires_at=datetime.utcnow().replace(hour=23, minute=59),
+        confirmation_expires_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=1),
     )
     db_session.add(visit)
     db_session.commit()
