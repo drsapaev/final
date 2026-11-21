@@ -36,18 +36,31 @@ const readSource = (relative: string) =>
 
 describe('DERMACOMPLETE-FE-002 — post-POST completion context guard (source contract)', () => {
   const source = readSource('../DermatologistPanelUnified.tsx');
+  // DERMACOMPLETE-FE-001: the completion POST lives in `runCompletionFlow`;
+  // the entry handler routes it through the shared dirty-source registry
+  // scoped to this visit's EMR draft (`emr-visit-<id>`).
+  const completionFlow =
+    source.match(/const runCompletionFlow = async[\s\S]*?\n {2}\};/)?.[0] ?? '';
   const completionHandler =
     source.match(/const handleSaveVisit = async[\s\S]*?\n {2}\};/)?.[0] ?? '';
 
   it('pins the handler block that owns completion', () => {
+    expect(completionFlow).not.toBe('');
+    expect(completionFlow).toContain('queueService.completeVisit');
+    // DERMACOMPLETE-FE-001: the entry handler defers to the shared
+    // dirty-source registry; a registered dirty draft gates the POST behind
+    // the canonical Save/Discard dialog.
     expect(completionHandler).not.toBe('');
-    expect(completionHandler).toContain('queueService.completeVisit');
+    expect(completionHandler).toContain('guardTransition(');
+    expect(completionHandler).toContain('emr-visit-${completionContext.visitId}');
+    expect(completionHandler).toContain("intentPolicy: 'leave'");
+    expect(completionHandler).toContain('runCompletionFlow(completionContext, entryId)');
   });
 
   it('rechecks the completion context AFTER the POST resolves, before any reset or auto-call', () => {
-    const postIndex = completionHandler.indexOf('await queueService.completeVisit');
+    const postIndex = completionFlow.indexOf('await queueService.completeVisit');
     expect(postIndex).toBeGreaterThan(-1);
-    const afterPost = completionHandler.slice(postIndex);
+    const afterPost = completionFlow.slice(postIndex);
     // The post-await guard must precede every effectful consequence.
     const guardIndex = afterPost.indexOf('isSameDermatologyVisit(completionContext, currentVisitContextRef.current)');
     expect(guardIndex).toBeGreaterThan(-1);
@@ -57,9 +70,10 @@ describe('DERMACOMPLETE-FE-002 — post-POST completion context guard (source co
   });
 
   it('keeps the pre-existing pre-POST identity recheck and ack guard (DOCFLOW pins stay green)', () => {
-    const prePost = completionHandler.slice(0, completionHandler.indexOf('await queueService.completeVisit'));
-    expect(prePost).toContain('isSameDermatologyVisit(completionContext, currentVisitContextRef.current)');
-    expect(completionHandler).toMatch(/completionAck\?\.success !== true/);
+    // The pre-POST identity recheck stays in the entry handler (pre-dialog);
+    // the ack guard stays in the flow body.
+    expect(completionHandler).toContain('isSameDermatologyVisit(completionContext, currentVisitContextRef.current)');
+    expect(completionFlow).toMatch(/completionAck\?\.success !== true/);
   });
 });
 

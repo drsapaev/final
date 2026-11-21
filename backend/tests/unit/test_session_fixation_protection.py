@@ -11,82 +11,132 @@ Covers:
 - Revoke failure is non-blocking (returns 0, doesn't raise)
 - REVOKE_SESSIONS_ON_NEW_LOGIN setting controls behavior
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 
+@pytest.fixture
+def auth_session():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.db.base_class import Base
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)()
+    yield session
+    session.close()
+    engine.dispose()
+
+
+def _seed_user(db):
+    from app.core.security import get_password_hash
+    from app.models.authentication import RefreshToken, UserSession
+    from app.models.user import User
+
+    user = User(
+        username="SYNTHETIC-fixation",
+        hashed_password=get_password_hash("SYNTHETIC-password"),
+        role="Patient",
+        is_active=True,
+        auth_epoch=0,
+    )
+    db.add(user)
+    db.flush()
+    for n in range(2):
+        db.add(
+            UserSession(
+                user_id=user.id,
+                refresh_token=f"SYNTHETIC-session-{n}",
+                expires_at=datetime.now(UTC) + timedelta(days=1),
+                revoked=False,
+            )
+        )
+        db.add(
+            RefreshToken(
+                user_id=user.id,
+                token=f"SYNTHETIC-token-{n}",
+                jti=f"SYNTHETIC-jti-{n}",
+                expires_at=datetime.now(UTC) + timedelta(days=1),
+                revoked=False,
+            )
+        )
+    db.commit()
+    return user
+
+
 class TestRevokeAllUserSessions:
-    """Tests for AuthenticationService._revoke_all_user_sessions()."""
+    """Account-wide revocation uses one transaction and a durable epoch."""
 
-    def test_revoke_all_user_sessions_revokes_active_sessions(self):
-        """_revoke_all_user_sessions revokes all active UserSession + RefreshToken."""
-        from app.services.auth_svc._tokens import TokensMixin
+    def test_revoke_all_user_sessions_revokes_active_sessions(self, auth_session):
+        from app.models.authentication import RefreshToken, UserSession
+        from app.services.auth_svc import AuthenticationService
 
-        # Create a minimal instance with required attributes
-        class TestAuth(TokensMixin):
-            pass
+        user = _seed_user(auth_session)
+        result = AuthenticationService()._revoke_all_user_sessions(
+            auth_session, user.id, reason="new_login"
+        )
+        auth_session.refresh(user)
+        assert result == 2 and user.auth_epoch == 1
+        assert (
+            auth_session.query(UserSession)
+            .filter_by(user_id=user.id, revoked=False)
+            .count()
+            == 0
+        )
+        assert (
+            auth_session.query(RefreshToken)
+            .filter_by(user_id=user.id, revoked=False)
+            .count()
+            == 0
+        )
 
-        auth = TestAuth()
+    def test_revoke_with_no_sessions_still_invalidates_old_access(self, auth_session):
+        from app.models.user import User
+        from app.services.auth_svc import AuthenticationService
 
-        db = MagicMock()
-        # Simulate query chain: db.query().filter().update()
-        refresh_query = MagicMock()
-        refresh_query.filter.return_value.update.return_value = 3  # 3 refresh tokens
+        user = User(
+            username="SYNTHETIC-empty",
+            hashed_password="x",
+            role="Patient",
+            is_active=True,
+            auth_epoch=0,
+        )
+        auth_session.add(user)
+        auth_session.commit()
+        assert (
+            AuthenticationService()._revoke_all_user_sessions(auth_session, user.id)
+            == 0
+        )
+        auth_session.refresh(user)
+        assert user.auth_epoch == 1
 
-        session_query = MagicMock()
-        session_query.filter.return_value.update.return_value = 2  # 2 sessions
+    def test_revoke_failure_rolls_back(self, auth_session):
+        from sqlalchemy import event
 
-        db.query.side_effect = [refresh_query, session_query]
+        from app.services.auth_svc import AuthenticationService
 
-        result = auth._revoke_all_user_sessions(db, user_id=42, reason="new_login")
+        user = _seed_user(auth_session)
 
-        assert result == 2  # Returns session count
-        assert db.commit.called
-        assert db.query.call_count == 2  # Called for RefreshToken + UserSession
+        def fail(session, context, instances):
+            raise RuntimeError("synthetic failure")
 
-    def test_revoke_all_user_sessions_returns_zero_when_no_sessions(self):
-        """Returns 0 when no active sessions exist."""
-        from app.services.auth_svc._tokens import TokensMixin
-
-        class TestAuth(TokensMixin):
-            pass
-
-        auth = TestAuth()
-
-        db = MagicMock()
-        refresh_query = MagicMock()
-        refresh_query.filter.return_value.update.return_value = 0
-
-        session_query = MagicMock()
-        session_query.filter.return_value.update.return_value = 0
-
-        db.query.side_effect = [refresh_query, session_query]
-
-        result = auth._revoke_all_user_sessions(db, user_id=42, reason="new_login")
-
-        assert result == 0
-        assert db.commit.called
-
-    def test_revoke_all_user_sessions_non_blocking_on_failure(self):
-        """Returns 0 and rolls back on db failure (non-blocking)."""
-        from app.services.auth_svc._tokens import TokensMixin
-
-        class TestAuth(TokensMixin):
-            pass
-
-        auth = TestAuth()
-
-        db = MagicMock()
-        db.query.side_effect = Exception("Database connection lost")
-
-        result = auth._revoke_all_user_sessions(db, user_id=42, reason="new_login")
-
-        assert result == 0
-        assert db.rollback.called
+        event.listen(auth_session, "before_flush", fail)
+        try:
+            assert (
+                AuthenticationService()._revoke_all_user_sessions(auth_session, user.id)
+                == 0
+            )
+        finally:
+            event.remove(auth_session, "before_flush", fail)
+        auth_session.refresh(user)
+        assert user.auth_epoch == 0
 
 
 class TestRevokePreviousPatientSessions:
@@ -147,87 +197,51 @@ class TestRevokePreviousPatientSessions:
 
 
 class TestLoginSessionFixationProtection:
-    """Tests that login_user revokes existing sessions when setting is enabled."""
+    """The configured policy acts atomically on actual stored sessions."""
 
-    def test_login_revokes_existing_sessions_when_enabled(self):
-        """When REVOKE_SESSIONS_ON_NEW_LOGIN=True, login revokes old sessions."""
-        from app.services.auth_svc._tokens import TokensMixin
+    @pytest.mark.parametrize("enabled", [True, False])
+    def test_login_respects_session_revocation_policy(
+        self, auth_session, monkeypatch, enabled
+    ):
+        from app.core.config import settings
+        from app.models.authentication import RefreshToken, UserSession
+        from app.services.auth_svc import AuthenticationService
 
-        class TestAuth(TokensMixin):
-            pass
-
-        auth = TestAuth()
-
-        # Mock the necessary dependencies
-        db = MagicMock()
-        user = MagicMock()
-        user.id = 1
-        user.username = "testuser"
-        user.role = "doctor"
-        user.is_active = True
-        user.is_superuser = False
-        user.email = "test@example.com"
-        user.full_name = "Test User"
-        user.two_factor_auth = None
-        user.must_change_password = False
-
-        with patch.object(auth, "authenticate_user", return_value=(user, "OK")), \
-             patch.object(auth, "_revoke_all_user_sessions", return_value=2) as mock_revoke, \
-             patch.object(auth, "create_access_token", return_value="access_token"), \
-             patch.object(auth, "create_refresh_token", return_value="refresh_token"), \
-             patch("app.services.auth_svc._tokens.settings") as mock_settings:
-
-            mock_settings.REVOKE_SESSIONS_ON_NEW_LOGIN = True
-            mock_settings.SECRET_KEY = "test-secret"
-            mock_settings.ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-            result = auth.login_user(
-                db=db,
-                username="testuser",
-                password="password",
-            )
-
-        # Verify _revoke_all_user_sessions was called
-        mock_revoke.assert_called_once_with(db, user.id, reason="new_login")
+        user = _seed_user(auth_session)
+        monkeypatch.setattr(settings, "REVOKE_SESSIONS_ON_NEW_LOGIN", enabled)
+        service = AuthenticationService()
+        result = service.login_user(
+            auth_session,
+            user.username,
+            "SYNTHETIC-password",
+            ip_address="127.0.0.1",
+            user_agent="SYNTHETIC-test",
+        )
         assert result["success"] is True
-
-    def test_login_does_not_revoke_when_setting_disabled(self):
-        """When REVOKE_SESSIONS_ON_NEW_LOGIN=False, login does NOT revoke."""
-        from app.services.auth_svc._tokens import TokensMixin
-
-        class TestAuth(TokensMixin):
-            pass
-
-        auth = TestAuth()
-
-        db = MagicMock()
-        user = MagicMock()
-        user.id = 1
-        user.username = "testuser"
-        user.role = "doctor"
-        user.is_active = True
-        user.is_superuser = False
-        user.email = "test@example.com"
-        user.full_name = "Test User"
-        user.two_factor_auth = None
-        user.must_change_password = False
-
-        with patch.object(auth, "authenticate_user", return_value=(user, "OK")), \
-             patch.object(auth, "_revoke_all_user_sessions", return_value=0) as mock_revoke, \
-             patch.object(auth, "create_access_token", return_value="access_token"), \
-             patch.object(auth, "create_refresh_token", return_value="refresh_token"), \
-             patch("app.services.auth_svc._tokens.settings") as mock_settings:
-
-            mock_settings.REVOKE_SESSIONS_ON_NEW_LOGIN = False
-            mock_settings.SECRET_KEY = "test-secret"
-            mock_settings.ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-            result = auth.login_user(
-                db=db,
-                username="testuser",
-                password="password",
+        auth_session.refresh(user)
+        assert user.auth_epoch == (1 if enabled else 0)
+        assert auth_session.query(UserSession).filter_by(
+            user_id=user.id, revoked=False
+        ).count() == (0 if enabled else 2)
+        old_active = (
+            auth_session.query(RefreshToken)
+            .filter(
+                RefreshToken.user_id == user.id,
+                RefreshToken.token.like("SYNTHETIC-token-%"),
+                RefreshToken.revoked.is_(False),
             )
-
-        # Verify _revoke_all_user_sessions was NOT called
-        mock_revoke.assert_not_called()
-        assert result["success"] is True
+            .count()
+        )
+        assert old_active == (0 if enabled else 2)
+        assert (
+            service.verify_token(result["tokens"]["access_token"], "access")[
+                "auth_epoch"
+            ]
+            == user.auth_epoch
+        )
+        assert (
+            service.verify_token(result["tokens"]["refresh_token"], "refresh")[
+                "auth_epoch"
+            ]
+            == user.auth_epoch
+        )

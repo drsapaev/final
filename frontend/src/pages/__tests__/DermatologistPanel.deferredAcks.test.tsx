@@ -343,6 +343,11 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
     fireEvent.click(completeButton);
     // The confirm dialog resolves immediately for the completion path.
     holder.confirmResolve?.(true);
+    // DERMACOMPLETE-FE-001: the synthetic editor registers `emr-visit-98`
+    // dirty in the shared registry — the completion defers to the canonical
+    // Save/Discard dialog; Save flushes the draft and issues the POST.
+    const completionGuardDialog = await screen.findByRole('dialog', {}, { timeout: 2500 });
+    fireEvent.click(within(completionGuardDialog).getByRole('button', { name: 'Сохранить и перейти' }));
     await waitFor(() => expect(mockedCompleteVisit).toHaveBeenCalled());
     expect(releaseCompletion).not.toBeNull();
 
@@ -381,6 +386,11 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
     }, { timeout: 2500 });
     fireEvent.click(completeButton);
     holder.confirmResolve?.(true);
+    // DERMACOMPLETE-FE-001: the always-dirty editor defers the completion to
+    // the shared guard dialog; Save flushes the draft, then the fresh
+    // acknowledgement path runs end-to-end.
+    const freshAckGuardDialog = await screen.findByRole('dialog', {}, { timeout: 2500 });
+    fireEvent.click(within(freshAckGuardDialog).getByRole('button', { name: 'Сохранить и перейти' }));
 
     await waitFor(() => {
       expect(notifyService.success).toHaveBeenCalledWith('Прием завершен успешно');

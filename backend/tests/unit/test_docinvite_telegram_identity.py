@@ -70,6 +70,8 @@ def _link(db, patient_id: int, chat_id: int, *, active=True, blocked=False,
 
 def _invite_data() -> dict:
     return {
+        "visit_id": 42,
+        "confirmation_context_epoch": 123,
         "patient_name": "Тестов Пациент",
         "doctor_name": "Докторов Доктор",
         "visit_date": "2026-11-20",
@@ -92,6 +94,39 @@ class _FakeBot:
         if self._succeed:
             return {"success": True, "message_id": 42}
         return {"success": False, "error": "synthetic telegram outage"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("chat_id", [0, -100123456])
+async def test_invitation_rejects_non_private_chat(db_session, monkeypatch, chat_id):
+    from app.services.notifications_pkg import NotificationSenderService
+
+    patient = _patient(db_session, unique=f"nonprivate{chat_id}")
+    _link(db_session, patient.id, chat_id)
+    sender = NotificationSenderService(db=db_session)
+    bot = _FakeBot()
+    monkeypatch.setattr(sender, "telegram_bot", bot, raising=False)
+    result = await sender._send_telegram_invitation(patient, _invite_data(), db_session)
+    assert not result["success"]
+    assert not bot.calls
+
+
+@pytest.mark.asyncio
+async def test_visit_invitation_hides_preparation_error(db_session, test_visit, monkeypatch, caplog):
+    from app.services.notifications_pkg import NotificationSenderService
+
+    sender = NotificationSenderService(db=db_session)
+    marker = "SYNTHETIC-CLINICAL-CANARY"
+    def fail(*args):
+        raise RuntimeError(marker)
+    monkeypatch.setattr(sender, "_prepare_notification_data", fail)
+    expected = {name: getattr(test_visit, name) for name in (
+        "patient_id", "confirmation_context_epoch", "confirmation_token")}
+    result = await sender.send_visit_confirmation_invitation(
+        db_session, test_visit.id, channel="telegram", expected_context=expected)
+    assert not result["success"]
+    assert marker not in str(result)
+    assert marker not in caplog.text
 
 
 @pytest.mark.unit
@@ -123,11 +158,21 @@ class TestDocInviteTelegramIdentity:
         assert len(bot.calls) == 1
         call = bot.calls[0]
         assert call["chat_id"] == link.chat_id
-        assert "Тестов Пациент" in call["message"]
+        assert call["message"] == "У вас новое уведомление."
+        from app.services.visit_confirmation_service import (
+            build_telegram_visit_action_token,
+        )
+
+        capability = build_telegram_visit_action_token(
+            visit_id=42, confirmation_token="tok-invite-123", link_id=link.id,
+            chat_id=link.chat_id, patient_id=patient.id, link_epoch=link.patient_link_epoch,
+            visit_context_epoch=123, purpose="view",
+        )
         assert any(
-            "confirm_visit:tok-invite-123" in btn["callback_data"]
+            f"view_visit:{capability}" == btn["callback_data"]
             for row in call["keyboard"] for btn in row
         )
+        assert "tok-invite-123" not in repr(call["keyboard"])
 
     def test_auto_channel_prefers_linked_telegram(self, db_session):
         """Auto channel choice resolves the chat via TelegramUser — linked
@@ -191,16 +236,12 @@ class TestDocInviteTelegramIdentity:
         svc = NotificationSenderService()
         keyboard = svc._create_telegram_keyboard("tok-x")
 
-        assert len(keyboard) == 2
+        assert len(keyboard) == 1
         for row in keyboard:
             for btn in row:
                 assert "tel:" not in str(btn.get("url", ""))
         assert any(
-            "confirm_visit:tok-x" in btn["callback_data"]
-            for row in keyboard for btn in row
-        )
-        assert any(
-            "cancel_visit:tok-x" in btn["callback_data"]
+            "view_visit:tok-x" in btn["callback_data"]
             for row in keyboard for btn in row
         )
 

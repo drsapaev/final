@@ -18,13 +18,13 @@ concurrency:
 jobs:
   security-scan:
     name: 🔒 Сканирование безопасности
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v7
     - uses: actions/setup-python@v7
       with:
-        python-version: '3.11.10'
+        python-version: '3.11.18'
 
     - name: 🔧 Настройка Python path
       run: |

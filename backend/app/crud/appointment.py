@@ -340,8 +340,14 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         """
         Обновить статус записи с валидацией перехода
         """
+        # Serialize validation with competing transitions (including Telegram
+        # callbacks). Refresh the identity-map object after waiting for a lock.
         appointment = (
-            db.query(self.model).filter(self.model.id == appointment_id).first()
+            db.query(self.model)
+            .filter(self.model.id == appointment_id)
+            .with_for_update(of=self.model)
+            .populate_existing()
+            .first()
         )
         if not appointment:
             return None

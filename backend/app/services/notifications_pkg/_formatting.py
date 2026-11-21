@@ -26,6 +26,7 @@ class FormattingMixin(NotificationSenderMixinBase):
                 db.query(TelegramUser.id)
                 .filter(
                     TelegramUser.patient_id == patient.id,
+                    TelegramUser.chat_id > 0,
                     TelegramUser.active.is_(True),
                     TelegramUser.blocked.is_(False),
                     TelegramUser.notifications_enabled.is_(True),
@@ -72,6 +73,7 @@ class FormattingMixin(NotificationSenderMixinBase):
             "services": services_text,
             "total_amount": total_amount,
             "confirmation_token": visit.confirmation_token,
+            "confirmation_context_epoch": visit.confirmation_context_epoch,
             "expires_at": visit.confirmation_expires_at,
             "visit_type": self._get_visit_type_text(visit.discount_mode),
         }
@@ -123,18 +125,12 @@ class FormattingMixin(NotificationSenderMixinBase):
         # bot dispatch, so even the merged TelegramUser identity resolution
         # never delivered an initial invitation. Telegram inline keyboards
         # support only https/tg:// URLs — the unsupported contact button is
-        # removed; confirm/cancel remain the actionable surface.
+        # removed; authenticated preview must precede a decision.
         return [
             [
                 {
-                    "text": "✅ Подтвердить визит",
-                    "callback_data": f"confirm_visit:{confirmation_token}",
-                }
-            ],
-            [
-                {
-                    "text": "❌ Отменить визит",
-                    "callback_data": f"cancel_visit:{confirmation_token}",
+                    "text": "Просмотреть",
+                    "callback_data": f"view_visit:{confirmation_token}",
                 }
             ],
         ]
@@ -162,6 +158,7 @@ class FormattingMixin(NotificationSenderMixinBase):
                 db.query(TelegramUser)
                 .filter(
                     TelegramUser.patient_id == patient.id,
+                    TelegramUser.chat_id > 0,
                     TelegramUser.active.is_(True),
                     TelegramUser.blocked.is_(False),
                     TelegramUser.notifications_enabled.is_(True),
@@ -173,12 +170,38 @@ class FormattingMixin(NotificationSenderMixinBase):
             if telegram_user is None:
                 return {"success": False, "error": "У пациента нет активной привязки Telegram"}
 
-            message = self._format_telegram_message(data)
-            keyboard = self._create_telegram_keyboard(data["confirmation_token"])
+            from app.services.visit_confirmation_service import (
+                build_telegram_visit_action_token,
+            )
+
+            capability = build_telegram_visit_action_token(
+                visit_id=data["visit_id"], confirmation_token=data["confirmation_token"],
+                link_id=telegram_user.id, chat_id=telegram_user.chat_id,
+                patient_id=patient.id, link_epoch=telegram_user.patient_link_epoch,
+                visit_context_epoch=data["confirmation_context_epoch"], purpose="view",
+            )
+            # Telegram delivery cannot be recalled after a concurrent opt-out.
+            # Keep the push itself neutral; the action remains actor-bound.
+            message = "У вас новое уведомление."
+            keyboard = self._create_telegram_keyboard(capability)
+
+            current_link = (
+                db.query(TelegramUser).filter(
+                    TelegramUser.id == telegram_user.id,
+                    TelegramUser.patient_id == patient.id,
+                    TelegramUser.chat_id == telegram_user.chat_id,
+                    TelegramUser.patient_link_epoch == telegram_user.patient_link_epoch,
+                    TelegramUser.active.is_(True), TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
+                    TelegramUser.appointment_reminders.is_(True),
+                ).populate_existing().first()
+            )
+            if current_link is None:
+                return {"success": False, "error": "У пациента нет активной привязки Telegram"}
 
             # Используем telegram_bot для отправки
             result = await self.telegram_bot.send_confirmation_invitation(
-                chat_id=telegram_user.chat_id, message=message, keyboard=keyboard
+                chat_id=current_link.chat_id, message=message, keyboard=keyboard
             )
 
             if result.get("success"):
@@ -191,12 +214,12 @@ class FormattingMixin(NotificationSenderMixinBase):
             else:
                 return {
                     "success": False,
-                    "error": result.get("error", "Ошибка отправки Telegram"),
+                    "error": "Ошибка отправки Telegram",
                 }
 
         except Exception as e:
-            logger.error(f"Ошибка отправки Telegram приглашения: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error("Ошибка отправки Telegram приглашения (%s)", type(e).__name__)
+            return {"success": False, "error": "Ошибка отправки Telegram"}
 
 
     async def _send_pwa_invitation(

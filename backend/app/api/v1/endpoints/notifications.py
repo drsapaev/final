@@ -4,13 +4,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
 from app.core.i18n import t  # noqa: F401
 from app.crud import patient as patient_crud
 from app.crud import visit as visit_crud
-from app.crud.notification import crud_notification_template
+from app.crud.notification import TemplateConcurrentUpdate, crud_notification_template
 from app.crud.user_management import (
     user_notification_settings as crud_user_notification_settings,
 )
@@ -555,6 +556,28 @@ async def get_notification_status(
 
 
 # Управление шаблонами уведомлений
+_TEMPLATE_DETAIL_SCHEMA = {
+    "type": "object",
+    "required": ["detail"],
+    "properties": {"detail": {"type": "string"}},
+}
+_TEMPLATE_VALIDATION_SCHEMA = {
+    "type": "object",
+    "required": ["error", "message", "detail"],
+    "properties": {
+        "error": {"type": "string"},
+        "message": {"type": "string"},
+        "detail": {"type": "array", "items": {"type": "object"}},
+    },
+}
+_TEMPLATE_CONFLICT_RESPONSE = {
+    "description": "Конфликт шаблона",
+    "content": {"application/json": {"schema": _TEMPLATE_DETAIL_SCHEMA}},
+}
+_TEMPLATE_SERVER_ERROR_RESPONSE = {"description": "Ошибка обработки или базы данных"}
+_TEMPLATE_DATABASE_UNAVAILABLE_RESPONSE = {"description": "Сервис базы данных недоступен"}
+
+
 @router.get("/templates", response_model=list[NotificationTemplate])
 async def get_notification_templates(
     current_user: User = Depends(require_roles(["admin"])),
@@ -564,17 +587,52 @@ async def get_notification_templates(
     return crud_notification_template.get_multi(db)
 
 
-@router.post("/templates", response_model=NotificationTemplate)
+@router.post(
+    "/templates",
+    response_model=NotificationTemplate,
+    responses={
+        409: _TEMPLATE_CONFLICT_RESPONSE,
+        422: {
+            "description": "Ошибка валидации запроса",
+            "content": {"application/json": {"schema": _TEMPLATE_VALIDATION_SCHEMA}},
+        },
+        500: _TEMPLATE_SERVER_ERROR_RESPONSE,
+        503: _TEMPLATE_DATABASE_UNAVAILABLE_RESPONSE,
+    },
+)
 async def create_notification_template(
     template_data: NotificationTemplateCreate,
     current_user: User = Depends(require_roles(["admin"])),
     db: Session = Depends(get_db),
 ):
     """Создание шаблона уведомления"""
-    return crud_notification_template.create(db, obj_in=template_data)
+    try:
+        return crud_notification_template.create_atomic(db, obj_in=template_data)
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Конфликт шаблона") from exc
 
 
-@router.put("/templates/{template_id}", response_model=NotificationTemplate)
+@router.put(
+    "/templates/{template_id}",
+    response_model=NotificationTemplate,
+    responses={
+        404: {
+            "description": "Шаблон не найден",
+            "content": {"application/json": {"schema": _TEMPLATE_DETAIL_SCHEMA}},
+        },
+        409: _TEMPLATE_CONFLICT_RESPONSE,
+        422: {
+            "description": "Ошибка валидации запроса или полей шаблона",
+            "content": {
+                "application/json": {
+                    "schema": {"oneOf": [_TEMPLATE_VALIDATION_SCHEMA, _TEMPLATE_DETAIL_SCHEMA]}
+                }
+            },
+        },
+        500: _TEMPLATE_SERVER_ERROR_RESPONSE,
+        503: _TEMPLATE_DATABASE_UNAVAILABLE_RESPONSE,
+    },
+)
 async def update_notification_template(
     template_id: int,
     template_data: NotificationTemplateUpdate,
@@ -582,11 +640,17 @@ async def update_notification_template(
     db: Session = Depends(get_db),
 ):
     """Обновление шаблона уведомления"""
-    template = crud_notification_template.get(db, id=template_id)
+    try:
+        template = crud_notification_template.update_atomic(
+            db, template_id=template_id, obj_in=template_data
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Некорректные поля шаблона") from exc
+    except (IntegrityError, TemplateConcurrentUpdate) as exc:
+        raise HTTPException(status_code=409, detail="Конфликт шаблона") from exc
     if not template:
         raise HTTPException(status_code=404, detail="Шаблон не найден")
-
-    return crud_notification_template.update(db, db_obj=template, obj_in=template_data)
+    return template
 
 
 @router.delete("/templates/{template_id}", response_model=dict[str, Any])
@@ -915,7 +979,11 @@ async def send_notification(
     current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
-    """Отправка уведомления с использованием шаблона"""
+    """Поставить попытки отправки в фон; ответ не подтверждает доставку.
+
+    При ошибке рендеринга шаблона сообщение не отправляется, а попытка
+    отмечается как неудачная в истории уведомлений.
+    """
     if request.scheduled_at is not None:
         raise HTTPException(
             status_code=422,

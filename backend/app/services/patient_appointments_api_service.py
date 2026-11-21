@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -12,6 +13,7 @@ from app.models.user import User
 from app.repositories.patient_appointments_api_repository import (
     PatientAppointmentsApiRepository,
 )
+from app.services.context_facades.scheduling_facade import SchedulingContextFacade
 
 
 class PatientAppointmentsApiService:
@@ -162,8 +164,17 @@ class PatientAppointmentsApiService:
         )
 
     def cancel_appointment(self, appointment: Appointment) -> None:
-        appointment.status = "cancelled"
-        appointment.updated_at = datetime.now()
+        # The endpoint's earlier read/cutoff is advisory: another actor may
+        # reschedule or finish the appointment before this transaction locks it.
+        locked = self.repository.get_locked_appointment_for_patient(
+            appointment_id=appointment.id, patient_id=appointment.patient_id
+        )
+        if not locked:
+            raise HTTPException(status_code=404, detail="Запись не найдена")
+        if not SchedulingContextFacade.can_patient_cancel(locked):
+            raise HTTPException(status_code=409, detail="Отмена записи недоступна")
+        locked.status = "cancelled"
+        locked.updated_at = datetime.now()
         self.repository.commit()
 
     def reschedule_appointment(

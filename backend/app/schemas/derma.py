@@ -32,6 +32,11 @@ class DermaExaminationOut(ORMModel):
     lesions: str | None = None
     distribution: str | None = None
     symptoms: str | None = None
+    # DERMAHIST-BE-001: schema-safe projection of the canonical EMR lesion
+    # localization (specialty_data.localization.description). Legacy rows
+    # (the closed derma_examinations table has no such column) keep None —
+    # nothing is back-filled or fabricated.
+    localization: str | None = None
     diagnosis: str | None = None
     treatment_plan: str | None = None
     created_at: datetime | None = None

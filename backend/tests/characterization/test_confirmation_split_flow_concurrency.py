@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
+from app.models.telegram_config import TelegramUser
 from app.models.user import User
 from app.models.visit import Visit
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
@@ -17,12 +18,18 @@ from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.visit_confirmation_service import (
     VisitConfirmationDomainError,
     VisitConfirmationService,
+    build_telegram_visit_action_token,
 )
+
+
+@pytest.fixture(autouse=True)
+def _future_telegram_start(monkeypatch):
+    monkeypatch.setattr("app.tasks.worker._appointment_start_utc", lambda visit: datetime.now(UTC) + timedelta(days=1))
 
 
 def _make_pending_confirmation_visit(
     test_db, suffix: str
-) -> tuple[str, int, int, int, int]:
+) -> tuple[str, int, int, int, int, int, str]:
     session_local = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
     session = session_local()
     try:
@@ -78,7 +85,18 @@ def _make_pending_confirmation_visit(
         session.add(visit)
         session.commit()
         session.refresh(visit)
-        return visit.confirmation_token, visit.id, patient.id, doctor.id, user.id
+        chat_id = 900000000000 + visit.id
+        link = TelegramUser(
+            chat_id=chat_id, patient_id=patient.id, active=True, blocked=False
+        )
+        session.add(link)
+        session.commit()
+        capability = build_telegram_visit_action_token(
+            visit_id=visit.id, confirmation_token=visit.confirmation_token,
+            link_id=link.id, chat_id=link.chat_id, patient_id=patient.id,
+            link_epoch=link.patient_link_epoch, visit_context_epoch=visit.confirmation_context_epoch,
+        )
+        return visit.confirmation_token, visit.id, patient.id, doctor.id, user.id, chat_id, capability
     finally:
         session.close()
 
@@ -87,7 +105,7 @@ def _make_pending_confirmation_visit(
 @pytest.mark.queue
 @pytest.mark.confirmation
 def test_parallel_confirmation_validation_can_allow_same_pending_token(test_db):
-    token, visit_id, patient_id, doctor_id, user_id = _make_pending_confirmation_visit(
+    token, visit_id, patient_id, doctor_id, user_id, _chat_id, _capability = _make_pending_confirmation_visit(
         test_db,
         suffix=uuid.uuid4().hex[:8],
     )
@@ -123,6 +141,7 @@ def test_parallel_confirmation_validation_can_allow_same_pending_token(test_db):
     finally:
         cleanup = session_local()
         try:
+            cleanup.query(TelegramUser).filter(TelegramUser.patient_id == patient_id).delete()
             cleanup.query(Visit).filter(Visit.id == visit_id).delete()
             cleanup.query(Patient).filter(Patient.id == patient_id).delete()
             cleanup.query(Doctor).filter(Doctor.id == doctor_id).delete()
@@ -136,7 +155,7 @@ def test_parallel_confirmation_validation_can_allow_same_pending_token(test_db):
 @pytest.mark.queue
 @pytest.mark.confirmation
 def test_parallel_confirmation_pending_lookup_can_observe_same_pending_visit(test_db):
-    token, visit_id, patient_id, doctor_id, user_id = _make_pending_confirmation_visit(
+    token, visit_id, patient_id, doctor_id, user_id, _chat_id, _capability = _make_pending_confirmation_visit(
         test_db,
         suffix=uuid.uuid4().hex[:8],
     )
@@ -167,6 +186,7 @@ def test_parallel_confirmation_pending_lookup_can_observe_same_pending_visit(tes
     finally:
         cleanup = session_local()
         try:
+            cleanup.query(TelegramUser).filter(TelegramUser.patient_id == patient_id).delete()
             cleanup.query(Visit).filter(Visit.id == visit_id).delete()
             cleanup.query(Patient).filter(Patient.id == patient_id).delete()
             cleanup.query(Doctor).filter(Doctor.id == doctor_id).delete()
@@ -180,7 +200,7 @@ def test_parallel_confirmation_pending_lookup_can_observe_same_pending_visit(tes
 @pytest.mark.queue
 @pytest.mark.confirmation
 def test_parallel_telegram_confirmation_claim_allows_only_one_mutation(test_db):
-    token, visit_id, patient_id, doctor_id, user_id = _make_pending_confirmation_visit(
+    _token, visit_id, patient_id, doctor_id, user_id, chat_id, capability = _make_pending_confirmation_visit(
         test_db,
         suffix=uuid.uuid4().hex[:8],
     )
@@ -197,8 +217,8 @@ def test_parallel_telegram_confirmation_claim_allows_only_one_mutation(test_db):
             service = VisitConfirmationService(session)
             try:
                 result = service.confirm_by_telegram(
-                    token=token,
-                    telegram_user_id="123456789",
+                    token=capability,
+                    telegram_user_id=str(chat_id),
                     source_ip="127.0.0.1",
                     user_agent="Mozilla/5.0",
                 )
@@ -241,6 +261,7 @@ def test_parallel_telegram_confirmation_claim_allows_only_one_mutation(test_db):
             cleanup.query(DailyQueue).filter(
                 DailyQueue.specialist_id == doctor_id
             ).delete()
+            cleanup.query(TelegramUser).filter(TelegramUser.patient_id == patient_id).delete()
             cleanup.query(Visit).filter(Visit.id == visit_id).delete()
             cleanup.query(Patient).filter(Patient.id == patient_id).delete()
             cleanup.query(Doctor).filter(Doctor.id == doctor_id).delete()

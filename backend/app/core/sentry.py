@@ -24,7 +24,7 @@ import os
 import re
 from typing import Any
 
-from app.core.pii_masker import mask_pii
+from app.core.pii_masker import is_sensitive_verification_path, mask_pii
 
 logger = logging.getLogger(__name__)
 
@@ -956,6 +956,41 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     Missing fields are skipped silently — this function must not raise on
     events with partial structure (e.g. ``{}`` or ``{"exception": {}}``).
     """
+    request = event.get("request")
+    request_url = request.get("url") if isinstance(request, dict) else None
+    if is_sensitive_verification_path(request_url) or is_sensitive_verification_path(
+        event.get("transaction")
+    ):
+        # Verification failures may contain arbitrary SMS text, a six-digit
+        # `code`, whole request bodies or exception locals.  A generic `code`
+        # key cannot be globally redacted (it also denotes medical ICD codes),
+        # so retain only safe diagnostic fields for these specific routes.
+        safe = {
+            key: event[key]
+            for key in ("event_id", "timestamp", "level", "platform", "environment", "release", "dist")
+            if key in event
+        }
+        safe["transaction"] = "[REDACTED VERIFICATION]"
+        if isinstance(request, dict) and request.get("method") in {
+            "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
+        }:
+            safe["request"] = {"method": request["method"]}
+        exception = event.get("exception")
+        values = exception.get("values") if isinstance(exception, dict) else None
+        if isinstance(values, list):
+            types = []
+            for value in values:
+                kind = value.get("type") if isinstance(value, dict) else None
+                if isinstance(kind, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,127}", kind):
+                    types.append({"type": kind})
+            if types:
+                safe["exception"] = {"values": types}
+        # Preserve the historical in-place contract: the installed SDK hook
+        # and some callers intentionally continue using the original dict.
+        event.clear()
+        event.update(safe)
+        return event
+
     if "request" in event:
         event["request"] = mask_pii(event["request"])
 
@@ -968,6 +1003,12 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         def _scrumb(b: Any) -> Any:
             if not isinstance(b, dict):
                 return mask_pii(b)
+            data = b.get("data")
+            if isinstance(data, dict) and any(
+                is_sensitive_verification_path(data.get(key))
+                for key in ("url", "from", "to")
+            ):
+                return {"category": "[REDACTED VERIFICATION]"}
             scrubbed = {**b, "data": mask_pii(b.get("data", {}))}
             message = scrubbed.get("message")
             if isinstance(message, str):
