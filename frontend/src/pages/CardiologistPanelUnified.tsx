@@ -166,7 +166,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     icd10: '',
     notes: ''
   });
-  const [loading, setLoading] = useState(false);
+  const [pendingVisitActions, setPendingVisitActions] = useState(0);
   // QW-01 (UX audit): removed swallowed setMessage — all calls now route through `notify`
   // (the shared adapter in services/notify.js) so users actually see error/success/warning
   // feedback. The `message` destructure was dropped, which silently discarded every
@@ -1162,7 +1162,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
 
     try {
-      setLoading(true);
+      setPendingVisitActions(count => count + 1);
       const token = tokenManager.getAccessToken();
       const response = await fetch(`${API_V1_BASE}/doctor/queue/${row?.doctor_queue_entry_id || row?.id}/cancel`, {
         method: 'POST',
@@ -1183,7 +1183,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       logger.error('[Cardiology] Ошибка отмены записи:', error);
       notify.error(getErrorMessage(error) || tI18n('cardio.cardio_panel_appointment_cancel_failed'));
     } finally {
-      setLoading(false);
+      setPendingVisitActions(count => count - 1);
     }
   };
 
@@ -1378,8 +1378,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       return;
     }
 
-    // A transport-level failure or a finally block is also an async
-    // completion of A's command. Never attribute its UI side effects to B.
+    // A transport-level failure also belongs to the initiating visit.
     const completionStillOwned = (): boolean => {
       const live = selectedPatientRef.current;
       return (
@@ -1472,7 +1471,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
 
     try {
-      setLoading(true);
+      setPendingVisitActions(count => count + 1);
 
       const visitPayload = {
         patient_id: completionIdentity.patientId,
@@ -1563,12 +1562,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       }
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_action_failed')));
     } finally {
-      // The single shared loading flag must still be released when A settles:
-      // otherwise B can remain permanently disabled after an A→B switch.
-      // This preserves the pre-existing cleanup contract; a future dedicated
-      // per-operation loading ticket would be needed for true overlapping
-      // completion requests, outside this narrow stale-ACK repair.
-      setLoading(false);
+      // Release this operation even when the selection changed in flight.
+      setPendingVisitActions(count => count - 1);
     }
   };
 
@@ -2162,7 +2157,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                   status?: string | null;
                 } | null}
                 emr={emr}
-                loading={loading}
+                loading={pendingVisitActions > 0}
                 onCancel={() => {
                   // RETRO-3971-04 residual: let the shared EMR leave guard
                   // resolve Save/Discard/Stay before invalidating async work

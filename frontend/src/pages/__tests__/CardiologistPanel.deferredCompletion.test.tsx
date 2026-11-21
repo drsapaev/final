@@ -11,7 +11,7 @@
  */
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { Link, MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type TestSelection = {
@@ -115,6 +115,7 @@ vi.mock('../../components/cardiology/VisitTab', () => ({
       <button
         type="button"
         data-testid="cardio-complete"
+        disabled={props.loading}
         onClick={() => {
           void props.onComplete({
             complaints: 'SYNTHETIC complaint',
@@ -129,6 +130,15 @@ vi.mock('../../components/cardiology/VisitTab', () => ({
 }));
 vi.mock('../../components/cardiology/CardiologyQueueTab', () => ({
   default: () => <div data-testid="cardio-queue" />,
+}));
+vi.mock('../../components/cardiology/AppointmentsTab', () => ({
+  default: ({ onActionClick }: {
+    onActionClick: (action: string, selection: TestSelection) => void;
+  }) => (
+    <button type="button" onClick={() => onActionClick('cancel', B)}>
+      Cancel synthetic appointment
+    </button>
+  ),
 }));
 vi.mock('../../components/cardiology/PatientSearch', () => ({
   default: () => <div data-testid="patient-search" />,
@@ -172,7 +182,13 @@ function deferred<T>() {
 
 function RouteQueryProbe() {
   const location = useLocation();
-  return <output data-testid="cardio-route-query">{location.search}</output>;
+  return (
+    <>
+      <output data-testid="cardio-route-query">{location.search}</output>
+      <Link to="?tab=appointments">Synthetic appointments</Link>
+      <Link to="?tab=visit">Synthetic visit</Link>
+    </>
+  );
 }
 
 async function mount(initialEntry = '/doctor/cardiology?tab=visit') {
@@ -284,6 +300,44 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
     expect(vi.mocked(notify.error)).not.toHaveBeenCalled();
     expect(vi.mocked(notify.success)).not.toHaveBeenCalled();
     expect(queueService.callNextWaiting).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { first: 'cancel', last: 'completion' },
+    { first: 'completion', last: 'cancel' },
+  ] as const)('keeps completion locked while $last is pending after $first settles', async ({ first, last }) => {
+    const completion = deferred<{ success: boolean }>();
+    const cancellation = deferred<Response>();
+    const cancelPath = `/doctor/queue/${B.doctor_queue_entry_id}/cancel`;
+    vi.mocked(queueService.completeVisit).mockReturnValue(completion.promise as never);
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      if (String(url).endsWith(cancelPath)) return cancellation.promise;
+      return new Response(null, { status: 404 });
+    });
+
+    await mount();
+    fireEvent.click(screen.getByTestId('cardio-complete'));
+    await waitFor(() => expect(queueService.completeVisit).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('link', { name: 'Synthetic appointments' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel synthetic appointment' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining(cancelPath),
+      expect.objectContaining({ method: 'POST' }),
+    ));
+    fireEvent.click(screen.getByRole('link', { name: 'Synthetic visit' }));
+    expect(await screen.findByTestId('cardio-complete')).toBeDisabled();
+
+    const settle = {
+      cancel: () => cancellation.resolve(new Response(null, { status: 200 })),
+      completion: () => completion.resolve({ success: false }),
+    };
+    await act(async () => settle[first]());
+    expect(screen.getByTestId('cardio-complete')).toBeDisabled();
+
+    await act(async () => settle[last]());
+    expect(screen.getByTestId('cardio-complete')).toBeEnabled();
+    expect(queueService.completeVisit).toHaveBeenCalledTimes(1);
   });
 
   it('positive control: the current visit A still finishes on an explicit success ACK', async () => {
