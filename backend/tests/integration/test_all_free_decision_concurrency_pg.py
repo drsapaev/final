@@ -75,6 +75,12 @@ def decision_engines(configured_benefit_db):
             connection.exec_driver_sql(
                 f"CREATE POLICY synthetic_decision_audit_id ON audit_logs FOR SELECT TO {RUNTIME} USING (true)"
             )
+    with runtime.connect() as connection:
+        confirmation_privileges = connection.exec_driver_sql("""
+            SELECT pg_catalog.has_sequence_privilege('public.visit_confirmation_generation_seq','USAGE'),
+                   pg_catalog.has_sequence_privilege('public.visit_confirmation_generation_seq','SELECT, UPDATE, USAGE WITH GRANT OPTION')
+        """).one()
+        assert tuple(confirmation_privileges) == (True, False)
     return admin, runtime
 
 

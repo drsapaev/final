@@ -73,6 +73,8 @@ def setup_db():
             connection.execute(sa.text(f'GRANT USAGE, CREATE ON SCHEMA "{schema}" TO "{owner}"'))
         with engine.begin() as connection:
             connection.execute(sa.text("CREATE TABLE visits (id integer PRIMARY KEY)"))
+            connection.execute(sa.text("CREATE SEQUENCE visit_confirmation_generation_seq AS bigint"))
+            connection.execute(sa.text(f'ALTER SEQUENCE visit_confirmation_generation_seq OWNER TO "{owner}"'))
             connection.execute(sa.text("INSERT INTO visits (id) VALUES (1),(2)"))
             connection.execute(sa.text(f'GRANT SELECT, UPDATE ON visits TO "{runtime}"'))
             connection.execute(sa.text("""CREATE TABLE visit_services
@@ -139,6 +141,9 @@ def test_provision_is_idempotent_and_enforces_snapshot_provenance(setup_db):
     with runtime_engine.begin() as connection:
         identity = connection.execute(sa.text("SELECT current_user,session_user")).one()
         assert identity[0] == identity[1] == runtime
+        assert connection.execute(sa.text(
+            "SELECT pg_catalog.has_sequence_privilege('visit_confirmation_generation_seq','USAGE')"
+        )).scalar_one() is False
         request_id = _insert_request(connection)
         connection.execute(sa.text("""
             INSERT INTO all_free_request_lines
@@ -216,6 +221,12 @@ def test_force_rls_stage_guard_and_decision_use_one_restricted_backend(setup_db)
         provisioner.provision(engine, schema, runtime, expected_owner=owner, decision_role=capability)
         provisioner.provision(engine, schema, runtime, expected_owner=owner, decision_role=capability)
         with runtime_engine.begin() as connection:
+            sequence_privileges = connection.execute(sa.text("""
+                SELECT pg_catalog.has_sequence_privilege('visit_confirmation_generation_seq','USAGE'),
+                       pg_catalog.has_sequence_privilege('visit_confirmation_generation_seq','SELECT, UPDATE, USAGE WITH GRANT OPTION'),
+                       pg_catalog.has_sequence_privilege(:other,'visit_confirmation_generation_seq','USAGE')
+            """), {"other": other}).one()
+            assert tuple(sequence_privileges) == (True, False, False)
             request_id = connection.execute(sa.text("""INSERT INTO all_free_requests
               (visit_id,patient_id,encounter_id,visit_id_snapshot,patient_id_snapshot,encounter_id_snapshot,
                visit_context_epoch,encounter_generation,policy_auto_approve,requested_by_user_id,

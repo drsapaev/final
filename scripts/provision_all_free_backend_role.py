@@ -141,6 +141,25 @@ def _provision_decision(db, qs: str, qp: str, qr: str, qc: str, sequences: dict[
     # Serialize policy/ACL inspection and changes with table DDL until commit.
     db.exec_driver_sql("LOCK TABLE " + ", ".join(f"{qs}.{table}" for table in
                        ("encounters", "patients", "users", "visits")) + " IN ACCESS EXCLUSIVE MODE")
+    # Approval updates VisitService.price under the application login. The
+    # invoker trigger needs nextval to invalidate the prior confirmation.
+    confirmation_sequence = f"{qs}.visit_confirmation_generation_seq"
+    sequence = db.execute(text("""
+        SELECT c.oid FROM pg_catalog.pg_class c
+        JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+        WHERE c.oid=pg_catalog.to_regclass(:sequence) AND c.relkind='S'
+          AND c.relowner IN (:table_owner,n.nspowner)
+          AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(c.relacl) a WHERE a.grantee=0)
+    """), {"sequence": confirmation_sequence, "table_owner": table_owner}).scalar_one_or_none()
+    _require(sequence is not None, "Trusted confirmation generation sequence is required")
+    sequence_privilege = text("SELECT pg_catalog.has_sequence_privilege(:role,:sequence,:privilege)")
+    _require(not db.execute(sequence_privilege, {
+        "role": backend_oid, "sequence": sequence, "privilege": "SELECT, UPDATE, USAGE WITH GRANT OPTION",
+    }).scalar_one(), "Unexpected confirmation generation sequence privileges")
+    db.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {confirmation_sequence} TO {qr}")
+    _require(db.execute(sequence_privilege, {
+        "role": backend_oid, "sequence": sequence, "privilege": "USAGE",
+    }).scalar_one(), "Confirmation generation sequence USAGE was not granted")
     db.exec_driver_sql(f"GRANT USAGE ON SCHEMA {qs} TO {qc}")
     for table in TABLES:
         qualified = f"{qs}.{table}"
