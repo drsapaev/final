@@ -32,7 +32,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.core.pii_masker import mask_phone
@@ -1152,13 +1152,19 @@ def get_or_create_daily_queue(
         DailyQueue.day == day,
         DailyQueue.specialist_id == actual_specialist_id,
     ]
-
     if queue_tag:
         query_filters.append(DailyQueue.queue_tag == queue_tag)
     else:
-        query_filters.append(DailyQueue.queue_tag.is_(None))
+        # The active doctor/day index folds NULL and the empty tag into
+        # one identity. An archived equivalent cannot hide its active row.
+        query_filters.append(
+            or_(DailyQueue.queue_tag.is_(None), DailyQueue.queue_tag == "")
+        )
 
-    daily_queue = db.query(DailyQueue).filter(and_(*query_filters)).first()
+    query = db.query(DailyQueue).filter(and_(*query_filters))
+    if not queue_tag:
+        query = query.order_by(DailyQueue.active.desc(), DailyQueue.id.asc())
+    daily_queue = query.first()
 
     if not daily_queue:
         # Если информация о кабинете не передана, получаем из таблицы doctors

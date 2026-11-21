@@ -330,6 +330,30 @@ def _queue_api_legacy_creator(engine, day, doctor_id, barrier, errors, queue_ids
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("has_archived_null_tag", [False, True])
+def test_batch_reuses_an_active_queue_with_a_legacy_empty_tag(
+    lock_parity_engine, has_archived_null_tag,
+):
+    from datetime import date
+
+    day = date(2026, 9, 29)
+    doctor_id = _seed_doctor(lock_parity_engine)
+    with Session(lock_parity_engine) as seed:
+        if has_archived_null_tag:
+            seed.add(DailyQueue(day=day, specialist_id=doctor_id, queue_tag=None, active=False))
+        queue = DailyQueue(day=day, specialist_id=doctor_id, queue_tag="", active=True)
+        seed.add(queue)
+        seed.flush()
+        queue_id = queue.id
+        seed.commit()
+
+    with Session(lock_parity_engine) as batch:
+        queue = crud_online_queue.get_or_create_daily_queue(batch, day, doctor_id, queue_tag=None)
+        assert queue.id == queue_id
+        assert queue.active and queue.queue_tag == ""
+
+
+@pytest.mark.integration
 def test_mixed_creators_serialize_on_one_canonical_scope(lock_parity_engine):
     """Five real creation paths, one fresh (day, doctor): one queue row,
     one shared id, zero exceptions."""
