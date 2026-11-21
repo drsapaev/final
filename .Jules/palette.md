@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-11-11 - [Replaced Native Tooltips in FileManager]
+**Learning:** In `FileManager.tsx`, native `title` attributes on icon-only buttons (like Preview, Download, Delete, and Refresh) were causing redundant screen reader announcements alongside `aria-label`, and did not align with the design system's macOS style. Additionally, the decorative SVG icons lacked `aria-hidden="true"`, causing further screen reader noise.
+**Action:** Wrap icon-only buttons in `<Tooltip content="...">` from the design system and remove their native `title` attributes. Add `aria-hidden="true"` to the internal SVG icons.
