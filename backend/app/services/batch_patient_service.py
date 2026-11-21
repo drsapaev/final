@@ -15,10 +15,11 @@ from datetime import UTC, datetime
 from datetime import date as date_type
 from typing import Any, Literal
 
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
 from app.crud.queue_owner_policy import (
     eligible_real_doctor,
@@ -33,6 +34,10 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit
+from app.services.patient_subject_lock import (
+    PatientSubjectLockError,
+    lock_patient_subject,
+)
 from app.services.queue_domain_service import QueueDomainService
 from app.services.queue_service import get_queue_service
 from app.services.queue_status import is_terminal_queue
@@ -192,8 +197,6 @@ class BatchPatientService:
         visit branches (_BatchActor) finally get a real actor instead of
         the latent always-None _actor_user_id.
         """
-        from fastapi import HTTPException
-
         from app.services.profile_contact_security import (
             ProfileBearerInvalid,
             check_bearer_expiry,
@@ -228,7 +231,8 @@ class BatchPatientService:
         results: list[EntryResult] = []
 
         try:
-            # Начинаем неявную транзакцию
+            if request.common_updates and request.common_updates.discount_mode:
+                self._lock_common_discount_visits(patient_id, target_date, request.common_updates.discount_mode)
 
             # Обрабатываем каждое действие
             for entry_action in request.entries:
@@ -308,6 +312,12 @@ class BatchPatientService:
         except ProfileBearerInvalid:
             self.db.rollback()
             raise HTTPException(status_code=401, detail="Сеанс недоступен") from None
+        except PatientSubjectLockError as exc:
+            self.db.rollback()
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
+        except HTTPException:
+            self.db.rollback()
+            raise
         except RepeatEvidenceBusy:
             self.db.rollback()
             raise
@@ -933,6 +943,30 @@ class BatchPatientService:
             }
         ]
 
+    def _common_visit_query(self, patient_id: int, target_date: date_type) -> Query[Visit]:
+        return self.db.query(Visit).filter(
+            Visit.patient_id == patient_id,
+            Visit.visit_date == target_date,
+            Visit.status.notin_(["cancelled"]),
+        )
+
+    def _lock_common_discount_visits(self, patient_id: int, target_date: date_type, requested_mode: str) -> None:
+        """Reserve the patient and affected visits before any batch changes."""
+        mode = requested_mode.strip().casefold()
+        if mode in {"all_free", "benefit"}:
+            raise HTTPException(status_code=409, detail="Для этого режима скидки требуется согласование")
+        if not lock_patient_subject(self.db, patient_id):
+            raise HTTPException(status_code=409, detail="Карточка пациента недоступна")
+        current_modes = (
+            self._common_visit_query(patient_id, target_date)
+            .with_entities(Visit.discount_mode)
+            .order_by(Visit.id)
+            .with_for_update(of=Visit, nowait=True)
+            .all()
+        )
+        if any((current_mode or "").strip().casefold() == "all_free" for (current_mode,) in current_modes):
+            raise HTTPException(status_code=409, detail="Скидка визита All Free защищена заявкой на согласование")
+
     def _apply_common_updates(
         self,
         patient_id: int,
@@ -955,11 +989,7 @@ class BatchPatientService:
                 entry.notes = updates.notes
 
         # Обновляем Visit записи
-        visits = self.db.query(Visit).filter(
-            Visit.patient_id == patient_id,
-            Visit.visit_date == target_date,
-            Visit.status.notin_(["cancelled"])
-        ).all()
+        visits = self._common_visit_query(patient_id, target_date).all()
 
         for visit in visits:
             if updates.payment_type:

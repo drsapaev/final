@@ -490,6 +490,24 @@ def test_native_qr_cancellation_audits_only_the_unlinked_ticket(qr_financial_eng
         assert (audit.old_values["total_amount"], audit.new_values["total_amount"]) == (AMOUNT, 0)
 
 
+def test_native_batch_discount_waits_for_the_canonical_visit(qr_financial_engines, benefit_client):
+    owner, _ = qr_financial_engines
+    visit_id, line_id, _, _, headers = _seed_qr_all_free(owner)
+    request = {"common_updates": {"discount_mode": "percent_10"}}
+    with Session(owner) as blocker:
+        visit = blocker.get(Visit, visit_id, with_for_update=True)
+        route = f"/api/v1/registrar/batch/patients/{visit.patient_id}/entries/{visit.visit_date}"
+        conflict = benefit_client.patch(route, headers=headers, json=request)
+        assert conflict.status_code == 409, conflict.text
+        assert "занята" in conflict.json()["detail"]
+
+    saved = benefit_client.patch(route, headers=headers, json=request)
+    assert saved.status_code == 200, saved.text
+    with Session(owner) as db:
+        assert db.get(Visit, visit_id).discount_mode == "percent_10"
+        assert db.get(VisitService, line_id).price == AMOUNT
+
+
 @pytest.mark.parametrize(("action", "final_status", "final_price"), (
     ("approve", "approved", Decimal("0.00")),
     ("reject", "rejected", AMOUNT),
@@ -528,6 +546,8 @@ def test_native_qr_all_free_decision_and_audit(
     with Session(owner, expire_on_commit=False) as db:
         request = db.scalars(select(AllFreeRequest).filter_by(visit_id=visit_id)).one()
         request_id = request.id
+        target_visit = db.get(Visit, visit_id)
+        batch_route = f"/api/v1/registrar/batch/patients/{target_visit.patient_id}/entries/{target_visit.visit_date}"
         line = db.scalars(select(AllFreeRequestLine).filter_by(request_id=request_id)).one()
         assert (request.status, request.baseline_total) == ("pending", 2 * AMOUNT)
         assert (line.quantity, line.unit_price, line.gross_amount, line.currency) == (2, AMOUNT, 2 * AMOUNT, "UZS")
@@ -539,6 +559,11 @@ def test_native_qr_all_free_decision_and_audit(
         db.commit()
         admin_headers = {"Authorization": f"Bearer {mint_access_token(admin)}"}
 
+    batch_discount = {"common_updates": {"discount_mode": "none"}}
+    batch_pending = benefit_client.patch(batch_route, headers=registrar_headers, json=batch_discount)
+    assert batch_pending.status_code == 409, batch_pending.text
+    assert "заявкой" in batch_pending.json()["detail"]
+
     decision = benefit_client.post(
         "/api/v1/admin/all-free-approve", headers=admin_headers,
         json={"visit_id": visit_id, "action": action, "rejection_reason": "SYNTHETIC review"},
@@ -547,12 +572,14 @@ def test_native_qr_all_free_decision_and_audit(
     regular_decided = benefit_client.put(route, headers=registrar_headers, json=regular_command)
     assert regular_decided.status_code == 409, regular_decided.text
     assert regular_decided.json() == regular_pending.json()
+    assert benefit_client.patch(batch_route, headers=registrar_headers, json=batch_discount).status_code == 409
     with Session(owner) as db:
         visit = db.get(Visit, visit_id)
         entry = db.get(OnlineQueueEntry, entry_id)
         line = db.scalars(select(VisitService).filter_by(visit_id=visit_id)).one()
         request = db.get(AllFreeRequest, request_id)
         assert (visit.status, visit.approval_status, visit.confirmed_at) == ("pending_confirmation", final_status, None)
+        assert visit.discount_mode == "all_free"
         assert (line.qty, line.price, line.currency) == (2, final_price, "UZS")
         assert (entry.visit_id, entry.discount_mode, entry.total_amount) == (visit_id, "all_free", 2 * AMOUNT)
         assert (request.status, request.baseline_total, request.decided_by_user_id) == (final_status, 2 * AMOUNT, admin.id)

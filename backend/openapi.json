@@ -73396,7 +73396,7 @@
           "registrar-batch"
         ],
         "summary": "Batch-обновление записей пациента",
-        "description": "⭐ Атомарное batch-обновление всех записей пациента за день.\n\nПоддерживаемые действия для каждой записи:\n- update: обновить поля записи\n- cancel: отменить запись\n- create: создать новую запись\n\nТакже можно применить common_updates ко всем записям:\n- payment_type\n- discount_mode\n- notes\n\nАтомарность: если хотя бы одна операция не удалась,\nвсе изменения откатываются.\n\nДоступно: Admin, Registrar\n\nExample Request:\n```json\n{\n  \"entries\": [\n    {\"id\": 123, \"action\": \"update\", \"status\": \"called\"},\n    {\"id\": 124, \"action\": \"cancel\", \"reason\": \"Patient request\"},\n    {\"id\": null, \"action\": \"create\", \"specialty\": \"cardiology\"}\n  ],\n  \"common_updates\": {\n    \"payment_type\": \"card\",\n    \"discount_mode\": \"percent_10\"\n  }\n}\n```",
+        "description": "⭐ Атомарное batch-обновление всех записей пациента за день.\n\nПоддерживаемые действия для каждой записи:\n- update: обновить поля записи\n- cancel: отменить запись\n- create: создать новую запись\n\nТакже можно применить common_updates ко всем записям:\n- payment_type\n- discount_mode\n- notes\n\nAll Free и льготы оформляются отдельной заявкой на согласование.\n\nАтомарность: если хотя бы одна операция не удалась,\nвсе изменения откатываются.\n\nДоступно: Admin, Registrar\n\nExample Request:\n```json\n{\n  \"entries\": [\n    {\"id\": 123, \"action\": \"update\", \"status\": \"called\"},\n    {\"id\": 124, \"action\": \"cancel\", \"reason\": \"Patient request\"},\n    {\"id\": null, \"action\": \"create\", \"specialty\": \"cardiology\"}\n  ],\n  \"common_updates\": {\n    \"payment_type\": \"card\",\n    \"discount_mode\": \"percent_10\"\n  }\n}\n```",
         "operationId": "batch_update_patient_entries_api_v1_registrar_batch_patients__patient_id__entries__date__patch",
         "security": [
           {
@@ -73454,6 +73454,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StructuredErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Запись занята или для режима скидки требуется согласование",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }

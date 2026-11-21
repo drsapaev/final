@@ -131,6 +131,12 @@ async def get_patient_entries(
             "description": "Batch operation failed — structured error with code and message",
             "model": StructuredErrorResponse,
         },
+        409: {
+            "description": "Запись занята или для режима скидки требуется согласование",
+            "content": {"application/json": {"schema": {
+                "type": "object", "properties": {"detail": {"type": "string"}}, "required": ["detail"],
+            }}},
+        },
     },
 )
 async def batch_update_patient_entries(
@@ -153,6 +159,8 @@ async def batch_update_patient_entries(
     - payment_type
     - discount_mode
     - notes
+
+    All Free и льготы оформляются отдельной заявкой на согласование.
 
     Атомарность: если хотя бы одна операция не удалась,
     все изменения откатываются.

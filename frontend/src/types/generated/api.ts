@@ -23170,6 +23170,8 @@ export type paths = {
          *     - discount_mode
          *     - notes
          *
+         *     All Free и льготы оформляются отдельной заявкой на согласование.
+         *
          *     Атомарность: если хотя бы одна операция не удалась,
          *     все изменения откатываются.
          *
@@ -89806,6 +89808,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StructuredErrorResponse"];
+                };
+            };
+            /** @description Запись занята или для режима скидки требуется согласование */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
