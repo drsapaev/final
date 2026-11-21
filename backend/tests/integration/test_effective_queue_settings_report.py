@@ -549,8 +549,8 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    # Head pin follows the latest migration (0094 — 2FA trust expiry/codes).
-    assert revision == "0094_2fa_trust_expiry"
+    # Head pin follows the notification template uniqueness migration.
+    assert revision == "0102_visit_confirm_context"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

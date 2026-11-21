@@ -3,6 +3,8 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FolderTree, Package } from 'lucide-react';
+import { useConfirm } from '../common/ConfirmDialog';
+import type { RegistrarTabsManagerHandle } from './RegistrarTabsManager';
 
 import {
   Skeleton,
@@ -15,7 +17,7 @@ import type {
   QueueSetupSection,
 } from './AdminSetupDirections';
 
-const LazyQueueProfilesManager = React.lazy(() => import('./QueueProfilesManager'));
+const LazyRegistrarTabsManager = React.lazy(() => import('./RegistrarTabsManager'));
 const LazyServiceCatalog = React.lazy(() => import('./ServiceCatalog'));
 
 const getServiceTabs = (t: (key: string, options?: Record<string, unknown>) => string) => [
@@ -119,6 +121,10 @@ const AdminServices = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const { t: rawT } = useTranslation(); const t = rawT;
+  const [tabsDirty, setTabsDirty] = useState(false);
+  const [tabsSaving, setTabsSaving] = useState(false);
+  const [confirmDiscard, discardDialog] = useConfirm();
+  const tabsEditorRef = React.useRef<RegistrarTabsManagerHandle | null>(null);
   const [initialLocation] = useState(() => ({
     key: location.key,
     tab: getInitialServicesTab(location.search),
@@ -164,8 +170,23 @@ const AdminServices = () => {
     }
   }, [location.hash, location.pathname, location.search, location.state, navigate, servicesTab]);
 
-  const selectTab = (tabKey: ServiceTabKey) => {
+  const confirmLeaveTabs = async () => {
+    if (tabsSaving) return false;
+    if (!tabsDirty) return true;
+    const discard = await confirmDiscard({
+      title: t('registrarPanel.rt_title'),
+      message: t('registrarPanel.rt_unsaved_warning'),
+      confirmLabel: t('registrarPanel.rt_discard_confirm'),
+      cancelLabel: t('common.cancel'),
+      intent: 'warning',
+    });
+    if (discard) tabsEditorRef.current?.discardDraft();
+    return discard;
+  };
+
+  const selectTab = async (tabKey: ServiceTabKey) => {
     if (tabKey === servicesTab) return;
+    if (!await confirmLeaveTabs()) return;
     const params = new URLSearchParams(location.search);
     params.set('servicesTab', tabKey);
     const destination = tabKey === 'catalog'
@@ -193,6 +214,13 @@ const AdminServices = () => {
             className="admin-sdx-link"
             to={buildSetupReturnLocation(setupReturnContext)}
             data-testid="queue-setup-return-link"
+            onClick={(event) => {
+              if (!tabsDirty && !tabsSaving) return;
+              event.preventDefault();
+              void confirmLeaveTabs().then((canLeave) => {
+                if (canLeave) navigate(buildSetupReturnLocation(setupReturnContext));
+              });
+            }}
           >
             {t('admin2.sdx_title')}
           </Link>
@@ -207,7 +235,8 @@ const AdminServices = () => {
               type="button"
               key={tab.key}
               aria-label={tab.label}
-              onClick={() => selectTab(tab.key)}
+              onClick={() => { void selectTab(tab.key); }}
+              disabled={tabsSaving && tab.key !== servicesTab}
               className={isActive ? 'admin-services-tab-btn-active' : 'admin-services-tab-btn'}
               onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                 if (!isActive) {
@@ -234,9 +263,12 @@ const AdminServices = () => {
       )}
       {servicesTab === 'queue-profiles' && (
         <React.Suspense fallback={<Skeleton className="admin-skeleton-h-384" />}>
-          <LazyQueueProfilesManager theme={isDark ? 'dark' : 'light'} />
+          <LazyRegistrarTabsManager ref={tabsEditorRef} theme={isDark ? 'dark' : 'light'}
+            defaultOpenProfiles={setupReturnContext?.entity?.kind === 'queue_profile'}
+            onDirtyChange={setTabsDirty} onSavingChange={setTabsSaving} />
         </React.Suspense>
       )}
+      {discardDialog}
     </div>
   );
 };

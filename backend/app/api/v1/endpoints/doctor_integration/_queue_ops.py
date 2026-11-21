@@ -5,6 +5,8 @@ Split from doctor_integration.py (1900 LOC god file → modular).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     DOCTOR_QUEUE_ALLOWED_TAGS,
@@ -27,7 +29,13 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
 )
 from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
+    lock_paired_appointment,
     move_paired_appointment_to_day,
+)
+from app.models.enums import (
+    AppointmentStatus,
+    can_transition_status,
+    normalize_appointment_status,
 )
 from app.schemas.doctor_queue import (
     DoctorQueueStartVisitResponse,
@@ -40,6 +48,28 @@ from app.services.emr_completion_policy import (
 from app.services.emr_completion_policy import (
     saved_emr_pairs as get_saved_emr_pairs,
 )
+
+
+def _stage_locked_appointment_completion(appointment) -> None:
+    """Validate the legacy paid-to-completed shortcut without reopening terminals.
+
+    Existing queue flows complete paid appointments directly. Validate both
+    canonical legs in memory in the same transaction, without emitting a
+    separate in-visit commit or its side effects.
+    """
+    raw = appointment.status
+    if raw not in {"paid", "confirmed", "in_visit", "completed"}:
+        raise HTTPException(status_code=409, detail="Завершение записи недоступно")
+    current = normalize_appointment_status(raw)
+    if current == AppointmentStatus.COMPLETED:
+        return
+    if current == AppointmentStatus.PAID:
+        if not can_transition_status(current, AppointmentStatus.IN_VISIT):
+            raise HTTPException(status_code=409, detail="Завершение записи недоступно")
+        current = AppointmentStatus.IN_VISIT
+    if not can_transition_status(current, AppointmentStatus.COMPLETED):
+        raise HTTPException(status_code=409, detail="Завершение записи недоступно")
+    appointment.status = AppointmentStatus.COMPLETED.value
 
 
 @router.get(
@@ -322,7 +352,16 @@ def _clinic_now(db: Session) -> datetime:
     return datetime.now(ZoneInfo(tz_name))
 
 
-def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
+@dataclass(frozen=True)
+class _QueueVisitResolution:
+    visit: Visit
+    original_date: date | None
+    moved_appointment: Appointment | None = None
+
+
+def _resolve_entry_visit(
+    db: Session, queue_entry, doctor, department: str
+) -> _QueueVisitResolution:
     """Визит командной поверхности доктора привязан к САМОЙ записи очереди.
 
     visit_id-first: подтверждённый визит записи (OnlineQueueEntry.visit_id)
@@ -369,7 +408,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             # резолвит свежий визит дня очереди ниже.
             queue_day = getattr(queue_entry.queue, "day", None)
             if queue_day is None or visit.visit_date == queue_day:
-                return visit
+                return _QueueVisitResolution(visit, visit.visit_date)
             shared = (
                 db.query(OnlineQueueEntry.id)
                 .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
@@ -392,14 +431,8 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 is not None
             )
             if not shared:
-                # Codex round-43 P2: парный appointment следует за
-                # перештампованным визитом — completion ищет аппойнтмент
-                # по НОВОЙ visit_date, а канонический паринг бьёт по
-                # patient/date/time/doctor: визит, переехавший без
-                # своего аппойнтмента, оставляет его запланированным на
-                # старом дне (и канонический резолв может родить под
-                # него второй визит). Паринг — тот же, что у
-                # CanonicalVisitRepository (время — оба написания).
+                # Переносим парный appointment с исходного дня под lock.
+                # Completion использует ту же строку после смены даты.
                 # Corrective follow-up (вердикт владельца по смерженному
                 # рантайму, P1): паринг сужается департаментом визита,
                 # берётся под lock, переносится РОВНО ОДНА строка, при
@@ -407,8 +440,11 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # UPDATE сдвигал ОБА doctorless-аппойнтмента пациента
                 # того же дня (лабораторию вместе с процедурным
                 # переносом).
+                original_date = visit.visit_date
                 try:
-                    move_paired_appointment_to_day(db, visit=visit, new_day=queue_day)
+                    moved_appointment = move_paired_appointment_to_day(
+                        db, visit=visit, new_day=queue_day
+                    )
                 except AmbiguousAppointmentPairingError as exc:
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
@@ -419,7 +455,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                         ),
                     ) from exc
                 visit.visit_date = queue_day
-                return visit
+                return _QueueVisitResolution(visit, original_date, moved_appointment)
             # shared by live same-day tickets: fall through to the
             # branch-specific resolution below (fresh visit + relink)
 
@@ -442,6 +478,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             )
             .first()
         )
+        original_date = visit.visit_date if visit is not None else None
         if visit is None:
             # Owner round-3 P2 (PR #3367): commit=False — the visit
             # INSERT joins the CALLER's transaction. Both callers of
@@ -497,6 +534,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             )
             .first()
         )
+        original_date = visit.visit_date if visit is not None else None
         if visit is None:
             # Owner round-3 P2 (PR #3367): commit=False here too — the
             # doctor-branch creation is the same mid-composition INSERT
@@ -516,7 +554,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
 
     if queue_entry.visit_id != visit.id:
         queue_entry.visit_id = visit.id
-    return visit
+    return _QueueVisitResolution(visit, original_date)
 
 
 @router.post("/doctor/queue/{entry_id}/call", response_model=dict[str, Any])
@@ -810,7 +848,7 @@ def start_patient_visit(
             queue_entry,
             doctor,
             getattr(daily_queue, "queue_tag", None) or "general",
-        )
+        ).visit
 
         # BUG 3 fix (Codex P1): transition visit open→in_progress when starting
         # the visit. Without this, visit stays in "open" and complete_visit()
@@ -981,7 +1019,11 @@ def complete_patient_visit(
         appointment = None
         if not queue_entry:
             appointment = (
-                db.query(Appointment).filter(Appointment.id == entry_id).first()
+                db.query(Appointment)
+                .filter(Appointment.id == entry_id)
+                .with_for_update(of=Appointment)
+                .populate_existing()
+                .first()
             )
             if (
                 appointment
@@ -1033,8 +1075,13 @@ def complete_patient_visit(
                         status_code=status.HTTP_409_CONFLICT,
                         detail=EMR_REQUIRED_DETAIL,
                     )
-            # Обновляем статус appointment
-            appointment.status = "completed"
+            # Validate the refreshed locked state, not an earlier identity-map
+            # snapshot that may predate a patient's cancellation.
+            try:
+                _stage_locked_appointment_completion(appointment)
+            except HTTPException:
+                db.rollback()
+                raise
 
             db.commit()
             db.refresh(appointment)
@@ -1109,27 +1156,11 @@ def complete_patient_visit(
             department_hint = resource_department or (
                 getattr(daily_queue, "queue_tag", None) or "general"
             )
-            # DOCWORKLIST-neighbor hardening (2026-11-16): capture whether
-            # the anchored visit is DATELESS *before* _resolve_entry_visit —
-            # a dateless solo visit gets re-stamped to the queue day there
-            # (visit.visit_date = queue_day), but the canonical pairing
-            # (patient/date/time/doctor) can never have paired a NULL-day
-            # visit: Appointment.appointment_date == NULL matches nothing,
-            # so move_paired_appointment_to_day was a no-op for it. The
-            # appointment-sync further down must therefore NOT treat the
-            # re-stamped host-day date as a proven visit↔appointment link,
-            # or the doctor's unrelated TODAY appointment (same patient)
-            # gets falsely completed.
-            anchored_dateless = (
-                queue_entry.visit_id is not None
-                and db.query(Visit.visit_date)
-                .filter(Visit.id == queue_entry.visit_id)
-                .scalar()
-                is None
-            )
-            resolved_visit = _resolve_entry_visit(
+            was_linked = queue_entry.visit_id is not None
+            resolution = _resolve_entry_visit(
                 db, queue_entry, doctor, department_hint
             )
+            resolved_visit = resolution.visit
 
             completion_specialty = (
                 doctor.specialty if doctor else getattr(daily_queue, "queue_tag", None)
@@ -1170,6 +1201,51 @@ def complete_patient_visit(
                 completion_specialty=completion_specialty,
             )
             resolved_visit.updated_at = changed_at
+
+            # The resolver may have staged a move of the existing pair.
+            db.flush()
+            appointment = resolution.moved_appointment
+            if was_linked and resolution.original_date is None:
+                logger.warning(
+                    "complete_patient_visit: entry %d visit %d has no original appointment date; appointment sync skipped",
+                    queue_entry.id,
+                    resolved_visit.id,
+                )
+            elif (
+                resolution.original_date is not None
+                and resolution.original_date == resolved_visit.visit_date
+            ):
+                try:
+                    appointment = lock_paired_appointment(
+                        db, visit=resolved_visit, include_terminal=True,
+                    )
+                except AmbiguousAppointmentPairingError as exc:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=409, detail="Не удалось однозначно определить запись для визита"
+                    ) from exc
+            if appointment is not None:
+                db.refresh(appointment)
+                try:
+                    _stage_locked_appointment_completion(appointment)
+                except HTTPException:
+                    db.rollback()
+                    raise
+
+                from app.models.payment import Payment
+
+                payment = (
+                    db.query(Payment)
+                    .filter(Payment.visit_id == resolved_visit.id)
+                    .order_by(Payment.created_at.desc())
+                    .first()
+                )
+                if (
+                    payment
+                    and ((payment.status and payment.status.lower() == "paid") or payment.paid_at)
+                    and not appointment.payment_processed_at
+                ):
+                    appointment.payment_processed_at = payment.paid_at or changed_at
 
             # Stage the queue transition only after the EMR check
             # and visit lifecycle validation have both succeeded.
@@ -1219,47 +1295,6 @@ def complete_patient_visit(
                         visit.payment_processed_at = payment.paid_at or datetime.now(
                             UTC
                         )
-                # ✅ Также обновляем соответствующий Appointment, если он существует
-                from app.models.appointment import Appointment
-
-                # DOCWORKLIST-neighbor hardening (2026-11-16): a legacy
-                # DATELESS anchored visit was re-stamped to the queue day by
-                # _resolve_entry_visit above, but no canonical visit↔appointment
-                # pair ever existed for a NULL-day visit (pairing matches
-                # Appointment.appointment_date == NULL — always empty). Syncing
-                # the appointment of the re-stamped host day would falsely
-                # complete the doctor's unrelated TODAY appointment; skip the
-                # sync for anchored dateless visits instead.
-                if anchored_dateless:
-                    logger.warning(
-                        "complete_patient_visit: entry %d anchors a dateless "
-                        "visit %d — appointment sync skipped (no canonical "
-                        "pair existed for a NULL-day visit)",
-                        queue_entry.id,
-                        visit.id,
-                    )
-                    appointment = None
-                else:
-                    appointment = (
-                        db.query(Appointment)
-                        .filter(
-                            and_(
-                                Appointment.patient_id == queue_entry.patient_id,
-                                Appointment.appointment_date == visit.visit_date,
-                                Appointment.doctor_id == visit.doctor_id,
-                            )
-                        )
-                        .first()
-                    )
-
-                if appointment:
-                    appointment.status = "completed"
-                    # Appointment has no discount_mode; use its explicit payment marker.
-                    if payment_is_paid and not appointment.payment_processed_at:
-                        appointment.payment_processed_at = (
-                            payment.paid_at or datetime.now(UTC)
-                        )
-
                 if visit_data:
                     # Сохраняем медицинские данные, если переданы
                     crud_visit.complete_visit(

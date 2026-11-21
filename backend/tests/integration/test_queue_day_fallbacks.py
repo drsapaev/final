@@ -27,8 +27,9 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.security import get_password_hash
 from app.api.v1.endpoints.doctor_integration import _queue_ops as qops
+from app.core.security import get_password_hash
+from app.crud.clinic import clinic_today
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -77,8 +78,9 @@ def _mk_patient(db) -> Patient:
 
 @pytest.mark.integration
 class TestCompleteAppointmentSyncDatelessVisit:
-    def test_dateless_visit_does_not_mark_todays_appointment_completed(
-        self, db_session,
+    @pytest.mark.parametrize("has_original_date", [False, True])
+    def test_appointment_completion_uses_the_original_visit_date(
+        self, db_session, has_original_date,
     ):
         """complete_patient_visit with a dateless legacy visit must NOT
         complete the doctor's TODAY appointment. Root cause: the canonical
@@ -91,8 +93,9 @@ class TestCompleteAppointmentSyncDatelessVisit:
         user = _mk_user(db_session)
         doctor = _mk_doctor(db_session, user, "dentistry")
         patient = _mk_patient(db_session)
+        today = clinic_today(db_session)
         queue = DailyQueue(
-            day=date.today(),
+            day=today,
             specialist_id=doctor.id,
             queue_tag=f"tag_{uuid4().hex[:8]}",
             active=True,
@@ -109,7 +112,8 @@ class TestCompleteAppointmentSyncDatelessVisit:
             id=7001,
             patient_id=patient.id,
             doctor_id=doctor.id,
-            visit_date=None,  # legacy defect: dateless visit (nullable)
+            visit_date=today if has_original_date else None,
+            visit_time="10:45",
             status="in_progress",
             source="desk",
         )
@@ -119,10 +123,19 @@ class TestCompleteAppointmentSyncDatelessVisit:
             id=7002,
             patient_id=patient.id,
             doctor_id=doctor.id,
-            appointment_date=date.today(),  # TODAY (host) appointment
+            appointment_date=today,
+            appointment_time="10:45:00",
             status="confirmed",
         )
-        db_session.add(appointment)
+        other_appointment = Appointment(
+            id=7000,
+            patient_id=patient.id,
+            doctor_id=doctor.id,
+            appointment_date=today,
+            appointment_time="16:30",
+            status="confirmed",
+        )
+        db_session.add_all([other_appointment, appointment])
         payment = Payment(
             visit_id=visit.id,
             amount=100000,
@@ -153,8 +166,9 @@ class TestCompleteAppointmentSyncDatelessVisit:
         )
         db_session.expire_all()
 
-        db_session.refresh(appointment)
-        assert appointment.status != "completed", (
-            "host-day fallback completed an UNRELATED today appointment for "
-            "a dateless visit — the sync must skip (with a warning) instead"
-        )
+        assert appointment.status == ("completed" if has_original_date else "confirmed")
+        assert (appointment.payment_processed_at is not None) == has_original_date
+        assert other_appointment.status == "confirmed"
+        assert other_appointment.payment_processed_at is None
+        assert entry.status == "served"
+        assert visit.visit_date == today

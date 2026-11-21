@@ -93,7 +93,7 @@ class SetupService:
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to initialize deployment: {exc}",
+                detail="Failed to initialize deployment",
             ) from exc
 
     def _upsert_clinic_settings(self, payload: SetupInitializeIn) -> None:

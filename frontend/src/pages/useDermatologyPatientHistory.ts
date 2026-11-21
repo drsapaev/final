@@ -16,6 +16,9 @@ export interface DermatologySkinExamination {
   exam_date?: string;
   skin_type?: string;
   skin_condition?: string;
+  /** DERMAHIST-BE-001: canonical lesion localization projected by the
+   * history read model (legacy rows stay null). */
+  localization?: string | null;
   diagnosis?: string;
 }
 

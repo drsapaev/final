@@ -32,6 +32,7 @@ from app.services.public_booking_calendar_settings import (
     is_public_booking_calendar_setting_key,
 )
 from app.services.public_booking_settings import is_public_booking_settings_key
+from app.services.registrar_tabs import is_registrar_tabs_setting_key
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -120,12 +121,19 @@ def _admin_clinic_http_error(exc: Exception) -> HTTPException:
 
 
 def _is_reserved_public_booking_setting_key(key: str) -> bool:
-    return is_public_booking_calendar_setting_key(
-        key
-    ) or is_public_booking_settings_key(key)
+    return (
+        is_registrar_tabs_setting_key(key)
+        or is_public_booking_calendar_setting_key(key)
+        or is_public_booking_settings_key(key)
+    )
 
 
 def _reject_reserved_public_booking_setting_key(key: str) -> None:
+    if is_registrar_tabs_setting_key(key):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "use_registrar_tabs_endpoint"},
+        )
     if is_public_booking_calendar_setting_key(key):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

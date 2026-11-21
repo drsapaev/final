@@ -19,6 +19,7 @@
 import { api } from './client';
 import { hardRedirectToLogin } from '../utils/navigation';
 import logger from '../utils/logger';
+import { assertMedicalAiSafety } from '../utils/aiSafety';
 import type { HttpApiError } from '../types/errors';
 
 // Префикс для всех MCP-эндпоинтов. Подставляется к baseURL из api/client.js.
@@ -87,6 +88,13 @@ async function mcpRequest(method: string, path: string, config: Record<string, u
   }
 }
 
+/** Health, capabilities and reference lookups do not return AI suggestions. */
+async function medicalMcpRequest(method: string, path: string, config: Record<string, unknown> = {}): Promise<unknown> {
+  const response = await mcpRequest(method, path, config);
+  assertMedicalAiSafety(response);
+  return response;
+}
+
 /**
  * MCP API методы — публичный интерфейс.
  * Сигнатуры идентичны предыдущей версии для обратной совместимости.
@@ -130,7 +138,7 @@ export const mcpAPI = {
    * Анализ жалоб пациента
    */
   async analyzeComplaint(data: Record<string, unknown>, options: Record<string, unknown> = {}): Promise<unknown> {
-    return mcpRequest('post', '/complaint/analyze', {
+    return medicalMcpRequest('post', '/complaint/analyze', {
       data: {
         complaint: data.complaint,
         patient_age: data.patientAge,
@@ -146,7 +154,7 @@ export const mcpAPI = {
    * Валидация жалоб
    */
   async validateComplaint(complaint: string) {
-    return mcpRequest('post', '/complaint/validate', {
+    return medicalMcpRequest('post', '/complaint/validate', {
       params: { complaint },
     });
   },
@@ -165,7 +173,7 @@ export const mcpAPI = {
    * Подсказки кодов МКБ-10
    */
   async suggestICD10(data: Record<string, unknown>, options: Record<string, unknown> = {}): Promise<unknown> {
-    return mcpRequest('post', '/icd10/suggest', {
+    return medicalMcpRequest('post', '/icd10/suggest', {
       data: {
         symptoms: data.symptoms,
         diagnosis: data.diagnosis,
@@ -181,7 +189,7 @@ export const mcpAPI = {
    * Валидация кода МКБ-10
    */
   async validateICD10(code: string, symptoms: string | null = null, diagnosis: string | null = null) {
-    return mcpRequest('post', '/icd10/validate', {
+    return medicalMcpRequest('post', '/icd10/validate', {
       params: { code, symptoms, diagnosis },
     });
   },
@@ -201,7 +209,7 @@ export const mcpAPI = {
    * Интерпретация лабораторных результатов
    */
   async interpretLabResults(data: Record<string, unknown>) {
-    return mcpRequest('post', '/lab/interpret', {
+    return medicalMcpRequest('post', '/lab/interpret', {
       data: {
         results: data.results,
         patient_age: data.patientAge,
@@ -216,7 +224,7 @@ export const mcpAPI = {
    * Проверка критических значений
    */
   async checkCriticalValues(results: Record<string, unknown>) {
-    return mcpRequest('post', '/lab/check-critical', { data: results });
+    return medicalMcpRequest('post', '/lab/check-critical', { data: results });
   },
 
   /**
@@ -243,7 +251,7 @@ export const mcpAPI = {
     if (options.clinicalContext) formData.append('clinical_context', String(options.clinicalContext));
     if (options.provider) formData.append('provider', String(options.provider));
 
-    return mcpRequest('post', '/imaging/analyze', {
+    return medicalMcpRequest('post', '/imaging/analyze', {
       data: formData,
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -260,7 +268,7 @@ export const mcpAPI = {
     if (patientHistory) formData.append('patient_history', JSON.stringify(patientHistory));
     if (provider) formData.append('provider', provider);
 
-    return mcpRequest('post', '/imaging/skin-lesion', {
+    return medicalMcpRequest('post', '/imaging/skin-lesion', {
       data: formData,
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -280,7 +288,7 @@ export const mcpAPI = {
    * Пакетная обработка запросов
    */
   async batchProcess(requests: Array<Record<string, unknown>>, parallel: boolean = true) {
-    return mcpRequest('post', '/batch', {
+    return medicalMcpRequest('post', '/batch', {
       data: { requests, parallel },
     });
   },

@@ -15,10 +15,7 @@ without requiring a running server.
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
-import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -120,26 +117,55 @@ class TestAuditLogGeneration:
 class TestSessionFixation:
     """M4-P0-3: New login revokes existing sessions."""
 
-    def test_revoke_all_user_sessions_revokes_active(self):
+    def test_revoke_all_user_sessions_revokes_active(self, db_session):
         """_revoke_all_user_sessions revokes all active sessions."""
-        from app.services.auth_svc._tokens import TokensMixin
+        import uuid
 
-        class TestAuth(TokensMixin):
-            pass
+        from app.models.authentication import RefreshToken, UserSession
+        from app.models.user import User
+        from app.services.auth_svc import AuthenticationService
 
-        auth = TestAuth()
-        db = MagicMock()
+        user = User(
+            username=f"SYNTHETIC-{uuid.uuid4().hex}", hashed_password="x",
+            role="Doctor", is_active=True, auth_epoch=0,
+        )
+        other = User(
+            username=f"SYNTHETIC-{uuid.uuid4().hex}", hashed_password="x",
+            role="Doctor", is_active=True, auth_epoch=0,
+        )
+        db_session.add_all([user, other])
+        db_session.flush()
+        auth = AuthenticationService()
+        expires = datetime.now(UTC) + timedelta(days=1)
+        refreshes = []
+        for owner in (user, user, other):
+            jti = str(uuid.uuid4())
+            refreshes.append(RefreshToken(
+                user_id=owner.id, token=auth.create_refresh_token(owner.id, jti),
+                jti=jti, expires_at=expires, revoked=False,
+            ))
+        active = UserSession(
+            user_id=user.id, refresh_token=refreshes[0].token,
+            expires_at=expires, revoked=False,
+        )
+        already_revoked = UserSession(
+            user_id=user.id, refresh_token="SYNTHETIC-revoked",
+            expires_at=expires, revoked=True,
+        )
+        other_session = UserSession(
+            user_id=other.id, refresh_token=refreshes[2].token,
+            expires_at=expires, revoked=False,
+        )
+        db_session.add_all([*refreshes, active, already_revoked, other_session])
+        db_session.commit()
 
-        refresh_q = MagicMock()
-        refresh_q.filter.return_value.update.return_value = 2
-        session_q = MagicMock()
-        session_q.filter.return_value.update.return_value = 1
-        db.query.side_effect = [refresh_q, session_q]
-
-        result = auth._revoke_all_user_sessions(db, user_id=1, reason="new_login")
-
-        assert result == 1
-        assert db.commit.called
+        assert auth._revoke_all_user_sessions(db_session, user.id, reason="new_login") == 1
+        db_session.expire_all()
+        assert user.auth_epoch == 1 and other.auth_epoch == 0
+        assert active.revoked and already_revoked.revoked and not other_session.revoked
+        assert refreshes[0].revoked and refreshes[1].revoked and not refreshes[2].revoked
+        assert auth.refresh_access_token(db_session, refreshes[0].token)["success"] is False
+        assert auth.refresh_access_token(db_session, refreshes[2].token)["success"] is True
 
 
 class TestJWTExpiry:
@@ -147,17 +173,19 @@ class TestJWTExpiry:
 
     def test_verify_patient_jwt_rejects_expired(self):
         """verify_patient_jwt returns None for expired token."""
-        from app.services.telegram_mini_app_jwt import verify_patient_jwt
-        import jwt as jwt_lib
         import uuid
+
+        import jwt as jwt_lib
+
+        from app.services.telegram_mini_app_jwt import verify_patient_jwt
 
         payload = {
             "sub": "42",
             "scope": "patient",
             "type": "access",
             "jti": str(uuid.uuid4()),
-            "iat": datetime.now(timezone.utc) - timedelta(minutes=30),
-            "exp": datetime.now(timezone.utc) - timedelta(minutes=15),
+            "iat": datetime.now(UTC) - timedelta(minutes=30),
+            "exp": datetime.now(UTC) - timedelta(minutes=15),
         }
         token = jwt_lib.encode(payload, "test-secret", algorithm="HS256")
 
@@ -175,7 +203,6 @@ class TestEmergencyTokenOneTimeUse:
         """Second use of emergency token returns None."""
         from app.services.emergency_access_service import (
             consume_emergency_token,
-            issue_emergency_token,
         )
 
         db = MagicMock()
@@ -185,7 +212,7 @@ class TestEmergencyTokenOneTimeUse:
             mock_token = MagicMock()
             mock_token.id = 1
             mock_token.token_hash = "test_hash"
-            mock_token.expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+            mock_token.expires_at = datetime.now(UTC) + timedelta(minutes=15)
             mock_token.used = False
             mock_token.patient_id = 42
             mock_token.resource_type = "all"

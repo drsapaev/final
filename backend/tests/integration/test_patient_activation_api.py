@@ -17,6 +17,7 @@ the standard patient self-scope endpoint GET /patients/{id}).
 
 from __future__ import annotations
 
+import os
 from datetime import date
 
 import pytest
@@ -28,6 +29,9 @@ from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.services.patient_otp_service import get_patient_otp_service
 from tests.conftest import mint_access_token
+from tests.integration.test_patient_activation_pg_phone_scope import (
+    pg_engine,
+)  # noqa: F401
 
 pytestmark = pytest.mark.asyncio
 
@@ -80,6 +84,9 @@ async def test_full_activation_flow_over_http(
     monkeypatch.setattr(
         "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
     )
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "REVOKE_SESSIONS_ON_NEW_LOGIN", True)
     patient = make_patient(db_session, phone=PHONE)
 
     # 1) registrar issues the token (201)
@@ -88,7 +95,7 @@ async def test_full_activation_flow_over_http(
     issue_body = r_issue.json()
     token = issue_body["activation_token"]
     assert issue_body["expires_in_hours"] == 72
-    assert issue_body["phone_masked"] == "+998900•••001"  # canonical 3-digit mask
+    assert issue_body["phone_masked"] == "•••001"  # canonical 3-digit mask
     assert PHONE not in issue_body["phone_masked"]
 
     # 2) activation OTP: NO client phone field exists; goes to the card phone
@@ -112,14 +119,27 @@ async def test_full_activation_flow_over_http(
     db_session.refresh(patient)
     jwt_user = db_session.query(User).filter(User.id == body["user"]["id"]).first()
     assert jwt_user is not None and patient.user_id == jwt_user.id
+    # The response token carries the post-login generation and authenticates;
+    # a pre-generation token without auth_epoch must not authenticate afterward.
+    import jwt
+
+    claims = jwt.decode(
+        body["access_token"], settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+    )
+    assert claims["sub"] == str(jwt_user.id)
+    assert claims["auth_epoch"] == jwt_user.auth_epoch > 0
     r_me = client.get(
         f"/api/v1/patients/{patient.id}",
-        headers={
-            "Authorization": f"Bearer {create_access_token({'sub': str(jwt_user.id)})}"
-        },
+        headers={"Authorization": f"Bearer {body['access_token']}"},
     )
-    assert r_me.status_code == 200
+    assert r_me.status_code == 200, r_me.text
     assert r_me.json()["id"] == patient.id
+    legacy = create_access_token({"sub": str(jwt_user.id)})
+    r_legacy = client.get(
+        f"/api/v1/patients/{patient.id}",
+        headers={"Authorization": f"Bearer {legacy}"},
+    )
+    assert r_legacy.status_code == 401
 
     # 5) token single-use over HTTP: replay confirm -> generic 400
     r_replay = client.post(CONFIRM_PATH, json={"activation_token": token, "code": code})
@@ -511,9 +531,7 @@ async def test_phone_change_stores_canonical_http(client, db_session, auth_heade
     assert r.status_code == 200, r.text[:300]
 
     profile = (
-        db_session.query(UserProfile)
-        .filter(UserProfile.user_id == user.id)
-        .first()
+        db_session.query(UserProfile).filter(UserProfile.user_id == user.id).first()
     )
     assert profile.phone == FAMILY_PHONE  # canonical, NOT the raw input
     assert profile.phone_verified is True  # normalized-equal: no re-bind
@@ -521,3 +539,98 @@ async def test_phone_change_stores_canonical_http(client, db_session, auth_heade
         db_session, FAMILY_PHONE
     )
     assert resolved is not None and resolved.id == user.id
+
+
+@pytest.mark.skipif(
+    not os.environ.get("PR_A2_REAL_REDIS_URL"),
+    reason="provide disposable Redis through PR_A2_REAL_REDIS_URL",
+)
+async def test_activation_epoch_http_postgres_redis(pg_engine, monkeypatch):
+    """Exercise the issued bearer on disposable PostgreSQL and real Redis."""
+    from urllib.parse import urlsplit
+    from uuid import uuid4
+
+    import jwt
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import Session
+
+    from app.core.config import settings
+    from app.db.session import get_db
+    from app.main import app
+    from app.services.patient_otp_service import _RedisBackend
+
+    redis_url = os.environ.get("PR_A2_REAL_REDIS_URL", "")
+    if not redis_url:
+        pytest.skip("provide disposable Redis through PR_A2_REAL_REDIS_URL")
+    if urlsplit(redis_url).hostname not in {"127.0.0.1", "localhost", "::1"}:
+        pytest.fail("activation test only permits disposable local Redis")
+    monkeypatch.setenv("REDIS_URL", redis_url)
+    monkeypatch.setattr(settings, "SMS_DEFAULT_PROVIDER", "mock")
+    monkeypatch.setattr(settings, "REVOKE_SESSIONS_ON_NEW_LOGIN", True)
+    otp = get_patient_otp_service()
+    backend = _RedisBackend()
+    backend.last_sent_code = {}
+    otp._backend = backend
+    phone = "+99890" + str(int(uuid4().hex[:8], 16) % 10_000_000).zfill(7)
+    with Session(pg_engine) as setup:
+        registrar = User(
+            username="synthetic-registrar-" + uuid4().hex[:12],
+            hashed_password="synthetic",
+            role="Registrar",
+            is_active=True,
+            is_superuser=False,
+        )
+        card = Patient(first_name="Synthetic", last_name="Activation", phone=phone)
+        setup.add_all([registrar, card])
+        setup.commit()
+        registrar_token = mint_access_token(registrar)
+        patient_id = card.id
+
+    def override_db():
+        with Session(pg_engine) as db:
+            yield db
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        with TestClient(app) as api:
+            issued = api.post(
+                ISSUE_PATH.format(pid=patient_id),
+                headers={"Authorization": f"Bearer {registrar_token}"},
+            )
+            assert issued.status_code == 201, issued.text
+            token = issued.json()["activation_token"]
+            requested = api.post(OTP_PATH, json={"activation_token": token})
+            assert requested.status_code == 200, requested.text
+            code = backend.last_sent_code[f"patact:{phone}"]
+            confirmed = api.post(
+                CONFIRM_PATH, json={"activation_token": token, "code": code}
+            )
+            assert confirmed.status_code == 200, confirmed.text
+            payload = confirmed.json()
+            claims = jwt.decode(
+                payload["access_token"],
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM],
+            )
+            with Session(pg_engine) as db:
+                user = db.get(User, payload["user"]["id"])
+                assert user and claims["sub"] == str(user.id)
+                assert claims["auth_epoch"] == user.auth_epoch > 0
+            live = api.get(
+                f"/api/v1/patients/{patient_id}",
+                headers={"Authorization": f"Bearer {payload['access_token']}"},
+            )
+            assert live.status_code == 200, live.text
+            legacy = create_access_token({"sub": claims["sub"]})
+            stale = api.get(
+                f"/api/v1/patients/{patient_id}",
+                headers={"Authorization": f"Bearer {legacy}"},
+            )
+            assert stale.status_code == 401
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        otp._reset_backend_for_tests()
+        keys = list(backend._client.scan_iter(match=f"*{phone}*"))
+        if keys:
+            backend._client.delete(*keys)
+        backend._client.close()

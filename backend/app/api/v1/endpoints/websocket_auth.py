@@ -23,6 +23,12 @@ from app.core.roles import (
     is_login_blocked_role,
     normalize_role_value,
 )
+from app.core.user_token_claims import (
+    has_patient_binding,
+    is_user_access_claims,
+    is_user_allowed_for_claims,
+    user_auth_epoch_matches,
+)
 from app.crud import user as crud_user
 from app.db.session import SessionLocal
 from app.middleware.websocket_rate_limit import websocket_rate_limiter
@@ -32,6 +38,7 @@ from app.ws.queue_ws import ws_manager
 logger = logging.getLogger(__name__)
 router = APIRouter()
 QUEUE_WS_AUTH_RECHECK_SECONDS = 15
+QUEUE_WS_AUTH_TIMEOUT_SECONDS = 2
 _ADMIN_WS_ROLES = frozenset(normalize_role_value(role) for role in ADMIN_ROLES)
 
 # ===================== WEBSOCKET АУТЕНТИФИКАЦИЯ =====================
@@ -81,9 +88,7 @@ def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
             return None
 
     if user is None:
-        logger.warning(
-            "WebSocket auth rejected: no user matched token subject %r", subject
-        )
+        logger.warning("WebSocket auth rejected: no user matched token subject")
         return None
 
     # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
@@ -121,8 +126,24 @@ def resolve_websocket_token_user(token: str | None, db: Session) -> User | None:
     except JWTError:
         return None
 
+    if not is_user_access_claims(payload):
+        return None
+
     user = _resolve_websocket_user(payload, db)
     if user is None:
+        return None
+
+    if not user_auth_epoch_matches(payload, getattr(user, "auth_epoch", None)):
+        return None
+
+    if not is_user_allowed_for_claims(
+        payload,
+        role=getattr(user, "role", None),
+        is_active=getattr(user, "is_active", None),
+        is_superuser=getattr(user, "is_superuser", None),
+    ):
+        return None
+    if not has_patient_binding(db, payload, user.id):
         return None
 
     # The subject may be a username instead of a numeric ID. Resolve the
@@ -132,7 +153,9 @@ def resolve_websocket_token_user(token: str | None, db: Session) -> User | None:
 
     jti = payload.get("jti")
     lookup_jti = jti if isinstance(jti, str) else ""
-    if TokenBlacklistService.is_token_blacklisted(db, lookup_jti, user_id=user.id):
+    if TokenBlacklistService.is_token_blacklisted(
+        db, lookup_jti, user_id=user.id, auth_epoch=user.auth_epoch
+    ):
         logger.warning(
             "WebSocket auth rejected: token revoked for user_id=%s", user.id
         )
@@ -156,6 +179,31 @@ def reauthorize_queue_websocket(token: str | None, department: str) -> User | No
         return user
     finally:
         db.close()
+
+
+async def _bounded_queue_authorization(token: str | None, department: str) -> User | None:
+    """Keep a stalled database from blocking the loop or extending access indefinitely."""
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(reauthorize_queue_websocket, token, department),
+            timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return None
+
+
+async def _close_expired_queue_socket(websocket: WebSocket) -> None:
+    """Do not let an unresponsive close delay room cleanup indefinitely."""
+    try:
+        await asyncio.wait_for(
+            websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Queue authorization expired or revoked",
+            ),
+            timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        pass
 
 
 # ===================== АУТЕНТИФИЦИРОВАННЫЕ WEBSOCKET ENDPOINTS =====================
@@ -185,7 +233,7 @@ async def ws_queue_authenticated(
     if secure_token and not token:
         token = secure_token
 
-    db = SessionLocal()
+    db = None
     ip_address = websocket.client.host if websocket.client else "unknown"
 
     try:
@@ -202,33 +250,17 @@ async def ws_queue_authenticated(
             return
 
         # Обязательная аутентификация
-        authenticated_user = await authenticate_websocket_token(token, db)
+        authenticated_user = await _bounded_queue_authorization(token, department)
         if not authenticated_user:
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token"
             )
             return
 
-        # Проверяем права доступа к отделению (WS-POSTMERGE-03: ownership
-        # через SSOT doctors.user_id; сессия уже в скоупе — передаём её).
-        if not _has_department_access(authenticated_user, department, db):
-            await websocket.close(
-                code=status.WS_1003_UNSUPPORTED_DATA,
-                reason="Access denied to department",
-            )
-            return
-
+        # The bounded worker checked both the user and department grant and
+        # released its short-lived DB session before returning.
         # ✅ SECURITY: Record connection after successful auth
         websocket_rate_limiter.record_connection(ip_address)
-
-        # LEGACYWSPOOL-BE-001 (P1 conditional): release the checked-out pool
-        # connection BEFORE the unlimited receive loop. The session was held
-        # for the whole WS lifetime; with the transport actually working
-        # (WS-POSTMERGE-04) every connected staff client pinned one of the
-        # PostgreSQL pool's 8+2 connections until disconnect. Per-message DB
-        # work opens short-lived sessions instead.
-        db.close()
-        db = None
 
         # WSHELPER-FE-001: echo the offered subprotocol so browser
         # handshakes complete.
@@ -272,10 +304,10 @@ async def ws_queue_authenticated(
 
         heartbeat_task = asyncio.create_task(send_heartbeat())
 
-        def refresh_queue_auth() -> bool:
+        async def refresh_queue_auth() -> bool:
             """Close this session when its current JWT or room grant is revoked."""
             nonlocal authenticated_user
-            current_user = reauthorize_queue_websocket(token, department)
+            current_user = await _bounded_queue_authorization(token, department)
             if current_user is None:
                 return False
             authenticated_user = current_user
@@ -295,11 +327,8 @@ async def ws_queue_authenticated(
                         ),
                     )
                     if loop.time() - last_auth_check[0] >= QUEUE_WS_AUTH_RECHECK_SECONDS:
-                        if not refresh_queue_auth():
-                            await websocket.close(
-                                code=status.WS_1008_POLICY_VIOLATION,
-                                reason="Queue authorization expired or revoked",
-                            )
+                        if not await refresh_queue_auth():
+                            await _close_expired_queue_socket(websocket)
                             break
                     message = json.loads(data)
 
@@ -315,17 +344,16 @@ async def ws_queue_authenticated(
                     # Обрабатываем сообщения от аутентифицированного клиента
                     # (LEGACYWSPOOL-BE-001: без удерживаемой сессии —
                     # обработчики открывают короткие сессии сами)
-                    await _handle_authenticated_message(
-                        websocket, message, authenticated_user, department, date, None
+                    await asyncio.wait_for(
+                        _handle_authenticated_message(
+                            websocket, message, authenticated_user, department, date, None
+                        ), timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
                     )
 
                 except TimeoutError:
                     if loop.time() - last_auth_check[0] >= QUEUE_WS_AUTH_RECHECK_SECONDS:
-                        if not refresh_queue_auth():
-                            await websocket.close(
-                                code=status.WS_1008_POLICY_VIOLATION,
-                                reason="Queue authorization expired or revoked",
-                            )
+                        if not await refresh_queue_auth():
+                            await _close_expired_queue_socket(websocket)
                             break
                     # Check if connection is still alive
                     # ✅ BUGFIX: Access list element to get current value
@@ -337,11 +365,13 @@ async def ws_queue_authenticated(
                         break
                     # Send ping to check connection
                     try:
-                        await websocket.send_json(
-                            {
-                                "type": "ping",
-                                "timestamp": asyncio.get_event_loop().time(),
-                            }
+                        await asyncio.wait_for(
+                            websocket.send_json(
+                                {
+                                    "type": "ping",
+                                    "timestamp": asyncio.get_event_loop().time(),
+                                }
+                            ), timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
                         )
                     except Exception:
                         break  # Connection is dead
@@ -409,35 +439,20 @@ async def ws_queue_optional_auth(
         )
         return
 
-    db = SessionLocal()
+    db = None
     authenticated_user = None
 
     try:
         # ✅ SECURITY: Require valid authentication
-        authenticated_user = await authenticate_websocket_token(token, db)
+        authenticated_user = await _bounded_queue_authorization(token, department)
         if not authenticated_user:
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token"
             )
             return
 
-        # WS-POSTMERGE-04: the latent RBAC trap — any authenticated JWT
-        # (including Patient) used to be accepted here. The same canonical
-        # department policy as /ws/queue/auth now runs BEFORE accept, so a
-        # repaired transport can never become a Patient/foreign-specialist
-        # subscription vector.
-        if not _has_department_access(authenticated_user, department, db):
-            await websocket.close(
-                code=status.WS_1008_POLICY_VIOLATION,
-                reason="Access denied to department",
-            )
-            return
-
-        # LEGACYWSPOOL-BE-001 (P1 conditional): release the pool connection
-        # before the unlimited receive loop (see /ws/queue/auth).
-        db.close()
-        db = None
-
+        # The bounded worker has already checked the canonical department
+        # policy and released its short-lived DB session.
         # WSHELPER-FE-001: echo the offered subprotocol so browser
         # handshakes complete.
         await accept_echoing_subprotocol(websocket)
@@ -467,12 +482,9 @@ async def ws_queue_optional_auth(
                     data = None
 
                 if loop.time() - last_auth_check >= QUEUE_WS_AUTH_RECHECK_SECONDS:
-                    current_user = reauthorize_queue_websocket(token, department)
+                    current_user = await _bounded_queue_authorization(token, department)
                     if current_user is None:
-                        await websocket.close(
-                            code=status.WS_1008_POLICY_VIOLATION,
-                            reason="Queue authorization expired or revoked",
-                        )
+                        await _close_expired_queue_socket(websocket)
                         break
                     authenticated_user = current_user
                     last_auth_check = loop.time()
@@ -484,8 +496,10 @@ async def ws_queue_optional_auth(
                 # Обрабатываем сообщения (только для аутентифицированных
                 # пользователей). LEGACYWSPOOL-BE-001: без удерживаемой
                 # сессии — обработчики открывают короткие сессии сами.
-                await _handle_authenticated_message(
-                    websocket, message, authenticated_user, department, date, None
+                await asyncio.wait_for(
+                    _handle_authenticated_message(
+                        websocket, message, authenticated_user, department, date, None
+                    ), timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
                 )
 
         except WebSocketDisconnect:
@@ -683,13 +697,14 @@ async def _handle_authenticated_message(
             # patient identifiers to the broadcast. Validate against the
             # queue SSOT (entry exists, is callable, lives in the room's
             # queue scope) with a SHORT-LIVED session before relaying.
-            session = SessionLocal()
-            try:
-                allowed, rejection_reason = _validate_patient_call(
-                    session, department, date, patient_id
-                )
-            finally:
-                session.close()
+            def validate_call():
+                session = SessionLocal()
+                try:
+                    return _validate_patient_call(session, department, date, patient_id)
+                finally:
+                    session.close()
+
+            allowed, rejection_reason = await asyncio.to_thread(validate_call)
             if allowed:
                 await _broadcast_patient_call(
                     department, date, patient_id, user.username
