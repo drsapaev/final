@@ -1,0 +1,52 @@
+name: Temporary Mini App tunnel egress diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/staging-miniapp-edge-diagnostic.yml']
+
+permissions: {}
+
+jobs:
+  edge-egress:
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      github.event.pull_request.head.repo.full_name == 'drsapaev/final' &&
+      github.head_ref == 'ci/miniapp-edge-diagnostic-20261121'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Check official Cloudflare edge DNS and outbound TCP only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import socket
+
+          lines = ["| Cloudflare Tunnel endpoint | IPv4 DNS | TCP 7844 |", "|---|---|---|"]
+          failures = 0
+          for host in ("region1.v2.argotunnel.com", "region2.v2.argotunnel.com"):
+              try:
+                  addresses = socket.getaddrinfo(host, 7844, socket.AF_INET, socket.SOCK_STREAM)
+              except socket.gaierror:
+                  addresses = []
+              tcp = False
+              for address in dict.fromkeys(entry[4][0] for entry in addresses):
+                  try:
+                      with socket.create_connection((address, 7844), timeout=2):
+                          tcp = True
+                          break
+                  except OSError:
+                      continue
+              failures += not tcp
+              lines.append(
+                  f"| `{host}` | {'PASS' if addresses else 'FAIL'} | {'PASS' if tcp else 'FAIL'} |"
+              )
+          lines.append("")
+          lines.append("TCP reachability only; no tunnel, credentials, ingress, or application.")
+          result = "\n".join(lines) + "\n"
+          print(result, end="")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(result)
+          raise SystemExit(bool(failures))
+          PY
