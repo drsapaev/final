@@ -27,6 +27,22 @@ on:
         type: boolean
         default: false
 
+  workflow_call:
+    inputs:
+      source-sha:
+        type: string
+        required: true
+      native-live:
+        type: boolean
+        required: true
+    secrets:
+      STAGING_TELEGRAM_BOT_TOKEN:
+        required: true
+      STAGING_TELEGRAM_CHAT_ID:
+        required: true
+      STAGING_MINIAPP_TUNNEL_TOKEN:
+        required: true
+
 permissions: {}
 
 jobs:
@@ -678,10 +694,11 @@ jobs:
       github.repository == 'drsapaev/final' &&
       github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main' &&
-      inputs.native-protected &&
-      !inputs.native-rehearsal
+      (inputs.native-protected || inputs.native-live) &&
+      !inputs.native-rehearsal &&
+      (!inputs.native-live || github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/main')
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: ${{ inputs.native-live && 65 || 35 }}
     environment: staging-integrations
     steps:
       - name: Prepare exact isolated backend, frontend and ingress
@@ -799,7 +816,7 @@ jobs:
           "$d/compose" pull postgres redis
           "$d/compose" build backend frontend
       - name: Start protected synthetic stack with token only in sealed backend
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.native-protected
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.native-protected || inputs.native-live)
         shell: bash
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
@@ -917,7 +934,188 @@ jobs:
           curl -fsS --max-time 5 -H "Host: $host" "http://127.0.0.1:18086/api/v1/auth/csrf-token" -o "$d/bootstrap.json"
           python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["csrf_token"]' "$d/bootstrap.json"
           test "$("$d/compose" ps --services --status running | sort)" = $'backend\nfrontend\ngateway\npostgres\nredis'
-          printf 'Loopback Mini App ingress and CSRF: PASS at `%s`. Public HTTPS and native Telegram: NOT_RUN.\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Loopback Mini App ingress and CSRF: PASS at `%s`. This step checks loopback only.\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
+      - name: Seed one approved synthetic Mini App identity
+        if: inputs.native-live
+        shell: bash
+        env:
+          STAGING_TELEGRAM_CHAT_ID: ${{ secrets.STAGING_TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ ! "$STAGING_TELEGRAM_CHAT_ID" =~ ^[1-9][0-9]{0,15}$ ]]; then
+            echo '::error::A verified private STAGING_TELEGRAM_CHAT_ID is required in staging-integrations.'
+            exit 1
+          fi
+          seed=$(cat <<'PY'
+          import os
+          import sys
+
+          from sqlalchemy import func, select, text
+
+          from app.db.session import SessionLocal
+          from app.models.patient import Patient
+          from app.models.telegram_config import TelegramUser
+
+          chat_id = int(sys.stdin.readline())
+          assert 0 < chat_id < 2**52
+          assert os.environ.get("ENV") == "staging"
+          with SessionLocal() as db:
+              assert db.get_bind().url.host == "postgres"
+              assert db.execute(text("select current_database(), current_user")).one() == (
+                  "miniapp_synthetic", "miniapp_synthetic",
+              )
+              for model in (Patient, TelegramUser):
+                  assert db.scalar(select(func.count()).select_from(model)) == 0
+              patient = Patient(first_name="SYNTHETIC", last_name="MINIAPP-STAGING")
+              db.add(patient)
+              db.flush()
+              db.add(TelegramUser(
+                  patient_id=patient.id,
+                  chat_id=chat_id,
+                  active=True,
+                  blocked=False,
+                  notifications_enabled=False,
+                  appointment_reminders=False,
+                  lab_notifications=False,
+              ))
+              db.commit()
+          PY
+          )
+          if ! printf '%s\n' "$STAGING_TELEGRAM_CHAT_ID" | "$d/compose" exec -T backend \
+              python -c "$seed" >/dev/null 2>&1; then
+            echo '::error::Synthetic identity could not be seeded in the isolated database.'
+            exit 1
+          fi
+
+      - name: Expose only the verified Mini App gateway and await session evidence
+        if: inputs.native-live
+        shell: bash
+        env:
+          TUNNEL_TOKEN: ${{ secrets.STAGING_MINIAPP_TUNNEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          host=miniapp-staging.finalclinic.fyi
+          origin="https://$host"
+          patient=/telegram/mini-app/patient
+          test -n "${TUNNEL_TOKEN:-}" || {
+            echo '::error::Dedicated STAGING_MINIAPP_TUNNEL_TOKEN is required in staging-integrations.'
+            exit 1
+          }
+          token=$TUNNEL_TOKEN
+          unset TUNNEL_TOKEN
+
+          http_status() {
+            curl --noproxy '*' --silent --max-time 5 --proto '=https' \
+              --output /dev/null --write-out '%{http_code}' "$origin$1" || true
+          }
+          offline() {
+            [[ "$(http_status "$patient")" =~ ^(404|502|503|525|530)$ ]]
+          }
+          offline || { echo '::error::Staging hostname is already serving the Mini App.'; exit 1; }
+          curl --fail --silent --show-error --location --max-time 40 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 \
+            --output "$d/cloudflared"
+          (cd "$d"; printf '%s  cloudflared\n' 1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872 | sha256sum --check -)
+          chmod 700 "$d/cloudflared"
+
+          connector=
+          cleanup_connector() {
+            local result=$? stopped=false
+            trap - EXIT
+            if [[ -n "$connector" ]]; then
+              kill -TERM "$connector" 2>/dev/null || true
+              for _ in {1..10}; do
+                kill -0 "$connector" 2>/dev/null || break
+                sleep 0.2
+              done
+              if kill -0 "$connector" 2>/dev/null; then kill -KILL "$connector" || result=1; fi
+              wait "$connector" 2>/dev/null || true
+              for _ in {1..8}; do
+                if offline; then stopped=true; break; fi
+                sleep 1
+              done
+              printf 'Public ingress stopped: %s.\n' "$stopped" >> "$GITHUB_STEP_SUMMARY"
+              [[ "$stopped" == true ]] || result=1
+            fi
+            exit "$result"
+          }
+          trap cleanup_connector EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          TUNNEL_TOKEN="$token" "$d/cloudflared" tunnel --no-autoupdate --protocol http2 \
+            --metrics 127.0.0.1:20246 run >/dev/null 2>&1 &
+          connector=$!
+          unset token
+
+          ready=false
+          for _ in {1..30}; do
+            kill -0 "$connector" 2>/dev/null || exit 1
+            if curl --noproxy '*' --fail --silent --max-time 4 --proto '=https' \
+                "$origin$patient?section=cabinet" -D "$d/public.headers" -o "$d/public.html" &&
+                cmp -s "$d/page" "$d/public.html"; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          [[ "$ready" == true ]] || { echo '::error::Public HTTPS did not return the verified Mini App build.'; exit 1; }
+          for denied in / /docs /openapi.json /api/v1/patients /api/v1/auth/me /sw.js /assets/not-built.js; do
+            test "$(http_status "$denied")" = 404
+          done
+          test "$(http_status /api/v1/auth/csrf-token)" = 200
+          grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/public.headers" >/dev/null
+          grep -qiE '^cross-origin-embedder-policy: require-corp' "$d/public.headers"
+          grep -qiE '^cache-control:.*no-store' "$d/public.headers"
+          printf 'Staging ready at https://%s%s?section=cabinet. Open the verified staging-bot Mini App under the same allowed Telegram account on both devices. Open the session list on A, wait 15 minutes after login without closing A, then refresh the session list on A, revoke B, verify B loses access, and log out on A. The window is 25 minutes.\n' "$host" "$patient"
+
+          # Only a boolean leaves the database, with no patient, session or request data.
+          query=$(cat <<'SQL'
+          SELECT EXISTS (
+            SELECT 1 FROM patient_access_audit_logs login
+            JOIN patient_access_audit_logs refresh ON refresh.session_id = login.session_id
+            JOIN patient_access_audit_logs revoke ON revoke.session_id = login.session_id
+            JOIN patient_access_audit_logs logout ON logout.session_id = login.session_id
+            JOIN patient_access_audit_logs second
+              ON second.subject_patient_id = login.subject_patient_id
+              AND second.session_id <> login.session_id
+            JOIN telegram_mini_app_sessions victim ON victim.id::text = second.session_id
+            WHERE login.resource_type = 'session_management' AND login.action = 'login'
+              AND login.outcome = 'success'
+              AND second.resource_type = 'session_management' AND second.action = 'login'
+              AND second.outcome = 'success' AND second.timestamp < revoke.timestamp
+              AND refresh.resource_type = 'session_management' AND refresh.action = 'refresh'
+              AND refresh.outcome = 'success'
+              AND refresh.timestamp >= login.timestamp + interval '15 minutes'
+              AND revoke.resource_type = 'session_management' AND revoke.action = 'revoke'
+              AND revoke.outcome = 'success' AND revoke.extra_data->>'revoked_count' = '1'
+              AND revoke.timestamp >= refresh.timestamp
+              AND (SELECT count(*) FROM telegram_mini_app_sessions sessions
+                   WHERE sessions.patient_id = login.subject_patient_id) = 2
+              AND victim.patient_id = login.subject_patient_id
+              AND victim.revoked_at BETWEEN refresh.timestamp AND revoke.timestamp
+              AND logout.resource_type = 'session_management' AND logout.action = 'logout'
+              AND logout.outcome = 'success' AND logout.extra_data->>'revoked_count' = '1'
+              AND logout.timestamp > revoke.timestamp
+          );
+          SQL
+          )
+          deadline=$((SECONDS + 1500))
+          while (( SECONDS < deadline )); do
+            kill -0 "$connector" 2>/dev/null || exit 1
+            evidence="$(timeout 10s "$d/compose" exec -T postgres psql -XAt \
+              --set ON_ERROR_STOP=on -U miniapp_synthetic -d miniapp_synthetic -c "$query" 2>/dev/null)"
+            if [[ "$evidence" == t ]]; then
+              printf 'Session audit PASS for 33f35996: two logins, refresh after 15 minutes, one other session revoked, current session logged out. Operator confirmation of the Telegram UI is recorded separately.\n' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          printf 'Native acceptance incomplete. Expected session evidence was missing at timeout.\n' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Remove exactly this isolated stack
         if: always()
         shell: bash
