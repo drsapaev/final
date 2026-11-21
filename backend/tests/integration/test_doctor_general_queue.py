@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import secrets
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal
 
 import pytest
 
 from app.core.security import get_password_hash
+from app.crud.clinic import clinic_today
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.emr_v2 import EMRRecord
@@ -764,6 +765,108 @@ class TestDoctorGeneralQueue:
         assert unrelated_visit.status == "open"
         assert unrelated_visit.visit_time == "08:00"
         assert unrelated_visit.notes == "do not touch"
+
+    @pytest.mark.parametrize(
+        ("notes_length", "expect_stamp"),
+        [
+            (None, True),
+            (64, True),
+            (512 - len("\nПрием начат в 00:00"), True),
+            (513 - len("\nПрием начат в 00:00"), False),
+            (512, False),
+        ],
+        ids=["empty", "existing", "exact-fit", "one-over", "full"],
+    )
+    def test_start_visit_preserves_pre_existing_visit_notes(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+        monkeypatch,
+        notes_length,
+        expect_stamp,
+    ):
+        """Preserve the full narrative even when the optional stamp cannot fit."""
+        notes = (
+            "SYNTHETIC заметка регистратора".ljust(notes_length, "я")
+            if notes_length is not None
+            else None
+        )
+        visit_day = clinic_today(db_session)
+        start_time = time(14, 27)
+        monkeypatch.setattr(
+            "app.api.v1.endpoints.doctor_integration._queue_ops._clinic_now",
+            lambda _db: datetime.combine(visit_day, start_time),
+        )
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        pre_existing_visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=doctor.id,
+            visit_date=visit_day,
+            visit_time="08:00",
+            status="open",
+            notes=notes,
+            discount_mode="none",
+            source="desk",
+        )
+        queue = DailyQueue(
+            day=visit_day,
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add_all([pre_existing_visit, queue])
+        db_session.commit()
+        db_session.refresh(pre_existing_visit)
+        db_session.refresh(queue)
+
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="called",
+            visit_id=pre_existing_visit.id,
+        )
+        db_session.add(entry)
+        db_session.commit()
+        db_session.refresh(entry)
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/start-visit",
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+
+        db_session.refresh(entry)
+        db_session.refresh(pre_existing_visit)
+        assert entry.status == "in_progress"
+        assert pre_existing_visit.status == "in_progress"
+        assert pre_existing_visit.visit_time == "14:27"
+        expected_notes = notes
+        if expect_stamp:
+            stamp = "Прием начат в 14:27"
+            expected_notes = f"{notes}\n{stamp}" if notes else stamp
+        assert pre_existing_visit.notes == expected_notes
 
     def test_general_queue_returns_empty_payload_without_configuration(
         self,
