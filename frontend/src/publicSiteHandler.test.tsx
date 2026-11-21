@@ -92,6 +92,46 @@ describe('public-site SSR request handler', () => {
     expect(html).not.toContain('/assets/clinic-app.js');
   });
 
+  it.each([
+    { path: '/', home: '/' },
+    { path: '/ru', home: '/ru' },
+    { path: '/contacts', home: '/' },
+    { path: '/ru/contacts', home: '/ru' },
+  ])('renders the published clinic logo on $path and falls back when absent', async ({ path, home }) => {
+    const apiOrigin = 'https://api.kosmed.test';
+    const logoPath = `/api/v1/public-site/media/${'b'.repeat(64)}`;
+
+    async function renderBrand(logoUrl: string | null) {
+      const fetchImpl = createFetch((url) => {
+        if (url.pathname === '/api/v1/public-site/clinic') {
+          return jsonResponse({ name: 'SYNTHETIC Clinic', logo_url: logoUrl });
+        }
+        expect(['/api/v1/public-site/doctors', '/api/v1/public-site/services']).toContain(url.pathname);
+        return jsonResponse([]);
+      });
+      const response = await handlePublicSiteRequest(
+        new Request(`https://preview.kosmed.test${path}`),
+        { apiOrigin, siteOrigin: 'https://www.kosmed.test', deploymentEnvironment: 'preview' },
+        assets,
+        fetchImpl,
+      );
+      expect(response.status).toBe(200);
+      const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+      return document.querySelector('header a.public-site__brand');
+    }
+
+    const brand = await renderBrand(logoPath);
+    expect(brand?.getAttribute('href')).toBe(home);
+    expect(brand?.textContent).toBe('Doktor KosMed Clinic');
+    expect(brand?.querySelector('img')?.getAttribute('src')).toBe(apiOrigin + logoPath);
+    expect(brand?.querySelector('img')?.getAttribute('alt')).toBe('');
+
+    const fallback = await renderBrand(null);
+    expect(fallback?.getAttribute('href')).toBe(home);
+    expect(fallback?.querySelector('img')).toBeNull();
+    expect(fallback?.querySelector('span[aria-hidden="true"]')?.textContent).toBe('K');
+  });
+
   it('shows doctor specialty, full name, and persisted experience on the public profile', async () => {
     const fetchImpl = createFetch((url) => {
       expect(url.pathname).toBe('/api/v1/public-site/doctors/dermatolog');
