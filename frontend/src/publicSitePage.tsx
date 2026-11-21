@@ -382,21 +382,45 @@ function ServiceList({ services, locale, copy, showPrices = false }: {
   );
 }
 
-function DoctorList({ doctors, locale, copy }: {
+function DoctorPortrait({ src, isProfile = false }: {
+  src: PublicSiteDoctor['portrait_url'];
+  isProfile?: boolean;
+}) {
+  if (!src) return null;
+  const size = isProfile ? 160 : 80;
+  return (
+    <img
+      className="public-site__doctor-portrait"
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      loading={isProfile ? undefined : 'lazy'}
+      fetchPriority={isProfile ? 'high' : undefined}
+      decoding="async"
+    />
+  );
+}
+
+function DoctorList({ doctors, locale, copy, showPortraits = false }: {
   doctors: PublicSiteDoctor[];
   locale: PublicSiteLocale;
   copy: Copy;
+  showPortraits?: boolean;
 }) {
   if (doctors.length === 0) return <p className="public-site__empty">{copy.emptyDoctors}</p>;
   return (
     <ul className="public-site__list public-site__list--doctors">
       {doctors.map((doctor) => (
         <li className="public-site__list-item" key={doctor.slug}>
-          <div>
-            <a className="public-site__list-title" href={localizePath('doctor', locale, doctor.slug)}>{formatDoctorHeading(doctor)}</a>
-            {doctor.experience_years != null && <p className="public-site__muted">{copy.experience(doctor.experience_years)}</p>}
-            {doctor.professional_category && <p className="public-site__muted">{doctor.professional_category}</p>}
-            <p>{doctor.bio}</p>
+          <div className="public-site__doctor-summary">
+            {showPortraits && <DoctorPortrait src={doctor.portrait_url} />}
+            <div>
+              <a className="public-site__list-title" href={localizePath('doctor', locale, doctor.slug)}>{formatDoctorHeading(doctor)}</a>
+              {doctor.experience_years != null && <p className="public-site__muted">{copy.experience(doctor.experience_years)}</p>}
+              {doctor.professional_category && <p className="public-site__muted">{doctor.professional_category}</p>}
+              <p>{doctor.bio}</p>
+            </div>
           </div>
           <a href={localizePath('doctor', locale, doctor.slug)}>{copy.openDoctor}</a>
         </li>
@@ -447,7 +471,7 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
     case 'prices':
       return <section className="public-site__section"><h1>{copy.prices}</h1><ServiceList services={data.services ?? []} locale={locale} copy={copy} showPrices /></section>;
     case 'doctors':
-      return <section className="public-site__section"><h1>{copy.doctors}</h1><DoctorList doctors={data.doctors ?? []} locale={locale} copy={copy} /></section>;
+      return <section className="public-site__section"><h1>{copy.doctors}</h1><DoctorList doctors={data.doctors ?? []} locale={locale} copy={copy} showPortraits /></section>;
     case 'contacts':
       return <section className="public-site__section"><h1>{copy.contacts}</h1><ContactLinks clinic={data.clinic} copy={copy} /></section>;
     case 'service':
@@ -465,9 +489,14 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
       return (
         <article className="public-site__section public-site__detail">
           <p className="public-site__eyebrow">{copy.doctorDetails}</p>
-          <h1>{formatDoctorHeading(data.doctor)}</h1>
-          {data.doctor.experience_years != null && <p className="public-site__muted">{copy.experience(data.doctor.experience_years)}</p>}
-          {data.doctor.professional_category && <p className="public-site__muted">{data.doctor.professional_category}</p>}
+          <div className="public-site__doctor-summary public-site__doctor-summary--profile">
+            <DoctorPortrait src={data.doctor.portrait_url} isProfile />
+            <div>
+              <h1>{formatDoctorHeading(data.doctor)}</h1>
+              {data.doctor.experience_years != null && <p className="public-site__muted">{copy.experience(data.doctor.experience_years)}</p>}
+              {data.doctor.professional_category && <p className="public-site__muted">{data.doctor.professional_category}</p>}
+            </div>
+          </div>
           <p>{data.doctor.bio}</p>
           <a className="public-site__button public-site__button--primary" href={localizePath('contacts', locale)}>{copy.contactClinic}</a>
         </article>

@@ -125,6 +125,66 @@ describe('public-site SSR request handler', () => {
     expect(html).toContain('SYNTHETIC verified doctor biography.');
   });
 
+  it.each([
+    { locale: 'uz-Latn', prefix: '' },
+    { locale: 'ru', prefix: '/ru' },
+  ])('renders published doctor portraits in the $locale catalog and profile', async ({ locale, prefix }) => {
+    const portraitPath = `/api/v1/public-site/media/${'a'.repeat(64)}`;
+    const apiOrigin = 'https://api.kosmed.test';
+    const doctor = {
+      slug: 'synthetic-with-portrait',
+      name: 'SYNTHETIC Doctor With Portrait',
+      bio: 'SYNTHETIC public biography.',
+      portrait_url: portraitPath,
+    };
+    const textOnlyDoctor = {
+      ...doctor,
+      slug: 'synthetic-without-portrait',
+      name: 'SYNTHETIC Doctor Without Portrait',
+      portrait_url: null,
+    };
+    const fetchImpl = createFetch((url) => {
+      expect(url.searchParams.get('locale')).toBe(locale);
+      if (url.pathname === '/api/v1/public-site/doctors') {
+        return jsonResponse([doctor, textOnlyDoctor]);
+      }
+      const profile = [doctor, textOnlyDoctor].find(({ slug }) =>
+        url.pathname === `/api/v1/public-site/doctors/${slug}`);
+      return profile ? jsonResponse(profile) : jsonResponse({}, 404);
+    });
+
+    async function renderDoctors(path: string) {
+      const response = await handlePublicSiteRequest(
+        new Request(`https://preview.kosmed.test${prefix}${path}`),
+        { apiOrigin, siteOrigin: 'https://www.kosmed.test', deploymentEnvironment: 'preview' },
+        assets,
+        fetchImpl,
+      );
+      expect(response.status).toBe(200);
+      return new DOMParser().parseFromString(await response.text(), 'text/html');
+    }
+
+    const catalog = await renderDoctors('/doctors');
+    expect(catalog.querySelectorAll('main img')).toHaveLength(1);
+    const cardPortrait = catalog.querySelector('main img');
+    expect(cardPortrait?.getAttribute('src')).toBe(apiOrigin + portraitPath);
+    expect(cardPortrait?.getAttribute('alt')).toBe('');
+    expect(cardPortrait?.getAttribute('loading')).toBe('lazy');
+    expect(cardPortrait?.closest('li')?.textContent).toContain(doctor.name);
+    expect(catalog.querySelector('main')?.textContent).toContain(textOnlyDoctor.name);
+
+    const profile = await renderDoctors(`/doctors/${doctor.slug}`);
+    const profilePortrait = profile.querySelector('main img');
+    expect(profilePortrait?.getAttribute('src')).toBe(apiOrigin + portraitPath);
+    expect(profilePortrait?.getAttribute('alt')).toBe('');
+    expect(profilePortrait?.getAttribute('loading')).not.toBe('lazy');
+    expect(profile.querySelector('main h1')?.textContent).toBe(doctor.name);
+
+    const textOnlyProfile = await renderDoctors(`/doctors/${textOnlyDoctor.slug}`);
+    expect(textOnlyProfile.querySelector('main img')).toBeNull();
+    expect(textOnlyProfile.querySelector('main h1')?.textContent).toBe(textOnlyDoctor.name);
+  });
+
   it('keeps live service prices on the prices page', async () => {
     const fetchImpl = createFetch((url) => {
       expect(url.pathname).toBe('/api/v1/public-site/services');
