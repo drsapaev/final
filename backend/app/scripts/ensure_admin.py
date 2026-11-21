@@ -14,24 +14,17 @@ BACKEND_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 if BACKEND_ROOT not in sys.path:
     sys.path.insert(0, BACKEND_ROOT)
 
+from app.core.security import get_password_hash  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.models.user import User  # type: ignore[attr-defined]  # noqa: E402
 from app.models.user_profile import UserProfile  # noqa: E402
 from app.services.setup_service import SetupService  # noqa: E402
-from app.services.token_blacklist_service import revoke_account_sessions_locked  # noqa: E402
+from app.services.token_blacklist_service import (
+    revoke_account_sessions_locked,
+)  # noqa: E402
 
 INITIALIZED_OVERRIDE_ENV = "ENSURE_ADMIN_ALLOW_INITIALIZED"
 INITIALIZED_OVERRIDE_CONFIRM_ENV = "ENSURE_ADMIN_CONFIRM_INITIALIZED_OVERRIDE"
-
-
-def _hash_or_plain(pw: str) -> str:
-    """Вернуть bcrypt-хэш, если passlib доступен, иначе исходную строку (для dev)."""
-    try:
-        from passlib.hash import bcrypt  # type: ignore
-
-        return bcrypt.hash(pw)
-    except Exception:
-        return pw
 
 
 def _required_admin_password() -> str:
@@ -61,10 +54,9 @@ def ensure_admin() -> dict:
         "true",
         "yes",
     }
-    confirm_initialized_override = (
-        os.getenv(INITIALIZED_OVERRIDE_CONFIRM_ENV, "").strip().lower()
-        in {"1", "true", "yes"}
-    )
+    confirm_initialized_override = os.getenv(
+        INITIALIZED_OVERRIDE_CONFIRM_ENV, ""
+    ).strip().lower() in {"1", "true", "yes"}
 
     with SessionLocal() as db:  # type: ignore # type: Session
         if SetupService(db).is_initialized():
@@ -79,12 +71,26 @@ def ensure_admin() -> dict:
                 }
 
         row = (
-            db.execute(select(User).where(User.username == username).with_for_update(key_share=True).execution_options(populate_existing=True)).scalars().first()
+            db.execute(
+                select(User)
+                .where(User.username == username)
+                .with_for_update(key_share=True)
+                .execution_options(populate_existing=True)
+            )
+            .scalars()
+            .first()
         )
 
         if not row and email:
             row = (
-                db.execute(select(User).where(User.email == email).with_for_update(key_share=True).execution_options(populate_existing=True)).scalars().first()
+                db.execute(
+                    select(User)
+                    .where(User.email == email)
+                    .with_for_update(key_share=True)
+                    .execution_options(populate_existing=True)
+                )
+                .scalars()
+                .first()
             )
 
         if row:
@@ -101,14 +107,26 @@ def ensure_admin() -> dict:
                 if not existing:
                     new_email = email
             reset_password = os.getenv("ADMIN_RESET_PASSWORD", "").strip().lower() in {
-                "1", "true", "yes",
+                "1",
+                "true",
+                "yes",
             }
-            password_hash = _hash_or_plain(_required_admin_password()) if reset_password else None
+            password_hash = (
+                get_password_hash(_required_admin_password())
+                if reset_password
+                else None
+            )
             profile = None
             if new_email:
-                profile = db.execute(
-                    select(UserProfile).where(UserProfile.user_id == row.id).with_for_update()
-                ).scalars().first()
+                profile = (
+                    db.execute(
+                        select(UserProfile)
+                        .where(UserProfile.user_id == row.id)
+                        .with_for_update()
+                    )
+                    .scalars()
+                    .first()
+                )
             if new_email or reset_password or row.role != "Admin" or not row.is_active:
                 revoke_account_sessions_locked(db, row, revoke_password_resets=True)
             if new_email:
@@ -140,12 +158,21 @@ def ensure_admin() -> dict:
             }
 
         existing_email = (
-            db.execute(select(User).where(User.email == email).with_for_update(key_share=True).execution_options(populate_existing=True)).scalars().first()
+            db.execute(
+                select(User)
+                .where(User.email == email)
+                .with_for_update(key_share=True)
+                .execution_options(populate_existing=True)
+            )
+            .scalars()
+            .first()
         )
         if existing_email:
             password = _required_admin_password()
-            password_hash = _hash_or_plain(password)
-            revoke_account_sessions_locked(db, existing_email, revoke_password_resets=True)
+            password_hash = get_password_hash(password)
+            revoke_account_sessions_locked(
+                db, existing_email, revoke_password_resets=True
+            )
             existing_email.username = username
             existing_email.role = "Admin"
             existing_email.is_active = True
@@ -168,7 +195,7 @@ def ensure_admin() -> dict:
             email=email,
             role="Admin",
             is_active=True,
-            hashed_password=_hash_or_plain(password),
+            hashed_password=get_password_hash(password),
         )
         db.add(row)
         db.commit()
