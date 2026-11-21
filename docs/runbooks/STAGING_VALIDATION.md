@@ -756,24 +756,24 @@ python -c "
 from app.core.pii_masker import mask_pii, mask_phone, mask_email, mask_name
 
 # Test per-field maskers
-assert mask_phone('+998901234567') == '•••567', mask_phone('+998901234567')
-assert mask_email('john@example.com').startswith('j'), mask_email('john@example.com')
-assert mask_name('Иван Иванов') == 'И.И.', mask_name('Иван Иванов')
+assert mask_phone('+000000000000') == '•••000', mask_phone('+000000000000')
+assert mask_email('synthetic@example.invalid').startswith('s'), mask_email('synthetic@example.invalid')
+assert mask_name('SYNTHETIC CHECK') == 'S.C.', mask_name('SYNTHETIC CHECK')
 
 # Test recursive mask_pii
 patient = {
-    'first_name': 'Akmal',
-    'last_name': 'Karimov',
-    'phone': '+998901234567',
-    'iin': '12345678901234',
-    'diagnosis': 'I10 Essential hypertension',
+    'first_name': 'SYNTHETIC',
+    'last_name': 'CHECK',
+    'phone': '+000000000000',
+    'iin': '00000000000000',
+    'diagnosis': 'SYNTHETIC',
     'id': 42,
 }
 masked = mask_pii(patient)
 print('Masked patient:', masked)
-assert masked['first_name'] == 'A.'
-assert masked['last_name'] == 'K.'
-assert masked['phone'] == '•••567'
+assert masked['first_name'] == 'S.'
+assert masked['last_name'] == 'C.'
+assert masked['phone'] == '•••000'
 assert masked['iin'] == '[REDACTED]'
 assert masked['diagnosis'] == '[REDACTED]'
 assert masked['id'] == 42  # untouched
@@ -785,7 +785,7 @@ print('✅ All PII scrubbing tests passed.')
 ### Expected
 
 ```
-Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '•••567', 'iin': '[REDACTED]', 'diagnosis': '[REDACTED]', 'id': 42}
+Masked patient: {'first_name': 'S.', 'last_name': 'C.', 'phone': '•••000', 'iin': '[REDACTED]', 'diagnosis': '[REDACTED]', 'id': 42}
 ✅ All PII scrubbing tests passed.
 ```
 

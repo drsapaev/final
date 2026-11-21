@@ -17,6 +17,57 @@ const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user';
 
+// The Mini App has a different principal, audience and refresh endpoint.
+// Keep its credentials in a dedicated tab-scoped namespace.
+const MINI_APP_SESSION_KEY = 'telegram_mini_app_session';
+export interface TelegramMiniAppStoredSession {
+  context: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+let miniAppMemory: TelegramMiniAppStoredSession | null = null;
+let miniAppStorageAvailable = true;
+
+export const miniAppTokenManager = {
+  get(): TelegramMiniAppStoredSession | null {
+    if (!miniAppStorageAvailable) return miniAppMemory;
+    let serialized: string | null;
+    try {
+      serialized = sessionStorage.getItem(MINI_APP_SESSION_KEY);
+    } catch {
+      miniAppStorageAvailable = false;
+      return miniAppMemory;
+    }
+    try {
+      const value: unknown = JSON.parse(serialized || 'null');
+      if (!value || typeof value !== 'object') return null;
+      const row = value as Record<string, unknown>;
+      if (typeof row.context !== 'string' || typeof row.access_token !== 'string'
+        || typeof row.refresh_token !== 'string' || typeof row.expires_at !== 'number') return null;
+      return row as unknown as TelegramMiniAppStoredSession;
+    } catch {
+      return null;
+    }
+  },
+  set(value: TelegramMiniAppStoredSession): void {
+    miniAppMemory = value;
+    try {
+      sessionStorage.setItem(MINI_APP_SESSION_KEY, JSON.stringify(value));
+    } catch {
+      miniAppStorageAvailable = false;
+    }
+  },
+  clear(): void {
+    miniAppMemory = null;
+    try {
+      sessionStorage.removeItem(MINI_APP_SESSION_KEY);
+    } catch {
+      miniAppStorageAvailable = false;
+    }
+  },
+};
+
 /**
  * Менеджер токенов
  */

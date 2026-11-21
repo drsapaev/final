@@ -45,7 +45,7 @@ describe('Telegram Mini App appointment create guardrails', () => {
       'const requestBody = buildMiniAppAppointmentRequestBody(authPayload, appointmentPreviewForm);'
     );
     expect(createHandler).toContain(
-      'api.post(\'/telegram/mini-app/appointments\', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)'
+      'telegramMiniAppApi.post(\'/telegram/mini-app/appointments\', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)'
     );
     expect(createHandler).not.toContain('/telegram/mini-app/appointments/preview');
     expect(createHandler).not.toMatch(/payment_provider|provider_payload|providerPayload|transaction|webhook|invoice|amount/i);

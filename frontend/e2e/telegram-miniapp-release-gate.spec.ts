@@ -56,6 +56,15 @@ const MINI_APP_VIEWPORTS = [
   { width: 1920, height: 1080 },
 ];
 
+const PATIENT_TOKEN_PAIR = {
+  access_token: 'synthetic-patient-access',
+  refresh_token: 'synthetic-patient-refresh',
+  token_type: 'bearer',
+  expires_in: 900,
+};
+const CURRENT_SESSION_ID = '11111111-1111-4111-8111-111111111111';
+const OTHER_SESSION_ID = '22222222-2222-4222-8222-222222222222';
+
 const MINI_APP_SCENARIOS: MiniAppScenario[] = [
   {
     name: 'onboarding-new',
@@ -280,6 +289,49 @@ for (const viewport of MINI_APP_VIEWPORTS) {
   }
 }
 
+test('Mini App devices require confirmation and preserve the current session', async ({ page }) => {
+  const scenario = MINI_APP_SCENARIOS.find(({ name }) => name === 'linked-cabinet')!;
+  await installMiniAppMocks(page, scenario);
+  const revokedIds: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/revoke')) revokedIds.push(request.url().split('/').at(-2)!);
+  });
+  await page.goto(`/telegram/mini-app/patient${scenario.query}`);
+  await expect(page.getByText('Это устройство', { exact: true })).toBeVisible();
+  const revoke = page.getByRole('button', { name: 'Завершить сеанс на устройстве Android', exact: true });
+  await revoke.click();
+  const confirmation = page.getByRole('group', { name: /Завершить выбранные сеансы/ });
+  await expect(confirmation).toBeFocused();
+  expect(revokedIds).toEqual([]);
+  await confirmation.getByRole('button', { name: 'Отмена', exact: true }).click();
+  expect(revokedIds).toEqual([]);
+  await revoke.click();
+  await confirmation.getByRole('button', { name: 'Подтвердить', exact: true }).click();
+  await expect(revoke).toHaveCount(0);
+  expect(revokedIds).toEqual([OTHER_SESSION_ID]);
+  await expect(page.getByText('Это устройство', { exact: true })).toBeVisible();
+});
+
+test('Mini App revoke others keeps this device and confirmed logout clears patient content', async ({ page }) => {
+  const scenario = MINI_APP_SCENARIOS.find(({ name }) => name === 'linked-cabinet')!;
+  await installMiniAppMocks(page, scenario);
+  await page.goto(`/telegram/mini-app/patient${scenario.query}`);
+  const revokeOthers = page.getByRole('button', { name: 'Завершить остальные сеансы', exact: true });
+  await expect(revokeOthers).toBeEnabled();
+  await revokeOthers.click();
+  await page.getByRole('group', { name: /Завершить выбранные сеансы/ })
+    .getByRole('button', { name: 'Подтвердить', exact: true }).click();
+  await expect(revokeOthers).toBeDisabled();
+  await expect(page.getByText('Это устройство', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Выйти на этом устройстве', exact: true }).click();
+  const confirmation = page.getByRole('group', { name: /Завершить текущий сеанс/ });
+  await expect(page.getByText('Алишер С.', { exact: true })).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Подтвердить', exact: true }).click();
+  await expect(page.getByText('Алишер С.', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Устройства и сеансы', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Сессия Telegram недоступна. Данные пациента не загружаются.', { exact: true })).toBeVisible();
+});
+
 test('TelegramManager dashboard and inbox 1280', async ({ page }) => {
   const errors = monitorRuntimeErrors(page);
   await page.setViewportSize({ width: 1280, height: 960 });
@@ -423,6 +475,16 @@ function monitorRuntimeErrors(page: Page): string[] {
 }
 
 async function installMiniAppMocks(page: Page, scenario: MiniAppScenario) {
+  const linkedPatient = scenario.manifest?.scope.type === 'linked_patient';
+  let sessions = [
+    { id: CURRENT_SESSION_ID, device_label: 'Windows', is_current: true },
+    { id: OTHER_SESSION_ID, device_label: 'Android', is_current: false },
+  ].map((session) => ({
+    ...session,
+    created_at: '2026-11-16T10:00:00Z',
+    last_active_at: '2026-11-16T10:00:00Z',
+    expires_at: '2026-11-23T10:00:00Z',
+  }));
   if (scenario.auth === 'telegram') {
     await page.addInitScript(() => {
       window.Telegram = {
@@ -458,7 +520,55 @@ async function installMiniAppMocks(page: Page, scenario: MiniAppScenario) {
     await route.fulfill({ status: 204, body: '' });
   });
 
+  await page.route('**/api/v1/telegram/mini-app/auth/exchange', async (route) => {
+    expect(scenario.auth).toBe('telegram');
+    expect(route.request().postDataJSON()).toEqual({ init_data: 'qa.init.data' });
+    expect(route.request().headers()['x-csrf-token']).toBe('test-csrf-token');
+    await route.fulfill({
+      status: linkedPatient ? 200 : 403,
+      contentType: 'application/json',
+      body: JSON.stringify(linkedPatient ? PATIENT_TOKEN_PAIR : {
+        detail: { reason: 'patient_scope_required' },
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/telegram/mini-app/sessions/**', async (route) => {
+    expect(linkedPatient).toBe(true);
+    expect(route.request().headers()['authorization']).toBe(`Bearer ${PATIENT_TOKEN_PAIR.access_token}`);
+    expect(route.request().headers()['x-csrf-token']).toBe('test-csrf-token');
+    expect(route.request().postDataJSON()).toEqual({});
+    const url = new URL(route.request().url());
+    let response: { sessions: typeof sessions; total: number } | { revoked: boolean; revoked_count: number };
+    if (url.pathname.endsWith('/list')) {
+      response = { sessions, total: sessions.length };
+    } else {
+      const before = sessions.length;
+      if (url.pathname.endsWith('/revoke-all')) sessions = sessions.filter(({ is_current }) => is_current);
+      else {
+        const id = url.pathname.split('/').at(-2);
+        expect(id).toBe(OTHER_SESSION_ID);
+        sessions = sessions.filter((session) => session.id !== id);
+      }
+      response = { revoked: true, revoked_count: before - sessions.length };
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
+  });
+
+  await page.route('**/api/v1/telegram/mini-app/auth/logout', async (route) => {
+    expect(route.request().headers()['authorization']).toBe(`Bearer ${PATIENT_TOKEN_PAIR.access_token}`);
+    expect(route.request().postDataJSON()).toEqual({});
+    await route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ revoked: true, revoked_count: 1 }),
+    });
+  });
+
   await page.route('**/api/v1/telegram/mini-app/patient/manifest', async (route) => {
+    if (linkedPatient) {
+      expect(route.request().headers()['authorization']).toBe(`Bearer ${PATIENT_TOKEN_PAIR.access_token}`);
+      expect(route.request().postDataJSON()).not.toHaveProperty('initData');
+      expect(route.request().postDataJSON()).not.toHaveProperty('entryToken');
+    }
     if (scenario.manifestErrorReason) {
       await route.fulfill({
         status: 403,
@@ -478,6 +588,8 @@ async function installMiniAppMocks(page: Page, scenario: MiniAppScenario) {
   });
 
   await page.route('**/api/v1/telegram/mini-app/cabinet/summary', async (route) => {
+    expect(route.request().headers()['authorization']).toBe(`Bearer ${PATIENT_TOKEN_PAIR.access_token}`);
+    expect(route.request().postDataJSON()).not.toHaveProperty('initData');
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -500,6 +612,9 @@ async function installMiniAppMocks(page: Page, scenario: MiniAppScenario) {
 }
 
 async function installAdminMocks(page: Page) {
+  // Dashboard snapshots use synthetic HTTP data and idle realtime channels.
+  await page.routeWebSocket('**/ws/chat*', () => {});
+  await page.routeWebSocket('**/ws/notifications/connect*', () => {});
   const token = createJwt(ADMIN_PROFILE);
   await page.addInitScript(({ authToken, profile }) => {
     window.sessionStorage.setItem('auth_token', authToken);

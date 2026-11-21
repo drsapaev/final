@@ -1,0 +1,14 @@
+.telegram-mini-app-sessions-list {
+  list-style: none;
+  padding: 0;
+}
+
+.telegram-mini-app-session {
+  padding-block: var(--mac-spacing-3, 12px);
+}
+
+.telegram-mini-app-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-2, 8px);
+}

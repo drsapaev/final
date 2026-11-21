@@ -1,58 +1,117 @@
-"""
-Telegram Mini App JWT Exchange Service — M4-P0-2 (Epic M4).
+"""Revocable patient-only Telegram JWT sessions with rotating refresh secrets."""
 
-Issues short-lived JWT after Telegram initData verification.
-This replaces the per-request initData-replay pattern with a proper
-OAuth-like exchange: initData → JWT → JWT used for all subsequent requests.
-
-Flow:
-    POST /telegram/mini-app/auth/exchange { initData }
-      → validate_telegram_mini_app_init_data(initData, max_age=5min, replay_check=True)
-      → resolve_telegram_mini_app_session_scope(db, init_data, expected_scope="patient")
-      → create_access_token({sub: patient_id, scope: "patient", ...})
-      → create UserSession with refresh_token
-      → return {access_token, refresh_token, expires_in}
-
-Security improvements over per-request initData:
-- initData used ONCE (replay protection via cache_manager)
-- initData max_age reduced from 24h to 5min
-- JWT short-lived (15 min) — even if leaked, small attack window
-- Refresh token stored in UserSession (revocable)
-"""
 from __future__ import annotations
 
-import logging
+import hashlib
+import hmac
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import parse_qsl
 
 import jwt
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.authentication import UserSession
+from app.models.telegram_mini_app_session import TelegramMiniAppSession
+from app.repositories.telegram_mini_app_session_repository import (
+    TelegramMiniAppSessionRepository,
+)
 from app.services.telegram_mini_app_init_data import (
     DEFAULT_MAX_AUTH_AGE_SECONDS,
     TelegramMiniAppInitDataError,
+    TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
     resolve_telegram_mini_app_session_scope,
     validate_telegram_mini_app_init_data,
 )
 
-logger = logging.getLogger(__name__)
-
-# JWT configuration for patient Mini App tokens
 PATIENT_JWT_ALGORITHM = "HS256"
-PATIENT_ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived: 15 minutes
-PATIENT_REFRESH_TOKEN_EXPIRE_DAYS = 7  # Refresh: 7 days
+PATIENT_JWT_AUDIENCE = "telegram-mini-app-patient"
+PATIENT_JWT_ISSUER = "clinic-telegram-mini-app"
+PATIENT_ACCESS_TOKEN_EXPIRE_MINUTES = 15
+PATIENT_REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 
 class TelegramMiniAppAuthExchangeError(ValueError):
-    """Raised when Mini App auth exchange fails."""
-
     def __init__(self, reason: str):
         super().__init__(reason)
         self.reason = reason
+
+
+@dataclass(frozen=True)
+class TelegramMiniAppPatientAuth:
+    session: TelegramMiniAppSession
+    scope: TelegramMiniAppSessionScope
+
+
+def _utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _digest(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _device_label(user_agent: str | None) -> str:
+    # Only coarse allowlisted labels reach the UI; never echo raw headers.
+    ua = (user_agent or "").lower()
+    for fragment, label in (
+        ("android", "Android"),
+        ("iphone", "iPhone"),
+        ("ipad", "iPad"),
+        ("windows", "Windows"),
+        ("macintosh", "macOS"),
+        ("linux", "Linux"),
+    ):
+        if fragment in ua:
+            return label
+    return "Telegram"
+
+
+def _encode_token(
+    row: TelegramMiniAppSession,
+    token_type: str,
+    now: datetime,
+    expiry: datetime,
+) -> str:
+    return jwt.encode(
+        {
+            # Namespaced subject and audience isolate staff authentication.
+            "sub": f"telegram-patient:{row.patient_id}",
+            "sid": row.id,
+            "scope": "patient",
+            "type": token_type,
+            "jti": str(uuid.uuid4()),
+            "iat": now,
+            "exp": expiry,
+            "iss": PATIENT_JWT_ISSUER,
+            "aud": PATIENT_JWT_AUDIENCE,
+        },
+        settings.SECRET_KEY,
+        algorithm=PATIENT_JWT_ALGORITHM,
+    )
+
+
+def _new_refresh_token(row: TelegramMiniAppSession) -> str:
+    return _encode_token(row, "refresh", datetime.now(UTC), _utc(row.expires_at))
+
+
+def _token_pair(row: TelegramMiniAppSession, refresh_token: str) -> dict[str, Any]:
+    now = datetime.now(UTC)
+    expiry = min(
+        now + timedelta(minutes=PATIENT_ACCESS_TOKEN_EXPIRE_MINUTES),
+        _utc(row.expires_at),
+    )
+    access_token = _encode_token(row, "access", now, expiry)
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": max(0, int((expiry - now).total_seconds())),
+    }
 
 
 def exchange_init_data_for_jwt(
@@ -60,209 +119,205 @@ def exchange_init_data_for_jwt(
     init_data_payload: str,
     *,
     bot_token: str,
-    request_ip: str | None = None,
     request_user_agent: str | None = None,
 ) -> dict[str, Any]:
-    """Exchange Telegram initData for short-lived JWT + refresh token.
-
-    M4-P0-2: This is the secure alternative to per-request initData replay.
-    initData is validated ONCE with max_age=5min and replay protection,
-    then a JWT is issued for subsequent requests.
-
-    Args:
-        db: SQLAlchemy session
-        init_data_payload: Telegram.WebApp.initData string
-        bot_token: Telegram bot token for HMAC verification
-        request_ip: Client IP (for UserSession audit)
-        request_user_agent: Client User-Agent (for UserSession audit)
-
-    Returns:
-        Dict with: access_token, refresh_token, token_type, expires_in,
-        patient_id, telegram_user_id
-
-    Raises:
-        TelegramMiniAppAuthExchangeError: if validation or scope resolution fails
-    """
-    # Step 1: Validate initData with SECURE defaults (5min + replay protection)
+    if not init_data_payload or len(init_data_payload) > 16384:
+        raise TelegramMiniAppAuthExchangeError("init_data_invalid")
     try:
+        # UNIQUE signed-initData digest consumes exchange atomically with the
+        # session. Cache get/set cannot provide this cross-worker guarantee.
         init_data = validate_telegram_mini_app_init_data(
             init_data_payload,
             bot_token=bot_token,
-            max_age_seconds=DEFAULT_MAX_AUTH_AGE_SECONDS,  # 5 minutes
-            replay_check=True,  # One-time use
+            max_age_seconds=DEFAULT_MAX_AUTH_AGE_SECONDS,
+            replay_check=False,
         )
-    except TelegramMiniAppInitDataError as exc:
-        logger.warning(
-            "Mini App auth exchange failed (init_data validation): %s",
-            exc.reason,
-        )
-        raise TelegramMiniAppAuthExchangeError(exc.reason) from exc
-
-    # Step 2: Resolve patient scope
-    try:
         scope = resolve_telegram_mini_app_session_scope(
             db,
             init_data,
             expected_scope="patient",
         )
-    except TelegramMiniAppSessionScopeError as exc:
-        logger.warning(
-            "Mini App auth exchange failed (scope resolution): %s",
-            exc.reason,
-        )
+    except (TelegramMiniAppInitDataError, TelegramMiniAppSessionScopeError) as exc:
         raise TelegramMiniAppAuthExchangeError(exc.reason) from exc
 
-    # Step 3: Create JWT access token
+    repo = TelegramMiniAppSessionRepository(db)
+    repo.lock_patient(scope.patient_id)
+    patient_link_epoch = repo.lock_patient_link_epoch(
+        telegram_user_id=scope.telegram_user_id,
+        patient_id=scope.patient_id,
+        chat_id=scope.telegram_chat_id,
+    )
+    if patient_link_epoch is None:
+        raise TelegramMiniAppAuthExchangeError("patient_link_invalid")
+
     now = datetime.now(UTC)
-    access_token_expires = timedelta(minutes=PATIENT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token_jti = str(uuid.uuid4())
-
-    access_token_payload = {
-        "sub": str(scope.patient_id),
-        "scope": "patient",
-        "telegram_user_id": scope.telegram_user_id,
-        "type": "access",
-        "jti": access_token_jti,
-        "iat": now,
-        "exp": now + access_token_expires,
-    }
-
-    access_token = jwt.encode(
-        access_token_payload,
-        settings.SECRET_KEY,
-        algorithm=PATIENT_JWT_ALGORITHM,
+    session_id = str(uuid.uuid4())
+    row = TelegramMiniAppSession(
+        id=session_id,
+        patient_id=scope.patient_id,
+        telegram_user_id=scope.telegram_user_id,
+        patient_link_epoch=patient_link_epoch,
+        init_data_hash=_digest(dict(parse_qsl(init_data_payload))["hash"]),
+        refresh_token_hash="",
+        device_label=_device_label(request_user_agent),
+        created_at=now,
+        last_active_at=now,
+        expires_at=now + timedelta(days=PATIENT_REFRESH_TOKEN_EXPIRE_DAYS),
     )
-
-    # Step 4: Create refresh token + UserSession
-    refresh_token_jti = str(uuid.uuid4())
-    refresh_token_expires = timedelta(days=PATIENT_REFRESH_TOKEN_EXPIRE_DAYS)
-
-    refresh_token_payload = {
-        "sub": str(scope.patient_id),
-        "scope": "patient",
-        "telegram_user_id": scope.telegram_user_id,
-        "type": "refresh",
-        "jti": refresh_token_jti,
-        "iat": now,
-        "exp": now + refresh_token_expires,
-    }
-
-    refresh_token = jwt.encode(
-        refresh_token_payload,
-        settings.SECRET_KEY,
-        algorithm=PATIENT_JWT_ALGORITHM,
-    )
-
-    # Step 5: M4-P0-3 — Revoke previous patient sessions for this telegram_user_id
-    # before creating a new one. This prevents session fixation: if a patient
-    # re-authenticates, old sessions are invalidated.
-    _revoke_previous_patient_sessions(db, scope.patient_id)
-
-    # Step 6: Store UserSession for revocation capability
-    user_session = UserSession(
-        # user_id is required by model — use patient_id as a placeholder.
-        # In a future migration, we may add patient_sessions table.
-        # For now, we store the session with a negative user_id to distinguish
-        # patient sessions from staff sessions.
-        # NOTE: This is a temporary approach until patient-specific session
-        # table is created (M4-P1-3 context roles).
-        user_id=-(scope.patient_id or 0),  # Negative = patient session
-        refresh_token=refresh_token,
-        expires_at=now + refresh_token_expires,
-        ip=request_ip,
-        user_agent=request_user_agent,
-    )
-    db.add(user_session)
-    db.commit()
-
-    # M4-P0-2: Do NOT log patient_id or telegram_user_id here —
-    # CodeQL flags this as clear-text logging of sensitive information.
-    # The audit trail (PatientAccessAuditLog) captures this in the DB.
-    logger.info("Mini App auth exchange successful")
-
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "expires_in": int(access_token_expires.total_seconds()),
-        "patient_id": scope.patient_id,
-        "telegram_user_id": scope.telegram_user_id,
-    }
-
-
-def verify_patient_jwt(token: str) -> dict[str, Any] | None:
-    """Verify a patient JWT access token.
-
-    M4-P0-2: Used by patient endpoints to verify Authorization: Bearer <JWT>.
-
-    Args:
-        token: JWT access token string
-
-    Returns:
-        Payload dict if valid, None if invalid/expired.
-    """
+    refresh_token = _new_refresh_token(row)
+    row.refresh_token_hash = _digest(refresh_token)
+    repo.add(row)
     try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise TelegramMiniAppAuthExchangeError("init_data_replayed") from exc
+    return _token_pair(row, refresh_token)
+
+
+def init_data_already_exchanged(db: Session, init_data_payload: str) -> bool:
+    """Consumed patient launch credentials cannot bypass session revocation."""
+    signature = dict(parse_qsl(init_data_payload)).get("hash", "")
+    return bool(signature) and TelegramMiniAppSessionRepository(db).init_data_exchanged(
+        _digest(signature),
+    )
+
+
+def _decode_token(token: str, token_type: str) -> dict[str, Any]:
+    try:
+        if not token or len(token) > 4096:
+            raise ValueError
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
             algorithms=[PATIENT_JWT_ALGORITHM],
+            audience=PATIENT_JWT_AUDIENCE,
+            issuer=PATIENT_JWT_ISSUER,
+            options={
+                "require": ["exp", "iat", "sub", "aud", "iss", "jti", "sid"],
+            },
         )
-        if payload.get("type") != "access":
-            return None
-        if payload.get("scope") != "patient":
-            return None
+        if payload.get("type") != token_type or payload.get("scope") != "patient":
+            raise ValueError
+        uuid.UUID(payload["sid"])
+        if not payload.get("jti"):
+            raise ValueError
         return payload
-    except jwt.ExpiredSignatureError:
-        logger.warning("Patient JWT expired")
-        return None
-    except jwt.InvalidTokenError:
-        logger.warning("Invalid patient JWT")
-        return None
+    except (jwt.InvalidTokenError, ValueError, KeyError, TypeError) as exc:
+        raise TelegramMiniAppAuthExchangeError("session_invalid") from exc
 
 
-def _revoke_previous_patient_sessions(db: Session, patient_id: int | None) -> int:
-    """M4-P0-3: Revoke all previous patient sessions before issuing a new JWT.
+def authenticate_patient_session(
+    db: Session,
+    token: str,
+    *,
+    lock: bool = False,
+) -> TelegramMiniAppPatientAuth:
+    payload = _decode_token(token, "access")
+    repo = TelegramMiniAppSessionRepository(db)
+    if lock:
+        existing = repo.get(payload["sid"])
+        if existing is None:
+            raise TelegramMiniAppAuthExchangeError("session_invalid")
+        repo.lock_patient(existing.patient_id)
+    context = repo.active_context(payload["sid"], datetime.now(UTC))
+    if context is None:
+        raise TelegramMiniAppAuthExchangeError("session_invalid")
+    row, chat_id = context
+    if payload["sub"] != f"telegram-patient:{row.patient_id}":
+        raise TelegramMiniAppAuthExchangeError("session_invalid")
+    return TelegramMiniAppPatientAuth(
+        row,
+        TelegramMiniAppSessionScope(
+            scope_type="patient",
+            patient_id=row.patient_id,
+            telegram_user_id=row.telegram_user_id,
+            telegram_chat_id=chat_id,
+        ),
+    )
 
-    Patient sessions are stored in UserSession with negative user_id
-    (e.g. user_id=-42 for patient_id=42). This function revokes all
-    active sessions for that patient before a new JWT exchange.
 
-    Args:
-        db: SQLAlchemy session
-        patient_id: Patient whose sessions to revoke
-
-    Returns:
-        Number of sessions revoked.
-    """
-    if patient_id is None:
-        return 0
-
+def verify_patient_jwt(token: str, db: Session) -> dict[str, Any] | None:
+    """Signature, server session, current account link and patient must be valid."""
     try:
+        authenticate_patient_session(db, token)
+        return _decode_token(token, "access")
+    except TelegramMiniAppAuthExchangeError:
+        return None
 
-        # Patient sessions use negative user_id (see exchange_init_data_for_jwt)
-        patient_session_user_id = -int(patient_id)
 
-        count = (
-            db.query(UserSession)
-            .filter(
-                UserSession.user_id == patient_session_user_id,
-                UserSession.revoked == False,
-            )
-            # UserSession has no revoked_at column (#2924) — see the same fix
-            # in telegram_webhook._routes and auth_svc._tokens.
-            .update({"revoked": True})
-        )
+def refresh_patient_session(db: Session, refresh_token: str) -> dict[str, Any]:
+    # Verify signature before a mismatch can invalidate a session family.
+    # Otherwise knowledge of a public session id would allow a logout DoS.
+    payload = _decode_token(refresh_token, "refresh")
+    session_id = payload["sid"]
+    repo = TelegramMiniAppSessionRepository(db)
+    existing = repo.get(session_id)
+    if existing is None:
+        raise TelegramMiniAppAuthExchangeError("session_invalid")
+    repo.lock_patient(existing.patient_id)
+    now = datetime.now(UTC)
+    context = repo.active_context(session_id, now)
+    if context is None:
+        raise TelegramMiniAppAuthExchangeError("session_invalid")
+    row, _chat_id = context
+    if payload["sub"] != f"telegram-patient:{row.patient_id}":
+        raise TelegramMiniAppAuthExchangeError("session_invalid")
+    if not hmac.compare_digest(row.refresh_token_hash, _digest(refresh_token)):
+        # Reuse of a rotated secret invalidates the whole session family.
+        row.revoked_at = now
         db.commit()
+        raise TelegramMiniAppAuthExchangeError("session_invalid")
+    rotated = _new_refresh_token(row)
+    row.refresh_token_hash = _digest(rotated)
+    row.last_active_at = now
+    db.commit()
+    return _token_pair(row, rotated)
 
-        if count > 0:
-            logger.info(
-                "Revoked %d previous patient sessions before new JWT exchange",
-                count,
-            )
 
-        return count
+def list_patient_sessions(
+    db: Session, token: str
+) -> tuple[TelegramMiniAppPatientAuth, dict]:
+    auth = authenticate_patient_session(db, token)
+    rows = TelegramMiniAppSessionRepository(db).list_active(
+        auth.session.patient_id,
+        datetime.now(UTC),
+    )
+    return auth, {
+        "sessions": [
+            {
+                "id": row.id,
+                "device_label": row.device_label,
+                "created_at": row.created_at,
+                "last_active_at": row.last_active_at,
+                "expires_at": row.expires_at,
+                "is_current": row.id == auth.session.id,
+            }
+            for row in rows
+        ],
+        "total": len(rows),
+    }
 
-    except Exception as e:
-        logger.error("Error revoking previous patient sessions: %s", e)
-        db.rollback()
-        return 0
+
+def revoke_patient_sessions(
+    db: Session,
+    token: str,
+    *,
+    target_id: str | None = None,
+    logout: bool = False,
+) -> tuple[TelegramMiniAppPatientAuth, int]:
+    auth = authenticate_patient_session(db, token, lock=True)
+    repo = TelegramMiniAppSessionRepository(db)
+    now = datetime.now(UTC)
+    if target_id is not None or logout:
+        target = repo.get(auth.session.id if logout else target_id)
+        if target is None or target.patient_id != auth.session.patient_id:
+            raise TelegramMiniAppAuthExchangeError("session_not_found")
+        if target.id == auth.session.id and not logout:
+            raise TelegramMiniAppAuthExchangeError("current_session_requires_logout")
+        count = int(target.revoked_at is None)
+        target.revoked_at = target.revoked_at or now
+    else:
+        count = repo.revoke_others(auth.session.patient_id, auth.session.id, now)
+    db.commit()
+    return auth, count

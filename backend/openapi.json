@@ -47809,17 +47809,77 @@
           "telegram-webhook"
         ],
         "summary": "Exchange Mini App Auth",
-        "description": "Exchange Telegram Mini App initData for short-lived JWT.\n\nM4-P0-2: Secure alternative to per-request initData replay.\n- initData validated ONCE (max_age=5min, replay protection)\n- Returns JWT access_token (15 min) + refresh_token (7 days)\n- Subsequent requests should use Authorization: Bearer <access_token>\n\nRequest body: { \"init_data\": \"<Telegram.WebApp.initData>\" }",
+        "description": "Consume signed Telegram initData once and create a patient-only session.",
         "operationId": "telegram_mini_app_auth_exchange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramMiniAppExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Telegram Mini App Auth Exchange"
+                  "$ref": "#/components/schemas/TelegramMiniAppTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/telegram/mini-app/auth/refresh": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "Refresh Mini App Auth",
+        "description": "Rotate a signed refresh credential without extending the session lifetime.",
+        "operationId": "telegram_mini_app_auth_refresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramMiniAppRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramMiniAppTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -47833,7 +47893,7 @@
           "telegram-webhook"
         ],
         "summary": "List Mini App Patient Sessions",
-        "description": "List active patient sessions (M4-P0-3).\n\nReturns active sessions for the authenticated patient, including\nIP, user-agent, and creation timestamp. Uses initData for auth\n(backward compat — will be replaced by JWT in future).\n\nRequest body: { \"init_data\": \"<Telegram.WebApp.initData>\" }",
+        "description": "List this patient's active devices and identify the current JWT session.",
         "operationId": "telegram_mini_app_patient_sessions_list",
         "responses": {
           "200": {
@@ -47841,14 +47901,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Telegram Mini App Patient Sessions List"
+                  "$ref": "#/components/schemas/TelegramMiniAppSessionListResponse"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "TelegramMiniAppPatientBearer": []
+          }
+        ]
       }
     },
     "/api/v1/telegram/mini-app/sessions/revoke-all": {
@@ -47857,7 +47920,7 @@
           "telegram-webhook"
         ],
         "summary": "Revoke All Mini App Patient Sessions",
-        "description": "Revoke all patient sessions except the current one (M4-P0-3).\n\nUsed when patient suspects their phone is stolen or wants to\nlog out from all other devices.\n\nRequest body: { \"init_data\": \"<Telegram.WebApp.initData>\" }",
+        "description": "Revoke all OTHER sessions; the calling JWT session remains active.",
         "operationId": "telegram_mini_app_patient_sessions_revoke_all",
         "responses": {
           "200": {
@@ -47865,14 +47928,93 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Telegram Mini App Patient Sessions Revoke All"
+                  "$ref": "#/components/schemas/TelegramMiniAppRevokeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramMiniAppPatientBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/telegram/mini-app/sessions/{session_id}/revoke": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "Revoke Mini App Patient Session",
+        "description": "Revoke one other device owned by this patient.",
+        "operationId": "telegram_mini_app_patient_session_revoke",
+        "security": [
+          {
+            "TelegramMiniAppPatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramMiniAppRevokeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
           }
         }
+      }
+    },
+    "/api/v1/telegram/mini-app/auth/logout": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "Logout Mini App Patient Session",
+        "description": "Explicitly terminate the current access and refresh credentials.",
+        "operationId": "telegram_mini_app_auth_logout",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramMiniAppRevokeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramMiniAppPatientBearer": []
+          }
+        ]
       }
     },
     "/api/v1/telegram/mini-app/booking/departments": {
@@ -122124,6 +122266,22 @@
         "title": "TelegramMiniAppBookingServicesRequest",
         "description": "Authenticated reference read for Admin-approved booking service IDs."
       },
+      "TelegramMiniAppExchangeRequest": {
+        "properties": {
+          "init_data": {
+            "type": "string",
+            "format": "password",
+            "title": "Init Data",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "init_data"
+        ],
+        "title": "TelegramMiniAppExchangeRequest"
+      },
       "TelegramMiniAppPatientCabinetSummaryRequest": {
         "properties": {
           "initData": {
@@ -122389,6 +122547,132 @@
           "reportId"
         ],
         "title": "TelegramMiniAppPatientReportDownloadRequest"
+      },
+      "TelegramMiniAppRefreshRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "format": "password",
+            "title": "Refresh Token",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "TelegramMiniAppRefreshRequest"
+      },
+      "TelegramMiniAppRevokeResponse": {
+        "properties": {
+          "revoked": {
+            "type": "boolean",
+            "title": "Revoked",
+            "default": true
+          },
+          "revoked_count": {
+            "type": "integer",
+            "title": "Revoked Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revoked_count"
+        ],
+        "title": "TelegramMiniAppRevokeResponse"
+      },
+      "TelegramMiniAppSessionItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "device_label": {
+            "type": "string",
+            "title": "Device Label"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_active_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Active At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "device_label",
+          "created_at",
+          "last_active_at",
+          "expires_at",
+          "is_current"
+        ],
+        "title": "TelegramMiniAppSessionItem"
+      },
+      "TelegramMiniAppSessionListResponse": {
+        "properties": {
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/TelegramMiniAppSessionItem"
+            },
+            "type": "array",
+            "title": "Sessions"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sessions",
+          "total"
+        ],
+        "title": "TelegramMiniAppSessionListResponse"
+      },
+      "TelegramMiniAppTokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "const": "bearer",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in"
+        ],
+        "title": "TelegramMiniAppTokenResponse"
       },
       "TelegramNotificationRequest": {
         "properties": {
@@ -132015,6 +132299,10 @@
             "tokenUrl": "/api/v1/authentication/login"
           }
         }
+      },
+      "TelegramMiniAppPatientBearer": {
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   },

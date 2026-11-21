@@ -99,6 +99,12 @@ def windows_distro_base_path(distribution: str) -> str:
         ) from None
 
 
+def _decode_native_output(data: bytes) -> str:
+    return data.decode(
+        "utf-16-le" if b"\0" in data else "utf-8", errors="replace"
+    ).strip()
+
+
 def native(argv: list[str], *, timeout: int = 30, operation: str = "native") -> str:
     try:
         result = subprocess.run(argv, capture_output=True, timeout=timeout, check=False)
@@ -107,24 +113,21 @@ def native(argv: list[str], *, timeout: int = 30, operation: str = "native") -> 
             f"NATIVE_UNAVAILABLE ({operation}): command missing or timed out; no mutation continued"
         ) from None
     if result.returncode:
-        # Native stderr can contain expanded secrets. Do not echo it or argv.
+        # Either stream can contain expanded secrets. Emit only fixed categories.
         category = (
-            f"; category {_compose_failure_category(result.stderr)}"
+            f"; category {_compose_failure_category(result.stdout, result.stderr)}"
             if operation.startswith("compose-")
             else ""
         )
         raise GuardError(
             f"NATIVE_FAILED ({operation}): exit {result.returncode}{category}; no subsequent command continued"
         )
-    data = result.stdout
-    return data.decode(
-        "utf-16-le" if b"\0" in data else "utf-8", errors="replace"
-    ).strip()
+    return _decode_native_output(result.stdout)
 
 
-def _compose_failure_category(stderr: bytes) -> str:
-    """Return one fixed category; never expose Compose stderr or arguments."""
-    text = stderr.decode("utf-8", errors="replace").casefold()
+def _compose_failure_category(*streams: bytes) -> str:
+    """Return one fixed category; never expose Compose output or arguments."""
+    text = "\n".join(_decode_native_output(stream) for stream in streams).casefold()
     patterns = (
         ("disk_exhausted", r"no space left on device|disk quota exceeded"),
         (
@@ -149,7 +152,9 @@ def _compose_failure_category(stderr: bytes) -> str:
         ),
         (
             "container_startup",
-            r"failed to create shim|failed to create task|failed to start container|failed to mount",
+            r"failed to create shim|failed to create task|failed to start container|failed to mount"
+            r"|dependency failed to start|container[^\r\n]*(?:is unhealthy|exited\b)"
+            r"|service[^\r\n]*didn't complete successfully",
         ),
         ("wsl_transport", r"wsl_e_[0-9a-f]+|wsl.*(?:failed|error)"),
     )

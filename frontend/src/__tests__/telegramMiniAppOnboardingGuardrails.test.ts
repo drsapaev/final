@@ -36,7 +36,7 @@ describe('Telegram Mini App onboarding guardrails', () => {
   it('does not fetch protected patient sections for onboarding scope manifests', () => {
     const manifestEffect = sourceBetween(
       appSource,
-      'api.post(\'/telegram/mini-app/patient/manifest\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
+      'telegramMiniAppApi.post(\'/telegram/mini-app/patient/manifest\', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)',
       'const capabilities = state.manifest?.capabilities || {};'
     );
 
@@ -44,7 +44,7 @@ describe('Telegram Mini App onboarding guardrails', () => {
     expect(manifestEffect).toContain('if (isOnboardingManifest) {');
     expect(manifestEffect).toContain('status: \'idle\'');
     expect(manifestEffect.indexOf('if (isOnboardingManifest) {')).toBeLessThan(
-      manifestEffect.indexOf('api.post(\'/telegram/mini-app/cabinet/summary\'')
+      manifestEffect.indexOf('telegramMiniAppApi.post(\'/telegram/mini-app/cabinet/summary\'')
     );
   });
 
@@ -58,6 +58,7 @@ describe('Telegram Mini App onboarding guardrails', () => {
     expect(onboardingBlockedPanel).toContain('t(\'onboardingBlockedText\')');
     expect(onboardingBlockedPanel).toContain('handleMiniAppCapabilitySelect(\'appointments\')');
     expect(onboardingBlockedPanel).toContain('handleMiniAppSupportClick');
+    expect(onboardingBlockedPanel).not.toContain('telegramMiniAppApi.post(');
     expect(onboardingBlockedPanel).not.toContain('api.post(');
     expect(onboardingBlockedPanel).not.toMatch(/403|Request failed|entryToken|patientId/);
   });
