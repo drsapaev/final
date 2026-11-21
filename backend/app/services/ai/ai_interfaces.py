@@ -8,7 +8,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from .medical_safety import MedicalAISafetyMeta
 
 
 class AITaskType(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
@@ -42,6 +44,8 @@ class AIResponse(BaseModel):
 
     Frontend всегда получает этот формат, независимо от провайдера или task type.
     """
+    model_config = ConfigDict(revalidate_instances="always", validate_assignment=True)
+
     status: str = Field(..., description="success | error | partial")
     data: dict[str, Any] = Field(default_factory=dict, description="Результат AI операции")
     provider: str = Field(..., description="openai | gemini | deepseek | mock")
@@ -53,6 +57,9 @@ class AIResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list, description="Предупреждения")
 
     # Medical compliance
+    ai_safety_meta: MedicalAISafetyMeta = Field(
+        ..., description="Server-owned safety boundary for medical AI suggestions"
+    )
     requires_doctor_confirmation: Literal[True] = Field(
         ..., description="Врач должен подтвердить предложение AI перед внесением в ЭМК"
     )
@@ -69,6 +76,13 @@ class AIResponse(BaseModel):
     # Metadata
     request_id: str | None = Field(None, description="Уникальный ID запроса для трекинга")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Время ответа")
+
+    @field_validator("requires_doctor_confirmation", mode="before")
+    @classmethod
+    def require_literal_confirmation(cls, value: Any) -> bool:
+        if value is not True:
+            raise ValueError("Doctor confirmation is required")
+        return True
 
 
 class AIICD10Suggestion(BaseModel):

@@ -34,6 +34,7 @@ import { useAppData } from '../../contexts/AppDataContext';
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
 import { readSavedEMRForCompletion, emrTextValue, emrTreatmentText } from './emrCompletion';
+import { assertMedicalAiSafety, hasMedicalAiSafety } from '../../utils/aiSafety';
 // Analytics is handled via handleTelemetry callback
 
 // Import modular sections
@@ -68,6 +69,7 @@ import { useConfirm } from '../common/ConfirmDialog';
 import notify from '../../services/notify';
 import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
+
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
 // (consistent with the rest of the app + screen-reader friendly via aria-label).
 import {
@@ -83,6 +85,14 @@ import {
     FilePenLine,
     Ban,
 } from 'lucide-react';
+
+/** Only reuse data together with the original verified server envelope. */
+export function readVerifiedMedicalAiCache(value: unknown): unknown[] | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const entry = value as { response?: unknown; suggestions?: unknown };
+    return hasMedicalAiSafety(entry.response) && Array.isArray(entry.suggestions)
+        ? entry.suggestions : null;
+}
 
 /**
  * EMRContainerV2 Component
@@ -416,6 +426,24 @@ export function EMRContainerV2({
     // AI Suggestions state — keyed by EMR field name (examination/diagnosis/treatment).
     const [aiSuggestions, setAiSuggestions] = useState<Record<string, unknown[]>>({});
     const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+    // A response belongs to the complete clinical input, not merely a visit.
+    // Replacing the scope during render invalidates in-flight responses even
+    // before effects run, including when the new input never starts a request.
+    const aiContextKey = JSON.stringify([
+        visitId, patientId, data?.specialty, emrTextValue(data?.complaints),
+        emrTextValue(data?.diagnosis), data?.patient_age, data?.patient_gender,
+    ]);
+    const aiScopeRef = useRef({ key: aiContextKey, active: true, versions: {} as Record<string, number> });
+    if (aiScopeRef.current.key !== aiContextKey) {
+        aiScopeRef.current = { key: aiContextKey, active: true, versions: {} };
+    }
+    useEffect(() => {
+        const scope = aiScopeRef.current;
+        scope.active = true;
+        setAiSuggestions({});
+        setAiLoading({});
+        return () => { scope.active = false; };
+    }, [aiContextKey]);
 
     // 🔄 Visit Lifecycle Management - критично для безопасности данных
     const visitLifecycle = useVisitLifecycle(visitId, patientId ?? 0, {
@@ -471,7 +499,9 @@ export function EMRContainerV2({
         const patientAge = typeof data?.patient_age === 'number' ? data?.patient_age : String(data?.patient_age ?? '');
         const patientGender = typeof data?.patient_gender === 'string' ? data?.patient_gender : String(data?.patient_gender ?? '');
         return cacheService.generateKey(
-            'ai',
+            'ai-safety-v1',
+            visitId,
+            patientId,
             fieldName,
             specialty,
             complaints,
@@ -479,7 +509,7 @@ export function EMRContainerV2({
             patientAge,
             patientGender
         );
-    }, [data?.specialty, data?.complaints, data?.diagnosis, data?.patient_age, data?.patient_gender]);
+    }, [visitId, patientId, data?.specialty, data?.complaints, data?.diagnosis, data?.patient_age, data?.patient_gender]);
 
     const buildAiTags = useCallback(() => {
         const tags = [CACHE_TAGS.aiAnalysis];
@@ -502,21 +532,22 @@ export function EMRContainerV2({
 
     // Handle AI Request - calls MCP API for suggestions
     const handleRequestAI = useCallback(async (fieldName: string) => {
+        const scope = aiScopeRef.current;
+        const version = (scope.versions[fieldName] ?? 0) + 1;
+        scope.versions[fieldName] = version;
+        const isCurrent = () => aiScopeRef.current === scope && scope.active
+            && scope.versions[fieldName] === version;
         // EMRAI-FE-001: same normalization applies to the debug preview —
         // `substring` on an object value would throw the same way.
         const complaintsPreviewText = emrTextValue(data?.complaints);
-        logger.info('[EMR AI Request]', {
-            fieldName,
-            specialty: data?.specialty || 'general',
-            complaintsLength: complaintsPreviewText.length,
-            complaintsPreview: complaintsPreviewText.substring(0, 50) || '(empty)'
-        });
+        logger.info('[EMR AI Request]', { fieldName, complaintsLength: complaintsPreviewText.length });
         handleTelemetry({ type: 'ai.requested', payload: { fieldName } });
 
         const cacheKey = buildAiCacheKey(fieldName);
-        const cachedSuggestions = cacheService.get(cacheKey);
+        setAiSuggestions(prev => ({ ...prev, [fieldName]: [] }));
+        const cachedSuggestions = readVerifiedMedicalAiCache(cacheService.get(cacheKey));
         if (cachedSuggestions) {
-            setAiSuggestions(prev => ({ ...prev, [fieldName]: cachedSuggestions }) as Record<string, unknown[]>);
+            setAiSuggestions(prev => ({ ...prev, [fieldName]: cachedSuggestions }));
             setAiLoading(prev => ({ ...prev, [fieldName]: false }));
             handleTelemetry({ type: 'ai.cache.hit', payload: { fieldName } });
             return;
@@ -569,12 +600,8 @@ export function EMRContainerV2({
                         specialty,
                         maxSuggestions: 5
                     }, requestOptions) as AiResult;
-                    logger.info('[EMR AI] ICD10 result:', result);
-
-                    // Log debug_meta in dev mode for transparency
-                    if (process.env.NODE_ENV === 'development' && result?.debug_meta) {
-                        logger.info('[AI Debug]', result.debug_meta);
-                    }
+                    if (requestOptions.signal.aborted || !isCurrent()) return;
+                    assertMedicalAiSafety(result);
 
                     // Handle wrapped response: {status, data: {suggestions: [...]}}
                     const icd10Data: AiResult['data'] | AiResult | undefined = result?.data || result;
@@ -594,7 +621,7 @@ export function EMRContainerV2({
                             ...prev,
                             [fieldName]: formattedSuggestions
                         }));
-                        cacheService.set(cacheKey, formattedSuggestions, {
+                        cacheService.set(cacheKey, { response: result, suggestions: formattedSuggestions }, {
                             ttl: CACHE_CONFIG.aiTTL,
                             tags: buildAiTags(),
                         });
@@ -616,12 +643,8 @@ export function EMRContainerV2({
                             patientAge: data?.patient_age,
                             patientGender: data?.patient_gender
                         }, requestOptions) as AiResult;
-                        logger.info('[EMR AI] Complaint analysis result:', result);
-
-                        // Log debug_meta in dev mode for transparency
-                        if (process.env.NODE_ENV === 'development' && result?.debug_meta) {
-                            logger.info('[AI Debug]', result.debug_meta);
-                        }
+                        if (requestOptions.signal.aborted || !isCurrent()) return;
+                        assertMedicalAiSafety(result);
 
                         const analysisData: AiResult['data'] | AiResult | undefined = result?.data || result;
                         if (analysisData) {
@@ -655,7 +678,7 @@ export function EMRContainerV2({
                             }
                             if (fieldSuggestions.length > 0) {
                                 setAiSuggestions(prev => ({ ...prev, [fieldName]: fieldSuggestions }));
-                                cacheService.set(cacheKey, fieldSuggestions, {
+                                cacheService.set(cacheKey, { response: result, suggestions: fieldSuggestions }, {
                                     ttl: CACHE_CONFIG.aiTTL,
                                     tags: buildAiTags(),
                                 });
@@ -683,6 +706,7 @@ export function EMRContainerV2({
                     logger.info('[EMR AI] No AI handler for field:', fieldName);
             }
         } catch (err) {
+            if (!isCurrent()) return;
             const errObj = err as { name?: string; code?: string; message?: string };
             if (errObj?.name === 'CanceledError' || errObj?.code === 'ERR_CANCELED') {
                 return;
@@ -690,7 +714,7 @@ export function EMRContainerV2({
             logger.error('[EMR AI Error]', err);
             handleTelemetry({ type: 'ai.error', payload: { fieldName, error: errObj?.message } });
         } finally {
-            setAiLoading(prev => ({ ...prev, [fieldName]: false }));
+            if (isCurrent()) setAiLoading(prev => ({ ...prev, [fieldName]: false }));
         }
     }, [
         data?.specialty,

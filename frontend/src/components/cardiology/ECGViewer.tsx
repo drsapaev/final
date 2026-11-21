@@ -40,6 +40,7 @@ import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import { getErrorMessage } from '../../utils/errorHandler';
 import { parseECGFile, analyzeECGParameters, toFiniteNumber } from './ECGParser';
+import { assertMedicalAiSafety } from '../../utils/aiSafety';
 
 
 const iconSize = 16;
@@ -571,6 +572,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
       // ECGVIEW-FE-002: an analysis for the previous patient's file must
       // not render under the new context.
       if (isStaleContext(epochAtStart)) return;
+      assertMedicalAiSafety(response.data);
       setAnalysisResult(response.data as unknown as AnalysisResult);
       onDataUpdate?.(undefined);
       

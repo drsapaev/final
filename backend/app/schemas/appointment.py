@@ -109,6 +109,8 @@ class Appointment(AppointmentBase):
     id: int
     created_at: datetime
     updated_at: datetime | None = None
+    # Patient RSVP is a read-only fact, separate from payment and visit status.
+    patient_confirmed_at: datetime | None = None
     patient_name: str | None = None  # Имя пациента (обогащается на бэкенде)
     # Round-3 (owner P2): the persisted routing FK stays on the READ model —
     # it was moved out of AppointmentBase so the public CREATE contract

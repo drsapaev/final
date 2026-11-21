@@ -32,6 +32,126 @@ executed the checks in this runbook AND they all passed. Hallucinating
 
 ---
 
+## Cloud staging integrations
+
+Use the published Codex Cloud environment **`final`** for isolated cloud
+validation. Start a fresh Cloud task after the configuration is published;
+open a fresh checkout of the exact requested SHA. Use only
+synthetic fixtures and owned loopback services, and record teardown. Never
+copy a clinic database, access the production bot, or reuse production
+credentials. These settings have separate storage in the two execution paths;
+neither path inherits the other's settings automatically.
+
+| Purpose | Codex Cloud `final` | GitHub Actions |
+|---|---|---|
+| Frontend Sentry | `STAGING_VITE_SENTRY_DSN` → build argument `VITE_SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
+| Backend Sentry | `STAGING_SENTRY_DSN` → backend runtime `SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
+| Telegram token | `STAGING_TELEGRAM_BOT_TOKEN`, a host-only network secret for `api.telegram.org`; use the authorized proxy injection, not a raw token | Same name as an Actions secret scoped to protected Environment `staging-integrations` |
+| Telegram destination | `STAGING_TELEGRAM_CHAT_ID` is provisioned as a Personal Vault environment variable scoped to `final` for the verified private staging chat. Start a fresh task in the published environment and check that the input is available. | Not provisioned in `staging-integrations`; do not assume the Cloud input carries over or guess a default. |
+
+Verify settings are available in the selected executor before asking for
+anything. If a specific input is missing, report its **name and scope**, not
+its value. Never request credentials in chat, export the proxy-injected
+token, embed it in a URL yourself in Cloud, dump resolved configuration, or
+broaden network access or token scopes. Only reviewed workflows explicitly
+bound to `staging-integrations` can consume its variables/secrets; their
+existence does not prove a workflow uses them.
+
+**Sentry:** Use only the dedicated `kosmed-staging-frontend` and
+`kosmed-staging-backend` projects in `kosmed-clinic` (IDs
+`4512459389730816` and `4512459393335296`, respectively). The configured
+ingest host is `o4511673323749376.ingest.us.sentry.io`. For a Cloud run,
+build the frontend with `VITE_SENTRY_ENV=staging` and
+`VITE_APP_VERSION=<full SHA>`; run the backend with `SENTRY_ENV=staging`
+and `APP_VERSION=<full SHA>`. Pass both values through the supported build
+or runtime path.
+
+### Mini App pre-merge preflight and live acceptance
+
+Use the manual **Mini App PR staging preflight** as a credential-free check
+of the reviewed SHA. Once this workflow is merged into `main`, dispatch it
+from `main` with the `source-sha` input set to
+`33f35996a1f86726b17f8caa819d1ed99aa1729a` (PR #4118). The workflow
+runs from `main` but fetches and validates that exact PR commit in a
+detached checkout; the PR branch does not need this workflow file.
+The preflight checks Compose configuration with a
+synthetic marker and does not start containers or use GitHub Environment
+secrets, HTTPS or the Telegram API. It cannot produce native acceptance.
+
+The separate GitHub Environment `staging-miniapp-pr` is for a future
+reviewed live job scoped to the explicitly allowed branch. Do not add or
+use a real token until the exact credential-consuming workflow, isolated
+runner and staging HTTPS endpoint have been reviewed. The host-only Codex
+Cloud Bot API secret cannot verify Mini App signatures locally. In a live
+run, supply the staging credential only to the isolated backend from the
+approved secret store. Do not start the worker: the base Compose file
+also maps `TELEGRAM_BOT_TOKEN` into that service. Use a fresh synthetic
+patient and record the exact tested SHA, native result and teardown.
+Do not reuse the reminder workflow or production credentials.
+
+### Verify Sentry canaries without asking the owner
+
+1. Resolve the full tested Git SHA from the validated checkout, then take
+   the exact frontend and backend event IDs from that run's evidence.
+   Do not search by issue title, use the latest event in an issue, or reuse
+   another run's IDs. If masking used separate events, track their IDs
+   separately from delivery canaries.
+2. Prefer an already authorized read-only Sentry connector for the two
+   staging projects. If unavailable, use an already authorized dashboard
+   session if the executor can access it. A Cloud send DSN permits ingest,
+   not event reads; a separate executor may have a different authorized
+   session. Do not assume those sessions are shared.
+3. Open the exact project/event redirect:
+   `https://sentry.io/organizations/kosmed-clinic/projects/<project-slug>/events/<event-id>/`.
+   Use `kosmed-staging-frontend` or `kosmed-staging-backend`, as applicable.
+   The redirect can resolve to the canonical exact issue event
+   `/issues/<issue-id>/events/<event-id>/` on the organization domain.
+   Confirm the returned event ID, project, `environment=staging`, and
+   `release=<full tested SHA>` before declaring readback `PASS`.
+4. For an authorized hosted masking check, inspect the exact event's JSON
+   in place via its `JSON` link, if accessible. Confirm `user.email` and `extra.diagnosis` are
+   absent and the synthetic exception value is `[REDACTED]`. Do not copy,
+   export, screenshot, or paste payloads, raw field values, or headers.
+   Report only field names and assertion outcomes. If only pre-transport
+   masking can be inspected, report that separately; it is not hosted proof.
+   UI-only inspection without exact field visibility is `PARTIAL`, not a
+   hosted masking PASS.
+5. HTTP 200 at ingest is only send-side evidence. A mismatched event,
+   project, environment, release, or masking assertion is `FAIL` for that
+   check. A 404 for the exact ID is `NOT_VERIFIED (404)`, not proof of
+   deletion or an ingest failure. Missing authorization or inaccessible
+   dashboard/JSON is `BLOCKED (read access)` for the affected check only.
+   No event ID means `NOT_RUN` for readback. Never report a readback PASS
+   based on ingest alone.
+
+If no approved read path exists, do not block a separately authorized
+send-only preflight or other independent checks. Do not resend, ask for
+tokens, broaden access, or routinely ask the owner to open each event.
+If a handoff is needed and an approved route to an authorized reviewer
+exists, send only the following fields, one line per event. Otherwise
+record the same handoff in the task result without interrupting the owner:
+
+```text
+project=<slug> event_id=<id> tested_sha=<full SHA> expected_env=staging
+ingest=<status> readback=<status and reason> hosted_masking=<status and reason>
+```
+
+Delivery readback, pre-transport masking, hosted masking readback, and
+full release admission remain separate results scoped to the tested SHA.
+
+**Telegram:** `@kosmed_staging_bot` and the closed **KosMed Staging Alerts**
+group are the designated test resources. The Cloud destination input is for
+private worker delivery, not the group. In a fresh `final` task, verify the
+configured staging bot and use a targeted `getChat` to confirm the expected
+private destination without printing the ID. Provisioning is not permission to
+send: use the private target only when explicit authorization covers that
+recipient and test. Do not use `getUpdates` to find a recipient or verify
+delivery, change the webhook, or guess a chat ID. Without a verified,
+authorized destination, mark live delivery `BLOCKED` and continue checks
+that do not send.
+
+---
+
 ## Prerequisites
 
 Before running any check below:
@@ -108,6 +228,10 @@ code 2 and also block — fix the environment before retrying.
 
 **Why it matters**: without Sentry, you have zero visibility into production
 errors. Patients see white screens, you see nothing.
+
+For Codex Cloud, follow [Cloud staging integrations](#cloud-staging-integrations)
+for `environment=staging` and exact-SHA release evidence. The local example
+below uses a legacy test label and is not Cloud release evidence.
 
 ### Backend
 
@@ -625,7 +749,7 @@ python -c "
 from app.core.pii_masker import mask_pii, mask_phone, mask_email, mask_name
 
 # Test per-field maskers
-assert mask_phone('+998901234567') == '+998901•••567', mask_phone('+998901234567')
+assert mask_phone('+998901234567') == '•••567', mask_phone('+998901234567')
 assert mask_email('john@example.com').startswith('j'), mask_email('john@example.com')
 assert mask_name('Иван Иванов') == 'И.И.', mask_name('Иван Иванов')
 
@@ -642,7 +766,7 @@ masked = mask_pii(patient)
 print('Masked patient:', masked)
 assert masked['first_name'] == 'A.'
 assert masked['last_name'] == 'K.'
-assert masked['phone'] == '+998901•••567'
+assert masked['phone'] == '•••567'
 assert masked['iin'] == '[REDACTED]'
 assert masked['diagnosis'] == '[REDACTED]'
 assert masked['id'] == 42  # untouched
@@ -654,7 +778,7 @@ print('✅ All PII scrubbing tests passed.')
 ### Expected
 
 ```
-Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '+998901•••567', 'iin': '[REDACTED]', 'diagnosis': '[REDACTED]', 'id': 42}
+Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '•••567', 'iin': '[REDACTED]', 'diagnosis': '[REDACTED]', 'id': 42}
 ✅ All PII scrubbing tests passed.
 ```
 

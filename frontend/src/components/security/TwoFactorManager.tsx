@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ComponentType, ReactNode } from "react";
 import {
   AlertTriangle,
@@ -311,11 +311,45 @@ export default function TwoFactorManager() {
   const [disableCode, setDisableCode] = useState('');
   const [showDisableForm, setShowDisableForm] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [regeneratePassword, setRegeneratePassword] = useState('');
+  const [regenerateFactor, setRegenerateFactor] = useState<'totp' | 'backup'>('totp');
+  const [regenerateCode, setRegenerateCode] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [devices, setDevices] = useState<TrustedDevice[]>([]);
   const [deviceToRevoke, setDeviceToRevoke] = useState<string | number | null>(null);
   const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>([]);
   const [recoveryMethods, setRecoveryMethods] = useState<RecoveryMethod[]>([]);
+  const sessionVersion = useRef(0);
+  const regenerationInFlight = useRef(false);
+
+  useEffect(() => {
+    const onAuthChange = () => {
+      sessionVersion.current += 1;
+      setStatus(null);
+      setSetupData(null);
+      setVerificationCode('');
+      setDisablePassword('');
+      setDisableCode('');
+      setShowDisableForm(false);
+      setConfirmRegenerate(false);
+      setRegeneratePassword('');
+      setRegenerateFactor('totp');
+      setRegenerateCode('');
+      setBackupCodes([]);
+      setDevices([]);
+      setDeviceToRevoke(null);
+      setSecurityLogs([]);
+      setRecoveryMethods([]);
+      setError('');
+      setSuccess('');
+      setLoading(false);
+    };
+    window.addEventListener('authStateChanged', onAuthChange);
+    return () => {
+      sessionVersion.current += 1;
+      window.removeEventListener('authStateChanged', onAuthChange);
+    };
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -323,7 +357,7 @@ export default function TwoFactorManager() {
       try {
         await Promise.all([loadStatus(), loadDevices(), loadSecurityLogs(), loadRecoveryMethods()]);
       } catch (err) {
-        logger.error('[FIX:2FA] Failed to refresh full security state', err);
+        logger.error('[FIX:2FA] Failed to refresh full security state', err instanceof Error ? err.name : 'Error');
       }
     })();
   }, []);
@@ -333,72 +367,58 @@ export default function TwoFactorManager() {
     try {
       await Promise.all([loadStatus(), loadDevices(), loadSecurityLogs(), loadRecoveryMethods()]);
     } catch (err) {
-      logger.error('[FIX:2FA] Failed to refresh full security state', err);
+      logger.error('[FIX:2FA] Failed to refresh full security state', err instanceof Error ? err.name : 'Error');
     }
   }
 
   async function loadStatus() {
+    const version = sessionVersion.current;
     try {
       const response = (await api.get('/2fa/status')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
+      if (version !== sessionVersion.current) return;
       setStatus(data);
       if (data?.enabled) {
         setSetupData(null);
         setVerificationCode('');
       }
     } catch (err) {
-      setError(resolveApiError(err, t('misc.tfm_error_load_status')));
+      if (version === sessionVersion.current) setError(resolveApiError(err, t('misc.tfm_error_load_status')));
     }
   }
 
   async function loadDevices() {
+    const version = sessionVersion.current;
     try {
       const response = (await api.get('/2fa/devices')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setDevices(((response.data?.devices as unknown[]) || []) as TrustedDevice[]);
+      if (version === sessionVersion.current) setDevices(((response.data?.devices as unknown[]) || []) as TrustedDevice[]);
     } catch (err) {
-      logger.error('Error loading devices:', err);
+      logger.error('Error loading devices:', err instanceof Error ? err.name : 'Error');
     }
   }
 
   async function loadSecurityLogs() {
+    const version = sessionVersion.current;
     try {
       const response = (await api.get('/2fa/security-logs')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setSecurityLogs(((response.data?.logs as unknown[]) || []) as SecurityLog[]);
+      if (version === sessionVersion.current) setSecurityLogs(((response.data?.logs as unknown[]) || []) as SecurityLog[]);
     } catch (err) {
-      logger.error('Error loading security logs:', err);
+      logger.error('Error loading security logs:', err instanceof Error ? err.name : 'Error');
     }
   }
 
   async function loadRecoveryMethods() {
+    const version = sessionVersion.current;
     try {
       const response = (await api.get('/2fa/recovery-methods')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setRecoveryMethods(((response.data?.methods as unknown[]) || []) as RecoveryMethod[]);
+      if (version === sessionVersion.current) setRecoveryMethods(((response.data?.methods as unknown[]) || []) as RecoveryMethod[]);
     } catch (err) {
-      logger.error('Error loading recovery methods:', err);
-    }
-  }
-
-  async function loadBackupCodes() {
-    if (!status?.enabled) {
-      setError(t('misc.tfm_backup_codes_setup_required'));
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError('');
-      const response = (await api.get('/2fa/backup-codes')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setBackupCodes(((response.data?.backup_codes as unknown[]) || []) as string[]);
-      logger.info('[FIX:2FA] Loaded backup codes for enabled 2FA');
-    } catch (err) {
-      logger.error('Error loading backup codes:', err);
-      setError(resolveApiError(err, t('misc.tfm_error_load_backup_codes')));
-    } finally {
-      setLoading(false);
+      logger.error('Error loading recovery methods:', err instanceof Error ? err.name : 'Error');
     }
   }
 
   async function handleEnable2FA() {
+    const version = sessionVersion.current;
     setLoading(true);
     setError('');
     setSuccess('');
@@ -409,15 +429,16 @@ export default function TwoFactorManager() {
         recovery_email: status?.recovery_email || '',
         recovery_phone: status?.recovery_phone || '',
       })) as import('axios').AxiosResponse<Record<string, unknown>>;
+      if (version !== sessionVersion.current) return;
       setSetupData(response.data as unknown as TwoFactorSetupData);
       setBackupCodes(((response.data?.backup_codes as unknown[]) || []) as string[]);
       setVerificationCode('');
       setSuccess(t('misc.tfm_setup_qr_prompt'));
       logger.info('[FIX:2FA] 2FA setup created, waiting for verify-setup');
     } catch (err) {
-      setError(resolveApiError(err, t('misc.tfm_error_setup')));
+      if (version === sessionVersion.current) setError(resolveApiError(err, t('misc.tfm_error_setup')));
     } finally {
-      setLoading(false);
+      if (version === sessionVersion.current) setLoading(false);
     }
   }
 
@@ -427,26 +448,31 @@ export default function TwoFactorManager() {
       return;
     }
 
+    const version = sessionVersion.current;
     setLoading(true);
     setError('');
     setSuccess('');
 
     try {
       logger.info('[FIX:2FA] Verifying 2FA setup');
-      const response = await api.post('/2fa/verify-setup', null, {
-        params: { totp_code: verificationCode },
+      const response = await api.post('/2fa/verify-setup', {
+        totp_code: verificationCode,
       }) as import('axios').AxiosResponse<Record<string, unknown>>;
+      if (version !== sessionVersion.current) return;
       if (response.data?.success) {
         setSuccess(t('misc.tfm_enable_success'));
         await loadStatus();
       } else {
-        setError(String(response.data?.detail || response.data?.message || t('misc.tfm_verify_code_invalid')));
+        setVerificationCode('');
+        setError(t('misc.tfm_verify_code_invalid'));
       }
-    } catch (err) {
-      logger.error('Error verifying 2FA setup:', err);
-      setError(resolveApiError(err, t('misc.tfm_error_verify')));
+    } catch {
+      if (version === sessionVersion.current) {
+        setVerificationCode('');
+        setError(t('misc.tfm_error_verify'));
+      }
     } finally {
-      setLoading(false);
+      if (version === sessionVersion.current) setLoading(false);
     }
   }
 
@@ -456,6 +482,7 @@ export default function TwoFactorManager() {
       return;
     }
 
+    const version = sessionVersion.current;
     setLoading(true);
     setError('');
     setSuccess('');
@@ -465,17 +492,29 @@ export default function TwoFactorManager() {
         password: disablePassword,
         totp_code: disableCode,
       });
+      if (version !== sessionVersion.current) return;
       setDisablePassword('');
       setDisableCode('');
       setShowDisableForm(false);
       setBackupCodes([]);
       setSuccess(t('misc.tfm_disable_success'));
       await loadAll();
-    } catch (err) {
-      setError(resolveApiError(err, t('misc.tfm_error_disable')));
+    } catch {
+      if (version === sessionVersion.current) {
+        setDisablePassword('');
+        setDisableCode('');
+        setError(t('misc.tfm_error_disable'));
+      }
     } finally {
-      setLoading(false);
+      if (version === sessionVersion.current) setLoading(false);
     }
+  }
+
+  function cancelRegeneration() {
+    setConfirmRegenerate(false);
+    setRegeneratePassword('');
+    setRegenerateCode('');
+    setRegenerateFactor('totp');
   }
 
   async function handleRegenerateBackupCodes() {
@@ -484,20 +523,46 @@ export default function TwoFactorManager() {
       return;
     }
 
+    if (regenerationInFlight.current) return;
+    const factor = regenerateCode;
+    if (!regeneratePassword || (regenerateFactor === 'totp' ? !/^\d{6}$/.test(factor) : factor.length < 8 || factor.length > 10)) {
+      setError(t('misc.tfm_regenerate_credentials_required'));
+      return;
+    }
+
+    const version = sessionVersion.current;
+    regenerationInFlight.current = true;
     setLoading(true);
     setError('');
     setSuccess('');
+    // A lost response may follow a committed rotation: never keep showing an
+    // earlier set as though it were still valid.
+    setBackupCodes([]);
 
     try {
-      logger.info('[FIX:2FA] Regenerating backup codes via supported endpoint');
-      const response = (await api.post('/2fa/backup-codes/regenerate')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setBackupCodes(((response.data?.backup_codes as unknown[]) || []) as string[]);
-      setConfirmRegenerate(false);
+      const response = (await api.post('/2fa/backup-codes/regenerate', {
+        password: regeneratePassword,
+        ...(regenerateFactor === 'totp' ? { totp_code: factor } : { backup_code: factor }),
+      })) as import('axios').AxiosResponse<Record<string, unknown>>;
+      if (version !== sessionVersion.current) return;
+      const codes = response.data?.backup_codes;
+      if (!Array.isArray(codes) || codes.length === 0 || !codes.every((code) => typeof code === 'string' && code.length > 0)) {
+        throw new Error('Invalid regeneration response');
+      }
+      setBackupCodes(codes);
+      cancelRegeneration();
       setSuccess(t('misc.tfm_regenerate_success'));
+      await loadStatus();
     } catch (err) {
-      setError(resolveApiError(err, t('misc.tfm_error_regenerate')));
+      if (version === sessionVersion.current) {
+        setRegeneratePassword('');
+        setRegenerateCode('');
+        const statusCode = (err as HttpApiError)?.response?.status;
+        setError(t(statusCode === 403 ? 'misc.tfm_regenerate_reauth_failed' : 'misc.tfm_regenerate_uncertain'));
+      }
     } finally {
-      setLoading(false);
+      regenerationInFlight.current = false;
+      if (version === sessionVersion.current) setLoading(false);
     }
   }
 
@@ -523,7 +588,7 @@ export default function TwoFactorManager() {
       await navigator.clipboard.writeText(text);
       setSuccess(t('misc.tfm_copied_to_clipboard'));
     } catch (err) {
-      logger.error('[FIX:2FA] Failed to copy to clipboard', err);
+      logger.error('[FIX:2FA] Failed to copy to clipboard', err instanceof Error ? err.name : 'Error');
       setError(t('misc.tfm_error_copy_to_clipboard'));
     }
   }
@@ -568,7 +633,7 @@ export default function TwoFactorManager() {
             accent={accentGradients.purple}
             icon={ShieldCheck}
             label={t('misc.tfm_metric_2fa_status')}
-            value={status?.enabled ? t('misc.tfm_metric_status_enabled') : t('misc.tfm_metric_status_disabled')}
+            value={!status ? t('misc.tfm_status_unknown') : status.enabled ? t('misc.tfm_metric_status_enabled') : t('misc.tfm_metric_status_disabled')}
           />
           <MetricCard
             accent={accentGradients.info}
@@ -590,21 +655,15 @@ export default function TwoFactorManager() {
           />
         </div>
 
-        {status?.enabled ? (
+        {!status ? (
+          <Alert severity="info">{t('misc.tfm_status_unknown')}</Alert>
+        ) : status.enabled ? (
           <div style={{ display: 'grid', gap: 16 }}>
             <Alert severity="info">
               {t('misc.tfm_2fa_already_enabled_info')}
             </Alert>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Button
-                variant="outline"
-                onClick={loadBackupCodes}
-                disabled={loading}
-                startIcon={<Key size={16} />}
-              >
-                {t('misc.tfm_show_backup_codes')}
-              </Button>
               <Button
                 variant="ghost"
                 onClick={() => setConfirmRegenerate(true)}
@@ -629,6 +688,36 @@ export default function TwoFactorManager() {
                   <div>
                     {t('misc.tfm_regenerate_confirm_warning')}
                   </div>
+                  <label htmlFor="regenerate-password">{t('misc.tfm_regenerate_password_label')}</label>
+                  <Input
+                    id="regenerate-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={regeneratePassword}
+                    disabled={loading}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRegeneratePassword(event.target.value)}
+                  />
+                  <fieldset disabled={loading}>
+                    <legend>{t('misc.tfm_regenerate_factor_label')}</legend>
+                    <label>
+                      <input type="radio" name="regenerate-factor" aria-label={t('misc.tfm_regenerate_totp_option')} checked={regenerateFactor === 'totp'} onChange={() => { setRegenerateFactor('totp'); setRegenerateCode(''); }} />
+                      {t('misc.tfm_regenerate_totp_option')}
+                    </label>
+                    <label>
+                      <input type="radio" name="regenerate-factor" aria-label={t('misc.tfm_regenerate_backup_option')} checked={regenerateFactor === 'backup'} onChange={() => { setRegenerateFactor('backup'); setRegenerateCode(''); }} />
+                      {t('misc.tfm_regenerate_backup_option')}
+                    </label>
+                  </fieldset>
+                  <label htmlFor="regenerate-code">{t(regenerateFactor === 'totp' ? 'misc.tfm_regenerate_totp_label' : 'misc.tfm_regenerate_backup_label')}</label>
+                  <Input
+                    id="regenerate-code"
+                    type="text"
+                    autoComplete="one-time-code"
+                    inputMode={regenerateFactor === 'totp' ? 'numeric' : 'text'}
+                    value={regenerateCode}
+                    disabled={loading}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRegenerateCode(event.target.value)}
+                  />
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <Button
                       variant="primary"
@@ -638,7 +727,7 @@ export default function TwoFactorManager() {
                     >
                       {t('misc.tfm_confirm_codes_update')}
                     </Button>
-                    <Button variant="ghost" onClick={() => setConfirmRegenerate(false)}>
+                    <Button variant="ghost" onClick={cancelRegeneration} disabled={loading}>
                       {t('misc.tfm_cancel')}
                     </Button>
                   </div>
@@ -788,6 +877,7 @@ export default function TwoFactorManager() {
                           onClick={() => {
                             setSetupData(null);
                             setVerificationCode('');
+                            setBackupCodes([]);
                           }}
                         >
                           {t('misc.tfm_cancel_setup')}
@@ -899,18 +989,10 @@ export default function TwoFactorManager() {
       <SectionShell
         title={t('misc.tfm_section_backup_codes_title')}
         description={t('misc.tfm_section_backup_codes_desc')}
-        action={status?.enabled ? (
-          <Button
-            variant="outline"
-            onClick={loadBackupCodes}
-            disabled={loading}
-            startIcon={<Download size={16} />}
-          >
-            {t('misc.tfm_load_current_codes')}
-          </Button>
-        ) : null}
       >
-        {!status?.enabled ? (
+        {!status ? (
+          <Alert severity="info">{t('misc.tfm_status_unknown')}</Alert>
+        ) : !status.enabled ? (
           <EmptyState
             icon={Key}
             title={t('misc.tfm_backup_codes_unavailable_title')}
@@ -957,6 +1039,9 @@ export default function TwoFactorManager() {
               <Button variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
                 {t('misc.tfm_create_new_set')}
               </Button>
+              <Button variant="ghost" onClick={() => setBackupCodes([])}>
+                {t('misc.tfm_backup_codes_done')}
+              </Button>
             </div>
           </div>
         ) : (
@@ -966,9 +1051,6 @@ export default function TwoFactorManager() {
             description={t('misc.tfm_backup_codes_not_loaded_desc')}
             action={(
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <Button variant="outline" onClick={loadBackupCodes} disabled={loading} startIcon={<Download size={16} />}>
-                  {t('misc.tfm_load_current_codes')}
-                </Button>
                 <Button variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
                   {t('misc.tfm_create_new_set')}
                 </Button>

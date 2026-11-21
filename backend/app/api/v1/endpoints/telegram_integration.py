@@ -8,8 +8,11 @@ validation. Replaced with typed Pydantic request models from
 app.schemas.notifications.
 """
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import UTC, datetime
+from html import escape
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import (
     APIRouter,
@@ -20,16 +23,15 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select, true
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user, get_db, require_roles
 from app.core.config import settings
 from app.core.rate_limiter import limiter
-from app.crud import patient as crud_patient
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES
 from app.crud import telegram_config as crud_telegram
-from app.models.appointment import Appointment
-from app.models.lab import LabOrder, LabResult
+from app.models.online_queue import QueueToken
 from app.models.patient import Patient
 from app.models.telegram_config import TelegramUser
 from app.models.user import User
@@ -39,14 +41,35 @@ from app.schemas.notifications import (
     SendQrCodeRequest,
     SendTelegramIntegrationNotificationRequest,
 )
+from app.services.notifications_pkg._helpers import (
+    _is_private_telegram_chat_id,
+    _patient_telegram_event_message,
+)
+from app.services.patient_phone_scope import canonical_phone_identity
 from app.services.telegram_bot import get_telegram_bot_service
+from app.services.telegram_delivery_authorization import (
+    TelegramDeliveryError,
+    _current_actor,
+    _link,
+    _not_found,
+    appointment_payload,
+    authorize_appointment,
+    authorize_lab_result,
+)
 from app.services.telegram_service import (
     get_telegram_service,
-    send_telegram_notification,
 )
 from app.services.telegram_token_store import resolve_patient_bot_token
 
 router = APIRouter()
+_PATIENT_DELIVERY_RESPONSES = {
+    400: {"model": TelegramDeliveryError, "description": "Missing or ambiguous resource identifier"},
+    403: {"model": TelegramDeliveryError, "description": "Staff role is not authorized"},
+    404: {"model": TelegramDeliveryError, "description": "Recipient or authorized resource is unavailable"},
+    409: {"model": TelegramDeliveryError, "description": "The clinical resource changed or is not ready"},
+    502: {"model": TelegramDeliveryError, "description": "Telegram did not confirm delivery"},
+    503: {"model": TelegramDeliveryError, "description": "Telegram is unavailable"},
+}
 
 # Mobile-contract router (Android client, M-CONTRACT-FIX lineage): mounted at
 # /telegram-integration in api.py. The staff notification surface above stays
@@ -58,6 +81,81 @@ _MOBILE_SELF_TEST_TEXT = (
 )
 
 
+async def _send_verified_patient_message(
+    db: Session, link: TelegramUser, message: str, event_type: str,
+    verify_resource: Callable[[], None],
+) -> None:
+    """Send only after ownership/consent and a fresh canonical bot-token check."""
+    patient_id, chat_id = link.patient_id, link.chat_id
+    service = await get_telegram_bot_service()
+    try:
+        token = resolve_patient_bot_token(db)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Telegram credential state is unavailable") from exc
+    if not token:
+        raise HTTPException(status_code=503, detail="Telegram bot is not configured")
+    if not service.active or service.bot_token != token:
+        initialized = await service.initialize(db)
+        if not initialized or service.bot_token != token:
+            raise HTTPException(status_code=503, detail="Telegram bot is not configured")
+    config = crud_telegram.get_telegram_config(db)
+    if not service.active or (config is not None and not config.active):
+        raise HTTPException(status_code=503, detail="Telegram bot is disabled")
+    # Re-read the original identity and its current consent after any awaited
+    # token initialization; stale ORM state must not authorize a revoked link.
+    verify_resource()
+    _link(db, patient_id, event_type, chat_id)
+    # This is the last check before dispatch, not an atomic revocation barrier:
+    # a consent/link change can commit while the Telegram request is in flight.
+    # Telegram cannot retract an already accepted message after revocation.
+    if not await service.send_plain_message(int(chat_id), message):
+        raise HTTPException(status_code=502, detail="Telegram delivery failed")
+
+
+def _patient_by_exact_phone(db: Session, phone: str) -> Patient:
+    """Fail closed on ambiguous matches; never use the old substring lookup."""
+    canonical = canonical_phone_identity(phone)
+    if not canonical:
+        raise _not_found()
+    # A bounded scan protects the endpoint on corrupt legacy data. A truncated
+    # scan is indeterminate, not proof of uniqueness.
+    dialect = db.get_bind().dialect.name
+    non_ascii = (Patient.phone.op("~")(r"[^ -~]") if dialect == "postgresql"
+                 else Patient.phone.op("GLOB")("*[^ -~]*") if dialect == "sqlite"
+                 else true())
+    pattern = "%" + "%".join(canonical[-9:]) + "%"
+    matches = []
+    candidates = db.query(Patient).filter(
+        Patient.is_deleted.is_(False), or_(Patient.phone.like(pattern), non_ascii)
+    ).populate_existing()
+    for index, patient in enumerate(candidates.yield_per(200)):
+        if index >= 10000:
+            raise _not_found()
+        if canonical_phone_identity(patient.phone or "") == canonical:
+            matches.append(patient)
+            if len(matches) > 1:
+                raise _not_found()
+    if len(matches) != 1:
+        raise _not_found()
+    return matches[0]
+
+
+def _verify_appointment_snapshot(
+    db: Session, user: User, data: dict[str, Any], snapshot: dict[str, Any],
+    *, phone: str | None = None, chat_id: int | None = None,
+) -> None:
+    appointment, _, _ = authorize_appointment(db, user, data, phone=phone, chat_id=chat_id)
+    if appointment_payload(db, appointment) != snapshot:
+        raise HTTPException(status_code=409, detail="Appointment changed; retry")
+
+
+def _verify_lab_snapshot(
+    db: Session, user: User, data: dict[str, Any], *, phone: str | None = None,
+    chat_id: int | None = None,
+) -> None:
+    authorize_lab_result(db, user, data, phone=phone, chat_id=chat_id)
+
+
 class MobileTelegramSelfTestResponse(BaseModel):
     """Concrete response contract for the mobile self-test endpoint."""
 
@@ -66,118 +164,48 @@ class MobileTelegramSelfTestResponse(BaseModel):
     chat_id: int
 
 
-def _appointment_id_from_payload(appointment_data: dict[str, Any]) -> int | None:
-    for key in ("appointment_id", "id"):
-        value = appointment_data.get(key)
-        if value is None:
-            continue
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid appointment_id",
-            )
-    return None
-
-
-def _ensure_appointment_reminder_belongs_to_phone(
-    db: Session,
-    *,
-    patient_phone: str,
-    appointment_data: dict[str, Any],
-) -> None:
-    appointment_id = _appointment_id_from_payload(appointment_data)
-    if appointment_id is None:
-        return
-
-    appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
-
-    patient = crud_patient.find_patient(db, phone=patient_phone)
-    if not patient or appointment.patient_id != patient.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
-
-def _lab_result_id_from_payload(lab_data: dict[str, Any]) -> int | None:
-    for key in ("lab_results_id", "lab_result_id", "id"):
-        value = lab_data.get(key)
-        if value is None:
-            continue
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid lab_results_id",
-            )
-    return None
-
-
-def _ensure_lab_notification_belongs_to_phone(
-    db: Session,
-    *,
-    patient_phone: str,
-    lab_data: dict[str, Any],
-) -> None:
-    lab_result_id = _lab_result_id_from_payload(lab_data)
-    if lab_result_id is None:
-        return
-
-    lab_result = db.query(LabResult).filter(LabResult.id == lab_result_id).first()
-    if not lab_result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lab result not found",
-        )
-
-    lab_order = db.query(LabOrder).filter(LabOrder.id == lab_result.order_id).first()
-    patient = crud_patient.find_patient(db, phone=patient_phone)
-    if not lab_order or not patient or lab_order.patient_id != patient.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
-
 # ===================== УВЕДОМЛЕНИЯ =====================
 
 
-@router.post("/send-notification", response_model=dict[str, Any])
+@router.post("/send-notification", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def send_notification(
     request: SendTelegramIntegrationNotificationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
+    current_user: User = Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     """
-    Отправка уведомления пациенту
+    Send a supported appointment or lab event to its verified patient chat.
+
+    ``data`` must contain the matching canonical appointment or lab result ID.
+    Caller-supplied clinical content is ignored.
     """
     try:
-        chat_id = request.chat_id
-        template_key = request.template_key
-        data = request.data
-        language = request.language
-        # Validation already done by Pydantic
-
-        # Отправляем уведомление в фоне
-        background_tasks.add_task(
-            send_telegram_notification, chat_id, template_key, data, language
-        )
-
-        return {
-            "success": True,
-            "message": "Уведомление поставлено в очередь на отправку",
-            "chat_id": chat_id,
-            "template": template_key,
-        }
+        if request.template_key == "appointment_reminder":
+            appointment, _, link = authorize_appointment(
+                db, current_user, request.data, chat_id=request.chat_id
+            )
+            payload = appointment_payload(db, appointment)
+            event_type = "appointment_reminder"
+            def verify() -> None:
+                _verify_appointment_snapshot(db, current_user, request.data, payload, chat_id=request.chat_id)
+        elif request.template_key in {"lab_results", "lab_results_ready"}:
+            _, _, _, link = authorize_lab_result(
+                db, current_user, request.data, chat_id=request.chat_id
+            )
+            payload = {}
+            event_type = "lab_results"
+            def verify() -> None:
+                _verify_lab_snapshot(db, current_user, request.data, chat_id=request.chat_id)
+        else:
+            # Arbitrary templates/data have no patient/visit provenance and
+            # cannot satisfy the recipient and doctor-assignment contract.
+            raise HTTPException(status_code=400, detail="A supported clinical event and resource identifier are required")
+        message = _patient_telegram_event_message(event_type, link.language_code, payload)
+        if not message:
+            raise HTTPException(status_code=503, detail="Telegram notification is unavailable")
+        await _send_verified_patient_message(db, link, message, event_type, verify)
+        return {"success": True, "message": "Уведомление отправлено"}
 
     except HTTPException:
         raise
@@ -188,66 +216,34 @@ async def send_notification(
         )
 
 
-@router.post("/appointment-reminder", response_model=dict[str, Any])
+@router.post("/appointment-reminder", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def send_appointment_reminder(
-    request: SendAppointmentReminderIntegrationRequest | dict[str, Any],
+    request: SendAppointmentReminderIntegrationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
-    Отправка напоминания о записи
+    Send the canonical appointment; an unambiguous appointment ID is required.
     """
     try:
-        if isinstance(request, dict):
-            request = SendAppointmentReminderIntegrationRequest(**request)
-        patient_phone = request.patient_phone
         appointment_data = request.appointment_data.model_dump(exclude_none=True)
-        # Validation already done by Pydantic
-
-        # Ищем Telegram пользователя по телефону
-        telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient_phone)
-
-        if not telegram_user:
-            return {
-                "success": False,
-                "message": "Пациент не зарегистрирован в Telegram боте",
-                "phone": patient_phone,
-            }
-
-        # Формируем данные для шаблона
-        _ensure_appointment_reminder_belongs_to_phone(
-            db,
-            patient_phone=patient_phone,
-            appointment_data=appointment_data,
+        appointment, _, link = authorize_appointment(
+            db, current_user, appointment_data, phone=request.patient_phone
         )
-
-        template_data = {
-            "patient_name": appointment_data.get("patient_name", "Пациент"),
-            "doctor_name": appointment_data.get("doctor_name", "Врач"),
-            "specialty": appointment_data.get("specialty", "Специалист"),
-            "appointment_date": appointment_data.get("date", "Не указано"),
-            "appointment_time": appointment_data.get("time", "Не указано"),
-            "cabinet": appointment_data.get("cabinet", "Уточните в регистратуре"),
-            "clinic_address": "г. Ташкент, ул. Медицинская, 15",  # Из настроек
-            "clinic_phone": "+998 71 123-45-67",  # Из настроек
-        }
-
-        # Отправляем напоминание
-        background_tasks.add_task(
-            send_telegram_notification,
-            telegram_user.chat_id,
-            "appointment_reminder",
-            template_data,
-            telegram_user.language_code,
+        payload = appointment_payload(db, appointment)
+        expected_chat = int(link.chat_id)
+        message = _patient_telegram_event_message("appointment_reminder", link.language_code, payload)
+        if not message:
+            raise HTTPException(status_code=503, detail="Telegram notification is unavailable")
+        await _send_verified_patient_message(
+            db, link, message, "appointment_reminder",
+            lambda: _verify_appointment_snapshot(
+                db, current_user, appointment_data, payload,
+                phone=request.patient_phone, chat_id=expected_chat,
+            ),
         )
-
-        return {
-            "success": True,
-            "message": "Напоминание отправлено",
-            "chat_id": telegram_user.chat_id,
-            "patient": appointment_data.get("patient_name"),
-        }
+        return {"success": True, "message": "Напоминание отправлено"}
 
     except HTTPException:
         raise
@@ -258,63 +254,32 @@ async def send_appointment_reminder(
         )
 
 
-@router.post("/lab-results-notification", response_model=dict[str, Any])
+@router.post("/lab-results-notification", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def send_lab_results_notification(
-    request: SendLabResultsNotificationRequest | dict[str, Any],
+    request: SendLabResultsNotificationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
+    current_user: User = Depends(require_roles("Admin", "Lab", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     """
-    Уведомление о готовности результатов анализов
+    Send a readiness notification; a finalized lab result ID is required.
     """
     try:
-        if isinstance(request, dict):
-            request = SendLabResultsNotificationRequest(**request)
-        patient_phone = request.patient_phone
         lab_data = request.lab_data.model_dump(exclude_none=True)
-        # Validation already done by Pydantic
-
-        # Ищем Telegram пользователя
-        telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient_phone)
-
-        if not telegram_user:
-            return {
-                "success": False,
-                "message": "Пациент не зарегистрирован в Telegram боте",
-                "phone": patient_phone,
-            }
-
-        # Формируем данные для шаблона
-        _ensure_lab_notification_belongs_to_phone(
-            db,
-            patient_phone=patient_phone,
-            lab_data=lab_data,
+        _, _, _, link = authorize_lab_result(
+            db, current_user, lab_data, phone=request.patient_phone
         )
-
-        template_data = {
-            "patient_name": lab_data.get("patient_name", "Пациент"),
-            "test_type": lab_data.get("test_type", "Лабораторное исследование"),
-            "collection_date": lab_data.get("collection_date", "Не указано"),
-            "ready_date": datetime.now().strftime("%d.%m.%Y"),
-            "has_abnormalities": lab_data.get("has_abnormalities", False),
-        }
-
-        # Отправляем уведомление
-        background_tasks.add_task(
-            send_telegram_notification,
-            telegram_user.chat_id,
-            "lab_results_ready",
-            template_data,
-            telegram_user.language_code,
+        expected_chat = int(link.chat_id)
+        message = _patient_telegram_event_message("lab_results", link.language_code, {})
+        if not message:
+            raise HTTPException(status_code=503, detail="Telegram notification is unavailable")
+        await _send_verified_patient_message(
+            db, link, message, "lab_results",
+            lambda: _verify_lab_snapshot(
+                db, current_user, lab_data, phone=request.patient_phone, chat_id=expected_chat
+            ),
         )
-
-        return {
-            "success": True,
-            "message": "Уведомление о результатах отправлено",
-            "chat_id": telegram_user.chat_id,
-            "patient": lab_data.get("patient_name"),
-        }
+        return {"success": True, "message": "Уведомление о результатах отправлено"}
 
     except HTTPException:
         raise
@@ -328,7 +293,7 @@ async def send_lab_results_notification(
 # ===================== QR КОДЫ =====================
 
 
-@router.post("/send-qr-code", response_model=dict[str, Any])
+@router.post("/send-qr-code", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def send_qr_code(
     request: SendQrCodeRequest,
     background_tasks: BackgroundTasks,
@@ -339,46 +304,42 @@ async def send_qr_code(
     Отправка QR кода для онлайн-очереди
     """
     try:
-        patient_phone = request.patient_phone
+        if getattr(current_user, "is_active", None) is not True:
+            raise _not_found()
         qr_data = request.qr_data.model_dump(exclude_none=True)
-        # Validation already done by Pydantic
+        raw_token = qr_data.get("token")
+        if not isinstance(raw_token, str) or not raw_token:
+            raise HTTPException(status_code=400, detail="A valid queue token is required")
+        token = db.query(QueueToken).filter(QueueToken.token == raw_token).first()
+        now = datetime.now(UTC)
+        expires = token.expires_at if token else None
+        if expires and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        if token is None or not token.active or expires is None or expires <= now:
+            raise _not_found()
+        patient = _patient_by_exact_phone(db, request.patient_phone)
+        link = _link(db, patient.id, "queue_ticket_issued")
+        patient_id, expected_chat = patient.id, int(link.chat_id)
+        # QueueToken is a clinic/specialist-scoped registration token, not a
+        # patient credential. Resolve the recipient exclusively via the linked
+        # patient and never echo the bearer token in the HTTP response or logs.
+        root = str(getattr(settings, "FRONTEND_URL", "") or "http://localhost:5173").rstrip("/")
+        url = root + "/queue?" + urlencode({"token": token.token})
+        message = "Ссылка для входа в очередь: " + escape(url)
+        def verify_qr() -> None:
+            _current_actor(db, current_user, {"registrar"})
+            current_token = db.query(QueueToken).filter(QueueToken.token == raw_token).populate_existing().first()
+            current_expires = current_token.expires_at if current_token else None
+            if current_expires and current_expires.tzinfo is None:
+                current_expires = current_expires.replace(tzinfo=UTC)
+            if current_token is None or not current_token.active or current_expires is None or current_expires <= datetime.now(UTC):
+                raise _not_found()
+            if _patient_by_exact_phone(db, request.patient_phone).id != patient_id:
+                raise _not_found()
+            _link(db, patient_id, "queue_ticket_issued", expected_chat)
 
-        # Ищем Telegram пользователя
-        telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient_phone)
-
-        if not telegram_user:
-            return {
-                "success": False,
-                "message": "Пациент не зарегистрирован в Telegram боте",
-                "phone": patient_phone,
-            }
-
-        # Формируем данные для шаблона QR
-        template_data = {
-            "doctor_name": qr_data.get("doctor_name", "Врач"),
-            "specialty": qr_data.get("specialty", "Специалист"),
-            "date": qr_data.get("date", "Не указано"),
-            "time_window": qr_data.get("time_window", "07:00-09:00"),
-            "qr_token": qr_data.get("token", ""),
-            # TG-AUDIT-28 P0-4: real URL (was clinic.example.com — regression)
-            "queue_url": f"{str(getattr(settings, 'FRONTEND_URL', '') or 'http://localhost:5173').rstrip('/')}/queue",
-        }
-
-        # Отправляем QR код
-        background_tasks.add_task(
-            send_telegram_notification,
-            telegram_user.chat_id,
-            "qr_code_message",
-            template_data,
-            telegram_user.language_code,
-        )
-
-        return {
-            "success": True,
-            "message": "QR код отправлен в Telegram",
-            "chat_id": telegram_user.chat_id,
-            "token": qr_data.get("token"),
-        }
+        await _send_verified_patient_message(db, link, message, "queue_ticket_issued", verify_qr)
+        return {"success": True, "message": "QR код отправлен в Telegram"}
 
     except HTTPException:
         raise
@@ -495,7 +456,7 @@ def get_telegram_users(
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
 
 
-@router.post("/quick/appointment-reminder", response_model=dict[str, Any])
+@router.post("/quick/appointment-reminder", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def quick_appointment_reminder(
     patient_phone: str,
     doctor_name: str,
@@ -503,6 +464,7 @@ async def quick_appointment_reminder(
     appointment_time: str,
     specialty: str = "Врач",
     cabinet: str = "Уточните в регистратуре",
+    appointment_id: int | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
@@ -511,6 +473,7 @@ async def quick_appointment_reminder(
     Быстрая отправка напоминания о записи
     """
     appointment_data = {
+        "appointment_id": appointment_id,
         "patient_name": "Пациент",  # Получать из БД по телефону
         "doctor_name": doctor_name,
         "specialty": specialty,
@@ -520,14 +483,16 @@ async def quick_appointment_reminder(
     }
 
     return await send_appointment_reminder(
-        {"patient_phone": patient_phone, "appointment_data": appointment_data},
+        SendAppointmentReminderIntegrationRequest(
+            patient_phone=patient_phone, appointment_data=appointment_data
+        ),
         background_tasks,
         db,
         current_user,
     )
 
 
-@router.post("/quick/qr-notification", response_model=dict[str, Any])
+@router.post("/quick/qr-notification", response_model=dict[str, Any], responses=_PATIENT_DELIVERY_RESPONSES)
 async def quick_qr_notification(
     patient_phone: str,
     doctor_name: str,
@@ -551,7 +516,7 @@ async def quick_qr_notification(
     }
 
     return await send_qr_code(
-        {"patient_phone": patient_phone, "qr_data": qr_data},
+        SendQrCodeRequest(patient_phone=patient_phone, qr_data=qr_data),
         background_tasks,
         db,
         current_user,
@@ -594,8 +559,10 @@ def _resolve_own_telegram_link(db: Session, current_user: User) -> TelegramUser:
         .order_by(TelegramUser.id.desc())
         .first()
     )
-    if link:
+    if link and (link.patient_id is None or _is_private_telegram_chat_id(link.chat_id)):
         return link
+    if link:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="telegram_not_linked")
     # 2) Patient-domain fallback (bot /start links patient rows).
     link = (
         db.query(TelegramUser)
@@ -608,7 +575,7 @@ def _resolve_own_telegram_link(db: Session, current_user: User) -> TelegramUser:
         .order_by(TelegramUser.id.desc())
         .first()
     )
-    if not link:
+    if not link or not _is_private_telegram_chat_id(link.chat_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="telegram_not_linked",

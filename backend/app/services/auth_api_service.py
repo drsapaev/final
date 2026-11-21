@@ -1,4 +1,4 @@
-"""Service layer for auth endpoints."""
+"""Credential validation for the optional fallback auth endpoints."""
 
 from __future__ import annotations
 
@@ -17,62 +17,66 @@ class AuthApiDomainError(Exception):
 
 
 class AuthApiService:
-    """Handles credential validation for auth endpoint responses."""
+    """The legacy fallback has no challenge flow, so never bypass 2FA."""
 
     def __init__(self, db, repository: AuthApiRepository | None = None):
         self.repository = repository or AuthApiRepository(db)
 
+    async def _authenticate(self, identifier: str, password: str, *, email: bool):
+        error = AuthApiDomainError(
+            status_code=401, detail="Incorrect username or password"
+        )
+        lookup = (
+            self.repository.get_user_by_username_or_email
+            if email
+            else self.repository.get_user_by_username
+        )
+        initial = await lookup(identifier)
+        if not initial or not verify_password(
+            password, getattr(initial, "hashed_password", "")
+        ):
+            raise error
+        user_id, password_hash, epoch = (
+            initial.id,
+            initial.hashed_password,
+            initial.auth_epoch,
+        )
+        user = await self.repository.get_user_for_update(user_id)
+        if (
+            not user
+            or not user.is_active
+            or user.is_superuser
+            or is_login_blocked_role(user.role)
+            or user.role in {"Admin", "Cashier", "SuperAdmin"}
+            or user.hashed_password != password_hash
+            or user.auth_epoch != epoch
+            or not (user.username == identifier or (email and user.email == identifier))
+            or await self.repository.has_configured_second_factor(user_id)
+        ):
+            raise error
+        await self.repository.apply_login_policy(user)
+        return user
+
     async def login_oauth_payload(self, *, username: str, password: str) -> dict:
-        user = await self.repository.get_user_by_username(username)
-        if not user or not verify_password(password, getattr(user, "hashed_password", "")):
-            raise AuthApiDomainError(
-                status_code=401,
-                detail="Incorrect username or password",
-            )
-
-        # QD-1.1 (queue resource role cleanup): internal-only sentinel roles
-        # are structural non-logins — synthetic queue-resource accounts stay
-        # tokenless on this legacy surface too (it has no is_active check
-        # either; the generic 401 keeps the same response shape).
-        if is_login_blocked_role(getattr(user, "role", None)):
-            raise AuthApiDomainError(
-                status_code=401,
-                detail="Incorrect username or password",
-            )
-
-        access_token = create_access_token({"sub": user.username})
-        return {"access_token": access_token, "token_type": "bearer"}
+        user = await self._authenticate(username, password, email=False)
+        payload = {
+            "access_token": create_access_token(
+                {"sub": str(user.id), "auth_epoch": user.auth_epoch}
+            ),
+            "token_type": "bearer",
+        }
+        await self.repository.commit()
+        return payload
 
     async def json_login_payload(
-        self,
-        *,
-        username: str,
-        password: str,
-        remember_me: bool,
+        self, *, username: str, password: str, remember_me: bool
     ) -> dict:
-        _ = remember_me  # kept for API compatibility
-        user = await self.repository.get_user_by_username_or_email(username)
-        if not user:
-            raise AuthApiDomainError(status_code=401, detail="Неверные учетные данные")
-        if not user.is_active:
-            raise AuthApiDomainError(
-                status_code=401,
-                detail="Пользователь деактивирован",
-            )
-        # QD-1.1 (queue resource role cleanup): internal-only sentinel roles
-        # are structural non-logins — the role, not the password hash, is
-        # the defense for synthetic queue-resource accounts.
-        if is_login_blocked_role(user.role):
-            raise AuthApiDomainError(
-                status_code=401,
-                detail="Аккаунт технический, вход запрещён",
-            )
-        if not verify_password(password, user.hashed_password):
-            raise AuthApiDomainError(status_code=401, detail="Неверные учетные данные")
-
-        access_token = create_access_token(data={"sub": str(user.id)})
-        return {
-            "access_token": access_token,
+        _ = remember_me
+        user = await self._authenticate(username, password, email=True)
+        payload = {
+            "access_token": create_access_token(
+                {"sub": str(user.id), "auth_epoch": user.auth_epoch}
+            ),
             "token_type": "bearer",
             "user": {
                 "id": user.id,
@@ -84,3 +88,5 @@ class AuthApiService:
                 "is_superuser": user.is_superuser,
             },
         }
+        await self.repository.commit()
+        return payload

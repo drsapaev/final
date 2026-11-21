@@ -13,6 +13,26 @@ from .mcp_client import MedicalMCPClient, get_mcp_client, shutdown_mcp_client
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_mcp_error_content(value: Any) -> Any:
+    """Strip provider-controlled error text while retaining the response shape."""
+    if isinstance(value, dict):
+        is_failure = value.get("status") == "error" or value.get("success") is False
+        return {
+            key: (
+                "MCP request failed"
+                if item and (
+                    key == "error"
+                    or (is_failure and key in {"message", "detail", "reason", "errors"})
+                )
+                else _sanitize_mcp_error_content(item)
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_sanitize_mcp_error_content(item) for item in value]
+    return value
+
+
 class MCPManager:
     """Менеджер для управления MCP сервисами и мониторинга"""
 
@@ -59,7 +79,7 @@ class MCPManager:
             # Cooldown passed, reset
             del self._server_disabled_until[server]
             self._server_failures[server] = 0
-            logger.info(f"CIRCUIT_BREAKER_RESET: server={server}")
+            logger.info("CIRCUIT_BREAKER_RESET")
         return True
 
     def _record_server_failure(self, server: str):
@@ -70,7 +90,7 @@ class MCPManager:
                 seconds=self.CIRCUIT_BREAKER_COOLDOWN
             )
             logger.warning(
-                f"CIRCUIT_BREAKER_TRIPPED: server={server}, "
+                "CIRCUIT_BREAKER_TRIPPED: "
                 f"failures={self._server_failures[server]}, "
                 f"disabled_for={self.CIRCUIT_BREAKER_COOLDOWN}s"
             )
@@ -197,9 +217,7 @@ class MCPManager:
         # Circuit breaker check
         if not self._is_server_available(server):
             remaining = (self._server_disabled_until[server] - datetime.now(UTC)).total_seconds()
-            logger.warning(
-                f"CIRCUIT_BREAKER_BLOCKED: server={server}, remaining={remaining:.0f}s"
-            )
+            logger.warning("CIRCUIT_BREAKER_BLOCKED: remaining=%.0fs", remaining)
             return {
                 "status": "error",
                 "error": "Server temporarily unavailable (circuit breaker)",
@@ -214,13 +232,12 @@ class MCPManager:
         try:
             # Логируем запрос если включено
             if self.config["log_requests"]:
-                logger.debug(f"MCP request: {server}.{method}")
+                logger.debug("MCP request started")
 
             # ⚠️ ВАЖНО: Явно логируем таймаут ПЕРЕД wait_for
             # Это гарантирует, что таймаут никогда не будет "немым"
             logger.info(
-                f"MCP_WAIT_START: server={server}, method={method}, "
-                f"timeout={timeout}s, layer=mcp_manager"
+                "MCP_WAIT_START: timeout=%ss, layer=mcp_manager", timeout
             )
 
             # Выполняем запрос с таймаутом
@@ -269,14 +286,14 @@ class MCPManager:
                     "timeout_ms": int(timeout * 1000),
                 }
 
-            return result
+            return _sanitize_mcp_error_content(result)
 
         except TimeoutError:
             elapsed = (datetime.now(UTC) - start_time).total_seconds()
             # ⚠️ КРИТИЧНО: Явный лог с указанием слоя и параметров
             logger.warning(
-                f"MCP_TIMEOUT: server={server}, method={method}, "
-                f"timeout={timeout}s, elapsed={elapsed:.2f}s, layer=mcp_manager"
+                "MCP_TIMEOUT: timeout=%ss, elapsed=%.2fs, layer=mcp_manager",
+                timeout, elapsed,
             )
             self.metrics["requests_failed"] += 1
             self._record_server_failure(server)  # Circuit breaker: track timeout as failure
@@ -293,13 +310,15 @@ class MCPManager:
             }
 
         except Exception as e:
-            logger.error(f"MCP request error: {server}.{method} - {str(e)}")
+            # Providers can include clinical prompts/results in exception text.
+            # Keep diagnostics bounded to the exception type, without traceback.
+            logger.error("MCP request failed error_type=%s", type(e).__name__)
             self.metrics["requests_failed"] += 1
             self._record_server_failure(server)  # Circuit breaker: track exception as failure
 
             return {
                 "status": "error",
-                "error": str(e),
+                "error": "MCP request failed",
                 "layer": "mcp_manager",
                 "server": server,
                 "method": method,
