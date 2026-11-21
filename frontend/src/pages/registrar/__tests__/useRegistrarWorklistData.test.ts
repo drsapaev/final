@@ -16,6 +16,7 @@
  * a newer sample (S-19).
  */
 import { act, renderHook } from '@testing-library/react';
+import { CanceledError } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../api/client', () => ({ api: { get: vi.fn() } }));
@@ -1022,7 +1023,7 @@ describe('useRegistrarWorklistData — REGDATA-FE-001/002 refresh-plane regressi
     expect(result.current.dataSource).toBe('api');
   });
 
-  it('REGDATA-FE-002: a 401 of the CURRENT request still clears the token and surfaces failure', async () => {
+  it('REGDATA-FE-002: the current request surfaces a 401 without writing credential storage', async () => {
     sessionStorage.setItem('auth_token', 'token-live');
     vi.mocked(api.get)
       .mockResolvedValueOnce({ data: { queues: [] } } as never)
@@ -1032,10 +1033,43 @@ describe('useRegistrarWorklistData — REGDATA-FE-001/002 refresh-plane regressi
     await act(async () => {});
 
     await act(async () => {
-      await result.current.loadAppointments({ source: 'current_session_401' });
+      await expect(result.current.loadAppointments({ source: 'current_session_401' })).resolves.toBe('failed');
     });
 
-    expect(sessionStorage.getItem('auth_token')).toBeNull();
+    expect(sessionStorage.getItem('auth_token')).toBe('token-live');
     expect(result.current.appointmentsLoading).toBe(false);
+  });
+
+  it('preserves a replacement token even if the worklist has not started another request', async () => {
+    sessionStorage.setItem('auth_token', 'synthetic-session-a');
+    const pending = deferred<{ data: { queues: unknown[] } }>();
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: { queues: [] } } as never)
+      .mockReturnValueOnce(pending.promise as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(depsFor()));
+    await act(async () => {});
+
+    await act(async () => {
+      const resultPromise = result.current.loadAppointments({ source: 'late_401' });
+      sessionStorage.setItem('auth_token', 'synthetic-session-b');
+      pending.reject({ response: { status: 401 } });
+      await resultPromise;
+    });
+
+    expect(sessionStorage.getItem('auth_token')).toBe('synthetic-session-b');
+  });
+
+  it('treats a cancelled request as superseded and preserves the visible sample', async () => {
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: { queues: [] } } as never)
+      .mockRejectedValueOnce(new CanceledError());
+    const { result } = renderHook(() => useRegistrarWorklistData(depsFor()));
+    await act(async () => {});
+
+    await act(async () => {
+      await expect(result.current.loadAppointments({ source: 'session_ended', silent: true })).resolves.toBe('superseded');
+    });
+
+    expect(result.current.dataSource).toBe('api');
   });
 });

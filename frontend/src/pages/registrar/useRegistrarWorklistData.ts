@@ -35,6 +35,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { startTransition } from 'react';
 import type { RefObject } from 'react';
+import { isCancel } from 'axios';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -404,6 +405,8 @@ export const useRegistrarWorklistData = ({
         return 'empty';
       }
     } catch (error: unknown) {
+      if (isCancel(error)) return 'superseded';
+
       if ((error as HttpApiError)?.response?.status === 429) {
         // REG-FE-020 (audit ledger 3803): cooldown принадлежит авторитетному
         // запросу — сменённый 429 не должен замораживать auto-refresh после
@@ -427,15 +430,12 @@ export const useRegistrarWorklistData = ({
 
       // Handle axios errors
       if ((error as HttpApiError)?.response?.status === 401) {
-        // REGDATA-FE-002 (group99): a superseded request's 401 must not touch
-        // the token of the newer live session — check supersession FIRST; the
-        // shared API interceptor already protects the newer token identity.
+        // The API client owns session invalidation. A worklist request id
+        // cannot establish that the currently stored token belongs to it.
         if (isSuperseded()) {
           return 'superseded';
         }
-        // Токен недействителен
-        logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
-        sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
+        logger.warn('Сервер отклонил запрос списка регистратуры (401)');
         // QW-03 fix: show error state instead of demo data.
         startTransition(() => {
           dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
