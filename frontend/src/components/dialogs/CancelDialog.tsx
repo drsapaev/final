@@ -26,14 +26,18 @@ interface CancelDialogProps {
   isOpen: boolean;
   onClose: () => void;
   appointment: Appointment | null;
+  targets?: { value: string; label: string; appointment: Appointment }[];
   onCancel: (appointmentId: unknown, reason: string) => Promise<CancelCommandOutcome | void> | CancelCommandOutcome | void;
 }
 
-const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogProps) => {
+const CancelDialog = ({ isOpen, onClose, appointment, targets, onCancel }: CancelDialogProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
   const [reason, setReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [selectedKey, setSelectedKey] = useState('');
+  const target = targets?.length === 1 ? targets[0] : targets?.find(({ value }) => value === selectedKey);
+  const details = targets ? target?.appointment : appointment;
 
   // Сброс состояния при открытии/закрытии
   useEffect(() => {
@@ -41,6 +45,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
       setReason('');
       setError('');
       setIsProcessing(false);
+      setSelectedKey('');
     }
   }, [isOpen]);
 
@@ -64,6 +69,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
   };
 
   const handleCancel = async () => {
+    if (targets && !target) return;
     const validationError = validateReason(reason);
     if (validationError) {
       setError(validationError);
@@ -74,7 +80,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
 
     try {
       if (onCancel && appointment) {
-        const result = await onCancel(appointment.id, reason.trim());
+        const result = await onCancel(target?.value ?? appointment.id, reason.trim());
         // REG-FE-017 (ledger PR 3803): успех подтверждается только явным
         // результатом команды. no_op/failed/partial держат диалог открытым;
         // легаси-void-контракт не считается доказательством отмены.
@@ -129,7 +135,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
       variant: 'danger',
       icon: isProcessing ? null : <X size={16} />,
       onClick: handleCancel,
-      disabled: isProcessing || !!error || !reason.trim(),
+      disabled: isProcessing || !!error || !reason.trim() || Boolean(targets && !target),
     },
   ];
 
@@ -173,28 +179,47 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
               </span>
             </div>
 
-            {Boolean(appointment?.services) && (
+            {targets && targets.length > 1 && (
+              <div>
+                <label htmlFor="cancel-record" className="cancel-reason-label">
+                  {t('registrar.cancel_select_record')}
+                </label>
+                <select
+                  id="cancel-record"
+                  className="registrar-reschedule-input registrar-reschedule-input-themed"
+                  value={selectedKey}
+                  onChange={(event) => { setSelectedKey(event.target.value); setError(''); }}
+                  disabled={isProcessing}
+                >
+                  <option value="" disabled>—</option>
+                  {targets.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </div>
+            )}
+            {targets?.length === 1 && <span className="cancel-info-value">{target?.label}</span>}
+
+            {details?.services && (
               <div className="cancel-info-row">
                 <span className="cancel-info-label">
                   Услуги:
                 </span>
                 <span className="cancel-info-value--right">
-                  {Array.isArray(appointment.services)
-                    ? appointment.services
+                  {Array.isArray(details.services)
+                    ? details.services
                         .map((s) => (typeof s === 'string' ? s : s?.name || s?.code || JSON.stringify(s)))
                         .join(', ')
-                    : String(appointment.services)}
+                    : String(details.services)}
                 </span>
               </div>
             )}
 
-            {Boolean(appointment?.cost) && (
+            {Boolean(details?.cost) && (
               <div className="cancel-info-row">
                 <span className="cancel-info-label">
                   Стоимость:
                 </span>
                 <span className="cancel-info-value">
-                  {new Intl.NumberFormat('ru-RU').format(Number(appointment.cost))} сум
+                  {new Intl.NumberFormat('ru-RU').format(Number(details?.cost))} сум
                 </span>
               </div>
             )}
@@ -217,7 +242,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
             aria-invalid={!!error}
             aria-describedby={error ? 'cancel-reason-error' : undefined}
             className={`cancel-reason-textarea ${error ? 'cancel-reason-textarea--error' : ''}`}
-            autoFocus
+            autoFocus={!targets || targets.length < 2}
           />
 
           {/* Счетчик символов и ошибка */}

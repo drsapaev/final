@@ -89,6 +89,18 @@ input to match the endpoint's accepted set.
 """
 from __future__ import annotations
 
+RESCHEDULE_VISIT_ROLES = ("Admin", "Registrar")
+
+
+def visit_reschedule_conflict(status: str | None, started_at: object) -> str | None:
+    """Return the visit-state conflict shared by both rescheduling commands."""
+    if status in {"closed", "canceled"}:
+        return "Cannot reschedule closed or canceled visit"
+    if started_at:
+        return "Cannot reschedule a visit that has been started"
+    return None
+
+
 # Terminal visit statuses: no outgoing transitions without admin
 # force-reopen. A duplicate request or a misclick must not reopen
 # these — that would silently break financial/EMR invariants

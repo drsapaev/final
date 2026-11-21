@@ -105,10 +105,11 @@ export const adaptQueueEntry = (
     queue_time: queueTime,
     discount_mode: fullEntry.discount_mode ?? null,
     approval_status: fullEntry.approval_status || null,
-    available_actions: Array.isArray(fullEntry.available_actions) ? fullEntry.available_actions : [],
+    available_actions: Array.isArray(fullEntry.available_actions) ? fullEntry.available_actions : undefined,
     can_mark_paid: Boolean(fullEntry.can_mark_paid),
     can_start_visit: Boolean(fullEntry.can_start_visit),
-    can_cancel: Boolean(fullEntry.can_cancel),
+    can_cancel: fullEntry.can_cancel,
+    can_reschedule: fullEntry.can_reschedule,
     can_print_ticket: Boolean(fullEntry.can_print_ticket),
     can_complete: Boolean(fullEntry.can_complete),
 

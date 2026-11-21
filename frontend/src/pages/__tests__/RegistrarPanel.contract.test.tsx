@@ -433,18 +433,17 @@ describe('RegistrarPanel command contract', () => {
     const source = readRegistrarSourceTree();
     const resolverBlock = extractSourceBlock(
       source,
-      'const resolveRescheduleVisitId = useCallback((appointmentRow: Record<string, unknown>) => {',
-      'const removeRescheduledAppointmentFromView = useCallback',
+      'export const getRegistrarRescheduleVisitIds = (row: RegistrarRecordLike): number[] => {',
+      'export const describeRegistrarRecord',
     );
 
     expect(source).toContain('appointment_id: fullEntry.appointment_id || entry.appointment_id || null');
     expect(source).not.toContain('appointment_id: fullEntry.appointment_id || entry.appointment_id || entryId');
-    expect(resolverBlock).toContain('visitIds?.[0]');
-    expect(resolverBlock).toContain('appointmentRow?.visit_id');
-    expect(resolverBlock).toContain('appointmentRow?.visitId');
+    expect(resolverBlock).toContain('record.visit_id ?? record.visitId');
+    expect(resolverBlock).toContain("hasBackendAction(record, 'reschedule')");
     expect(resolverBlock).not.toContain('appointment_id');
     expect(resolverBlock).not.toContain('appointment_ids');
-    expect(resolverBlock).not.toContain('appointmentRow?.id');
+    expect(resolverBlock).not.toContain('record.id');
     expect(source).toContain("tI18n('registrar.no_visit_for_postpone')");
   });
 

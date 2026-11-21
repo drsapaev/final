@@ -281,6 +281,7 @@ def _prime_registrar_queue_read_cache(
             resource.queue_tag: resource.id for resource in active_resources
         },
         "visit_services": visit_services_by_id,
+        "visits": all_visits,
         "daily_queues": daily_queues_by_id,
         "daily_queue_ids_checked": queue_ids,
         "visit_queue_entries": visit_queue_entries,
@@ -1346,6 +1347,7 @@ def _serialize_queue_entry(
         "can_print_ticket": can_print_ticket,
         "can_complete": can_complete,
         "can_cancel": can_cancel,
+        "can_reschedule": "reschedule" in available_actions,
         "can_view_emr": can_view_emr,
         "can_schedule_next": can_schedule_next,
         "available_actions": available_actions,

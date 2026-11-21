@@ -474,7 +474,6 @@ const RegistrarPanel = () => {
         setWizardEditMode={setWizardEditMode}
         setWizardInitialData={setWizardInitialData}
         setIsProcessing={setIsProcessing}
-        appointments={appointments}
         loadAppointments={loadAppointments}
         loadIntegratedData={loadIntegratedData}
         openRecordEditor={openRecordEditor}

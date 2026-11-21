@@ -20,7 +20,7 @@
  */
 
 import { useCallback } from 'react';
-import { Phone, Home, FileText, Eye, Edit, X, MoreHorizontal, CalendarClock, Calendar, Clock } from 'lucide-react';
+import { Phone, Home, FileText, Eye, Edit, X, MoreHorizontal, CalendarClock, Calendar, Clock, Layers } from 'lucide-react';
 import {
   CheckCircle,
   User,
@@ -35,6 +35,7 @@ import { getRegistrarTimestampDisplay } from '../../utils/dateUtils';
 import type { RegistrarTimestampRecord } from '../../utils/dateUtils';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { getServiceDisplayName } from '../../utils/serviceCodeResolver';
+import { getRegistrarCancelTargets, getRegistrarRescheduleVisitIds } from '../../pages/registrar/registrarHelpers';
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
 import {
   type AppointmentRow,
@@ -246,6 +247,18 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
         icon: CalendarClock,
         text: t('misc.eat_status_rescheduled'),
         emoji: '🔁'
+      },
+
+      // REGAGG-FE-002 (owner group100, 2026-11-16): агрегат «Все отделения»
+      // с разными per-record статусами — честная mixed-пометка, а не статус
+      // первой записи. Не клиническое состояние: состав статусов виден в
+      // grouped_record_statuses / grouped_records[].status.
+      mixed: {
+        color: 'var(--mac-accent-purple, rgb(175 82 222))',
+        bg: withOpacity('var(--mac-accent-purple, rgb(175 82 222))', 0.12),
+        icon: Layers,
+        text: t('misc.eat_status_mixed'),
+        emoji: '🧩'
       }
     };
 
@@ -1342,20 +1355,8 @@ export const buildAppointmentsTableColumns = ({
       const canComplete = isDoctorView && backendCanComplete === true;
       const canViewEmr = isDoctorView && backendCanViewEmr === true;
       const canScheduleNext = isDoctorView && backendCanScheduleNext === true;
-      // UX Audit Registrar #4: inline кнопки Cancel и Reschedule для registrar view.
-      // Раньше были доступны только через context menu (правый клик),
-      // что не работало на touch-устройствах (планшеты в регистратуре).
-      const canCancel = !isDoctorView && (
-        row?.status === 'waiting' ||
-        row?.status === 'called' ||
-        row?.status === 'pending' ||
-        row?.status === 'confirmed'
-      );
-      const canReschedule = !isDoctorView && (
-        row?.status === 'waiting' ||
-        row?.status === 'pending' ||
-        row?.status === 'confirmed'
-      );
+      const canCancel = !isDoctorView && getRegistrarCancelTargets(rowRecord).length > 0;
+      const canReschedule = !isDoctorView && getRegistrarRescheduleVisitIds(rowRecord).length > 0;
       return (
         <div
           className="eat-actions-cell"
