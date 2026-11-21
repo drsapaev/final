@@ -6,6 +6,7 @@
  */
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
+import Tooltip from '../ui/macos/Tooltip';
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string;
 
@@ -24,8 +25,15 @@ const AppointmentPagination = ({
   onPageChange: (page: number) => void;
   t?: TFunc;
 }) => {
-  void t;
-  if (totalItems === 0) return null;
+  const { t: hookT } = useTranslation();
+  const getT = (key: string, options?: Record<string, unknown>) => {
+    if (t) return t(key, options);
+    return hookT(key, options);
+  };
+
+  if (totalItems === 0) {
+    return null;
+  }
 
   const start = (currentPage - 1) * pageSize + 1;
   const end = Math.min(currentPage * pageSize, totalItems);
@@ -43,11 +51,13 @@ const AppointmentPagination = ({
         {start}–{end} из {totalItems}
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-1)' }}>
-        <button
+        <Tooltip content={getT('misc.eat_back', { defaultValue: 'Предыдущая страница' })}>
+          <span style={{ display: 'inline-block' }}>
+          <button
           className="pagination-button"
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage <= 1}
-          aria-label="Предыдущая страница"
+          aria-label={getT('misc.eat_back', { defaultValue: 'Предыдущая страница' })}
           style={{
             padding: '4px 8px',
             border: '1px solid var(--mac-border)',
@@ -59,14 +69,18 @@ const AppointmentPagination = ({
         >
           <ChevronLeft size={16} />
         </button>
+        </span>
+        </Tooltip>
         <span style={{ fontSize: 'var(--mac-font-size-sm)', padding: '0 var(--mac-spacing-2)' }}>
           {currentPage} / {totalPages || 1}
         </span>
-        <button
+        <Tooltip content={getT('misc.eat_next', { defaultValue: 'Следующая страница' })}>
+          <span style={{ display: 'inline-block' }}>
+          <button
           className="pagination-button"
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage >= totalPages}
-          aria-label="Следующая страница"
+          aria-label={getT('misc.eat_next', { defaultValue: 'Следующая страница' })}
           style={{
             padding: '4px 8px',
             border: '1px solid var(--mac-border)',
@@ -78,6 +92,8 @@ const AppointmentPagination = ({
         >
           <ChevronRight size={16} />
         </button>
+        </span>
+        </Tooltip>
       </div>
     </div>
   );
