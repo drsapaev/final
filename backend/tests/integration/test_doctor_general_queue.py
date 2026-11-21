@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import secrets
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal
 
 import pytest
 
 from app.core.security import get_password_hash
+from app.crud.clinic import clinic_today
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.emr_v2 import EMRRecord
@@ -765,17 +766,39 @@ class TestDoctorGeneralQueue:
         assert unrelated_visit.visit_time == "08:00"
         assert unrelated_visit.notes == "do not touch"
 
+    @pytest.mark.parametrize(
+        ("notes_length", "expect_stamp"),
+        [
+            (None, True),
+            (64, True),
+            (512 - len("\nПрием начат в 00:00"), True),
+            (513 - len("\nПрием начат в 00:00"), False),
+            (512, False),
+        ],
+        ids=["empty", "existing", "exact-fit", "one-over", "full"],
+    )
     def test_start_visit_preserves_pre_existing_visit_notes(
         self,
         client,
         db_session,
         test_doctor_user,
         test_patient,
+        monkeypatch,
+        notes_length,
+        expect_stamp,
     ):
-        """DOCSTART-BE-002 (audit 3892): doctor start must APPEND the
-        clinic stamp to pre-existing Visit.notes, never clobber the
-        persistent narrative field — scheduling context from the
-        registrar or a prior stage must survive the start transition."""
+        """Preserve the full narrative even when the optional stamp cannot fit."""
+        notes = (
+            "SYNTHETIC заметка регистратора".ljust(notes_length, "я")
+            if notes_length is not None
+            else None
+        )
+        visit_day = clinic_today(db_session)
+        start_time = time(14, 27)
+        monkeypatch.setattr(
+            "app.api.v1.endpoints.doctor_integration._queue_ops._clinic_now",
+            lambda _db: datetime.combine(visit_day, start_time),
+        )
         doctor = Doctor(
             user_id=test_doctor_user.id,
             specialty="general",
@@ -789,15 +812,15 @@ class TestDoctorGeneralQueue:
         pre_existing_visit = Visit(
             patient_id=test_patient.id,
             doctor_id=doctor.id,
-            visit_date=date.today(),
+            visit_date=visit_day,
             visit_time="08:00",
             status="open",
-            notes="SYNTHETIC scheduling instruction from registrar — keep me",
+            notes=notes,
             discount_mode="none",
             source="desk",
         )
         queue = DailyQueue(
-            day=date.today(),
+            day=visit_day,
             specialist_id=doctor.id,
             queue_tag="general",
             active=True,
@@ -837,12 +860,13 @@ class TestDoctorGeneralQueue:
         db_session.refresh(entry)
         db_session.refresh(pre_existing_visit)
         assert entry.status == "in_progress"
-        # The registrar's narrative context must survive...
-        assert "SYNTHETIC scheduling instruction from registrar — keep me" in (
-            pre_existing_visit.notes or ""
-        )
-        # ...AND the clinic stamp must be appended.
-        assert "Прием начат в" in (pre_existing_visit.notes or "")
+        assert pre_existing_visit.status == "in_progress"
+        assert pre_existing_visit.visit_time == "14:27"
+        expected_notes = notes
+        if expect_stamp:
+            stamp = "Прием начат в 14:27"
+            expected_notes = f"{notes}\n{stamp}" if notes else stamp
+        assert pre_existing_visit.notes == expected_notes
 
     def test_general_queue_returns_empty_payload_without_configuration(
         self,

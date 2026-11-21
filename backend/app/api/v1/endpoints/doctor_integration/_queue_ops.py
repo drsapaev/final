@@ -29,6 +29,7 @@ from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
     move_paired_appointment_to_day,
 )
+from app.models.visit import Visit
 from app.schemas.doctor_queue import (
     DoctorQueueStartVisitResponse,
     DoctorQueueTodayResponse,
@@ -845,12 +846,12 @@ def start_patient_visit(
         # неверное время приёма
         clinic_now = _clinic_now(db)
         visit.visit_time = clinic_now.strftime("%H:%M")
-        # DOCSTART-BE-002 (audit 3892): Visit.notes — постоянное
-        # нарративное поле (модели visit.py); старт приёма ДОБАВЛЯЕТ
-        # клиник-штамп, а не затирает существующий контекст записи из
-        # регистратуры/предыдущей стадии.
-        start_stamp = f"Прием начат в {clinic_now.strftime('%H:%M')}"
-        visit.notes = f"{visit.notes}\n{start_stamp}" if visit.notes else start_stamp
+        # DOCSTART-BE-002: preserve the whole narrative. The start time is
+        # always recorded in visit_time, including when the note is full.
+        start_stamp = f"Прием начат в {visit.visit_time}"
+        notes_with_stamp = f"{visit.notes}\n{start_stamp}" if visit.notes else start_stamp
+        if len(notes_with_stamp) <= Visit.__table__.c.notes.type.length:
+            visit.notes = notes_with_stamp
 
         visit.updated_at = changed_at
 
