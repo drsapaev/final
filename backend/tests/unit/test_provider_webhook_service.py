@@ -149,7 +149,7 @@ class TestProviderWebhookService:
         db = Mock()
         repository = Mock()
         repository.get_existing_transaction.return_value = SimpleNamespace(
-            payment_id=44, amount=Decimal("182753"), webhook_id=33,
+            payment_id=44, amount=Decimal("182753"), webhook_id=33, status="completed",
         )
         repository.get_payment_by_id.return_value = SimpleNamespace(
             provider="click", currency="UZS", provider_payment_id=payload["merchant_trans_id"],

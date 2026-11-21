@@ -39,13 +39,15 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import CreateSchema, DropSchema
@@ -215,11 +217,13 @@ def _make_click_webhook_data(issued_order: str, amount: int = 10000) -> dict:
         "click_trans_id": f"test-{uuid.uuid4().hex[:8]}",
         "merchant_trans_id": issued_order,
         "amount": amount * 100,
+        "action": 1,
+        "error": 0,
         "sign_string": "test-sig",
     }
 
 
-def _make_mock_manager(callback: dict):
+def _make_mock_manager(callback: dict, *, status: str = "completed"):
     """Create a mock payment manager that returns success for the given payment.
 
     The mock replaces get_payment_manager() so that:
@@ -236,9 +240,14 @@ def _make_mock_manager(callback: dict):
 
     mock_result = MagicMock()
     mock_result.success = True
-    mock_result.status = "completed"
+    mock_result.status = status
     mock_result.payment_id = callback["merchant_trans_id"]
-    mock_result.provider_data = {"test": "data", "amount": str(Decimal(callback["amount"]) / 100)}
+    mock_result.provider_data = {
+        "test": "data",
+        "amount": str(Decimal(callback["amount"]) / 100),
+        "action": callback["action"],
+        "error": callback["error"],
+    }
     mock_result.error_message = None
     mock_manager.process_webhook.return_value = mock_result
     return mock_manager
@@ -269,6 +278,89 @@ class TestClickWebhookRealDBPersistence:
                                   │
                                   └── PaymentWebhook remains persisted
     """
+
+    @pytest.mark.parametrize(
+        ("action", "provider_status", "payment_status", "response_error"),
+        [(1, "completed", "paid", 0), (0, "processing", "processing", -1)],
+        ids=["completed", "prepare"],
+    )
+    def test_click_concurrent_replay_reuses_committed_result(
+        self,
+        production_session,
+        verify_session_factory,
+        monkeypatch,
+        action,
+        provider_status,
+        payment_status,
+        response_error,
+    ):
+        from app.models.payment import Payment
+        from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
+        from app.repositories.provider_webhook_repository import (
+            ProviderWebhookRepository,
+        )
+        from app.services.provider_webhook_service import ProviderWebhookService
+
+        payment = _setup_payment(production_session)
+        payment_id = payment.id
+        visit_id = payment.visit_id
+        callback = _make_click_webhook_data(payment.provider_payment_id)
+        callback["action"] = action
+        production_session.close()
+        manager = _make_mock_manager(callback, status=provider_status)
+        monkeypatch.setattr(
+            "app.services.provider_webhook_service.get_payment_manager", lambda: manager
+        )
+
+        lookups = threading.Barrier(2)
+
+        class ConcurrentClickRepository(ProviderWebhookRepository):
+            initial_lookup = True
+
+            def get_existing_transaction(self, *, transaction_id, provider):
+                result = super().get_existing_transaction(
+                    transaction_id=transaction_id, provider=provider
+                )
+                if self.initial_lookup:
+                    self.initial_lookup = False
+                    assert result is None
+                    lookups.wait(timeout=8)
+                return result
+
+        def deliver():
+            with verify_session_factory() as session:
+                pid = session.scalar(text("SELECT pg_backend_pid()"))
+                service = ProviderWebhookService(session, ConcurrentClickRepository(session))
+                return pid, service.process_click_webhook(callback)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            deliveries = [pool.submit(deliver) for _ in range(2)]
+            (first_pid, first), (second_pid, second) = [
+                result.result(timeout=15) for result in deliveries
+            ]
+
+        assert first_pid != second_pid
+        assert first["error"] == second["error"] == response_error
+        assert first["merchant_prepare_id"] == second["merchant_prepare_id"]
+        assert {first["payment_status"], second["payment_status"]} == {payment_status, None}
+
+        with verify_session_factory() as session:
+            replay = ProviderWebhookService(session).process_click_webhook(callback)
+            assert replay["error"] == response_error
+            assert replay["merchant_prepare_id"] == first["merchant_prepare_id"]
+
+        with verify_session_factory() as verify:
+            transaction = verify.query(PaymentTransaction).filter_by(payment_id=payment_id).one()
+            assert transaction.webhook_id == first["merchant_prepare_id"]
+            assert transaction.status == provider_status
+            persisted_payment = verify.get_one(Payment, payment_id)
+            assert persisted_payment.status == payment_status
+            assert (persisted_payment.paid_at is not None) == (payment_status == "paid")
+            receipts = verify.query(PaymentWebhook).filter_by(
+                provider="click", transaction_id=callback["merchant_trans_id"]
+            ).all()
+            assert sorted(receipt.status for receipt in receipts) == ["ignored", "processed"]
+            assert all(receipt.visit_id == visit_id and receipt.processed_at for receipt in receipts)
 
     def test_click_success_persists_across_sessions(
         self, production_session, verify_session_factory
@@ -306,11 +398,22 @@ class TestClickWebhookRealDBPersistence:
             result = service.process_click_webhook(webhook_data)
             with verify_session_factory() as retry_session:
                 replay = ProviderWebhookService(retry_session).process_click_webhook(webhook_data)
+            with verify_session_factory() as mismatch_session:
+                mismatched_amount = {**webhook_data, "amount": webhook_data["amount"] + 100}
+                mismatch = ProviderWebhookService(mismatch_session).process_click_webhook(
+                    mismatched_amount
+                )
+                mismatched_phase = {**webhook_data, "action": 0}
+                different_phase = ProviderWebhookService(mismatch_session).process_click_webhook(
+                    mismatched_phase
+                )
 
         assert result["error"] == 0
         assert replay["error"] == 0
         assert replay["error_note"] == "Already processed"
         assert replay["merchant_prepare_id"] == result["merchant_prepare_id"]
+        assert mismatch == {"error": -1, "error_note": "Payment amount mismatch"}
+        assert different_phase == {"error": -1, "error_note": "Payment phase mismatch"}
         mock_manager.process_webhook.assert_called_once()
 
         # Close Session A (simulates production get_db cleanup)

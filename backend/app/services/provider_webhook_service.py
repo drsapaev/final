@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.db.transactions import transaction as transaction_ctx
 from app.models.audit import AuditLog
+from app.models.payment import Payment
+from app.models.payment_webhook import PaymentTransaction
 from app.repositories.provider_webhook_repository import ProviderWebhookRepository
 from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.payment_state_checks import (
@@ -117,6 +119,40 @@ class ProviderWebhookService:
             and payment.provider_payment_id == order_id
         )
 
+    def _click_replay_response(
+        self,
+        transaction: PaymentTransaction,
+        payment: Payment | None,
+        webhook_data: dict[str, Any],
+        *,
+        expected_status: str | None = None,
+    ) -> dict[str, Any]:
+        order_id = webhook_data.get("merchant_trans_id", "unknown")
+        if not self._click_payment_matches_order(payment, order_id):
+            return {"error": -1, "error_note": "Payment order mismatch"}
+        if not self._amounts_match(transaction.amount, webhook_data.get("amount")):
+            return {"error": -1, "error_note": "Payment amount mismatch"}
+        if expected_status is not None and transaction.status != expected_status:
+            return {"error": -1, "error_note": "Payment phase mismatch"}
+        recorded_fields = getattr(transaction, "provider_data", None) or {}
+        if any(
+            key in recorded_fields and recorded_fields[key] != webhook_data.get(key)
+            for key in ("action", "error")
+        ):
+            return {"error": -1, "error_note": "Payment phase mismatch"}
+        logger.info("Click webhook: Transaction already processed (idempotent)")
+        error = 0 if transaction.status == "completed" else -1
+        return {
+            "click_trans_id": webhook_data.get("click_trans_id"),
+            "merchant_trans_id": order_id,
+            "merchant_prepare_id": transaction.webhook_id or 0,
+            "error": error,
+            "error_note": "Already processed" if error == 0 else "Payment processing error",
+            "payment_id": transaction.payment_id,
+            "payment_status": None,
+            "payment_provider": "click",
+        }
+
     def _payme_params_amount_matches_payment(
         self,
         payment: Any,
@@ -183,21 +219,7 @@ class ProviderWebhookService:
                     if payment_id is not None
                     else None
                 )
-                if not self._click_payment_matches_order(payment, transaction_id):
-                    return {"error": -1, "error_note": "Payment order mismatch"}
-                if not self._amounts_match(existing_transaction.amount, webhook_data.get("amount")):
-                    return {"error": -1, "error_note": "Payment amount mismatch"}
-                logger.info("Click webhook: Transaction already processed (idempotent)")
-                return {
-                    "click_trans_id": click_trans_id,
-                    "merchant_trans_id": transaction_id,
-                    "merchant_prepare_id": existing_transaction.webhook_id or 0,
-                    "error": 0,
-                    "error_note": "Already processed",
-                    "payment_id": payment_id,
-                    "payment_status": None,
-                    "payment_provider": "click",
-                }
+                return self._click_replay_response(existing_transaction, payment, webhook_data)
 
             # P2-3 Finding C fix (PR #2730): persist PaymentWebhook record
             # in a SEPARATE transaction BEFORE entering the business
@@ -234,6 +256,31 @@ class ProviderWebhookService:
                         candidate = self.repository.get_payment_by_id_for_update(payment_id_from_order)
                         if self._click_payment_matches_order(candidate, transaction_id):
                             payment = candidate
+
+                if payment is not None:
+                    # Recheck after acquiring the payment lock. Another delivery
+                    # may have committed while this request waited for the row.
+                    existing_transaction = self.repository.get_existing_transaction(
+                        transaction_id=click_trans_id,
+                        provider="click",
+                    )
+                    if existing_transaction:
+                        matched_payment = (
+                            payment if existing_transaction.payment_id == payment.id else None
+                        )
+                        replay = self._click_replay_response(
+                            existing_transaction,
+                            matched_payment,
+                            webhook_data,
+                            expected_status=result.status,
+                        )
+                        if replay.get("payment_id") == payment.id:
+                            webhook.status = "ignored"
+                            webhook.visit_id = payment.visit_id
+                        else:
+                            webhook.status = "failed"
+                            webhook.error_message = replay["error_note"]
+                        return replay
 
                 if payment is None and (result.success or result.payment_id):
                     webhook.status = "failed"
