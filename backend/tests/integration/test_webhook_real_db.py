@@ -39,14 +39,20 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.schema import CreateSchema, DropSchema
+
+from tests._pg_admin_guard import is_local_admin_dsn
 
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -57,47 +63,65 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-webhook-real-db-32!")
 os.environ.setdefault("TESTING", "1")
 
 
-@pytest.fixture(scope="module")
+def _disposable_database_url(raw_url: str) -> URL | None:
+    if not is_local_admin_dsn(raw_url):
+        return None
+    url = make_url(raw_url)
+    database = url.database or ""
+    if url.query:
+        # Keep the dial target and server options explicit and unambiguous.
+        return None
+    if database == "clinic_test" or database.startswith("clinic_test_"):
+        return url
+    if os.environ.get("CI") == "true" and database == "clinicdb":
+        return url
+    return None
+
+
+@pytest.mark.unit
+def test_click_persistence_admits_only_explicit_local_test_databases(monkeypatch):
+    monkeypatch.delenv("PGSERVICE", raising=False)
+    monkeypatch.delenv("PGHOSTADDR", raising=False)
+    monkeypatch.delenv("CI", raising=False)
+    local = "postgresql+psycopg://test@127.0.0.1/"
+    assert _disposable_database_url(local + "clinic_test_click") is not None
+    assert _disposable_database_url(local + "clinicdb") is None
+    assert _disposable_database_url(local + "clinic_test_click?dbname=clinicdb") is None
+    assert _disposable_database_url("postgresql+psycopg://test@db.example.invalid/clinic_test") is None
+    monkeypatch.setenv("CI", "true")
+    assert _disposable_database_url(local + "clinicdb") is not None
+    assert _disposable_database_url(local + "clinic") is None
+
+
+@pytest.fixture
 def db_engine():
-    """Create a real PostgreSQL engine for the test module.
+    """Give each test a private schema on a disposable local PostgreSQL."""
+    url = _disposable_database_url(os.environ.get("DATABASE_URL", ""))
+    if url is None:
+        pytest.skip("Click persistence requires a disposable local PostgreSQL database")
 
-    Refuses SQLite — real-DB tests require PostgreSQL transaction semantics.
-    """
-    db_url = os.environ.get("DATABASE_URL", "")
+    from app.db.base import Base
 
-    if not db_url or "sqlite" in db_url:
-        pytest.skip(
-            "Finding F real-DB tests require PostgreSQL. "
-            "Set DATABASE_URL to a postgresql+psycopg:// URL. "
-            f"Got: {db_url or '(empty)'}"
-        )
-
-    engine = create_engine(db_url, echo=False, pool_pre_ping=True)
-
-    from app.db.base_class import Base
-    from app.models import (  # noqa: F401
-        audit, appointment, clinic, emr_v2, lab, online_queue,
-        payment, payment_invoice, payment_webhook, patient, user, visit,
+    schema = f"click_persistence_{uuid.uuid4().hex}"
+    engine = create_engine(
+        url,
+        hide_parameters=True,
+        connect_args={"options": f"-csearch_path={schema}"},
     )
-    from app.models import (  # noqa: F401
-        authentication, billing, department, emr, file_system,
-        role_permission, schedule, user_profile,
-    )
-
-    Base.metadata.create_all(engine)
-
-    yield engine
-
-    # Clean up test data (don't drop tables — other tests may use them)
-    with engine.connect() as conn:
-        for table in [
-            "payment_transactions", "payment_webhooks", "payments",
-            "queue_entries", "visit_services", "visits",
-            "daily_queues", "services", "doctors", "patients", "users",
-        ]:
-            conn.execute(text(f"DELETE FROM {table}"))
-        conn.commit()
-    engine.dispose()
+    schema_created = False
+    try:
+        with engine.begin() as setup:
+            setup.execute(CreateSchema(schema))
+            Base.metadata.create_all(setup)
+        schema_created = True
+        yield engine
+    finally:
+        try:
+            if schema_created:
+                with engine.begin() as teardown:
+                    teardown.execute(DropSchema(schema, cascade=True))
+        finally:
+            engine.dispose()
 
 
 @pytest.fixture
@@ -130,19 +154,6 @@ def verify_session_factory(db_engine):
     return _create
 
 
-@pytest.fixture
-def clean_db(db_engine):
-    """Clean all relevant tables before each test."""
-    with db_engine.connect() as conn:
-        for table in [
-            "payment_transactions", "payment_webhooks", "payments",
-            "queue_entries", "visit_services", "visits",
-            "daily_queues", "services", "doctors", "patients", "users",
-        ]:
-            conn.execute(text(f"DELETE FROM {table}"))
-        conn.commit()
-
-
 def _setup_payment(session, *, status: str = "pending"):
     """Create a payment with the given status using real DB objects."""
     from app.models.clinic import Doctor
@@ -150,11 +161,12 @@ def _setup_payment(session, *, status: str = "pending"):
     from app.models.payment import Payment
     from app.models.service import Service
     from app.models.user import User
-    from app.models.visit import Visit, VisitService
+    from app.models.visit import Visit
 
     unique = uuid.uuid4().hex[:8]
     doctor_user = User(
-        username=f"doctor_{unique}", full_name="Dr", email=f"d_{unique}@t.local",
+        username=f"synthetic_{unique}", full_name="SYNTHETIC-Doctor",
+        email=f"d_{unique}@example.invalid",
         hashed_password="x", role="Doctor", is_active=True, is_superuser=False,
         must_change_password=False, created_at=datetime.now(UTC),
     )
@@ -164,8 +176,8 @@ def _setup_payment(session, *, status: str = "pending"):
     session.add(doctor)
     session.flush()
     patient = Patient(
-        last_name="P", first_name="Patient", birth_date=date(1990, 1, 1),
-        sex="M", phone="+998900000000", email=f"p_{unique}@t.local",
+        last_name="SYNTHETIC-Click", first_name="Patient", birth_date=date(1990, 1, 1),
+        sex="M", email=f"p_{unique}@example.invalid",
         created_at=datetime.now(UTC), is_deleted=False,
     )
     session.add(patient)
@@ -189,28 +201,29 @@ def _setup_payment(session, *, status: str = "pending"):
     session.flush()
     payment = Payment(
         visit_id=visit.id, amount=10000, currency="UZS",
-        status=status, method="click",
+        status=status, method="click", provider="click",
         created_at=datetime.now(UTC),
     )
     session.add(payment)
+    session.flush()
+    payment.provider_payment_id = f"clinic_{payment.id}_1700000000"
     session.commit()
     session.refresh(payment)
     return payment
 
 
-def _make_click_webhook_data(payment_id: int) -> dict:
-    """Create Click webhook data with correct order_id format."""
-    ts = int(datetime.now(UTC).timestamp())
+def _make_click_webhook_data(issued_order: str, amount: int = 10000) -> dict:
     return {
         "click_trans_id": f"test-{uuid.uuid4().hex[:8]}",
-        "merchant_trans_id": f"clinic_{payment_id}_{ts}",
-        "amount": 10000,
+        "merchant_trans_id": issued_order,
+        "amount": amount * 100,
+        "action": 1,
+        "error": 0,
         "sign_string": "test-sig",
-        "_test_ts": ts,
     }
 
 
-def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = None, amount: str = "10000"):
+def _make_mock_manager(callback: dict, *, status: str = "completed"):
     """Create a mock payment manager that returns success for the given payment.
 
     The mock replaces get_payment_manager() so that:
@@ -220,8 +233,6 @@ def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = Non
     transaction_ctx is NOT mocked — real transaction boundaries are used.
     BillingService is NOT mocked — real state machine validation applies.
     """
-    if ts is None:
-        ts = int(datetime.now(UTC).timestamp())
     mock_manager = MagicMock()
     mock_provider = MagicMock()
     mock_provider.validate_webhook_signature.return_value = True
@@ -230,8 +241,13 @@ def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = Non
     mock_result = MagicMock()
     mock_result.success = True
     mock_result.status = status
-    mock_result.payment_id = f"clinic_{payment_id}_{ts}"
-    mock_result.provider_data = {"test": "data", "amount": amount}
+    mock_result.payment_id = callback["merchant_trans_id"]
+    mock_result.provider_data = {
+        "test": "data",
+        "amount": str(Decimal(callback["amount"]) / 100),
+        "action": callback["action"],
+        "error": callback["error"],
+    }
     mock_result.error_message = None
     mock_manager.process_webhook.return_value = mock_result
     return mock_manager
@@ -263,8 +279,91 @@ class TestClickWebhookRealDBPersistence:
                                   └── PaymentWebhook remains persisted
     """
 
+    @pytest.mark.parametrize(
+        ("action", "provider_status", "payment_status", "response_error"),
+        [(1, "completed", "paid", 0), (0, "processing", "processing", -1)],
+        ids=["completed", "prepare"],
+    )
+    def test_click_concurrent_replay_reuses_committed_result(
+        self,
+        production_session,
+        verify_session_factory,
+        monkeypatch,
+        action,
+        provider_status,
+        payment_status,
+        response_error,
+    ):
+        from app.models.payment import Payment
+        from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
+        from app.repositories.provider_webhook_repository import (
+            ProviderWebhookRepository,
+        )
+        from app.services.provider_webhook_service import ProviderWebhookService
+
+        payment = _setup_payment(production_session)
+        payment_id = payment.id
+        visit_id = payment.visit_id
+        callback = _make_click_webhook_data(payment.provider_payment_id)
+        callback["action"] = action
+        production_session.close()
+        manager = _make_mock_manager(callback, status=provider_status)
+        monkeypatch.setattr(
+            "app.services.provider_webhook_service.get_payment_manager", lambda: manager
+        )
+
+        lookups = threading.Barrier(2)
+
+        class ConcurrentClickRepository(ProviderWebhookRepository):
+            initial_lookup = True
+
+            def get_existing_transaction(self, *, transaction_id, provider):
+                result = super().get_existing_transaction(
+                    transaction_id=transaction_id, provider=provider
+                )
+                if self.initial_lookup:
+                    self.initial_lookup = False
+                    assert result is None
+                    lookups.wait(timeout=8)
+                return result
+
+        def deliver():
+            with verify_session_factory() as session:
+                pid = session.scalar(text("SELECT pg_backend_pid()"))
+                service = ProviderWebhookService(session, ConcurrentClickRepository(session))
+                return pid, service.process_click_webhook(callback)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            deliveries = [pool.submit(deliver) for _ in range(2)]
+            (first_pid, first), (second_pid, second) = [
+                result.result(timeout=15) for result in deliveries
+            ]
+
+        assert first_pid != second_pid
+        assert first["error"] == second["error"] == response_error
+        assert first["merchant_prepare_id"] == second["merchant_prepare_id"]
+        assert {first["payment_status"], second["payment_status"]} == {payment_status, None}
+
+        with verify_session_factory() as session:
+            replay = ProviderWebhookService(session).process_click_webhook(callback)
+            assert replay["error"] == response_error
+            assert replay["merchant_prepare_id"] == first["merchant_prepare_id"]
+
+        with verify_session_factory() as verify:
+            transaction = verify.query(PaymentTransaction).filter_by(payment_id=payment_id).one()
+            assert transaction.webhook_id == first["merchant_prepare_id"]
+            assert transaction.status == provider_status
+            persisted_payment = verify.get_one(Payment, payment_id)
+            assert persisted_payment.status == payment_status
+            assert (persisted_payment.paid_at is not None) == (payment_status == "paid")
+            receipts = verify.query(PaymentWebhook).filter_by(
+                provider="click", transaction_id=callback["merchant_trans_id"]
+            ).all()
+            assert sorted(receipt.status for receipt in receipts) == ["ignored", "processed"]
+            assert all(receipt.visit_id == visit_id and receipt.processed_at for receipt in receipts)
+
     def test_click_success_persists_across_sessions(
-        self, production_session, verify_session_factory, clean_db
+        self, production_session, verify_session_factory
     ):
         """Click SUCCESS: PaymentWebhook AND payment status AND PaymentTransaction persist.
 
@@ -284,14 +383,11 @@ class TestClickWebhookRealDBPersistence:
         # Setup: create payment in pending state
         payment = _setup_payment(production_session, status="pending")
         payment_id = payment.id
-        original_provider_data = None  # pending payment has no provider_data yet
+        webhook_data = _make_click_webhook_data(payment.provider_payment_id)
         production_session.expunge_all()
 
         # Process Click webhook
-        webhook_data = _make_click_webhook_data(payment_id)
-        mock_manager = _make_mock_manager(
-            payment_id, "completed", ts=webhook_data.get("_test_ts")
-        )
+        mock_manager = _make_mock_manager(webhook_data)
 
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
@@ -300,6 +396,25 @@ class TestClickWebhookRealDBPersistence:
             repo = ProviderWebhookRepository(production_session)
             service = ProviderWebhookService(production_session, repository=repo)
             result = service.process_click_webhook(webhook_data)
+            with verify_session_factory() as retry_session:
+                replay = ProviderWebhookService(retry_session).process_click_webhook(webhook_data)
+            with verify_session_factory() as mismatch_session:
+                mismatched_amount = {**webhook_data, "amount": webhook_data["amount"] + 100}
+                mismatch = ProviderWebhookService(mismatch_session).process_click_webhook(
+                    mismatched_amount
+                )
+                mismatched_phase = {**webhook_data, "action": 0}
+                different_phase = ProviderWebhookService(mismatch_session).process_click_webhook(
+                    mismatched_phase
+                )
+
+        assert result["error"] == 0
+        assert replay["error"] == 0
+        assert replay["error_note"] == "Already processed"
+        assert replay["merchant_prepare_id"] == result["merchant_prepare_id"]
+        assert mismatch == {"error": -1, "error_note": "Payment amount mismatch"}
+        assert different_phase == {"error": -1, "error_note": "Payment phase mismatch"}
+        mock_manager.process_webhook.assert_called_once()
 
         # Close Session A (simulates production get_db cleanup)
         production_session.close()
@@ -311,7 +426,7 @@ class TestClickWebhookRealDBPersistence:
             webhook_records = verify.query(PaymentWebhook).filter(
                 PaymentWebhook.provider == "click"
             ).all()
-            assert len(webhook_records) >= 1, (
+            assert len(webhook_records) == 1, (
                 "PaymentWebhook record NOT found in new PostgreSQL session. "
                 "Click webhook data was not committed — production data loss."
             )
@@ -330,7 +445,7 @@ class TestClickWebhookRealDBPersistence:
             tx_records = verify.query(PaymentTransaction).filter(
                 PaymentTransaction.payment_id == payment_id
             ).all()
-            assert len(tx_records) >= 1, (
+            assert len(tx_records) == 1, (
                 "PaymentTransaction NOT found after Click webhook success. "
                 "Business transaction did not commit."
             )
@@ -351,7 +466,7 @@ class TestClickWebhookRealDBPersistence:
             verify.close()
 
     def test_click_error_webhook_survives_rollback(
-        self, production_session, verify_session_factory, clean_db
+        self, production_session, verify_session_factory
     ):
         """Click ERROR (terminal→paid): PaymentWebhook survives ValueError rollback.
 
@@ -372,12 +487,10 @@ class TestClickWebhookRealDBPersistence:
         payment = _setup_payment(production_session, status="refunded")
         payment_id = payment.id
         original_provider_data = payment.provider_data  # should be None for new payment
+        webhook_data = _make_click_webhook_data(payment.provider_payment_id)
         production_session.expunge_all()
 
-        webhook_data = _make_click_webhook_data(payment_id)
-        mock_manager = _make_mock_manager(
-            payment_id, "completed", ts=webhook_data.get("_test_ts")
-        )
+        mock_manager = _make_mock_manager(webhook_data)
 
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
@@ -387,6 +500,7 @@ class TestClickWebhookRealDBPersistence:
             service = ProviderWebhookService(production_session, repository=repo)
             result = service.process_click_webhook(webhook_data)
 
+        assert result == {"error": -1, "error_note": "Internal server error"}
         # Close Session A
         production_session.close()
 
@@ -435,12 +549,16 @@ class TestClickWebhookRealDBPersistence:
         finally:
             verify.close()
 
-    def test_click_amount_mismatch_webhook_survives(
-        self, production_session, verify_session_factory, clean_db
+    @pytest.mark.parametrize(("order_issued", "amount", "audit_error"), [
+        (True, 999, "provider_amount_mismatch"),
+        (False, 10000, "provider_order_mismatch"),
+    ])
+    def test_click_rejected_webhook_survives(
+        self, production_session, verify_session_factory, order_issued, amount, audit_error,
     ):
-        """Click AMOUNT MISMATCH: PaymentWebhook survives rejection.
+        """The audit survives a rejected amount or an unissued order.
 
-        Session A: process Click webhook with wrong amount → rejected
+        Session A: process rejected Click webhook
         Session A: close
         Session B (NEW): PaymentWebhook EXISTS, payment status unchanged,
                          PaymentTransaction ABSENT, provider_data unchanged.
@@ -453,14 +571,11 @@ class TestClickWebhookRealDBPersistence:
         payment = _setup_payment(production_session, status="pending")
         payment_id = payment.id
         original_provider_data = payment.provider_data
+        order = payment.provider_payment_id if order_issued else f"clinic_{payment_id}_1700000001"
         production_session.expunge_all()
 
-        webhook_data = _make_click_webhook_data(payment_id)
-        webhook_data["amount"] = 999  # wrong amount
-
-        mock_manager = _make_mock_manager(
-            payment_id, "completed", ts=webhook_data.get("_test_ts"), amount="999"
-        )
+        webhook_data = _make_click_webhook_data(order, amount)
+        mock_manager = _make_mock_manager(webhook_data)
 
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
@@ -470,6 +585,7 @@ class TestClickWebhookRealDBPersistence:
             service = ProviderWebhookService(production_session, repository=repo)
             result = service.process_click_webhook(webhook_data)
 
+        assert result["error"] == -1
         production_session.close()
 
         verify = verify_session_factory()
@@ -479,9 +595,10 @@ class TestClickWebhookRealDBPersistence:
                 PaymentWebhook.provider == "click"
             ).all()
             assert len(webhook_records) >= 1, (
-                "PaymentWebhook record NOT found after amount mismatch on PostgreSQL. "
+                "PaymentWebhook record NOT found after rejection on PostgreSQL. "
                 "Audit trail should persist even for rejected webhooks."
             )
+            assert webhook_records[0].error_message == audit_error
 
             # 2. Payment status must remain 'pending'
             committed_payment = verify.query(Payment).filter(

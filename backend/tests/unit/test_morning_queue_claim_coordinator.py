@@ -59,7 +59,7 @@ def _doctor(doctor_id: int) -> SimpleNamespace:
 
 
 def _visit(*, doctor_id: int = 10) -> SimpleNamespace:
-    return SimpleNamespace(id=301, patient_id=77, doctor_id=doctor_id)
+    return SimpleNamespace(id=301, patient_id=77, doctor_id=doctor_id, encounter_id=None)
 
 
 def _claim(
@@ -68,6 +68,7 @@ def _claim(
     queue_resource_id: int | None = None,
     patient_id: int | None = None,
     visit_id: int | None = None,
+    encounter_id: int | None = None,
 ):
     return ActiveQueueClaim(
         daily_queue=SimpleNamespace(
@@ -80,6 +81,7 @@ def _claim(
             number=17,
             patient_id=patient_id,
             visit_id=visit_id,
+            encounter_id=encounter_id,
         ),
     )
 
@@ -218,6 +220,20 @@ def test_prepare_rejects_existing_claim_bound_to_another_patient(
 
     assert claim.entry.patient_id == 999
     assert claim.entry.visit_id == 555
+
+
+@pytest.mark.unit
+def test_prepare_rejects_existing_claim_bound_to_another_encounter(monkeypatch):
+    db = _DoctorOnlyDb(_doctor(10))
+    claim = _claim(specialist_id=10, patient_id=77, visit_id=301, encounter_id=505)
+    monkeypatch.setattr(morning_assignment_module, "resolve_tag_resource", lambda _db, _tag: None)
+    monkeypatch.setattr(
+        morning_assignment_module, "lock_and_resolve_active_tag_claim", lambda _db, **_kwargs: claim,
+    )
+    with pytest.raises(MorningAssignmentClaimError, match="another encounter"):
+        MorningAssignmentService(db).prepare_wizard_queue_assignment(_visit(), "cardio", _DAY)
+    assert claim.entry.encounter_id == 505
+    assert claim.entry.patient_id == 77 and claim.entry.visit_id == 301
 
 
 @pytest.mark.unit

@@ -73,6 +73,7 @@ def _create_visit_with_row(
         approval_status="approved",
         status="open",
         source="desk",
+        confirmation_context_epoch=1,
     )
     db_session.add(visit)
     db_session.flush()

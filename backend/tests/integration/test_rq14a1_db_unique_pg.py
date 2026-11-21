@@ -283,21 +283,26 @@ def _seed_queue(session, doctor_id: int, day: date, tag, active=True):
 
 
 def _seed_entry(session, queue_id: int, number: int, status="waiting", source="desk"):
-    from app.models.online_queue import OnlineQueueEntry
-
-    entry = OnlineQueueEntry(
-        queue_id=queue_id,
-        number=number,
-        patient_name=f"SYNTHETIC-RQ14A2 {number}",
-        phone=f"+9989070000{number:03d}",
-        source=source,
-        status=status,
-        queue_time=datetime.now(UTC),
+    """Seed using columns present at revision 0064 as well as at head."""
+    session.execute(
+        text(
+            "INSERT INTO queue_entries "
+            "(queue_id, number, patient_name, phone, visit_type, discount_mode, "
+            "total_amount, source, status, queue_time, priority) "
+            "VALUES (:queue_id, :number, :patient_name, :phone, 'paid', 'none', "
+            "0, :source, :status, :queue_time, 0)"
+        ),
+        {
+            "queue_id": queue_id,
+            "number": number,
+            "patient_name": f"SYNTHETIC-RQ14A2 {number}",
+            "phone": f"+9989070000{number:03d}",
+            "source": source,
+            "status": status,
+            "queue_time": datetime.now(UTC),
+        },
     )
-    session.add(entry)
     session.commit()
-    session.refresh(entry)
-    return entry
 
 
 # ===================== populated upgrade / constraint shape =====================

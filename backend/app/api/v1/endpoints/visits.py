@@ -1,23 +1,47 @@
 # app/api/v1/endpoints/visits.py
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
+import time
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
+from pydantic import BaseModel, Field, StrictBool, field_validator
 from sqlalchemy import Table, or_, select, text, update
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.deps import get_db, require_roles
-from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
+from app.api.deps import get_db, require_active_roles, require_roles
+from app.core.config import settings
+from app.core.roles import (
+    DOCTOR_FAMILY_GATE_ROLES,
+    is_doctor_role_spelling,
+    normalize_role_value,
+)
+from app.models.audit import AuditLog
 from app.models.clinic import Doctor
+from app.models.user import User
 from app.models.visit import Visit
 from app.services.derma_history_projection import resync_derma_history_for_visits
 from app.services.patient_access_audit import (
+    _build_patient_access_entry,
     log_patient_access,
     log_patient_access_many,
+)
+from app.services.profile_contact_security import (
+    ProfileBearerContext,
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+    check_bearer_expiry,
+    check_profile_bearer,
 )
 from app.services.visit_state_checks import (
     ACCEPTED_VISIT_STATUSES,
@@ -82,6 +106,43 @@ class VisitServiceIn(BaseModel):
     name: str = Field(max_length=255)
     price: float = 0.0
     qty: int = 1
+
+
+class RepeatConsultationAttestation(BaseModel):
+    doctor_user_id: int = Field(gt=0, strict=True)
+    reviewed_record: StrictBool
+    expected_generation: int = Field(gt=0, strict=True)
+    review_expires_at: int = Field(gt=0, strict=True)
+    token: str
+
+    @field_validator("reviewed_record")
+    @classmethod
+    def require_review(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("Требуется подтвердить проверку исторического приёма")
+        return value
+
+
+class RepeatConsultationAttestationResponse(BaseModel):
+    success: bool
+    visit_id: int
+
+
+class RepeatConsultationReviewRequest(BaseModel):
+    doctor_user_id: int = Field(gt=0, strict=True)
+
+
+class RepeatConsultationReviewResponse(BaseModel):
+    visit_id: int
+    patient_id: int
+    doctor_id: int | None
+    current_doctor_user_id: int | None
+    doctor_user_id: int
+    visit_date: date | None
+    status: str
+    evidence_generation: int
+    review_expires_at: int
+    token: str
 
 
 class VisitServiceOut(BaseModel):
@@ -291,6 +352,141 @@ def list_visits(
     return [VisitOut(**row) for row in rows]  # type: ignore[arg-type]
 
 
+_REPEAT_REVIEW_TTL_SECONDS = 600
+_REPEAT_NO_STORE = {"Cache-Control": "no-store"}
+
+
+class _RepeatEvidenceRoute(APIRoute):
+    """Never cache or echo a review capability, including error responses."""
+
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def safe_handler(request: Request):
+            try:
+                result = await handler(request)
+            except RequestValidationError:
+                return JSONResponse(
+                    status_code=422,
+                    content={"error": "validation_error", "message": "Ошибка валидации запроса", "detail": []},
+                    headers=_REPEAT_NO_STORE,
+                )
+            except StarletteHTTPException as exc:
+                exc.headers = {**(exc.headers or {}), **_REPEAT_NO_STORE}
+                raise
+            result.headers.update(_REPEAT_NO_STORE)
+            return result
+
+        return safe_handler
+
+
+repeat_evidence_router = APIRouter(route_class=_RepeatEvidenceRoute)
+
+
+def _lock_repeat_review_context(db: Session, bearer: ProfileBearerContext, visit_id: int):
+    """Lock actor, Doctor then Visit; reject an owner changed during lookup."""
+    actor = (
+        db.query(User).filter(User.id == bearer.user_id)
+        .with_for_update().populate_existing().first()
+    )
+    if not actor or not actor.is_active or (
+        not actor.is_superuser and normalize_role_value(actor.role) != "admin"
+    ):
+        raise HTTPException(status_code=403, detail="Доступ запрещён", headers=_REPEAT_NO_STORE)
+    check_profile_bearer(db, actor, bearer)
+    doctor_hint = db.query(Visit.doctor_id).filter(Visit.id == visit_id).first()
+    if doctor_hint is None:
+        raise HTTPException(status_code=404, detail="Визит не найден", headers=_REPEAT_NO_STORE)
+    doctor = None
+    if doctor_hint[0] is not None:
+        doctor = (
+            db.query(Doctor).filter(Doctor.id == doctor_hint[0])
+            .with_for_update().populate_existing().first()
+        )
+    visit = (
+        db.query(Visit).filter(Visit.id == visit_id)
+        .with_for_update().populate_existing().first()
+    )
+    if visit is None:
+        raise HTTPException(status_code=404, detail="Визит не найден", headers=_REPEAT_NO_STORE)
+    if visit.doctor_id != doctor_hint[0] or (visit.doctor_id is not None and doctor is None):
+        raise HTTPException(status_code=409, detail="Контекст визита изменился", headers=_REPEAT_NO_STORE)
+    return actor, doctor, visit
+
+
+def _repeat_review_token(actor: User, doctor: Doctor | None, visit: Visit, candidate_user_id: int, expires_at: int) -> str:
+    """Bind a review to this actor/epoch and exact visit/physician context."""
+    if not settings.SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Подтверждение недоступно", headers=_REPEAT_NO_STORE)
+    values = [
+        "repeat-consultation-review-v1", actor.id, actor.auth_epoch,
+        visit.id, visit.patient_id, visit.doctor_id,
+        visit.visit_date.isoformat() if visit.visit_date else None,
+        visit.status, visit.repeat_evidence_generation,
+        doctor.user_id if doctor else None,
+        doctor.repeat_owner_generation if doctor else None,
+        candidate_user_id,
+        expires_at,
+    ]
+    key = hmac.new(settings.SECRET_KEY.encode(), b"repeat-consultation-review-v1", hashlib.sha256).digest()
+    return hmac.new(key, json.dumps(values, separators=(",", ":")).encode(), hashlib.sha256).hexdigest()
+
+
+@repeat_evidence_router.post(
+    "/{visit_id}/repeat-evidence/review",
+    summary="Проверить контекст исторической консультации",
+    response_model=RepeatConsultationReviewResponse,
+)
+def review_repeat_consultation(
+    visit_id: int,
+    payload: RepeatConsultationReviewRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_active_roles("Admin")),
+) -> RepeatConsultationReviewResponse:
+    """Start an audited review; the returned capability is not a login token."""
+    try:
+        bearer = capture_profile_bearer(request, current_user)
+        actor, doctor, visit = _lock_repeat_review_context(db, bearer, visit_id)
+        if visit.status not in {"completed", "closed"}:
+            raise HTTPException(status_code=409, detail="Исторический визит не завершён", headers=_REPEAT_NO_STORE)
+        if visit.repeat_proof_generation == visit.repeat_evidence_generation and visit.repeat_proof_consultation is not None:
+            raise HTTPException(status_code=409, detail="Подтверждение уже существует", headers=_REPEAT_NO_STORE)
+        if db.query(User.id).filter(User.id == payload.doctor_user_id).first() is None:
+            raise HTTPException(status_code=404, detail="Указанный врач не найден", headers=_REPEAT_NO_STORE)
+        expires_at = int(time.time()) + _REPEAT_REVIEW_TTL_SECONDS
+        result = RepeatConsultationReviewResponse(
+            visit_id=visit.id, patient_id=visit.patient_id, doctor_id=visit.doctor_id,
+            current_doctor_user_id=doctor.user_id if doctor else None,
+            doctor_user_id=payload.doctor_user_id,
+            visit_date=visit.visit_date, status=visit.status,
+            evidence_generation=visit.repeat_evidence_generation,
+            review_expires_at=expires_at,
+            token=_repeat_review_token(actor, doctor, visit, payload.doctor_user_id, expires_at),
+        )
+        audit = _build_patient_access_entry(
+            db, actor_user=actor, subject_patient_id=visit.patient_id,
+            resource_type="visit", resource_id=str(visit.id), action="view", request=request,
+        )
+        if audit is None:
+            raise RuntimeError("patient access audit unavailable")
+        db.add(audit)
+        check_bearer_expiry(bearer)
+        db.commit()
+        response.headers.update(_REPEAT_NO_STORE)
+        return result
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сеанс недоступен", headers=_REPEAT_NO_STORE) from None
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Не удалось проверить визит", headers=_REPEAT_NO_STORE) from None
+
+
 @router.post(
     "/visits",
     response_model=VisitOut,
@@ -482,6 +678,7 @@ def set_status(
     # race: the route answers 409 and the worker's dispatch stays grounded
     # in the state that existed when it claimed. Bound to the READ status
     # too, so a concurrent transition cannot be double-applied.
+    old_status = visit.status
     status_values: dict = {"status": status_new}
     if status_new == "in_progress" and hasattr(visit, "started_at"):
         status_values["started_at"] = datetime.now(UTC)
@@ -497,16 +694,27 @@ def set_status(
                 Visit.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
             )
         )
-    claimed = db.execute(
-        update(Visit)
-        .where(*status_conditions)
-        .values(**status_values)
-        # The SQLite stored values are naive while the predicate is
-        # aware — session synchronization would evaluate the criterion
-        # in Python and die on the comparison; the instance is expired
-        # below instead.
-        .execution_options(synchronize_session=False)
-    )
+    try:
+        claimed = db.execute(
+            update(Visit)
+            .where(*status_conditions)
+            .values(**status_values)
+            # SQLite timestamps are naive; do not evaluate the lease
+            # predicate in Python while synchronizing this identity map.
+            .execution_options(synchronize_session=False)
+        )
+    except DBAPIError as exc:
+        # The CAS occurs before evidence capture reserves SQLite's writer.
+        # Map only actual SQLite contention; all other errors propagate.
+        sqlite_code = getattr(getattr(exc, "orig", None), "sqlite_errorcode", None)
+        if (status_new == "completed"
+                and db.get_bind().dialect.name == "sqlite"
+                and sqlite_code is not None and sqlite_code & 0xff in {5, 6}):
+            from app.services.visit_completion_evidence import RepeatEvidenceBusy
+
+            db.rollback()
+            raise RepeatEvidenceBusy() from None
+        raise
     if claimed.rowcount == 0:
         # A reminder claim landed after the wait loop's last poll — the
         # dispatch is in flight for the still-pending visit.
@@ -514,6 +722,25 @@ def set_status(
     # Keep the ORM instance in sync with the row for the VisitOut below
     # (the conditional UPDATE bypasses the identity map).
     db.expire(visit)
+
+    if status_new == "completed" and old_status != "completed":
+        # The CAS above now holds the Visit lock. Recheck the owner and the
+        # same completion policy used by lifecycle callers against the
+        # locked record before creating clinical evidence or committing.
+        try:
+            _ensure_visit_doctor_access(db, visit, current_user)
+            from app.services.emr_completion_policy import require_saved_emr_for_visit
+            from app.services.visit_completion_evidence import (
+                capture_completion_evidence,
+            )
+
+            require_saved_emr_for_visit(db, visit)
+            capture_completion_evidence(db, visit)
+        except Exception:
+            # The conditional UPDATE has already executed; do not leave a
+            # failed completion staged in a reused session.
+            db.rollback()
+            raise
 
     # [FIX] Также обновляем статус в очереди, если есть связанная запись
     if status_new == "canceled":
@@ -543,6 +770,86 @@ def set_status(
         notes=visit.notes,
         planned_date=visit.visit_date,
     )
+
+
+@repeat_evidence_router.post(
+    "/{visit_id}/repeat-evidence/attest",
+    summary="Подтвердить историческую консультацию для повторного визита",
+    response_model=RepeatConsultationAttestationResponse,
+)
+def attest_repeat_consultation(
+    visit_id: int,
+    payload: RepeatConsultationAttestation,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_active_roles("Admin")),
+) -> RepeatConsultationAttestationResponse:
+    """Record an administrator's review of a historical clinical record.
+
+    The physician identity must come from that reviewed record, not from
+    today's mutable Doctor profile. The proof and append-only audit record
+    commit together under the Visit lock.
+    """
+    try:
+        bearer = capture_profile_bearer(request, current_user)
+        actor, doctor, visit = _lock_repeat_review_context(db, bearer, visit_id)
+        if visit.status not in {"completed", "closed"}:
+            raise HTTPException(status_code=409, detail="Исторический визит не завершён", headers=_REPEAT_NO_STORE)
+        now = int(time.time())
+        if (
+            payload.expected_generation != visit.repeat_evidence_generation
+            or payload.review_expires_at <= now
+            or payload.review_expires_at > now + _REPEAT_REVIEW_TTL_SECONDS
+            or len(payload.token) != 64
+            or not payload.token.isascii()
+            or not hmac.compare_digest(
+                payload.token, _repeat_review_token(actor, doctor, visit, payload.doctor_user_id, payload.review_expires_at)
+            )
+        ):
+            raise HTTPException(status_code=409, detail="Контекст проверки устарел", headers=_REPEAT_NO_STORE)
+        if (
+            visit.repeat_proof_generation == visit.repeat_evidence_generation
+            and visit.repeat_proof_consultation is not None
+        ):
+            raise HTTPException(status_code=409, detail="Подтверждение уже существует", headers=_REPEAT_NO_STORE)
+        if db.query(User.id).filter(User.id == payload.doctor_user_id).first() is None:
+            raise HTTPException(status_code=404, detail="Указанный врач не найден", headers=_REPEAT_NO_STORE)
+
+        visit.repeat_proof_generation = visit.repeat_evidence_generation
+        visit.repeat_proof_consultation = True
+        visit.repeat_proof_doctor_user_id = payload.doctor_user_id
+        db.add(AuditLog(
+            action="repeat_consultation_attested",
+            event_type="repeat_consultation_attested",
+            entity_type="visit",
+            entity_id=visit.id,
+            actor_user_id=actor.id,
+            actor_role=str(getattr(actor.role, "value", actor.role)),
+            actor_type="staff",
+            outcome="success",
+            payload={
+                "doctor_user_id": payload.doctor_user_id,
+                "evidence_generation": visit.repeat_evidence_generation,
+            },
+            reason_code={"code": "admin_reviewed_historical_record"},
+        ))
+        check_bearer_expiry(bearer)
+        db.commit()
+        response.headers.update(_REPEAT_NO_STORE)
+        return RepeatConsultationAttestationResponse(success=True, visit_id=visit_id)
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сеанс недоступен", headers=_REPEAT_NO_STORE) from None
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Не удалось сохранить подтверждение", headers=_REPEAT_NO_STORE) from None
+
+
+router.include_router(repeat_evidence_router)
 
 
 # ─── H-3: Admin force-reopen ─────────────────────────────────────────────

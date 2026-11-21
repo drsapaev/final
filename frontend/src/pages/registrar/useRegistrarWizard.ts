@@ -124,7 +124,8 @@ export const useRegistrarWizard = ({
     logger.info('AppointmentWizardV2 completed successfully:', wizardData);
     const wasEditMode = state.editMode;
     const wizardDataObj = (wizardData && typeof wizardData === 'object' ? wizardData : {}) as Record<string, unknown>;
-    const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0)
+    const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0) &&
+      wizardDataObj.payment_dialog_deferred !== true
       ? buildPostWizardPaymentRow(wizardDataObj)
       : null;
 

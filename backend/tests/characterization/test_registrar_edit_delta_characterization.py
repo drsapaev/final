@@ -108,6 +108,7 @@ def _create_visit(db_session, *, patient, doctor_id: int | None, department: str
         approval_status="approved",
         status="open",
         source="desk",
+        confirmation_context_epoch=1,
     )
     db_session.add(visit)
     db_session.commit()

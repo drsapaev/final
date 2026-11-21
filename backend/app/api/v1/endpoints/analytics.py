@@ -1,11 +1,12 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.models.user import User
 from app.services.analytics import AnalyticsService
 from app.services.analytics_simple_api_service import (
     AnalyticsSimpleApiService,
@@ -24,13 +25,28 @@ CLINICAL_ANALYTICS_ROLES = ["admin", "doctor"]
 FINANCIAL_ANALYTICS_ROLES = ["admin"]
 
 
+def _revenue_report_dates(start_date: str, end_date: str) -> tuple[datetime, datetime]:
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный формат даты") from None
+    if start > end:
+        raise HTTPException(
+            status_code=400, detail="Начальная дата должна быть раньше конечной"
+        )
+    return start, datetime.combine(end.date(), datetime.max.time())
+
+
 def _build_payment_provider_payload(
     db: Session, start: datetime, end: datetime, department: str | None
 ) -> dict:
     revenue_breakdown = AnalyticsService.get_revenue_breakdown_analytics(
         db, start, end, department
     )
+    provider_totals = revenue_breakdown["provider_totals"]
 
+    # Settled payments alone provide neither the attempt count nor verified commissions.
     providers = {}
     for provider_code, stats in revenue_breakdown.get("provider_breakdown", {}).items():
         providers[provider_code] = {
@@ -38,16 +54,17 @@ def _build_payment_provider_payload(
             "count": stats.get("count", 0),
             "total_amount": stats.get("total_amount", 0),
             "average_amount": stats.get("average_amount", 0),
-            "success_rate": 100.0 if stats.get("count", 0) > 0 else 0.0,
+            "success_rate": None,
         }
 
     return {
+        "currency": revenue_breakdown["currency"],
         "providers": providers,
         "summary": {
             "active_providers": sum(1 for stats in providers.values() if stats["count"]),
-            "total_transactions": revenue_breakdown.get("total_transactions", 0),
-            "total_revenue": revenue_breakdown.get("total_revenue", 0),
-            "total_commission": 0,
+            "total_transactions": provider_totals["total_transactions"],
+            "total_revenue": provider_totals["total_revenue"],
+            "total_commission": None,
         },
         "period": revenue_breakdown.get("period", {}),
     }
@@ -82,16 +99,16 @@ async def get_dashboard_data(
 @router.get("/trends", response_model=dict[str, Any])
 async def get_trends_analytics(
     days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
-    current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
+    current_user: User = Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Получение трендов за последние N дней через SSOT"""
     try:
-        _end_date = datetime.now()
-        _start_date = _end_date - timedelta(days=days)
-
-        # Используем SSOT для получения трендов
-        return AnalyticsService.get_trends(db, days)
+        include_revenue = (
+            current_user.is_superuser
+            or current_user.role.strip().lower() in FINANCIAL_ANALYTICS_ROLES
+        )
+        return AnalyticsService.get_trends(db, days, include_revenue=include_revenue)
     except Exception as e:
         logger.warning(
             "Analytics trends endpoint failed error_type=%s",
@@ -135,17 +152,7 @@ async def get_revenue_breakdown_analytics(
     db: Session = Depends(get_db),
 ):
     """Legacy-compatible analytics route for revenue breakdown."""
-    try:
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        end = datetime.strptime(end_date, "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Неверный формат даты")
-
-    if start > end:
-        raise HTTPException(
-            status_code=400, detail="Начальная дата должна быть раньше конечной"
-        )
-
+    start, end = _revenue_report_dates(start_date, end_date)
     return AnalyticsService.get_revenue_breakdown_analytics(db, start, end, department)
 
 
@@ -158,15 +165,5 @@ async def get_payment_provider_analytics(
     db: Session = Depends(get_db),
 ):
     """Legacy-compatible analytics route for provider summary."""
-    try:
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        end = datetime.strptime(end_date, "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Неверный формат даты")
-
-    if start > end:
-        raise HTTPException(
-            status_code=400, detail="Начальная дата должна быть раньше конечной"
-        )
-
+    start, end = _revenue_report_dates(start_date, end_date)
     return _build_payment_provider_payload(db, start, end, department)

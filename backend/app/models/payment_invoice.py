@@ -4,7 +4,18 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -19,9 +30,25 @@ class PaymentInvoice(Base):
     """
 
     __tablename__ = "payment_invoices"
+    __table_args__ = (
+        CheckConstraint(
+            "(registrar_encounter_id_snapshot IS NULL AND registrar_encounter_generation_snapshot IS NULL) OR "
+            "(registrar_encounter_id_snapshot IS NOT NULL AND registrar_encounter_generation_snapshot IS NOT NULL "
+            "AND registrar_encounter_id_snapshot>0 AND registrar_encounter_generation_snapshot>0)",
+            name="ck_payment_invoice_registrar_origin",
+        ),
+        Index(
+            "uq_payment_invoice_registrar_encounter", "registrar_encounter_id_snapshot", unique=True,
+            postgresql_where=text("registrar_encounter_id_snapshot IS NOT NULL"),
+            sqlite_where=text("registrar_encounter_id_snapshot IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     patient_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    # Historical identifiers do not follow a changed or anonymized encounter.
+    registrar_encounter_id_snapshot: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    registrar_encounter_generation_snapshot: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     # Финансовая информация
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)

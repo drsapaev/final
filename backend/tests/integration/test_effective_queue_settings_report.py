@@ -40,6 +40,8 @@ from typing import Any
 
 import psycopg
 import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -118,6 +120,8 @@ def pg_engine():
     last_error: Exception | None = None
     admin_url = None
     for candidate in _candidate_admin_urls():
+        if not is_local_admin_dsn(candidate):
+            continue
         try:
             with psycopg.connect(candidate, connect_timeout=5, autocommit=True) as c:
                 c.execute("SELECT 1")
@@ -549,8 +553,8 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    # Head pin follows the notification template uniqueness migration.
-    assert revision == "0102_visit_confirm_context"
+    migrations = ScriptDirectory.from_config(Config(str(BACKEND_DIR / "alembic.ini")))
+    assert revision == migrations.get_current_head()
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

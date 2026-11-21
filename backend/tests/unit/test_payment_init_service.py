@@ -244,8 +244,8 @@ def test_init_payment_provider_failure_sets_failed_status(
     repo.rollback.assert_not_called()
 
 
-def test_init_payment_unexpected_error_returns_with_payment_id(
-    monkeypatch: pytest.MonkeyPatch,
+def test_init_payment_unexpected_error_redacts_internal_details_and_keeps_local_id(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
 ) -> None:
     repo = Mock()
     repo.db = Mock()
@@ -274,6 +274,9 @@ def test_init_payment_unexpected_error_returns_with_payment_id(
 
     assert result["success"] is False
     assert result["payment_id"] == 888
-    assert "Ошибка инициализации платежа" in result["error_message"]
+    assert result["error_message"] == "Ошибка инициализации платежа"
+    assert "network down" not in caplog.text
+    [diagnostic] = [record for record in caplog.records if record.getMessage() == "payment_init_service.failed"]
+    assert diagnostic.__dict__["error_type"] == "RuntimeError"
     repo.rollback.assert_called_once()
     repo.commit.assert_not_called()

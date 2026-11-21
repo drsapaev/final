@@ -6,14 +6,15 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from app.models.enums import PaymentStatus
+from app.models.user import User
 from app.repositories.payment_create_repository import PaymentCreateRepository
 from app.services.billing_service import BillingService
-from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.canonical_visit_service import (
     CanonicalVisitResolutionError,
     CanonicalVisitService,
 )
+from app.services.payment_invariant_service import PaymentInvariantService
+from app.services.payment_refund_guard import CASHIER_IMMEDIATE_PAID_METHODS
 
 
 @dataclass
@@ -34,11 +35,18 @@ class PaymentCreateService:
         *,
         visit_id: int | None,
         appointment_id: int | None,
-        amount: float,
+        amount: Decimal | float,
         currency: str,
         method: str,
         note: str | None,
+        current_user: User | None = None,
     ) -> dict[str, Any]:
+        method = method.strip().lower()
+        if method not in CASHIER_IMMEDIATE_PAID_METHODS:
+            raise PaymentCreateDomainError(
+                status_code=422,
+                detail="Для прямой кассовой оплаты выберите наличные или карту",
+            )
         resolved_visit_id = self._resolve_visit_id(visit_id=visit_id, appointment_id=appointment_id)
         if not resolved_visit_id:
             raise PaymentCreateDomainError(
@@ -54,14 +62,13 @@ class PaymentCreateService:
         #   - paid_amount vs total_cost check
         #   - overpayment policy
         #   - IntegrityError defense-in-depth
-        from decimal import Decimal
-
         payment = PaymentInvariantService(self.billing_service.db).create_payment_for_visit(
             visit_id=resolved_visit_id,
             amount=Decimal(str(amount)),
             method=method,
             note=note,
-            current_user=type("User", (), {"id": None})(),  # no user context in this service
+            current_user=current_user,
+            currency=currency,
             commit=True,  # standalone — caller owns no larger transaction
         )
 

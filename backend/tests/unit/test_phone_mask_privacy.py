@@ -168,7 +168,7 @@ def test_canonical_idempotency_log_preserves_only_its_hmac_fingerprint() -> None
         msg="user=%s key_fingerprint=%s phone=%s",
         args=("synthetic", fingerprint, "000000000"),
         exc_info=None,
-        func="dispatch",
+        func="_dispatch",
     )
     assert AppLogFilter().filter(record) is True
     assert (
@@ -183,25 +183,25 @@ def test_canonical_idempotency_log_preserves_only_its_hmac_fingerprint() -> None
         (
             "other.logger",
             "/synthetic/app/middleware/idempotency_middleware.py",
-            "dispatch",
+            "_dispatch",
             "key_fingerprint=%s",
         ),
         (
             "app.middleware.idempotency_middleware",
             "/synthetic/other.py",
-            "dispatch",
-            "key_fingerprint=%s",
-        ),
-        (
-            "app.middleware.idempotency_middleware",
-            "/synthetic/app/middleware/idempotency_middleware.py",
-            "other",
+            "_dispatch",
             "key_fingerprint=%s",
         ),
         (
             "app.middleware.idempotency_middleware",
             "/synthetic/app/middleware/idempotency_middleware.py",
             "dispatch",
+            "key_fingerprint=%s",
+        ),
+        (
+            "app.middleware.idempotency_middleware",
+            "/synthetic/app/middleware/idempotency_middleware.py",
+            "_dispatch",
             "key_fingerprint=%r",
         ),
     ],
@@ -222,7 +222,7 @@ def test_idempotency_fingerprint_log_arguments_are_server_generated() -> None:
     dispatch = next(
         node
         for node in ast.walk(module)
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "dispatch"
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_dispatch"
     )
     stores = [
         node

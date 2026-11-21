@@ -7,6 +7,16 @@ from app.api.v1.endpoints.registrar_wizard._cart import (
     BenefitSettingsResponse,
 )
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
+from app.services.all_free_policy import (
+    load_all_free_auto_approve,
+    lock_all_free_policy,
+)
+from app.services.repeat_policy_input import (
+    RepeatSettingsWriter,
+    finish_repeat_settings_write,
+    repeat_settings_writer,
+    validate_repeat_setting,
+)
 
 
 @router.get("/admin/benefit-settings", summary="Получить настройки льгот", response_model=BenefitSettingsResponse)
@@ -50,15 +60,8 @@ def get_benefit_settings(
             bool(benefit_free_setting.value) if benefit_free_setting else True
         )
 
-        # Автоодобрение All Free заявок
-        auto_approve_setting = (
-            db.query(ClinicSettings)
-            .filter(ClinicSettings.key == "all_free_auto_approve")
-            .first()
-        )
-        settings['all_free_auto_approve'] = (
-            bool(auto_approve_setting.value) if auto_approve_setting else False
-        )
+        # Use the canonical whitelist; a legacy string "false" must not enable approval.
+        settings['all_free_auto_approve'] = load_all_free_auto_approve(db)
 
         # Время последнего обновления
         latest_update = (
@@ -98,12 +101,15 @@ def get_benefit_settings(
 def update_benefit_settings(
     settings_data: BenefitSettingsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    writer: RepeatSettingsWriter = Depends(repeat_settings_writer),
 ) -> dict[str, Any]:
     """
     Обновить настройки льгот и повторных визитов
     """
     try:
+        validate_repeat_setting("repeat_visit_days", settings_data.repeat_visit_days)
+        validate_repeat_setting("repeat_visit_discount", settings_data.repeat_visit_discount)
+        lock_all_free_policy(db)
         # Список настроек для обновления
         settings_to_update = [
             {
@@ -133,13 +139,14 @@ def update_benefit_settings(
             setting = (
                 db.query(ClinicSettings)
                 .filter(ClinicSettings.key == setting_data["key"])
+                .populate_existing()
                 .first()
             )
 
             if setting:
                 # Обновляем существующую настройку
                 setting.value = setting_data["value"]
-                setting.updated_by = current_user.id
+                setting.updated_by = writer.actor.id
                 setting.updated_at = datetime.now(UTC)
             else:
                 # Создаём новую настройку
@@ -148,10 +155,11 @@ def update_benefit_settings(
                     value=setting_data["value"],
                     category="benefits",
                     description=setting_data["description"],
-                    updated_by=current_user.id,
+                    updated_by=writer.actor.id,
                 )
                 db.add(setting)
 
+        finish_repeat_settings_write(writer)
         db.commit()
 
         return {
@@ -165,12 +173,17 @@ def update_benefit_settings(
             },
         }
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
+update_benefit_settings.idempotency_replay_global_roles = ("Admin",)
 
 
 # ==================== НАСТРОЙКИ МАСТЕРА РЕГИСТРАЦИИ ====================

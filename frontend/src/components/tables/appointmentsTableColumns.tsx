@@ -35,6 +35,7 @@ import { getRegistrarTimestampDisplay } from '../../utils/dateUtils';
 import type { RegistrarTimestampRecord } from '../../utils/dateUtils';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { getServiceDisplayName } from '../../utils/serviceCodeResolver';
+import { isAllFreeApprovalPending, PAYMENT_RECONCILIATION_REQUIRED } from '../../utils/registrarAggregation';
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
 import {
   type AppointmentRow,
@@ -509,6 +510,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
       free: '🆓',
       approval_pending: '📝',
       pending_payment: '⌛',
+      [PAYMENT_RECONCILIATION_REQUIRED]: '⚠️',
       unknown_payment: '💰',
       mixed_payment: '🔀'
     };
@@ -520,6 +522,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
       free: 'var(--mac-warning)',
       approval_pending: 'var(--mac-warning)',
       pending_payment: 'var(--mac-warning)',
+      [PAYMENT_RECONCILIATION_REQUIRED]: 'var(--mac-warning)',
       unknown_payment: 'var(--mac-text-secondary)',
       mixed_payment: 'var(--mac-text-secondary)'
     };
@@ -534,6 +537,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
       free: t('misc.eat_payment_free'),
       approval_pending: t('misc.eat_approval_pending'),
       pending_payment: t('misc.eat_pending_payment'),
+      [PAYMENT_RECONCILIATION_REQUIRED]: t('misc.eat_payment_reconciliation_required'),
       unknown_payment: t('misc.eat_unknown_payment'),
       mixed_payment: t('misc.eat_mixed_payment')
     };
@@ -1106,6 +1110,10 @@ export const buildAppointmentsTableColumns = ({
       <div className="eat-cell eat-cell--center" style={{ minWidth: isDoctorView ? '8%' : '100px' }}>
         {renderPaymentType(
           String((() => {
+            const paymentStatus = String(row.payment_status || '').toLowerCase();
+            if (paymentStatus === PAYMENT_RECONCILIATION_REQUIRED) {
+              return PAYMENT_RECONCILIATION_REQUIRED;
+            }
             if (row.payment_type === 'mixed_payment') {
               return 'mixed_payment';
             }
@@ -1116,10 +1124,9 @@ export const buildAppointmentsTableColumns = ({
               return 'free';
             }
             const discountMode = row.discount_mode;
-            const paymentStatus = (String(row.payment_status || '')).toLowerCase();
             const amount = getDisplayAmount(row as unknown as Appointment);
             const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
-            const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';
+            const isPendingAllFree = isAllFreeApprovalPending(discountMode, row.approval_status);
             const isZeroCostDiscount = ['repeat', 'benefit'].includes(String(discountMode)) && amount <= 0 && paymentStatus !== 'paid';
 
             if (isPendingAllFree) {
@@ -1291,36 +1298,31 @@ export const buildAppointmentsTableColumns = ({
     key: 'cost',
     sortable: true,
     title: <div className="eat-th-content eat-cell--end" style={{ minWidth: isDoctorView ? '8%' : '90px' }}>{t('misc.eat_cost')}</div>,
-    render: (_value: unknown, row: AppointmentRow) => (
-      <span
-        className="eat-cell eat-cell--end"
-        style={{
-          minWidth: isDoctorView ? '8%' : '90px',
-          color: (() => {
-            if (row.cost_display === 'free') return 'var(--mac-warning)';
-            const discountMode = row.discount_mode;
-            const amount = getDisplayAmount(row as unknown as Appointment);
-            const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
-            if (isZeroCostRegistration) return 'var(--mac-warning)';
-            return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
-          })(),
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
-        {(() => {
-          if (row.cost_display === 'free') {
-            return t('misc.eat_payment_free');
-          }
-          const discountMode = row.discount_mode;
-          const amount = getDisplayAmount(row as unknown as Appointment);
-          const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
-          if (isZeroCostRegistration) {
-            return t('misc.eat_payment_free');
-          }
-          return amount > 0 ? t('misc.eat_amount_with_currency', { amount: amount.toLocaleString() }) : '—';
-        })()}
-      </span>
-    )
+    render: (_value: unknown, row: AppointmentRow) => {
+      const amount = getDisplayAmount(row as unknown as Appointment);
+      const pendingApproval = isAllFreeApprovalPending(row.discount_mode, row.approval_status);
+      const zeroCostRegistration = amount <= 0 &&
+        ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(row.discount_mode));
+      const showFree = !pendingApproval && (row.cost_display === 'free' || zeroCostRegistration);
+      const color = showFree
+        ? 'var(--mac-warning)'
+        : amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
+      const display = showFree
+        ? t('misc.eat_payment_free')
+        : amount > 0 ? t('misc.eat_amount_with_currency', { amount: amount.toLocaleString() }) : '—';
+      return (
+        <span
+          className="eat-cell eat-cell--end"
+          style={{
+            minWidth: isDoctorView ? '8%' : '90px',
+            color,
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
+          {display}
+        </span>
+      );
+    }
   });
 
   // Действия

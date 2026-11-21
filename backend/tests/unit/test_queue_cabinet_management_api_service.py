@@ -528,8 +528,10 @@ class TestQueueCabinetManagementApiService:
         ]
 
     def test_apply_endpoint_same_key_replays_without_duplicate_audit(
-        self, client, db_session, admin_auth_headers, monkeypatch
+        self, client, db_session, admin_user, admin_auth_headers, monkeypatch
     ):
+        admin_user.is_superuser = False
+        db_session.commit()
         clinic_day = date(2026, 10, 6)
         monkeypatch.setattr(
             "app.services.queue_cabinet_management_api_service.clinic_today",
@@ -568,6 +570,16 @@ class TestQueueCabinetManagementApiService:
         assert first.status_code == 200
         assert second.status_code == 200
         assert second.json() == first.json()
+
+        admin_user.role = "Registrar"
+        db_session.commit()
+        denied = client.post(
+            "/api/v1/admin/queues/cabinet-info/apply",
+            json=body,
+            headers=headers,
+        )
+        assert denied.status_code == 403, denied.text
+        assert "changed_queue_ids" not in denied.json()
         assert doctor_queue.cabinet_number == "302"
         assert (
             db_session.query(AuditLog)

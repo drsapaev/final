@@ -52,7 +52,7 @@ class KaspiProvider(BasePaymentProvider):
                 )
 
             # Форматируем сумму (в тенге, без копеек для Kaspi)
-            amount_kzt = int(amount)
+            amount_kzt = self.format_amount(amount, currency)
 
             # Генерируем уникальный ID транзакции
             transaction_id = f"clinic_{order_id}_{uuid.uuid4().hex[:8]}"
@@ -246,8 +246,10 @@ class KaspiProvider(BasePaymentProvider):
                 "timestamp": int(datetime.now().timestamp()),
             }
 
-            if amount:
-                refund_data["amount"] = int(amount)
+            if amount is not None:
+                # Only None means full refund; zero/fractional amounts must
+                # fail before any provider request instead of truncating.
+                refund_data["amount"] = self.format_amount(amount, "KZT")
 
             # Генерируем подпись
             timestamp = refund_data["timestamp"]

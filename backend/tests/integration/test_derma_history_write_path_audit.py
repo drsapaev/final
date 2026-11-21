@@ -105,6 +105,27 @@ AUDITED_SITES: dict[str, dict[str, tuple[int, str]]] = {
             "не-проекционных (owner fact-check 5625c8f1b)",
         ),
     },
+    "backend/app/services/all_free_guard.py": {
+        "raw_dml": (1, "SQLite резервирует запись перед проверкой All Free. WHERE 0 не выбирает строк."),
+    },
+    "backend/app/services/billing_service_pkg/_invoices.py": {
+        "raw_dml": (1, "SQLite резервирует запись перед созданием счёта. WHERE 0 не выбирает строк."),
+    },
+    "backend/app/services/cashier_stats_snapshot.py": {
+        "raw_dml": (1, "SQLite резервирует запись до чтения снимка отчёта. WHERE 0 не выбирает строк."),
+    },
+    "backend/app/services/encounter_benefit_net.py": {
+        "raw_dml": (1, "SQLite резервирует запись до чтения снимка льготы. WHERE 0 не выбирает строк."),
+    },
+    "backend/app/services/encounter_financial_fence.py": {
+        "raw_dml": (4, "SQLite резервирует запись перед финансовыми проверками. WHERE 0 не выбирает строк."),
+    },
+    "backend/app/services/force_majeure_service.py": {
+        "raw_dml": (1, "SQLite резервирует запись перед проверкой депозита. WHERE 0 не выбирает строк."),
+    },
+    "backend/app/services/provider_attempt_service.py": {
+        "raw_dml": (1, "SQLite резервирует запись перед проверкой попытки оплаты. WHERE 0 не выбирает строк."),
+    },
     "backend/app/services/telegram_staff_action_adapter_service.py": {
         "query_dml": (
             1,
@@ -124,6 +145,9 @@ AUDITED_SITES: dict[str, dict[str, tuple[int, str]]] = {
             "колонки; вскрыты семейством query_dml в раунде 3 "
             "(owner review 9e6c0f6c1), аудированы задним числом",
         ),
+    },
+    "backend/app/services/visit_completion_evidence.py": {
+        "raw_dml": (1, "SQLite резервирует запись для выбранного визита с присвоением id его прежнего значения."),
     },
     "backend/app/services/visits_api_service.py": {
         "reflected_table": (
@@ -158,6 +182,18 @@ AUDITED_SITES: dict[str, dict[str, tuple[int, str]]] = {
             "confirmation/reminder-поля, не id/visit_date/doctor_id; "
             "VisitService и телефон пациента не являются источниками проекции",
         ),
+    },
+    "backend/alembic/versions/0103_visit_consultation_completion.py": {
+        "raw_dml": (7, "Заполнение и триггеры обновляют только repeat_* поля признаков завершения."),
+    },
+    "backend/alembic/versions/0104_encounters.py": {
+        "raw_dml": (1, "Заполнение записывает только encounter_id, которого нет в проекции."),
+    },
+    "backend/alembic/versions/0115_confirmation_trigger_path.py": {
+        "raw_dml": (4, "Триггеры SQLite записывают только confirmation_* и reminder_* поля."),
+    },
+    "backend/alembic/versions/0116_patient_owner_confirmation.py": {
+        "raw_dml": (1, "Триггер SQLite сбрасывает только confirmation_* и reminder_* поля."),
     },
     "scripts/legacy_scripts/backend/verify_fk_enforcement.py": {
         "raw_dml": (

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
@@ -9,6 +10,10 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
 )  # noqa: F401
 from app.crud import queue_resource_routing  # QD-2C (round-17 P1)
 from app.crud.clinic import clinic_today
+from app.models.online_queue import OnlineQueueEntry
+from app.models.visit import Visit
+from app.services.all_free_approval import awaits_all_free_decision
+from app.services.payment_invariant_service import PAYMENT_RECONCILIATION_REQUIRED
 from app.services.queue_service import queue_service  # noqa: F401
 
 _REGISTRAR_QUEUE_CACHE_KEY = "_registrar_queue_read_cache"
@@ -32,7 +37,6 @@ def _prime_registrar_queue_read_cache(
     from app.models.clinic import Doctor
     from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
     from app.models.patient import Patient
-    from app.models.payment import Payment
     from app.models.service import Service
     from app.models.visit import Visit
     from app.services.payment_invariant_service import PaymentInvariantService
@@ -247,26 +251,10 @@ def _prime_registrar_queue_read_cache(
             if len(candidates) == 1 and appointments_per_key.get(key, 0) == 1:
                 appointment_queue_metadata[key] = candidates[0]
 
-    payment_truth_by_visit: dict[int, dict[str, Any]] = {}
     payment_checked_visit_ids = set(all_visits)
-    if all_visits:
-        payment_visit_ids = {
-            visit_id
-            for (visit_id,) in db.query(Payment.visit_id)
-            .filter(Payment.visit_id.in_(payment_checked_visit_ids))
-            .distinct()
-            .all()
-        }
-        if payment_visit_ids:
-            payment_visits = [
-                visit
-                for visit_id, visit in all_visits.items()
-                if visit_id in payment_visit_ids
-            ]
-            summary = PaymentInvariantService(db).summarize_visits(payment_visits)
-            payment_truth_by_visit = {
-                row["visit_id"]: row for row in summary["visits"]
-            }
+    payment_truth_by_visit = PaymentInvariantService(db).recorded_payment_states(
+        list(all_visits.values())
+    )
 
     return {
         "patients": patients_by_id,
@@ -281,6 +269,7 @@ def _prime_registrar_queue_read_cache(
             resource.queue_tag: resource.id for resource in active_resources
         },
         "visit_services": visit_services_by_id,
+        "visits_by_id": all_visits,
         "daily_queues": daily_queues_by_id,
         "daily_queue_ids_checked": queue_ids,
         "visit_queue_entries": visit_queue_entries,
@@ -1341,6 +1330,7 @@ def _serialize_queue_entry(
         "cost": total_cost,
         "payment_status": payment_status,
         "payment_type": payment_type,
+        "blocks_group_payment": payment_status == PAYMENT_RECONCILIATION_REQUIRED,
         "can_mark_paid": can_mark_paid,
         "can_start_visit": can_start_visit,
         "can_print_ticket": can_print_ticket,
@@ -1363,7 +1353,7 @@ def _serialize_queue_entry(
         "called_at": None,
         "visit_time": visit_time,
         "discount_mode": discount_mode,
-        "approval_status": getattr(entry_data, "approval_status", None),
+        "approval_status": entry_wrapper.get("approval_status", getattr(entry_data, "approval_status", None)),
         "latest_lab_report": latest_lab_report,
         "type": entry_type,
         "record_type": entry_type,
@@ -1775,6 +1765,20 @@ def _process_appointment_entry(
 
 
 
+def _linked_all_free_visit_for_ticket(db: Session, entry: OnlineQueueEntry) -> Visit | None:
+    """Read the canonical decision only for the exact ticket subject."""
+    if entry.visit_id is None or entry.encounter_id is None:
+        return None
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    visit = cache["visits_by_id"].get(entry.visit_id) if cache is not None else db.get(Visit, entry.visit_id)
+    if (
+        visit is None or visit.patient_id != entry.patient_id
+        or visit.encounter_id != entry.encounter_id or visit.discount_mode != "all_free"
+    ):
+        return None
+    return visit
+
+
 def _process_online_queue_entry(
     *,
     db: Session,
@@ -1798,10 +1802,13 @@ def _process_online_queue_entry(
     services: list = []
     service_codes: list = []
     service_details: list = []
+    all_free_visit = None
 
     if is_visit_object:
         # entry_data это Visit с source='online'
         visit = entry_data
+        if visit.discount_mode == "all_free":
+            all_free_visit = visit
         queue_entry_for_visit = _same_patient_queue_entry_for_visit(db, visit)
         if queue_entry_for_visit:
             record_id = queue_entry_for_visit.id
@@ -1857,6 +1864,7 @@ def _process_online_queue_entry(
         entry_status = online_entry.status
         source = online_entry.source or "online"
         discount_mode = online_entry.discount_mode or "none"
+        all_free_visit = _linked_all_free_visit_for_ticket(db, online_entry)
         visit_time = None
 
         # Услуги из online_entry.services (list или JSON string)
@@ -1913,9 +1921,28 @@ def _process_online_queue_entry(
             except Exception:
                 pass
 
-    # total_cost: приоритет oqe_total_amount > entry_data.total_amount > VisitService SUM
     total_cost = entry_wrapper.get("oqe_total_amount") or getattr(entry_data, 'total_amount', 0) or 0
-    if total_cost == 0:
+    if all_free_visit is not None:
+        discount_mode = all_free_visit.discount_mode
+        entry_wrapper["approval_status"] = all_free_visit.approval_status
+        entry_wrapper["awaits_all_free_decision"] = awaits_all_free_decision(all_free_visit)
+        lines = {line.service_id: line for line in _cached_visit_services(db, all_free_visit.id)}
+        assigned_service_ids = set(lines) if is_visit_object else set()
+        priced_services = []
+        for service in services:
+            if isinstance(service, dict) and not service.get("cancelled"):
+                line = lines.get(service.get("service_id") or service.get("id"))
+                if line is not None:
+                    assigned_service_ids.add(line.service_id)
+                    service = {**service, "quantity": line.qty, "price": float(line.price or 0)}
+            priced_services.append(service)
+        services = priced_services
+        assigned_lines = (lines[service_id] for service_id in assigned_service_ids)
+        total_cost = float(sum(
+            (line.price * line.qty for line in assigned_lines if line.price is not None),
+            Decimal("0.00"),
+        ))
+    elif total_cost == 0:
         linked_visit_id = getattr(entry_data, 'visit_id', None) or entry_wrapper.get("visit_id")
         if linked_visit_id:
             try:
@@ -1940,8 +1967,8 @@ def _process_online_queue_entry(
                 pass  # Fallback на 0
 
     # service_details из entry_data.services
-    if hasattr(entry_data, 'services') and entry_data.services:
-        parsed_services = entry_data.services
+    parsed_services = services if all_free_visit is not None else getattr(entry_data, "services", None)
+    if parsed_services:
         if isinstance(parsed_services, str):
             import json
             try:

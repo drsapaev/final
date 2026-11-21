@@ -285,6 +285,7 @@ export function isUnknownPublicBookingOutcome(error: unknown): boolean {
   if (!isAxiosError(error)) return true;
   const code = getPublicBookingErrorCode(error);
   return code === 'idempotency_uncertain_outcome'
+    || code === 'idempotency_reconciliation_required'
     || code === 'idempotency_in_flight'
     || !error.response
     || (error.response?.status ?? 0) >= 500;

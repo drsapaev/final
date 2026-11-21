@@ -1,16 +1,124 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
+from app.services.payment_providers.click import ClickProvider
 from app.services.provider_webhook_service import ProviderWebhookService
+
+
+@pytest.fixture
+def click_provider():
+    return ClickProvider({
+        "service_id": "synthetic-service",
+        "merchant_id": "synthetic-merchant",
+        "secret_key": "synthetic-config",
+    })
+
+
+@pytest.mark.parametrize(
+    ("signature", "reason"),
+    [(None, "Missing signature"), ("SYNTHETIC_RECEIVED", "Signature mismatch")],
+)
+def test_click_signature_diagnostics_omit_callback_and_signatures(
+    click_provider, monkeypatch, caplog, signature, reason,
+):
+    payload = {"error_note": "SYNTHETIC_CALLBACK"}
+    monkeypatch.setattr(
+        click_provider, "_generate_webhook_signature", Mock(return_value="SYNTHETIC_EXPECTED")
+    )
+
+    assert not click_provider.validate_webhook_signature(payload, signature)
+    assert reason in caplog.text
+    assert "SYNTHETIC_CALLBACK" not in caplog.text
+    assert "SYNTHETIC_EXPECTED" not in caplog.text
+    assert "SYNTHETIC_RECEIVED" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("failure", "error_message", "logged_reason"),
+    [
+        (None, "Неверная подпись webhook", "Неверная подпись"),
+        (RuntimeError("SYNTHETIC_EXCEPTION_DETAIL"), "Внутренняя ошибка", "Internal error type=RuntimeError"),
+    ],
+)
+def test_click_adapter_errors_omit_callback_and_exception_details(
+    click_provider, monkeypatch, caplog, failure, error_message, logged_reason,
+):
+    payload = {"error_note": "SYNTHETIC_CALLBACK", "sign_string": "SYNTHETIC_RECEIVED"}
+    monkeypatch.setattr(
+        click_provider, "_generate_webhook_signature",
+        Mock(return_value="SYNTHETIC_EXPECTED", side_effect=failure),
+    )
+
+    result = click_provider.process_webhook(payload)
+
+    assert not result.success
+    assert result.error_message == error_message
+    assert logged_reason in caplog.text
+    assert "SYNTHETIC_" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("action", "error", "status"),
+    [(0, 0, "processing"), (1, 0, "completed"), (1, -1, "failed")],
+)
+def test_click_adapter_logs_callback_status_without_payment_fields(
+    click_provider, monkeypatch, caplog, action, error, status,
+):
+    payload = {
+        "click_trans_id": "SYNTHETIC-TRANSACTION",
+        "merchant_trans_id": "SYNTHETIC-ORDER",
+        "amount": 182753,
+        "action": action,
+        "error": error,
+        "sign_string": "synthetic-signature",
+    }
+    monkeypatch.setattr(
+        click_provider,
+        "_generate_webhook_signature",
+        Mock(return_value=payload["sign_string"]),
+    )
+    caplog.set_level(logging.INFO, logger="app.services.payment_providers.base")
+
+    result = click_provider.process_webhook(payload)
+
+    assert result.success
+    assert result.status == status
+    assert result.payment_id == payload["merchant_trans_id"]
+    assert result.provider_data["click_trans_id"] == payload["click_trans_id"]
+    assert result.provider_data["amount"] == "1827.53"
+    assert any("process_webhook" in message and status in message for message in caplog.messages)
+    assert payload["click_trans_id"] not in caplog.text
+    assert payload["merchant_trans_id"] not in caplog.text
+    assert result.provider_data["amount"] not in caplog.text
 
 
 @pytest.mark.unit
 class TestProviderWebhookService:
+    def test_webhook_error_responses_and_logs_omit_internal_details(self, client, caplog):
+        private_detail = "SYNTHETIC-DRIVER-DIAGNOSTIC"
+        with patch(
+            "app.services.provider_webhook_service.get_payment_manager",
+            side_effect=RuntimeError(private_detail),
+        ):
+            click = client.post("/api/v1/payments/webhook/click", json={})
+            payme = client.post("/api/v1/payments/webhook/payme", json={"id": "synthetic-rpc"})
+
+        assert click.status_code == payme.status_code == 200
+        assert click.json() == {"error": -1, "error_note": "Internal server error"}
+        assert payme.json() == {
+            "error": {"code": -32603, "message": "Internal server error"},
+            "id": "synthetic-rpc",
+        }
+        assert private_detail not in caplog.text
+        assert "Click webhook error type=RuntimeError" in caplog.text
+        assert "Payme webhook error type=RuntimeError" in caplog.text
+
     def test_click_webhook_requires_signature(self, db_session):
         service = ProviderWebhookService(db_session)
         try:
@@ -28,6 +136,51 @@ class TestProviderWebhookService:
 
         assert result["error"] == -1
         assert result["error_note"] == "Missing signature"
+
+    @pytest.mark.parametrize("valid_signature", [False, True])
+    def test_click_callback_service_logs_omit_request_fields(self, caplog, valid_signature):
+        payload = {
+            "click_trans_id": "SYNTHETIC-TRANSACTION",
+            "merchant_trans_id": "SYNTHETIC-ORDER",
+            "amount": 182753,
+            "action": 1,
+            "sign_string": "synthetic-signature",
+        }
+        db = Mock()
+        repository = Mock()
+        repository.get_existing_transaction.return_value = SimpleNamespace(
+            payment_id=44, amount=Decimal("182753"), webhook_id=33, status="completed",
+        )
+        repository.get_payment_by_id.return_value = SimpleNamespace(
+            provider="click", currency="UZS", provider_payment_id=payload["merchant_trans_id"],
+        )
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = valid_signature
+        service = ProviderWebhookService(db, repository=repository)
+        caplog.set_level(logging.INFO, logger=ProviderWebhookService.__module__)
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            result = service.process_click_webhook(payload)
+
+        if valid_signature:
+            assert result["error"] == 0
+            assert result["error_note"] == "Already processed"
+            assert result["click_trans_id"] == payload["click_trans_id"]
+            assert result["merchant_trans_id"] == payload["merchant_trans_id"]
+            assert result["merchant_prepare_id"] == 33
+            assert "already processed" in caplog.text
+        else:
+            assert result == {"error": -1, "error_note": "Invalid signature"}
+            repository.get_existing_transaction.assert_not_called()
+            assert "Invalid signature" in caplog.text
+        repository.create_webhook.assert_not_called()
+        repository.create_transaction.assert_not_called()
+        db.commit.assert_not_called()
+        assert "Click webhook received" in caplog.text
+        assert payload["click_trans_id"] not in caplog.text
+        assert payload["merchant_trans_id"] not in caplog.text
+        request_fields = {"click_trans_id", "merchant_trans_id", "action"}
+        assert all(request_fields.isdisjoint(vars(record)) for record in caplog.records)
 
     def test_payme_webhook_requires_auth_header(self, db_session):
         service = ProviderWebhookService(db_session)
@@ -180,6 +333,9 @@ class TestProviderWebhookService:
         payment = SimpleNamespace(
             id=44,
             amount=Decimal("1000"),
+            provider="click",
+            currency="UZS",
+            provider_payment_id="clinic_44_1700000000",
             status="pending",
             paid_at=None,
             provider_data={},
@@ -242,6 +398,105 @@ class TestProviderWebhookService:
         assert payment.paid_at is None
         repository.create_transaction.assert_not_called()
 
+    @pytest.mark.parametrize(("provider_success", "payment_fields", "parsed_order"), [
+        (True, {"provider_payment_id": None}, "clinic_44_1700000000"),
+        (True, {"provider": "payme"}, "clinic_44_1700000000"),
+        (True, {"currency": "USD"}, "clinic_44_1700000000"),
+        (True, {}, "clinic_44_1700000001"),
+        (False, {"provider_payment_id": "clinic_44_1700000001"}, "clinic_44_1700000000"),
+    ])
+    def test_click_webhook_rejects_callbacks_without_matching_order(
+        self, db_session, provider_success, payment_fields, parsed_order,
+    ):
+        issued_order = "clinic_44_1700000000"
+        webhook = SimpleNamespace(id=33, status="pending")
+        payment = SimpleNamespace(**{
+            "id": 44, "provider": "click", "currency": "UZS", "status": "pending",
+            "provider_payment_id": issued_order, **payment_fields,
+        })
+        repository = SimpleNamespace(
+            get_existing_transaction=Mock(return_value=None),
+            get_payment_by_id_for_update=Mock(return_value=payment),
+            create_webhook=Mock(return_value=webhook),
+            create_transaction=Mock(),
+        )
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        manager.process_webhook.return_value = SimpleNamespace(
+            success=provider_success, payment_id=parsed_order,
+        )
+        service = ProviderWebhookService(db_session, repository=repository)
+        with (
+            patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager),
+            patch.object(service, "_update_payment_status") as update_payment,
+        ):
+            result = service.process_click_webhook({
+                "click_trans_id": "synthetic-click",
+                "merchant_trans_id": issued_order,
+                "amount": 100000,
+                "sign_string": "synthetic-signature",
+            })
+        assert result["error"] == -1
+        assert result["error_note"] == "Payment order mismatch"
+        assert result["payment_id"] is None
+        assert webhook.status == "failed"
+        assert webhook.error_message == "provider_order_mismatch"
+        assert payment.status == "pending"
+        if parsed_order == issued_order:
+            repository.get_payment_by_id_for_update.assert_called_once_with(44)
+        else:
+            repository.get_payment_by_id_for_update.assert_not_called()
+        update_payment.assert_not_called()
+        repository.create_transaction.assert_not_called()
+
+    def test_click_webhook_refuses_mutation_if_receipt_commit_fails(self):
+        db = Mock()
+        db.commit.side_effect = RuntimeError("synthetic receipt write error")
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        service = ProviderWebhookService(db, repository=repository)
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            result = service.process_click_webhook({
+                "click_trans_id": "synthetic-click",
+                "merchant_trans_id": "clinic_44_1700000000",
+                "amount": 100000,
+                "sign_string": "synthetic-signature",
+            })
+
+        assert result == {"error": -1, "error_note": "Internal server error"}
+        repository.create_webhook.assert_called_once()
+        db.rollback.assert_called_once()
+        manager.process_webhook.assert_not_called()
+        repository.get_payment_by_id_for_update.assert_not_called()
+        repository.create_transaction.assert_not_called()
+
+    def test_click_rollback_omits_private_diagnostics(self, caplog):
+        marker = "SYNTHETIC-PRIVATE-FINANCIAL-DIAGNOSTIC"
+        db = Mock()
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        manager.process_webhook.side_effect = RuntimeError(marker)
+        service = ProviderWebhookService(db, repository=repository)
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            response = service.process_click_webhook({
+                "click_trans_id": "synthetic-click",
+                "merchant_trans_id": "clinic_44_1700000000",
+                "amount": 100000,
+                "sign_string": "synthetic-signature",
+            })
+
+        assert response == {"error": -1, "error_note": "Internal server error"}
+        assert db.commit.call_count == 1
+        db.rollback.assert_called()
+        assert "Transaction rolled back due to error type=RuntimeError" in caplog.text
+        assert marker not in caplog.text
+
     # --- FOLLOWUP-10: Click/Kaspi/Payme must lock Payment before mutation ---
 
     def test_click_webhook_locks_payment_before_mutation(self, db_session):
@@ -255,6 +510,9 @@ class TestProviderWebhookService:
         payment = SimpleNamespace(
             id=44,
             amount=Decimal("1000"),
+            provider="click",
+            currency="UZS",
+            provider_payment_id="clinic_44_1700000000",
             status="pending",
             paid_at=None,
             provider_data={},

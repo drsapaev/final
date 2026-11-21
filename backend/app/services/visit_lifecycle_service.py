@@ -66,6 +66,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.visit import Visit
+from app.services.all_free_approval import (
+    ALL_FREE_DECISION_REQUIRED,
+    all_free_decision_required_clause,
+)
 from app.services.visit_state_checks import (
     ACCEPTED_VISIT_STATUSES,
     force_reopen_target_allowed,
@@ -73,6 +77,16 @@ from app.services.visit_state_checks import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _numeric_actor_id(actor: Any | None) -> int | None:
+    """Only staff database IDs are safe for lifecycle event logs.
+
+    Patient confirmation adapters may use a phone, Telegram identity, IP, or
+    other arbitrary string as ``actor.id``; never stringify that value here.
+    """
+    actor_id = getattr(actor, "id", None)
+    return actor_id if type(actor_id) is int and actor_id > 0 else None
 
 
 class VisitLifecycleError(Exception):
@@ -108,12 +122,28 @@ class VisitLifecycleService:
         Raises:
             VisitNotFoundError: if the visit does not exist.
         """
+        # A caller may already have this Visit in its identity map. Flush its
+        # staged work, then replace that cached state with the row observed
+        # under the lock; otherwise a concurrent committed cancellation can
+        # be overwritten by a transition validated against an old status.
+        self.db.flush()
         visit = (
-            self.db.query(Visit).filter(Visit.id == visit_id).with_for_update().first()
+            self.db.query(Visit).filter(Visit.id == visit_id)
+            .with_for_update().populate_existing().first()
         )
         if not visit:
             raise VisitNotFoundError(f"Visit {visit_id} not found")
         return visit
+
+    def _require_confirmation_approval(self, visit_id: int) -> None:
+        # Read the approval after locking the visit without refreshing any
+        # staged ORM changes belonging to the caller's transaction.
+        if (
+            self.db.query(all_free_decision_required_clause())
+            .filter(Visit.id == visit_id)
+            .scalar()
+        ):
+            raise HTTPException(status.HTTP_409_CONFLICT, ALL_FREE_DECISION_REQUIRED)
 
     # ─── Core transition logic ────────────────────────────────────────
 
@@ -220,7 +250,24 @@ class VisitLifecycleService:
                             detail=REMINDER_IN_PROGRESS_DETAIL,
                         )
 
+        if target_status == "completed" and self.db.get_bind().dialect.name == "sqlite":
+            # The lease wait above must precede this writer reservation, or it
+            # would prevent a worker from releasing the lease. Revalidate the
+            # lease below after reserving and refreshing the actual Visit.
+            from app.services.visit_completion_evidence import (
+                reserve_sqlite_completion_writer,
+            )
+
+            reserve_sqlite_completion_writer(self.db, visit_id)
+            self.db.flush()
         visit = self._load_visit_for_update(visit_id)
+        if target_status == "completed" and self.db.get_bind().dialect.name == "sqlite":
+            self.db.refresh(visit)
+        if target_status == "confirmed" or (
+            visit.status == "pending_confirmation"
+            and target_status in ("open", "in_progress", "completed")
+        ):
+            self._require_confirmation_approval(visit_id)
 
         # PR-1 (Codex rounds 14+15, P2): a lifecycle transition out of
         # ``pending_confirmation`` must not commit while a reminder
@@ -330,6 +377,17 @@ class VisitLifecycleService:
                 visit,
                 specialty_override=completion_specialty,
             )
+
+            # A force-reopen corrects an administrative status; it is not
+            # itself a new clinical completion and cannot invent proof for
+            # historic visits. Normal completion creates the proof under the
+            # same Visit lock and transaction as the state change.
+            if not force:
+                from app.services.visit_completion_evidence import (
+                    capture_completion_evidence,
+                )
+
+                capture_completion_evidence(self.db, visit)
 
         visit.status = target_status
 
@@ -560,6 +618,7 @@ class VisitLifecycleService:
                         )
 
         visit = self._load_visit_for_update(visit_id)
+        self._require_confirmation_approval(visit_id)
 
         # PR-1 (Codex round 14, P2): the patient-facing confirm is a
         # lifecycle transition out of ``pending_confirmation`` — see the
@@ -581,11 +640,10 @@ class VisitLifecycleService:
                     )
 
         logger.info(
-            "visit.confirm visit_id=%s current_status=%s user_id=%s confirmed_by=%r",
+            "visit.confirm visit_id=%s current_status=%s user_id=%s",
             visit_id,
             visit.status,
-            getattr(current_user, "id", None),
-            confirmed_by,
+            _numeric_actor_id(current_user),
         )
 
         # Set confirmation metadata if the visit supports it.
@@ -682,7 +740,7 @@ class VisitLifecycleService:
             logger.info(
                 "visit.activate_confirmed visit_id=%s user_id=%s",
                 visit_id,
-                getattr(current_user, "id", None) if current_user else "batch",
+                _numeric_actor_id(current_user) if current_user is not None else "batch",
             )
             visit.status = "open"
             if commit:
@@ -841,6 +899,9 @@ class VisitLifecycleService:
             if commit:
                 self.db.commit()
                 self.db.refresh(visit)
+            else:
+                # The caller can read invoice debt before committing.
+                self.db.flush([visit])
 
         # If the visit has a valid operational status, no change needed.
         # The payment state is tracked separately in the Payment table.

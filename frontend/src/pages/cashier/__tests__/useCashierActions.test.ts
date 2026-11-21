@@ -20,7 +20,7 @@
  *  - loadHourlyStats: success → showHourlyStats(data)
  *  - openCancelDialog: builds {id, patient, amount} with row fallbacks
  */
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import notify from '../../../services/notify';
@@ -268,10 +268,26 @@ describe('useCashierActions (PR-UI-14-4)', () => {
 
     const { result: r2 } = renderActions(deps, { refundPaymentId: 3, refundAmount: '50', refundReason: 'ok reason' });
     await r2.current.handleRefund();
-    expect(deps.paymentsApi.refundPayment).toHaveBeenCalledWith(3, { amount: 50, reason: 'ok reason' });
+    expect(deps.paymentsApi.refundPayment).toHaveBeenCalledWith(3, {
+      amount: '50', reason: 'ok reason', client_request_id: expect.any(String),
+    });
     expect(deps.dialogs.resetRefundDialog).toHaveBeenCalled();
     expect(notify.success).toHaveBeenCalled();
     expect(deps.worklist.triggerDataReload).toHaveBeenCalled();
+  });
+
+  it('handleRefund keeps the operation key on retry and prevents overlapping submissions', async () => {
+    const deps = makeDeps();
+    const request = vi.mocked(deps.paymentsApi.refundPayment);
+    request.mockResolvedValueOnce({ success: false, error: 'SYNTHETIC connection interrupted' });
+    const { result } = renderActions(deps, { refundPaymentId: 4, refundAmount: '1.25', refundReason: 'ok reason' });
+
+    await act(async () => { await Promise.all([result.current.handleRefund(), result.current.handleRefund()]); });
+    expect(request).toHaveBeenCalledTimes(1);
+    await act(async () => { await result.current.handleRefund(); });
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]).toEqual(request.mock.calls[0]);
+    expect(deps.dialogs.resetRefundDialog).toHaveBeenCalledTimes(1);
   });
 
   it('handlePrintReceipt: row with successful browser print (invoked/deferred) → success notify, no receipt API call', async () => {

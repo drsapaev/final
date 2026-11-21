@@ -3,6 +3,8 @@ E2E тесты для полного сценария работы с визит
 Врач назначил → Пациент подтвердил → Номер в очереди выдан
 """
 
+import hashlib
+import logging
 from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
@@ -14,12 +16,19 @@ from app.models.patient import Patient
 from app.models.service import Service
 from app.models.telegram_config import TelegramUser
 from app.models.visit import Visit, VisitService
+from app.models.visit_invitation_delivery import (
+    VisitInvitationDelivery,
+    VisitInvitationIssuerAuth,
+)
 from app.services.morning_assignment import MorningAssignmentService
 from app.services.visit_confirmation_service import (
     VisitConfirmationDomainError,
     VisitConfirmationService,
     build_telegram_visit_action_token,
 )
+from tests.integration.doctor_schedule_fixtures import mock_invitations  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures("mock_invitations")
 
 
 @pytest.fixture(autouse=True)
@@ -294,7 +303,7 @@ class TestE2EVisitFlow:
         assert visit_info_response.status_code == 400  # Токен уже использован
 
     def test_complete_visit_flow_future_date(
-        self, client, db_session, auth_headers, test_patient
+        self, client, db_session, cardio_auth_headers, test_patient, test_doctor
     ):
         """
         E2E тест: врач назначил визит на завтра → пациент подтвердил → номер НЕ выдан
@@ -308,11 +317,31 @@ class TestE2EVisitFlow:
             price=100000.00,
             queue_tag="cardiology_common",
             is_active=True,
+            is_consultation=True,
         )
         db_session.add(future_service)
+        today = _clinic_today(db_session)
+        prior = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=today - timedelta(days=1),
+            status="completed",
+            discount_mode="none",
+            source="desk",
+            repeat_evidence_generation=1,
+            repeat_proof_generation=1,
+            repeat_proof_consultation=True,
+            repeat_proof_doctor_user_id=test_doctor.user_id,
+        )
+        db_session.add(prior)
+        db_session.flush()
+        db_session.add(VisitService(
+            visit_id=prior.id, service_id=future_service.id, name=future_service.name,
+            qty=1, price=future_service.price, currency="UZS",
+        ))
         db_session.commit()
 
-        tomorrow = _clinic_today(db_session) + timedelta(days=1)
+        tomorrow = today + timedelta(days=1)
 
         # ШАГ 1: Врач назначает визит на завтра
         schedule_response = client.post(
@@ -326,10 +355,10 @@ class TestE2EVisitFlow:
                 "all_free": False,
                 "confirmation_channel": "pwa",
             },
-            headers=auth_headers,
+            headers=cardio_auth_headers,
         )
 
-        assert schedule_response.status_code == 200
+        assert schedule_response.status_code == 200, schedule_response.text
         schedule_data = schedule_response.json()
 
         visit_id = schedule_data["visit_id"]
@@ -464,7 +493,7 @@ class TestE2EVisitFlow:
         assert visit.status == "open"
 
     def test_registrar_confirmation_flow(
-        self, client, db_session, auth_headers, test_doctor, test_patient, admin_user
+        self, client, db_session, auth_headers, test_doctor, test_patient, test_service
     ):
         """
         E2E тест подтверждения регистратором: визит создан → регистратор подтвердил → номер выдан
@@ -489,6 +518,12 @@ class TestE2EVisitFlow:
             confirmation_expires_at=datetime.utcnow() + timedelta(hours=24),
         )
         db_session.add(visit)
+        db_session.flush()
+        test_service.queue_tag = "cardiology_common"
+        db_session.add(VisitService(
+            visit_id=visit.id, service_id=test_service.id, name=test_service.name,
+            qty=1, price=test_service.price, currency="UZS",
+        ))
         db_session.commit()
 
         # ШАГ 2: Создаем дневную очередь
@@ -504,11 +539,11 @@ class TestE2EVisitFlow:
         # ШАГ 3: Регистратор подтверждает визит по телефону
         confirm_response = client.post(
             f"/api/v1/registrar/visits/{visit.id}/confirm",
-            json={"confirmation_notes": "Подтверждено по телефону +998900000121"},
+            json={"notes": "Synthetic phone confirmation"},
             headers=auth_headers,
         )
 
-        assert confirm_response.status_code == 200
+        assert confirm_response.status_code == 200, confirm_response.text
         confirm_data = confirm_response.json()
 
         assert confirm_data["success"] is True
@@ -742,154 +777,47 @@ class TestE2EVisitFlow:
         assert visit.confirmation_expires_at is not None
 
 
-class TestScheduleNextInvitationDispatch:
-    """Regression: the schedule-next endpoint called
-    send_visit_confirmation_invitation(visit=..., channel=...) while the
-    method's contract includes db, visit_id, channel, and expected_context — TypeError on EVERY call,
-    swallowed by the except, so invitations silently never reached patients.
-    """
-
-    def test_invitation_dispatched_with_correct_arguments(
-        self,
-        client,
-        db_session,
-        cardio_auth_headers,
-        test_patient,
-        test_doctor,
-        test_service,
-        monkeypatch,
-    ):
-        from app.services.notification_service import (
-            NotificationService as _RealService,
-        )
-
-        existing_visit = Visit(
-            patient_id=test_patient.id,
-            doctor_id=test_doctor.id,
-            visit_date=_clinic_today(db_session),
-            visit_time="09:00",
-            status="open",
-            discount_mode="none",
-            source="desk",
-        )
-        db_session.add(existing_visit)
-        db_session.commit()
-
-        calls: list[tuple[int, str, dict]] = []
-
-        async def _spy(self, db, visit_id, channel="auto", *, expected_context):
-            calls.append((visit_id, channel, expected_context))
-            return {"success": True, "channel": channel}
-
-        monkeypatch.setattr(_RealService, "send_visit_confirmation_invitation", _spy)
-
+@pytest.mark.parametrize("channel", ["phone", "pwa"])
+def test_schedule_stages_bound_invitation_without_logging_token(
+    client, db_session, cardio_auth_headers, test_patient, test_doctor, test_service,
+    mock_invitations, caplog, channel,
+):
+    today = _clinic_today(db_session)
+    db_session.add(Visit(
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        visit_date=today,
+        visit_time="09:00",
+        status="open",
+        discount_mode="none",
+        source="desk",
+    ))
+    db_session.commit()
+    with caplog.at_level(logging.INFO, logger="app.api.v1.endpoints.doctor_integration._visits"):
         response = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json={
                 "patient_id": test_patient.id,
-                "service_ids": [test_service.id],
-                "visit_date": (
-                    _clinic_today(db_session) + timedelta(days=1)
-                ).isoformat(),
+                "services": [{"service_id": test_service.id, "quantity": 1}],
+                "visit_date": (today + timedelta(days=1)).isoformat(),
                 "visit_time": "10:00",
                 "discount_mode": "none",
-                "all_free": False,
-                "confirmation_channel": "phone",
+                "confirmation_channel": channel,
             },
             headers=cardio_auth_headers,
         )
 
-        assert response.status_code == 200, response.text
-        assert calls, "invitation dispatch was never reached (swallowed TypeError?)"
-        visit_id, channel, expected_context = calls[0]
-        assert visit_id == response.json()["visit_id"]
-        assert channel == "phone"
-        visit = db_session.query(Visit).filter_by(id=visit_id).populate_existing().one()
-        assert expected_context == {
-            "patient_id": visit.patient_id,
-            "confirmation_context_epoch": visit.confirmation_context_epoch,
-            "confirmation_token": visit.confirmation_token,
-        }
-
-
-class TestScheduleNextInvitationLogHygiene:
-    """Codex P1: the dispatch result for the pwa channel carries a URL with
-    the raw confirmation token — the info log must never include it."""
-
-    def test_confirmation_token_never_logged(
-        self,
-        client,
-        db_session,
-        cardio_auth_headers,
-        test_patient,
-        test_doctor,
-        test_service,
-        monkeypatch,
-        caplog,
-    ):
-        import logging as _logging
-
-        from app.services.notification_service import (
-            NotificationService as _RealService,
-        )
-
-        existing_visit = Visit(
-            patient_id=test_patient.id,
-            doctor_id=test_doctor.id,
-            visit_date=_clinic_today(db_session),
-            visit_time="09:00",
-            status="open",
-            discount_mode="none",
-            source="desk",
-        )
-        db_session.add(existing_visit)
-        db_session.commit()
-
-        secret_token = "TOPSECRET-CONFIRM-TOKEN-123"
-
-        calls = []
-
-        async def _fake_send(self, db, visit_id, channel="auto", *, expected_context):
-            calls.append((visit_id, channel, expected_context))
-            return {
-                "success": True,
-                "channel": "pwa",
-                "pwa_url": f"https://finalclinic.fyi/confirm?token={secret_token}",
-            }
-
-        monkeypatch.setattr(
-            _RealService, "send_visit_confirmation_invitation", _fake_send
-        )
-
-        with caplog.at_level(
-            _logging.INFO, logger="app.api.v1.endpoints.doctor_integration._visits"
-        ):
-            response = client.post(
-                "/api/v1/doctor/visits/schedule-next",
-                json={
-                    "patient_id": test_patient.id,
-                    "service_ids": [test_service.id],
-                    "visit_date": (
-                        _clinic_today(db_session) + timedelta(days=1)
-                    ).isoformat(),
-                    "visit_time": "10:00",
-                    "discount_mode": "none",
-                    "all_free": False,
-                    "confirmation_channel": "pwa",
-                },
-                headers=cardio_auth_headers,
-            )
-
-        assert response.status_code == 200, response.text
-        assert len(calls) == 1
-        assert calls[0][0] == response.json()["visit_id"]
-        assert calls[0][1] == "pwa"
-        visit = db_session.query(Visit).filter_by(id=calls[0][0]).populate_existing().one()
-        assert calls[0][2] == {
-            "patient_id": visit.patient_id,
-            "confirmation_context_epoch": visit.confirmation_context_epoch,
-            "confirmation_token": visit.confirmation_token,
-        }
-        logged = "\n".join(r.getMessage() for r in caplog.records)
-        assert secret_token not in logged, "confirmation token leaked into logs"
-        assert "channel=pwa" in logged  # safe fields still present
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["confirmation"]["notification_sent"] is False
+    assert mock_invitations == []
+    visit = db_session.get(Visit, result["visit_id"])
+    delivery = db_session.query(VisitInvitationDelivery).filter_by(visit_id=visit.id).one()
+    assert delivery.state == "pending" and delivery.channel == channel
+    assert delivery.patient_id == visit.patient_id
+    assert delivery.context_epoch == visit.confirmation_context_epoch
+    assert delivery.token_digest == hashlib.sha256(visit.confirmation_token.encode("utf-8")).hexdigest()
+    authorization = db_session.query(VisitInvitationIssuerAuth).filter_by(delivery_id=delivery.id).one()
+    assert authorization.requester_type == "doctor" and authorization.doctor_id == test_doctor.id
+    assert authorization.actor_user_id == test_doctor.user_id
+    assert visit.confirmation_token not in caplog.text, "confirmation token leaked into logs"

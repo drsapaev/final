@@ -7,6 +7,7 @@ from datetime import time
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
+from app.models.encounter import Encounter
 from app.models.visit import Visit
 
 
@@ -18,6 +19,27 @@ class CanonicalVisitRepository:
 
     def get_appointment(self, appointment_id: int) -> Appointment | None:
         return self.db.query(Appointment).filter(Appointment.id == appointment_id).first()
+
+    def lock_source_visit(self, visit_id: int) -> Visit | None:
+        return (self.db.query(Visit).filter(Visit.id == visit_id)
+                .with_for_update(of=Visit).populate_existing().first())
+
+    def lock_encounter(self, encounter_id: int) -> Encounter | None:
+        return (self.db.query(Encounter).filter(Encounter.id == encounter_id)
+                .with_for_update(of=Encounter).populate_existing().first())
+
+    def read_payment_source_context(self, visit_id: int) -> tuple[Visit | None, Encounter | None]:
+        """Read context that the cashier already locked through payment preflight."""
+        visit = self.db.query(Visit).filter(Visit.id == visit_id).populate_existing().first()
+        if visit is None or visit.encounter_id is None:
+            return visit, None
+        encounter = (self.db.query(Encounter).filter(Encounter.id == visit.encounter_id)
+                     .populate_existing().first())
+        return visit, encounter
+
+    def lock_appointment(self, appointment_id: int) -> Appointment | None:
+        return (self.db.query(Appointment).filter(Appointment.id == appointment_id)
+                .with_for_update(of=Appointment).populate_existing().first())
 
     def list_visits_for_appointment(self, appointment: Appointment) -> list[Visit]:
         query = self.db.query(Visit).filter(

@@ -44,6 +44,8 @@ from app.models.patient import Patient
 from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.user import User
 
+pytestmark = pytest.mark.usefixtures("patient_ownership_epochs")
+
 _FRONTEND_API_TS = (
     Path(__file__).resolve().parents[3]
     / "frontend"
@@ -161,6 +163,25 @@ class TestSoftDeletedPatientRejected:
         )
         assert response.status_code == 403
         assert response.json()["detail"]["reason"] == "patient_link_invalid"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_revoked_session_does_not_receive_patient_binding_state(
+        self, client: TestClient, linked_patient_headers, db_session, test_patient,
+    ):
+        self._soft_delete(db_session, test_patient)
+        actor = db_session.get(User, test_patient.user_id)
+        actor.auth_epoch += 1
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "revoked-synthetic-session"},
+            json={"appointmentDate": str(date.today() + timedelta(days=3))},
+        )
+
+        assert response.status_code == 403
+        assert response.headers["Cache-Control"] == "no-store"
+        assert isinstance(response.json()["detail"], str)
         assert db_session.query(Appointment).count() == 0
 
 
@@ -362,13 +383,27 @@ class TestBookingIdempotency:
         detail = response.json()["detail"]
         assert any("Idempotency-Key" in str(item.get("loc", [])) for item in detail)
 
+    @pytest.mark.parametrize("use_redis_snapshot", [False, True])
     def test_same_key_replays_single_appointment(
-        self, client: TestClient, linked_patient_headers, db_session, test_patient
+        self, client: TestClient, linked_patient_headers, db_session, test_patient,
+        monkeypatch, use_redis_snapshot,
     ):
+        if use_redis_snapshot:
+            from urllib.parse import urlparse
+
+            from app.core.config import settings
+            from app.middleware import idempotency_middleware as middleware
+
+            redis_url = settings.IDEMPOTENCY_REDIS_URL or settings.ARQ_REDIS_URL
+            if not redis_url or urlparse(redis_url).hostname not in {"127.0.0.1", "localhost", "::1"}:
+                pytest.skip("requires a disposable local Redis")
+            claim = middleware.get_distributed_claim()
+            if claim is None or not claim.try_available():
+                pytest.skip("requires a disposable local Redis")
         # The duplicate-booking scenario: date-only request (no doctor slot
         # lock applies), response lost, browser retries with the SAME key —
         # the middleware must replay the committed 201, not re-execute.
-        key = "portal-retry-1"
+        key = f"portal-retry-redis-{use_redis_snapshot}"
         body = {"appointmentDate": self.future_date}
         first = client.post(
             "/api/v1/patients/booking",
@@ -376,6 +411,8 @@ class TestBookingIdempotency:
             json=body,
         )
         assert first.status_code == 201
+        if use_redis_snapshot:
+            monkeypatch.setattr(middleware, "_local_patient_outcome_get", lambda *_: (None, False, None))
         second = client.post(
             "/api/v1/patients/booking",
             headers={**linked_patient_headers, "Idempotency-Key": key},
@@ -407,6 +444,32 @@ class TestBookingIdempotency:
             .count()
             == 2
         )
+
+    @pytest.mark.parametrize("changed_result", ["reassigned", "removed"])
+    def test_same_key_cannot_replay_a_result_that_the_patient_no_longer_owns(
+        self, client, linked_patient_headers, db_session, test_patient, changed_result,
+    ):
+        path = "/api/v1/patients/booking"
+        headers = {**linked_patient_headers, "Idempotency-Key": f"synthetic-recheck-result-{changed_result}"}
+        body = {"appointmentDate": self.future_date}
+        initial = client.post(path, headers=headers, json=body)
+        assert initial.status_code == 201
+        appointment = db_session.get(Appointment, initial.json()["appointment_id"])
+        assert appointment.patient_id == test_patient.id
+        if changed_result == "reassigned":
+            other_patient = Patient(first_name="SYNTHETIC", last_name="Other card")
+            db_session.add(other_patient)
+            db_session.flush()
+            appointment.patient_id = other_patient.id
+        else:
+            db_session.delete(appointment)
+        db_session.commit()
+
+        replay = client.post(path, headers=headers, json=body)
+        assert replay.status_code == 409
+        assert replay.json()["code"] == "idempotency_reconciliation_required"
+        assert "appointment_id" not in replay.json()
+        assert db_session.query(Appointment).filter_by(patient_id=test_patient.id).count() == 0
 
 
 class TestFormsReadOnly:

@@ -14,7 +14,8 @@ class TestBillingApiService:
         invoice = SimpleNamespace(status=InvoiceStatus.PAID)
 
         class Repository:
-            def get_invoice(self, invoice_id):
+            def get_invoice(self, invoice_id, *, for_update):
+                assert for_update
                 return invoice
 
         service = BillingApiService(db=None, repository=Repository())
@@ -29,6 +30,7 @@ class TestBillingApiService:
             id=1,
             visit_id=2,
             amount=15.5,
+            currency="USD",
             method="cash",
             status="paid",
             receipt_no="R1",
@@ -40,3 +42,4 @@ class TestBillingApiService:
         payload = BillingApiService.serialize_payments([payment])
         assert payload[0]["id"] == 1
         assert payload[0]["amount"] == 15.5
+        assert payload[0]["currency"] == "USD"

@@ -62,11 +62,9 @@ from app.models.visit import Visit  # noqa: E402
 
 
 @pytest.fixture(scope="module")
-def db_engine():
+def db_engine(tmp_path_factory):
     """Real engine — NO savepoint tricks. Commits are real."""
-    db_path = BACKEND_DIR / "test_click_audit.db"
-    if db_path.exists():
-        db_path.unlink()
+    db_path = tmp_path_factory.mktemp("click_audit") / "payments.db"
     engine = create_engine(
         f"sqlite:///{db_path}",
         echo=False,
@@ -81,8 +79,6 @@ def db_engine():
     yield engine
     Base.metadata.drop_all(engine)
     engine.dispose()
-    if db_path.exists():
-        db_path.unlink()
 
 
 @pytest.fixture
@@ -154,31 +150,29 @@ def _setup_payment(session, *, status: str = "pending"):
     session.flush()
     payment = Payment(
         visit_id=visit.id, amount=10000, currency="UZS",
-        status=status, method="click",
+        status=status, method="click", provider="click",
         created_at=datetime.now(UTC),
     )
     session.add(payment)
+    session.flush()
+    payment.provider_payment_id = f"clinic_{payment.id}_1700000000"
     session.commit()
     session.refresh(payment)
     return payment
 
 
-def _make_click_webhook_data(payment_id: int) -> dict:
-    """Create Click webhook data with correct order_id format."""
-    ts = int(datetime.now(UTC).timestamp())
+def _make_click_webhook_data(issued_order: str, amount: int = 10000) -> dict:
+    """Build a synthetic callback in the provider's minor units."""
     return {
         "click_trans_id": f"test-{uuid.uuid4().hex[:8]}",
-        "merchant_trans_id": f"clinic_{payment_id}_{ts}",
-        "amount": 10000,
+        "merchant_trans_id": issued_order,
+        "amount": amount * 100,
         "sign_string": "test-sig",
-        "_test_ts": ts,  # for mock to use same timestamp
     }
 
 
-def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = None):
+def _make_mock_manager(callback: dict):
     """Create a mock payment manager that returns success for the given payment."""
-    if ts is None:
-        ts = int(datetime.now(UTC).timestamp())
     mock_manager = MagicMock()
     mock_provider = MagicMock()
     mock_provider.validate_webhook_signature.return_value = True
@@ -186,9 +180,9 @@ def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = Non
 
     mock_result = MagicMock()
     mock_result.success = True
-    mock_result.status = status
-    mock_result.payment_id = f"clinic_{payment_id}_{ts}"
-    mock_result.provider_data = {"test": "data"}
+    mock_result.status = "completed"
+    mock_result.payment_id = callback["merchant_trans_id"]
+    mock_result.provider_data = {"test": "data", "amount": str(callback["amount"] // 100)}
     mock_result.error_message = None
     mock_manager.process_webhook.return_value = mock_result
     return mock_manager
@@ -198,12 +192,6 @@ def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = Non
 class TestClickWebhookAuditDurability:
     """P2-3 Finding C: PaymentWebhook must survive business transaction rollback."""
 
-    @pytest.mark.xfail(
-        reason="Success path requires real payment manager integration. "
-               "Passes on PostgreSQL (see test_webhook_real_db.py Finding F). "
-               "Fails on SQLite with mock payment manager due to order_id parsing.",
-        strict=True,
-    )
     def test_click_success_persists_webhook_and_payment(
         self, production_session, verify_session, clean_db
     ):
@@ -217,16 +205,17 @@ class TestClickWebhookAuditDurability:
 
         payment = _setup_payment(production_session, status="pending")
         payment_id = payment.id
+        webhook_data = _make_click_webhook_data(payment.provider_payment_id)
         production_session.expunge_all()
 
-        webhook_data = _make_click_webhook_data(payment_id)
-        mock_manager = _make_mock_manager(payment_id, "completed", ts=webhook_data.get("_test_ts"))
+        mock_manager = _make_mock_manager(webhook_data)
 
         with patch("app.services.provider_webhook_service.get_payment_manager", return_value=mock_manager):
             repo = ProviderWebhookRepository(production_session)
             service = ProviderWebhookService(production_session, repository=repo)
             result = service.process_click_webhook(webhook_data)
 
+        assert result["error"] == 0
         production_session.close()
 
         # Verify from NEW session
@@ -242,9 +231,7 @@ class TestClickWebhookAuditDurability:
             Payment.id == payment_id
         ).first()
         assert committed_payment is not None
-        assert committed_payment.status in ("paid", "processing"), (
-            f"Payment status should be 'paid' or 'processing'. Got: {committed_payment.status}"
-        )
+        assert committed_payment.status == "paid"
 
     def test_click_error_persists_webhook_after_value_error(
         self, production_session, verify_session, clean_db
@@ -260,10 +247,10 @@ class TestClickWebhookAuditDurability:
         # Create a payment in terminal state (refunded)
         payment = _setup_payment(production_session, status="refunded")
         payment_id = payment.id
+        webhook_data = _make_click_webhook_data(payment.provider_payment_id)
         production_session.expunge_all()
 
-        webhook_data = _make_click_webhook_data(payment_id)
-        mock_manager = _make_mock_manager(payment_id, "completed", ts=webhook_data.get("_test_ts"))
+        mock_manager = _make_mock_manager(webhook_data)
 
         with patch("app.services.provider_webhook_service.get_payment_manager", return_value=mock_manager):
             repo = ProviderWebhookRepository(production_session)
@@ -271,6 +258,7 @@ class TestClickWebhookAuditDurability:
             # This should NOT crash — ValueError should be caught
             result = service.process_click_webhook(webhook_data)
 
+        assert result == {"error": -1, "error_note": "Internal server error"}
         production_session.close()
 
         # CRITICAL: PaymentWebhook MUST persist even after ValueError rollback
@@ -306,18 +294,17 @@ class TestClickWebhookAuditDurability:
 
         payment = _setup_payment(production_session, status="pending")
         payment_id = payment.id
+        webhook_data = _make_click_webhook_data(payment.provider_payment_id, amount=999)
         production_session.expunge_all()
 
-        webhook_data = _make_click_webhook_data(payment_id)
-        webhook_data["amount"] = 999  # wrong amount
-
-        mock_manager = _make_mock_manager(payment_id, "completed", ts=webhook_data.get("_test_ts"))
+        mock_manager = _make_mock_manager(webhook_data)
 
         with patch("app.services.provider_webhook_service.get_payment_manager", return_value=mock_manager):
             repo = ProviderWebhookRepository(production_session)
             service = ProviderWebhookService(production_session, repository=repo)
             result = service.process_click_webhook(webhook_data)
 
+        assert result["error_note"] == "Payment amount mismatch"
         production_session.close()
 
         # PaymentWebhook should persist

@@ -1995,6 +1995,112 @@
         }
       }
     },
+    "/api/v1/patients/{patient_id}/birth-date/review": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Review Birth Date",
+        "operationId": "review_birth_date_api_v1_patients__patient_id__birth_date_review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BirthDateReviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patient_id}/birth-date/attest": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Attest Birth Date",
+        "operationId": "attest_birth_date_api_v1_patients__patient_id__birth_date_attest_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BirthDateAttestation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Attest Birth Date Api V1 Patients  Patient Id  Birth Date Attest Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/visits/visits": {
       "get": {
         "tags": [
@@ -2444,6 +2550,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VisitOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/visits/{visit_id}/repeat-evidence/review": {
+      "post": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Проверить контекст исторической консультации",
+        "description": "Start an audited review; the returned capability is not a login token.",
+        "operationId": "review_repeat_consultation_api_v1_visits__visit_id__repeat_evidence_review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepeatConsultationReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepeatConsultationReviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/visits/{visit_id}/repeat-evidence/attest": {
+      "post": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Подтвердить историческую консультацию для повторного визита",
+        "description": "Record an administrator's review of a historical clinical record.\n\nThe physician identity must come from that reviewed record, not from\ntoday's mutable Doctor profile. The proof and append-only audit record\ncommit together under the Visit lock.",
+        "operationId": "attest_repeat_consultation_api_v1_visits__visit_id__repeat_evidence_attest_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepeatConsultationAttestation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepeatConsultationAttestationResponse"
                 }
               }
             }
@@ -6228,6 +6450,119 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VisitInfoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/visits/{visit_id}/confirmation-reissue/review": {
+      "post": {
+        "tags": [
+          "visit-confirmation"
+        ],
+        "summary": "Review Invitation Reissue",
+        "operationId": "review_invitation_reissue_api_v1_visits__visit_id__confirmation_reissue_review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationReissueReview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/visits/{visit_id}/confirmation-reissue": {
+      "post": {
+        "tags": [
+          "visit-confirmation"
+        ],
+        "summary": "Reissue Invitation",
+        "operationId": "reissue_invitation_api_v1_visits__visit_id__confirmation_reissue_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationReissueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationReissueResponse"
                 }
               }
             }
@@ -11708,7 +12043,7 @@
           "qr-queue"
         ],
         "summary": "Cancel Service In Entry",
-        "description": "Отменяет услугу в записи очереди с сохранением аудита\n\nВАЖНО:\n- Услуга помечается как отмененная (cancelled=True), но НЕ удаляется\n- Сохраняется причина отмены и информация о том, кто отменил\n- Пересчитывается итоговая сумма\n- Если услуга была оплачена, сохраняется флаг was_paid_before_cancel\n- Синхронизируется со всеми другими queue_entries этого пациента\n\nДоступно: администраторам, регистраторам и врачам",
+        "description": "Отменяет услугу в талоне без привязки к визиту и сохраняет аудит.",
         "operationId": "cancel_service_in_entry_api_v1_queue_online_entry__entry_id__cancel_service_post",
         "security": [
           {
@@ -11743,6 +12078,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CancelServiceResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Талон связан с визитом или сумма услуг требует сверки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -21778,6 +22131,24 @@
               }
             }
           },
+          "409": {
+            "description": "Условия расчёта требуют проверки или согласования",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -21820,6 +22191,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EditDeltaResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Условия расчёта требуют проверки или согласования",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -21932,7 +22321,7 @@
           "registrar-wizard"
         ],
         "summary": "Одобрить или отклонить изменение цены",
-        "description": "Одобрить или отклонить изменение цены врачом\n\nREGPRICE-BE-001/002/003/005 (audit #3892, group 16): the registrar route\nnow delegates to the canonical PriceOverrideApprovalService — the SAME\nimplementation the dental PUT route uses — so both independently exposed\nroutes converge on one outcome: locked decision (409 for the loser of a\nconcurrent race), chargeable ``VisitService.price`` update PLUS the\n``Visit.doctor_price_override`` JSON mirror in one commit, stale-intent\nvalidation and a mandatory non-blank rejection reason.",
+        "description": "Рассмотреть изменение цены и обновить черновой счёт при одобрении.",
         "operationId": "approve_price_override_api_v1_registrar_price_override_approve_post",
         "requestBody": {
           "content": {
@@ -22150,7 +22539,7 @@
           "registrar-wizard"
         ],
         "summary": "Check Invoice Status",
-        "description": "Проверка статуса оплаты invoice",
+        "description": "Read the provider outside the transaction that records its receipt.",
         "operationId": "check_invoice_status_api_v1_registrar_invoice__invoice_id__status_get",
         "security": [
           {
@@ -22998,7 +23387,6 @@
           "registrar-wizard"
         ],
         "summary": "Confirm Visit By Registrar",
-        "description": "Подтверждение визита регистратором (по телефону)\nПрисваивает номера в очередях если визит на сегодня",
         "operationId": "confirm_visit_by_registrar_api_v1_registrar_visits__visit_id__confirm_post",
         "security": [
           {
@@ -23461,7 +23849,7 @@
           "doctor-integration"
         ],
         "summary": "Schedule Next Visit",
-        "description": "Назначение следующего визита врачом (без номера в очереди)\nНомер будет присвоен только после подтверждения пациентом",
+        "description": "Create one server-priced visit and any row-bound pending requests atomically.\n\nA staged invitation is durable but is not dispatched here. The consumer\nand finance fences must be integrated before this slice is mergeable.",
         "operationId": "schedule_next_visit_api_v1_doctor_visits_schedule_next_post",
         "requestBody": {
           "content": {
@@ -23708,6 +24096,10 @@
               "anyOf": [
                 {
                   "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
                 },
                 {
                   "type": "null"
@@ -59789,13 +60181,157 @@
         }
       }
     },
+    "/api/v1/notifications/visit-invitation-status/{visit_id}": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Read Visit Invitation Status",
+        "description": "Reveal only the current subject's delivery outcome to an active Admin.",
+        "operationId": "read_visit_invitation_status_api_v1_notifications_visit_invitation_status__visit_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitInvitationStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/visit-invitation-tasks/{handle}": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Read Visit Invitation Task",
+        "description": "Resolve a neutral inbox handle only for its current authorized recipient.",
+        "operationId": "read_visit_invitation_task_api_v1_notifications_visit_invitation_tasks__handle__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handle"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitInvitationTaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/visit-invitation-recoveries/{handle}": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Read Visit Invitation Recovery",
+        "description": "Resolve a neutral recovery handle for its current Admin recipient.",
+        "operationId": "read_visit_invitation_recovery_api_v1_notifications_visit_invitation_recoveries__handle__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handle"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitInvitationRecoveryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/notifications/send-appointment-reminder": {
       "post": {
         "tags": [
           "notifications"
         ],
         "summary": "Send Appointment Reminder",
-        "description": "Отправка напоминания о записи",
+        "description": "Queue a neutral reminder for one explicit, currently authorized Visit.",
         "operationId": "send_appointment_reminder_api_v1_notifications_send_appointment_reminder_post",
         "security": [
           {
@@ -59839,6 +60375,22 @@
               "type": "string",
               "title": "Department"
             }
+          },
+          {
+            "name": "visit_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Visit Id"
+            }
           }
         ],
         "responses": {
@@ -59873,7 +60425,7 @@
           "notifications"
         ],
         "summary": "Send Visit Confirmation",
-        "description": "Отправка подтверждения визита",
+        "description": "Queue a neutral notice; details stay in the patient's protected view.",
         "operationId": "send_visit_confirmation_api_v1_notifications_send_visit_confirmation_post",
         "security": [
           {
@@ -59939,7 +60491,7 @@
           "notifications"
         ],
         "summary": "Send Payment Notification",
-        "description": "Отправка уведомления об оплате",
+        "description": "Queue a neutral notice for a confirmed payment belonging to this Visit.",
         "operationId": "send_payment_notification_api_v1_notifications_send_payment_notification_post",
         "security": [
           {
@@ -59972,6 +60524,22 @@
             "schema": {
               "type": "string",
               "title": "Currency"
+            }
+          },
+          {
+            "name": "payment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Payment Id"
             }
           }
         ],
@@ -68910,7 +69478,7 @@
           "billing"
         ],
         "summary": "Record Payment",
-        "description": "Записать платеж",
+        "description": "Записать платёж с ключом для повторной выдачи исходной квитанции.",
         "operationId": "record_payment_api_v1_billing_payments_post",
         "security": [
           {
@@ -68937,6 +69505,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Payment conflict or reconciliation required"
           },
           "422": {
             "description": "Validation Error",
@@ -69027,8 +69598,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BillingPaymentListItem"
+                  },
                   "title": "Response Get Payments Api V1 Billing Payments Get"
                 }
               }
@@ -69952,6 +70525,65 @@
         ]
       }
     },
+    "/api/v1/discount-benefits/benefits/encounter/apply": {
+      "post": {
+        "tags": [
+          "discount-benefits"
+        ],
+        "summary": "Apply Registrar Encounter Benefit",
+        "description": "Подтвердить одну льготу для всех услуг исходного оформления.",
+        "operationId": "apply_registrar_encounter_benefit_api_v1_discount_benefits_benefits_encounter_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveRegistrarBenefitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncounterBenefitDecision"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Для решения нужна действующая сессия сотрудника"
+          },
+          "403": {
+            "description": "Решение доступно администратору"
+          },
+          "409": {
+            "description": "Счёт, обращение или право на льготу требует сверки"
+          },
+          "503": {
+            "description": "Подтверждение льготы временно недоступно"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/discount-benefits/loyalty-programs": {
       "post": {
         "tags": [
@@ -70528,7 +71160,7 @@
           "cashier"
         ],
         "summary": "Get Cashier Stats",
-        "description": "Получить агрегированную статистику платежей за период.\n\nCSH-FE-036 (#3813 follow-up): контракт фиксирован — ОБЕ финансовые\nвеличины. ``total_amount``/``cash_amount``/``card_amount`` — валовые\nпоступления (исходные суммы ``paid``/``completed`` без вычета возвратов;\nзначение существующих полей не меняется молча).\n``refunded_amount``/``net_*`` — поступления за вычетом возвратов.\n``pending_amount`` с CSH-FE-028 (#3814) считается за вычетом возвратов.",
+        "description": "Keep legacy UZS totals only when the full snapshot proves them.",
         "operationId": "get_cashier_stats_api_v1_cashier_stats_get",
         "security": [
           {
@@ -70599,6 +71231,87 @@
         }
       }
     },
+    "/api/v1/cashier/stats/by-currency": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "summary": "Get Cashier Stats By Currency",
+        "description": "Return separate buckets; null amounts require explicit reconciliation.",
+        "operationId": "get_cashier_stats_by_currency_api_v1_cashier_stats_by_currency_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Дата начала",
+              "title": "Date From"
+            },
+            "description": "Дата начала"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Дата окончания",
+              "title": "Date To"
+            },
+            "description": "Дата окончания"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyCurrencyStatItem"
+                  },
+                  "title": "Response Get Cashier Stats By Currency Api V1 Cashier Stats By Currency Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/cashier/stats/hourly": {
       "get": {
         "tags": [
@@ -70644,6 +71357,68 @@
                     "$ref": "#/components/schemas/HourlyStatItem"
                   },
                   "title": "Response Get Hourly Stats Api V1 Cashier Stats Hourly Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cashier/stats/hourly/by-currency": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "summary": "Get Hourly Stats By Currency",
+        "description": "Return only observed hours; unknown currency is explicitly null.",
+        "operationId": "get_hourly_stats_by_currency_api_v1_cashier_stats_hourly_by_currency_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Дата статистики",
+              "title": "Target Date"
+            },
+            "description": "Дата статистики"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HourlyCurrencyStatItem"
+                  },
+                  "title": "Response Get Hourly Stats By Currency Api V1 Cashier Stats Hourly By Currency Get"
                 }
               }
             }
@@ -71278,7 +72053,7 @@
           "cashier"
         ],
         "summary": "Refund Payment",
-        "description": "Частичный или полный возврат средств по платежу.",
+        "description": "Частичный или полный возврат кассового платежа с постоянным ключом операции.",
         "operationId": "refund_payment_api_v1_cashier_payments__payment_id__refund_post",
         "security": [
           {
@@ -72076,6 +72851,9 @@
               }
             }
           },
+          "409": {
+            "description": "Конфликт команды пополнения"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -72122,6 +72900,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Конфликт команды или решение по визиту ещё не принято"
           },
           "422": {
             "description": "Validation Error",
@@ -72615,7 +73396,7 @@
           "registrar-batch"
         ],
         "summary": "Batch-обновление записей пациента",
-        "description": "⭐ Атомарное batch-обновление всех записей пациента за день.\n\nПоддерживаемые действия для каждой записи:\n- update: обновить поля записи\n- cancel: отменить запись\n- create: создать новую запись\n\nТакже можно применить common_updates ко всем записям:\n- payment_type\n- discount_mode\n- notes\n\nАтомарность: если хотя бы одна операция не удалась,\nвсе изменения откатываются.\n\nДоступно: Admin, Registrar\n\nExample Request:\n```json\n{\n  \"entries\": [\n    {\"id\": 123, \"action\": \"update\", \"status\": \"called\"},\n    {\"id\": 124, \"action\": \"cancel\", \"reason\": \"Patient request\"},\n    {\"id\": null, \"action\": \"create\", \"specialty\": \"cardiology\"}\n  ],\n  \"common_updates\": {\n    \"payment_type\": \"card\",\n    \"discount_mode\": \"percent_10\"\n  }\n}\n```",
+        "description": "⭐ Атомарное batch-обновление всех записей пациента за день.\n\nПоддерживаемые действия для каждой записи:\n- update: обновить поля записи\n- cancel: отменить запись\n- create: создать новую запись\n\nТакже можно применить common_updates ко всем записям:\n- payment_type\n- discount_mode\n- notes\n\nAll Free и льготы оформляются отдельной заявкой на согласование.\n\nАтомарность: если хотя бы одна операция не удалась,\nвсе изменения откатываются.\n\nДоступно: Admin, Registrar\n\nExample Request:\n```json\n{\n  \"entries\": [\n    {\"id\": 123, \"action\": \"update\", \"status\": \"called\"},\n    {\"id\": 124, \"action\": \"cancel\", \"reason\": \"Patient request\"},\n    {\"id\": null, \"action\": \"create\", \"specialty\": \"cardiology\"}\n  ],\n  \"common_updates\": {\n    \"payment_type\": \"card\",\n    \"discount_mode\": \"percent_10\"\n  }\n}\n```",
         "operationId": "batch_update_patient_entries_api_v1_registrar_batch_patients__patient_id__entries__date__patch",
         "security": [
           {
@@ -72673,6 +73454,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StructuredErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Запись занята или для режима скидки требуется согласование",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }
@@ -76679,26 +77478,42 @@
             "title": "Patient Id"
           },
           "amount": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+              }
+            ],
             "title": "Amount"
           },
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 500
               },
               {
                 "type": "null"
               }
             ],
             "title": "Description"
+          },
+          "client_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Request Id",
+            "description": "Один идентификатор команды для всех её повторов"
           }
         },
         "type": "object",
         "required": [
           "patient_id",
-          "amount"
+          "amount",
+          "client_request_id"
         ],
         "title": "AddDepositRequest",
         "description": "Запрос на пополнение депозита"
@@ -79226,6 +80041,29 @@
         "type": "object",
         "title": "AppointmentUpdate"
       },
+      "ApproveRegistrarBenefitRequest": {
+        "properties": {
+          "invoice_id": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Invoice Id"
+          },
+          "patient_benefit_id": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Patient Benefit Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "invoice_id",
+          "patient_benefit_id"
+        ],
+        "title": "ApproveRegistrarBenefitRequest"
+      },
       "AssignRoleRequest": {
         "properties": {
           "role_id": {
@@ -80357,6 +81195,85 @@
         "title": "BenefitType",
         "description": "Типы льгот"
       },
+      "BillingPaymentListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "receipt_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt No"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visit_id",
+          "amount",
+          "currency",
+          "method",
+          "status",
+          "created_at",
+          "paid_at"
+        ],
+        "title": "BillingPaymentListItem"
+      },
       "BillingSettingsUpdate": {
         "properties": {
           "invoice_number_prefix": {
@@ -80562,6 +81479,77 @@
         },
         "type": "object",
         "title": "BillingSettingsUpdate"
+      },
+      "BirthDateAttestation": {
+        "properties": {
+          "confirmed_exact_date": {
+            "type": "boolean",
+            "title": "Confirmed Exact Date"
+          },
+          "expected_generation": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Generation"
+          },
+          "review_expires_at": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Review Expires At"
+          },
+          "token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "confirmed_exact_date",
+          "expected_generation",
+          "review_expires_at",
+          "token"
+        ],
+        "title": "BirthDateAttestation"
+      },
+      "BirthDateReviewResponse": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "birth_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Birth Date"
+          },
+          "precision": {
+            "type": "string",
+            "title": "Precision"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "review_expires_at": {
+            "type": "integer",
+            "title": "Review Expires At"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "birth_date",
+          "precision",
+          "generation",
+          "review_expires_at",
+          "token"
+        ],
+        "title": "BirthDateReviewResponse"
       },
       "Body_admin_upload_public_site_media": {
         "properties": {
@@ -83382,6 +84370,17 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
           "approval_status": {
             "type": "string",
             "title": "Approval Status"
@@ -83396,6 +84395,7 @@
         "required": [
           "items",
           "total_amount",
+          "currency",
           "approval_status"
         ],
         "title": "CartQuoteResponse"
@@ -84850,6 +85850,164 @@
         "title": "CreatePaymentRequest",
         "description": "Запрос на создание платежа"
       },
+      "DailyCurrencyStatItem": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Код валюты; null означает неизвестную валюту"
+          },
+          "requires_reconciliation": {
+            "type": "boolean",
+            "title": "Requires Reconciliation"
+          },
+          "total_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Amount"
+          },
+          "cash_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Amount"
+          },
+          "card_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Amount"
+          },
+          "refunded_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunded Amount"
+          },
+          "net_total_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Total Amount"
+          },
+          "net_cash_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Cash Amount"
+          },
+          "net_card_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Card Amount"
+          },
+          "pending_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Amount"
+          },
+          "paid_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid Count"
+          },
+          "cancelled_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled Count"
+          },
+          "pending_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "requires_reconciliation",
+          "total_amount",
+          "cash_amount",
+          "card_amount",
+          "refunded_amount",
+          "net_total_amount",
+          "net_cash_amount",
+          "net_card_amount",
+          "pending_amount",
+          "paid_count",
+          "cancelled_count",
+          "pending_count"
+        ],
+        "title": "DailyCurrencyStatItem"
+      },
       "DataTransferRequest": {
         "properties": {
           "source_user_id": {
@@ -85228,12 +86386,24 @@
             "type": "integer",
             "title": "Service Id"
           },
+          "target_visit_service_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Visit Service Id"
+          },
           "new_price": {
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 1000000000.0,
-                "exclusiveMinimum": 0.0
+                "maximum": 9999999999.99,
+                "minimum": 0.0
               },
               {
                 "type": "string",
@@ -92042,6 +93212,42 @@
         "title": "EmrVersionDataRequest",
         "description": "Request body for POST /emr/{emr_id}/versions/create."
       },
+      "EncounterBenefitDecision": {
+        "properties": {
+          "application_id": {
+            "type": "integer",
+            "title": "Application Id"
+          },
+          "invoice_id": {
+            "type": "integer",
+            "title": "Invoice Id"
+          },
+          "gross_total": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Gross Total"
+          },
+          "benefit_total": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Benefit Total"
+          },
+          "total_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "invoice_id",
+          "gross_total",
+          "benefit_total",
+          "total_amount"
+        ],
+        "title": "EncounterBenefitDecision"
+      },
       "EntryAction": {
         "properties": {
           "id": {
@@ -95307,6 +96513,17 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
           "method": {
             "type": "string",
             "title": "Method"
@@ -95360,6 +96577,67 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HourlyCurrencyStatItem": {
+        "properties": {
+          "hour": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Код валюты платежа; null означает неизвестную валюту"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count",
+            "description": "Количество; null при неполной разбивке"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount",
+            "description": "Точная сумма; null для неизвестной валюты"
+          },
+          "requires_reconciliation": {
+            "type": "boolean",
+            "title": "Requires Reconciliation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hour",
+          "currency",
+          "count",
+          "amount",
+          "requires_reconciliation"
+        ],
+        "title": "HourlyCurrencyStatItem"
       },
       "HourlyStatItem": {
         "properties": {
@@ -95647,6 +96925,204 @@
         ],
         "title": "InterpretLabResultsIntegrationRequest",
         "description": "Request body for POST /ai-integration/interpret-lab-results (legacy integration)."
+      },
+      "InvitationReissueRequest": {
+        "properties": {
+          "expected_patient_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Patient Id"
+          },
+          "expected_owner_generation": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Owner Generation"
+          },
+          "expected_context_epoch": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Context Epoch"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "telegram",
+              "pwa",
+              "phone"
+            ],
+            "title": "Channel"
+          },
+          "token": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 20,
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_patient_id",
+          "expected_owner_generation",
+          "expected_context_epoch",
+          "channel",
+          "token"
+        ],
+        "title": "InvitationReissueRequest"
+      },
+      "InvitationReissueResponse": {
+        "properties": {
+          "delivery_id": {
+            "type": "integer",
+            "title": "Delivery Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "unknown",
+              "sent",
+              "cancelled"
+            ],
+            "title": "State"
+          },
+          "idempotent_replay": {
+            "type": "boolean",
+            "title": "Idempotent Replay"
+          }
+        },
+        "type": "object",
+        "required": [
+          "delivery_id",
+          "state",
+          "idempotent_replay"
+        ],
+        "title": "InvitationReissueResponse"
+      },
+      "InvitationReissueReview": {
+        "properties": {
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "visit_date": {
+            "type": "string",
+            "title": "Visit Date"
+          },
+          "visit_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Time"
+          },
+          "owner_generation": {
+            "type": "integer",
+            "title": "Owner Generation"
+          },
+          "context_epoch": {
+            "type": "integer",
+            "title": "Context Epoch"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationReissueServiceItem"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "total_amount": {
+            "type": "number",
+            "title": "Total Amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "patient_id",
+          "patient_name",
+          "visit_date",
+          "visit_time",
+          "owner_generation",
+          "context_epoch",
+          "channel",
+          "services",
+          "total_amount",
+          "currency",
+          "token"
+        ],
+        "title": "InvitationReissueReview"
+      },
+      "InvitationReissueServiceItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "code",
+          "quantity",
+          "price",
+          "total"
+        ],
+        "title": "InvitationReissueServiceItem"
       },
       "InvoiceCreate": {
         "properties": {
@@ -106703,12 +108179,25 @@
             "title": "Invoice Id"
           },
           "amount": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
             "title": "Amount"
           },
           "payment_method": {
             "$ref": "#/components/schemas/PaymentMethod"
+          },
+          "client_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Request Id"
           },
           "reference_number": {
             "anyOf": [
@@ -106749,7 +108238,8 @@
         "required": [
           "invoice_id",
           "amount",
-          "payment_method"
+          "payment_method",
+          "client_request_id"
         ],
         "title": "PaymentCreate"
       },
@@ -106943,6 +108433,17 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
           },
           "method": {
             "type": "string",
@@ -108971,12 +110472,24 @@
             "type": "integer",
             "title": "Service Id"
           },
+          "target_visit_service_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Visit Service Id"
+          },
           "new_price": {
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 1000000000.0,
-                "exclusiveMinimum": 0.0
+                "maximum": 9999999999.99,
+                "minimum": 0.0
               },
               {
                 "type": "string",
@@ -115786,12 +117299,19 @@
             "minLength": 3,
             "title": "Reason",
             "description": "Причина возврата"
+          },
+          "client_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Request Id",
+            "description": "Постоянный ключ одной операции возврата"
           }
         },
         "type": "object",
         "required": [
           "amount",
-          "reason"
+          "reason",
+          "client_request_id"
         ],
         "title": "RefundRequest",
         "description": "Запрос на возврат средств"
@@ -115944,6 +117464,17 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
           },
           "refunded_amount": {
             "type": "string",
@@ -116978,6 +118509,154 @@
         "title": "ReorderQueueProfilesRequest",
         "description": "Request body for POST /registrar/queues/profiles/reorder.\n\nMaps profile_key (str) → display_order (int).\nExample: {\"cardiology\": 1, \"ecg\": 2, \"dermatology\": 3}"
       },
+      "RepeatConsultationAttestation": {
+        "properties": {
+          "doctor_user_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Doctor User Id"
+          },
+          "reviewed_record": {
+            "type": "boolean",
+            "title": "Reviewed Record"
+          },
+          "expected_generation": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Generation"
+          },
+          "review_expires_at": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Review Expires At"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doctor_user_id",
+          "reviewed_record",
+          "expected_generation",
+          "review_expires_at",
+          "token"
+        ],
+        "title": "RepeatConsultationAttestation"
+      },
+      "RepeatConsultationAttestationResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "visit_id"
+        ],
+        "title": "RepeatConsultationAttestationResponse"
+      },
+      "RepeatConsultationReviewRequest": {
+        "properties": {
+          "doctor_user_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Doctor User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doctor_user_id"
+        ],
+        "title": "RepeatConsultationReviewRequest"
+      },
+      "RepeatConsultationReviewResponse": {
+        "properties": {
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "current_doctor_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Doctor User Id"
+          },
+          "doctor_user_id": {
+            "type": "integer",
+            "title": "Doctor User Id"
+          },
+          "visit_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "evidence_generation": {
+            "type": "integer",
+            "title": "Evidence Generation"
+          },
+          "review_expires_at": {
+            "type": "integer",
+            "title": "Review Expires At"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "patient_id",
+          "doctor_id",
+          "current_doctor_user_id",
+          "doctor_user_id",
+          "visit_date",
+          "status",
+          "evidence_generation",
+          "review_expires_at",
+          "token"
+        ],
+        "title": "RepeatConsultationReviewResponse"
+      },
       "RepeatEligibilityCandidate": {
         "properties": {
           "service_id": {
@@ -117998,8 +119677,16 @@
           "idempotent_replay": {
             "type": "boolean",
             "title": "Idempotent Replay",
-            "description": "True, когда идентичный intent уже был зафиксирован в окне дедупликации и ответ перестроен из СОХРАНЁННОГО визита (второй визит/токен не создавались).",
+            "description": "True при авторизованном повторе ранее сохранённого намерения.",
             "default": false
+          },
+          "price_override_requests": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Price Override Requests"
           }
         },
         "type": "object",
@@ -118027,6 +119714,10 @@
             "anyOf": [
               {
                 "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -124143,9 +125834,35 @@
             "title": "Patient Id"
           },
           "amount": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+              }
+            ],
             "title": "Amount"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "client_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Request Id",
+            "description": "Один идентификатор команды для всех её повторов"
           },
           "visit_id": {
             "anyOf": [
@@ -124157,23 +125874,13 @@
               }
             ],
             "title": "Visit Id"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
           }
         },
         "type": "object",
         "required": [
           "patient_id",
-          "amount"
+          "amount",
+          "client_request_id"
         ],
         "title": "UseDepositRequest",
         "description": "Запрос на использование депозита для оплаты"
@@ -127056,7 +128763,14 @@
             "title": "Total Amount"
           },
           "currency": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Currency"
           },
           "confirmation_expires_at": {
@@ -127129,6 +128843,114 @@
           "total"
         ],
         "title": "VisitInfoServiceItem"
+      },
+      "VisitInvitationRecoveryResponse": {
+        "properties": {
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id"
+        ],
+        "title": "VisitInvitationRecoveryResponse"
+      },
+      "VisitInvitationStatusResponse": {
+        "properties": {
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "unknown",
+              "sent",
+              "cancelled",
+              "reissue_required"
+            ],
+            "title": "State"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "telegram",
+                  "pwa",
+                  "phone"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "confirmation_expired": {
+            "type": "boolean",
+            "title": "Confirmation Expired"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "state",
+          "channel",
+          "confirmation_expired"
+        ],
+        "title": "VisitInvitationStatusResponse"
+      },
+      "VisitInvitationTaskResponse": {
+        "properties": {
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "patient_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Phone"
+          },
+          "visit_date": {
+            "type": "string",
+            "title": "Visit Date"
+          },
+          "visit_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "patient_name",
+          "patient_phone",
+          "visit_date",
+          "visit_time"
+        ],
+        "title": "VisitInvitationTaskResponse"
       },
       "VisitOut": {
         "properties": {
@@ -129839,6 +131661,17 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
           },
           "method": {
             "type": "string",

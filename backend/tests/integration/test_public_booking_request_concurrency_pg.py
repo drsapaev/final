@@ -8,8 +8,11 @@ import time as time_module
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, time, timedelta
+from pathlib import Path
 
 import pytest
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -21,6 +24,7 @@ from app.api import deps
 from app.api.v1.endpoints import patient_portal as patient_portal_module
 from app.crud.clinic import update_weekly_schedule
 from app.db.base_class import Base
+from app.db.capability_namespace import capability_schema_name
 from app.main import app
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, Schedule
@@ -41,7 +45,12 @@ from app.services.public_booking_availability import PUBLIC_BOOKING_TIMEZONE
 from app.services.telegram_staff_action_adapter_service import (
     TelegramStaffActionAdapterService,
 )
+from tests._pg_admin_guard import is_local_admin_dsn
 from tests.conftest import mint_access_token
+from tests.integration.test_staff_confirmation_guard_pg import (
+    _module,
+    isolated_staff_guard_postgres,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -50,18 +59,20 @@ PATIENT_CONFIRMED_APPOINTMENTS = "/api/v1/patients/public-booking/appointments"
 PATIENT_PORTAL_BOOKING = "/api/v1/patients/booking"
 
 
+def _booking_test_url():
+    raw_url = os.environ.get("DATABASE_URL", "").strip()
+    if not is_local_admin_dsn(raw_url):
+        pytest.skip("public booking concurrency requires local disposable PostgreSQL")
+    url = make_url(raw_url)
+    ci_service = os.environ.get("CI") == "true" and url.database == "clinicdb"
+    if url.query or not (ci_service or (url.database or "").startswith("clinic_test")):
+        pytest.skip("use CI or an explicitly disposable clinic_test database")
+    return url
+
+
 @pytest.fixture
 def booking_request_pg_engine():
-    raw_url = os.environ.get("DATABASE_URL", "").strip()
-    if not raw_url:
-        pytest.skip("public booking concurrency proof requires PostgreSQL")
-    url = make_url(raw_url)
-    if url.get_backend_name() != "postgresql":
-        pytest.skip("public booking concurrency proof requires PostgreSQL")
-    if os.environ.get("CI", "").lower() != "true" and not (
-        url.database or ""
-    ).startswith("clinic_test"):
-        pytest.skip("use CI or an explicitly disposable clinic_test database")
+    url = _booking_test_url()
 
     schema = "test_booking_request_" + uuid.uuid4().hex
     admin_engine = create_engine(url, pool_pre_ping=True)
@@ -91,10 +102,84 @@ def booking_request_pg_engine():
         admin_engine.dispose()
 
 
+@pytest.fixture
+def booking_app_pg_engines(monkeypatch):
+    """Keep setup and inspection separate from the application's booking login."""
+    with isolated_staff_guard_postgres(_booking_test_url(), monkeypatch) as (owner, runtime, _):
+        root = Path(__file__).resolve().parents[3]
+        schema = owner.dialect.default_schema_name
+        quote = owner.dialect.identifier_preparer.quote_identifier
+        qualified, role = quote(schema), quote(runtime.url.username)
+        private = quote(capability_schema_name(schema))
+        reads = (
+            "doctors", "departments", "department_services", "schedules", "services", "queue_resources",
+            "clinic_settings", "appointments", "public_booking_requests",
+            "public_booking_request_events", "public_booking_request_notification_outbox",
+        )
+        inserts = (
+            "appointments", "public_booking_requests", "public_booking_request_events",
+            "public_booking_request_notification_outbox", "patient_access_audit_logs",
+        )
+        with owner.begin() as db:
+            db.exec_driver_sql(f"ALTER TABLE {qualified}.patients DROP COLUMN notification_owner_generation")
+            for revision in (
+                "0113_subject_ownership.py",
+                "0140_booking_patient_lock.py", "0141_confirmation_financial_trigger.py",
+            ):
+                migration = _module(root / "backend/alembic/versions" / revision)
+                migration.op = Operations(MigrationContext.configure(db, opts={"version_table_schema": schema}))
+                migration.upgrade()
+            expected_owner = db.scalar(text("SELECT CURRENT_USER"))
+            capability = db.scalar(text("""
+                SELECT pg_catalog.pg_get_userbyid(proowner) FROM pg_catalog.pg_proc
+                WHERE oid=pg_catalog.to_regprocedure(:function)
+            """), {"function": f"{private}.lock_confirmation_patient(pg_catalog.int4)"})
+            for table in reads:
+                db.exec_driver_sql(f"GRANT SELECT ON {qualified}.{table} TO {role}")
+            for table in inserts:
+                db.exec_driver_sql(f"GRANT INSERT ON {qualified}.{table} TO {role}")
+                sequence = db.scalar(text("SELECT pg_catalog.pg_get_serial_sequence(:table,'id')"), {
+                    "table": f"{qualified}.{table}",
+                })
+                if sequence:
+                    db.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {sequence} TO {role}")
+            for table in ("doctors", "departments", "services", "clinic_settings"):
+                db.exec_driver_sql(f"GRANT UPDATE (id) ON {qualified}.{table} TO {role}")
+            db.exec_driver_sql(f"GRANT UPDATE ON {qualified}.public_booking_requests TO {role}")
+            db.exec_driver_sql(f"GRANT SELECT (id) ON {qualified}.patient_access_audit_logs TO {role}")
+        provisioner = _module(root / "scripts/provision_confirmation_subject_role.py")
+        provisioner.provision(owner, schema, capability, runtime.url.username, expected_owner=expected_owner)
+        with runtime.connect() as db:
+            assert db.scalar(text(
+                "SELECT pg_catalog.has_any_column_privilege(CURRENT_USER, 'patients', 'UPDATE')"
+            )) is False
+        yield owner, runtime
+
+
+def _race_booking_writes(monkeypatch, method_name, submit, first_input, second_input):
+    """Start competing booking writes after separate authorization transactions."""
+    service = booking_request_service_module.PublicBookingRequestService
+    original = getattr(service, method_name)
+    first_ready = threading.Event()
+    writes = threading.Barrier(2)
+
+    def wait_before_write(self, *args, **kwargs):
+        first_ready.set()
+        writes.wait(timeout=10)
+        return original(self, *args, **kwargs)
+
+    with monkeypatch.context() as setup, ThreadPoolExecutor(max_workers=2) as executor:
+        setup.setattr(service, method_name, wait_before_write)
+        first = executor.submit(submit, first_input)
+        assert first_ready.wait(timeout=10), "First request did not pass authorization"
+        second = executor.submit(submit, second_input)
+        return first.result(timeout=15), second.result(timeout=15)
+
+
 def test_concurrent_different_keys_create_one_active_request(
-    booking_request_pg_engine,
+    booking_app_pg_engines, monkeypatch,
 ):
-    engine = booking_request_pg_engine
+    engine, runtime = booking_app_pg_engines
     unique = uuid.uuid4().hex[:12]
     with Session(engine) as db:
         doctor_user = User(
@@ -191,11 +276,10 @@ def test_concurrent_different_keys_create_one_active_request(
     previous_override = app.dependency_overrides.get(deps.get_db)
 
     def override_get_db():
-        with Session(engine) as db:
+        with Session(runtime) as db:
             yield db
 
     app.dependency_overrides[deps.get_db] = override_get_db
-    barrier = threading.Barrier(2)
     body = {
         "service_slug": service_slug,
         "doctor_slug": doctor_slug,
@@ -207,7 +291,6 @@ def test_concurrent_different_keys_create_one_active_request(
         with TestClient(app) as client:
 
             def submit(key: str):
-                barrier.wait(timeout=5)
                 return client.post(
                     PATIENT_REQUESTS,
                     headers={
@@ -217,10 +300,9 @@ def test_concurrent_different_keys_create_one_active_request(
                     json=body,
                 )
 
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                responses = list(
-                    executor.map(submit, (uuid.uuid4().hex, uuid.uuid4().hex))
-                )
+            responses = _race_booking_writes(
+                monkeypatch, "create_for_patient", submit, uuid.uuid4().hex, uuid.uuid4().hex,
+            )
     finally:
         if previous_override is None:
             app.dependency_overrides.pop(deps.get_db, None)
@@ -244,10 +326,10 @@ def test_concurrent_different_keys_create_one_active_request(
 
 
 def test_concurrent_confirmed_public_bookings_create_one_appointment_for_slot(
-    booking_request_pg_engine,
+    booking_app_pg_engines, monkeypatch,
 ):
     """The doctor slot lock allows only one confirmed appointment per interval."""
-    engine = booking_request_pg_engine
+    engine, runtime = booking_app_pg_engines
     unique = uuid.uuid4().hex[:12]
     with Session(engine) as db:
         doctor_user = User(
@@ -360,16 +442,14 @@ def test_concurrent_confirmed_public_bookings_create_one_appointment_for_slot(
     previous_override = app.dependency_overrides.get(deps.get_db)
 
     def override_get_db():
-        with Session(engine) as db:
+        with Session(runtime) as db:
             yield db
 
     app.dependency_overrides[deps.get_db] = override_get_db
-    barrier = threading.Barrier(2)
     try:
         with TestClient(app) as client:
 
             def submit(key: str):
-                barrier.wait(timeout=5)
                 return client.post(
                     PATIENT_CONFIRMED_APPOINTMENTS,
                     headers={
@@ -379,10 +459,10 @@ def test_concurrent_confirmed_public_bookings_create_one_appointment_for_slot(
                     json=body,
                 )
 
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                responses = list(
-                    executor.map(submit, (uuid.uuid4().hex, uuid.uuid4().hex))
-                )
+            responses = _race_booking_writes(
+                monkeypatch, "create_confirmed_appointment_for_patient",
+                submit, uuid.uuid4().hex, uuid.uuid4().hex,
+            )
     finally:
         if previous_override is None:
             app.dependency_overrides.pop(deps.get_db, None)
@@ -408,10 +488,10 @@ def test_concurrent_confirmed_public_bookings_create_one_appointment_for_slot(
 
 
 def test_concurrent_confirmed_bookings_cannot_exceed_patient_active_appointment_cap(
-    booking_request_pg_engine,
+    booking_app_pg_engines, monkeypatch,
 ):
     """Patient-row serialization keeps the five-future-appointment cap atomic."""
-    engine = booking_request_pg_engine
+    engine, runtime = booking_app_pg_engines
     unique = uuid.uuid4().hex[:12]
     with Session(engine) as db:
         doctor_user = User(
@@ -543,17 +623,15 @@ def test_concurrent_confirmed_bookings_cannot_exceed_patient_active_appointment_
     previous_override = app.dependency_overrides.get(deps.get_db)
 
     def override_get_db():
-        with Session(engine) as db:
+        with Session(runtime) as db:
             yield db
 
     app.dependency_overrides[deps.get_db] = override_get_db
-    barrier = threading.Barrier(2)
     try:
         with TestClient(app) as client:
 
             def submit(item: tuple[dict[str, str], str]):
                 body, key = item
-                barrier.wait(timeout=5)
                 return client.post(
                     PATIENT_CONFIRMED_APPOINTMENTS,
                     headers={
@@ -563,13 +641,10 @@ def test_concurrent_confirmed_bookings_cannot_exceed_patient_active_appointment_
                     json=body,
                 )
 
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                responses = list(
-                    executor.map(
-                        submit,
-                        [(body, uuid.uuid4().hex) for body in bodies],
-                    )
-                )
+            responses = _race_booking_writes(
+                monkeypatch, "create_confirmed_appointment_for_patient", submit,
+                (bodies[0], uuid.uuid4().hex), (bodies[1], uuid.uuid4().hex),
+            )
     finally:
         if previous_override is None:
             app.dependency_overrides.pop(deps.get_db, None)
@@ -701,10 +776,10 @@ def test_postgres_future_quota_excludes_terminal_and_elapsed_appointments(
 
 
 def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
-    booking_request_pg_engine, monkeypatch
+    booking_app_pg_engines, monkeypatch
 ):
     """The existing portal and public writer can reserve different slots together."""
-    engine = booking_request_pg_engine
+    engine, runtime = booking_app_pg_engines
     unique = uuid.uuid4().hex[:12]
     with Session(engine) as db:
         doctor_user = User(
@@ -862,7 +937,7 @@ def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
     previous_override = app.dependency_overrides.get(deps.get_db)
 
     def override_get_db():
-        with Session(engine) as db:
+        with Session(runtime) as db:
             yield db
 
     app.dependency_overrides[deps.get_db] = override_get_db
@@ -911,10 +986,10 @@ def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
 
 
 def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
-    booking_request_pg_engine, monkeypatch
+    booking_app_pg_engines, monkeypatch
 ):
     """Two requests for one slot serialize; only one becomes an appointment."""
-    engine = booking_request_pg_engine
+    engine, runtime = booking_app_pg_engines
     unique = uuid.uuid4().hex[:12]
     with Session(engine) as setup:
         doctor_user = User(
@@ -1033,7 +1108,7 @@ def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
     previous_override = app.dependency_overrides.get(deps.get_db)
 
     def override_get_db():
-        with Session(engine) as db:
+        with Session(runtime) as db:
             yield db
 
     app.dependency_overrides[deps.get_db] = override_get_db
@@ -1595,9 +1670,9 @@ def test_delete_cancels_linked_public_booking_appointment_and_keeps_link(
 
 
 def test_staff_confirmation_waits_for_service_update_and_uses_new_duration(
-    booking_request_pg_engine, monkeypatch
+    booking_app_pg_engines, monkeypatch
 ):
-    engine = booking_request_pg_engine
+    engine, runtime = booking_app_pg_engines
     unique = uuid.uuid4().hex[:12]
     with Session(engine) as setup:
         doctor_user = User(
@@ -1709,7 +1784,7 @@ def test_staff_confirmation_waits_for_service_update_and_uses_new_duration(
     previous_override = app.dependency_overrides.get(deps.get_db)
 
     def override_get_db():
-        with Session(engine) as db:
+        with Session(runtime) as db:
             yield db
 
     app.dependency_overrides[deps.get_db] = override_get_db

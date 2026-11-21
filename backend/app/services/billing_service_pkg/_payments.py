@@ -4,9 +4,24 @@ Split from billing_service.py.
 """
 from __future__ import annotations
 
+import math
+from decimal import Decimal
+
+from fastapi import HTTPException
+
 from app.services.billing_service_pkg._base import *  # noqa: F401, F403
 from app.services.billing_service_pkg._base import BillingServiceMixinBase
-from decimal import Decimal
+from app.services.money_input import MoneyInputError, parse_money
+
+
+def _legacy_invoice_amount(value: float | None) -> Decimal:
+    """Remove only binary float noise from historical invoice values."""
+    if value is None or not math.isfinite(value) or value < 0:
+        raise MoneyInputError("Invalid invoice amount")
+    rounded = round(value, 2)
+    if abs(value - rounded) > 2 * math.ulp(value):
+        raise MoneyInputError("Invoice amount is not exact to cents")
+    return parse_money(rounded)
 
 
 class PaymentsMixin(BillingServiceMixinBase):
@@ -383,14 +398,11 @@ class PaymentsMixin(BillingServiceMixinBase):
 
         # Устанавливаем paid_at если статус "paid"
         if new_status_lower == "paid" and not payment.paid_at:
-            payment.paid_at = self._get_local_timestamp_naive()
+            payment.paid_at = datetime.now(UTC)
 
-        # Обновляем метаданные если переданы
+        # Assign a new mapping so SQLAlchemy records the JSON change.
         if meta:
-            if payment.provider_data:
-                payment.provider_data.update(meta)
-            else:
-                payment.provider_data = meta
+            payment.provider_data = {**(payment.provider_data or {}), **meta}
 
         if commit:
             self.db.commit()
@@ -404,12 +416,15 @@ class PaymentsMixin(BillingServiceMixinBase):
     def record_payment(
         self,
         invoice_id: int,
-        amount: float,
+        amount: Decimal | float,
         payment_method: PaymentMethod,
         reference_number: str = None,
         description: str = None,
         created_by: int = None,
         current_user: Any = None,
+        *,
+        client_request_id: str | None = None,
+        commit: bool = True,
     ) -> Payment:
         """
         Записать платеж для счета.
@@ -417,15 +432,9 @@ class PaymentsMixin(BillingServiceMixinBase):
         Delegates payment creation to
         ``PaymentInvariantService.create_payment_for_visit(commit=False)``.
 
-        This provides:
-        - ``with_for_update()`` lock on Visit row (serializes concurrent payments)
-        - ``paid_amount`` vs ``total_cost`` check (prevents overpayment)
-        - Overpayment policy (allow as advance/deposit, logged at WARNING)
-        - ``IntegrityError`` defense-in-depth (degrades to 409)
-
-        The Invoice update logic (paid_amount, balance, status) is preserved
-        — ``create_payment_for_visit()`` does NOT touch Invoice, so we update
-        it here in the same transaction.
+        The shared financial preflight serializes receipts for the visit.
+        The legacy invoice is reread under its own lock, then updated in
+        the same transaction as the new receipt.
 
         Args:
             invoice_id: ID of the Invoice to record payment against.
@@ -437,6 +446,9 @@ class PaymentsMixin(BillingServiceMixinBase):
             current_user: The User object creating the payment (required for
                 PaymentInvariantService audit logging). If None, a lightweight
                 wrapper with .id=created_by is used for backward compatibility.
+            client_request_id: Operation key linking the payment to its receipt.
+            commit: Persist the receipt and the invoice together. HTTP callers
+                can validate their response before committing the transaction.
 
         Returns:
             Payment - созданный платеж
@@ -446,17 +458,22 @@ class PaymentsMixin(BillingServiceMixinBase):
             HTTPException: 400/409 from PaymentInvariantService (overpayment,
                 concurrent payment race, etc.).
         """
-        invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        if not invoice:
+        try:
+            exact_amount = parse_money(amount)
+        except MoneyInputError:
+            raise HTTPException(status_code=422, detail="Некорректная сумма платежа") from None
+        if exact_amount <= 0:
+            raise HTTPException(status_code=422, detail="Сумма платежа должна быть больше нуля")
+
+        reference = self.db.query(Invoice.visit_id).filter(Invoice.id == invoice_id).one_or_none()
+        if reference is None:
             raise ValueError("Счет не найден")
 
-        if not invoice.visit_id:
+        visit_id = reference.visit_id
+        if not visit_id:
             raise ValueError(
                 "Невозможно записать платеж: у счета нет связанного визита (invoice.visit_id)"
             )
-
-        # Генерируем номер платежа (используем как receipt_no)
-        payment_number = self._generate_payment_number()
 
         # Определяем валюту из настроек биллинга
         settings = self.get_billing_settings()
@@ -473,17 +490,6 @@ class PaymentsMixin(BillingServiceMixinBase):
                 f"payment_method must be PaymentMethod enum or string, got {type(payment_method)}"
             )
 
-        # Delegate to PaymentInvariantService for race-condition protection:
-        #   - with_for_update() on Visit row
-        #   - paid_amount vs total_cost check
-        #   - overpayment policy
-        #   - IntegrityError defense-in-depth
-        #
-        # commit=False because we need to update Invoice in the same transaction.
-        # The Visit lock is held until we commit at the end of this method.
-        #
-        # Note: create_payment_for_visit() sets status='paid' and paid_at automatically.
-        # It does not accept receipt_no and provider_payment_id, so we set them after.
         from app.services.payment_invariant_service import PaymentInvariantService
 
         # Build current_user object if only created_by (int) was provided
@@ -494,25 +500,53 @@ class PaymentsMixin(BillingServiceMixinBase):
             current_user = type("UserRef", (), {"id": None})()
 
         payment_service = PaymentInvariantService(self.db)
+        # Lock the complete financial group before the legacy invoice row.
+        # A concurrent receipt may have updated the invoice while we waited.
+        payment_service.preflight_payment_groups([visit_id])
+        invoice = (
+            self.db.query(Invoice)
+            .filter(Invoice.id == invoice_id)
+            .with_for_update(of=Invoice)
+            .populate_existing()
+            .one_or_none()
+        )
+        visit = self.db.get(Visit, visit_id, populate_existing=True)
+        if invoice is None or invoice.visit_id != visit_id or visit is None or invoice.patient_id != visit.patient_id:
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail="Контекст счёта требует сверки")
+
+        try:
+            total = _legacy_invoice_amount(invoice.total_amount)
+            paid = _legacy_invoice_amount(invoice.paid_amount)
+        except MoneyInputError:
+            raise HTTPException(status_code=409, detail="Суммы счёта требуют сверки") from None
+        if invoice.status in {InvoiceStatus.CANCELLED, InvoiceStatus.REFUNDED}:
+            raise HTTPException(status_code=409, detail="Счёт закрыт для оплаты")
+        if paid > total:
+            raise HTTPException(status_code=409, detail="Суммы счёта требуют сверки")
+        if exact_amount > total - paid:
+            raise HTTPException(status_code=400, detail="Сумма платежа превышает остаток счёта")
+
         payment = payment_service.create_payment_for_visit(
-            visit_id=invoice.visit_id,
-            amount=Decimal(str(amount)),
+            visit_id=visit_id,
+            amount=exact_amount,
             method=method_str,
             note=description,
             current_user=current_user,
             currency=currency,
             provider=None,
+            allow_overpayment=False,
+            client_request_id=client_request_id,
             commit=False,
         )
 
         # Set fields that create_payment_for_visit() doesn't accept
         # (receipt_no and provider_payment_id were in the deprecated method)
-        payment.receipt_no = payment_number
+        payment.receipt_no = self._generate_payment_number(payment.id)
         payment.provider_payment_id = reference_number
 
-        # Обновляем статус счета (preserved from original record_payment)
-        invoice.paid_amount += amount
-        invoice.balance = invoice.total_amount - invoice.paid_amount
+        invoice.paid_amount = float(paid + exact_amount)
+        invoice.balance = float(total - paid - exact_amount)
 
         if invoice.balance <= 0:
             invoice.status = InvoiceStatus.PAID
@@ -520,8 +554,9 @@ class PaymentsMixin(BillingServiceMixinBase):
         elif invoice.paid_amount > 0:
             invoice.status = InvoiceStatus.PARTIALLY_PAID
 
-        self.db.commit()
-        self.db.refresh(payment)
+        if commit:
+            self.db.commit()
+            self.db.refresh(payment)
 
         return payment
 

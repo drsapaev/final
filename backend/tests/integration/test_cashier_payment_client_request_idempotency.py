@@ -28,10 +28,19 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from app.models.patient import Patient
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentClientRequest
+from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services import payment_client_requests
+from tests.conftest import mint_access_token
+from tests.integration.test_refund_cross_channel_budget import (
+    _install_cashier_receipt_policy,
+)
+from tests.integration.test_staff_confirmation_guard_pg import guarded_pg  # noqa: F401
 
 pytestmark = pytest.mark.integration
 
@@ -47,11 +56,14 @@ def _make_patient(db_session, *, phone="+998900550011"):
 
 
 def _make_visit(db_session, patient, amount, *, name="SYNTHETIC-csh-fe-008-idem"):
-    visit = Visit(patient_id=patient.id, status="open", discount_mode="none")
+    visit = Visit(
+        patient_id=patient.id, status="open", discount_mode="none",
+        confirmation_context_epoch=1,  # This metadata fixture omits migration 0102.
+    )
     db_session.add(visit)
     db_session.flush()
     db_session.add(
-        VisitService(visit_id=visit.id, service_id=1, name=name, qty=1, price=amount)
+        VisitService(visit_id=visit.id, service_id=1, name=name, qty=1, price=amount, currency="UZS")
     )
     db_session.commit()
     return visit
@@ -64,6 +76,20 @@ def _paid_rows(db_session, visit):
         .filter(Payment.status.in_(["paid", "completed"]))
         .all()
     )
+
+
+@pytest.fixture
+def other_cashier_headers(db_session):
+    cashier = User(
+        username=f"SYNTHETIC-rfin-cashier-{uuid4().hex}",
+        hashed_password="unused-by-test",
+        role="Cashier",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(cashier)
+    db_session.commit()
+    return {"Authorization": f"Bearer {mint_access_token(cashier)}"}
 
 
 def test_same_client_request_id_replays_single_payment_without_second_row(
@@ -160,6 +186,26 @@ def test_replay_returns_stored_result_even_after_visit_fully_settled(
     assert len(_paid_rows(db_session, visit)) == 2
 
 
+def test_receipt_with_missing_owner_requires_reconciliation(client, db_session, admin_auth_headers):
+    patient = _make_patient(db_session)
+    visit = _make_visit(db_session, patient, 100000)
+    key = str(uuid4())
+    body = {"visit_id": visit.id, "amount": 40000, "method": "cash", "client_request_id": key}
+    first = client.post(SINGLE_URL, headers=admin_auth_headers, json=body)
+    assert first.status_code == 200, first.text
+
+    receipt = db_session.query(PaymentClientRequest).filter_by(client_request_id=key).one()
+    receipt.created_by = None
+    db_session.commit()
+
+    retry = client.post(SINGLE_URL, headers=admin_auth_headers, json=body)
+    assert retry.status_code == 409, retry.text
+    assert retry.json()["detail"]["reason"] == "client_request_id_owner_unverified"
+    assert db_session.query(PaymentClientRequest).filter_by(client_request_id=key).count() == 1
+    [payment] = _paid_rows(db_session, visit)
+    assert payment.id == first.json()["id"] and payment.amount == Decimal("40000")
+
+
 def test_grouped_same_client_request_id_replays_without_second_allocation(
     client, db_session, admin_auth_headers
 ):
@@ -187,6 +233,33 @@ def test_grouped_same_client_request_id_replays_without_second_allocation(
         .count()
     )
     assert total_rows == 2, f"grouped retry must not re-allocate, got {total_rows} rows"
+
+
+def test_grouped_receipt_failure_rolls_back_and_redacts_internal_details(
+    client, db_session, admin_auth_headers, monkeypatch, caplog,
+):
+    patient = _make_patient(db_session)
+    visit = _make_visit(db_session, patient, 100000)
+    key = str(uuid4())
+    diagnostic = "SYNTHETIC-PRIVATE-ALLOCATION-DIAGNOSTIC"
+
+    def fail_receipt(*args, **kwargs):
+        raise RuntimeError(diagnostic)
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.cashier._payments.commit_with_client_request",
+        fail_receipt,
+    )
+    response = client.post(GROUPED_URL, headers=admin_auth_headers, json={
+        "visit_ids": [visit.id], "amount": 40000, "method": "cash", "client_request_id": key,
+    })
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Grouped cashier payment allocation failed"}
+    assert "Grouped cashier payment allocation failed error_type=RuntimeError" in caplog.text
+    assert diagnostic not in caplog.text
+    assert not _paid_rows(db_session, visit)
+    assert db_session.query(PaymentClientRequest).filter_by(client_request_id=key).count() == 0
 
 
 def test_grouped_missing_client_request_id_keeps_legacy_behavior(
@@ -225,54 +298,21 @@ def test_cross_endpoint_key_reuse_is_rejected(
     assert cross.status_code == 409, cross.text
 
 
-def test_concurrent_duplicate_recovers_into_replay(
-    client, db_session, admin_auth_headers, monkeypatch
+@pytest.mark.parametrize("same_owner", [True, False], ids=["same-owner", "different-owner"])
+def test_concurrent_duplicate_checks_receipt_owner(
+    client, db_session, admin_auth_headers, other_cashier_headers, monkeypatch, same_owner
 ):
-    """IntegrityError on the dedup insert must recover into a replay.
-
-    Simulates the lost race: another request with the same key committed
-    first (its intent row exists), but this request's pre-check missed it
-    (both checked before either committed). The duplicate insert fails the
-    unique constraint at commit; the endpoint must roll back its payment,
-    re-read the winner's stored response and replay it — one row, 200.
-    """
-    from app.api.v1.endpoints.cashier import _payments as payments_module
-    from app.models.payment import PaymentClientRequest
-
+    """A conflicting receipt insert rolls back and keeps replay owner-bound."""
     patient = _make_patient(db_session, phone="+998900550018")
     visit = _make_visit(db_session, patient, 100000)
     key = str(uuid4())
-
-    # The "winner": payment + intent row already committed.
-    winner = Payment(
-        visit_id=visit.id,
-        amount=Decimal("40000"),
-        method="cash",
-        status="paid",
-        client_request_id=key,
-    )
-    db_session.add(winner)
-    db_session.add(PaymentClientRequest(
-        client_request_id=key,
-        endpoint="single",
-        response_payload={
-            "id": 424242,
-            "visit_id": visit.id,
-            "patient_id": patient.id,
-            "amount": "40000",
-            "method": "cash",
-            "status": "paid",
-            "created_at": "2026-11-04T00:00:00Z",
-            "paid_at": "2026-11-04T00:00:00Z",
-            "note": None,
-        },
-        created_by=None,
-    ))
-    db_session.commit()
+    body = {"visit_id": visit.id, "amount": 40000, "method": "cash", "client_request_id": key}
+    first = client.post(SINGLE_URL, headers=admin_auth_headers, json=body)
+    assert first.status_code == 200, first.text
 
     # Both racers missed the row before either committed — but the
     # recovery re-read (after the IntegrityError) must see the winner.
-    real_find = payments_module._find_payment_client_request
+    real_find = payment_client_requests.find_payment_client_request
     lookup_calls = {"n": 0}
 
     def miss_only_the_precheck(db_session_arg, key_arg):
@@ -281,21 +321,70 @@ def test_concurrent_duplicate_recovers_into_replay(
             return None
         return real_find(db_session_arg, key_arg)
 
-    monkeypatch.setattr(
-        payments_module, "_find_payment_client_request", miss_only_the_precheck
-    )
+    monkeypatch.setattr(payment_client_requests, "find_payment_client_request", miss_only_the_precheck)
 
-    response = client.post(SINGLE_URL, headers=admin_auth_headers, json={
-        "visit_id": visit.id, "amount": 40000, "method": "cash",
-        "client_request_id": key,
-    })
-    assert response.status_code == 200, response.text
-    assert response.json()["id"] == 424242, "must replay the winner's stored response"
+    headers = admin_auth_headers if same_owner else other_cashier_headers
+    response = client.post(SINGLE_URL, headers=headers, json=body)
+    assert lookup_calls["n"] == 2
+    if same_owner:
+        assert response.status_code == 200, response.text
+        assert response.json() == first.json()
+    else:
+        assert response.status_code == 409, response.text
+        assert response.json()["detail"]["reason"] == "client_request_id_owner_mismatch"
 
     db_session.expire_all()
     rows = _paid_rows(db_session, visit)
     assert len(rows) == 1, "the losing racer's payment must be rolled back"
     assert rows[0].client_request_id == key
+
+
+@pytest.mark.parametrize("endpoint", ["single", "grouped"])
+def test_postgres_receipt_conflict_rolls_back_under_the_runtime_role(guarded_pg, endpoint):
+    owner, runtime, ids = guarded_pg
+    with owner.begin() as connection:
+        _install_cashier_receipt_policy(
+            connection, owner.dialect.default_schema_name, runtime.url.username,
+        )
+
+    key = str(uuid4())
+    rolled_back_key = str(uuid4())
+    payload = {"id": 1, "status": "paid"}
+    receipt = {
+        "client_request_id": key,
+        "endpoint": endpoint,
+        "request_fingerprint": "a" * 64,
+        "response_payload": payload,
+    }
+    with Session(runtime) as winner:
+        assert payment_client_requests.commit_with_client_request(winner, created_by=ids["stage"], **receipt) is None
+
+    with Session(runtime) as other:
+        other.add(PaymentClientRequest(
+            client_request_id=rolled_back_key,
+            endpoint=endpoint,
+            response_payload={"id": 2},
+            created_by=ids["confirm"],
+        ))
+        with pytest.raises(HTTPException) as denied:
+            payment_client_requests.commit_with_client_request(other, created_by=ids["confirm"], **receipt)
+        assert denied.value.status_code == 409
+        assert denied.value.detail["reason"] == "client_request_id_owner_mismatch"
+
+    with Session(runtime) as retry:
+        assert payment_client_requests.commit_with_client_request(retry, created_by=ids["stage"], **receipt) == payload
+        [stored] = retry.query(PaymentClientRequest).all()
+        assert stored.client_request_id == key
+        assert stored.created_by == ids["stage"]
+
+    with Session(owner) as archive:
+        [stored] = archive.query(PaymentClientRequest).all()
+        stored.created_by = None
+        archive.commit()
+    with Session(runtime) as retry, pytest.raises(HTTPException) as unknown:
+        payment_client_requests.commit_with_client_request(retry, created_by=ids["stage"], **receipt)
+    assert unknown.value.status_code == 409
+    assert unknown.value.detail["reason"] == "client_request_id_owner_unverified"
 
 
 def test_non_uuid_client_request_id_is_rejected(
@@ -597,14 +686,12 @@ def test_same_key_different_grouped_visit_set_is_rejected(
     assert len(visit_c_rows) == 0, "refused replay must not touch visit_c"
 
 
-def test_same_key_from_another_user_is_rejected(client, db_session, admin_auth_headers):
+def test_same_key_from_another_user_is_rejected(
+    client, db_session, admin_auth_headers, other_cashier_headers
+):
     """RETRO-FIN-001: the replay path is owner-bound — another authorized
     account replaying someone else's key gets 409, not the stored payment
     metadata (the audited missing request-owner check)."""
-    from app.core.security import get_password_hash
-    from app.models.user import User
-    from tests.conftest import mint_access_token
-
     patient = _make_patient(db_session, phone="+998900550028")
     visit = _make_visit(db_session, patient, 100000, name="SYNTHETIC-rfin-L")
     key = str(uuid4())
@@ -621,23 +708,9 @@ def test_same_key_from_another_user_is_rejected(client, db_session, admin_auth_h
     )
     assert first.status_code == 200, first.text
 
-    other_cashier = User(
-        username="rfin_other_cashier",
-        email="rfin_other_cashier@test.com",
-        full_name="Other Cashier",
-        hashed_password=get_password_hash("other-cashier-pass-123"),
-        role="Cashier",
-        is_active=True,
-        is_superuser=False,
-    )
-    db_session.add(other_cashier)
-    db_session.commit()
-    db_session.refresh(other_cashier)
-    other_headers = {"Authorization": f"Bearer {mint_access_token(other_cashier)}"}
-
     other_user_replay = client.post(
         SINGLE_URL,
-        headers=other_headers,
+        headers=other_cashier_headers,
         json={
             "visit_id": visit.id,
             "amount": 40000,

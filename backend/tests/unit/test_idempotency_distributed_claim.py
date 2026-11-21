@@ -176,9 +176,9 @@ class FakeRedis:
 
 def auth_headers(sub: str = "1") -> dict[str, str]:
     """Bearer token for a verified principal (Codex R3 #3092 P1)."""
-    from app.core.security import create_access_token
+    from app.api.deps import create_access_token
 
-    return {"Authorization": f"Bearer {create_access_token(sub)}"}
+    return {"Authorization": f"Bearer {create_access_token({'sub': sub})}"}
 
 
 def nkey(sub: str, key: str, kind: str, path: str = "/echo") -> str:
@@ -222,11 +222,15 @@ def _make_app(counter: dict, call_next_error: Exception | None = None) -> FastAP
         counter["calls"] += 1
         return {"ok": True, "calls": counter["calls"]}
 
+    _echo.idempotency_replay_global_roles = ("Admin", "Registrar", "Doctor", "Patient")
+
     @app.post("/cart-like")
     async def _cart_like(_policy: None = Depends(_policy_dep)) -> dict[str, Any]:
         # /registrar/cart accepts BOTH Admin and Registrar (_cart.py:14-18)
         counter["calls"] += 1
         return {"ok": True, "calls": counter["calls"]}
+
+    _cart_like.idempotency_replay_global_roles = ("Admin", "Registrar")
 
     @app.post("/inline-auth")
     async def _inline_auth() -> Any:
@@ -815,13 +819,14 @@ def test_principal_authorization_check_fails_closed(fake_redis, monkeypatch):
     assert _check_principal_authorized_sync(request, None, None, None)[0] is False
 
 
-def test_authorization_resolves_through_dependency_override():
+def test_authorization_resolves_through_dependency_override(monkeypatch):
     """The check must query the SAME DB the endpoint authenticates against:
     when the app overrides get_db (test world), the middleware follows the
     override instead of opening a second connection to another database."""
     from types import SimpleNamespace
 
     from app.api.deps import get_db
+    from app.db import trusted_schema
     from app.middleware.idempotency_middleware import _check_principal_authorized_sync
 
     class SessionSpy:
@@ -833,6 +838,22 @@ def test_authorization_resolves_through_dependency_override():
             # user found, active, not blacklisted, role Registrar, not superuser
             return SimpleNamespace(first=lambda: (7, True, "Registrar", False, False, False))
 
+        def get_bind(self):
+            return SimpleNamespace(dialect=SimpleNamespace(name="synthetic"))
+
+        def query(self, *_args):
+            self.used = True
+            return self
+
+        def filter(self, *_args):
+            return self
+
+        def with_for_update(self, **_kwargs):
+            return self
+
+        def first(self):
+            return (7,)
+
     class Override:
         def __init__(self) -> None:
             self.session = SessionSpy()
@@ -841,6 +862,7 @@ def test_authorization_resolves_through_dependency_override():
             yield self.session
 
     override = Override()
+    monkeypatch.setattr(trusted_schema, "pin_application_schema", lambda *_a, **_k: None)
     request = SimpleNamespace(app=SimpleNamespace(dependency_overrides={get_db: override}))
     authorized, role, is_superuser = _check_principal_authorized_sync(request, 7, None, None)
     assert authorized is True
@@ -881,6 +903,7 @@ def test_login_and_refresh_token_shapes_share_one_namespace(two_workers, monkeyp
 
     login_payload = {
         "sub": "1",
+        "jti": "SYNTHETIC-login-session",
         "exp": datetime.now(UTC) + timedelta(minutes=5),
     }
     login_token = pyjwt.encode(login_payload, settings.SECRET_KEY, algorithm="HS256")
@@ -1057,8 +1080,8 @@ def test_role_change_to_unauthorized_role_refuses_but_keeps_snapshot(two_workers
         idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Doctor", False)
     )
     second = client2.post("/cart-like", headers={**h1, "Idempotency-Key": key})
-    assert second.status_code == 200  # fell through (the endpoint 403s in production)
-    assert counters["w2"]["calls"] == 1, "policy-refused role must not receive the cached response"
+    assert second.status_code == 403
+    assert counters["w2"]["calls"] == 0, "policy-refused role must not execute or receive the cached response"
 
     # Re-promoted → the SAME snapshot replays (retention, not eviction).
     monkeypatch.setattr(
@@ -1066,7 +1089,7 @@ def test_role_change_to_unauthorized_role_refuses_but_keeps_snapshot(two_workers
     )
     third = client2.post("/cart-like", headers={**h1, "Idempotency-Key": key})
     assert third.status_code == 200
-    assert counters["w2"]["calls"] == 1, "re-promoted principal replays the retained snapshot"
+    assert counters["w2"]["calls"] == 0, "re-promoted principal replays the retained snapshot"
 
 
 def test_superuser_replays_across_role_change(two_workers, monkeypatch):
@@ -1134,9 +1157,9 @@ def test_role_change_does_not_bypass_inline_authorization(two_workers, monkeypat
     assert first.status_code == 200
     assert counters["w1"]["inline"]["calls"] == 1
 
-    # Same-role replay still works (R4 fallback: unchanged role label).
+    # The inline resource policy is unknown even when the role is unchanged.
     same_role = client2.post("/inline-auth", headers={**h1, "Idempotency-Key": key})
-    assert same_role.status_code == 200
+    assert same_role.status_code == 409
     assert counters["w2"]["inline"]["calls"] == 0, (
         "same-role replay must not re-execute the handler"
     )
@@ -1149,13 +1172,8 @@ def test_role_change_does_not_bypass_inline_authorization(two_workers, monkeypat
     counters["w2"]["inline"]["allowed"] = False
 
     second = client2.post("/inline-auth", headers={**h1, "Idempotency-Key": key})
-    assert second.status_code == 403, (
-        "empty allowed set must NOT authorize a role-changed replay — "
-        "the inline authorization must re-run"
-    )
-    assert counters["w2"]["inline"]["calls"] == 1, (
-        "the handler (inline authorization) must have re-executed"
-    )
+    assert second.status_code == 409
+    assert counters["w2"]["inline"]["calls"] == 0
     assert "patient_name" not in second.text, (
         "the cached Registrar response must not be exposed to the Cashier role"
     )
@@ -1184,52 +1202,33 @@ def test_role_change_with_unknown_policy_blocks_replay(two_workers, monkeypatch)
         idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Doctor", False)
     )
     second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert second.status_code == 200  # re-executed under the new role
-    assert counters["w2"]["calls"] == 1, (
-        "unknown policy + changed role → conservative re-execution, no replay"
-    )
+    assert second.status_code == 409
+    assert counters["w2"]["calls"] == 0
 
-    # Each further same-role retry replays the response stored under the
-    # CURRENT role binding (no endless refusals, no duplicate executions)
+    # Repeated attempts remain non-executing and preserve the original outcome.
     third = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert third.status_code == 200
-    assert counters["w2"]["calls"] == 1
+    assert third.status_code == 409
+    assert counters["w2"]["calls"] == 0
 
 
 def test_endpoint_allowed_roles_resolves_matched_route():
-    """Codex R6 #3092 (P1): the policy resolver walks the app router, matches
-    the request scope against the routes and unions the published
-    required_roles of the matched route's dependencies; an unrestricted
-    route resolves to an empty frozenset (any authenticated principal)."""
+    """Resolve the handler's explicit contract through a nested router."""
     from types import SimpleNamespace
 
+    from fastapi import APIRouter
+
     middleware = IdempotencyMiddleware(app=None)
+    app = FastAPI()
+    router = APIRouter(prefix="/nested")
 
-    class _Route:
-        def __init__(self, path: str, roles) -> None:
-            self.path = path
-            self._roles = roles
+    @router.post("/cart-like")
+    async def endpoint():
+        return {"ok": True}
 
-        def matches(self, scope):
-            from starlette.routing import Match
-
-            if scope.get("path") == self.path and scope.get("method") == "POST":
-                return Match.FULL, {}
-            return Match.NONE, {}
-
-        @property
-        def dependant(self):
-            dep = SimpleNamespace(call=_policy_dep)
-            return SimpleNamespace(dependencies=[dep])
-
-    class _App:
-        def __init__(self, routes) -> None:
-            self.router = SimpleNamespace(routes=routes)
-
-    request = SimpleNamespace(scope={"path": "/cart-like", "method": "POST"})
-    app = _App([
-        _Route("/cart-like", _policy_dep.required_roles),
-    ])
+    endpoint.idempotency_replay_global_roles = ("Admin", "Registrar")
+    app.include_router(router, prefix="/v1")
+    request = SimpleNamespace(scope={"type": "http", "path": "/v1/nested/cart-like",
+                                     "root_path": "", "method": "POST"})
     request.scope["app"] = app
     assert middleware._endpoint_allowed_roles(request) == frozenset({"admin", "registrar"})
 
@@ -1382,7 +1381,7 @@ def test_replay_refused_after_owner_revocation_even_when_name_is_reused(two_work
 
 def create_canonical_token(sub: str, username: str) -> str:
     """A canonical 2FA-style token: numeric sub AND username claim."""
-    from app.core.security import create_access_token
+    from app.api.deps import create_access_token
 
     return create_access_token({"sub": sub, "username": username})
 
@@ -2968,7 +2967,7 @@ def test_relinked_card_refused_after_invalid_key_flood(two_workers, monkeypatch)
         user_id or 1
     )
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -2988,6 +2987,7 @@ def test_relinked_card_refused_after_invalid_key_flood(two_workers, monkeypatch)
         counter["calls"] += 1
         return {"ok": True}
 
+    _booking_like.idempotency_replay_global_roles = ("Patient",)
     client = TC(app, raise_server_exceptions=False)
     origin_ns = IdempotencyMiddleware._namespace(1, "POST:/booking-like")
     key = "relink-flood-1"
@@ -3000,7 +3000,7 @@ def test_relinked_card_refused_after_invalid_key_flood(two_workers, monkeypatch)
         # The durable successful binding exists locally AND in Redis.
         assert (origin_ns, key) in idem_module._local_scope_bindings
         pscope_key = f"idem:{origin_ns}:{key}:pscope"
-        assert fake_redis.store.get(pscope_key, "").startswith("patient:7|")
+        assert fake_redis.store.get(pscope_key, "").startswith("patient:1:7|")
 
         # The flood: 120 unique keys that all end in a KNOWN non-2xx — 120
         # >> the 50-entry bound, the exact round-6 eviction vector.
@@ -3030,7 +3030,7 @@ def test_relinked_card_refused_after_invalid_key_flood(two_workers, monkeypatch)
 
         # The account is re-linked to card B; the same key must refuse.
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-            "patient:8",
+            "patient:1:8",
             False,
             True,
         )
@@ -3040,7 +3040,7 @@ def test_relinked_card_refused_after_invalid_key_flood(two_workers, monkeypatch)
         assert counter["calls"] == 1, (
             "one logical submit — the re-linked card never gets a second record"
         )
-        assert fake_redis.store.get(pscope_key, "").startswith("patient:7|")
+        assert fake_redis.store.get(pscope_key, "").startswith("patient:1:7|")
     finally:
         idem_module._patient_replay_policy_sync = saved_policy
         idem_module._check_principal_authorized_sync = saved_auth
@@ -3063,7 +3063,7 @@ def test_patient_outcome_replays_atomically_and_survives_local_eviction(
     client1, client2, counters, fake_redis = two_workers
     saved_policy = idem_module._patient_replay_policy_sync
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -3079,7 +3079,7 @@ def test_patient_outcome_replays_atomically_and_survives_local_eviction(
 
         # The atomic entry carries scope + snapshot (never a bare binding).
         entry = idem_module._local_scope_bindings.get((origin_ns, key))
-        assert entry is not None and entry[1] == "patient:7"
+        assert entry is not None and entry[1] == "patient:1:7"
         assert entry[2] is not None, "the snapshot is attached to the binding"
 
         # Same-card retry on a COLD worker replays through the distributed
@@ -3095,7 +3095,7 @@ def test_patient_outcome_replays_atomically_and_survives_local_eviction(
 
         # The re-linked card is STILL refused — the durable Redis binding.
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-            "patient:8",
+            "patient:1:8",
             False,
             True,
         )
@@ -3106,7 +3106,7 @@ def test_patient_outcome_replays_atomically_and_survives_local_eviction(
 
         # And the SAME card replays from Redis — never re-executes.
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-            "patient:7",
+            "patient:1:7",
             False,
             True,
         )
@@ -3135,7 +3135,7 @@ def test_scope_binding_store_stays_incremental_after_fill(monkeypatch):
         # with an immediately-expiring TTL the very set() that wrote the
         # entry purges it again (no full sweep needed).
         idem_module._CACHE_TTL_SECONDS = -1
-        idem_module._local_scope_binding_set("ns", "expired-1", "patient:1")
+        idem_module._local_scope_binding_set("ns", "expired-1", "patient:1:1")
         assert ("ns", "expired-1") not in idem_module._local_scope_bindings, (
             "expired entries are reclaimed by the bounded-budget purge"
         )
@@ -3147,7 +3147,7 @@ def test_scope_binding_store_stays_incremental_after_fill(monkeypatch):
         # A flood of unique keys at the bound: the store stays bounded and
         # the heap is compacted to the live set (no stale-record growth).
         for i in range(300):
-            idem_module._local_scope_binding_set("ns", f"f{i}", "patient:1")
+            idem_module._local_scope_binding_set("ns", f"f{i}", "patient:1:1")
         assert len(idem_module._local_scope_bindings) <= 50
         assert len(idem_module._local_scope_bindings_expiry) <= len(
             idem_module._local_scope_bindings
@@ -3157,7 +3157,7 @@ def test_scope_binding_store_stays_incremental_after_fill(monkeypatch):
         assert (_live_expires, ("ns", "f299")) in idem_module._local_scope_bindings_expiry
         # The newest entries are alive, the oldest evicted (LRU intact).
         assert idem_module._local_scope_binding_get("ns", "f0") is None
-        assert idem_module._local_scope_binding_get("ns", "f299") == "patient:1"
+        assert idem_module._local_scope_binding_get("ns", "f299") == "patient:1:1"
     finally:
         idem_module._CACHE_TTL_SECONDS = saved_ttl
         idem_module._local_scope_bindings.clear()
@@ -3198,11 +3198,7 @@ def test_store_response_reports_confirmed_writes(fake_redis):
 
 
 def test_pre_deploy_legacy_outcome_replays_and_migrates(two_workers):
-    """Rollout compatibility: the namespace became operation-scoped in
-    #3340, but outcomes committed by the PREVIOUS deployment live under the
-    user-only hash for up to 24h. A same-key retry after deploy must replay
-    that committed outcome (never re-execute the write) and migrate it to
-    the current namespace so later replays resolve without the legacy read."""
+    """A legacy namespace outcome with matching operation evidence replays."""
     from starlette.responses import Response
 
     client1, client2, counters, fake_redis = two_workers
@@ -3221,6 +3217,7 @@ def test_pre_deploy_legacy_outcome_replays_and_migrates(two_workers):
         ),
         payload_hash=idem_module.payload_hash(b""),
         principal_role="Registrar",
+        operation_scope="POST:/echo",
     )
     assert _legacy_nkey("1", key, "resp") in fake_redis.store
 
@@ -3237,6 +3234,27 @@ def test_pre_deploy_legacy_outcome_replays_and_migrates(two_workers):
     assert nkey("1", key, "resp") in fake_redis.store, (
         "the legacy outcome must migrate so subsequent replays skip the legacy read"
     )
+
+
+@pytest.mark.parametrize("in_flight", [False, True])
+def test_unstamped_legacy_outcome_is_preserved_for_reconciliation(two_workers, in_flight):
+    from starlette.responses import Response
+
+    _client1, client2, counters, fake_redis = two_workers
+    key = "legacy-unknown-operation"
+    legacy_ns = IdempotencyMiddleware._namespace(1)
+    claim = idem_module._distributed_claim
+    claim.store_response(legacy_ns, key, Response(content=b'{"private":"SYNTHETIC"}', status_code=200),
+                         payload_hash=idem_module.payload_hash(b""), principal_role="Registrar")
+    if in_flight:
+        assert fake_redis.set(_legacy_nkey("1", key, "claim"), "SYNTHETIC-old-worker", nx=True, ex=90)
+    response = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+    assert response.status_code == 409
+    assert response.json()["code"] == "idempotency_reconciliation_required"
+    assert "private" not in response.text
+    assert counters["w2"]["calls"] == 0
+    assert _legacy_nkey("1", key, "resp") in fake_redis.store
+    assert nkey("1", key, "resp") not in fake_redis.store
 
 
 def test_pre_deploy_legacy_intent_refused_conservatively(two_workers):
@@ -3304,7 +3322,7 @@ def test_patient_scope_principal_skips_legacy_reconciliation(two_workers):
     # This worker resolves an ACTIVE patient card (round-3 policy hook).
     saved_policy = idem_module._patient_replay_policy_sync
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:5",
+        "patient:1:5",
         False,
         True,
     )
@@ -3332,9 +3350,9 @@ def test_scope_binding_refuses_relinked_card_across_workers(two_workers):
 
     saved_policy = idem_module._patient_replay_policy_sync
     try:
-        # Card A: the booking commits, binding written (patient:7).
+        # Card A: the booking commits, binding written (patient:1:7).
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-            "patient:7",
+            "patient:1:7",
             False,
             True,
         )
@@ -3345,12 +3363,12 @@ def test_scope_binding_refuses_relinked_card_across_workers(two_workers):
         origin_ns = IdempotencyMiddleware._namespace(1, "POST:/echo")
         assert fake_redis.store.get(
             f"idem:{origin_ns}:{key}:pscope", ""
-        ).startswith("patient:7|")
+        ).startswith("patient:1:7|")
 
         # The account is re-linked to card B; the retry (same key + body)
         # lands on ANOTHER worker — the binding refuses it there too.
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-            "patient:8",
+            "patient:1:8",
             False,
             True,
         )
@@ -3401,12 +3419,13 @@ def test_pre_deploy_legacy_claim_and_intent_returns_in_flight(two_workers):
         payload_hash=idem_module.payload_hash(b""),
         principal_role="Registrar",
     )
-    # The stored outcome answers the retry (the uncertain intent is cleared
-    # by the completing old worker); a bare intent would still reconcile.
+    # The old worker's unstamped outcome is retained for reconciliation;
+    # its source route cannot be proven from the user-only namespace.
     del fake_redis.store[_legacy_nkey("1", key, "intent")]
     final = client2.post("/echo", headers=headers)
-    assert final.status_code == 200
-    assert final.content == b'{"ok": true, "late": "old-worker"}'
+    assert final.status_code == 409
+    assert final.json()["code"] == "idempotency_reconciliation_required"
+    assert _legacy_nkey("1", key, "resp") in fake_redis.store
     assert counters["w2"]["calls"] == 0
 
 
@@ -3440,7 +3459,7 @@ def test_required_redis_failure_on_scope_binding_refuses_503(monkeypatch):
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:5",
+        "patient:1:5",
         False,
         True,
     )
@@ -3495,7 +3514,7 @@ def test_relinked_card_outage_refuses_via_mirrored_binding(two_workers, monkeypa
     try:
         # Card A books with Redis up: binding lands in Redis AND the mirror.
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-            "patient:7",
+            "patient:1:7",
             False,
             True,
         )
@@ -3505,7 +3524,7 @@ def test_relinked_card_outage_refuses_via_mirrored_binding(two_workers, monkeypa
         origin_ns = IdempotencyMiddleware._namespace(1, "POST:/echo")
         assert fake_redis.store.get(
             f"idem:{origin_ns}:{key}:pscope", ""
-        ).startswith("patient:7|")
+        ).startswith("patient:1:7|")
         assert any(
             k[1] == key for k in idem_module._local_scope_bindings
         ), "the Redis-resolved binding must be mirrored for outage resilience"
@@ -3518,7 +3537,7 @@ def test_relinked_card_outage_refuses_via_mirrored_binding(two_workers, monkeypa
         # The account is re-linked to card B; the same key during the outage
         # must be refused by the MIRRORED binding — never re-bound.
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-            "patient:8",
+            "patient:1:8",
             False,
             True,
         )
@@ -3529,7 +3548,7 @@ def test_relinked_card_outage_refuses_via_mirrored_binding(two_workers, monkeypa
         # The binding was never re-written to card B.
         assert fake_redis.store.get(
             f"idem:{origin_ns}:{key}:pscope", ""
-        ).startswith("patient:7|")
+        ).startswith("patient:1:7|")
     finally:
         idem_module._patient_replay_policy_sync = saved_policy
         idem_module._local_scope_bindings.clear()
@@ -3549,7 +3568,7 @@ def test_degraded_binding_unknown_scope_refuses_conservatively(two_workers, monk
     saved_policy = idem_module._patient_replay_policy_sync
     try:
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-            "patient:9",
+            "patient:1:9",
             False,
             True,
         )
@@ -3586,48 +3605,48 @@ def test_scope_binding_extend_is_value_guarded(fake_redis):
     claim._failed_at = 0.0
     origin_ns = "extend-ns"
     outcome, bound = claim.bind_scope_if_absent(
-        origin_ns, "k-ext", "patient:1", "gen-a"
+        origin_ns, "k-ext", "patient:1:1", "gen-a"
     )
     assert outcome == idem_module._SCOPE_BINDING_RESOLVED
-    assert bound == "patient:1"
+    assert bound == "patient:1:1"
     scope_key = f"idem:{origin_ns}:k-ext:pscope"
-    assert fake_redis.store[scope_key] == "patient:1|gen-a"
+    assert fake_redis.store[scope_key] == "patient:1:1|gen-a"
 
     # A foreign scope never overwrites the binding (and reports False).
-    assert claim.extend_scope_binding(origin_ns, "k-ext", "patient:2", "gen-b") is False
-    assert fake_redis.store[scope_key] == "patient:1|gen-a"
-    # A prefix collision (patient:1 vs patient:12) must not pass the guard.
-    fake_redis.store[f"idem:{origin_ns}:k-prefix:pscope"] = "patient:12|other"
+    assert claim.extend_scope_binding(origin_ns, "k-ext", "patient:1:2", "gen-b") is False
+    assert fake_redis.store[scope_key] == "patient:1:1|gen-a"
+    # A prefix collision (patient:1:1 vs patient:1:12) must not pass the guard.
+    fake_redis.store[f"idem:{origin_ns}:k-prefix:pscope"] = "patient:1:12|other"
     assert (
-        claim.extend_scope_binding(origin_ns, "k-prefix", "patient:1", "gen-p")
+        claim.extend_scope_binding(origin_ns, "k-prefix", "patient:1:1", "gen-p")
         is False
     )
-    assert fake_redis.store[f"idem:{origin_ns}:k-prefix:pscope"] == "patient:12|other"
+    assert fake_redis.store[f"idem:{origin_ns}:k-prefix:pscope"] == "patient:1:12|other"
     # Our own scope refresh re-stamps the generation and re-arms the TTL.
-    assert claim.extend_scope_binding(origin_ns, "k-ext", "patient:1", "gen-b") is True
-    assert fake_redis.store[scope_key] == "patient:1|gen-b"
+    assert claim.extend_scope_binding(origin_ns, "k-ext", "patient:1:1", "gen-b") is True
+    assert fake_redis.store[scope_key] == "patient:1:1|gen-b"
     assert fake_redis.ttls[scope_key] == claim._ttl
     # Round-8: an ABSENT binding is RESTORED (never left missing while the
     # snapshot it guards is alive).
     del fake_redis.store[scope_key]
-    assert claim.extend_scope_binding(origin_ns, "k-ext", "patient:1", "gen-c") is True
-    assert fake_redis.store[scope_key] == "patient:1|gen-c"
+    assert claim.extend_scope_binding(origin_ns, "k-ext", "patient:1:1", "gen-c") is True
+    assert fake_redis.store[scope_key] == "patient:1:1|gen-c"
 
     # The known non-2xx cleanup is a FULL compare-and-delete: only the
     # binding value THIS attempt wrote (scope AND generation) is removed.
-    assert claim.clear_scope_binding(origin_ns, "k-ext", "patient:1", "gen-x") is False
-    assert fake_redis.store[scope_key] == "patient:1|gen-c", (
+    assert claim.clear_scope_binding(origin_ns, "k-ext", "patient:1:1", "gen-x") is False
+    assert fake_redis.store[scope_key] == "patient:1:1|gen-c", (
         "a foreign generation never deletes the binding"
     )
-    assert claim.clear_scope_binding(origin_ns, "k-ext", "patient:1", "gen-c") is True
+    assert claim.clear_scope_binding(origin_ns, "k-ext", "patient:1:1", "gen-c") is True
     assert scope_key not in fake_redis.store
 
     # A legacy bare-scope value (no generation) still reads as the scope.
-    fake_redis.store[f"idem:{origin_ns}:k-legacy:pscope"] = "patient:5"
+    fake_redis.store[f"idem:{origin_ns}:k-legacy:pscope"] = "patient:1:5"
     outcome, bound = claim.bind_scope_if_absent(
-        origin_ns, "k-legacy", "patient:5", "gen-l"
+        origin_ns, "k-legacy", "patient:1:5", "gen-l"
     )
-    assert outcome == idem_module._SCOPE_BINDING_RESOLVED and bound == "patient:5"
+    assert outcome == idem_module._SCOPE_BINDING_RESOLVED and bound == "patient:1:5"
 
 
 # ── Round-6 (owner review on 113d155, PR #3340): migration fence ────────────
@@ -3691,9 +3710,8 @@ def test_legacy_outcome_landing_between_fence_and_probe_replays(
     """The second round-4/5 hole: the old worker completes BETWEEN the three
     separate probe GETs — the response read saw nothing, by the marker reads
     the response was stored and the markers dropped → three misses and the
-    write re-executed. Round-6 reads the legacy artifacts only AFTER owning
-    the fence: an old worker completing in that window is REPLAYED and
-    migrated, never re-executed."""
+    write re-executed. The response is read after acquiring the fence; an
+    unstamped old outcome is retained for reconciliation, never re-executed."""
     client1, client2, counters, fake_redis = two_workers
     key = "fence-complete-1"
     headers = {**auth_headers("1"), "Idempotency-Key": key}
@@ -3729,13 +3747,14 @@ def test_legacy_outcome_landing_between_fence_and_probe_replays(
     finally:
         monkeypatch.undo()
 
-    assert response.status_code == 200
-    assert response.content == b'{"ok": true, "committed": "old-worker"}'
+    assert response.status_code == 409
+    assert response.json()["code"] == "idempotency_reconciliation_required"
     assert counters["w1"]["calls"] == 0, (
-        "the just-completed legacy outcome must replay, never re-execute"
+        "the unscoped legacy outcome must never re-execute"
     )
-    # Migrated to the current namespace; the fence is released.
-    assert nkey("1", key, "resp") in fake_redis.store
+    # The original outcome is retained; the fence is released.
+    assert _legacy_nkey("1", key, "resp") in fake_redis.store
+    assert nkey("1", key, "resp") not in fake_redis.store
     assert f"idem:{legacy_ns}:{key}:claim" not in fake_redis.store
 
 
@@ -3871,16 +3890,16 @@ def test_local_scope_bindings_bounded_lru(monkeypatch):
     idem_module._local_scope_bindings_expiry.clear()
     try:
         for i in range(120):
-            idem_module._local_scope_binding_set("ns", f"k{i}", "patient:1")
+            idem_module._local_scope_binding_set("ns", f"k{i}", "patient:1:1")
         assert len(idem_module._local_scope_bindings) <= 50
         # Oldest entries evicted, newest present.
         assert idem_module._local_scope_binding_get("ns", "k0") is None
-        assert idem_module._local_scope_binding_get("ns", "k119") == "patient:1"
+        assert idem_module._local_scope_binding_get("ns", "k119") == "patient:1:1"
         # LRU: a GET makes the entry recent; later inserts must not evict it.
-        assert idem_module._local_scope_binding_get("ns", "k100") == "patient:1"
+        assert idem_module._local_scope_binding_get("ns", "k100") == "patient:1:1"
         for i in range(120, 160):
-            idem_module._local_scope_binding_set("ns", f"k{i}", "patient:2")
-        assert idem_module._local_scope_binding_get("ns", "k100") == "patient:1", (
+            idem_module._local_scope_binding_set("ns", f"k{i}", "patient:1:2")
+        assert idem_module._local_scope_binding_get("ns", "k100") == "patient:1:1", (
             "a recently used binding must survive LRU eviction"
         )
         assert len(idem_module._local_scope_bindings) <= 50
@@ -3894,10 +3913,10 @@ def test_local_scope_bindings_bounded_lru(monkeypatch):
             content=b'{"ok": true}', status_code=200, media_type="application/json"
         )
         idem_module._local_patient_outcome_store(
-            "ns", "atomic-1", "patient:3", outcome, "hash-1", "Patient"
+            "ns", "atomic-1", "patient:1:3", outcome, "hash-1", "Patient"
         )
         entry = idem_module._local_scope_bindings[("ns", "atomic-1")]
-        assert entry[1] == "patient:3"
+        assert entry[1] == "patient:1:3"
         assert entry[2] is not None and entry[2][4] == "hash-1"
         replayed, mismatch, role = idem_module._local_patient_outcome_get(
             "ns", "atomic-1", "hash-1"
@@ -3913,19 +3932,19 @@ def test_local_scope_bindings_bounded_lru(monkeypatch):
 
         # Value-guarded drop (known non-2xx): our own binding is removed,
         # a foreign one is never touched.
-        idem_module._local_scope_binding_drop("ns", "atomic-1", "patient:9")
+        idem_module._local_scope_binding_drop("ns", "atomic-1", "patient:1:9")
         assert ("ns", "atomic-1") in idem_module._local_scope_bindings
-        idem_module._local_scope_binding_drop("ns", "atomic-1", "patient:3")
+        idem_module._local_scope_binding_drop("ns", "atomic-1", "patient:1:3")
         assert ("ns", "atomic-1") not in idem_module._local_scope_bindings
 
         # Snapshot-only forget (role-changed re-execution): the binding
         # survives, the snapshot is gone; a foreign scope is never touched.
-        idem_module._local_scope_binding_set("ns", "forget-1", "patient:4")
-        idem_module._local_patient_outcome_forget_snapshot("ns", "forget-1", "patient:9")
+        idem_module._local_scope_binding_set("ns", "forget-1", "patient:1:4")
+        idem_module._local_patient_outcome_forget_snapshot("ns", "forget-1", "patient:1:9")
         assert ("ns", "forget-1") in idem_module._local_scope_bindings, (
             "a foreign scope never rewrites the entry"
         )
-        idem_module._local_patient_outcome_forget_snapshot("ns", "forget-1", "patient:4")
+        idem_module._local_patient_outcome_forget_snapshot("ns", "forget-1", "patient:1:4")
         assert idem_module._local_scope_bindings[("ns", "forget-1")][2] is None
         assert (
             idem_module._local_scope_bindings[("ns", "forget-1")][0]
@@ -3954,7 +3973,7 @@ def test_local_only_binding_outlives_response_snapshot(two_workers, monkeypatch)
         user_id or 1
     )
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -3978,6 +3997,7 @@ def test_local_only_binding_outlives_response_snapshot(two_workers, monkeypatch)
         seen["during"] = entry[0] if entry else None
         return {"ok": True}
 
+    _booking_like.idempotency_replay_global_roles = ("Patient",)
     client = TC(app, raise_server_exceptions=False)
     headers = {**auth_headers("1"), "Idempotency-Key": key}
     try:
@@ -4014,7 +4034,7 @@ def test_redis_scope_mirror_preserves_local_snapshot(two_workers, monkeypatch):
     client1, client2, counters, fake_redis = two_workers
     saved_policy = idem_module._patient_replay_policy_sync
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -4069,7 +4089,7 @@ def test_non_2xx_binding_cleanup_precedes_claim_release(two_workers, monkeypatch
     client1, client2, counters, fake_redis = two_workers
     saved_policy = idem_module._patient_replay_policy_sync
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -4092,6 +4112,7 @@ def test_non_2xx_binding_cleanup_precedes_claim_release(two_workers, monkeypatch
         counter["calls"] += 1
         return {"ok": True}
 
+    _booking_like.idempotency_replay_global_roles = ("Patient",)
     from fastapi.testclient import TestClient as TC
 
     worker_a = TC(app, raise_server_exceptions=False)
@@ -4131,7 +4152,7 @@ def test_non_2xx_binding_cleanup_precedes_claim_release(two_workers, monkeypatch
         ta = threading.Thread(target=_a_attempt)
         ta.start()
         assert pause_a.wait(5), "A must reach its binding cleanup"
-        assert fake_redis.store.get(pscope_key, "").startswith("patient:7|"), (
+        assert fake_redis.store.get(pscope_key, "").startswith("patient:1:7|"), (
             "the binding still exists while A is frozen before the cleanup"
         )
 
@@ -4165,20 +4186,20 @@ def test_non_2xx_binding_cleanup_precedes_claim_release(two_workers, monkeypatch
     # B retries with the corrected body — binding absent, it re-binds and
     # executes; its completed outcome re-stamps the binding (generation B).
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
     retry = worker_b.post("/booking-like", headers=b_headers, content=b"{}")
     assert retry.status_code == 200
     assert counter["calls"] == 1
-    assert fake_redis.store.get(pscope_key, "").startswith("patient:7|"), (
+    assert fake_redis.store.get(pscope_key, "").startswith("patient:1:7|"), (
         "the Redis origin binding must REMAIN after B's success"
     )
 
     # The re-linked card never re-runs the key.
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:8",
+        "patient:1:8",
         False,
         True,
     )
@@ -4210,39 +4231,39 @@ def test_store_response_with_scope_atomic_contract(fake_redis):
         "k1",
         resp,
         origin_ns="ons",
-        patient_scope="patient:1",
+        patient_scope="patient:1:1",
         generation="g1",
     )
     assert ok is True and ext is True
     assert "idem:rns:k1:resp" in fake_redis.store
-    assert fake_redis.store["idem:ons:k1:pscope"] == "patient:1|g1"
+    assert fake_redis.store["idem:ons:k1:pscope"] == "patient:1:1|g1"
     assert fake_redis.ttls["idem:ons:k1:pscope"] == claim._ttl
 
     # Foreign scope: response stored, binding untouched, NOT durable.
-    fake_redis.store["idem:ons:k2:pscope"] = "patient:9|foreign"
+    fake_redis.store["idem:ons:k2:pscope"] = "patient:1:9|foreign"
     ok2, ext2 = claim.store_response_with_scope(
         "rns",
         "k2",
         resp,
         origin_ns="ons",
-        patient_scope="patient:1",
+        patient_scope="patient:1:1",
         generation="g2",
     )
     assert ok2 is True and ext2 is False
-    assert fake_redis.store["idem:ons:k2:pscope"] == "patient:9|foreign"
+    assert fake_redis.store["idem:ons:k2:pscope"] == "patient:1:9|foreign"
 
-    # Prefix collision must not pass the value guard (patient:1 vs patient:12).
-    fake_redis.store["idem:ons:k3:pscope"] = "patient:12|other"
+    # Prefix collision must not pass the value guard (patient:1:1 vs patient:1:12).
+    fake_redis.store["idem:ons:k3:pscope"] = "patient:1:12|other"
     ok3, ext3 = claim.store_response_with_scope(
         "rns",
         "k3",
         resp,
         origin_ns="ons",
-        patient_scope="patient:1",
+        patient_scope="patient:1:1",
         generation="g3",
     )
     assert ok3 is True and ext3 is False
-    assert fake_redis.store["idem:ons:k3:pscope"] == "patient:12|other"
+    assert fake_redis.store["idem:ons:k3:pscope"] == "patient:1:12|other"
 
     # Absent binding is RESTORED atomically with the response.
     del fake_redis.store["idem:ons:k1:pscope"]
@@ -4251,11 +4272,11 @@ def test_store_response_with_scope_atomic_contract(fake_redis):
         "k1",
         resp,
         origin_ns="ons",
-        patient_scope="patient:1",
+        patient_scope="patient:1:1",
         generation="g4",
     )
     assert ok4 is True and ext4 is True
-    assert fake_redis.store["idem:ons:k1:pscope"] == "patient:1|g4"
+    assert fake_redis.store["idem:ons:k1:pscope"] == "patient:1:1|g4"
 
     # Degraded transport reports (False, False) and stores NOTHING.
     claim._available = False
@@ -4265,7 +4286,7 @@ def test_store_response_with_scope_atomic_contract(fake_redis):
         "k5",
         resp,
         origin_ns="ons",
-        patient_scope="patient:1",
+        patient_scope="patient:1:1",
         generation="g5",
     )
     assert ok5 is False and ext5 is False
@@ -4281,7 +4302,7 @@ def test_scope_extension_failure_keeps_outcome_non_durable(two_workers, monkeypa
     client1, client2, counters, fake_redis = two_workers
     saved_policy = idem_module._patient_replay_policy_sync
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -4292,7 +4313,7 @@ def test_scope_extension_failure_keeps_outcome_non_durable(two_workers, monkeypa
     origin_ns = IdempotencyMiddleware._namespace(1, "POST:/echo")
     # The outcome namespace of a patient-scope request carries the card
     # scope (resp/intent), unlike the ORIGIN namespace (pscope).
-    scoped_ns = IdempotencyMiddleware._namespace(1, "POST:/echo", "patient:7")
+    scoped_ns = IdempotencyMiddleware._namespace(1, "POST:/echo", "patient:1:7")
 
     real_eval = fake_redis.eval
 
@@ -4311,7 +4332,7 @@ def test_scope_extension_failure_keeps_outcome_non_durable(two_workers, monkeypa
         # …the pre-handler binding exists but was never extended, and the
         # unknown-outcome guards stay up.
         assert fake_redis.store.get(f"idem:{origin_ns}:{key}:pscope", "").startswith(
-            "patient:7|"
+            "patient:1:7|"
         )
         assert f"idem:{scoped_ns}:{key}:intent" in fake_redis.store
     finally:
@@ -4330,7 +4351,7 @@ def test_scope_extension_failure_keeps_outcome_non_durable(two_workers, monkeypa
     idem_module._local_scope_bindings_expiry.clear()
     saved_policy = idem_module._patient_replay_policy_sync
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -4501,10 +4522,10 @@ class _RelinkedAtReassertRedis(_ReassertScenarioRedis):
     The upsert then correctly refuses to touch the foreign binding."""
 
     def _on_reassert(self, scope_key: str) -> None:
-        self.store[scope_key] = "patient:99|stale-attempt"
+        self.store[scope_key] = "patient:1:99|stale-attempt"
 
 
-def _install_patient_worker(monkeypatch, fake_redis, patient_scope: str = "patient:7"):
+def _install_patient_worker(monkeypatch, fake_redis, patient_scope: str = "patient:1:7"):
     """Wire ONE harness worker with a patient-scoped policy (round-7 test
     pattern): saves and restores every singleton the dispatch reads."""
     saved = (
@@ -4563,6 +4584,7 @@ def test_scope_reassert_transport_failure_fails_closed_503(monkeypatch):
         counter["calls"] += 1
         return {"ok": True}
 
+    _booking_like.idempotency_replay_global_roles = ("Patient",)
     client = TC(app, raise_server_exceptions=False)
     key = "reassert-503-1"
     headers = {**auth_headers("1"), "Idempotency-Key": key}
@@ -4581,7 +4603,7 @@ def test_scope_reassert_transport_failure_fails_closed_503(monkeypatch):
         # The claim (and intent) namespaces carry the PATIENT scope — the
         # origin namespace is only the scope binding's.
         claim_ns = IdempotencyMiddleware._namespace(
-            1, "POST:/booking-like", "patient:7"
+            1, "POST:/booking-like", "patient:1:7"
         )
         fake.store.pop(f"idem:{claim_ns}:{key}:claim", None)
 
@@ -4610,6 +4632,7 @@ def test_scope_reassert_lost_to_relinked_card_refuses_409(monkeypatch):
         counter["calls"] += 1
         return {"ok": True}
 
+    _booking_like.idempotency_replay_global_roles = ("Patient",)
     client = TC(app, raise_server_exceptions=False)
     key = "reassert-409-1"
     headers = {**auth_headers("1"), "Idempotency-Key": key}
@@ -4624,7 +4647,7 @@ def test_scope_reassert_lost_to_relinked_card_refuses_409(monkeypatch):
         assert fake.store.get(
             f"idem:{IdempotencyMiddleware._namespace(1, 'POST:/booking-like')}:{key}:pscope",
             "",
-        ).startswith("patient:99|")
+        ).startswith("patient:1:99|")
     finally:
         restore()
 
@@ -4643,7 +4666,7 @@ def test_local_snapshot_expiry_does_not_slide_on_mirror(monkeypatch):
     try:
         key = "no-slide-1"
         snapshot = (201, {"x": "1"}, b"{}", "application/json", "hash1", "Patient")
-        idem_module._local_scope_binding_set("ns1", key, "patient:7", snapshot)
+        idem_module._local_scope_binding_set("ns1", key, "patient:1:7", snapshot)
         cache_key = ("ns1", key)
         entry = idem_module._local_scope_bindings[cache_key]
 
@@ -4652,7 +4675,7 @@ def test_local_snapshot_expiry_does_not_slide_on_mirror(monkeypatch):
         idem_module._local_scope_bindings[cache_key] = aged
 
         # A Redis→local mirror at hour 23 (scope-only rebind).
-        idem_module._local_scope_binding_mirror("ns1", key, "patient:7")
+        idem_module._local_scope_binding_mirror("ns1", key, "patient:1:7")
         mirrored = idem_module._local_scope_bindings[cache_key]
         assert mirrored[2] == snapshot, "the snapshot is preserved (round-8)"
         assert mirrored[0] == aged[0], (
@@ -4674,7 +4697,7 @@ def test_local_snapshot_expiry_does_not_slide_on_mirror(monkeypatch):
         idem_module._local_patient_outcome_store(
             "ns1",
             key,
-            "patient:7",
+            "patient:1:7",
             Response(content=b"{}", status_code=201, media_type="application/json"),
             "hash2",
             "Patient",
@@ -4685,7 +4708,7 @@ def test_local_snapshot_expiry_does_not_slide_on_mirror(monkeypatch):
         )
 
         # A foreign-scope mirror never inherits the entry (or its window).
-        idem_module._local_scope_binding_mirror("ns1", "other-key", "patient:8")
+        idem_module._local_scope_binding_mirror("ns1", "other-key", "patient:1:8")
         foreign = idem_module._local_scope_bindings[("ns1", "other-key")]
         assert foreign[2] is None
     finally:
@@ -4822,8 +4845,6 @@ def test_patient_replay_writes_audit_row_on_distributed_replay(
     calls = 1 (worker 2 never executes), the distributed replay carries its
     own audited row; the FIRST execution writes no middleware row (its trail
     row is the endpoint's business)."""
-    import tempfile
-
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
@@ -4848,7 +4869,7 @@ def test_patient_replay_writes_audit_row_on_distributed_replay(
     # The harness fixture stubs the policy WITHOUT a patient scope; this
     # contract needs the patient-scoped dispatch.
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -4934,7 +4955,7 @@ def test_expired_local_binding_snapshot_is_not_resurrected_by_mirror(monkeypatch
         # The entry was born 24 h ago and its window has ALREADY lapsed —
         # with the snapshot still attached (the pre-fix store state: the
         # lazy expiry purge has not touched it yet).
-        expired = (_time.time() - 1, "patient:7", snapshot)
+        expired = (_time.time() - 1, "patient:1:7", snapshot)
         idem_module._local_scope_bindings[("ns1", key)] = expired
         import heapq
 
@@ -4944,7 +4965,7 @@ def test_expired_local_binding_snapshot_is_not_resurrected_by_mirror(monkeypatch
         )
 
         # The dispatch's Redis-resolved-binding mirror step.
-        idem_module._local_scope_binding_mirror("ns1", key, "patient:7")
+        idem_module._local_scope_binding_mirror("ns1", key, "patient:1:7")
 
         mirrored = idem_module._local_scope_bindings[("ns1", key)]
         assert mirrored[0] > _time.time(), (
@@ -4979,7 +5000,7 @@ def test_expired_local_snapshot_does_not_replay_in_dispatch(two_workers):
 
     client1, client2, counters, fake_redis = two_workers
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )
@@ -5002,7 +5023,7 @@ def test_expired_local_snapshot_does_not_replay_in_dispatch(two_workers):
         # namespace AND the legacy dual-write copy (the round-6 fence).
         claim = idem_module._distributed_claim
         claim.forget_response(
-            IdempotencyMiddleware._namespace(1, "POST:/echo", "patient:7"), key
+            IdempotencyMiddleware._namespace(1, "POST:/echo", "patient:1:7"), key
         )
         claim.forget_response(IdempotencyMiddleware._namespace(1), key)
         cache_key = (origin_ns, key)
@@ -5142,7 +5163,7 @@ def _audit_replay_harness(monkeypatch, tmp_path):
 
     monkeypatch.setattr(idem_module, "_resolve_request_db", _fake_resolve_db)
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
-        "patient:7",
+        "patient:1:7",
         False,
         True,
     )

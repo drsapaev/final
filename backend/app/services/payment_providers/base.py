@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Any
 
+from app.services.money_input import MoneyInputError, parse_money
+
 logger = logging.getLogger(__name__)
 
 
@@ -159,18 +161,23 @@ class BasePaymentProvider(ABC):
         )
 
     def format_amount(self, amount: Decimal, currency: str) -> int:
-        """
-        Форматирование суммы для провайдера
+        """Convert exactly; never truncate a fraction of a provider unit.
 
-        Args:
-            amount: Сумма в десятичном виде
-            currency: Валюта
-
-        Returns:
-            int: Сумма в копейках/тийинах
+        UZS providers currently use tiyin; the existing Kaspi adapter accepts
+        whole KZT. Floats are accepted temporarily via their shortest decimal
+        spelling for existing internal callers. HTTP callers must parse the
+        original JSON before that conversion to preserve lexical precision.
         """
-        # Большинство провайдеров работают с копейками/тийинами
-        return int(amount * 100)
+        exponent = {"UZS": 2, "KZT": 0}.get(currency)
+        if exponent is None:
+            raise MoneyInputError("Валюта провайдера не поддерживается")
+        value = parse_money(amount)
+        if value <= 0:
+            raise MoneyInputError("Сумма должна быть положительной")
+        scaled = value * (10 ** exponent)
+        if scaled != scaled.to_integral_value():
+            raise MoneyInputError("Сумма не соответствует разрядности валюты")
+        return int(scaled)
 
     def parse_amount(self, amount: int, currency: str) -> Decimal:
         """

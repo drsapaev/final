@@ -24,6 +24,7 @@ from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.api.trusted_financial_auth import _authenticate, financial_reviewer
 from app.core.roles import (
     DOCTOR_FAMILY_GATE_ROLES,
     is_admin_role,
@@ -49,6 +50,11 @@ from app.schemas.file_system import FilePermissionEnum, FileTypeEnum, FileUpload
 from app.services.audit_service import log_audit_event
 from app.services.dental_api_service import DentalApiDomainError, DentalApiService
 from app.services.file_system_service import DENTAL_MEDIA_TAG, get_file_system_service
+from app.services.money_input import parse_exact_json, parse_money
+from app.services.profile_contact_security import (
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+)
 from app.utils.file_validator import validate_upload_file
 
 logger = logging.getLogger(__name__)
@@ -56,6 +62,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dental", tags=["dental"])
 
 DENTAL_CLINICIAN_ROLES = ("Admin", *DOCTOR_FAMILY_GATE_ROLES)
+
+
+async def _price_override_issuer(
+    token: str = Depends(deps.oauth2_scheme), db: Session = Depends(deps.get_db),
+) -> User:
+    return await _authenticate(token, db, DENTAL_CLINICIAN_ROLES)
 DENTAL_PERSISTENCE_NOT_IMPLEMENTED_DETAIL = (
     "Dental examination/treatment persistence is not implemented on this endpoint. "
     "Use the canonical visit protocol or odontogram workflow until a durable dental "
@@ -612,14 +624,19 @@ def delete_dental_media(
 class DentalPriceOverrideRequest(BaseModel):
     visit_id: int
     service_id: int
-    # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
-    new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
+    target_visit_service_id: int | None = Field(default=None, gt=0)
+    new_price: Decimal = Field(..., ge=0, le=Decimal("9999999999.99"))
     # DERMAPRICE-BE-003 shared policy (audit #3892, group 15): the dental
     # sibling feeds the same DoctorPriceOverride.reason String(255) column —
     # same meaningful-justification validation.
     reason: str = Field(..., min_length=1, max_length=255)
     details: str | None = None
     treatment_completed: bool = True
+
+    @field_validator("new_price", mode="before")
+    @classmethod
+    def _valid_money(cls, value):
+        return parse_money(value)
 
     @field_validator("reason")
     @classmethod
@@ -641,8 +658,7 @@ class DentalPriceOverrideResponse(BaseModel):
     # DERMAPRICE-BE-002: visit-level before-price captured at creation —
     # additive truth alongside the immutable catalogue reference.
     visit_price_before: Decimal | None = None
-    # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
-    new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
+    new_price: Decimal = Field(..., ge=0, le=Decimal("9999999999.99"))
     reason: str
     details: str | None
     status: str
@@ -779,17 +795,27 @@ async def get_xray_images(
 )
 async def create_dental_price_override(
     override_data: DentalPriceOverrideRequest,
+    request: Request,
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
+    user: User = Depends(_price_override_issuer),
 ) -> DentalPriceOverrideResponse:
     """
     Стоматолог указывает цену после проведенного лечения
     """
     service = DentalApiService(db)
     try:
+        try:
+            override_data = DentalPriceOverrideRequest.model_validate(parse_exact_json(await request.body()))
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=422, detail="Некорректный формат запроса") from None
+        try:
+            bearer = capture_profile_bearer(request, user)
+        except ProfileBearerInvalid:
+            raise HTTPException(status_code=401, detail="Сессия недействительна") from None
         price_override = await service.create_dental_price_override(
             override_data=override_data,
             user=user,
+            bearer=bearer,
         )
         return DentalPriceOverrideResponse(
             id=price_override.id,
@@ -806,6 +832,8 @@ async def create_dental_price_override(
         )
     except DentalApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except HTTPException:
+        raise
     except Exception:
         service.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -870,8 +898,9 @@ class PriceOverrideApprovalRequest(BaseModel):
 async def approve_price_override(
     override_id: int,
     approval_data: PriceOverrideApprovalRequest,
+    request: Request,
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Registrar")),
+    user: User = Depends(financial_reviewer),
 ):
     """
     Одобрить или отклонить изменение цены стоматологом
@@ -879,13 +908,20 @@ async def approve_price_override(
     """
     service = DentalApiService(db)
     try:
+        try:
+            bearer = capture_profile_bearer(request, user)
+        except ProfileBearerInvalid:
+            raise HTTPException(status_code=401, detail="Сессия недействительна") from None
         return await service.approve_price_override(
             override_id=override_id,
             approval_data=approval_data,
             user=user,
+            bearer=bearer,
         )
     except DentalApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except HTTPException:
+        raise
     except Exception:
         service.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -898,7 +934,7 @@ async def approve_price_override(
 )
 async def get_pending_price_overrides(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Registrar")),
+    user: User = Depends(financial_reviewer),
     limit: int = Query(50, ge=1, le=100),
     # REGPRICE-BE-004 (audit #3892, group 16): offset pagination so requests
     # beyond the first page stay reachable.

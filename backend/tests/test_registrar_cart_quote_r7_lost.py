@@ -24,12 +24,22 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import OnlineQueueEntry
+from app.models.payment_invoice import PaymentInvoice
 from app.models.service import Service
+from app.models.visit import Visit, VisitService
+from app.services.registrar_edit_delta_service import (
+    RegistrarEditDeltaItem,
+    RegistrarEditDeltaService,
+)
 from tests.conftest import mint_access_token
+from tests.integration.test_all_free_registrar_workflow import (
+    migrated_visit_confirmation_context,  # noqa: F401
+)
 
 pytestmark = [pytest.mark.integration]
 
@@ -59,84 +69,68 @@ def _r7_service(db: Session, *, code: str, price: Decimal) -> Service:
 # ===================== P1: All Free строковый режим =====================
 
 
-def test_edit_delta_all_free_string_mode_bills_free(
+@pytest.mark.parametrize(("mode", "all_free"), (("all_free", False), ("none", True), (" ALL_FREE ", False)))
+def test_edit_delta_all_free_requires_the_approval_workflow(
     client: TestClient,
     db_session: Session,
     registrar_auth_headers,
     admin_user,
     test_patient,
     test_doctor,
+    mode,
+    all_free,
 ):
-    """Edit-delta сохранение с discount_mode="all_free" и all_free=False
-    обязано выставить 0 — тот же резолв, что подтвердила квота."""
     service = _r7_service(db_session, code="R7-AF-ED", price=Decimal("25000"))
+    target_date = date.today()
+    line = {"service_id": service.id, "quantity": 1, "specialist_id": test_doctor.id}
+    pricing = {"discount_mode": mode, "all_free": all_free}
 
     quoted = client.post(
         "/api/v1/registrar/cart/quote",
         headers=_auth_headers(admin_user),
         json={
-            "items": [
-                {
-                    "service_id": service.id,
-                    "quantity": 1,
-                    "specialist_id": test_doctor.id,
-                }
-            ],
-            "discount_mode": "all_free",
-            "all_free": False,
+            "items": [line],
+            **pricing,
             "pricing_mode": "edit_delta",
             "patient_id": test_patient.id,
-            "target_date": date.today().isoformat(),
+            "target_date": target_date.isoformat(),
         },
     )
-    assert quoted.status_code == 200, quoted.text
-    token = quoted.json()["quote_token"]
-    assert token
+    assert quoted.status_code == 409, quoted.text
 
     response = client.post(
         "/api/v1/registrar/cart/edit-delta",
         headers=registrar_auth_headers,
         json={
             "patient_id": test_patient.id,
-            "target_date": date.today().isoformat(),
+            "target_date": target_date.isoformat(),
             "payment_method": "cash",
-            "discount_mode": "all_free",
-            "all_free": False,
-            "services": [
-                {
-                    "service_id": service.id,
-                    "quantity": 1,
-                    "specialist_id": test_doctor.id,
-                }
-            ],
+            **pricing,
+            "services": [line],
             "existing_queue_entry_ids": [],
-            "quote_token": token,
         },
     )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["success"] is True
-    assert Decimal(str(body["total_amount"])) == 0, (
-        "aggregated record carries discount_mode='all_free' without the "
-        "boolean flag: the command must bill ZERO, not catalog prices"
-    )
-    entry = (
-        db_session.query(OnlineQueueEntry)
-        .filter(
-            OnlineQueueEntry.patient_id == test_patient.id,
-            OnlineQueueEntry.queue_time
-            >= datetime.now(ZoneInfo("Asia/Tashkent")).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ),
+    assert response.status_code == 409, response.text
+    assert response.json() == quoted.json()
+    with pytest.raises(HTTPException) as blocked:
+        RegistrarEditDeltaService(db_session).apply(
+            patient_id=test_patient.id,
+            services=[RegistrarEditDeltaItem(**line)],
+            target_date=target_date,
+            payment_method="cash",
+            discount_mode=mode,
+            all_free=all_free,
         )
-        .order_by(OnlineQueueEntry.id.desc())
-        .first()
-    )
-    assert entry is not None
-    assert int(entry.total_amount or 0) == 0
+    assert blocked.value.status_code == 409
+    assert blocked.value.detail == response.json()["detail"]
+    assert db_session.query(Visit.id).filter_by(patient_id=test_patient.id).first() is None
+    assert db_session.query(OnlineQueueEntry.id).filter_by(patient_id=test_patient.id).first() is None
+    assert db_session.query(PaymentInvoice.id).filter_by(patient_id=test_patient.id).first() is None
 
 
-def test_full_update_all_free_string_mode_bills_free(
+@pytest.mark.usefixtures("migrated_visit_confirmation_context")
+@pytest.mark.parametrize("decision", (None, "approve", "reject"))
+def test_full_update_all_free_string_mode_keeps_price_pending_decision(
     client: TestClient,
     db_session: Session,
     registrar_auth_headers,
@@ -144,9 +138,9 @@ def test_full_update_all_free_string_mode_bills_free(
     test_daily_queue,
     test_patient,
     test_doctor,
+    decision,
 ):
-    """Full-update сохранение с discount_mode="all_free" и all_free=False
-    обязано выставить 0 — команды нормализуют режим как квота."""
+    """The string All Free mode and boolean mode use the same approval path."""
     from app.models.online_queue import DailyQueue
 
     service = _r7_service(db_session, code="R7-AF-FU", price=Decimal("25000"))
@@ -190,9 +184,8 @@ def test_full_update_all_free_string_mode_bills_free(
     body = quoted.json()
     token = body["quote_token"]
     assert token
-    assert float(body["total_amount"]) == 0, (
-        "the quote already prices the string all_free mode as free"
-    )
+    assert Decimal(str(body["total_amount"])) == Decimal("25000.00")
+    assert body["approval_status"] == "pending"
 
     response = client.put(
         f"/api/v1/queue/online-entry/{entry.id}/full-update",
@@ -220,10 +213,62 @@ def test_full_update_all_free_string_mode_bills_free(
         .all()
     )
     assert len(created) == 1
-    assert int(created[0].total_amount or 0) == 0, (
-        "the full-update command must normalize discount_mode='all_free' "
-        "the same way the quote does: total 0, not catalog 25000"
+    child = created[0]
+    assert child.total_amount == 25000
+    assert child.discount_mode == "all_free"
+    db_session.refresh(entry)
+    assert child.visit_id == entry.visit_id
+    assert child.encounter_id == entry.encounter_id
+    assert child.encounter_id is not None
+
+    if decision is not None:
+        decided = client.post(
+            "/api/v1/admin/all-free-approve", headers=_auth_headers(admin_user),
+            json={"visit_id": child.visit_id, "action": decision},
+        )
+        assert decided.status_code == 200, decided.text
+
+    db_session.expire_all()
+    visit_id = child.visit_id
+    original_ticket = (child.services, child.total_amount)
+    target_date = test_daily_queue.day.isoformat()
+    edit_line = {"service_id": service.id, "queue_entry_id": child.id, "quantity": 2}
+    edit_quote = {
+        "pricing_mode": "edit_delta", "patient_id": test_patient.id, "target_date": target_date,
+        "preferred_entry_ids": [child.id], "discount_mode": "none",
+    }
+    unchanged = client.post(
+        "/api/v1/registrar/cart/quote", headers=registrar_auth_headers,
+        json={**edit_quote, "items": [{**edit_line, "quantity": 1}]},
     )
+    assert unchanged.status_code == 200, unchanged.text
+    assert Decimal(str(unchanged.json()["total_amount"])) == 0
+
+    adjusted = client.post(
+        "/api/v1/registrar/cart/quote", headers=registrar_auth_headers,
+        json={**edit_quote, "items": [edit_line]},
+    )
+    assert adjusted.status_code == (200 if decision == "reject" else 409), adjusted.text
+    changed = client.post(
+        "/api/v1/registrar/cart/edit-delta", headers=registrar_auth_headers,
+        json={
+            "patient_id": test_patient.id, "target_date": target_date, "discount_mode": "none",
+            "payment_method": "cash", "services": [edit_line], "existing_queue_entry_ids": [child.id],
+            "quote_token": adjusted.json().get("quote_token"),
+        },
+    )
+    db_session.expire_all()
+    charges = db_session.query(VisitService).filter_by(visit_id=visit_id, service_id=service.id).all()
+    if decision == "reject":
+        assert changed.status_code == 200, changed.text
+        assert sum(line.qty for line in charges) == 2
+        assert sum(line.qty * line.price for line in charges) == Decimal("50000.00")
+    else:
+        assert changed.status_code == 409, changed.text
+        assert changed.json() == adjusted.json()
+        assert (child.services, child.total_amount) == original_ticket
+        assert sum(line.qty for line in charges) == 1
+        assert sum(line.qty * line.price for line in charges) == (0 if decision else Decimal("25000.00"))
 
 
 # ===================== P2: дубликаты строк edit-delta =====================

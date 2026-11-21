@@ -365,21 +365,6 @@ const PatientStepV2 = ({
             </span>
           </label>
 
-          <label className="patient-step-v2__discount-card">
-
-            <input
-              type="radio"
-              name="discount_mode"
-              value="benefit"
-              aria-label="Select benefit discount mode"
-              checked={cart?.discount_mode === 'benefit'}
-              onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
-              className="patient-step-v2__discount-radio-input" />
-
-            <span className="patient-step-v2__discount-card-text">
-              Льготный (бесплатная консультация)
-            </span>
-          </label>
         </div>
 
         <div className="patient-step-v2__discount-section-wrapper">

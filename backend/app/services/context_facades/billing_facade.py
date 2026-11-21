@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from app.domain.contracts.billing_contracts import (
     BillingContract,
@@ -9,7 +10,20 @@ from app.domain.contracts.billing_contracts import (
     PaymentStatusSnapshot,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from app.models.visit import Visit
+    from app.services.encounter_benefit_net import BenefitVisitQuote
+
 logger = logging.getLogger(__name__)
+
+
+def quote_visit_for_confirmation(db: Session, visit: Visit) -> BenefitVisitQuote:
+    """Read the billing quote within the caller's confirmation transaction."""
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    return PaymentInvariantService(db).compute_visit_quote(visit)
 
 
 class BillingContextFacade:

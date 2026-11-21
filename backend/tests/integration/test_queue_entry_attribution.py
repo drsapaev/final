@@ -25,9 +25,11 @@ from sqlalchemy import inspect, text
 
 from app.core.security import get_password_hash
 from app.crud.clinic import clinic_today
+from app.models.emr_v2 import EMRRecord
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
 from app.models.user_profile import UserAuditLog
+from app.services.emr_completion_policy import EMR_REQUIRED_DETAIL
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
@@ -278,13 +280,33 @@ def test_complete_flow_persists_served_by_and_served_at(
     )
     assert start_resp.status_code == 200, start_resp.text
 
+    complete_url = f"/api/v1/doctor/queue/{entry.id}/complete"
+    incomplete = client.post(complete_url, headers=admin_auth_headers)
+    assert incomplete.status_code == 409, incomplete.text
+    assert incomplete.json()["detail"] == EMR_REQUIRED_DETAIL
+    assert _raw_attribution(db_session, entry.id)[1:] == (None, None)
+
+    visit_id = (
+        db_session.query(OnlineQueueEntry.visit_id)
+        .filter(OnlineQueueEntry.id == entry.id)
+        .scalar()
+    )
+    assert visit_id is not None
+    db_session.add(
+        EMRRecord(
+            visit_id=visit_id,
+            patient_id=test_patient.id,
+            status="in_progress",
+            data={},
+            created_by=test_doctor.user_id,
+        )
+    )
+    db_session.commit()
+
     admin_user_id = (
         db_session.query(User).filter(User.username == "test_admin").first().id
     )
-    complete_resp = client.post(
-        f"/api/v1/doctor/queue/{entry.id}/complete",
-        headers=admin_auth_headers,
-    )
+    complete_resp = client.post(complete_url, headers=admin_auth_headers)
     assert complete_resp.status_code == 200, complete_resp.text
     assert complete_resp.json()["success"] is True
 

@@ -1,8 +1,10 @@
 import { api } from '../../api/client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
+import { extractApiMessage, getErrorStatus } from '../../utils/error-utils';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
+import { cartIdempotencyGuard, createIdempotencyKey } from '../wizard/wizardUtils';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
   Calendar,
@@ -75,6 +77,8 @@ const ScheduleNextModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const submission = useRef<'idle' | 'in-flight' | 'completed'>('idle');
+  const request = useRef<{ key: string | null; payload: string | null }>({ key: null, payload: null });
 
   // Загрузка данных при открытии модала
   useEffect(() => {
@@ -187,6 +191,9 @@ const ScheduleNextModal = ({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submission.current !== 'idle') return;
+    submission.current = 'in-flight';
+    const previousAttempt = request.current;
     setLoading(true);
     setError('');
     setSuccess('');
@@ -194,23 +201,45 @@ const ScheduleNextModal = ({
     try {
       // Валидация
       if (!formData.patient_id) {
-        throw new Error(t('misc.snm_err_select_patient'));
+        setError(t('misc.snm_err_select_patient'));
+        return;
       }
       if (!formData.visit_date) {
-        throw new Error(t('misc.snm_err_select_visit_date'));
+        setError(t('misc.snm_err_select_visit_date'));
+        return;
       }
       if (formData.services.some((s) => !s.service_id)) {
-        throw new Error(t('misc.snm_err_select_all_services'));
+        setError(t('misc.snm_err_select_all_services'));
+        return;
       }
+
+      const attempt = cartIdempotencyGuard({
+        existingKey: previousAttempt.key,
+        existingPayload: previousAttempt.payload,
+        payload: JSON.stringify(formData),
+        newKey: previousAttempt.key ?? createIdempotencyKey(),
+      });
+      if (attempt.action === 'block' || !attempt.key) {
+        setError(t('misc.aw_cart_retry_payload_changed'));
+        return;
+      }
+      request.current = { key: attempt.key, payload: attempt.payload };
 
       // DERMSCHED-FE-001 (audit 3892): submit through the shared
       // authenticated client — absolute `/api/v1/doctor/visits/
       // schedule-next` path, interceptors own auth/refresh/CSRF.
-      const response = await api.post('/doctor/visits/schedule-next', formData);
+      const response = await api.post('/doctor/visits/schedule-next', formData, {
+        headers: { 'Idempotency-Key': attempt.key },
+      });
       const result = response.data as {
         visit_id?: number | string;
         confirmation?: { token?: string; channel?: string };
       };
+      if (!result?.visit_id) {
+        setError(t('misc.snm_err_create_visit'));
+        return;
+      }
+      submission.current = 'completed';
       const normalizedFormData = {
         ...formData,
         patient_id: formData.patient_id ? Number(formData.patient_id) : null,
@@ -243,14 +272,21 @@ const ScheduleNextModal = ({
         resetForm();
       }, 2000);
     } catch (err) {
-      const errorData = (err as { response?: { data?: { detail?: string } } })?.response?.data;
-      setError(String(errorData?.detail || t('misc.snm_err_create_visit')));
+      const status = getErrorStatus(err);
+      // A denial of a replay cannot determine the result of the original request.
+      if (previousAttempt.key === null && status !== null && [400, 401, 403, 404, 422].includes(status)) {
+        request.current = { key: null, payload: null };
+      }
+      setError(extractApiMessage(err) ?? t('misc.snm_err_create_visit'));
     } finally {
+      if (submission.current === 'in-flight') submission.current = 'idle';
       setLoading(false);
     }
   };
 
   const resetForm = () => {
+    request.current = { key: null, payload: null };
+    submission.current = 'idle';
     setFormData({
       patient_id: '',
       visit_date: '',
@@ -594,7 +630,6 @@ const ScheduleNextModal = ({
               
               <option value="none">{t('misc.snm_visit_type_paid')}</option>
               <option value="repeat">{t('misc.snm_visit_type_repeat')}</option>
-              <option value="benefit">{t('misc.snm_visit_type_benefit')}</option>
             </select>
           </div>
 
@@ -633,7 +668,7 @@ const ScheduleNextModal = ({
             <button
               type="submit"
               style={primaryButtonStyle}
-              disabled={loading}>
+              disabled={loading || Boolean(success)}>
               
               {loading ? t('misc.snm_btn_creating') : t('misc.snm_btn_schedule')}
             </button>

@@ -5,8 +5,8 @@
  *
  * Pins the externally observable load semantics that previously lived inline
  * in CashierPanel effects:
- *  - stats load: success sets snapshot; initial failure keeps the legacy
- *    empty snapshot + sets statsError; a refresh failure keeps the previous
+ *  - stats load: success sets snapshot; initial failure leaves figures
+ *    unavailable and sets statsError; a refresh failure keeps the previous
  *    snapshot (CSH-FE-001 — zeros are never presented as server-confirmed)
  *  - pending/history loads: success maps data + pagination (or falls back
  *    to totalPages=1 / totalItems=data.length); failure keeps the previous
@@ -81,7 +81,7 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
     const { result } = renderWorklist(api);
 
     await waitFor(() => {
-      expect(result.current.stats.total_amount).toBe(100);
+      expect(result.current.stats?.total_amount).toBe(100);
       expect(result.current.appointments).toHaveLength(2);
       expect(result.current.payments).toEqual([{ id: 'p1' }]);
     });
@@ -104,13 +104,13 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
 
     const { result } = renderWorklist(api);
 
-    await waitFor(() => expect(result.current.stats.total_amount).toBe(100000));
+    await waitFor(() => expect(result.current.stats?.total_amount).toBe(100000));
     // The snapshot must preserve "field absent": a fake 0 here would render
     // as «0 сум» in CashierStatsCard while the old API never reported it.
-    expect(result.current.stats.refunded_amount).toBeUndefined();
-    expect(result.current.stats.net_total_amount).toBeUndefined();
-    expect(result.current.stats.net_cash_amount).toBeUndefined();
-    expect(result.current.stats.net_card_amount).toBeUndefined();
+    expect(result.current.stats?.refunded_amount).toBeUndefined();
+    expect(result.current.stats?.net_total_amount).toBeUndefined();
+    expect(result.current.stats?.net_cash_amount).toBeUndefined();
+    expect(result.current.stats?.net_card_amount).toBeUndefined();
   });
 
   it('single date mode sends selectedDate as both bounds', async () => {
@@ -172,24 +172,14 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
 
   it('initial failure keeps empty rows + exposes section errors — never a confirmed empty (CSH-FE-001)', async () => {
     const api = makeApi();
-    api.getStats.mockRejectedValue(new Error('boom'));
+    api.getStats.mockResolvedValue({ success: false, data: null, error: 'Статистика требует сверки' });
     api.getPendingPayments.mockResolvedValue({ success: false, data: [], error: 'backend down', pagination: { total: 0, page: 1, size: 20, pages: 1 } });
     api.getPayments.mockRejectedValue(new Error('boom'));
 
     const { result } = renderWorklist(api);
 
-    await waitFor(() => {
-      // CSH-FE-036 P2 (review 4439005298): the empty snapshot keeps the
-      // LEGACY zeros (gross tiles unchanged), but the net-of-refunds fields
-      // stay ABSENT — their value is unknown, and the card renders «—»
-      // instead of inventing a zero.
-      expect(result.current.stats).toEqual({
-        total_amount: 0, cash_amount: 0, card_amount: 0,
-        pending_count: 0, pending_amount: 0, paid_count: 0, cancelled_count: 0,
-      });
-      expect(result.current.stats.refunded_amount).toBeUndefined();
-      expect(result.current.stats.net_total_amount).toBeUndefined();
-    });
+    await waitFor(() => expect(result.current.statsError).toBe('Статистика требует сверки'));
+    expect(result.current.stats).toBeNull();
     await waitFor(() => {
       expect(result.current.appointments).toEqual([]);
       expect(result.current.payments).toEqual([]);
@@ -201,7 +191,6 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
     // genuine «no pending payments» / «empty history» empty states.
     expect(result.current.pendingError).toBe('backend down');
     expect(result.current.historyError).toBe('boom');
-    expect(result.current.statsError).toBe('boom');
   });
 
   it('history result without pagination falls back to totalPages=1 and data length', async () => {
@@ -371,11 +360,29 @@ describe('useCashierWorklistData — CSH-FE-001/002 read integrity', () => {
     rerender({ ...DEFAULT_PROPS, selectedDate: '2026-09-15' });
 
     await act(async () => { b.resolve(okStats(200)); });
-    await waitFor(() => expect(result.current.stats.total_amount).toBe(200));
+    await waitFor(() => expect(result.current.stats?.total_amount).toBe(200));
 
     await act(async () => { a.resolve(okStats(100)); });
     await act(async () => { await Promise.resolve(); });
-    expect(result.current.stats.total_amount).toBe(200);
+    expect(result.current.stats?.total_amount).toBe(200);
+  });
+
+  it('keeps a confirmed snapshot only when a failed refresh uses the same dates', async () => {
+    const api = makeApi();
+    const requiresReview = { success: false, data: null, error: 'Статистика требует сверки' };
+    api.getStats.mockResolvedValueOnce(okStats(200)).mockResolvedValue(requiresReview);
+    api.getPendingPayments.mockResolvedValue({ success: true, data: [], pagination: emptyPagination });
+    api.getPayments.mockResolvedValue({ success: true, data: [], pagination: emptyPagination });
+    const { result, rerender } = renderWorklist(api);
+
+    await waitFor(() => expect(result.current.stats?.total_amount).toBe(200));
+    act(() => result.current.triggerDataReload());
+    await waitFor(() => expect(result.current.statsError).toBe(requiresReview.error));
+    expect(result.current.stats?.total_amount).toBe(200);
+
+    rerender({ ...DEFAULT_PROPS, selectedDate: '2026-09-15' });
+    expect(result.current.stats).toBeNull();
+    await waitFor(() => expect(result.current.statsError).toBe(requiresReview.error));
   });
 
   it('keeps previously loaded rows and raises the section error when a refresh fails (CSH-FE-001)', async () => {

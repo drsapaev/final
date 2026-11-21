@@ -2,21 +2,23 @@
 Тесты для системы аудит-логирования.
 Проверяет, что все критические операции логируются корректно.
 """
+from decimal import Decimal
+from unittest.mock import Mock
+
 import pytest  # pyright: ignore[reportMissingImports]
-from datetime import date
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.audit import (
-    log_critical_change,
     CRITICAL_TABLES,
     calculate_diff_hash,
-    extract_model_changes,
+    log_critical_change,
 )
-from app.models.user_profile import UserAuditLog
 from app.models.patient import Patient
 from app.models.user import User
-from app.models.visit import Visit
+from app.models.user_profile import UserAuditLog
+from app.models.visit import Visit, VisitService
+from app.services.payment_providers.base import PaymentResult
 
 
 def test_audit_log_create_patient(client: TestClient, db: Session, admin_user: User, admin_password: str):
@@ -127,7 +129,9 @@ def test_audit_log_delete_patient(client: TestClient, db: Session, admin_user: U
     assert audit_log.old_values is not None
 
 
-def test_audit_log_create_payment_init(client: TestClient, db: Session, admin_user: User, test_patient: Patient, admin_password: str):
+def test_audit_log_create_payment_init(
+    client: TestClient, db: Session, admin_user: User, test_patient: Patient, test_service, monkeypatch,
+):
     """Тест: инициализация платежа через /payments/init должна логироваться"""
     # Логин админа
     from tests.conftest import mint_access_token
@@ -139,15 +143,25 @@ def test_audit_log_create_payment_init(client: TestClient, db: Session, admin_us
         patient_id=test_patient.id,
         status="open",
         notes="Audit payment init test",
+        confirmation_context_epoch=1,
     )
     db.add(visit)
+    db.flush()
+    db.add(VisitService(
+        visit_id=visit.id, service_id=test_service.id, name="Synthetic audit consultation",
+        qty=1, price=Decimal("100000.00"), currency="UZS",
+    ))
     db.commit()
     db.refresh(visit)
+
+    provider = Mock()
+    provider.get_providers_for_currency.return_value = ["click"]
+    provider.create_payment.return_value = PaymentResult(False, status="failed", error_message="Synthetic refusal")
+    monkeypatch.setattr("app.api.v1.endpoints.payments.get_payment_manager", lambda: provider)
 
     # Инициализируем платеж
     payment_data = {
         "visit_id": visit.id,
-        # Используем провайдера, который гарантированно включён в тестовой конфигурации
         "provider": "click",
         "amount": 100000,
         "currency": "UZS",
@@ -159,19 +173,19 @@ def test_audit_log_create_payment_init(client: TestClient, db: Session, admin_us
         headers={"Authorization": f"Bearer {token}"},
     )
     # Эндпоинт может вернуть success=False (ошибка провайдера), но платеж и аудит создаются
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     body = response.json()
     payment_id = body.get("payment_id")
     assert payment_id is not None
+    provider.create_payment.assert_called_once()
 
     # Проверяем, что создан audit log для платежа.
-    # Важно, что есть запись по ресурсному типу \"payments\" с действием CREATE;
-    # привязка к конкретному ID платежа может отличаться в зависимости от реализации.
     audit_log = (
         db.query(UserAuditLog)
         .filter(
             UserAuditLog.resource_type == "payments",
             UserAuditLog.action == "CREATE",
+            UserAuditLog.resource_id == payment_id,
         )
         .order_by(UserAuditLog.id.desc())
         .first()

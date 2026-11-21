@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import type { AsyncState } from '../types/async-state';
+import type { components } from '../types/api';
 import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 const formatPaymentError = (err: unknown, fallbackMessage: string): string =>
@@ -48,10 +49,7 @@ interface DateRangeParams {
   date_to?: string;
 }
 
-interface RefundParams {
-  amount?: number;
-  reason?: string;
-}
+type RefundParams = components['schemas']['RefundRequest'];
 
 interface HourlyStatsParams {
   target_date?: string;
@@ -367,14 +365,11 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const refundPayment = useCallback(
-    async (paymentId: string | number, { amount, reason }: RefundParams): Promise<PaymentOperationResult> => {
+    async (paymentId: string | number, params: RefundParams): Promise<PaymentOperationResult> => {
       setRequestState(loadingState<unknown>());
 
       try {
-        const response = await api.post(`/cashier/payments/${paymentId}/refund`, {
-          amount,
-          reason,
-        });
+        const response = await api.post(`/cashier/payments/${paymentId}/refund`, params);
         setRequestState(successState<unknown>(null));
 
         return { success: true, data: response.data };

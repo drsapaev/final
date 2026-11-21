@@ -4,9 +4,10 @@
 
 import logging
 from datetime import datetime, timedelta
+from math import isfinite
 from typing import Any
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -26,6 +27,10 @@ from app.models.discount_benefits import (
 from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
+
+
+class EncounterBenefitAuthorityRequired(ValueError):
+    """Legacy client-supplied amounts cannot authorize a benefit."""
 
 
 class DiscountBenefitsService:
@@ -139,32 +144,44 @@ class DiscountBenefitsService:
         invoice_id: int | None = None,
         applied_by: int = None,
     ) -> DiscountApplication:
-        """Применить скидку"""
-        discount = self.db.query(Discount).filter(Discount.id == discount_id).first()
-        if not discount:
-            raise ValueError("Скидка не найдена")
+        """Apply and record a positive discount under its shared usage lock."""
+        if not isfinite(amount) or amount <= 0:
+            raise ValueError("Недопустимая сумма скидки")
+        try:
+            if self.db.get_bind().dialect.name == "sqlite":
+                self.db.execute(text("UPDATE discounts SET id=id WHERE 0"))
+            self.db.flush()
+            discount = (
+                self.db.query(Discount)
+                .filter(Discount.id == discount_id)
+                .with_for_update()
+                .populate_existing()
+                .first()
+            )
+            if discount is None:
+                raise ValueError("Скидка не найдена")
 
-        discount_amount = self.calculate_discount(discount, amount)
-        final_amount = amount - discount_amount
+            discount_amount = self.calculate_discount(discount, amount)
+            if not isfinite(discount_amount) or not 0 < discount_amount <= amount:
+                raise ValueError("Скидка недоступна")
 
-        application = DiscountApplication(
-            discount_id=discount_id,
-            appointment_id=appointment_id,
-            visit_id=visit_id,
-            invoice_id=invoice_id,
-            original_amount=amount,
-            discount_amount=discount_amount,
-            final_amount=final_amount,
-            applied_by=applied_by,
-        )
-
-        # Увеличить счетчик использований
-        discount.usage_count += 1
-
-        self.db.add(application)
-        self.db.commit()
+            application = DiscountApplication(
+                discount_id=discount_id,
+                appointment_id=appointment_id,
+                visit_id=visit_id,
+                invoice_id=invoice_id,
+                original_amount=amount,
+                discount_amount=discount_amount,
+                final_amount=amount - discount_amount,
+                applied_by=applied_by,
+            )
+            discount.usage_count += 1
+            self.db.add(application)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
         self.db.refresh(application)
-
         return application
 
     # === ЛЬГОТЫ ===
@@ -311,31 +328,13 @@ class DiscountBenefitsService:
             invoice_id=invoice_id,
         )
 
-        benefit_amount = self.calculate_benefit_discount(patient_benefit, amount)
-        final_amount = amount - benefit_amount
-
-        application = BenefitApplication(
-            patient_benefit_id=patient_benefit_id,
-            benefit_id=patient_benefit.benefit_id,
-            appointment_id=appointment_id,
-            visit_id=visit_id,
-            invoice_id=invoice_id,
-            original_amount=amount,
-            benefit_amount=benefit_amount,
-            final_amount=final_amount,
-            applied_by=applied_by,
+        # This legacy API accepts an arbitrary caller-provided amount and
+        # cannot bind approval, quota consumption or allocation to the whole
+        # encounter. Keep it closed until the server-owned authority replaces
+        # this path; even direct service callers must not write the old ledger.
+        raise EncounterBenefitAuthorityRequired(
+            "Применение льготы требует подтверждения полного обращения"
         )
-
-        # Обновить использование льготы
-        patient_benefit.monthly_used_amount += benefit_amount
-        patient_benefit.yearly_used_amount += benefit_amount
-        patient_benefit.last_used_date = datetime.now()
-
-        self.db.add(application)
-        self.db.commit()
-        self.db.refresh(application)
-
-        return application
 
     def get_monthly_benefit_usage(self, patient_benefit_id: int) -> float:
         """Получить месячное использование льготы"""
@@ -575,6 +574,14 @@ class DiscountBenefitsService:
         self, patient_id: int, service_ids: list[int], amount: float
     ) -> dict[str, Any]:
         """Рассчитать общую скидку для пациента"""
+        # The caller supplies no authoritative encounter or line snapshot, so
+        # neither a benefit estimate nor a final amount can be established for
+        # a patient with an active verified benefit. Other discount and loyalty
+        # operations remain available independently.
+        if self.get_patient_benefits(patient_id):
+            raise EncounterBenefitAuthorityRequired(
+                "Расчёт льготы требует подтверждения полного обращения"
+            )
         result = {
             'original_amount': amount,
             'discounts': [],
@@ -586,9 +593,6 @@ class DiscountBenefitsService:
 
         # Получить активные скидки для услуг
         discounts = self.get_active_discounts(service_ids)
-
-        # Получить льготы пациента
-        patient_benefits = self.get_patient_benefits(patient_id)
 
         # Получить баллы лояльности
         active_programs = (
@@ -615,23 +619,6 @@ class DiscountBenefitsService:
                 )
                 total_discount += discount_amount
                 current_amount -= discount_amount
-
-        # Применить льготы
-        for patient_benefit in patient_benefits:
-            benefit_amount = self.calculate_benefit_discount(
-                patient_benefit, current_amount
-            )
-            if benefit_amount > 0:
-                result['benefits'].append(
-                    {
-                        'id': patient_benefit.id,
-                        'name': patient_benefit.benefit.name,
-                        'type': patient_benefit.benefit.benefit_type,
-                        'amount': benefit_amount,
-                    }
-                )
-                total_discount += benefit_amount
-                current_amount -= benefit_amount
 
         # Рассчитать доступные баллы лояльности
         for program in active_programs:

@@ -23,6 +23,7 @@ import { printPanelTicketInBrowserAsync } from '../../../services/panelPrint';
 import type { Appointment } from '../../../types/domain/clinic';
 import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../../api/registrarPayments';
 import RecordPreview from './RecordPreview';
+import RegistrarInvitationTask from './RegistrarInvitationTask';
 import RescheduleSlots from './RescheduleSlots';
 import type { RegistrarWorklistLoadOutcome } from '../useRegistrarWorklistData';
 import type {
@@ -133,6 +134,7 @@ const RegistrarDialogsLayer = ({
   tI18n,
 }: RegistrarDialogsLayerProps) => (
   <>
+    <RegistrarInvitationTask />
     <RecordPreview
       isOpen={recordPreviewDialog.open}
       row={recordPreviewDialog.row}

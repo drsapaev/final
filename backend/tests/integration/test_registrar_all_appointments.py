@@ -6,19 +6,27 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import event
+from fastapi import HTTPException
+from sqlalchemy import event, text
+from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.registrar_integration import (
     _registrar_available_actions,
     _serialize_registrar_datetime,
 )
+from app.api.v1.endpoints.registrar_integration._helpers import (
+    _resolve_payment_truth as _resolve_queue_payment_truth,
+)
+from app.api.v1.endpoints.registrar_wizard._helpers import _resolve_payment_truth
 from app.models.appointment import Appointment
 from app.models.lab import LabReportInstance
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services.payment_invariant_service import PaymentInvariantService
+from tests.integration.test_staff_confirmation_guard_pg import guarded_pg  # noqa: F401
 
 
 def _clinic_today(db_session):
@@ -33,9 +41,90 @@ def _clinic_today(db_session):
     return clinic_today(db_session)
 
 
+@pytest.mark.parametrize(
+    ("payment_currency", "visible", "expected"),
+    [
+        ("UZS", True, ("paid", "cash")),
+        ("KZT", True, ("reconciliation_required", None)),
+        ("UZS", False, ("reconciliation_required", None)),
+    ],
+)
+def test_legacy_payment_projection_uses_postgres_quote(guarded_pg, payment_currency, visible, expected):
+    owner, runtime, ids = guarded_pg
+    with Session(owner) as db:
+        db.add(Payment(
+            visit_id=ids["visit"], amount=Decimal("10.00"), currency=payment_currency,
+            status="paid", method="cash",
+        ))
+        db.commit()
+    if not visible:
+        schema = owner.dialect.identifier_preparer.quote_schema(owner.dialect.default_schema_name)
+        with owner.begin() as conn:
+            conn.exec_driver_sql(f"ALTER POLICY financial_backend_select ON {schema}.payments USING (false)")
+    with Session(runtime) as db:
+        assert not db.execute(text("SELECT pg_catalog.has_table_privilege(CURRENT_USER,'payments','SELECT')")).scalar_one()
+        assert not db.execute(text(
+            "SELECT pg_catalog.has_column_privilege(CURRENT_USER,'payments','provider_data','SELECT')"
+        )).scalar_one()
+        assert _resolve_payment_truth(db, visit_id=ids["visit"]) == expected
+        assert _resolve_queue_payment_truth(db, visit_id=ids["visit"]) == expected
+        invariant = PaymentInvariantService(db)
+        if visible:
+            assert invariant.compute_paid_amount(ids["visit"]) == Decimal("10.00")
+            assert invariant.compute_net_paid_amounts_by_visit_id([ids["visit"]]) == {
+                ids["visit"]: Decimal("10.00")
+            }
+        else:
+            with pytest.raises(HTTPException) as refused:
+                invariant.compute_paid_amount(ids["visit"])
+            assert refused.value.status_code == 409
+
+
+@pytest.mark.parametrize("allocation", ["mirror", "split", "duplicate"])
+def test_postgres_visit_balances_require_verified_payment_allocation(guarded_pg, allocation):
+    owner, runtime, ids = guarded_pg
+    source_id = ids["visit"]
+    amount = Decimal("10.00")
+    with Session(owner, expire_on_commit=False) as db:
+        target = Visit(patient_id=ids["patient"], visit_date=_clinic_today(db), status="waiting", source="desk")
+        payment = Payment(visit_id=source_id, amount=amount, currency="UZS", status="paid", method="cash")
+        db.add_all([target, payment])
+        db.flush()
+        target_id = target.id
+        link_amount = amount / 2 if allocation == "split" else amount
+        db.add(PaymentVisit(payment_id=payment.id, visit_id=source_id, amount=link_amount))
+        if allocation != "mirror":
+            other_id = target_id if allocation == "split" else source_id
+            db.add(PaymentVisit(payment_id=payment.id, visit_id=other_id, amount=link_amount))
+        db.commit()
+
+    with Session(runtime) as db:
+        invariant = PaymentInvariantService(db)
+        source, target = db.get(Visit, source_id), db.get(Visit, target_id)
+        if allocation == "mirror":
+            assert invariant.recorded_payment_states([source, target]) == {source_id: ("paid", "cash")}
+            assert invariant.compute_net_paid_amounts_by_visit_id([source_id, target_id]) == {
+                source_id: amount, target_id: Decimal("0"),
+            }
+            return
+
+        affected = [source, target] if allocation == "split" else [source]
+        assert invariant.recorded_payment_states([source, target]) == {
+            visit.id: ("reconciliation_required", None) for visit in affected
+        }
+        for visit in affected:
+            assert invariant.recorded_payment_states([visit]) == {visit.id: ("reconciliation_required", None)}
+            with pytest.raises(HTTPException, match="Распределение платежей требует сверки") as refused:
+                invariant.compute_paid_amount(visit.id)
+            assert refused.value.status_code == 409
+            with pytest.raises(HTTPException, match="Распределение платежей требует сверки") as refused:
+                invariant.summarize_visits([visit])
+            assert refused.value.status_code == 409
+
 
 @pytest.mark.integration
 class TestRegistrarAllAppointments:
+    @pytest.mark.parametrize("with_receipts", [False, True], ids=["without-receipts", "with-receipts"])
     def test_today_queue_reference_reads_are_batched_for_multiple_visits(
         self,
         client,
@@ -44,6 +133,7 @@ class TestRegistrarAllAppointments:
         test_patient,
         test_doctor,
         test_service,
+        with_receipts,
     ):
         test_patient.sex = "M"
         db_session.commit()
@@ -71,13 +161,24 @@ class TestRegistrarAllAppointments:
                 name=test_service.name,
                 qty=1,
                 price=test_service.price,
-                currency="UZS",
+                currency="KZT" if visit is visits[3] else "UZS",
             )
             for visit in visits
         )
+        receipt_currencies = {0: "UZS", 1: "KZT", 3: "KZT"} if with_receipts else {}
+        db_session.add_all(
+            Payment(
+                visit_id=visits[index].id,
+                amount=Decimal(str(test_service.price)),
+                currency=currency,
+                status="paid",
+                method="cash",
+            )
+            for index, currency in receipt_currencies.items()
+        )
         db_session.commit()
 
-        query_counts = {"patients": 0, "visit_services": 0, "services": 0}
+        query_counts = {"patients": 0, "visit_services": 0, "services": 0, "payments": 0}
 
         def count_reference_reads(
             _conn, _cursor, statement, _parameters, _context, _many
@@ -117,8 +218,26 @@ class TestRegistrarAllAppointments:
             and entry.get("record_kind") == "visit"
         )
         assert query_counts["patients"] <= 3, query_counts
-        assert query_counts["visit_services"] <= 2, query_counts
+        # The queue loads its display references in bulk. Each recorded
+        # payment additionally uses the independent canonical quote on SQLite.
+        assert query_counts["visit_services"] <= 2 + len(receipt_currencies), query_counts
         assert query_counts["services"] <= 2, query_counts
+        assert query_counts["payments"] == 1, query_counts
+
+        visits_by_id = {row["id"]: row for row in rows if row.get("record_kind") == "visit"}
+        expected_payment_states = [
+            ("paid", "cash", False),
+            ("reconciliation_required", None, False),
+            ("pending", None, True),
+            ("paid", "cash", False),
+        ] if with_receipts else [("pending", None, True)] * len(visits)
+        for visit, (payment_status, payment_type, can_pay) in zip(visits, expected_payment_states, strict=True):
+            row = visits_by_id[visit.id]
+            assert (row["payment_status"], row["payment_type"], row["can_mark_paid"]) == (
+                payment_status, payment_type, can_pay,
+            )
+            assert row["blocks_group_payment"] is (payment_status == "reconciliation_required")
+            assert ("mark_paid" in row["available_actions"]) is can_pay
 
     def test_date_filters_accept_iso_strings_for_appointments_and_visits(
         self,
@@ -172,7 +291,15 @@ class TestRegistrarAllAppointments:
         assert visit_row["patient_id"] == test_patient.id
         assert visit_row["appointment_date"] == today
 
-    def test_search_uses_patient_name_and_marks_paid_status(
+    @pytest.mark.parametrize(
+        ("quote_currency", "expected_status"),
+        [
+            ("UZS", "paid"),
+            (None, "reconciliation_required"),
+            ("KZT", "reconciliation_required"),
+        ],
+    )
+    def test_search_keeps_rows_and_reports_verified_payment_status(
         self,
         client,
         db_session,
@@ -180,6 +307,9 @@ class TestRegistrarAllAppointments:
         test_patient,
         test_doctor,
         test_visit,
+        test_service,
+        quote_currency,
+        expected_status,
     ):
         appointment = Appointment(
             patient_id=test_patient.id,
@@ -192,9 +322,23 @@ class TestRegistrarAllAppointments:
             services=[],
             notes="SSOT registrar paid-search regression",
         )
-        db_session.add(appointment)
-        db_session.commit()
-        db_session.refresh(appointment)
+        unrelated = Appointment(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            appointment_date=_clinic_today(db_session) + timedelta(days=1),
+            appointment_time="12:30",
+            status="scheduled",
+        )
+        db_session.add_all([appointment, unrelated])
+        if quote_currency is not None:
+            db_session.add(VisitService(
+                visit_id=test_visit.id,
+                service_id=test_service.id,
+                name="SYNTHETIC registrar payment",
+                qty=1,
+                price=Decimal("150000.00"),
+                currency=quote_currency,
+            ))
 
         payment = Payment(
             visit_id=test_visit.id,
@@ -223,8 +367,15 @@ class TestRegistrarAllAppointments:
         assert appointment_row is not None
         assert appointment_row["patient_id"] == test_patient.id
         assert appointment_row["patient_fio"] == test_patient.short_name()
-        assert appointment_row["payment_status"] == "paid"
         assert appointment_row["visit_type"] == "none"
+        visit_row = next(item for item in items if item["source"] == "visits" and item["visit_id"] == test_visit.id)
+        for row in (appointment_row, visit_row):
+            assert row["payment_status"] == expected_status
+            assert row["payment_type"] == ("cash" if expected_status == "paid" else None)
+        unrelated_row = next(item for item in items if item.get("appointment_id") == unrelated.id)
+        assert unrelated_row["payment_status"] == "pending"
+        assert unrelated_row["payment_type"] is None
+        assert db_session.get(Payment, payment.id).status == "paid"
 
     def test_today_queues_serializes_queue_time_and_created_at(
         self,

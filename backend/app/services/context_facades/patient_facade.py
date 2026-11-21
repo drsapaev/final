@@ -9,6 +9,15 @@ from app.domain.contracts.patient_contracts import (
     PatientContractFacade,
     PatientSummary,
 )
+from app.services.patient_subject_lock import (
+    PatientSubjectLockError as PatientSubjectLockError,
+)
+from app.services.patient_subject_lock import (
+    lock_patient_subject as lock_patient_subject,
+)
+from app.services.patient_subject_lock import (
+    require_patient_subject_visibility as require_patient_subject_visibility,
+)
 
 logger = logging.getLogger(__name__)
 

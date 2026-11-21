@@ -713,7 +713,9 @@ async def update_profile(
             update_data["last_name"] = name_parts["last_name"]
             update_data["first_name"] = name_parts["first_name"]
             update_data["middle_name"] = name_parts.get("middle_name")
-        if request.birth_date:
+        if "birth_date" in request.model_fields_set and request.birth_date is None:
+            update_data["birth_date"] = None
+        elif request.birth_date:
             update_data["birth_date"] = datetime.fromisoformat(
                 request.birth_date
             ).date()

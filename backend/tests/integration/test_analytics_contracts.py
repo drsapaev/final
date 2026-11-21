@@ -1,11 +1,25 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
+from unittest.mock import Mock
+from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.models.payment import Payment, PaymentVisit
+from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 from app.models.user import User
+from app.models.visit import Visit
+from app.repositories.analytics_simple_repository import AnalyticsSimpleRepository
+from app.services import analytics as analytics_module
+from app.services.analytics import AnalyticsService
+from app.services.billing_service import BillingService
+from app.services.billing_service_pkg import _payments as billing_payments
+from app.services.queue_service import queue_service
 
 
 @pytest.fixture
@@ -27,6 +41,31 @@ def doctor_token(client: TestClient, test_doctor_user: User) -> str:
 
 def _auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.mark.parametrize("path", ["quick-stats", "dashboard"])
+def test_analytics_response_hides_unexpected_repository_failure(
+    client: TestClient,
+    doctor_token: str,
+    monkeypatch,
+    caplog,
+    path: str,
+) -> None:
+    marker = "SYNTHETIC_ANALYTICS_QUERY_FAILURE"
+    monkeypatch.setattr(
+        AnalyticsSimpleRepository,
+        "count_patients",
+        Mock(side_effect=RuntimeError(marker)),
+    )
+
+    response = client.get(
+        f"/api/v1/analytics/{path}", headers=_auth_headers(doctor_token)
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Internal server error"
+    assert marker not in response.text
+    assert marker not in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -54,6 +93,380 @@ def test_analytics_legacy_contracts_exist(
     payload: dict[str, Any] = response.json()
     for key in expected_keys:
         assert key in payload
+
+
+def test_revenue_counts_settled_payments_once_and_keeps_currencies_separate(
+    client: TestClient, admin_token: str, db_session, test_patient, monkeypatch,
+) -> None:
+    created_at = datetime(2032, 6, 7, 12, tzinfo=UTC)
+    cardio = Visit(patient_id=test_patient.id, visit_date=created_at.date(), department="cardiology")
+    lab = Visit(patient_id=test_patient.id, visit_date=created_at.date(), department="laboratory")
+    db_session.add_all([cardio, lab])
+    db_session.flush()
+
+    online = Payment(
+        visit_id=cardio.id, amount=Decimal("44.25"), currency="UZS",
+        status="completed", method="click", provider="click", created_at=created_at,
+    )
+    ambiguous = Payment(
+        visit_id=cardio.id, amount=Decimal("50.00"), currency="UZS",
+        status="paid", method="cash", created_at=created_at,
+    )
+    db_session.add_all([online, ambiguous])
+    db_session.add(Payment(
+        visit_id=cardio.id, amount=Decimal("999.00"), currency="UZS",
+        status="paid", method="cash", created_at=created_at + timedelta(hours=12),
+    ))
+    for visit_id, amount, currency, status in (
+        (cardio.id, "125.50", "UZS", "paid"),
+        (lab.id, "75.00", "UZS", "paid"),
+        (cardio.id, "10.50", "USD", "paid"),
+        (cardio.id, "33.20", "", "paid"),
+        (cardio.id, "999.00", "UZS", "pending"),
+        (cardio.id, "777.00", "UZS", "failed"),
+    ):
+        db_session.add(Payment(
+            visit_id=visit_id, amount=Decimal(amount), currency=currency,
+            status=status, method="cash", created_at=created_at,
+        ))
+    db_session.flush()
+    db_session.add_all([
+        PaymentVisit(payment_id=online.id, visit_id=cardio.id, amount=online.amount),
+        PaymentVisit(payment_id=ambiguous.id, visit_id=lab.id, amount=ambiguous.amount),
+    ])
+    for _ in range(2):
+        external_id = f"synthetic-{uuid4()}"
+        receipt = PaymentWebhook(
+            provider="click", webhook_id=external_id, transaction_id=external_id,
+            amount=4425, currency="UZS", raw_data={}, status="success", created_at=created_at,
+        )
+        db_session.add(receipt)
+        db_session.flush()
+        db_session.add(PaymentTransaction(
+            provider="click", transaction_id=external_id, amount=4425,
+            currency="UZS", status="success", payment_id=online.id, webhook_id=receipt.id,
+            created_at=created_at,
+        ))
+    db_session.commit()
+
+    dashboard = AnalyticsService.calculate_revenue(
+        db_session, created_at - timedelta(hours=1), created_at + timedelta(hours=1),
+    )
+    assert dashboard["total_revenue"] == 294.75
+    assert dashboard["total_transactions"] == 4
+    assert dashboard["by_provider"] == {"click": 44.25}
+    assert dashboard["daily_revenue"] == {"2032-06-07": 294.75}
+    assert dashboard["by_currency"]["USD"] == {"total_revenue": 10.50, "total_transactions": 1}
+    assert dashboard["unclassified_transactions"] == 1
+    assert dashboard["unattributed_transactions"] == 1
+
+    response = client.get(
+        "/api/v1/analytics/revenue-breakdown",
+        headers=_auth_headers(admin_token),
+        params={"start_date": "2032-06-07", "end_date": "2032-06-07", "department": "cardiology"},
+    )
+    assert response.status_code == 200, response.text
+    filtered = response.json()
+    assert filtered["currency"] == "UZS"
+    assert filtered["basis"] == "gross_settled_payments"
+    assert filtered["total_revenue"] == 169.75
+    assert filtered["total_transactions"] == 2
+    assert filtered["by_currency"]["USD"]["total_revenue"] == 10.50
+    assert filtered["provider_breakdown"]["click"]["total_amount"] == 44.25
+    assert filtered["department_breakdown"] == {"cardiology": {"visits": 1, "total_revenue": 169.75}}
+    assert filtered["daily_revenue"] == [{"date": "2032-06-07", "amount": 169.75}]
+
+    monkeypatch.setattr(queue_service, "get_local_timestamp", lambda db: created_at + timedelta(days=1))
+    trends = client.get("/api/v1/analytics/trends", headers=_auth_headers(admin_token), params={"days": 2})
+    assert trends.status_code == 200, trends.text
+    assert trends.json()["revenue_trend"] == [
+        {"date": "2032-06-06", "revenue": 0.0},
+        {"date": "2032-06-07", "revenue": 294.75},
+    ]
+
+    providers = client.get(
+        "/api/v1/analytics/payment-providers",
+        headers=_auth_headers(admin_token),
+        params={"start_date": "2032-06-07", "end_date": "2032-06-07", "department": "cardiology"},
+    )
+    assert providers.status_code == 200, providers.text
+    provider_report = providers.json()
+    summary = provider_report["summary"]
+    assert summary["total_transactions"] == 1
+    assert summary["total_revenue"] == 44.25
+    assert summary["total_commission"] is None
+    assert provider_report["providers"]["click"]["success_rate"] is None
+
+
+def test_revenue_groups_payments_by_posting_day(
+    client: TestClient,
+    admin_token: str,
+    db_session,
+    test_patient,
+    monkeypatch,
+) -> None:
+    posting_day = datetime(2034, 7, 12, tzinfo=UTC)
+    order_day = posting_day - timedelta(days=1)
+    visit = Visit(
+        patient_id=test_patient.id, visit_date=order_day.date(), department="cardiology"
+    )
+    db_session.add(visit)
+    db_session.flush()
+    db_session.add_all(
+        [
+            Payment(
+                visit_id=visit.id,
+                amount=Decimal("60.25"),
+                currency="UZS",
+                status="paid",
+                method="click",
+                provider="click",
+                created_at=order_day + timedelta(hours=10),
+                paid_at=posting_day + timedelta(hours=11),
+            ),
+            Payment(
+                visit_id=visit.id,
+                amount=Decimal("5.00"),
+                currency="UZS",
+                status="paid",
+                method="cash",
+                created_at=order_day + timedelta(hours=10),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/analytics/revenue-breakdown",
+        headers=_auth_headers(admin_token),
+        params={
+            "start_date": order_day.date().isoformat(),
+            "end_date": posting_day.date().isoformat(),
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["daily_revenue"] == [
+        {"date": order_day.date().isoformat(), "amount": 5.00},
+        {"date": posting_day.date().isoformat(), "amount": 60.25},
+    ]
+
+    on_posting_day = AnalyticsService.calculate_revenue(
+        db_session,
+        posting_day,
+        posting_day + timedelta(hours=23),
+    )
+    assert on_posting_day["total_revenue"] == 60.25
+    assert on_posting_day["by_provider"] == {"click": 60.25}
+
+    monkeypatch.setattr(
+        queue_service, "get_local_timestamp", lambda db: posting_day + timedelta(days=1)
+    )
+    response = client.get(
+        "/api/v1/analytics/trends",
+        headers=_auth_headers(admin_token),
+        params={"days": 2},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["revenue_trend"] == [
+        {"date": order_day.date().isoformat(), "revenue": 5.00},
+        {"date": posting_day.date().isoformat(), "revenue": 60.25},
+    ]
+
+
+def test_gross_receipt_keeps_original_posting_day_after_a_full_refund(
+    client: TestClient,
+    admin_token: str,
+    db_session,
+    test_patient,
+    monkeypatch,
+) -> None:
+    posted_at = datetime(2034, 9, 12, 11, tzinfo=UTC)
+    ordered_at = posted_at - timedelta(days=1)
+    refunded_at = posted_at + timedelta(days=1)
+    visit = Visit(
+        patient_id=test_patient.id, visit_date=ordered_at.date(), department="cardiology"
+    )
+    db_session.add(visit)
+    db_session.flush()
+    payment = Payment(
+        visit_id=visit.id, amount=Decimal("31.25"), currency="UZS", status="paid",
+        method="click", provider="click", created_at=ordered_at, paid_at=posted_at,
+    )
+    db_session.add_all([
+        payment,
+        Payment(
+            visit_id=visit.id, amount=Decimal("80.00"), currency="UZS", status="refunded",
+            refunded_amount=Decimal("80.00"), created_at=ordered_at, refunded_at=refunded_at,
+        ),
+        Payment(
+            visit_id=visit.id, amount=Decimal("70.00"), currency="UZS", status="pending",
+            created_at=ordered_at, paid_at=posted_at,
+        ),
+    ])
+    db_session.commit()
+
+    def report() -> dict[str, Any]:
+        response = client.get(
+            "/api/v1/analytics/revenue-breakdown",
+            headers=_auth_headers(admin_token),
+            params={
+                "start_date": ordered_at.date().isoformat(),
+                "end_date": refunded_at.date().isoformat(),
+                "department": "cardiology",
+            },
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    before = report()
+    assert before["basis"] == "gross_settled_payments"
+    assert before["total_revenue"] == 31.25
+    assert before["total_transactions"] == 1
+    assert before["daily_revenue"] == [{"date": "2034-09-12", "amount": 31.25}]
+
+    payment.refunded_amount = payment.amount
+    payment.refunded_at = refunded_at
+    BillingService(db_session).update_payment_status(payment.id, "refunded", commit=False)
+    db_session.commit()
+
+    assert report() == before
+    monkeypatch.setattr(
+        queue_service, "get_local_timestamp", lambda db: refunded_at + timedelta(days=1)
+    )
+    response = client.get(
+        "/api/v1/analytics/trends", headers=_auth_headers(admin_token), params={"days": 3}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["revenue_trend"] == [
+        {"date": "2034-09-11", "revenue": 0.0},
+        {"date": "2034-09-12", "revenue": 31.25},
+        {"date": "2034-09-13", "revenue": 0.0},
+    ]
+
+
+def test_revenue_trends_match_clinic_calendar_dates(
+    client: TestClient,
+    admin_token: str,
+    db_session,
+    test_patient,
+    monkeypatch,
+) -> None:
+    now = datetime(2040, 8, 3, 14, tzinfo=ZoneInfo("Asia/Tashkent"))
+    today = now.replace(hour=0)
+    yesterday = today - timedelta(days=1)
+    visit = Visit(patient_id=test_patient.id, visit_date=yesterday.date())
+    db_session.add(visit)
+    db_session.flush()
+    for posted, amount in (
+        (yesterday - timedelta(microseconds=1), "10.25"),
+        (yesterday, "20.50"),
+        (today, "30.00"),
+    ):
+        db_session.add(
+            Payment(
+                visit_id=visit.id,
+                amount=Decimal(amount),
+                currency="UZS",
+                status="paid",
+                created_at=posted.astimezone(UTC),
+                paid_at=posted.astimezone(UTC),
+            )
+        )
+    db_session.commit()
+
+    monkeypatch.setattr(queue_service, "get_local_timestamp", lambda db: now)
+    response = client.get(
+        "/api/v1/analytics/trends",
+        headers=_auth_headers(admin_token),
+        params={"days": 2},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["revenue_trend"] == [
+        {"date": "2040-08-01", "revenue": 10.25},
+        {"date": "2040-08-02", "revenue": 20.50},
+    ]
+
+
+@pytest.mark.parametrize("is_superuser", [False, True])
+def test_trends_query_finance_only_for_financial_roles(
+    client: TestClient,
+    db_session,
+    test_doctor_user,
+    test_patient,
+    monkeypatch,
+    is_superuser: bool,
+) -> None:
+    from tests.conftest import mint_access_token
+
+    now = datetime(2040, 8, 2, 12, tzinfo=UTC)
+    yesterday = (now - timedelta(days=1)).date()
+    db_session.add(Visit(patient_id=test_patient.id, visit_date=yesterday))
+    test_doctor_user.is_superuser = is_superuser
+    db_session.commit()
+
+    monkeypatch.setattr(queue_service, "get_local_timestamp", lambda db: now)
+    financial_report = Mock(return_value=([], {}))
+    monkeypatch.setattr(analytics_module, "_gross_payment_report", financial_report)
+    response = client.get(
+        "/api/v1/analytics/trends",
+        headers=_auth_headers(mint_access_token(test_doctor_user)),
+        params={"days": 1},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["visit_trend"] == [{"date": yesterday.isoformat(), "visits": 1}]
+    if is_superuser:
+        assert payload["revenue_trend"] == [
+            {"date": yesterday.isoformat(), "revenue": 0.0}
+        ]
+        financial_report.assert_called_once()
+    else:
+        assert "revenue_trend" not in payload
+        financial_report.assert_not_called()
+
+
+def test_payment_confirmation_records_an_absolute_utc_time(
+    db_session, test_patient, monkeypatch
+) -> None:
+    confirmed_at = datetime(2034, 7, 12, 6, 30, tzinfo=UTC)
+    clock_time = confirmed_at
+
+    class ConfirmationClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock_time.astimezone(tz)
+
+    monkeypatch.setattr(billing_payments, "datetime", ConfirmationClock)
+    monkeypatch.setattr(
+        BillingService,
+        "_get_local_timestamp_naive",
+        lambda self: confirmed_at.replace(tzinfo=None) + timedelta(hours=5),
+    )
+    visit = Visit(
+        patient_id=test_patient.id,
+        visit_date=confirmed_at.date(),
+        department="cardiology",
+    )
+    db_session.add(visit)
+    db_session.flush()
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("32.00"),
+        currency="UZS",
+        status="pending",
+        method="click",
+    )
+    db_session.add(payment)
+    db_session.flush()
+
+    service = BillingService(db_session)
+    settled = service.update_payment_status(payment.id, "paid", commit=False)
+    assert settled.paid_at == confirmed_at
+    clock_time += timedelta(days=1)
+    assert (
+        service.update_payment_status(payment.id, "paid", commit=False).paid_at
+        == confirmed_at
+    )
 
 
 def test_predictive_endpoint_returns_flat_forecasts(

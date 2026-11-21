@@ -11,6 +11,12 @@ from sqlalchemy.orm import Session
 from app.models.billing import InvoiceStatus
 from app.repositories.billing_api_repository import BillingApiRepository
 
+_SETTLEMENT_STATUSES = {
+    InvoiceStatus.PAID,
+    InvoiceStatus.PARTIALLY_PAID,
+    InvoiceStatus.REFUNDED,
+}
+
 
 @dataclass
 class BillingApiDomainError(Exception):
@@ -36,6 +42,7 @@ class BillingApiService:
         recurrence_interval: int,
         next_date_calculator: Callable,
     ) -> None:
+        """Stage the recurrence alongside the invoice in the caller's transaction."""
         invoice.is_recurring = True
         invoice.recurrence_type = recurrence_type
         invoice.recurrence_interval = recurrence_interval
@@ -44,7 +51,6 @@ class BillingApiService:
             recurrence_type,
             recurrence_interval,
         )
-        self.repository.commit()
 
     def list_invoices(
         self,
@@ -67,14 +73,22 @@ class BillingApiService:
             date_to=date_to,
         )
 
-    def get_invoice_or_error(self, *, invoice_id: int):
-        invoice = self.repository.get_invoice(invoice_id)
+    def get_invoice_or_error(self, *, invoice_id: int, for_update: bool = False):
+        invoice = self.repository.get_invoice(invoice_id, for_update=for_update)
         if not invoice:
             raise BillingApiDomainError(404, "Счет не найден")
         return invoice
 
     def update_invoice(self, *, invoice_id: int, update_data: dict):
-        invoice = self.get_invoice_or_error(invoice_id=invoice_id)
+        invoice = self.get_invoice_or_error(invoice_id=invoice_id, for_update=True)
+        requested_status = update_data.get("status", invoice.status)
+        if requested_status != invoice.status and (
+            requested_status is None
+            or requested_status in _SETTLEMENT_STATUSES
+            or invoice.status in _SETTLEMENT_STATUSES
+            or invoice.paid_amount != 0
+        ):
+            raise BillingApiDomainError(409, "Изменение расчётного статуса требует финансовой операции")
         for field, value in update_data.items():
             setattr(invoice, field, value)
         self.repository.commit()
@@ -82,9 +96,9 @@ class BillingApiService:
         return invoice
 
     def delete_invoice(self, *, invoice_id: int) -> None:
-        invoice = self.get_invoice_or_error(invoice_id=invoice_id)
-        if invoice.status != InvoiceStatus.DRAFT:
-            raise BillingApiDomainError(400, "Можно удалять только черновики")
+        invoice = self.get_invoice_or_error(invoice_id=invoice_id, for_update=True)
+        if invoice.status != InvoiceStatus.DRAFT or invoice.paid_amount != 0:
+            raise BillingApiDomainError(400, "Можно удалять только неоплаченные черновики")
         self.repository.delete(invoice)
 
     def list_payments(
@@ -109,6 +123,7 @@ class BillingApiService:
                 "id": payment.id,
                 "visit_id": payment.visit_id,
                 "amount": float(payment.amount),
+                "currency": payment.currency,
                 "method": payment.method,
                 "status": payment.status,
                 "receipt_no": payment.receipt_no,

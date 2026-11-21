@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any
 
+from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
@@ -10,20 +12,36 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _build_repeat_eligibility_preview_item,
     _load_registration_discount_settings,
 )  # noqa: F401
+from app.models.payment import Payment
+from app.services.all_free_approval import awaits_all_free_decision
+from app.services.money_input import MoneyInputError, parse_money
 from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.payment_invoice_service import PaymentInvoiceService
+from app.services.payment_providers.base import PaymentResult
+from app.services.visit_lifecycle_service import VisitLifecycleService
+
+_FINAL_INVOICE_STATES = frozenset({"paid", "failed", "cancelled"})
+_CLICK_FINAL_STATUS = {"completed": 2, "failed": -1, "cancelled": -2}
+_INVOICE_RECONCILIATION_REQUIRED = "Результат оплаты требует сверки с провайдером"
+
+
+def _read_invoice_links(db: Session, invoice_id: int) -> list[PaymentInvoiceVisit]:
+    return (
+        db.query(PaymentInvoiceVisit)
+        .filter(PaymentInvoiceVisit.invoice_id == invoice_id)
+        .order_by(PaymentInvoiceVisit.visit_id, PaymentInvoiceVisit.id)
+        .populate_existing()
+        .all()
+    )
 
 
 def _lock_invoice_settlement_context(
     db: Session,
     invoice_id: int,
+    *,
+    starting_payment: bool = False,
 ) -> tuple[PaymentInvoice, list[Visit], list[PaymentInvoiceVisit]]:
-    """Lock invoice visits before the invoice and revalidate their linkage.
-
-    Cash and grouped-payment commands lock visits first. Using the same order
-    avoids a visit/invoice deadlock while preserving coordination with invoice
-    edits, which lock the invoice before changing its amount or links.
-    """
+    """Use the shared lock order, then reread all links, including zero rows."""
     invoice_exists = (
         db.query(PaymentInvoice.id)
         .filter(PaymentInvoice.id == invoice_id)
@@ -37,10 +55,7 @@ def _lock_invoice_settlement_context(
             int(row[0])
             for row in (
                 db.query(PaymentInvoiceVisit.visit_id)
-                .filter(
-                    PaymentInvoiceVisit.invoice_id == invoice_id,
-                    PaymentInvoiceVisit.visit_amount > 0,
-                )
+                .filter(PaymentInvoiceVisit.invoice_id == invoice_id)
                 .all()
             )
         }
@@ -51,63 +66,24 @@ def _lock_invoice_settlement_context(
             detail="Счёт не связан с оплачиваемыми визитами",
         )
 
-    visits = (
-        db.query(Visit)
-        .filter(Visit.id.in_(initial_visit_ids))
-        .order_by(Visit.id)
-        .with_for_update(of=Visit)
-        .populate_existing()
-        .all()
-    )
-    if len(visits) != len(initial_visit_ids):
-        raise HTTPException(
-            status_code=409,
-            detail="Состав счёта изменился. Обновите список счетов.",
-        )
+    invariant = PaymentInvariantService(db)
+    if starting_payment:
+        invariant.preflight_new_payment(initial_visit_ids)
+    else:
+        invariant.preflight_payment_groups(initial_visit_ids)
 
     invoice = (
         db.query(PaymentInvoice)
         .filter(PaymentInvoice.id == invoice_id)
-        .with_for_update()
         .populate_existing()
         .first()
     )
     if invoice is None:
         raise HTTPException(status_code=404, detail="Invoice не найден")
 
-    invoice_visits = (
-        db.query(PaymentInvoiceVisit)
-        .filter(
-            PaymentInvoiceVisit.invoice_id == invoice.id,
-            PaymentInvoiceVisit.visit_amount > 0,
-        )
-        .order_by(PaymentInvoiceVisit.visit_id, PaymentInvoiceVisit.id)
-        .populate_existing()
-        .all()
-    )
+    invoice_visits = _read_invoice_links(db, invoice_id)
     locked_visit_ids = sorted({int(link.visit_id) for link in invoice_visits})
-    if locked_visit_ids != initial_visit_ids or any(
-        visit.patient_id != invoice.patient_id for visit in visits
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="Состав счёта изменился. Обновите список счетов.",
-        )
-    linked_amount = sum(
-        (Decimal(str(link.visit_amount)) for link in invoice_visits),
-        Decimal("0"),
-    )
-    if linked_amount != Decimal(str(invoice.total_amount or 0)):
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Распределение суммы счёта изменилось. "
-                "Обновите список счетов перед оплатой."
-            ),
-        )
-    # An edit may have held the invoice lock while changing VisitService rows.
-    # Refresh those rows only after both lock sets are held so the balance and
-    # invoice amount belong to the same committed state.
+    # The loss or addition of a link during the preflight changes the target.
     visits = (
         db.query(Visit)
         .options(selectinload(Visit.services))
@@ -116,6 +92,45 @@ def _lock_invoice_settlement_context(
         .populate_existing()
         .all()
     )
+    if (
+        locked_visit_ids != initial_visit_ids
+        or len(visits) != len(initial_visit_ids)
+        or any(visit.patient_id != invoice.patient_id for visit in visits)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Состав счёта изменился. Обновите список счетов.",
+        )
+    if starting_payment:
+        invariant.assert_all_free_decided(visits)
+    try:
+        linked_amount = sum((parse_money(link.visit_amount) for link in invoice_visits), Decimal("0"))
+        invoice_total = parse_money(invoice.total_amount)
+    except MoneyInputError as exc:
+        raise HTTPException(status_code=409, detail="Распределение суммы счёта требует сверки") from exc
+    if linked_amount != invoice_total:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Распределение суммы счёта изменилось. "
+                "Обновите список счетов перед оплатой."
+            ),
+        )
+    if linked_amount <= 0:
+        raise HTTPException(status_code=409, detail="Счёт не связан с оплачиваемыми визитами")
+    if invoice.status == "pending":
+        allocation_by_visit = {visit.id: Decimal("0.00") for visit in visits}
+        for link in invoice_visits:
+            allocation_by_visit[link.visit_id] += Decimal(str(link.visit_amount))
+        for visit in visits:
+            # Equal-and-opposite changes to two visits can preserve the total
+            # while leaving the allocation stale before provider checkout.
+            outstanding = max(invariant.compute_total_cost(visit) - invariant.compute_paid_amount(visit.id), Decimal("0.00"))
+            if allocation_by_visit[visit.id] != outstanding:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Распределение счёта по визитам изменилось. Обновите список счетов перед оплатой.",
+                )
     return invoice, visits, invoice_visits
 
 
@@ -132,6 +147,7 @@ def init_invoice_payment(
         invoice, visits, invoice_visits = _lock_invoice_settlement_context(
             db,
             payment_req.invoice_id,
+            starting_payment=True,
         )
 
         if invoice.status != "pending":
@@ -143,6 +159,7 @@ def init_invoice_payment(
         provider_name = payment_req.provider.lower()
         payment_manager = get_payment_manager()
         if not payment_manager.supports_registrar_invoice_payment(provider_name):
+            db.rollback()
             return InvoicePaymentResponse(
                 success=False,
                 error_message=f"Провайдер {payment_req.provider} не поддерживается",
@@ -153,6 +170,8 @@ def init_invoice_payment(
             [visit.id for visit in visits]
         )
         settlement = invariant_service.summarize_visits(visits)
+        if settlement["currency"] != invoice.currency:
+            raise HTTPException(status_code=409, detail="Валюта счёта требует сверки")
         ledger_remaining_amount = Decimal(str(settlement["remaining_amount"]))
         invoice_total = Decimal(str(invoice.total_amount or 0))
         remaining_amount = min(invoice_total, ledger_remaining_amount)
@@ -209,16 +228,164 @@ def init_invoice_payment(
                 provider_payment_id=result.payment_id,
             )
         else:
+            db.rollback()
             return InvoicePaymentResponse(
                 success=False, error_message=result.error_message
             )
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
+        db.rollback()
         raise HTTPException(
             status_code=500, detail="Internal server error"
         )
+
+
+def _invoice_checkout_binding(invoice: PaymentInvoice, links: list[PaymentInvoiceVisit]) -> tuple:
+    return (
+        invoice.patient_id,
+        invoice.provider,
+        invoice.provider_payment_id,
+        invoice.provider_transaction_id,
+        invoice.total_amount,
+        invoice.currency,
+        tuple((link.id, link.visit_id, link.visit_amount) for link in links),
+    )
+
+
+def _click_outcome_reference(invoice: PaymentInvoice, result: PaymentResult) -> str | None:
+    """Check evidence returned by the provider, including the invoice amount."""
+    data = getattr(result, "provider_data", None)
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
+    raw_status = data.get("status")
+    raw_amount = data.get("amount")
+    error_code = data.get("error_code", 0)
+    if (
+        invoice.provider != "click"
+        or result.payment_id != invoice.provider_payment_id
+        or data.get("merchant_trans_id") != invoice.provider_payment_id
+        or type(raw_status) is not int
+        or raw_status != _CLICK_FINAL_STATUS[result.status]
+        or type(error_code) is not int
+        or error_code != 0
+        or invoice.currency != "UZS"
+        or data.get("currency", "UZS") != invoice.currency
+        or type(raw_amount) not in (Decimal, str, int)
+    ):
+        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
+    try:
+        exact_amount = parse_money(raw_amount)
+    except MoneyInputError as exc:
+        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED) from exc
+    if exact_amount != invoice.total_amount:
+        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
+    if result.status != "completed":
+        return None
+
+    reference = data.get("click_trans_id")
+    if type(reference) is int:
+        reference = str(reference)
+    if (
+        not isinstance(reference, str)
+        or not 1 <= len(reference) <= 19
+        or not reference.isascii()
+        or not reference.isdecimal()
+        or reference.startswith("0")
+        or invoice.provider_transaction_id not in (None, reference)
+    ):
+        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
+    return reference
+
+
+def _record_completed_invoice(
+    db: Session,
+    invoice: PaymentInvoice,
+    visits: list[Visit],
+    links: list[PaymentInvoiceVisit],
+    reference: str,
+    actor: User,
+) -> None:
+    """Apply one verified provider receipt while the financial locks are held."""
+    allocations: dict[int, Decimal] = {}
+    for link in links:
+        if link.visit_amount > 0:
+            allocations[link.visit_id] = allocations.get(link.visit_id, Decimal("0.00")) + link.visit_amount
+    if db.query(PaymentInvoice.id).filter(
+        PaymentInvoice.id != invoice.id,
+        PaymentInvoice.provider == invoice.provider,
+        or_(PaymentInvoice.provider_payment_id == invoice.provider_payment_id,
+            PaymentInvoice.provider_transaction_id == reference),
+    ).first():
+        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
+
+    existing_visits: set[int] = set()
+    existing = db.query(Payment).filter(
+        Payment.provider == invoice.provider,
+        or_(Payment.provider_payment_id == invoice.provider_payment_id,
+            Payment.provider_transaction_id == reference),
+    ).populate_existing().all()
+    for payment in existing:
+        visit_id = payment.visit_id
+        if (
+            visit_id not in allocations or visit_id in existing_visits
+            or payment.amount != allocations[visit_id] or payment.currency != invoice.currency
+            or payment.status not in {"paid", "completed"}
+            or payment.provider_payment_id != invoice.provider_payment_id
+            or payment.provider_transaction_id != reference
+        ):
+            raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
+        existing_visits.add(visit_id)
+
+    invariant = PaymentInvariantService(db)
+    for visit_id, amount in sorted(allocations.items()):
+        if visit_id in existing_visits:
+            continue
+        payment = invariant.create_payment_for_visit(
+            visit_id=visit_id,
+            amount=amount,
+            method="online",
+            note=f"Оплата через {invoice.provider} (invoice {invoice.id})",
+            current_user=actor,
+            provider=invoice.provider,
+            currency=invoice.currency,
+            allow_overpayment=False,
+            settling_invoice_id=invoice.id,
+            commit=False,
+        )
+        payment.provider_payment_id = invoice.provider_payment_id
+        payment.provider_transaction_id = reference
+        payment.provider_data = invoice.provider_data
+
+    # Clinical transitions can advance the visit context epoch. Run them only
+    # after the entire receipt has been checked and staged under the same locks.
+    lifecycle = VisitLifecycleService(db)
+    actor_id = f"invoice_{invoice.id}"
+    invoice_actor = SimpleNamespace(id=actor_id)
+    for visit in visits:
+        if visit.id in allocations and not awaits_all_free_decision(visit):
+            lifecycle.confirm_visit(
+                visit_id=visit.id,
+                current_user=invoice_actor,
+                confirmed_by=actor_id,
+                commit=False,
+            )
+    invoice.provider_transaction_id = reference
+    invoice.status = "paid"
+    invoice.paid_at = datetime.now(UTC)
+
+
+def _invoice_status_response(invoice: PaymentInvoice) -> dict[str, Any]:
+    return {
+        "invoice_id": invoice.id,
+        "status": invoice.status,
+        "total_amount": invoice.total_amount,
+        "currency": invoice.currency,
+        "provider_payment_id": invoice.provider_payment_id,
+        "paid_at": invoice.paid_at,
+    }
 
 
 @router.get("/registrar/invoice/{invoice_id}/status", response_model=dict[str, Any])
@@ -227,156 +394,50 @@ def check_invoice_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
-    """
-    Проверка статуса оплаты invoice
-    """
+    """Read the provider outside the transaction that records its receipt."""
     try:
-        invoice = (
-            db.query(PaymentInvoice).filter(PaymentInvoice.id == invoice_id).first()
-        )
-        if not invoice:
+        invoice = db.get(PaymentInvoice, invoice_id, populate_existing=True)
+        if invoice is None:
             raise HTTPException(status_code=404, detail="Invoice не найден")
+        if invoice.status != "processing" or not invoice.provider_payment_id or not invoice.provider:
+            return _invoice_status_response(invoice)
 
-        # Если статус уже финальный, возвращаем как есть
-        if invoice.status in ["paid", "failed", "cancelled"]:
-            return {
-                "invoice_id": invoice.id,
-                "status": invoice.status,
-                "total_amount": invoice.total_amount,
-                "currency": invoice.currency,
-                "provider_payment_id": invoice.provider_payment_id,
-            }
+        snapshot = _invoice_checkout_binding(invoice, _read_invoice_links(db, invoice_id))
+        provider_name = invoice.provider.lower()
+        provider_payment_id = invoice.provider_payment_id
+        payment_manager = get_payment_manager()
+        if not payment_manager.supports_registrar_invoice_payment(provider_name):
+            return _invoice_status_response(invoice)
 
-        # Проверяем статус у провайдера
-        if invoice.provider_payment_id and invoice.provider:
-            provider_name = invoice.provider.lower()
+        db.rollback()
+        result = payment_manager.check_payment_status(provider_name, provider_payment_id)
+        if not result.success or result.status not in _CLICK_FINAL_STATUS:
+            invoice = db.get(PaymentInvoice, invoice_id, populate_existing=True)
+            if invoice is None:
+                raise HTTPException(status_code=404, detail="Invoice не найден")
+            return _invoice_status_response(invoice)
 
-            payment_manager = get_payment_manager()
-            if payment_manager.supports_registrar_invoice_payment(provider_name):
-                result = payment_manager.check_payment_status(
-                    provider_name, invoice.provider_payment_id
-                )
+        invoice, visits, links = _lock_invoice_settlement_context(db, invoice_id)
+        if invoice.status in _FINAL_INVOICE_STATES:
+            status_payload = _invoice_status_response(invoice)
+            db.rollback()
+            return status_payload
+        if invoice.status != "processing" or _invoice_checkout_binding(invoice, links) != snapshot:
+            raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
 
-                if result.success:
-                    # Обновляем статус invoice
-                    if result.status == "completed":
-                        (
-                            invoice,
-                            locked_visits,
-                            invoice_visits,
-                        ) = _lock_invoice_settlement_context(db, invoice.id)
-                        if invoice.status == "paid":
-                            return {
-                                "invoice_id": invoice.id,
-                                "status": invoice.status,
-                                "total_amount": invoice.total_amount,
-                                "currency": invoice.currency,
-                                "provider_payment_id": invoice.provider_payment_id,
-                                "paid_at": invoice.paid_at,
-                            }
-                        if invoice.status != "processing":
-                            raise HTTPException(
-                                status_code=409,
-                                detail=(
-                                    "Состояние счёта изменилось. "
-                                    "Обновите список счетов."
-                                ),
-                            )
-
-                        visits_by_id = {visit.id: visit for visit in locked_visits}
-                        allocation_by_visit_id: dict[int, Decimal] = {}
-                        for invoice_visit in invoice_visits:
-                            allocation_by_visit_id[invoice_visit.visit_id] = (
-                                allocation_by_visit_id.get(
-                                    invoice_visit.visit_id,
-                                    Decimal("0"),
-                                )
-                                + Decimal(str(invoice_visit.visit_amount))
-                            )
-                        invariant_service = PaymentInvariantService(db)
-
-                        from app.models.payment import Payment
-                        from app.services.visit_lifecycle_service import (
-                            VisitLifecycleService,
-                        )
-
-                        class _InvoiceActor:
-                            def __init__(self, invoice_id: int) -> None:
-                                self.id = f"invoice_{invoice_id}"
-
-                        for visit_id, visit_amount in sorted(
-                            allocation_by_visit_id.items()
-                        ):
-                            visit = visits_by_id.get(visit_id)
-                            if visit:
-                                # Idempotency is tied to this provider checkout,
-                                # not to any historical cash receipt for the visit.
-                                existing_payment = (
-                                    db.query(Payment)
-                                    .filter(
-                                        Payment.visit_id == visit.id,
-                                        Payment.provider == invoice.provider,
-                                        Payment.provider_payment_id
-                                        == invoice.provider_payment_id,
-                                        Payment.status.in_(["paid", "completed"]),
-                                    )
-                                    .first()
-                                )
-
-                                if not existing_payment:
-                                    payment = invariant_service.create_payment_for_visit(
-                                        visit_id=visit.id,
-                                        amount=visit_amount,
-                                        method="online",
-                                        note=f"Оплата через {invoice.provider} (invoice {invoice.id})",
-                                        current_user=current_user,
-                                        provider=invoice.provider,
-                                        allow_overpayment=False,
-                                        settling_invoice_id=invoice.id,
-                                        commit=False,
-                                    )
-                                    payment.provider_payment_id = (
-                                        invoice.provider_payment_id
-                                    )
-                                    payment.provider_transaction_id = (
-                                        invoice.provider_transaction_id
-                                    )
-                                    payment.provider_data = invoice.provider_data
-                                    logger.info(
-                                        "check_invoice_status: Создан платеж ID=%d для визита %d",
-                                        payment.id,
-                                        visit.id,
-                                    )
-
-                                VisitLifecycleService(db).confirm_visit(
-                                    visit_id=visit.id,
-                                    current_user=_InvoiceActor(invoice.id),
-                                    confirmed_by=f"invoice_{invoice.id}",
-                                    commit=False,
-                                )
-
-                        invoice.status = "paid"
-                        invoice.paid_at = datetime.now(UTC)
-                        db.commit()
-                    elif result.status in ["failed", "cancelled"]:
-                        invoice.status = result.status
-                        db.commit()
-
-        return {
-            "invoice_id": invoice.id,
-            "status": invoice.status,
-            "total_amount": invoice.total_amount,
-            "currency": invoice.currency,
-            "provider_payment_id": invoice.provider_payment_id,
-            "paid_at": invoice.paid_at,
-        }
-
+        reference = _click_outcome_reference(invoice, result)
+        if reference is not None:
+            _record_completed_invoice(db, invoice, visits, links, reference, current_user)
+        else:
+            invoice.status = result.status
+        db.commit()
+        return _invoice_status_response(invoice)
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post(

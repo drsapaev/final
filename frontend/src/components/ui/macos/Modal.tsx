@@ -68,27 +68,34 @@ const Modal = ({
   // PR-37 / P0-B: unique id for aria-labelledby — avoids collisions when
   // multiple modals are rendered simultaneously.
   const titleId = useId();
-  // Focus belongs to the open session. Updating the keyboard callback must
-  // not return focus to the trigger while the modal is still open.
+  // Keep focus scoped to an open session. Replacing the caller's callback
+  // while the dialog is visible should only update keyboard handling.
   useEffect(() => {
     const modal = modalRef.current;
     if (!isOpen || !modal) return;
 
-    const trigger = document.activeElement;
+    const previouslyFocused = document.activeElement;
     const focusFrame = requestAnimationFrame(() => {
-      const first = modal.querySelector<HTMLElement>(
+      if (modal.contains(document.activeElement)) return;
+      const firstControl = modal.querySelector<HTMLElement>(
         'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
       );
-      (first ?? modal).focus();
+      (firstControl ?? modal).focus();
     });
 
     return () => {
       cancelAnimationFrame(focusFrame);
-      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+      const activeElement = document.activeElement;
+      if (!modal.isConnected
+        && previouslyFocused instanceof HTMLElement
+        && previouslyFocused.isConnected
+        && (!activeElement || activeElement === document.body || modal.contains(activeElement))) {
+        previouslyFocused.focus();
+      }
     };
   }, [isOpen]);
 
-  // Escape and Tab use the latest options without resetting the focus session.
+  // PR-37 / P0-A: cycle Tab inside the dialog using the latest keyboard options.
   useEffect(() => {
     if (!isOpen) return;
 

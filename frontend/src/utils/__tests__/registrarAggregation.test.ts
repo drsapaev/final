@@ -1,6 +1,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { hasBackendAction } from '../../pages/registrar/registrarHelpers';
 import {
   adaptTimeFields,
   aggregatePatientsForAllDepartments,
@@ -50,6 +51,7 @@ const makeAppointment = (overrides: Record<string, unknown> = {}) => ({
   approval_status: overrides.approval_status ?? null,
   available_actions: overrides.available_actions ?? [],
   can_mark_paid: overrides.can_mark_paid ?? false,
+  blocks_group_payment: overrides.blocks_group_payment ?? false,
   can_start_visit: overrides.can_start_visit ?? false,
   can_cancel: overrides.can_cancel ?? false,
   can_print_ticket: overrides.can_print_ticket ?? false,
@@ -101,11 +103,21 @@ describe('aggregatePatientsForAllDepartments', () => {
 
     expect(result[0].discount_mode).toBe('all_free');
     expect(result[0].payment_type).toBe('approval_pending');
-    expect(result[0].cost_display).toBe('free');
+    expect(result[0].cost_display).toBeNull();
     expect(result[0]).not.toHaveProperty('can_mark_paid');
     expect(result[0]).not.toHaveProperty('can_start_visit');
     expect(result[0]).not.toHaveProperty('can_cancel');
     expect(result[0]).not.toHaveProperty('can_print_ticket');
+  });
+
+  it('shows the ordinary amount due after an All Free rejection', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, cost: 200000.50, discount_mode: 'all_free', approval_status: 'rejected' }),
+    ]);
+
+    expect(result[0].payment_type).toBe('pending_payment');
+    expect(result[0].cost).toBe(200000.50);
+    expect(result[0].cost_display).toBeNull();
   });
 
   it('shows mixed payment for groups with mixed statuses or methods', () => {
@@ -134,6 +146,24 @@ describe('aggregatePatientsForAllDepartments', () => {
     expect(result[0]).not.toHaveProperty('can_start_visit');
     expect(result[0]).not.toHaveProperty('can_cancel');
     expect(result[0]).not.toHaveProperty('can_print_ticket');
+  });
+
+  it('keeps reconciliation visible and prevents payment on an affected group only', () => {
+    const payable = { cost: 50000, payment_status: 'pending', available_actions: ['mark_paid'], can_mark_paid: true };
+    const [affected, unrelated] = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, payment_status: 'reconciliation_required', payment_type: null, cost: 100000, blocks_group_payment: true }),
+      makeAppointment({ id: 2, ...payable }),
+      makeAppointment({ id: 3, patient_id: 20, ...payable }),
+    ]);
+
+    expect(affected.payment_status).toBe('reconciliation_required');
+    expect(affected.payment_type).toBeNull();
+    expect(affected.grouped_records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ payment_status: 'reconciliation_required', blocks_group_payment: true }),
+    ]));
+    expect(hasBackendAction(affected, 'mark_paid')).toBe(false);
+    expect(hasBackendAction(unrelated, 'mark_paid')).toBe(true);
+    expect(hasBackendAction({ payment_status: 'reconciliation_required', available_actions: ['mark_paid'] }, 'mark_paid')).toBe(true);
   });
 
   it('preserves backend command availability only inside grouped records', () => {

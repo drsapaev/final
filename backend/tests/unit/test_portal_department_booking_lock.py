@@ -171,6 +171,7 @@ class TestLockDepartmentForBooking:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("patient_ownership_epochs")
 class TestPortalCreateAtomicDepartmentRevalidation:
     def _latest_denied(self, db_session, subject_patient_id):
         return (

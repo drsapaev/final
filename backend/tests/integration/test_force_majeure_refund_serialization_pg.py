@@ -156,6 +156,12 @@ def db_engine():
         setup.execute(text(f'CREATE SCHEMA "{schema}"'))
     Base.metadata.create_all(engine)
     try:
+        from tests.integration.test_deposit_refund_evidence_pg import (
+            install_deposit_guards,
+        )
+
+        with engine.begin() as setup:
+            install_deposit_guards(setup, schema)
         yield engine
     finally:
         # Строгий guard перед удалением: только своя схема этого прогона.
@@ -1059,33 +1065,6 @@ def test_rejected_bank_request_allows_corrected_bank_retry_pg(
         verify.close()
 
 
-def _cashier_act_once(session_factory, *, request_id, cashier_id, action):
-    """Одиночное кассирское действие через реальный API-сервис
-    (production-путь process_refund_request: FOR UPDATE на строке заявки
-    -> проверка статуса -> переход + processed_by; reject вдобавок
-    освобождает claim той же транзакцией)."""
-    from types import SimpleNamespace
-
-    session = session_factory()
-    try:
-        service = ForceMajeureApiService(session)
-        return service.process_refund_request(
-            request_id=request_id,
-            process_request=SimpleNamespace(
-                action=action,
-                rejection_reason="invalid bank details" if action == "reject" else None,
-                bank_card_number=None,
-                manager_notes=None,
-            ),
-            current_user=SimpleNamespace(id=cashier_id, full_name="FM Cashier"),
-        )
-    except ForceMajeureApiDomainError:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
 def _run_cashier_action(
     session_factory,
     *,
@@ -1130,34 +1109,10 @@ def _run_cashier_action(
         session.close()
 
 
-def test_cashier_reject_vs_complete_race_serializes_on_request_row(
+def test_concurrent_unverified_bank_transitions_keep_the_refund_claim(
     db_engine, session_factory
 ):
-    """3808 round 6 (P1 reject/complete race), PostgreSQL-доказательство.
-
-    ``reject`` и ``complete`` принимают ОДИН И ТОТ ЖЕ исходный статус
-    ``approved``. До round 6 process_refund_request читал заявку обычным
-    SELECT-ом: две кассирские сессии одновременно читали один и тот же
-    снапшот, первая отклоняла заявку и освобождала claim, вторая —
-    завершала возврат по устаревшей копии. Итог гонки — выплаченный
-    (completed) возврат БЕЗ claim: платеж снова доступен для второго
-    возврата; либо (при обратном порядке коммитов) completed перетирается
-    rejected уже после выплаты. UNIQUE-ограничение claim не защищает от
-    строки, явно удалённой этой гонкой.
-
-    Фикс round 6: заявка читается с блокировкой строки (FOR UPDATE) до
-    проверки статуса. Обе сессии стартуют одновременно по барьеру и
-    конкурируют за одну approved-заявку: ровно ОДНА выполняет свой
-    переход, вторая после снятия лока перечитывает committed статус
-    (READ COMMITTED + populate_existing) и получает доменный отказ (400)
-    вместо второго перехода.
-
-    Инвариант по итогам: ``completed`` ДЕРЖИТ claim (выплата защищена от
-    повторного возврата), ``rejected`` — освободил (повторный возврат
-    разрешён). Финальный рубеж — реальный повторный возврат другого
-    канала (deposit) через отмену очереди B: он проходит iff заявка
-    отклонена.
-    """
+    """An approved external payout keeps its claim until reconciliation."""
     seed = session_factory()
     try:
         world = _seed_two_queue_world(seed)
@@ -1182,13 +1137,12 @@ def test_cashier_reject_vs_complete_race_serializes_on_request_row(
         )
         assert request.status == "pending", request.status
         request_id, cashier_id = request.id, world["cashier_id"]
+        # Stage a historical approval. The current service requires payout evidence.
+        request.payment_currency_snapshot = None
+        request.status = "approved"
+        verify.commit()
     finally:
         verify.close()
-
-    approved = _cashier_act_once(
-        session_factory, request_id=request_id, cashier_id=cashier_id, action="approve"
-    )
-    assert approved["status"] == "approved", approved
 
     outcomes: dict[str, tuple] = {}
     barrier = threading.Barrier(2)
@@ -1213,41 +1167,12 @@ def test_cashier_reject_vs_complete_race_serializes_on_request_row(
         thread.join(timeout=20)
         assert not thread.is_alive(), "кассирское действие зависло на блокировке заявки"
 
-    kinds = sorted(outcomes[tag][0] for tag in ("A", "B"))
-    assert kinds == ["domain_error", "ok"], outcomes
-    loser_status = [
-        outcomes[tag][1] for tag in outcomes if outcomes[tag][0] == "domain_error"
-    ]
-    assert loser_status == [400], outcomes
+    assert outcomes == {"A": ("domain_error", 409), "B": ("domain_error", 409)}, outcomes
+    with session_factory() as verify:
+        assert verify.get(RefundRequest, request_id).status == "approved"
+        claim = verify.query(PaymentRefundClaim).filter_by(payment_id=world["payment_id"]).one()
+        assert claim.refund_request_id == request_id
 
-    verify = session_factory()
-    try:
-        request = (
-            verify.query(RefundRequest)
-            .filter(RefundRequest.id == request_id)
-            .one()
-        )
-        final_status = request.status
-        assert final_status in ("rejected", "completed"), final_status
-        claims = (
-            verify.query(PaymentRefundClaim)
-            .filter(PaymentRefundClaim.payment_id == world["payment_id"])
-            .all()
-        )
-        if final_status == "completed":
-            # выиграл complete: деньги УШЛИ — claim обязан держаться,
-            # иначе выплата остаётся без защиты от повторного возврата
-            assert len(claims) == 1, claims
-            assert claims[0].channel == "refund_request", claims
-            assert claims[0].refund_request_id == request_id, claims
-        else:
-            # выиграл reject: деньги не ушли — claim освобождён
-            assert claims == [], claims
-    finally:
-        verify.close()
-
-    # Финальный рубеж: повторный возврат другого канала (deposit) разрешён
-    # iff заявка отклонена; completed остаётся под защитой единого claim.
     second = _cancel_once(
         session_factory,
         specialist_id=world["spec_b"],
@@ -1257,20 +1182,9 @@ def test_cashier_reject_vs_complete_race_serializes_on_request_row(
     )
     assert second["cancelled"] == 1, second
     refund_info = second["details"][0]["refund_info"]
-    if final_status == "completed":
-        assert refund_info.get("already_refunded"), second
-        verify = session_factory()
-        try:
-            assert (
-                verify.query(DepositTransaction)
-                .filter(DepositTransaction.payment_id == world["payment_id"])
-                .count()
-                == 0
-            ), "completed выплата не должна допускать второй возврат"
-        finally:
-            verify.close()
-    else:
-        assert not refund_info.get("already_refunded"), second
+    assert refund_info["already_refunded"] and refund_info["prior_channel"] == "refund_request"
+    with session_factory() as verify:
+        assert verify.query(DepositTransaction.id).filter_by(payment_id=world["payment_id"]).count() == 0
 
 
 def test_cashier_reject_waits_for_the_request_row_lock(db_engine, session_factory):
@@ -1311,13 +1225,12 @@ def test_cashier_reject_waits_for_the_request_row_lock(db_engine, session_factor
         )
         assert request.status == "pending", request.status
         request_id, cashier_id = request.id, world["cashier_id"]
+        # Stage a historical approval. The current service requires payout evidence.
+        request.payment_currency_snapshot = None
+        request.status = "approved"
+        verify.commit()
     finally:
         verify.close()
-
-    approved = _cashier_act_once(
-        session_factory, request_id=request_id, cashier_id=cashier_id, action="approve"
-    )
-    assert approved["status"] == "approved", approved
 
     holder = session_factory()
     holder_locked = threading.Event()
@@ -1335,9 +1248,8 @@ def test_cashier_reject_waits_for_the_request_row_lock(db_engine, session_factor
         holder_locked.set()
         # Reject (thread B) must be stuck on this row lock meanwhile.
         holder_release.wait(timeout=10)
-        # Другая кассирская сессия завершает возврат ПРЯМОЙ записью по
-        # approved-заявке (мимо API-сервиса, но по тем же правилам
-        # перехода) и коммитит, отпуская лок.
+        # Model bank reconciliation committing its completed row while
+        # the cashier request is waiting on the same lock.
         holder.execute(
             update(RefundRequest)
             .where(RefundRequest.id == request_id)

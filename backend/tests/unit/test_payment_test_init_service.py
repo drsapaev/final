@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.models.payment import Payment
+from app.models.visit import VisitService
 from app.services.payment_providers.base import PaymentResult
 from app.services.payment_test_init_service import (
     PaymentTestInitDomainError,
@@ -18,9 +19,19 @@ class _FakePaymentManager:
         return self.result
 
 
+@pytest.fixture
+def visit_with_uzs_quote(db_session, test_visit):
+    db_session.add(VisitService(
+        visit_id=test_visit.id, service_id=1, name="SYNTHETIC-test checkout",
+        qty=1, price=20_000, currency="UZS",
+    ))
+    db_session.commit()
+    return test_visit
+
+
 @pytest.mark.unit
 class TestPaymentTestInitService:
-    def test_init_test_payment_success(self, db_session, test_visit):
+    def test_init_test_payment_success(self, db_session, visit_with_uzs_quote):
         service = PaymentTestInitService(
             db_session,
             _FakePaymentManager(
@@ -33,7 +44,7 @@ class TestPaymentTestInitService:
         )
 
         result = service.init_test_payment(
-            visit_id=test_visit.id,
+            visit_id=visit_with_uzs_quote.id,
             provider="click",
             amount=20_000.0,
             currency="UZS",
@@ -52,7 +63,7 @@ class TestPaymentTestInitService:
         assert payment.provider_payment_id == "provider-1"
         assert result["success"] is True
 
-    def test_init_test_payment_provider_failure(self, db_session, test_visit):
+    def test_init_test_payment_provider_failure(self, db_session, visit_with_uzs_quote):
         service = PaymentTestInitService(
             db_session,
             _FakePaymentManager(
@@ -62,7 +73,7 @@ class TestPaymentTestInitService:
 
         with pytest.raises(PaymentTestInitDomainError) as exc_info:
             service.init_test_payment(
-                visit_id=test_visit.id,
+                visit_id=visit_with_uzs_quote.id,
                 provider="click",
                 amount=20_000.0,
                 currency="UZS",

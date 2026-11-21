@@ -18,6 +18,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from sqlalchemy.exc import StatementError
+
 from app.services.patient_access_audit import (
     _get_client_ip,
     _get_user_agent,
@@ -228,6 +230,24 @@ class TestPatientAccessAuditService:
 
         # Verify rollback was attempted
         assert db.rollback.called
+
+    def test_single_and_batch_failure_logs_do_not_expose_sql_parameters(self, caplog):
+        patient = "SYNTHETIC-PATIENT-IDENTIFIER"
+        credential = "SYNTHETIC-JTI-SECRET"
+        for batched in (False, True):
+            db = MagicMock()
+            db.commit.side_effect = StatementError(
+                "synthetic failure", "INSERT INTO audit VALUES (:patient, :jti)",
+                {"patient": patient, "jti": credential}, Exception("failure"),
+            )
+            if batched:
+                log_patient_access_many(db, subject_patient_ids=[42], resource_type="patient", action="view")
+            else:
+                log_patient_access(db, subject_patient_id=42, resource_type="patient", action="view")
+            db.rollback.assert_called_once()
+        assert patient not in caplog.text and credential not in caplog.text
+        assert caplog.text.count("error_type=StatementError") == 2
+        assert all(record.exc_info is None for record in caplog.records)
 
     def test_batched_resource_audit_preserves_ids_for_same_patient(self):
         db = MagicMock()

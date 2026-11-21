@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from uuid import UUID
 
 from sqlalchemy import insert
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +15,7 @@ from app.crud.queue_resource_routing import resolve_registry_tag_queue_for_speci
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.refund_deposit import (
     DepositTransaction,
+    DepositTransactionType,
     PatientDeposit,
     PaymentRefundClaim,
     RefundRequest,
@@ -260,8 +262,28 @@ class ForceMajeureApiRepository:
         assert created is not None
         return created, True
 
-    def get_visit(self, visit_id: int) -> Visit | None:
-        return self.db.query(Visit).filter(Visit.id == visit_id).first()
+    def get_visit(self, visit_id: int, *, lock: bool = True) -> Visit | None:
+        """Load the live deposit debit target, optionally acquiring the visit lock."""
+        query = (
+            self.db.query(Visit)
+            .filter(Visit.id == visit_id)
+            .populate_existing()
+        )
+        return (query.with_for_update(of=Visit) if lock else query).first()
+
+    def find_manual_deposit_receipt(self, client_request_id: UUID) -> DepositTransaction | None:
+        return (
+            self.db.query(DepositTransaction)
+            .filter(DepositTransaction.client_request_id == client_request_id)
+            .one_or_none()
+        )
+
+    def visit_has_unpaired_deposit_debit(self, visit_id: int) -> bool:
+        return self.db.query(DepositTransaction.id).filter(
+            DepositTransaction.visit_id == visit_id,
+            DepositTransaction.transaction_type == DepositTransactionType.DEBIT.value,
+            DepositTransaction.payment_id.is_(None),
+        ).first() is not None
 
     def list_deposit_transactions(
         self,

@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -7,8 +7,8 @@ from fastapi import HTTPException
 
 from app.api.v1.endpoints.admin_telegram import (
     StaffActionConfirmRequest,
-    confirm_staff_action,
     _staff_runtime_reference_hash,
+    confirm_staff_action,
 )
 from app.models.clinic import Schedule
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -43,7 +43,7 @@ def _issue_confirmation(
             else f"staff_action:{uuid4().hex}"
         ),
         idempotency_key_hash=f"staff_action_idempotency:{uuid4().hex}",
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+        expires_at=datetime.now(UTC) + timedelta(minutes=2),
     )
 
 
@@ -338,6 +338,32 @@ def test_confirm_refund_rejects_mismatched_bound_payment_target(
     assert other_payment.status == "paid"
     assert bound_payment.refunded_amount is None
     assert other_payment.refunded_amount is None
+
+
+def test_confirm_refund_rejects_an_existing_deposit_return(db_session, admin_user, test_visit):
+    from app.services.force_majeure_service import ForceMajeureService
+
+    payment = Payment(visit_id=test_visit.id, amount=Decimal("12.00"), currency="UZS", method="cash", status="paid")
+    db_session.add(payment)
+    db_session.flush()
+    ForceMajeureService(db_session)._add_to_deposit(
+        patient_id=test_visit.patient_id, amount=payment.amount, reason="SYNTHETIC",
+        payment_id=payment.id, visit_id=test_visit.id, performed_by_id=admin_user.id,
+    )
+    record = _issue_confirmation(
+        db_session, user=admin_user, operation_key="refund_issue", command_key="/refund",
+        target_type="payment", target_id=payment.id,
+    )
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        confirm_staff_action(
+            record.id, db_session, admin_user,
+            StaffActionConfirmRequest(payment_id=payment.id, refund_amount=Decimal("12.00")),
+        )
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "payment_refund_already_routed"
+    assert payment.status == "paid" and payment.refunded_amount is None
 
 
 def test_confirm_refund_rejects_unbound_command_level_token(

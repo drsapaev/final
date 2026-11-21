@@ -124,8 +124,12 @@ class ClickProvider(BasePaymentProvider):
                 -2: PaymentStatus.CANCELLED,  # Отменен
             }
 
-            click_status = data.get("status", -1)
-            our_status = status_mapping.get(click_status, PaymentStatus.FAILED)
+            click_status = data.get("status") if isinstance(data, dict) else None
+            if type(click_status) is not int or click_status not in status_mapping:
+                self.log_error("check_payment_status", "Unrecognized provider status")
+                return PaymentResult(success=False, error_message="Статус платежа не подтверждён")
+
+            our_status = status_mapping[click_status]
 
             self.log_operation(
                 "check_status",
@@ -168,7 +172,7 @@ class ClickProvider(BasePaymentProvider):
             # Валидация подписи
             expected_sign = self._generate_webhook_signature(webhook_data)
             if sign_string != expected_sign:
-                self.log_error("process_webhook", "Неверная подпись", webhook_data)
+                self.log_error("process_webhook", "Неверная подпись")
                 return PaymentResult(
                     success=False, error_message="Неверная подпись webhook"
                 )
@@ -189,17 +193,7 @@ class ClickProvider(BasePaymentProvider):
                 self.parse_amount(amount, "UZS") if amount else Decimal("0")
             )
 
-            self.log_operation(
-                "process_webhook",
-                {
-                    "click_trans_id": click_trans_id,
-                    "transaction_param": transaction_param,
-                    "action": action,
-                    "error": error,
-                    "status": status,
-                    "amount": str(amount_decimal),
-                },
-            )
+            self.log_operation("process_webhook", {"status": status})
 
             return PaymentResult(
                 success=True,
@@ -223,7 +217,7 @@ class ClickProvider(BasePaymentProvider):
             )
 
         except Exception as e:
-            self.log_error("process_webhook", str(e), webhook_data)
+            self.log_error("process_webhook", f"Internal error type={type(e).__name__}")
             return PaymentResult(
                 success=False, error_message="Внутренняя ошибка"
             )
@@ -259,16 +253,13 @@ class ClickProvider(BasePaymentProvider):
     ) -> bool:
         """Валидация подписи webhook"""
         if not signature:
-            self.log_error("validate_webhook_signature", "Missing signature", webhook_data)
+            self.log_error("validate_webhook_signature", "Missing signature")
             return False
 
         expected_signature = self._generate_webhook_signature(webhook_data)
         is_valid = hmac.compare_digest(signature, expected_signature)
 
         if not is_valid:
-            self.log_error("validate_webhook_signature", "Signature mismatch", {
-                "received": signature[:20] if signature else None,
-                "expected": expected_signature[:20] if expected_signature else None
-            })
+            self.log_error("validate_webhook_signature", "Signature mismatch")
 
         return is_valid

@@ -145,11 +145,13 @@ class ChannelsMixin(NotificationSenderMixinBase):
                 logger.info("SMS sent", extra={"provider": getattr(response, "provider", "unknown")})
                 return True
             else:
-                logger.error(f"Ошибка отправки SMS ({response.provider}): {response.error}")
+                # Provider errors may echo the phone or complete SMS body,
+                # including a PWA capability. Never log provider-supplied text.
+                logger.warning("SMS delivery failed")
                 return False
 
-        except Exception as e:
-            logger.error(f"Ошибка отправки SMS: {e}")
+        except Exception as exc:
+            logger.warning("SMS dispatch failed (%s)", type(exc).__name__)
             return False
 
 
@@ -160,6 +162,10 @@ class ChannelsMixin(NotificationSenderMixinBase):
         message: str,
         data: dict[str, Any] | None = None,
         db: Session | None = None,
+        subject_after_commit=None,
+        subject_schema_pin=None,
+        subject_before_send=None,
+        subject_preference_event_type: str | None = None,
     ) -> bool:
         """Отправка Push-уведомления (Mobile + WebSocket)"""
         try:
@@ -176,13 +182,20 @@ class ChannelsMixin(NotificationSenderMixinBase):
             }
 
             if db:
+                if subject_after_commit is not None and not subject_after_commit():
+                    return False
                 user = db.query(User).filter(User.id == user_id).first()
                 if not user:
                     logger.warning("Push target user not found")
                     return False
 
                 platform_service = self._platform_service(db)
-                await platform_service.record_delivery_for_user(
+                delivery_options = {}
+                if subject_after_commit is not None:
+                    delivery_options["subject_after_commit"] = subject_after_commit
+                if subject_before_send is not None:
+                    delivery_options["subject_before_send"] = subject_before_send
+                delivery = await platform_service.record_delivery_for_user(
                     user=user,
                     event_type=notification_type,
                     title=title,
@@ -195,7 +208,10 @@ class ChannelsMixin(NotificationSenderMixinBase):
                         "metadata": data or {},
                     },
                     transport_type=notification_type,
+                    **delivery_options,
                 )
+                if subject_after_commit is not None and delivery is None:
+                    return False
 
                 # Sender-level gates (PR-5): the single-device token registry
                 # on users.device_token, the user opt-out flag, and FCM
@@ -211,10 +227,12 @@ class ChannelsMixin(NotificationSenderMixinBase):
                         db=db,
                         user_id=user.id,
                         channel="push",
-                        event_type=notification_type,
+                        event_type=subject_preference_event_type or notification_type,
                     )
                     and self.fcm_service.active
                 ):
+                    if subject_before_send is not None and not subject_before_send():
+                        return True  # The neutral inbox entry was committed.
                     push_attempted = True
                     fcm_result = await self.fcm_service.send_notification(
                         device_token=user.device_token,
@@ -224,13 +242,18 @@ class ChannelsMixin(NotificationSenderMixinBase):
                     )
 
                 push_sent = bool(fcm_result is not None and fcm_result.success)
+                # A scoped caller must establish a fresh trusted transaction
+                # after the provider call before any follow-up database work.
+                # This never retries an external delivery.
+                if push_attempted and subject_schema_pin is not None and not subject_schema_pin():
+                    return True  # The neutral inbox entry was committed.
                 if push_attempted and not push_sent:
                     # PII-safe: numeric error code only, never the token/body.
                     logger.warning(
                         "FCM delivery failed",
                         extra={"error_code": fcm_result.error_code},
                     )
-                    if is_unregistered_token_response(fcm_result):
+                    if fcm_result is not None and is_unregistered_token_response(fcm_result):
                         # UNREGISTERED: drop the dead token from the registry
                         # (atomic conditional update — clear the registry only
                         # if it STILL holds the exact token that failed, so a
@@ -239,6 +262,8 @@ class ChannelsMixin(NotificationSenderMixinBase):
                         crud_user.clear_device_token_if_unchanged(
                             db, user_id=user.id, expected_token=failed_token
                         )
+                        if subject_schema_pin is not None and not subject_schema_pin():
+                            return True
 
                 # Legacy audit trail remains for external/mobile channels —
                 # PR-5: honest now. The row is written only when the push was
@@ -253,7 +278,9 @@ class ChannelsMixin(NotificationSenderMixinBase):
                             "channel": "mobile",
                             "subject": title,
                             "content": message,
-                            "status": "sent" if push_sent else "failed",
+                            "status": ("sent" if push_sent else
+                                       "failed" if subject_after_commit is None or (fcm_result is not None and is_unregistered_token_response(fcm_result))
+                                       else "unknown"),
                         }
                         crud_notification_history.create(
                             db, obj_in=NotificationHistoryCreate(**notification_data)

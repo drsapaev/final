@@ -6,19 +6,29 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any
 
+from sqlalchemy import inspect
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from app.core.roles import (
+    DOCTOR_FAMILY_GATE_ROLES,
+    is_doctor_role_spelling,
+    normalize_role_value,
+)
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.user import User
 from app.repositories.dental_api_repository import DentalApiRepository
+from app.services.money_input import MoneyInputError, parse_money
 from app.services.notifications import notification_sender_service
 from app.services.price_override_approval import (
     PENDING_DUPLICATE_DETAIL,
     PriceOverrideApprovalError,
     PriceOverrideApprovalService,
 )
+from app.services.profile_contact_security import ProfileBearerInvalid
 
 logger = logging.getLogger(__name__)
 
@@ -55,106 +65,113 @@ class DentalApiService:
         return str(service_id) if service_id is not None else None
 
     def _visit_belongs_to_doctor(self, *, visit, doctor, user_id: int) -> bool:
-        visit_doctor_id = getattr(visit, "doctor_id", None)
-        if visit_doctor_id == getattr(doctor, "id", None):
-            return True
+        # User.id is not evidence that the assigned Doctor performed the visit.
+        doctor_id = getattr(doctor, "id", None)
+        return type(doctor_id) is int and doctor_id > 0 and getattr(visit, "doctor_id", None) == doctor_id
 
-        get_doctor = getattr(self.repository, "get_doctor", None)
-        assigned_doctor = get_doctor(user_id) if get_doctor else None
-        # Some legacy visit writers stored User.id in doctor_id. Allow that only
-        # when the value does not target another real Doctor row.
-        return assigned_doctor is None and visit_doctor_id == user_id
-
-    async def create_dental_price_override(self, *, override_data, user: User) -> DoctorPriceOverride:
-        visit = self.repository.get_visit(override_data.visit_id)
+    def _prepare_override(self, *, override_data, user_id, bearer):
+        # Keep the locks through insertion/commit: User -> Doctor -> Visit -> Service.
+        if bearer.user_id != user_id or bearer.patient_id is not None:
+            raise ProfileBearerInvalid("Bearer session unavailable")
+        self.repository.reserve_request_writer()
+        user = self.repository.lock_request_user(bearer)
+        if not user.is_active or (not user.is_superuser and normalize_role_value(user.role) not in {"admin", *(normalize_role_value(role) for role in DOCTOR_FAMILY_GATE_ROLES)}):
+            raise DentalApiDomainError(403, "Access denied")
+        doctor = self.repository.lock_request_doctor(user_id)
+        if not doctor or not doctor.active or doctor.user_id != user_id:
+            raise DentalApiDomainError(403, "Access denied")
+        if doctor.specialty not in {"stomatology", "dental", "dentistry"}:
+            raise DentalApiDomainError(403, "Access denied")
+        visit = self.repository.lock_request_visit(override_data.visit_id)
         if not visit:
             raise DentalApiDomainError(404, "Визит не найден")
-
-        service = self.repository.get_service(override_data.service_id)
+        if not self._visit_belongs_to_doctor(visit=visit, doctor=doctor, user_id=user_id):
+            raise DentalApiDomainError(403, "Access denied")
+        service = self.repository.lock_request_service(override_data.service_id)
         if not service:
             raise DentalApiDomainError(404, "Услуга не найдена")
-        if not service.allow_doctor_price_override:
-            raise DentalApiDomainError(
-                400,
-                "Данная услуга не разрешает изменение цены врачом",
-            )
-
-        doctor = self.repository.get_doctor_by_user_id(user.id)
-        if not doctor:
-            raise DentalApiDomainError(404, "Врач не найден")
-        # Vocabulary note: the system provisions dentists with different
-        # specialty spellings — queue machinery seeds 'stomatology'
-        # (service_mapping.py), user provisioning & dev_seed create
-        # 'dentistry' (user_mgmt/_core.py), departments use 'dental'. All
-        # three denote the same dental clinician, so all are accepted here.
-        # (Repo-wide canonical vocabulary is a separate pending decision.)
-        if doctor.specialty not in ("stomatology", "dental", "dentistry"):
-            raise DentalApiDomainError(
-                403,
-                "Только стоматолог может указывать цену после лечения",
-            )
-
-        if not self._visit_belongs_to_doctor(visit=visit, doctor=doctor, user_id=user.id):
-            raise DentalApiDomainError(403, "Access denied")
-
-        # DERMAPRICE-BE-001 shared policy (audit #3892, group 15): the dental
-        # sibling feeds the SAME DoctorPriceOverride workflow and the SAME
-        # shared approval — the requested service must be attached to the
-        # visit (VisitService membership), otherwise the approval would
-        # either silently skip the price update (old false-success) or be
-        # refused later at fail-closed approval time.
-        visit_service = self.repository.get_visit_service(
-            visit_id=override_data.visit_id,
-            service_id=override_data.service_id,
-        )
-        if visit_service is None:
-            raise DentalApiDomainError(
-                409,
-                "Услуга не привязана к выбранному визиту",
-            )
-
-        # REGPRICE-BE-003 (audit #3892, group 16): two sequential pending
-        # overrides for the same visit/service can be approved in reverse
-        # order — each approval validated against the SAME captured
-        # before-price, silently overwriting the newer intent. Creation is
-        # refused while one intent is still awaiting review. The probe goes
-        # through the repository (session access is boundary-forbidden in
-        # this service layer).
-        if self.repository.has_pending_override(
-            visit_id=override_data.visit_id,
-            service_id=override_data.service_id,
-        ):
+        if not service.active or not service.allow_doctor_price_override:
+            raise DentalApiDomainError(400, "Данная услуга не разрешает изменение цены врачом")
+        if not visit.confirmation_context_epoch or visit.confirmation_context_epoch < 1 or not doctor.repeat_owner_generation or doctor.repeat_owner_generation < 1:
+            raise DentalApiDomainError(409, "Контекст визита недоступен")
+        try:
+            price = parse_money(override_data.new_price)
+        except MoneyInputError:
+            raise DentalApiDomainError(422, "Некорректная денежная сумма") from None
+        rows = self.repository.request_visit_services(visit.id, service.id)
+        target_id = getattr(override_data, "target_visit_service_id", None)
+        if target_id is None and len(rows) != 1:
+            raise DentalApiDomainError(409, "Укажите конкретную услугу визита")
+        target = next((row for row in rows if row.id == target_id), None) if target_id else rows[0]
+        if target is None:
+            raise DentalApiDomainError(409, "Услуга не привязана к выбранному визиту")
+        if self.repository.has_pending_override(visit_id=visit.id, service_id=service.id, target_id=target.id):
             raise DentalApiDomainError(409, PENDING_DUPLICATE_DETAIL)
+        target = self.repository.protect_target_fk(visit.id, service.id, target.id)
+        if target is None:
+            raise DentalApiDomainError(409, "Услуга изменяется, повторите запрос")
+        if (type(visit.price_context_generation) is not int or visit.price_context_generation < 1
+                or type(target.price_line_generation) is not int or target.price_line_generation < 1
+                or type(doctor.price_owner_generation) is not int or doctor.price_owner_generation < 1
+                or type(user.auth_epoch) is not int or user.auth_epoch < 0):
+            raise DentalApiDomainError(409, "Контекст визита недоступен")
+        try:
+            parse_money(target.price)
+        except MoneyInputError:
+            raise DentalApiDomainError(409, "Цена услуги визита недоступна") from None
+        return user, doctor, visit, service, target, price
 
-        price_override = DoctorPriceOverride(
-            visit_id=override_data.visit_id,
-            doctor_id=doctor.id,
-            service_id=override_data.service_id,
-            original_price=service.price or Decimal("0"),
-            new_price=override_data.new_price,
-            reason=override_data.reason,
-            details=override_data.details,
-            # DERMAPRICE-BE-002: visit-level before-price (may differ from the
-            # catalogue reference after discounts/overrides).
-            visit_price_before=visit_service.price,
-            status="pending",
-        )
-
-        self.repository.add(price_override)
-        self.repository.commit()
-        self.repository.refresh(price_override)
+    async def create_dental_price_override(self, *, override_data, user: User, bearer) -> SimpleNamespace:
+        try:
+            user, doctor, visit, service, visit_service, price = self._prepare_override(
+                override_data=override_data, user_id=user.id, bearer=bearer,
+            )
+            price_override = DoctorPriceOverride(
+                visit_id=visit.id, doctor_id=doctor.id, service_id=service.id,
+                original_price=service.price or Decimal("0"), new_price=price,
+                reason=override_data.reason, details=override_data.details,
+                visit_price_before=visit_service.price, status="pending",
+                target_scope="visit_service", target_visit_service_id=visit_service.id,
+                visit_context_epoch=visit.confirmation_context_epoch,
+                doctor_owner_user_id=user.id,
+                doctor_owner_generation=doctor.repeat_owner_generation,
+                price_context_generation=visit.price_context_generation,
+                price_line_generation=visit_service.price_line_generation,
+                price_owner_generation=doctor.price_owner_generation,
+                doctor_user_auth_epoch=user.auth_epoch,
+                requester_type="doctor", requester_user_id=user.id,
+                requester_user_id_snapshot=user.id, requester_auth_epoch=user.auth_epoch,
+            )
+            self.repository.add(price_override)
+            # Capture all response scalars before commit ends the validated
+            # transaction and its SET LOCAL search path.
+            self.repository.flush()
+            self.repository.refresh(price_override)
+            response_snapshot = SimpleNamespace(**{
+                column.key: getattr(price_override, column.key)
+                for column in inspect(DoctorPriceOverride).column_attrs
+            })
+            self.repository.commit_request(bearer)
+        except ProfileBearerInvalid:
+            self.repository.rollback()
+            raise DentalApiDomainError(401, "Сессия недействительна") from None
+        except DBAPIError as exc:
+            self.repository.rollback()
+            sqlite_code = getattr(exc.orig, "sqlite_errorcode", 0) or 0
+            if getattr(exc.orig, "sqlstate", None) == "55P03" or sqlite_code & 255 in (5, 6):
+                raise DentalApiDomainError(409, "Услуга изменяется, повторите запрос") from None
+            raise
+        except Exception:
+            self.repository.rollback()
+            raise
 
         try:
             await self.send_price_override_notification(
-                price_override=price_override,
-                doctor=doctor,
-                service=service,
-                visit=visit,
+                price_override=price_override, doctor=doctor, service=service, visit=visit,
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Не удалось отправить уведомление о изменении цены: {exc}")
-
-        return price_override
+        return response_snapshot
 
     async def send_price_override_notification(
         self,
@@ -262,16 +279,9 @@ class DentalApiService:
         override_id: int,
         approval_data,
         user: User,
+        bearer,
     ) -> dict[str, Any]:
-        # REGPRICE-BE-001/002/003/005 (audit #3892, group 16): the dental
-        # route previously mutated ONLY the chargeable VisitService rows and
-        # left the Visit.doctor_price_override JSON mirror stale, while the
-        # registrar sibling route mutated ONLY the JSON. Both routes now
-        # delegate to the canonical PriceOverrideApprovalService: locked
-        # decision (concurrent loser gets 409), identical approve outcome
-        # (chargeable price + JSON mirror in ONE commit), stale-intent
-        # validation (visit_price_before vs current price → 409) and the
-        # mandatory non-blank rejection reason (absent/whitespace → 400).
+        # Both routes use the same transaction-bound review service.
         action = approval_data.action
         if action not in ["approve", "reject"]:
             raise DentalApiDomainError(
@@ -299,6 +309,7 @@ class DentalApiService:
                 action=action,
                 rejection_reason=approval_data.rejection_reason,
                 approver_id=user.id,
+                bearer=bearer,
             )
         except PriceOverrideApprovalError as exc:
             raise DentalApiDomainError(exc.status_code, exc.detail) from exc
@@ -306,7 +317,6 @@ class DentalApiService:
         try:
             await self.send_price_override_result_notification(
                 price_override=price_override,
-                approved_by=user,
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Не удалось отправить уведомление врачу о результате: {exc}")
@@ -325,36 +335,32 @@ class DentalApiService:
         self,
         *,
         price_override: DoctorPriceOverride,
-        approved_by: User,
     ) -> None:
         doctor = self.repository.get_doctor(price_override.doctor_id)
-        if not doctor or not doctor.user:
+        if doctor is None or not doctor.active or doctor.user is None:
             return
-
-        service = self.repository.get_service(price_override.service_id)
-        status_text = "ОДОБРЕНО" if price_override.status == "approved" else "ОТКЛОНЕНО"
-
-        message = (
-            f"Изменение цены {status_text}\n\n"
-            f"Услуга: {service.name if service else f'Услуга #{price_override.service_id}'}\n"
-            f"Цена: {price_override.original_price} -> {price_override.new_price} UZS\n"
-            f"Ваша причина: {price_override.reason}\n\n"
-            f"Рассмотрел: {approved_by.full_name or approved_by.username}\n"
-            f"Время: {price_override.approved_at.strftime('%d.%m.%Y %H:%M')}\n"
-            f"{f'Причина отклонения: {price_override.rejection_reason}' if price_override.rejection_reason else ''}"
-        )
+        owner = doctor.user
+        if (
+            not owner.is_active or not is_doctor_role_spelling(owner.role)
+            or owner.id != price_override.doctor_owner_user_id
+            or owner.auth_epoch != price_override.doctor_user_auth_epoch
+            or not price_override.doctor_owner_generation
+            or doctor.repeat_owner_generation != price_override.doctor_owner_generation
+            or not price_override.price_owner_generation
+            or doctor.price_owner_generation != price_override.price_owner_generation
+        ):
+            return
+        status_text = "одобрено" if price_override.status == "approved" else "отклонено"
 
         delivered = await notification_sender_service.send_canonical_notification_to_user(
             db=self.db,
-            recipient=doctor.user,
+            recipient=owner,
             event_type="dental_price_override_result",
-            title=f"Изменение цены {status_text.lower()}",
-            message=message,
+            title=f"Изменение цены {status_text}",
+            message="Решение доступно в списке изменений цены.",
             source_module="dental",
             metadata={
                 "override_id": price_override.id,
-                "visit_id": price_override.visit_id,
-                "service_id": price_override.service_id,
                 "status": price_override.status,
             },
             entity_type="doctor_price_override",
@@ -365,13 +371,13 @@ class DentalApiService:
             logger.info(
                 "Уведомление о результате изменения цены "
                 "записано в inbox врача %s",
-                doctor.user.username,
+                owner.username,
             )
         else:
             logger.warning(
                 "Не удалось записать результат изменения "
                 "цены в inbox врача %s",
-                doctor.user.username,
+                owner.username,
             )
 
     def get_pending_price_overrides(self, *, limit: int, offset: int = 0) -> dict[str, Any]:

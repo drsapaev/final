@@ -47,10 +47,10 @@ This slice (contract pinned RED-first by this module):
    rows from their owner's ``start_number_online`` (resource join /
    doctor join), so in-flight days keep their pre-migration baseline.
 
-Disposable PostgreSQL: the module provisions its own scratch database
-(rq13b_check), runs ``alembic upgrade head`` against it and drops it at the
-end. Skips (NOT_RUN, per plan P0) when no disposable PostgreSQL server is
-reachable. SQLite is never a substitute here. SYNTHETIC data only.
+Disposable PostgreSQL: the acceptance tests provision a scratch database at
+the current head. The historical migration test provisions a separate database
+at 0066. Both scratch databases are dropped at teardown. Skips (NOT_RUN, per
+plan P0) when no disposable PostgreSQL server is reachable. SYNTHETIC data only.
 """
 
 from __future__ import annotations
@@ -60,19 +60,22 @@ import os
 import subprocess
 import sys
 import uuid
-from datetime import datetime
+from contextlib import contextmanager
+from datetime import date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import psycopg
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 SCRATCH_DB_PREFIX = "rq13b_check"
-SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
+SNAPSHOT_PREDECESSOR = "0066_general_retirement_cutover"
+SNAPSHOT_REVISION = "0067_daily_queue_start_number"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -85,11 +88,20 @@ def _candidate_admin_urls() -> list[str]:
     """Admin DSNs for scratch provisioning — LOCAL servers only."""
     urls: list[str] = []
     explicit = os.getenv("RQ13B_PG_ADMIN_URL", "").strip()
-    if explicit:
+    if is_local_admin_dsn(explicit):
         urls.append(explicit)
     local_pw = os.getenv("LOCAL_PG_SUPERUSER_PASSWORD", "").strip()
     if local_pw:
-        urls.append(f"postgresql://postgres:{local_pw}@localhost:5432/postgres")
+        local_url = URL.create(
+            "postgresql",
+            username="postgres",
+            password=local_pw,
+            host="localhost",
+            port=5432,
+            database="postgres",
+        ).render_as_string(hide_password=False)
+        if is_local_admin_dsn(local_url):
+            urls.append(local_url)
     env_url = os.getenv("DATABASE_URL", "").strip()
     if env_url:
         # PR #3468 audit P1: DATABASE_URL is usable for scratch
@@ -101,40 +113,22 @@ def _candidate_admin_urls() -> list[str]:
     return urls
 
 
-def _dsn_parts(admin_url: str) -> dict:
-    """Parse a TCP or unix-socket DSN (pgserver emits ?host=<socket dir>)."""
-    from urllib.parse import parse_qs, urlparse
-
-    p = urlparse(admin_url)
-    q = parse_qs(p.query)
-    return {
-        "sockdir": (q.get("host") or [None])[0],
-        "user": p.username or "postgres",
-        "password": p.password or "",
-        "host": p.hostname or "localhost",
-        "port": p.port or 5432,
-    }
-
-
-def _scratch_urls(admin_url: str) -> tuple[str, str]:
-    """(psycopg DSN, SQLAlchemy URL) for the scratch database."""
-    parts = _dsn_parts(admin_url)
-    if parts["sockdir"]:
-        base_p = f"postgresql://{parts['user']}:{parts['password']}@/"
-        base_s = f"postgresql+psycopg://{parts['user']}:{parts['password']}@/"
-        return (
-            f"{base_p}{SCRATCH_DB}?host={parts['sockdir']}",
-            f"{base_s}{SCRATCH_DB}?host={parts['sockdir']}",
-        )
-    base = f"postgresql://{parts['user']}:{parts['password']}@{parts['host']}:{parts['port']}"
-    return (
-        f"{base}/{SCRATCH_DB}",
-        f"postgresql+psycopg://{parts['user']}:{parts['password']}@{parts['host']}:{parts['port']}/{SCRATCH_DB}",
+def _run_alembic(url: URL, operation: str, revision: str) -> None:
+    # SQLAlchemy masks the password in str(url). Pass it only in the child environment.
+    database_url = url.render_as_string(hide_password=False)
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", "alembic.ini", operation, revision],
+        capture_output=True,
+        text=True,
+        cwd=BACKEND_DIR,
+        env=dict(os.environ, DATABASE_URL=database_url, TESTING="1"),
     )
+    stderr = result.stderr.replace(database_url, str(url))
+    assert result.returncode == 0, stderr[-1500:]
 
 
-@pytest.fixture(scope="module")
-def pg_engine():
+@contextmanager
+def _scratch_pg_engine(revision: str):
     last_error: Exception | None = None
     admin_url = None
     for candidate in _candidate_admin_urls():
@@ -151,12 +145,23 @@ def pg_engine():
             f"(last error: {last_error})"
         )
 
-    psycopg_dsn, sa_url = _scratch_urls(admin_url)
+    database = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
+    admin = make_url(admin_url)
+    # Preserve the validated endpoints and use only the generated database.
+    url = admin.set(
+        drivername="postgresql+psycopg",
+        database=database,
+        query={
+            key: value
+            for key, value in admin.query.items()
+            if key in {"host", "hostaddr", "port"}
+        },
+    )
     with psycopg.connect(admin_url, autocommit=True) as c:
         # No pre-drop: the run-unique name cannot pre-exist (a collision would
         # take 2**48 parallel runs), and dropping a fixed name unconditionally
         # is exactly the cross-run hazard this fixture used to carry.
-        c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
+        c.execute(f'CREATE DATABASE "{database}"')
 
     # PR #3468 audit P2: from this point on a scratch database EXISTS on the
     # admin server. Run-unique names mean the next run can no longer sweep a
@@ -166,21 +171,17 @@ def pg_engine():
     # failure included — instead of only after a successful yield.
     engine = None
     try:
-        env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
-        r = subprocess.run(
-            [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
-            capture_output=True,
-            text=True,
-            cwd=str(BACKEND_DIR),
-            env=env,
-        )
-        assert r.returncode == 0, r.stderr[-1500:]
-
-        engine = create_engine(sa_url, future=True)
+        _run_alembic(url, "upgrade", revision)
+        engine = create_engine(url, future=True)
         with engine.connect() as conn:
-            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
             dialect = conn.execute(text("select version()")).scalar()
-        assert version, "alembic_version must be present after upgrade"
+        if revision == "head":
+            assert version, "alembic_version must be present after upgrade"
+        else:
+            assert version == revision
         assert "PostgreSQL" in (dialect or ""), "RQ-13.b proof requires real PostgreSQL"
         yield engine
     finally:
@@ -191,9 +192,21 @@ def pg_engine():
             # WITH (FORCE) clears lingering connections (PG 13+), falling back
             # to the plain form on older servers.
             try:
-                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+                c.execute(f'DROP DATABASE IF EXISTS "{database}" WITH (FORCE)')
             except psycopg.errors.SyntaxError:
-                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+                c.execute(f'DROP DATABASE IF EXISTS "{database}"')
+
+
+@pytest.fixture(scope="module")
+def pg_engine():
+    with _scratch_pg_engine("head") as engine:
+        yield engine
+
+
+@pytest.fixture
+def historical_pg_engine():
+    with _scratch_pg_engine(SNAPSHOT_PREDECESSOR) as engine:
+        yield engine
 
 
 @pytest.fixture
@@ -559,76 +572,107 @@ def test_get_next_queue_number_prefers_snapshot_over_live_resource(pg_session):
 
 
 # ---------------------------------------------------------------------------
-# T7 (LAST — mutates the scratch DB's alembic version): 0067 backfill —
-# existing rows get their owner's start_number_online; downgrade/upgrade
-# cycle stays clean.
+# T7: 0067 backfills its predecessor's rows and preserves them on rollback.
 # ---------------------------------------------------------------------------
 
-def test_0067_backfills_owner_values_and_reversible(pg_session, pg_engine):
-    from app.services.queue_service import queue_service
+def test_0067_backfills_owner_values_and_reversible(historical_pg_engine):
+    engine = historical_pg_engine
+    assert "start_number" not in {
+        c["name"] for c in inspect(engine).get_columns("daily_queues")
+    }
 
-    suffix = "b01"
-    resource = _seed_resource(pg_session, suffix, start_number_online=12)
-    doctor = _seed_doctor(pg_session, suffix, start_number_online=7)
-    day = _clinic_day(pg_session)
+    # Use the 0066 table shape, so the rows exist before the snapshot column.
+    with engine.begin() as conn:
+        resource_id = conn.execute(
+            text("""
+            INSERT INTO queue_resources
+                (code, queue_tag, display_name, start_number_online, max_online_per_day)
+            VALUES ('rq13b_snapshot', 'rq13b_snapshot', 'Synthetic resource', 12, 20)
+            RETURNING id
+        """)
+        ).scalar_one()
+        doctor_id = conn.execute(
+            text("""
+            INSERT INTO doctors (specialty, start_number_online, max_online_per_day, active)
+            VALUES ('cardiology', 7, 20, true)
+            RETURNING id
+        """)
+        ).scalar_one()
+        add_queue = text("""
+            INSERT INTO daily_queues
+                (day, queue_resource_id, specialist_id, queue_tag, active,
+                 online_start_time, online_end_time, max_online_entries)
+            VALUES (:day, :resource_id, :doctor_id, :tag, true, '07:00', '22:00', 20)
+            RETURNING id
+        """)
+        day = date(2026, 1, 1)
+        resource_queue = conn.execute(
+            add_queue,
+            {
+                "day": day,
+                "resource_id": resource_id,
+                "doctor_id": None,
+                "tag": "rq13b_snapshot",
+            },
+        ).scalar_one()
+        doctor_queue = conn.execute(
+            add_queue,
+            {
+                "day": day,
+                "resource_id": None,
+                "doctor_id": doctor_id,
+                "tag": "cardiology",
+            },
+        ).scalar_one()
 
-    res_dq = queue_service.get_or_create_daily_queue(
-        pg_session, day=day, specialist_id=None, queue_tag=resource.queue_tag
-    )
-    doc_dq = queue_service.get_or_create_daily_queue(
-        pg_session, day=day, specialist_id=doctor.id, queue_tag="general"
-    )
-    pg_session.refresh(res_dq)
-    pg_session.refresh(doc_dq)
-    assert res_dq.start_number == 12
-    assert doc_dq.start_number == 7
+    queue_ids = {"resource_queue": resource_queue, "doctor_queue": doctor_queue}
 
-    # Capture ids BEFORE commit/close — commit expires, close detaches.
-    res_dq_id = res_dq.id
-    doc_dq_id = doc_dq.id
-
-    # Release the session's table locks BEFORE the alembic subprocess:
-    # downgrade/upgrade take ACCESS EXCLUSIVE on daily_queues and would
-    # otherwise wait on this session's open snapshot.
-    pg_session.commit()
-    pg_session.close()
-
-    env = dict(os.environ, TESTING="1")
-    env["DATABASE_URL"] = str(pg_engine.url)
-
-    def _alembic(*args: str) -> None:
-        r = subprocess.run(
-            [sys.executable, "-m", "alembic", "-c", "alembic.ini", *args],
-            capture_output=True,
-            text=True,
-            cwd=str(BACKEND_DIR),
-            env=env,
-        )
-        assert r.returncode == 0, r.stderr[-1500:]
-
-    _alembic("downgrade", "0066")
-    _alembic("upgrade", "head")
-
-    fresh = sessionmaker(bind=pg_engine, future=True)()
-    try:
-        r_row = fresh.execute(
-            text("SELECT start_number FROM daily_queues WHERE id = :i"),
-            {"i": res_dq_id},
-        ).scalar()
-        d_row = fresh.execute(
-            text("SELECT start_number FROM daily_queues WHERE id = :i"),
-            {"i": doc_dq_id},
-        ).scalar()
-        nullable = fresh.execute(
-            text(
-                "SELECT is_nullable, column_default FROM information_schema.columns "
-                "WHERE table_name = 'daily_queues' AND column_name = 'start_number'"
+    def assert_backfill() -> None:
+        columns = {c["name"]: c for c in inspect(engine).get_columns("daily_queues")}
+        assert columns["start_number"]["nullable"] is False
+        assert columns["start_number"]["default"] == "1"
+        with engine.connect() as conn:
+            assert (
+                conn.execute(
+                    text("SELECT version_num FROM alembic_version")
+                ).scalar_one()
+                == SNAPSHOT_REVISION
             )
-        ).fetchone()
-    finally:
-        fresh.close()
+            rows = conn.execute(
+                text("""
+                SELECT id, start_number FROM daily_queues
+                WHERE id IN (:resource_queue, :doctor_queue)
+            """),
+                queue_ids,
+            )
+            assert {row.id: row.start_number for row in rows} == {
+                resource_queue: 12,
+                doctor_queue: 7,
+            }
 
-    assert r_row == 12, f"resource row backfill expected 12, got {r_row}"
-    assert d_row == 7, f"doctor row backfill expected 7, got {d_row}"
-    assert nullable is not None and nullable[0] == "NO", nullable
-    assert nullable[1] is not None and "1" in (nullable[1] or ""), nullable
+    _run_alembic(engine.url, "upgrade", SNAPSHOT_REVISION)
+    assert_backfill()
+
+    _run_alembic(engine.url, "downgrade", SNAPSHOT_PREDECESSOR)
+    assert "start_number" not in {
+        c["name"] for c in inspect(engine).get_columns("daily_queues")
+    }
+    with engine.connect() as conn:
+        assert (
+            conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            == SNAPSHOT_PREDECESSOR
+        )
+        rows = conn.execute(
+            text("""
+            SELECT id, queue_resource_id, specialist_id FROM daily_queues
+            WHERE id IN (:resource_queue, :doctor_queue)
+        """),
+            queue_ids,
+        )
+        assert {row.id: (row.queue_resource_id, row.specialist_id) for row in rows} == {
+            resource_queue: (resource_id, None),
+            doctor_queue: (None, doctor_id),
+        }
+
+    _run_alembic(engine.url, "upgrade", SNAPSHOT_REVISION)
+    assert_backfill()

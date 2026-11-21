@@ -14,9 +14,14 @@ EMR_REQUIRED_SPECIALTY_KEYS = frozenset(
         "cardio",
         "cardiology",
         "cardiologist",
+        # Existing profiles may predate the canonical specialty catalogue.
+        "кардиология",
+        "кардиолог",
         "derma",
         "dermatology",
         "dermatologist",
+        "дерматология",
+        "дерматолог",
     }
 )
 EMR_REQUIRED_DETAIL = "Для завершения приёма сохраните ЭМК со статусом не «черновик»"

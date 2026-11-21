@@ -17,16 +17,23 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from unittest.mock import Mock
 from zoneinfo import ZoneInfo
 
 import pytest
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.registrar_wizard import _invoice
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.payment_invoice import PaymentInvoice
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
+from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.registrar_edit_delta_service import RegistrarEditDeltaService
+from tests.integration.test_cashier_appointment_source_locks_pg import pg_cashier  # noqa: F401
 
 TZ = ZoneInfo("Asia/Tashkent")
 
@@ -434,17 +441,41 @@ def test_decrease_revalidates_invoice_status_under_lock(
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_init_invoice_payment_locks_the_invoice_row_source_contract():
-    """Координация второй стороны гонки: init_invoice_payment читает счёт
-    FOR UPDATE — сериализуется со снижением edit-delta (кто первый взял
-    блокировку, второй видит закоммиченное состояние)."""
-    import inspect
-    from pathlib import Path
+def test_init_invoice_payment_respects_the_invoice_row_lock(pg_cashier, monkeypatch):
+    owner, runtime, ids = pg_cashier
+    amount = Decimal("10.00")
+    with Session(owner, expire_on_commit=False) as db:
+        invoice = PaymentInvoice(
+            patient_id=ids["patient"], total_amount=amount, currency="UZS", status="pending",
+        )
+        db.add(invoice)
+        db.flush()
+        db.add(PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=ids["visit"], visit_amount=amount))
+        db.commit()
+        invoice_id = invoice.id
 
-    import app.api.v1.endpoints.registrar_wizard._invoice as invoice_module
+    manager = Mock()
+    manager.supports_registrar_invoice_payment.return_value = False
+    factory = Mock(return_value=manager)
+    monkeypatch.setattr(_invoice, "get_payment_manager", factory)
+    request = _invoice.InvoicePaymentRequest(invoice_id=invoice_id)
 
-    source = Path(inspect.getsourcefile(invoice_module)).read_text(encoding="utf-8")
-    assert ".with_for_update()" in source
-    # Блокировка стоит на ЧТЕНИИ счёта, до проверки статуса и вызова провайдера
-    read_block = source[source.index("invoice = (") : source.index('if invoice.status != "pending"')]
-    assert "with_for_update" in read_block
+    with Session(owner) as locker:
+        locked_id = locker.scalar(select(PaymentInvoice.id).filter_by(id=invoice_id).with_for_update())
+        assert locked_id == invoice_id
+        with Session(runtime) as db:
+            actor = db.get(User, ids["stage"])
+            with pytest.raises(HTTPException) as blocked:
+                _invoice.init_invoice_payment(request, db=db, current_user=actor)
+        assert blocked.value.status_code == 409
+        assert blocked.value.detail == "Обращение занято, повторите оплату"
+        factory.assert_not_called()
+
+    with Session(runtime) as db:
+        actor = db.get(User, ids["stage"])
+        response = _invoice.init_invoice_payment(request, db=db, current_user=actor)
+    assert response.success is False
+    manager.supports_registrar_invoice_payment.assert_called_once_with("click")
+    manager.create_payment.assert_not_called()
+    with Session(owner) as db:
+        assert db.get(PaymentInvoice, invoice_id).status == "pending"

@@ -47,16 +47,27 @@ class FormattingMixin(NotificationSenderMixinBase):
         """Подготавливает данные для уведомления"""
         from app.models.clinic import Doctor
         from app.models.visit import VisitService
+        from app.services.payment_invariant_service import PaymentInvariantService
 
+        invariant = PaymentInvariantService(db)
+        quote = invariant.compute_visit_quote(visit)
         visit_services = (
-            db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+            db.query(VisitService).filter(VisitService.visit_id == visit.id).populate_existing().all()
         )
+        # Refreshing names and quantities is a separate query: compare another
+        # complete quote so a concurrent line change cannot mix two contexts.
+        if (invariant.compute_visit_quote(visit) != quote
+                or getattr(patient, "id", None) != quote.patient_id
+                or {vs.id for vs in visit_services} != set(quote.line_totals)):
+            raise ValueError("Контекст визита изменился")
+        if quote.currency is None and (quote.line_totals or quote.total):
+            raise ValueError("Валюта визита требует сверки")
 
         services_text = []
-        total_amount = 0
+        currency_label = "сум" if quote.currency == "UZS" else quote.currency
         for vs in visit_services:
-            services_text.append(f"• {vs.name} - {vs.price} сум")
-            total_amount += float(vs.price) if vs.price else 0
+            quantity = f" × {vs.qty}" if vs.qty != 1 else ""
+            services_text.append(f"• {vs.name}{quantity} - {quote.line_totals[vs.id]} {currency_label}")
 
         doctor_name = "Без врача"
         if visit.doctor_id:
@@ -71,7 +82,8 @@ class FormattingMixin(NotificationSenderMixinBase):
             "visit_date": visit.visit_date.strftime("%d.%m.%Y"),
             "visit_time": visit.visit_time or "Время не указано",
             "services": services_text,
-            "total_amount": total_amount,
+            "total_amount": quote.total,
+            "currency": quote.currency,
             "confirmation_token": visit.confirmation_token,
             "confirmation_context_epoch": visit.confirmation_context_epoch,
             "expires_at": visit.confirmation_expires_at,
@@ -104,7 +116,7 @@ class FormattingMixin(NotificationSenderMixinBase):
 📋 **Услуги:**
 {services_list}
 
-💵 **Общая сумма:** {data["total_amount"]} сум
+💵 **Общая сумма:** {data["total_amount"]} {data.get("currency") or "(валюта не указана)"}
 
 ⏰ **Подтвердите визит до:** {data["expires_at"].strftime("%d.%m.%Y %H:%M") if data["expires_at"] else "Не указано"}
 
@@ -137,15 +149,14 @@ class FormattingMixin(NotificationSenderMixinBase):
 
 
     def _format_sms_message(self, data: dict[str, Any], pwa_url: str) -> str:
-        return f"""
-Клиника: Подтвердите визит на {data["visit_date"]} в {data["visit_time"]} к врачу {data["doctor_name"]}.
-Сумма: {data["total_amount"]} сум.
-Подтвердить: {pwa_url}
-        """.strip()
+        # The fragment remains the existing scoped confirmation capability;
+        # no appointment, physician or payment details go over SMS.
+        return f"У вас новое уведомление. Откройте ссылку: {pwa_url}"
 
 
     async def _send_telegram_invitation(
-        self, patient: Any, data: dict[str, Any], db: Session | None = None
+        self, patient: Any, data: dict[str, Any], db: Session | None = None,
+        *, expected_link: tuple[int, int] | None = None,
     ) -> dict[str, Any]:
         """Отправляет приглашение через Telegram"""
         try:
@@ -154,19 +165,20 @@ class FormattingMixin(NotificationSenderMixinBase):
 
             from app.models.telegram_config import TelegramUser
 
-            telegram_user = (
-                db.query(TelegramUser)
-                .filter(
+            link_query = db.query(TelegramUser).filter(
                     TelegramUser.patient_id == patient.id,
                     TelegramUser.chat_id > 0,
                     TelegramUser.active.is_(True),
                     TelegramUser.blocked.is_(False),
                     TelegramUser.notifications_enabled.is_(True),
                     TelegramUser.appointment_reminders.is_(True),
-                )
-                .order_by(TelegramUser.id.desc())
-                .first()
             )
+            if expected_link is not None:
+                link_query = link_query.filter(
+                    TelegramUser.id == expected_link[0],
+                    TelegramUser.patient_link_epoch == expected_link[1],
+                )
+            telegram_user = link_query.order_by(TelegramUser.id.desc()).first()
             if telegram_user is None:
                 return {"success": False, "error": "У пациента нет активной привязки Telegram"}
 
@@ -268,9 +280,10 @@ class FormattingMixin(NotificationSenderMixinBase):
             else:
                 return {"success": False, "error": "Ошибка отправки SMS"}
 
-        except Exception as e:
-            logger.error(f"Ошибка отправки PWA приглашения: {e}")
-            return {"success": False, "error": str(e)}
+        except Exception as exc:
+            # Provider exceptions may contain the SMS body and capability URL.
+            logger.error("Ошибка отправки PWA приглашения (%s)", type(exc).__name__)
+            return {"success": False, "error": "Ошибка отправки PWA приглашения"}
 
 
     async def _send_phone_invitation(

@@ -8,214 +8,79 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.services.dental_api_service import DentalApiDomainError, DentalApiService
+from tests.unit.test_derma_api_service import Repository, _bearer, _data
 
 
 @pytest.mark.unit
 class TestDentalApiService:
     @pytest.mark.asyncio
     async def test_create_dental_price_override_raises_when_visit_missing(self):
-        class Repository:
-            def get_visit(self, visit_id):
-                return None
-
-        service = DentalApiService(db=None, repository=Repository())
-        with pytest.raises(DentalApiDomainError) as exc_info:
-            await service.create_dental_price_override(
-                override_data=SimpleNamespace(
-                    visit_id=1,
-                    service_id=2,
-                    new_price=100,
-                    reason="reason",
-                    details=None,
-                ),
-                user=SimpleNamespace(id=5),
-            )
-        assert exc_info.value.status_code == 404
+        repo = Repository()
+        repo.doctor.specialty = "dental"
+        repo.visit = None
+        with pytest.raises(DentalApiDomainError) as exc:
+            await DentalApiService(None, repo).create_dental_price_override(override_data=_data(), user=repo.actor, bearer=_bearer())
+        assert exc.value.status_code == 404
 
     @pytest.mark.asyncio
     async def test_create_dental_price_override_rejects_foreign_visit(self):
-        class Repository:
-            def get_visit(self, visit_id):
-                return SimpleNamespace(id=visit_id, doctor_id=99)
-
-            def get_service(self, service_id):
-                return SimpleNamespace(
-                    id=service_id,
-                    allow_doctor_price_override=True,
-                    price=Decimal("120"),
-                )
-
-            def get_doctor_by_user_id(self, user_id):
-                return SimpleNamespace(id=7, specialty="dental")
-
-            def get_doctor(self, doctor_id):
-                return None
-
-        service = DentalApiService(db=None, repository=Repository())
-        with pytest.raises(DentalApiDomainError) as exc_info:
-            await service.create_dental_price_override(
-                override_data=SimpleNamespace(
-                    visit_id=1,
-                    service_id=2,
-                    new_price=Decimal("100"),
-                    reason="reason",
-                    details=None,
-                ),
-                user=SimpleNamespace(id=10),
-            )
-
-        assert exc_info.value.status_code == 403
+        repo = Repository()
+        repo.doctor.specialty = "dental"
+        repo.visit.doctor_id = 99
+        with pytest.raises(DentalApiDomainError) as exc:
+            await DentalApiService(None, repo).create_dental_price_override(override_data=_data(), user=repo.actor, bearer=_bearer())
+        assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("specialty", ["stomatology", "dental", "dentistry"])
-    async def test_create_dental_price_override_accepts_all_dental_specialty_vocabularies(
-        self, specialty
-    ):
-        """Every dental specialty spelling provisioned by the system passes.
+    async def test_create_dental_price_override_accepts_all_dental_specialty_vocabularies(self, specialty):
+        repo = Repository()
+        repo.doctor.specialty = specialty
+        repo.add = lambda obj: setattr(repo, "created", obj)
+        repo.flush = lambda: None
+        repo.commit_request = lambda context: None
+        repo.refresh = lambda obj: None
+        service = DentalApiService(None, repo)
+        service.send_price_override_notification = AsyncMock()
+        result = await service.create_dental_price_override(override_data=_data(), user=repo.actor, bearer=_bearer())
+        assert result is not repo.created
+        assert result.doctor_id == 7
+        assert result.target_visit_service_id == 3
+        assert result.visit_context_epoch == 9
+        assert result.doctor_owner_generation == 8
+        assert (result.price_context_generation, result.price_line_generation,
+                result.price_owner_generation, result.requester_auth_epoch) == (13, 14, 12, 4)
+        assert result.requester_type == "doctor" and result.requester_user_id_snapshot == 10
 
-        'dentistry' is what user provisioning (user_mgmt/_core.py) and
-        dev_seed actually write into doctors.specialty for dentists — it must
-        not be rejected by the dental-only guard.
-        """
-
-        class Repository:
-            def get_visit(self, visit_id):
-                return SimpleNamespace(id=visit_id, patient_id=20, doctor_id=7)
-
-            def get_service(self, service_id):
-                return SimpleNamespace(
-                    id=service_id,
-                    allow_doctor_price_override=True,
-                    price=Decimal("120"),
-                )
-
-            def get_visit_service(self, *, visit_id, service_id):
-                return SimpleNamespace(visit_id=visit_id, service_id=service_id, price=Decimal("120"))
-
-            def has_pending_override(self, *, visit_id, service_id):
-                return False  # REGPRICE-BE-003: no other pending intent
-
-            def get_doctor_by_user_id(self, user_id):
-                return SimpleNamespace(id=7, specialty=specialty, user=None)
-
-            def get_doctor(self, doctor_id):
-                return None
-
-            def add(self, obj):
-                self.created = obj
-
-            def commit(self):
-                pass
-
-            def refresh(self, obj):
-                obj.id = 55
-
-            def list_registrars(self):
-                return []
-
-        repository = Repository()
-        service = DentalApiService(db=None, repository=repository)
-
-        result = await service.create_dental_price_override(
-            override_data=SimpleNamespace(
-                visit_id=1,
-                service_id=2,
-                new_price=Decimal("100"),
-                reason="reason",
-                details=None,
-            ),
-            user=SimpleNamespace(id=10),
-        )
-        assert result is not None
-        assert repository.created.doctor_id == 7
+    @pytest.mark.asyncio
+    async def test_user_id_is_not_an_assigned_doctor(self):
+        repo = Repository()
+        repo.doctor.specialty = "dental"
+        repo.visit.doctor_id = repo.actor.id
+        with pytest.raises(DentalApiDomainError) as exc:
+            await DentalApiService(None, repo).create_dental_price_override(override_data=_data(), user=repo.actor, bearer=_bearer())
+        assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
     async def test_create_dental_price_override_rejects_non_dental_specialty(self):
-        """A non-dental doctor must still be rejected (403)."""
-
-        class Repository:
-            def get_visit(self, visit_id):
-                return SimpleNamespace(id=visit_id, patient_id=20, doctor_id=7)
-
-            def get_service(self, service_id):
-                return SimpleNamespace(
-                    id=service_id,
-                    allow_doctor_price_override=True,
-                    price=Decimal("120"),
-                )
-
-            def get_doctor_by_user_id(self, user_id):
-                return SimpleNamespace(id=7, specialty="cardiology", user=None)
-
-            def get_doctor(self, doctor_id):
-                return None
-
-        service = DentalApiService(db=None, repository=Repository())
-        with pytest.raises(DentalApiDomainError) as exc_info:
-            await service.create_dental_price_override(
-                override_data=SimpleNamespace(
-                    visit_id=1,
-                    service_id=2,
-                    new_price=Decimal("100"),
-                    reason="reason",
-                    details=None,
-                ),
-                user=SimpleNamespace(id=10),
-            )
-        assert exc_info.value.status_code == 403
+        repo = Repository()
+        repo.doctor.specialty = "cardiology"
+        with pytest.raises(DentalApiDomainError) as exc:
+            await DentalApiService(None, repo).create_dental_price_override(override_data=_data(), user=repo.actor, bearer=_bearer())
+        assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
     async def test_create_dental_price_override_accepts_owned_visit(self):
-        class Repository:
-            def get_visit(self, visit_id):
-                return SimpleNamespace(id=visit_id, patient_id=20, doctor_id=7)
-
-            def get_service(self, service_id):
-                return SimpleNamespace(
-                    id=service_id,
-                    allow_doctor_price_override=True,
-                    price=Decimal("120"),
-                )
-
-            def get_visit_service(self, *, visit_id, service_id):
-                return SimpleNamespace(visit_id=visit_id, service_id=service_id, price=Decimal("120"))
-
-            def has_pending_override(self, *, visit_id, service_id):
-                return False  # REGPRICE-BE-003: no other pending intent
-
-            def get_doctor_by_user_id(self, user_id):
-                return SimpleNamespace(id=7, specialty="dental", user=None)
-
-            def get_doctor(self, doctor_id):
-                return None
-
-            def add(self, obj):
-                self.created = obj
-
-            def commit(self):
-                pass
-
-            def refresh(self, obj):
-                obj.id = 55
-
-            def list_registrars(self):
-                return []
-
-        repository = Repository()
-        service = DentalApiService(db=None, repository=repository)
-
-        result = await service.create_dental_price_override(
-            override_data=SimpleNamespace(
-                visit_id=1,
-                service_id=2,
-                new_price=Decimal("100"),
-                reason="reason",
-                details=None,
-            ),
-            user=SimpleNamespace(id=10),
-        )
-
-        assert result is repository.created
+        repo = Repository()
+        repo.doctor.specialty = "dental"
+        repo.add = lambda obj: setattr(repo, "created", obj)
+        repo.flush = lambda: None
+        repo.commit_request = lambda context: None
+        repo.refresh = lambda obj: None
+        service = DentalApiService(None, repo)
+        service.send_price_override_notification = AsyncMock()
+        result = await service.create_dental_price_override(override_data=_data(), user=repo.actor, bearer=_bearer())
+        assert result is not repo.created
         assert result.doctor_id == 7
 
     def test_get_dental_price_overrides_raises_when_doctor_missing(self):
@@ -254,6 +119,7 @@ class TestDentalApiService:
                 override_id=1,
                 approval_data=SimpleNamespace(action="reject", rejection_reason=None),
                 user=SimpleNamespace(id=9, username="admin", full_name="Admin"),
+                bearer=None,
             )
         assert exc_info.value.status_code == 400
 
@@ -321,21 +187,29 @@ class TestDentalApiService:
         assert repository.commits == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("binding", ["current", "reassigned", "rebound", "revoked"])
     async def test_price_override_result_uses_doctor_protected_inbox(
-        self, monkeypatch
+        self, monkeypatch, binding
     ):
         import app.services.dental_api_service as dental_module
 
         doctor_user = SimpleNamespace(
-            id=12,
+            id=14 if binding == "reassigned" else 12,
             username="synthetic-doctor",
             full_name="Synthetic Doctor",
             is_active=True,
+            role="dentist",
+            auth_epoch=2 if binding == "revoked" else 1,
         )
 
         class Repository:
             def get_doctor(self, doctor_id):
-                return SimpleNamespace(user=doctor_user)
+                return SimpleNamespace(
+                    user=doctor_user,
+                    active=True,
+                    repeat_owner_generation=5 if binding == "rebound" else 4,
+                    price_owner_generation=8,
+                )
 
             def get_service(self, service_id):
                 return SimpleNamespace(name="Synthetic service")
@@ -366,12 +240,21 @@ class TestDentalApiService:
                 reason="synthetic test",
                 approved_at=datetime(2026, 11, 14, 10, 0),
                 rejection_reason=None,
+                doctor_owner_user_id=12,
+                doctor_owner_generation=4,
+                price_owner_generation=8,
+                doctor_user_auth_epoch=1,
             ),
-            approved_by=SimpleNamespace(username="admin", full_name="Synthetic Admin"),
         )
 
-        notification.assert_awaited_once()
-        assert notification.await_args.kwargs["recipient"] is doctor_user
-        assert notification.await_args.kwargs["event_type"] == "dental_price_override_result"
-        assert notification.await_args.kwargs["source_module"] == "dental"
+        if binding == "current":
+            notification.assert_awaited_once()
+            sent = notification.await_args.kwargs
+            assert sent["recipient"] is doctor_user
+            assert sent["event_type"] == "dental_price_override_result"
+            assert sent["source_module"] == "dental"
+            assert sent["metadata"] == {"override_id": 90, "status": "approved"}
+            assert sent["message"] == "Решение доступно в списке изменений цены."
+        else:
+            notification.assert_not_awaited()
         telegram.assert_not_awaited()

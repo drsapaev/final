@@ -124,3 +124,98 @@ describe('DERMSCHED-FE-002 — schedule-next preselects the canonical patient_id
     });
   });
 });
+
+async function prepareScheduleForm() {
+  const { container } = render(<ScheduleNextModal isOpen patient={QUEUE_ROW_PATIENT} />);
+  const service = screen.getByLabelText('Schedule next visit service 1');
+  await waitFor(() => expect(service.querySelector('option[value="5"]')).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Schedule next visit date'), { target: { value: '2030-01-01' } });
+  fireEvent.change(service, { target: { value: '5' } });
+  return container.querySelector('form') as HTMLFormElement;
+}
+
+function requestKey(index: number) {
+  return mockedPost.mock.calls[index]?.[2]?.headers?.['Idempotency-Key'];
+}
+
+describe('doctor schedule submission identity', () => {
+  it('retries a lost reply with the original key', async () => {
+    mockedPost.mockReset()
+      .mockRejectedValueOnce(new Error('Synthetic connection loss'))
+      .mockResolvedValueOnce(jsonResponse({ visit_id: 55 }));
+    const form = await prepareScheduleForm();
+
+    fireEvent.submit(form);
+    await screen.findByText('misc.snm_err_create_visit');
+    fireEvent.submit(form);
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(2));
+
+    expect(requestKey(0)).toEqual(expect.any(String));
+    expect(requestKey(1)).toBe(requestKey(0));
+    expect(mockedPost.mock.calls[0][2]?.headers?.['Idempotency-Intent']).toBeUndefined();
+  });
+
+  it('holds one request in flight and prevents changing an uncertain attempt', async () => {
+    let failRequest: (error: Error) => void = () => {};
+    mockedPost.mockReset().mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      failRequest = reject;
+    }));
+    const form = await prepareScheduleForm();
+
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(mockedPost).toHaveBeenCalledTimes(1);
+    failRequest(new Error('Synthetic connection loss'));
+    await screen.findByText('misc.snm_err_create_visit');
+    fireEvent.change(screen.getByLabelText('Schedule next visit date'), { target: { value: '2030-01-02' } });
+    fireEvent.submit(form);
+
+    expect(screen.getByText('misc.aw_cart_retry_payload_changed')).toBeVisible();
+    expect(mockedPost).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows correction after a definitive validation rejection', async () => {
+    mockedPost.mockReset()
+      .mockRejectedValueOnce({ response: { status: 422, data: { detail: { message: 'Synthetic date validation' } } } })
+      .mockResolvedValueOnce(jsonResponse({ visit_id: 56 }));
+    const form = await prepareScheduleForm();
+
+    fireEvent.submit(form);
+    await screen.findByText('Synthetic date validation');
+    fireEvent.change(screen.getByLabelText('Schedule next visit date'), { target: { value: '2030-01-02' } });
+    fireEvent.submit(form);
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(2));
+
+    expect(requestKey(1)).toEqual(expect.any(String));
+    expect(requestKey(1)).not.toBe(requestKey(0));
+  });
+
+  it('keeps an uncertain attempt when a later retry is denied', async () => {
+    mockedPost.mockReset()
+      .mockRejectedValueOnce(new Error('Synthetic connection loss'))
+      .mockRejectedValueOnce({ response: { status: 403, data: { detail: 'Synthetic access denial' } } });
+    const form = await prepareScheduleForm();
+
+    fireEvent.submit(form);
+    await screen.findByText('misc.snm_err_create_visit');
+    fireEvent.submit(form);
+    await screen.findByText('Synthetic access denial');
+    expect(requestKey(1)).toBe(requestKey(0));
+
+    fireEvent.change(screen.getByLabelText('Schedule next visit date'), { target: { value: '2030-01-02' } });
+    fireEvent.submit(form);
+
+    expect(screen.getByText('misc.aw_cart_retry_payload_changed')).toBeVisible();
+    expect(mockedPost).toHaveBeenCalledTimes(2);
+  });
+});
+
+it('offers the physician the paid and repeat visit types', async () => {
+  render(<ScheduleNextModal isOpen patient={QUEUE_ROW_PATIENT} />);
+
+  await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/services'));
+  const visitType = screen.getByRole('combobox', { name: 'Schedule next visit type' });
+  expect(visitType).toHaveValue('none');
+  expect(screen.getByRole('option', { name: 'misc.snm_visit_type_repeat' })).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'misc.snm_visit_type_benefit' })).toBeNull();
+});

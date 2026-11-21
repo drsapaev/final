@@ -92,3 +92,64 @@ class TestCanonicalVisitService:
             service.resolve_canonical_visit(12)
 
         assert exc_info.value.status_code == 409
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('source_id', [None, 55])
+def test_expected_visit_rejects_unproven_or_other_source_before_lock(source_id):
+    class Repository:
+        def get_appointment(self, appointment_id):
+            return _appointment(source_visit_id=source_id)
+
+        def lock_source_visit(self, visit_id):
+            raise AssertionError('must not lock an unrelated Visit')
+
+        def list_visits_for_appointment(self, appointment):
+            raise AssertionError('legacy heuristics cannot prove payment binding')
+
+    with pytest.raises(CanonicalVisitResolutionError) as exc:
+        CanonicalVisitService(db=None, repository=Repository()).resolve_canonical_visit(
+            12, create_if_missing=False, expected_visit_id=44
+        )
+    assert exc.value.status_code == 409
+
+
+@pytest.mark.unit
+def test_expected_visit_rechecks_source_after_appointment_lock():
+    visit = SimpleNamespace(id=44, patient_id=5, encounter_id=None)
+
+    class Repository:
+        def get_appointment(self, appointment_id):
+            return _appointment(source_visit_id=44)
+
+        def lock_source_visit(self, visit_id):
+            assert visit_id == 44
+            return visit
+
+        def lock_appointment(self, appointment_id):
+            return _appointment(source_visit_id=55, encounter_id=None)
+
+    with pytest.raises(CanonicalVisitResolutionError) as exc:
+        CanonicalVisitService(db=None, repository=Repository()).resolve_canonical_visit(
+            12, create_if_missing=False, expected_visit_id=44
+        )
+    assert exc.value.status_code == 409
+
+
+@pytest.mark.unit
+def test_expected_visit_accepts_consistent_locked_source():
+    visit = SimpleNamespace(id=44, patient_id=5, encounter_id=None)
+
+    class Repository:
+        def get_appointment(self, appointment_id):
+            return _appointment(source_visit_id=44)
+
+        def lock_source_visit(self, visit_id):
+            return visit
+
+        def lock_appointment(self, appointment_id):
+            return _appointment(source_visit_id=44, encounter_id=None)
+
+    assert CanonicalVisitService(db=None, repository=Repository()).resolve_canonical_visit(
+        12, create_if_missing=False, expected_visit_id=44
+    ) == 44
