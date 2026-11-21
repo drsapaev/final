@@ -651,7 +651,11 @@ def start_queue_visit(
         from app.models.visit import Visit
 
         queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.id == entry_id)
+            .with_for_update(of=OnlineQueueEntry)
+            .populate_existing()
+            .first()
         )
         if not queue_entry:
             # This legacy queue route must not fall back to Visit or Appointment IDs:
@@ -746,6 +750,20 @@ def start_queue_visit(
                         status_code=status.HTTP_409_CONFLICT,
                         detail="Queue entry visit does not belong to the queue patient",
                     )
+
+            queue_status = str(queue_entry.status or "").strip().lower()
+            terminal_statuses = (
+                REGISTRAR_CANCEL_BLOCKED_STATUSES
+                | REGISTRAR_HIDDEN_QUEUE_STATUSES
+                | {"incomplete"}
+            )
+            if queue_status in terminal_statuses or (
+                linked_visit is None and queue_status not in REGISTRAR_START_STATUSES
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Queue entry cannot be started from the current status",
+                )
 
             changed_at = datetime.now(UTC)
             queue_entry.status = "in_progress"
