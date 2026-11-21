@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Browser, type Locator, type Page, type Request } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const VITE_ORIGIN = 'http://localhost:5173';
@@ -46,6 +46,44 @@ const PAGES = [
 ] as const;
 
 const AXE_WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+const CATALOG_FILTER_ASSET = '/public-site-catalog-filter.js';
+const PRIVATE_SEARCH_PROBE = 'synthetic-private-qa-741e';
+const CATALOG_COPY = {
+  'uz-Latn': {
+    service: { search: 'Xizmatlarni qidirish', group: 'Toifa', firstGroup: 'Sinov toifasi' },
+    doctor: { search: 'Shifokorlarni qidirish', group: 'Mutaxassisligi', firstGroup: 'Sinov mutaxassisligi' },
+    all: 'Barchasi',
+    reset: 'Filtrlarni tozalash',
+    resultPrefix: 'Natijalar',
+    noResults: 'Hech narsa topilmadi.',
+    query: '  O\'RIK  ',
+  },
+  ru: {
+    service: { search: 'Поиск услуг', group: 'Категория', firstGroup: 'Тестовая категория' },
+    doctor: { search: 'Поиск врачей', group: 'Специализация', firstGroup: 'Тестовая специализация' },
+    all: 'Все',
+    reset: 'Сбросить фильтры',
+    resultPrefix: 'Найдено',
+    noResults: 'Ничего не найдено.',
+    query: '  ЕЛКА  ',
+  },
+} as const;
+
+const CATALOG_DETAILS = {
+  service: [
+    '/services/synthetic-service',
+    '/services/synthetic-service-match',
+    '/services/synthetic-service-other',
+    '/services/synthetic-service-no-category',
+  ],
+  doctor: [
+    '/doctors/synthetic-profile',
+    '/doctors/synthetic-profile-match',
+    '/doctors/synthetic-profile-other',
+    '/doctors/synthetic-profile-no-specialty',
+  ],
+} as const;
+type CatalogKind = keyof typeof CATALOG_DETAILS;
 
 function jsonResponse(body: unknown, status = 200) {
   return {
@@ -149,6 +187,124 @@ async function assertNoAxeViolations(page: Page) {
   expect(violations).toEqual([]);
 }
 
+async function assertVisibleCatalogLinks(catalog: Locator, paths: readonly string[]) {
+  const links = catalog.locator('[data-catalog-item]:visible a.public-site__list-title');
+  await expect.poll(() => links.evaluateAll((elements) => elements.map((element) => element.getAttribute('href'))))
+    .toEqual(paths);
+}
+
+async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind) {
+  const catalog = page.locator('public-site-catalog-filter');
+  const controls = catalog.getByRole('search');
+  const copy = CATALOG_COPY[locale.lang];
+  const search = controls.getByRole('searchbox', { name: copy[kind].search, exact: true });
+  const group = controls.getByRole('combobox', { name: copy[kind].group, exact: true });
+  const status = catalog.locator('.public-site__catalog-status');
+  const reset = controls.getByRole('button', { name: copy.reset, exact: true });
+  const paths = CATALOG_DETAILS[kind].map((path) => locale.prefix + path);
+
+  await expect(search).toBeVisible();
+  await expect(group.locator('option:checked')).toHaveText(copy.all);
+  await assertVisibleCatalogLinks(catalog, paths);
+  await expect(status).toHaveText(`${copy.resultPrefix} 4`);
+
+  let sentQuery = false;
+  let fetchedCatalog = false;
+  const recordRequest = (request: Request) => {
+    const url = new URL(request.url());
+    if (url.href.toLowerCase().includes(PRIVATE_SEARCH_PROBE)
+      || request.postData()?.toLowerCase().includes(PRIVATE_SEARCH_PROBE)) sentQuery = true;
+    if (url.pathname.startsWith('/api/v1/public-site/')) fetchedCatalog = true;
+  };
+  const initialUrl = page.url();
+  page.on('request', recordRequest);
+  try {
+    await group.selectOption({ label: copy[kind].firstGroup });
+    await assertVisibleCatalogLinks(catalog, paths.slice(0, 2));
+    await expect(status).toHaveText(`${copy.resultPrefix} 2`);
+
+    await search.fill(copy.query);
+    await assertVisibleCatalogLinks(catalog, [paths[1]]);
+    await expect(status).toHaveText(`${copy.resultPrefix} 1`);
+
+    await group.selectOption({ label: copy.all });
+    await assertVisibleCatalogLinks(catalog, paths.slice(1, 3));
+    if (locale.lang === 'uz-Latn') {
+      await search.fill('O’RIK');
+      await assertVisibleCatalogLinks(catalog, paths.slice(1, 3));
+    }
+    await expect(page).toHaveURL(initialUrl);
+
+    await group.selectOption({ label: copy[kind].firstGroup });
+    await search.fill(PRIVATE_SEARCH_PROBE);
+    await search.press('Enter');
+    await assertVisibleCatalogLinks(catalog, []);
+    await expect(status).toHaveText(`${copy.resultPrefix} 0`);
+    await expect(catalog.getByText(copy.noResults, { exact: true })).toBeVisible();
+    await expect(catalog.locator(`a[href="${locale.prefix}/contacts"]`)).toBeVisible();
+    await expect(page).toHaveURL(initialUrl);
+    const storedQuery = await page.evaluate((probe) => {
+      const storageHasProbe = [localStorage, sessionStorage].some((storage) =>
+        Object.entries(storage).some(([key, value]) =>
+          key.toLowerCase().includes(probe) || String(value).toLowerCase().includes(probe)));
+      return storageHasProbe || document.cookie.toLowerCase().includes(probe);
+    }, PRIVATE_SEARCH_PROBE);
+    expect(storedQuery, 'the synthetic search term must remain out of browser storage').toBe(false);
+
+    await reset.click();
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue('');
+    await expect(group.locator('option:checked')).toHaveText(copy.all);
+    await assertVisibleCatalogLinks(catalog, paths);
+    await expect(status).toHaveText(`${copy.resultPrefix} 4`);
+    await expect(catalog.getByText(copy.noResults, { exact: true })).toBeHidden();
+    await expect(page).toHaveURL(initialUrl);
+    expect(sentQuery, 'the synthetic search term must remain out of requests').toBe(false);
+    expect(fetchedCatalog, 'filtering must use the catalog already on the page').toBe(false);
+  } finally {
+    page.off('request', recordRequest);
+  }
+}
+
+async function assertCatalogFallback(page: Page, browser: Browser, request: APIRequestContext) {
+  await test.step('Vite keeps the complete linked catalog when the filter asset is blocked', async () => {
+    const assetUrl = VITE_ORIGIN + CATALOG_FILTER_ASSET;
+    let blockedAsset = false;
+    await page.route(assetUrl, (route) => {
+      blockedAsset = true;
+      return route.abort('blockedbyclient');
+    });
+    try {
+      await page.goto(VITE_ORIGIN + '/ru/services');
+      const catalog = page.locator('public-site-catalog-filter');
+      await assertVisibleCatalogLinks(catalog, CATALOG_DETAILS.service.map((path) => '/ru' + path));
+      await expect(catalog.getByRole('search', { includeHidden: true })).toBeHidden();
+      await expect.poll(() => blockedAsset).toBe(true);
+    } finally {
+      await page.unroute(assetUrl);
+    }
+  });
+
+  await test.step('Nitro serves the built enhancement asset and works with JavaScript disabled', async () => {
+    const nitroOrigin = PUBLIC_SITE_ORIGINS[1].origin;
+    const asset = await request.head(nitroOrigin + CATALOG_FILTER_ASSET, { maxRedirects: 0, timeout: 5000 });
+    expect(asset.ok()).toBe(true);
+    expect(asset.headers()['content-type']).toContain('javascript');
+    expect(asset.headers()['cache-control']).toBe('no-store');
+
+    const noScriptPage = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 320, height: 900 } });
+    try {
+      await installSyntheticApi(noScriptPage, request);
+      await noScriptPage.goto(nitroOrigin + '/doctors');
+      const catalog = noScriptPage.locator('public-site-catalog-filter');
+      await assertVisibleCatalogLinks(catalog, CATALOG_DETAILS.doctor);
+      await expect(catalog.getByRole('search', { includeHidden: true })).toBeHidden();
+    } finally {
+      await noScriptPage.close();
+    }
+  });
+}
+
 async function assertLocalizedCatalog(page: Page, request: APIRequestContext, width: number) {
   await page.setViewportSize({ width, height: 900 });
   await installSyntheticApi(page, request);
@@ -166,6 +322,11 @@ async function assertLocalizedCatalog(page: Page, request: APIRequestContext, wi
           if (path === '/services/synthetic-service') {
             await expect(main.getByRole('link', { name: locale.doctorName, exact: true }))
               .toHaveAttribute('href', locale.prefix + '/doctors/synthetic-profile');
+          }
+
+          const isCatalog = path === '/services' || path === '/prices' || path === '/doctors';
+          if (isCatalog) {
+            await expect(main.getByRole('search')).toBeVisible();
           }
 
           await expect.poll(() => page.evaluate(() => {
@@ -190,6 +351,10 @@ async function assertLocalizedCatalog(page: Page, request: APIRequestContext, wi
             expect(scroll.bodyOffset, 'the body should not scroll independently').toBe(0);
           }
 
+          if (width === 320 && isCatalog) {
+            await assertCatalogFilter(page, locale, path === '/doctors' ? 'doctor' : 'service');
+          }
+
           await assertNoAxeViolations(page);
         });
       }
@@ -206,9 +371,10 @@ async function navigateInApp(page: Page, path: string) {
 }
 
 test.describe('public-site accessibility', () => {
-  test('the localized Vite and Nitro catalog passes keyboard and Axe checks at 320px', async ({ page, request }) => {
+  test('the localized Vite and Nitro catalog passes keyboard and Axe checks at 320px', async ({ page, browser, request }) => {
     test.setTimeout(120_000);
     await assertLocalizedCatalog(page, request, 320);
+    await assertCatalogFallback(page, browser, request);
   });
 
   test('the localized Vite and Nitro catalog passes keyboard and Axe checks at 1440px', async ({ page, request }) => {

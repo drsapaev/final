@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import process from 'node:process';
@@ -10,40 +10,110 @@ const fixturePort = Number(process.env.PUBLIC_SITE_FIXTURE_PORT || 5279);
 const appPort = Number(process.env.PUBLIC_SITE_SSR_PORT || 5278);
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const allowedLocales = new Set(['ru', 'uz-Latn']);
+const catalogFilterFile = 'public-site-catalog-filter.js';
+
+const serviceFields = {
+  ru: {
+    description: 'Синтетические данные для проверки сайта; это не предложение медицинской услуги.',
+    price: null,
+    currency: null,
+  },
+  'uz-Latn': {
+    description: 'Saytni tekshirish uchun sintetik ma’lumot; bu tibbiy xizmat taklifi emas.',
+    price: null,
+    currency: null,
+  },
+};
+const doctorFields = {
+  ru: { bio: 'Синтетические данные; это не реальный врач.' },
+  'uz-Latn': { bio: 'Sintetik ma’lumot; bu haqiqiy shifokor emas.' },
+};
 
 /** @type {Record<'ru' | 'uz-Latn', import('../../src/publicSiteApi').PublicSiteService[]>} */
 const services = {
   ru: [{
+    ...serviceFields.ru,
     slug: 'synthetic-service',
     name: 'Синтетическая тестовая услуга',
-    description: 'Синтетические данные для проверки сайта; это не предложение медицинской услуги.',
-    price: null,
-    currency: null,
     category: 'Тестовая категория',
+  }, {
+    ...serviceFields.ru,
+    slug: 'synthetic-service-match',
+    name: 'Синтетическая услуга Ёлка',
+    category: 'Тестовая категория',
+  }, {
+    ...serviceFields.ru,
+    slug: 'synthetic-service-other',
+    name: 'Другая синтетическая услуга Ёлка',
+    category: 'Другая тестовая категория',
+  }, {
+    ...serviceFields.ru,
+    slug: 'synthetic-service-no-category',
+    name: 'Синтетическая услуга без категории',
   }],
   'uz-Latn': [{
+    ...serviceFields['uz-Latn'],
     slug: 'synthetic-service',
     name: 'Sintetik sinov xizmati',
-    description: 'Saytni tekshirish uchun sintetik ma’lumot; bu tibbiy xizmat taklifi emas.',
-    price: null,
-    currency: null,
     category: 'Sinov toifasi',
+  }, {
+    ...serviceFields['uz-Latn'],
+    slug: 'synthetic-service-match',
+    name: 'Sintetik Oʻrik xizmati',
+    category: 'Sinov toifasi',
+  }, {
+    ...serviceFields['uz-Latn'],
+    slug: 'synthetic-service-other',
+    name: 'Boshqa sintetik O‘rik xizmati',
+    category: 'Boshqa sinov toifasi',
+  }, {
+    ...serviceFields['uz-Latn'],
+    slug: 'synthetic-service-no-category',
+    name: 'Toifasi yo‘q sintetik xizmat',
   }],
 };
 
 /** @type {Record<'ru' | 'uz-Latn', import('../../src/publicSiteApi').PublicSiteDoctor[]>} */
 const doctors = {
   ru: [{
+    ...doctorFields.ru,
     slug: 'synthetic-profile',
     name: 'Синтетический тестовый профиль',
-    bio: 'Синтетические данные; это не реальный врач.',
     specialty: 'Тестовая специализация',
+  }, {
+    ...doctorFields.ru,
+    slug: 'synthetic-profile-match',
+    name: 'Синтетический профиль Ёлка',
+    specialty: 'Тестовая специализация',
+  }, {
+    ...doctorFields.ru,
+    slug: 'synthetic-profile-other',
+    name: 'Другой синтетический профиль Ёлка',
+    specialty: 'Другая тестовая специализация',
+  }, {
+    ...doctorFields.ru,
+    slug: 'synthetic-profile-no-specialty',
+    name: 'Синтетический профиль без специализации',
   }],
   'uz-Latn': [{
+    ...doctorFields['uz-Latn'],
     slug: 'synthetic-profile',
     name: 'Sintetik sinov profili',
-    bio: 'Sintetik ma’lumot; bu haqiqiy shifokor emas.',
     specialty: 'Sinov mutaxassisligi',
+  }, {
+    ...doctorFields['uz-Latn'],
+    slug: 'synthetic-profile-match',
+    name: 'Sintetik Oʻrik profili',
+    specialty: 'Sinov mutaxassisligi',
+  }, {
+    ...doctorFields['uz-Latn'],
+    slug: 'synthetic-profile-other',
+    name: 'Boshqa sintetik O‘rik profili',
+    specialty: 'Boshqa sinov mutaxassisligi',
+  }, {
+    ...doctorFields['uz-Latn'],
+    slug: 'synthetic-profile-no-specialty',
+    name: 'Mutaxassisligi yo‘q sintetik profil',
   }],
 };
 
@@ -79,31 +149,32 @@ function handleFixture(request, response) {
     sendJson(response, 200, services[locale]);
     return;
   }
-  if (pathname === '/services/synthetic-service') {
-    const { slug, name } = doctors[locale][0];
-    /** @type {import('../../src/publicSiteApi').PublicSiteServiceDetail} */
-    const detail = { ...services[locale][0], related_doctors: [{ slug, name }] };
-    sendJson(response, 200, detail);
-    return;
-  }
   if (pathname.startsWith('/services/')) {
-    sendJson(response, 404, { detail: { code: 'public_content_not_found' } });
+    const service = services[locale].find(({ slug }) => pathname === `/services/${slug}`);
+    if (!service) {
+      sendJson(response, 404, { detail: { code: 'public_content_not_found' } });
+      return;
+    }
+    const { slug, name } = doctors[locale][0];
+    const relatedDoctors = service.slug === 'synthetic-service' ? [{ slug, name }] : [];
+    /** @type {import('../../src/publicSiteApi').PublicSiteServiceDetail} */
+    const detail = { ...service, related_doctors: relatedDoctors };
+    sendJson(response, 200, detail);
     return;
   }
   if (pathname === '/doctors') {
     sendJson(response, 200, doctors[locale]);
     return;
   }
-  if (pathname === '/doctors/synthetic-profile') {
-    sendJson(response, 200, doctors[locale][0]);
-    return;
-  }
   if (pathname.startsWith('/doctors/')) {
-    sendJson(response, 404, { detail: { code: 'public_content_not_found' } });
+    const doctor = doctors[locale].find(({ slug }) => pathname === `/doctors/${slug}`);
+    if (doctor) sendJson(response, 200, doctor);
+    else sendJson(response, 404, { detail: { code: 'public_content_not_found' } });
     return;
   }
   if (pathname === '/categories') {
-    sendJson(response, 200, [{ name: services[locale][0].category }]);
+    const categories = new Set(services[locale].map(({ category }) => category).filter(Boolean));
+    sendJson(response, 200, Array.from(categories, (name) => ({ name })));
     return;
   }
 
@@ -126,7 +197,8 @@ if (process.env.PUBLIC_SITE_FIXTURE_ONLY === '1') {
     if (process.env[key]) safeEnv[key] = process.env[key];
   }
 
-  const functionEntrypoint = path.join(repositoryRoot, '.vercel', 'output', 'functions', 'index.func', 'index.mjs');
+  const vercelOutput = path.join(repositoryRoot, '.vercel', 'output');
+  const functionEntrypoint = path.join(vercelOutput, 'functions', 'index.func', 'index.mjs');
   const reuseBuild = process.env.PUBLIC_SITE_REUSE_VERIFIED_BUILD === '1' && existsSync(functionEntrypoint);
   if (!reuseBuild) {
     const build = spawnSync(process.execPath, [viteCli, 'build', '--mode', 'ssr'], {
@@ -156,10 +228,12 @@ if (process.env.PUBLIC_SITE_FIXTURE_ONLY === '1') {
   process.env.VERCEL_ENV = 'preview';
 
   let runtime;
+  let catalogFilterAsset;
   try {
     runtime = (await import(pathToFileURL(functionEntrypoint).href)).default;
+    catalogFilterAsset = readFileSync(path.join(vercelOutput, 'static', catalogFilterFile));
   } catch (error) {
-    process.stderr.write('Could not load the built Vercel function: ' + error.message + '\n');
+    process.stderr.write('Could not load the built Vercel function or catalog asset: ' + error.message + '\n');
     fixtureServer.close();
     process.exit(1);
   }
@@ -175,6 +249,21 @@ if (process.env.PUBLIC_SITE_FIXTURE_ONLY === '1') {
         method: incoming.method || 'GET',
         headers,
       });
+      if (new URL(request.url).pathname === '/' + catalogFilterFile) {
+        if (request.method !== 'GET' && request.method !== 'HEAD') {
+          outgoing.writeHead(405, { Allow: 'GET, HEAD', 'Cache-Control': 'no-store' });
+          outgoing.end();
+          return;
+        }
+        outgoing.writeHead(200, {
+          'Cache-Control': 'no-store',
+          'Content-Length': catalogFilterAsset.length,
+          'Content-Type': 'text/javascript; charset=utf-8',
+          'X-Content-Type-Options': 'nosniff',
+        });
+        outgoing.end(request.method === 'HEAD' ? undefined : catalogFilterAsset);
+        return;
+      }
       const response = await runtime.fetch(request, {});
       if (!response) {
         outgoing.writeHead(404, { 'Cache-Control': 'no-store' });
