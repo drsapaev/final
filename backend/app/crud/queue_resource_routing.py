@@ -40,6 +40,7 @@ from datetime import date
 from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import DailyQueue, QueueResource
@@ -201,8 +202,11 @@ def ensure_daily_queue_identity_is_new(
     query = db.query(DailyQueue).filter(DailyQueue.day == day)
     if specialist_id is not None:
         query = query.filter(DailyQueue.specialist_id == specialist_id)
-        if queue_tag is None:
-            query = query.filter(DailyQueue.queue_tag.is_(None))
+        if queue_tag in (None, ""):
+            # Match the doctor/day index, including archived legacy empty tags.
+            query = query.filter(
+                or_(DailyQueue.queue_tag.is_(None), DailyQueue.queue_tag == "")
+            )
         else:
             query = query.filter(DailyQueue.queue_tag == queue_tag)
     else:
