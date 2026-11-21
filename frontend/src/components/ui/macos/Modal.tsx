@@ -273,7 +273,6 @@ const Modal = ({
           size="small"
           onClick={onClose}
           aria-label={t('common.close', { defaultValue: 'Close' })}
-          title={t('common.close', { defaultValue: 'Close' })}
           style={{
             position: 'absolute',
             top: '12px',
@@ -287,7 +286,7 @@ const Modal = ({
             justifyContent: 'center'
           }}>
 
-            ✕
+            <span aria-hidden="true">✕</span>
           </Button>
         }
       </div>

@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-11-09 - Hide decorative icons in interactive elements
+**Learning:** When elements like buttons communicate state via ARIA attributes (e.g., `aria-busy="true"`), internal visual SVGs like spinners or decorative icons are redundantly announced by screen readers if not hidden. Also, redundant `title` attributes on icon-only buttons with `aria-label` cause duplicate screen reader announcements.
+**Action:** Always apply both `aria-hidden="true"` and `focusable="false"` to internal visual elements (spinners, carets, decorative icons) when the parent container already communicates the state or action semantically. Remove `title` attributes from icon-only buttons that already have `aria-label`.
