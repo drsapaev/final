@@ -87,6 +87,11 @@
   font-size: 1.15rem;
 }
 
+.public-site__brand-logo {
+  flex: none;
+  object-fit: contain;
+}
+
 .public-site__nav {
   display: flex;
   align-items: center;

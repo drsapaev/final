@@ -18,7 +18,7 @@ export type PublicSiteFetch = (
 ) => Promise<Response>;
 
 export interface PublicSiteApi {
-  getClinic(): Promise<PublicSiteClinic>;
+  getClinic(signal?: AbortSignal): Promise<PublicSiteClinic>;
   listServices(locale: PublicSiteLocale): Promise<PublicSiteService[]>;
   getService(slug: string, locale: PublicSiteLocale): Promise<PublicSiteService | null>;
   listDoctors(locale: PublicSiteLocale): Promise<PublicSiteDoctor[]>;
@@ -44,7 +44,13 @@ export function createPublicSiteApi(
 ): PublicSiteApi {
   const origin = normalizeApiOrigin(apiOrigin);
 
-  async function request<T>(path: string, missingIsNull = false): Promise<T | null> {
+  async function request<T>(
+    path: string,
+    { missingIsNull = false, signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS) }: {
+      missingIsNull?: boolean;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<T | null> {
     let response: Response;
     try {
       response = await fetchImpl(new URL(`/api/v1/public-site/${path}`, origin), {
@@ -53,7 +59,7 @@ export function createPublicSiteApi(
         cache: 'no-store',
         credentials: 'omit',
         redirect: 'error',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal,
       });
     } catch {
       throw new PublicSiteApiError();
@@ -93,8 +99,8 @@ export function createPublicSiteApi(
   }
 
   return {
-    async getClinic() {
-      const result = await request<PublicSiteClinic>('clinic');
+    async getClinic(signal) {
+      const result = await request<PublicSiteClinic>('clinic', { signal });
       if (!result || typeof result !== 'object') throw new PublicSiteApiError();
       return withClinicMedia(result);
     },
@@ -104,7 +110,7 @@ export function createPublicSiteApi(
     async getService(slug, locale) {
       return request<PublicSiteService>(
         localized(`services/${encodeURIComponent(slug)}`, locale),
-        true,
+        { missingIsNull: true },
       );
     },
     listDoctors(locale) {
@@ -114,7 +120,7 @@ export function createPublicSiteApi(
     async getDoctor(slug, locale) {
       const doctor = await request<PublicSiteDoctor>(
         localized(`doctors/${encodeURIComponent(slug)}`, locale),
-        true,
+        { missingIsNull: true },
       );
       return doctor ? withDoctorMedia(doctor) : null;
     },
