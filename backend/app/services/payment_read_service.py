@@ -13,6 +13,7 @@ from app.models.patient import Patient
 from app.models.visit import Visit
 from app.repositories.payment_read_repository import PaymentReadRepository
 from app.services.billing_service import BillingService
+from app.services.payment_state_checks import is_valid_payment_transition
 
 
 @dataclass
@@ -177,30 +178,41 @@ class PaymentReadService:
         if not payment:
             raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
 
-        provider_payment_id = payment.provider_payment_id or ""
-        is_test_provider_payment = provider_payment_id.startswith("test_")
+        provider = payment.provider
+        order_id = payment.provider_payment_id
+        recorded_status = payment.status
 
         if (
             self.payment_manager
-            and payment.provider
-            and payment.provider_payment_id
-            and payment.status
-            in [PaymentStatus.PENDING.value, PaymentStatus.PROCESSING.value]
-            and not is_test_provider_payment
+            and provider
+            and order_id
+            and recorded_status in (PaymentStatus.PENDING.value, PaymentStatus.PROCESSING.value)
+            and not order_id.startswith("test_")
         ):
-            result = self.payment_manager.check_payment_status(
-                payment.provider, payment.provider_payment_id
-            )
+            visit_id = payment.visit_id
+            recorded_payment_terms = (payment.amount, payment.currency, payment.updated_at)
+            result = self.payment_manager.check_payment_status(provider, order_id)
+            reported_status = result.status.lower() if isinstance(result.status, str) else ""
 
-            if result.success and result.status and result.status != payment.status:
-                meta = {**(payment.provider_data or {}), **(result.provider_data or {})}
-                self.billing_service.update_payment_status(
-                    payment_id=payment.id, new_status=result.status, meta=meta
-                )
-                payment = self.repository.get_payment(payment_id)
-                if not payment:
-                    raise PaymentReadDomainError(
-                        status_code=500, detail="Платеж не найден после обновления статуса"
+            if (
+                result.success
+                and reported_status != recorded_status
+                and is_valid_payment_transition(recorded_status, reported_status)
+            ):
+                # The provider call can outlive a concurrent settlement or order change.
+                payment = self.repository.get_payment(payment_id, for_update=True)
+                if payment is None or payment.visit_id != visit_id:
+                    raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
+
+                if (
+                    payment.status == recorded_status
+                    and payment.provider == provider
+                    and payment.provider_payment_id == order_id
+                    and (payment.amount, payment.currency, payment.updated_at) == recorded_payment_terms
+                ):
+                    meta = {**(payment.provider_data or {}), **(result.provider_data or {})}
+                    payment = self.billing_service.update_payment_status(
+                        payment_id=payment.id, new_status=reported_status, meta=meta
                     )
 
         return {

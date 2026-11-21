@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import Mock
 
 import pytest
+from sqlalchemy import update
 
 from app.models.payment import Payment
 from app.services.payment_providers.base import PaymentResult
@@ -60,6 +62,63 @@ class TestPaymentReadService:
         assert payment.provider_data["source"] == "unit"
         assert result["status"] == "paid"
         assert result["payment_id"] == payment.id
+
+    def test_provider_poll_preserves_payment_posted_during_lookup(self, db_session, test_visit):
+        payment = Payment(
+            visit_id=test_visit.id,
+            amount=Decimal("15000.00"),
+            currency="UZS",
+            method="online",
+            status="pending",
+            provider="click",
+            provider_payment_id="SYNTHETIC-status-read",
+        )
+        db_session.add(payment)
+        db_session.commit()
+        payment_id = payment.id
+        posting_time = datetime(2026, 1, 10, 12, tzinfo=UTC)
+
+        def check_payment_status(provider, order_id):
+            assert provider == "click"
+            assert order_id == "SYNTHETIC-status-read"
+            # Apply the authoritative database change without updating the cached ORM row.
+            db_session.connection().execute(
+                update(Payment)
+                .where(Payment.id == payment_id)
+                .values(status="paid", paid_at=posting_time, provider_data={"source": "SYNTHETIC-settlement"})
+            )
+            return PaymentResult(success=True, status="processing", provider_data={"status": 1})
+
+        manager = Mock()
+        manager.check_payment_status.side_effect = check_payment_status
+        result = PaymentReadService(db_session, manager).get_payment_status(payment_id=payment_id)
+
+        db_session.refresh(payment)
+        assert result["status"] == payment.status == "paid"
+        assert payment.paid_at is not None
+        assert payment.paid_at.replace(tzinfo=payment.paid_at.tzinfo or UTC) == posting_time
+        assert payment.provider_data == {"source": "SYNTHETIC-settlement"}
+
+    def test_provider_poll_reports_saved_status_for_disallowed_transition(self, db_session, test_visit):
+        payment = Payment(
+            visit_id=test_visit.id,
+            amount=Decimal("15000.00"),
+            currency="UZS",
+            method="online",
+            status="pending",
+            provider="click",
+            provider_payment_id="SYNTHETIC-incomplete-proof",
+        )
+        db_session.add(payment)
+        db_session.commit()
+        manager = _FakePaymentManager(PaymentResult(success=True, status="completed"))
+
+        result = PaymentReadService(db_session, manager).get_payment_status(payment_id=payment.id)
+
+        db_session.refresh(payment)
+        assert result["status"] == payment.status == "pending"
+        assert payment.paid_at is None
+        assert payment.provider_data is None
 
     @pytest.mark.parametrize(
         ("provider_response", "expected_status"),
