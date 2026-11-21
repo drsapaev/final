@@ -149,7 +149,7 @@ describe('public-site SSR request handler', () => {
       const fetchImpl = createFetch((url, init) => {
         if (url.pathname === '/api/v1/public-site/clinic') {
           expect(init?.cache).toBe('no-store');
-          return jsonResponse({ name: 'SYNTHETIC Clinic', logo_url: logoUrl });
+          return jsonResponse({ name: 'SYNTHETIC Clinic', address: 'SYNTHETIC address', logo_url: logoUrl });
         }
         switch (url.pathname) {
           case '/api/v1/public-site/doctors/synthetic':
@@ -173,7 +173,9 @@ describe('public-site SSR request handler', () => {
       const clinicReads = fetchImpl.mock.calls.filter(([url]) =>
         String(url) === apiOrigin + '/api/v1/public-site/clinic');
       expect(clinicReads).toHaveLength(1);
-      const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const html = await response.text();
+      if (!path.endsWith('/contacts')) expect(html).not.toContain('MedicalClinic');
+      const document = new DOMParser().parseFromString(html, 'text/html');
       return document.querySelector('header a.public-site__brand');
     }
 
@@ -348,37 +350,172 @@ describe('public-site SSR request handler', () => {
     expect(html).toContain('125');
   });
 
-  it('renders the admin-managed clinic opening and closing times in localized contacts', async () => {
-    const fetchImpl = createFetch((url) => {
-      expect(url.pathname).toBe('/api/v1/public-site/clinic');
-      return jsonResponse({
-        name: 'Doktor KosMed Clinic',
-        address: 'SYNTHETIC address',
-        phone: null,
-        email: null,
-        logo_url: null,
-        working_hours_start: '09:00:00',
-        working_hours_end: '17:00:00',
+  describe('MedicalClinic structured data', () => {
+    const fixture = {
+      name: 'SYNTHETIC Clinic',
+      address: 'SYNTHETIC address',
+      phone: '+000 (00) 000-000',
+      email: 'clinic+synthetic@example.test',
+      logo_url: null,
+      working_hours_start: '09:00:00',
+      working_hours_end: '17:00:00',
+    };
+
+    function requestContacts(path: string, fetchImpl: ReturnType<typeof createFetch>) {
+      return handlePublicSiteRequest(
+        new Request(`https://preview.kosmed.test${path}`),
+        {
+          apiOrigin: 'https://api.kosmed.test',
+          siteOrigin: 'https://www.kosmed.test',
+          deploymentEnvironment: 'preview',
+        },
+        assets,
+        fetchImpl,
+      );
+    }
+
+    function readStructuredData(document: Document): Record<string, unknown>[] {
+      return Array.from(document.querySelectorAll('head script[type="application/ld+json"]'), (tag) =>
+        JSON.parse(tag.textContent ?? '') as Record<string, unknown>);
+    }
+
+    it.each([
+      {
+        path: '/contacts',
+        locale: 'uz-Latn',
+        workingDays: 'Dushanba–shanba',
+        sundayClosed: 'Yakshanba — dam olish kuni',
+      },
+      {
+        path: '/ru/contacts',
+        locale: 'ru',
+        workingDays: 'Понедельник–суббота',
+        sundayClosed: 'Воскресенье — выходной',
+      },
+    ])('matches rendered contacts and the canonical clinic identity on $path', async ({ path, locale, workingDays, sundayClosed }) => {
+      const fetchImpl = createFetch((url) => {
+        expect(url.href).toBe('https://api.kosmed.test/api/v1/public-site/clinic');
+        return jsonResponse(fixture);
       });
+
+      const response = await requestContacts(path, fetchImpl);
+      const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const contactText = document.querySelector('address')?.textContent;
+      const structuredData = readStructuredData(document);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+      expect(response.headers.get('Content-Language')).toBe(locale);
+      expect(document.querySelector('footer')?.textContent).toContain(fixture.name);
+      expect(contactText).toContain(fixture.address);
+      expect(contactText).toContain(fixture.phone);
+      expect(contactText).toContain(fixture.email);
+      expect(contactText).toContain(workingDays);
+      expect(contactText).toContain('09:00–17:00');
+      expect(contactText).toContain(sundayClosed);
+      expect(structuredData).toContainEqual(expect.objectContaining({ '@type': 'BreadcrumbList' }));
+      expect(structuredData.filter((record) => record['@type'] === 'MedicalClinic')).toEqual([{
+        '@context': 'https://schema.org',
+        '@type': 'MedicalClinic',
+        '@id': 'https://www.kosmed.test/#clinic',
+        url: 'https://www.kosmed.test/',
+        name: fixture.name,
+        address: fixture.address,
+        telephone: '+00000000000',
+        email: fixture.email,
+        openingHoursSpecification: {
+          '@type': 'OpeningHoursSpecification',
+          dayOfWeek: [
+            'https://schema.org/Monday',
+            'https://schema.org/Tuesday',
+            'https://schema.org/Wednesday',
+            'https://schema.org/Thursday',
+            'https://schema.org/Friday',
+            'https://schema.org/Saturday',
+          ],
+          opens: '09:00:00',
+          closes: '17:00:00',
+        },
+      }]);
+      expect(fetchImpl).toHaveBeenCalledOnce();
     });
 
-    const response = await handlePublicSiteRequest(
-      new Request('https://preview.kosmed.test/ru/contacts'),
-      {
-        apiOrigin: 'https://api.kosmed.test',
-        siteOrigin: 'https://www.kosmed.test',
-        deploymentEnvironment: 'preview',
-      },
-      assets,
-      fetchImpl,
-    );
-    const html = await response.text();
+    it('uses current clinic hours on every uncached request', async () => {
+      const clinic = { ...fixture };
+      const fetchImpl = createFetch((_url, init) => {
+        expect(init?.cache).toBe('no-store');
+        return jsonResponse(clinic);
+      });
 
-    expect(response.status).toBe(200);
-    expect(html).toContain('Понедельник–суббота');
-    expect(html).toContain('09:00');
-    expect(html).toContain('17:00');
-    expect(html).toContain('Воскресенье — выходной');
+      const original = await requestContacts('/contacts', fetchImpl);
+      const originalDocument = new DOMParser().parseFromString(await original.text(), 'text/html');
+      expect(originalDocument.querySelector('address')?.textContent).toContain('09:00–17:00');
+      clinic.working_hours_start = '08:30:00';
+      clinic.working_hours_end = '16:15:00';
+      const updated = await requestContacts('/contacts', fetchImpl);
+      const document = new DOMParser().parseFromString(await updated.text(), 'text/html');
+
+      expect(updated.headers.get('Cache-Control')).toBe('no-store');
+      expect(document.querySelector('address')?.textContent).toContain('08:30–16:15');
+      expect(readStructuredData(document)).toContainEqual(expect.objectContaining({
+        '@type': 'MedicalClinic',
+        openingHoursSpecification: expect.objectContaining({ opens: '08:30:00', closes: '16:15:00' }),
+      }));
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      { label: 'out-of-range hours', start: '99:00:00', end: '17:00:00' },
+      { label: 'a missing closing time', start: '09:00:00', end: null },
+      { label: 'reversed hours', start: '18:00:00', end: '09:00:00' },
+    ])('omits invalid contacts and $label while retaining the published address', async ({ start, end }) => {
+      const response = await requestContacts('/ru/contacts', createFetch(() => jsonResponse({
+        ...fixture,
+        phone: 'SYNTHETIC invalid phone',
+        email: 'SYNTHETIC invalid email',
+        working_hours_start: start,
+        working_hours_end: end,
+      })));
+      const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+
+      expect(response.status).toBe(200);
+      expect(document.querySelector('address')?.textContent).toContain(fixture.address);
+      expect(document.querySelector('address')?.textContent).not.toContain('SYNTHETIC invalid');
+      expect(document.querySelector('address')?.textContent).not.toContain('Понедельник–суббота');
+      expect(readStructuredData(document).filter((record) => record['@type'] === 'MedicalClinic')).toEqual([{
+        '@context': 'https://schema.org',
+        '@type': 'MedicalClinic',
+        '@id': 'https://www.kosmed.test/#clinic',
+        url: 'https://www.kosmed.test/',
+        name: fixture.name,
+        address: fixture.address,
+      }]);
+    });
+
+    it.each([
+      { label: 'has no published name', clinic: { ...fixture, name: null } },
+      { label: 'has no publishable contact information or hours', clinic: { name: fixture.name } },
+    ])('omits the entity when the clinic $label', async ({ clinic }) => {
+      const response = await requestContacts('/contacts', createFetch(() => jsonResponse(clinic)));
+      const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+
+      expect(response.status).toBe(200);
+      expect(document.querySelector('main')).not.toBeNull();
+      expect(readStructuredData(document)).not.toContainEqual(expect.objectContaining({ '@type': 'MedicalClinic' }));
+    });
+
+    it('preserves published contact text without letting it close the JSON-LD script', async () => {
+      const address = 'SYNTHETIC </script> <address> &';
+      const response = await requestContacts('/contacts', createFetch(() => jsonResponse({ ...fixture, address })));
+      const html = await response.text();
+      const document = new DOMParser().parseFromString(html, 'text/html');
+
+      expect(response.status).toBe(200);
+      expect(html).not.toContain(address);
+      expect(document.querySelector('address')?.textContent).toContain(address);
+      expect(readStructuredData(document)).toContainEqual(expect.objectContaining({ '@type': 'MedicalClinic', address }));
+    });
   });
 
   it.each([
@@ -551,10 +688,10 @@ describe('public-site SSR request handler', () => {
     expect(jsonLd.itemListElement[jsonLd.itemListElement.length - 1]?.name).toBe(unsafeName);
   });
 
-  it('returns a generic 503 and never renders prior page data when the API fails', async () => {
+  it.each(['/ru/services', '/ru/contacts'])('returns a generic 503 without published data when %s fails', async (path) => {
     const fetchImpl = createFetch(() => new Response('private upstream error', { status: 500 }));
     const response = await handlePublicSiteRequest(
-      new Request('https://preview.kosmed.test/ru/services'),
+      new Request(`https://preview.kosmed.test${path}`),
       { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'preview' },
       assets,
       fetchImpl,
@@ -567,6 +704,7 @@ describe('public-site SSR request handler', () => {
     expect(html).toContain('Не удалось загрузить актуальную информацию клиники.');
     expect(html).not.toContain('private upstream error');
     expect(html).not.toContain('old published card');
+    expect(html).not.toContain('MedicalClinic');
   });
 
   it('returns a public 404 for a hidden or unknown detail slug', async () => {
@@ -584,6 +722,7 @@ describe('public-site SSR request handler', () => {
     expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
     expect(html).toContain('Услуга не найдена или больше не опубликована.');
     expect(html).not.toContain('public_content_not_found');
+    expect(html).not.toContain('MedicalClinic');
   });
 
   it('generates a no-store sitemap from published services and doctors in both locales', async () => {
@@ -655,6 +794,7 @@ describe('public-site SSR request handler', () => {
       expect(html, pathname).toContain('id="root"');
       expect(html, pathname).toContain('/assets/clinic-app.js');
       expect(html, pathname).not.toContain('id="public-site-root"');
+      expect(html, pathname).not.toContain('MedicalClinic');
     }
 
     expect(fetchImpl).not.toHaveBeenCalled();
