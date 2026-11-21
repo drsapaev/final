@@ -39,6 +39,14 @@ def test_openapi_cashier_refund_requires_a_durable_operation_id(client: TestClie
     assert request["properties"]["client_request_id"]["format"] == "uuid"
 
 
+def test_openapi_legacy_qr_service_cancellation_documents_conflict(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/queue/online-entry/{entry_id}/cancel-service"]["post"]
+    response = operation["responses"]["409"]["content"]["application/json"]["schema"]
+    assert response["required"] == ["detail"]
+    assert response["properties"]["detail"] == {"type": "string"}
+
+
 def test_openapi_legacy_billing_payment_requires_a_durable_operation_id(client: TestClient) -> None:
     schema = _get_openapi_schema(client)
     operation = schema["paths"]["/api/v1/billing/payments"]["post"]

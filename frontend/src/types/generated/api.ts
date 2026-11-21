@@ -3708,16 +3708,7 @@ export type paths = {
         put?: never;
         /**
          * Cancel Service In Entry
-         * @description Отменяет услугу в записи очереди с сохранением аудита
-         *
-         *     ВАЖНО:
-         *     - Услуга помечается как отмененная (cancelled=True), но НЕ удаляется
-         *     - Сохраняется причина отмены и информация о том, кто отменил
-         *     - Пересчитывается итоговая сумма
-         *     - Если услуга была оплачена, сохраняется флаг was_paid_before_cancel
-         *     - Синхронизируется со всеми другими queue_entries этого пациента
-         *
-         *     Доступно: администраторам, регистраторам и врачам
+         * @description Отменяет услугу в талоне без привязки к визиту и сохраняет аудит.
          */
         post: operations["cancel_service_in_entry_api_v1_queue_online_entry__entry_id__cancel_service_post"];
         delete?: never;
@@ -53039,6 +53030,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancelServiceResponse"];
+                };
+            };
+            /** @description Талон связан с визитом или сумма услуг требует сверки */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */

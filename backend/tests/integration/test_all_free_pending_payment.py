@@ -29,6 +29,7 @@ from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.refund_deposit import DepositTransaction, PatientDeposit
 from app.models.service import Service
 from app.models.user import User
+from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit, VisitService
 from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
 from app.services.force_majeure_api_service import (
@@ -281,6 +282,7 @@ def qr_financial_engines(decision_engines):
             "encounters": ("INSERT (patient_id, provenance, legacy_visit_id, generation)",),
             "services": ("SELECT", "UPDATE (price)"),
             "queue_entries": ("SELECT", "UPDATE"),
+            "user_audit_logs": ("INSERT", "SELECT (id, created_at)"),
             "visits": (
                 "UPDATE (status, encounter_id, discount_mode, approval_status, department, doctor_id, updated_at, "
                 "confirmation_context_epoch, confirmation_token, confirmation_expires_at, "
@@ -307,7 +309,7 @@ def qr_financial_engines(decision_engines):
                     )
         connection.exec_driver_sql(
             "GRANT USAGE ON SEQUENCE encounters_id_seq, visit_services_id_seq, visit_confirmation_generation_seq, "
-            f"repeat_evidence_generation_seq TO {RUNTIME}"
+            f"repeat_evidence_generation_seq, user_audit_logs_id_seq TO {RUNTIME}"
         )
     return owner, runtime
 
@@ -448,6 +450,44 @@ def test_native_regular_qr_edit_waits_for_an_available_link(
         assert (entry.visit_id, entry.total_amount) == (visit_id, AMOUNT)
         assert (line.visit_id, line.qty, line.price) == (visit_id, 1, AMOUNT)
         assert db.scalar(select(AllFreeRequest.id).where(AllFreeRequest.visit_id == visit_id)) is None
+
+
+def test_native_qr_cancellation_audits_only_the_unlinked_ticket(qr_financial_engines, benefit_client):
+    owner, _ = qr_financial_engines
+    visit_id, line_id, linked_id, service_id, headers = _seed_qr_all_free(owner)
+    with Session(owner, expire_on_commit=False) as db:
+        linked = db.get(OnlineQueueEntry, linked_id)
+        unlinked = OnlineQueueEntry(
+            queue_id=linked.queue_id, number=2, patient_id=linked.patient_id,
+            source="online", status="waiting", queue_time=datetime.now(UTC),
+            total_amount=int(AMOUNT), services=linked.services,
+        )
+        db.add(unlinked)
+        db.commit()
+        unlinked_id = unlinked.id
+
+    request = {"service_id": service_id, "cancel_reason": "SYNTHETIC review"}
+    linked_response = benefit_client.post(
+        f"/api/v1/queue/online-entry/{linked_id}/cancel-service", headers=headers, json=request,
+    )
+    assert linked_response.status_code == 409, linked_response.text
+    route = f"/api/v1/queue/online-entry/{unlinked_id}/cancel-service"
+    canceled = benefit_client.post(route, headers=headers, json=request)
+    assert canceled.status_code == 200, canceled.text
+    assert canceled.json()["new_total_amount"] == 0
+    assert benefit_client.post(route, headers=headers, json=request).status_code == 404
+
+    with Session(owner) as db:
+        assert db.get(OnlineQueueEntry, unlinked_id).total_amount == 0
+        assert db.get(OnlineQueueEntry, linked_id).total_amount == AMOUNT
+        assert db.get(VisitService, line_id).price == AMOUNT
+        audit = db.scalars(select(UserAuditLog).where(
+            UserAuditLog.action == "CANCEL_SERVICE",
+            UserAuditLog.resource_type == "online_queue_entries",
+            UserAuditLog.resource_id.in_([unlinked_id, linked_id]),
+        )).one()
+        assert audit.resource_id == unlinked_id
+        assert (audit.old_values["total_amount"], audit.new_values["total_amount"]) == (AMOUNT, 0)
 
 
 @pytest.mark.parametrize(("action", "final_status", "final_price"), (

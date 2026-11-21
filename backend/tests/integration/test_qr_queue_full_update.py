@@ -8,11 +8,13 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
+from app.api.v1.endpoints.qr_queue import _online_entries
 from app.core.security import get_password_hash
 from app.crud.clinic import clinic_today
 from app.models.all_free_request import AllFreeRequest
 from app.models.audit import AuditLog
 from app.models.clinic import Doctor
+from app.models.encounter import Encounter
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment, PaymentVisit
@@ -25,6 +27,7 @@ from app.models.provider_attempt import (
 from app.models.refund_deposit import DepositTransaction, PatientDeposit
 from app.models.service import Service
 from app.models.user import User
+from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit, VisitService
 from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
 from app.services.all_free_request_service import AllFreeRequestService
@@ -693,6 +696,139 @@ def test_full_update_without_visit_id_matches_same_session_phone_digits(
     assert current_services[0]["queue_time"] == existing_queue_time.isoformat()
 
 
+@pytest.fixture
+def legacy_service_cancellation_records(
+    db_session, test_doctor, test_patient, test_service,
+):
+    queue = DailyQueue(
+        day=clinic_today(db_session), specialist_id=test_doctor.id, queue_tag="cardiology_common", active=True,
+    )
+    first_encounter = Encounter(patient_id=test_patient.id, provenance="new")
+    second_encounter = Encounter(patient_id=test_patient.id, provenance="new")
+    db_session.add_all([queue, first_encounter, second_encounter])
+    db_session.flush()
+
+    cancelled = {
+        "service_id": test_service.id, "name": "SYNTHETIC-Cancellable service", "price": 40000, "quantity": 1,
+    }
+    retained = {
+        "service_id": test_service.id + 1, "name": "SYNTHETIC-Retained service", "price": 5000, "quantity": 1,
+    }
+    selected = OnlineQueueEntry(
+        queue_id=queue.id, number=91, patient_id=test_patient.id, encounter_id=first_encounter.id,
+        source="online", status="waiting", total_amount=45000, services=json.dumps([cancelled, retained]),
+    )
+    separate = OnlineQueueEntry(
+        queue_id=queue.id, number=92, patient_id=test_patient.id, encounter_id=second_encounter.id,
+        source="online", status="waiting", total_amount=40000, services=json.dumps([cancelled]),
+    )
+    db_session.add_all([selected, separate])
+    db_session.commit()
+    return selected, separate
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(("storage", "price", "quantity"), (
+    ("serialized", 5000, 1), ("array", 5000, 1), ("double-encoded", 5000, 1),
+    ("serialized", 5000, 2), ("array", 2500.25, 2),
+))
+def test_qr_service_cancellation_records_one_audit_for_the_addressed_ticket(
+    client, db_session, registrar_auth_headers, registrar_user,
+    legacy_service_cancellation_records, test_service, storage, price, quantity,
+):
+    selected, separate = legacy_service_cancellation_records
+    services = json.loads(selected.services)
+    services[1].update(price=price, quantity=quantity)
+    if storage == "array":
+        selected.services = services
+    elif storage == "double-encoded":
+        selected.services = json.dumps(json.dumps(services))
+    else:
+        selected.services = json.dumps(services)
+    db_session.commit()
+    separate_snapshot = (separate.services, separate.total_amount, separate.encounter_id)
+    path = f"/api/v1/queue/online-entry/{selected.id}/cancel-service"
+    payload = {
+        "service_id": test_service.id,
+        "cancel_reason": "SYNTHETIC-Cancellation reason",
+        "was_paid": True,
+    }
+
+    response = client.post(path, json=payload, headers=registrar_auth_headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["cancelled_service"]["cancelled_by"] == registrar_user.id
+    assert response.json()["new_total_amount"] == 5000
+    repeat = client.post(path, json=payload, headers=registrar_auth_headers)
+    assert repeat.status_code == 404, repeat.text
+
+    db_session.expire_all()
+    assert selected.total_amount == 5000
+    cancelled, retained = json.loads(selected.services)
+    assert cancelled["cancelled"] is True
+    assert cancelled["cancel_reason"] == payload["cancel_reason"]
+    assert cancelled["was_paid_before_cancel"] is True
+    assert retained.get("cancelled") is not True
+    assert (separate.services, separate.total_amount, separate.encounter_id) == separate_snapshot
+    audit = db_session.query(UserAuditLog).filter_by(
+        action="CANCEL_SERVICE", resource_type="online_queue_entries", resource_id=selected.id,
+    ).one()
+    assert audit.user_id == registrar_user.id
+    assert audit.request_id
+    assert audit.old_values == {"service_id": test_service.id, "cancelled": False, "total_amount": 45000}
+    assert audit.new_values == {"service_id": test_service.id, "cancelled": True, "total_amount": 5000}
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("issue", "expected_status"),
+    (
+        ("audit-unavailable", 500), ("audit-insert-failure", 500), ("inactive-staff", 403), ("different-doctor", 403),
+        ("linked-visit", 409), ("unreconciled-total", 409),
+    ),
+)
+def test_qr_service_cancellation_leaves_the_amount_and_service_on_rejection(
+    client, db_session, registrar_auth_headers, registrar_user, legacy_service_cancellation_records,
+    test_service, monkeypatch, request, issue, expected_status,
+):
+    selected, separate = legacy_service_cancellation_records
+    headers = registrar_auth_headers
+    if issue == "audit-unavailable":
+        monkeypatch.setattr(_online_entries, "log_critical_change", lambda **kwargs: None)
+    elif issue == "audit-insert-failure":
+        log_change = _online_entries.log_critical_change
+
+        def break_audit_insert(**kwargs):
+            audit = log_change(**kwargs)
+            audit.action = None
+            return audit
+
+        monkeypatch.setattr(_online_entries, "log_critical_change", break_audit_insert)
+    elif issue == "inactive-staff":
+        registrar_user.is_active = False
+        db_session.commit()
+    elif issue == "different-doctor":
+        other_doctor, _ = _create_queue_doctor(db_session, label="cancel_other")
+        headers = _doctor_headers(client, other_doctor)
+    elif issue == "linked-visit":
+        selected.visit_id = request.getfixturevalue("test_visit").id
+        db_session.commit()
+    elif issue == "unreconciled-total":
+        selected.total_amount = 44000
+        db_session.commit()
+
+    snapshots = [(entry.services, entry.total_amount, entry.visit_id) for entry in (selected, separate)]
+    response = client.post(
+        f"/api/v1/queue/online-entry/{selected.id}/cancel-service", headers=headers,
+        json={"service_id": test_service.id, "cancel_reason": "SYNTHETIC-Rejected cancellation"},
+    )
+    assert response.status_code == expected_status, response.text
+    db_session.expire_all()
+    assert [(entry.services, entry.total_amount, entry.visit_id) for entry in (selected, separate)] == snapshots
+    assert db_session.query(UserAuditLog).filter_by(
+        action="CANCEL_SERVICE", resource_type="online_queue_entries", resource_id=selected.id,
+    ).count() == 0
+
+
 @pytest.mark.integration
 def test_full_update_frontend_aggregated_ids_ignore_unrelated_queue_entry(
     client,
@@ -1063,7 +1199,7 @@ def test_qr_all_free_worklist_displays_the_decision_and_exact_ticket_prices(
         )
         assert decision.status_code == 200, decision.text
 
-    for ticket in (primary_ticket, secondary_ticket):
+    for ticket, service in ((primary_ticket, test_service), (secondary_ticket, secondary_service)):
         db_session.refresh(ticket)
         snapshot = (ticket.visit_id, ticket.services, ticket.total_amount)
         blocked = client.put(
@@ -1071,6 +1207,11 @@ def test_qr_all_free_worklist_displays_the_decision_and_exact_ticket_prices(
             json={"patient_data": {}, "visit_type": "paid", "discount_mode": "none", "services": []},
         )
         assert blocked.status_code == 409, blocked.text
+        cancellation = client.post(
+            f"/api/v1/queue/online-entry/{ticket.id}/cancel-service", headers=registrar_auth_headers,
+            json={"service_id": service.id, "cancel_reason": "SYNTHETIC-Linked visit"},
+        )
+        assert cancellation.status_code == 409, cancellation.text
         db_session.refresh(ticket)
         assert (ticket.visit_id, ticket.services, ticket.total_amount) == snapshot
 

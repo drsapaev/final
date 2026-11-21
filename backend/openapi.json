@@ -12043,7 +12043,7 @@
           "qr-queue"
         ],
         "summary": "Cancel Service In Entry",
-        "description": "Отменяет услугу в записи очереди с сохранением аудита\n\nВАЖНО:\n- Услуга помечается как отмененная (cancelled=True), но НЕ удаляется\n- Сохраняется причина отмены и информация о том, кто отменил\n- Пересчитывается итоговая сумма\n- Если услуга была оплачена, сохраняется флаг was_paid_before_cancel\n- Синхронизируется со всеми другими queue_entries этого пациента\n\nДоступно: администраторам, регистраторам и врачам",
+        "description": "Отменяет услугу в талоне без привязки к визиту и сохраняет аудит.",
         "operationId": "cancel_service_in_entry_api_v1_queue_online_entry__entry_id__cancel_service_post",
         "security": [
           {
@@ -12078,6 +12078,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CancelServiceResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Талон связан с визитом или сумма услуг требует сверки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
                 }
               }
             }

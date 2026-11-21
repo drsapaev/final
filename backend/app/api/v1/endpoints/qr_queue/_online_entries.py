@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 
 from fastapi import Request
 from sqlalchemy.exc import DBAPIError
 
+from app.api.deps import require_active_roles
 from app.api.v1.endpoints.qr_queue._analytics import (
     UpdateOnlineEntryRequest,  # noqa: F401
 )
@@ -16,6 +17,7 @@ from app.api.v1.endpoints.qr_queue._helpers import (
     _queue_phone_matches,
     router,
 )
+from app.core.audit import log_critical_change
 from app.models.online_queue import OnlineQueueEntry
 from app.models.visit import Visit
 from app.services.all_free_request_service import (
@@ -2123,45 +2125,62 @@ def full_update_online_entry(
         ) from None
 
 
+def _legacy_cancel_remaining_total(
+    services: list[dict[str, Any]], total: int, service_id: int,
+) -> int | None:
+    """Reconcile the stored integer total with legacy unit or line amounts."""
+    line_before = line_after = unit_before = unit_after = Decimal(0)
+    try:
+        for service in services:
+            price = Decimal(str(service.get("price", 0)))
+            quantity = service.get("quantity", 1)
+            if (
+                not price.is_finite() or price < 0
+                or type(quantity) is not int or quantity < 1
+            ):
+                return None
+            unit_charge = price * quantity
+            line_before += price
+            unit_before += unit_charge
+            if service.get("service_id") != service_id:
+                line_after += price
+                unit_after += unit_charge
+    except DecimalException:
+        return None
+
+    remaining = {
+        int(after)
+        for before, after in ((line_before, line_after), (unit_before, unit_after))
+        if total <= before < total + 1
+    }
+    return remaining.pop() if len(remaining) == 1 else None
+
+
 @router.post(
-    "/online-entry/{entry_id}/cancel-service", response_model=CancelServiceResponse
+    "/online-entry/{entry_id}/cancel-service",
+    response_model=CancelServiceResponse,
+    responses={409: {
+        "description": "Талон связан с визитом или сумма услуг требует сверки",
+        "content": {"application/json": {"schema": {
+            "type": "object",
+            "properties": {"detail": {"type": "string"}},
+            "required": ["detail"],
+        }}},
+    }},
 )
 def cancel_service_in_entry(
     entry_id: int,
     request: CancelServiceRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
-):
-    """
-    Отменяет услугу в записи очереди с сохранением аудита
-
-    ВАЖНО:
-    - Услуга помечается как отмененная (cancelled=True), но НЕ удаляется
-    - Сохраняется причина отмены и информация о том, кто отменил
-    - Пересчитывается итоговая сумма
-    - Если услуга была оплачена, сохраняется флаг was_paid_before_cancel
-    - Синхронизируется со всеми другими queue_entries этого пациента
-
-    Доступно: администраторам, регистраторам и врачам
-    """
+    current_user: User = Depends(require_active_roles("Admin", "Registrar", "Doctor")),
+) -> CancelServiceResponse:
+    """Отменяет услугу в талоне без привязки к визиту и сохраняет аудит."""
     import json
 
-    from app.models.online_queue import OnlineQueueEntry
-
-    logger.info(
-        "[cancel_service] Отмена услуги service_id=%d в entry_id=%d, Причина: %s, Была оплачена: %s, Отменяет: %s (ID: %d)",
-        request.service_id,
-        entry_id,
-        request.cancel_reason,
-        request.was_paid,
-        current_user.username,
-        current_user.id,
-    )
-
     try:
-        # Получаем запись
-        entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        entry = db.get(
+            OnlineQueueEntry, entry_id, populate_existing=True, with_for_update=True
         )
         if not entry:
             raise HTTPException(
@@ -2169,166 +2188,90 @@ def cancel_service_in_entry(
                 detail="Запись в очереди не найдена",
             )
 
-        # Парсим текущие услуги
         _ensure_doctor_can_mutate_queue_entry(
             db,
             entry=entry,
             current_user=current_user,
         )
+        if entry.visit_id is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Услуги связанного визита изменяются через редактирование обращения",
+            )
 
-        services_list = json.loads(entry.services) if entry.services else []
-
-        # Проверяем, что услуги в новом формате (с service_id)
-        if not services_list or not isinstance(services_list[0], dict):
+        services_list = _full_update_parse_entry_services(entry.services)
+        if not services_list or not all(
+            isinstance(service, dict) for service in services_list
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Услуги в старом формате. Необходимо выполнить миграцию данных.",
             )
 
-        # Ищем услугу для отмены
-        service_found = False
-        cancelled_service_obj = None
-        new_total = 0
-
-        for service_obj in services_list:
-            if service_obj.get(
-                "service_id"
-            ) == request.service_id and not service_obj.get("cancelled", False):
-                # Отменяем услугу
-                service_obj["cancelled"] = True
-                service_obj["cancel_reason"] = request.cancel_reason
-                service_obj["cancelled_by"] = current_user.id
-                service_obj["was_paid_before_cancel"] = request.was_paid
-                service_found = True
-                cancelled_service_obj = service_obj.copy()
-                logger.info(
-                    "[cancel_service] Услуга '%s' отменена",
-                    service_obj.get("name"),
-                )
-
-            # Пересчитываем сумму (только не отмененные услуги)
-            if not service_obj.get("cancelled", False):
-                new_total += service_obj.get("price", 0) * service_obj.get(
-                    "quantity", 1
-                )
-
-        if not service_found:
+        active_services = [service for service in services_list if not service.get("cancelled")]
+        cancelled_services = [
+            service for service in active_services if service.get("service_id") == request.service_id
+        ]
+        if not cancelled_services:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Услуга с ID {request.service_id} не найдена или уже отменена",
             )
 
-        # Обновляем services и total_amount
+        previous_total = entry.total_amount
+        new_total = _legacy_cancel_remaining_total(
+            active_services, previous_total, request.service_id,
+        )
+        if new_total is None:
+            raise HTTPException(status_code=409, detail="Сумма услуг талона требует сверки")
+        for service in cancelled_services:
+            service.update(
+                cancelled=True,
+                cancel_reason=request.cancel_reason,
+                cancelled_by=current_user.id,
+                was_paid_before_cancel=request.was_paid,
+            )
+        cancelled_service = cancelled_services[-1]
         entry.services = json.dumps(services_list, ensure_ascii=False)
         entry.total_amount = new_total
 
-        logger.info(
-            "[cancel_service] Новая сумма: %s",
-            new_total,
+        audit = log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="CANCEL_SERVICE",
+            table_name="online_queue_entries",
+            row_id=entry.id,
+            old_data={
+                "service_id": request.service_id,
+                "cancelled": False,
+                "total_amount": previous_total,
+            },
+            new_data={
+                "service_id": request.service_id,
+                "cancelled": True,
+                "total_amount": new_total,
+            },
+            request=http_request,
         )
+        if audit is None:
+            raise RuntimeError("queue service cancellation audit unavailable")
 
-        # Sync only within the same visit/session; patient_id alone is too broad.
-        if entry.patient_id:
-            other_entry_filters = [
-                OnlineQueueEntry.patient_id == entry.patient_id,
-                OnlineQueueEntry.id != entry.id,
-            ]
-            if entry.visit_id:
-                other_entry_filters.append(OnlineQueueEntry.visit_id == entry.visit_id)
-            elif entry.session_id:
-                other_entry_filters.extend(
-                    [
-                        OnlineQueueEntry.visit_id.is_(None),
-                        OnlineQueueEntry.session_id == entry.session_id,
-                    ]
-                )
-            else:
-                other_entry_filters.extend(
-                    [
-                        OnlineQueueEntry.visit_id.is_(None),
-                        OnlineQueueEntry.queue_id == entry.queue_id,
-                    ]
-                )
-
-            other_entries = (
-                db.query(OnlineQueueEntry).filter(*other_entry_filters).all()
-            )
-
-            if other_entries:
-                logger.info(
-                    "[cancel_service] Синхронизация отмены с %d другими записями",
-                    len(other_entries),
-                )
-
-                for other_entry in other_entries:
-                    other_services = (
-                        json.loads(other_entry.services) if other_entry.services else []
-                    )
-
-                    # Проверяем формат
-                    if other_services and isinstance(other_services[0], dict):
-                        other_total = 0
-                        updated = False
-
-                        for other_service_obj in other_services:
-                            # Отменяем ту же услугу
-                            if other_service_obj.get(
-                                "service_id"
-                            ) == request.service_id and not other_service_obj.get(
-                                "cancelled", False
-                            ):
-                                other_service_obj["cancelled"] = True
-                                other_service_obj["cancel_reason"] = (
-                                    request.cancel_reason
-                                )
-                                other_service_obj["cancelled_by"] = current_user.id
-                                other_service_obj["was_paid_before_cancel"] = (
-                                    request.was_paid
-                                )
-                                updated = True
-
-                            # Пересчитываем сумму
-                            if not other_service_obj.get("cancelled", False):
-                                other_total += other_service_obj.get(
-                                    "price", 0
-                                ) * other_service_obj.get("quantity", 1)
-
-                        if updated:
-                            other_entry.services = json.dumps(
-                                other_services, ensure_ascii=False
-                            )
-                            other_entry.total_amount = other_total
-                            logger.info(
-                                "[cancel_service] Синхронизирована запись %d, новая сумма: %s",
-                                other_entry.id,
-                                other_total,
-                            )
-
-        # Коммитим изменения
+        response = CancelServiceResponse(
+            success=True,
+            message=f"Услуга '{cancelled_service.get('name')}' успешно отменена",
+            cancelled_service=cancelled_service,
+            new_total_amount=new_total,
+        )
         db.commit()
-        db.refresh(entry)
-
-        logger.info("[cancel_service] ✅ Услуга успешно отменена")
-
-        return {
-            "success": True,
-            "message": f"Услуга '{cancelled_service_obj.get('name')}' успешно отменена",
-            "cancelled_service": cancelled_service_obj,
-            "new_total_amount": new_total,
-        }
+        return response
 
     except HTTPException:
-        raise
-    except Exception as e:
         db.rollback()
-
-        logger.error(
-            "[cancel_service] Ошибка: %s: %s",
-            type(e).__name__,
-            str(e),
-            exc_info=True,
-        )
+        raise
+    except Exception as exc:
+        db.rollback()
+        logger.error("[cancel_service] Ошибка: %s", type(exc).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
-        )
+        ) from None
