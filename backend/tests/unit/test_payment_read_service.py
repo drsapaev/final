@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import Mock
 
 import pytest
 
 from app.models.payment import Payment
 from app.services.payment_providers.base import PaymentResult
+from app.services.payment_providers.click import ClickProvider
 from app.services.payment_read_service import PaymentReadDomainError, PaymentReadService
 
 
@@ -58,6 +60,56 @@ class TestPaymentReadService:
         assert payment.provider_data["source"] == "unit"
         assert result["status"] == "paid"
         assert result["payment_id"] == payment.id
+
+    @pytest.mark.parametrize(
+        ("provider_response", "expected_status"),
+        [
+            pytest.param({}, "pending", id="missing-status"),
+            pytest.param({"status": 99}, "pending", id="unknown-status"),
+            pytest.param({"status": "-1"}, "pending", id="string-status"),
+            pytest.param({"status": True}, "pending", id="boolean-status"),
+            pytest.param([], "pending", id="non-object-response"),
+            pytest.param({"status": 1}, "processing", id="reported-processing"),
+            pytest.param({"status": -1}, "failed", id="reported-failure"),
+        ],
+    )
+    def test_click_status_read_uses_only_known_provider_codes(
+        self, db_session, test_visit, monkeypatch, provider_response, expected_status,
+    ):
+        payment = Payment(
+            visit_id=test_visit.id,
+            amount=Decimal("15000.00"),
+            currency="UZS",
+            method="online",
+            status="pending",
+            provider="click",
+            provider_payment_id="synthetic-order",
+        )
+        db_session.add(payment)
+        db_session.commit()
+        provider = ClickProvider({
+            "service_id": "synthetic-service",
+            "merchant_id": "synthetic-merchant",
+            "secret_key": "synthetic-config",
+            "base_url": "https://synthetic-provider.invalid",
+        })
+        response = Mock()
+        response.json.return_value = provider_response
+        monkeypatch.setattr("app.services.payment_providers.click.httpx.post", Mock(return_value=response))
+
+        observation = provider.check_payment_status(payment.provider_payment_id)
+        service = PaymentReadService(db_session, _FakePaymentManager(observation))
+        result = service.get_payment_status(payment_id=payment.id)
+
+        db_session.refresh(payment)
+        assert result["status"] == payment.status == expected_status
+        assert payment.paid_at is None
+        if expected_status == "pending":
+            assert not observation.success
+            assert payment.provider_data is None
+        else:
+            assert observation.success
+            assert payment.provider_data == provider_response
 
     def test_get_visit_payments_returns_formatted_items(self, db_session, test_visit):
         payment_1 = Payment(

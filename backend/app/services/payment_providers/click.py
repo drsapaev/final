@@ -124,8 +124,12 @@ class ClickProvider(BasePaymentProvider):
                 -2: PaymentStatus.CANCELLED,  # Отменен
             }
 
-            click_status = data.get("status", -1)
-            our_status = status_mapping.get(click_status, PaymentStatus.FAILED)
+            click_status = data.get("status") if isinstance(data, dict) else None
+            if type(click_status) is not int or click_status not in status_mapping:
+                self.log_error("check_payment_status", "Unrecognized provider status")
+                return PaymentResult(success=False, error_message="Статус платежа не подтверждён")
+
+            our_status = status_mapping[click_status]
 
             self.log_operation(
                 "check_status",
