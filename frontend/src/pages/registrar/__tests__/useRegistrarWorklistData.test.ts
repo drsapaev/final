@@ -16,6 +16,7 @@
  * a newer sample (S-19).
  */
 import { act, renderHook } from '@testing-library/react';
+import { CanceledError } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../api/client', () => ({ api: { get: vi.fn() } }));
@@ -901,5 +902,174 @@ describe('useRegistrarWorklistData — PR #3851 review (P2): loadedDate binds to
     expect(result.current.appointments).toEqual([]);
     expect(result.current.loadedDate).toBe(TODAY);
     expect(result.current.stale).toBe(false);
+  });
+});
+
+/**
+ * REGDATA-FE-001/002 (owner group99 worklist-refresh review, 2026-11-16):
+ * (a) the delayed critical-action refresh timer must be cleared on effect
+ * cleanup — a late-STARTING stale closure (old date) must never fire after a
+ * calendar-date switch or unmount and acquire the newest requestSeqRef id;
+ * (b) a superseded request's 401 must run isSuperseded() BEFORE clearing the
+ * auth token, so it cannot wipe a newer live session token.
+ */
+describe('useRegistrarWorklistData — REGDATA-FE-001/002 refresh-plane regressions', () => {
+  // Stable dep functions: recreated-per-render callbacks would re-run
+  // loadAppointments' effect chain every render (infinite loop → OOM).
+  const stableDeps = {
+    searchParams: new URLSearchParams(),
+    activeTab: null as string | null,
+    showCalendar: false,
+    historyDate: '',
+    showWizard: false,
+    anyDialogOpenRef: { current: false },
+    enrichAppointmentsWithPatientData: async (rows: Record<string, unknown>[]) => rows,
+    loadIntegratedData: () => undefined,
+    tI18n: (key: string) => key,
+  };
+  const depsFor = (overrides: Partial<Parameters<typeof useRegistrarWorklistData>[0]> = {}) => ({
+    ...stableDeps,
+    ...overrides,
+  });
+
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+    sessionStorage.clear();
+  });
+
+  const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+
+  it('REGDATA-FE-001: unmount clears the pending critical-action timer — no late fetch after unmount', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { queues: [] } } as never);
+    const { unmount } = renderHook(() => useRegistrarWorklistData(depsFor()));
+    await act(async () => {});
+    const callsAfterMount = vi.mocked(api.get).mock.calls.length;
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('queueUpdated', { detail: { action: 'patientCalled' } }));
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBe(callsAfterMount); // timer scheduled, not fired yet
+
+    unmount();
+    await sleep(700);
+    expect(vi.mocked(api.get).mock.calls.length).toBe(callsAfterMount); // cleanup cleared the timer
+  });
+
+  it('REGDATA-FE-001: a calendar-date switch clears the pending timer — the stale closure never starts', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { queues: [] } } as never);
+    const { rerender } = renderHook(
+      ({ historyDate }: { historyDate: string }) =>
+        useRegistrarWorklistData(depsFor({ historyDate, showCalendar: true })),
+      { initialProps: { historyDate: '2026-11-15' } },
+    );
+    await act(async () => { await sleep(20); });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('queueUpdated', { detail: { action: 'visitCompleted' } }));
+    });
+
+    // The registrar switches the calendar date before the delayed refresh fires.
+    rerender({ historyDate: '2026-11-16' });
+    await act(async () => { await sleep(120); });
+    const settledCalls = vi.mocked(api.get).mock.calls.length;
+
+    // The stale-closure timer window (300/500ms) passes: nothing else may run.
+    await sleep(700);
+    expect(vi.mocked(api.get).mock.calls.length).toBe(settledCalls);
+  });
+
+  it('REGDATA-FE-002: a superseded 401 leaves the live session token intact', async () => {
+    sessionStorage.setItem('auth_token', 'token-B-live');
+    const stale = deferred<{ data: { queues: unknown[] } }>();
+    const fresh = deferred<{ data: { queues: unknown[] } }>();
+    // Call order: (0) hook initial-load, (1) stale request A, (2) newer request B.
+    const callQueue = [
+      Promise.resolve({ data: { queues: [] } }),
+      stale.promise,
+      fresh.promise,
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as Promise<{ data: { queues: unknown[] } }>);
+
+    const { result } = renderHook(() => useRegistrarWorklistData(depsFor()));
+    await act(async () => {});
+
+    await act(async () => {
+      result.current.loadAppointments({ source: 'race_a_401' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await act(async () => {
+      result.current.loadAppointments({ source: 'race_b_ok' });
+      fresh.resolve({ data: { queues: [{ entries: [{ id: 'fresh-b' }] }] } } as never);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['fresh-b']);
+
+    // The superseded request fails with 401 LATE: it must not clear the token
+    // of the newer live session.
+    await act(async () => {
+      stale.reject({ response: { status: 401 } } as never);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(sessionStorage.getItem('auth_token')).toBe('token-B-live');
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['fresh-b']);
+    expect(result.current.dataSource).toBe('api');
+  });
+
+  it('REGDATA-FE-002: the current request surfaces a 401 without writing credential storage', async () => {
+    sessionStorage.setItem('auth_token', 'token-live');
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: { queues: [] } } as never)
+      .mockRejectedValueOnce({ response: { status: 401 } } as never);
+
+    const { result } = renderHook(() => useRegistrarWorklistData(depsFor()));
+    await act(async () => {});
+
+    await act(async () => {
+      await expect(result.current.loadAppointments({ source: 'current_session_401' })).resolves.toBe('failed');
+    });
+
+    expect(sessionStorage.getItem('auth_token')).toBe('token-live');
+    expect(result.current.appointmentsLoading).toBe(false);
+  });
+
+  it('preserves a replacement token even if the worklist has not started another request', async () => {
+    sessionStorage.setItem('auth_token', 'synthetic-session-a');
+    const pending = deferred<{ data: { queues: unknown[] } }>();
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: { queues: [] } } as never)
+      .mockReturnValueOnce(pending.promise as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(depsFor()));
+    await act(async () => {});
+
+    await act(async () => {
+      const resultPromise = result.current.loadAppointments({ source: 'late_401' });
+      sessionStorage.setItem('auth_token', 'synthetic-session-b');
+      pending.reject({ response: { status: 401 } });
+      await resultPromise;
+    });
+
+    expect(sessionStorage.getItem('auth_token')).toBe('synthetic-session-b');
+  });
+
+  it('treats a cancelled request as superseded and preserves the visible sample', async () => {
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: { queues: [] } } as never)
+      .mockRejectedValueOnce(new CanceledError());
+    const { result } = renderHook(() => useRegistrarWorklistData(depsFor()));
+    await act(async () => {});
+
+    await act(async () => {
+      await expect(result.current.loadAppointments({ source: 'session_ended', silent: true })).resolves.toBe('superseded');
+    });
+
+    expect(result.current.dataSource).toBe('api');
   });
 });
