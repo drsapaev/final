@@ -870,7 +870,10 @@ const DermatologistPanelUnified = () => {
     null
   ), [currentAppointment?.patient_id, selectedPatient]);
 
-  const patientHistory = useDermatologyPatientHistory(getSelectedPatientId());
+  const historyPatientId = getSelectedPatientId();
+  const historyPatientIdRef = useRef(historyPatientId);
+  historyPatientIdRef.current = historyPatientId;
+  const patientHistory = useDermatologyPatientHistory(historyPatientId);
   const {
     appointments: patientAppointmentsHistory,
     skinExaminations,
@@ -1721,7 +1724,13 @@ const DermatologistPanelUnified = () => {
                   visitId={(currentAppointment?.visit_id ?? undefined) as string | number}
                   patientId={(currentAppointment?.patient_id ?? undefined) as string | number | null | undefined}
                   specialty="dermatology"
-                  onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)} />
+                  onPersisted={() => {
+                    const savedPatientId = String(currentAppointment.patient_id ?? '');
+                    if (savedPatientId && savedPatientId === String(historyPatientIdRef.current ?? '')) {
+                      patientHistory.reload();
+                    }
+                    return refreshCanonicalStatus(currentVisitContext, true);
+                  }} />
 
                 </div>
 

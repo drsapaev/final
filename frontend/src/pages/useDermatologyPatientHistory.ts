@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
 
@@ -45,6 +45,7 @@ const HISTORY_PAGE_SIZE = 20;
 
 interface PatientHistorySnapshot {
   patientId: string | null;
+  requestGeneration: number;
   appointments: DermatologyAppointmentHistoryItem[];
   skinExaminations: DermatologySkinExamination[];
   skinExaminationsTotal: number;
@@ -60,6 +61,7 @@ interface PatientHistorySnapshot {
 
 const emptySnapshot: PatientHistorySnapshot = {
   patientId: null,
+  requestGeneration: 0,
   appointments: [],
   skinExaminations: [],
   skinExaminationsTotal: 0,
@@ -119,15 +121,21 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
     : String(patientId);
   const [snapshot, setSnapshot] = useState<PatientHistorySnapshot>(emptySnapshot);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const requestGenerationRef = useRef(0);
 
   useEffect(() => {
+    const generation = ++requestGenerationRef.current;
     if (!normalizedPatientId) {
       setSnapshot(emptySnapshot);
       return;
     }
 
-    let active = true;
-    setSnapshot({ ...emptySnapshot, patientId: normalizedPatientId, loading: true });
+    setSnapshot({
+      ...emptySnapshot,
+      patientId: normalizedPatientId,
+      requestGeneration: generation,
+      loading: true,
+    });
 
     void Promise.allSettled([
       api.get(`/patients/${encodeURIComponent(normalizedPatientId)}/appointments`),
@@ -138,7 +146,7 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
         '/derma/procedures', normalizedPatientId, 1,
       ),
     ]).then(([appointmentsResult, examinationsResult, proceduresResult]) => {
-      if (!active) return;
+      if (requestGenerationRef.current !== generation) return;
 
       if (examinationsResult.status === 'rejected' || proceduresResult.status === 'rejected') {
         logger.warn(
@@ -160,6 +168,7 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
       setSnapshot({
         ...emptySnapshot,
         patientId: normalizedPatientId,
+        requestGeneration: generation,
         appointments,
         skinExaminations: examinationsPage.items,
         skinExaminationsTotal: examinationsPage.total,
@@ -174,7 +183,7 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
     });
 
     return () => {
-      active = false;
+      requestGenerationRef.current += 1;
     };
   }, [normalizedPatientId, reloadVersion]);
 
@@ -182,16 +191,19 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
     if (
       snapshot.loading || snapshot.loadingMoreExaminations
       || snapshot.patientId !== normalizedPatientId
+      || snapshot.requestGeneration !== requestGenerationRef.current
       || snapshot.skinExaminations.length >= snapshot.skinExaminationsTotal
     ) return;
 
     const patientId = snapshot.patientId as string;
+    const generation = snapshot.requestGeneration;
     const nextPage = snapshot.skinExaminationsNextPage;
     setSnapshot((prev) => ({ ...prev, loadingMoreExaminations: true }));
     void fetchHistoryPage<DermatologySkinExamination>('/derma/examinations', patientId, nextPage)
       .then((page) => {
+        if (requestGenerationRef.current !== generation) return;
         setSnapshot((current) => (
-          current.patientId === patientId
+          current.requestGeneration === generation
             ? {
               ...current,
               skinExaminations: mergeById(current.skinExaminations, page.items),
@@ -203,9 +215,10 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
         ));
       })
       .catch(() => {
+        if (requestGenerationRef.current !== generation) return;
         logger.warn('[DermaHistory] failed to load more examinations', { patientId });
         setSnapshot((current) => (
-          current.patientId === patientId
+          current.requestGeneration === generation
             ? { ...current, loadingMoreExaminations: false }
             : current
         ));
@@ -216,16 +229,19 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
     if (
       snapshot.loading || snapshot.loadingMoreProcedures
       || snapshot.patientId !== normalizedPatientId
+      || snapshot.requestGeneration !== requestGenerationRef.current
       || snapshot.cosmeticProcedures.length >= snapshot.cosmeticProceduresTotal
     ) return;
 
     const patientId = snapshot.patientId as string;
+    const generation = snapshot.requestGeneration;
     const nextPage = snapshot.cosmeticProceduresNextPage;
     setSnapshot((prev) => ({ ...prev, loadingMoreProcedures: true }));
     void fetchHistoryPage<DermatologyCosmeticProcedure>('/derma/procedures', patientId, nextPage)
       .then((page) => {
+        if (requestGenerationRef.current !== generation) return;
         setSnapshot((current) => (
-          current.patientId === patientId
+          current.requestGeneration === generation
             ? {
               ...current,
               cosmeticProcedures: mergeById(current.cosmeticProcedures, page.items),
@@ -237,16 +253,20 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
         ));
       })
       .catch(() => {
+        if (requestGenerationRef.current !== generation) return;
         logger.warn('[DermaHistory] failed to load more procedures', { patientId });
         setSnapshot((current) => (
-          current.patientId === patientId
+          current.requestGeneration === generation
             ? { ...current, loadingMoreProcedures: false }
             : current
         ));
       });
   }, [snapshot, normalizedPatientId]);
 
-  const reload = useCallback(() => setReloadVersion((version) => version + 1), []);
+  const reload = useCallback(() => {
+    requestGenerationRef.current += 1;
+    setReloadVersion((version) => version + 1);
+  }, []);
   const isCurrentPatient = Boolean(normalizedPatientId && snapshot.patientId === normalizedPatientId);
 
   return {
