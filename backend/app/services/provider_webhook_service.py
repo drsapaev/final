@@ -150,16 +150,7 @@ class ProviderWebhookService:
         closed (get_db does NOT auto-commit).
         """
         try:
-            # PAY-REAUDIT-28 P1-2: PII-safe logging — только идентификаторы,
-            # не весь payload (webhook_data содержит order_id с payment_id).
-            logger.info(
-                "Click webhook received",
-                extra={
-                    "click_trans_id": webhook_data.get("click_trans_id"),
-                    "merchant_trans_id": webhook_data.get("merchant_trans_id"),
-                    "action": webhook_data.get("action"),
-                },
-            )
+            logger.info("Click webhook received")
 
             manager = get_payment_manager()
             signature = webhook_data.get("sign_string")
@@ -196,10 +187,7 @@ class ProviderWebhookService:
                     return {"error": -1, "error_note": "Payment order mismatch"}
                 if not self._amounts_match(existing_transaction.amount, webhook_data.get("amount")):
                     return {"error": -1, "error_note": "Payment amount mismatch"}
-                logger.info(
-                    "Click webhook: Transaction %s already processed (idempotent)",
-                    click_trans_id,
-                )
+                logger.info("Click webhook: Transaction already processed (idempotent)")
                 return {
                     "click_trans_id": click_trans_id,
                     "merchant_trans_id": transaction_id,

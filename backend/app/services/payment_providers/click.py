@@ -189,17 +189,7 @@ class ClickProvider(BasePaymentProvider):
                 self.parse_amount(amount, "UZS") if amount else Decimal("0")
             )
 
-            self.log_operation(
-                "process_webhook",
-                {
-                    "click_trans_id": click_trans_id,
-                    "transaction_param": transaction_param,
-                    "action": action,
-                    "error": error,
-                    "status": status,
-                    "amount": str(amount_decimal),
-                },
-            )
+            self.log_operation("process_webhook", {"status": status})
 
             return PaymentResult(
                 success=True,

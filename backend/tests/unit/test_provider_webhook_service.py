@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -62,6 +63,41 @@ def test_click_adapter_errors_omit_callback_and_exception_details(
     assert "SYNTHETIC_" not in caplog.text
 
 
+@pytest.mark.parametrize(
+    ("action", "error", "status"),
+    [(0, 0, "processing"), (1, 0, "completed"), (1, -1, "failed")],
+)
+def test_click_adapter_logs_callback_status_without_payment_fields(
+    click_provider, monkeypatch, caplog, action, error, status,
+):
+    payload = {
+        "click_trans_id": "SYNTHETIC-TRANSACTION",
+        "merchant_trans_id": "SYNTHETIC-ORDER",
+        "amount": 182753,
+        "action": action,
+        "error": error,
+        "sign_string": "synthetic-signature",
+    }
+    monkeypatch.setattr(
+        click_provider,
+        "_generate_webhook_signature",
+        Mock(return_value=payload["sign_string"]),
+    )
+    caplog.set_level(logging.INFO, logger="app.services.payment_providers.base")
+
+    result = click_provider.process_webhook(payload)
+
+    assert result.success
+    assert result.status == status
+    assert result.payment_id == payload["merchant_trans_id"]
+    assert result.provider_data["click_trans_id"] == payload["click_trans_id"]
+    assert result.provider_data["amount"] == "1827.53"
+    assert any("process_webhook" in message and status in message for message in caplog.messages)
+    assert payload["click_trans_id"] not in caplog.text
+    assert payload["merchant_trans_id"] not in caplog.text
+    assert result.provider_data["amount"] not in caplog.text
+
+
 @pytest.mark.unit
 class TestProviderWebhookService:
     def test_webhook_error_responses_and_logs_omit_internal_details(self, client, caplog):
@@ -100,6 +136,51 @@ class TestProviderWebhookService:
 
         assert result["error"] == -1
         assert result["error_note"] == "Missing signature"
+
+    @pytest.mark.parametrize("valid_signature", [False, True])
+    def test_click_callback_service_logs_omit_request_fields(self, caplog, valid_signature):
+        payload = {
+            "click_trans_id": "SYNTHETIC-TRANSACTION",
+            "merchant_trans_id": "SYNTHETIC-ORDER",
+            "amount": 182753,
+            "action": 1,
+            "sign_string": "synthetic-signature",
+        }
+        db = Mock()
+        repository = Mock()
+        repository.get_existing_transaction.return_value = SimpleNamespace(
+            payment_id=44, amount=Decimal("182753"), webhook_id=33,
+        )
+        repository.get_payment_by_id.return_value = SimpleNamespace(
+            provider="click", currency="UZS", provider_payment_id=payload["merchant_trans_id"],
+        )
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = valid_signature
+        service = ProviderWebhookService(db, repository=repository)
+        caplog.set_level(logging.INFO, logger=ProviderWebhookService.__module__)
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            result = service.process_click_webhook(payload)
+
+        if valid_signature:
+            assert result["error"] == 0
+            assert result["error_note"] == "Already processed"
+            assert result["click_trans_id"] == payload["click_trans_id"]
+            assert result["merchant_trans_id"] == payload["merchant_trans_id"]
+            assert result["merchant_prepare_id"] == 33
+            assert "already processed" in caplog.text
+        else:
+            assert result == {"error": -1, "error_note": "Invalid signature"}
+            repository.get_existing_transaction.assert_not_called()
+            assert "Invalid signature" in caplog.text
+        repository.create_webhook.assert_not_called()
+        repository.create_transaction.assert_not_called()
+        db.commit.assert_not_called()
+        assert "Click webhook received" in caplog.text
+        assert payload["click_trans_id"] not in caplog.text
+        assert payload["merchant_trans_id"] not in caplog.text
+        request_fields = {"click_trans_id", "merchant_trans_id", "action"}
+        assert all(request_fields.isdisjoint(vars(record)) for record in caplog.records)
 
     def test_payme_webhook_requires_auth_header(self, db_session):
         service = ProviderWebhookService(db_session)
