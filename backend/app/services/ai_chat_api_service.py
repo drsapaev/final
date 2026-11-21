@@ -11,6 +11,7 @@ from jwt import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
 from app.core.roles import is_login_blocked_role
+from app.core.user_token_claims import is_user_access_claims, user_auth_epoch_matches
 from app.models.user import User
 from app.repositories.ai_chat_api_repository import AIChatApiRepository
 from app.services.ai.chat_service import AIChatService, get_chat_service
@@ -139,22 +140,43 @@ class AIChatApiService:
     ) -> User | None:
         try:
             payload = jwt.decode(token, secret_key, algorithms=[algorithm])
-        except JWTError:
+        except (JWTError, TypeError, ValueError):
+            return None
+
+        # Keep patient-scoped tokens out of this staff/AI socket.
+        if not is_user_access_claims(payload) or payload.get("scope") == "patient_portal":
             return None
 
         user_id = payload.get("sub")
-        if user_id is None:
+        if isinstance(user_id, bool) or not isinstance(user_id, (str, int)):
             return None
 
         try:
             parsed_user_id = int(user_id)
         except (TypeError, ValueError):
             return None
-
-        user = self.repository.get_user(parsed_user_id)
-        # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
-        # sentinel roles are structural non-logins — the AI chat WebSocket
-        # must reject their tokens like every HTTP surface.
-        if user is not None and is_login_blocked_role(getattr(user, "role", None)):
+        if parsed_user_id <= 0:
             return None
-        return user
+
+        if self.db is None:
+            return None
+        try:
+            user = self.repository.get_user(parsed_user_id)
+            if user is None:
+                return None
+            if not user.is_active or is_login_blocked_role(user.role):
+                return None
+            if not user_auth_epoch_matches(payload, user.auth_epoch):
+                return None
+            from app.services.token_blacklist_service import TokenBlacklistService
+
+            jti = payload.get("jti")
+            if TokenBlacklistService.is_token_blacklisted(
+                self.db, jti if isinstance(jti, str) else "",
+                user_id=user.id, auth_epoch=user.auth_epoch,
+            ):
+                return None
+            return user
+        except Exception:
+            # Database failures and deleted principals fail closed.
+            return None

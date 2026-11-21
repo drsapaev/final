@@ -3,12 +3,14 @@ Registrar integration package.
 
 Re-exports router and key functions for backward compatibility.
 """
+
 # Import endpoint modules to register routes
 from app.api.v1.endpoints.registrar_integration import (
     _departments,  # noqa: F401
     _queue_ops,  # noqa: F401
     _queue_profiles,  # noqa: F401
     _services_doctors,  # noqa: F401
+    _tabs,  # noqa: F401
     _today_queues,  # noqa: F401
 )
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa: F401, F403

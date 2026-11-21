@@ -62,6 +62,7 @@ describe('MCP Client API', () => {
       const mockResponse = {
         data: {
           status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
           data: {
             preliminary_diagnosis: ['Мигрень'],
             examinations: [],
@@ -118,6 +119,7 @@ describe('MCP Client API', () => {
       const mockResponse = {
         data: {
           status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
           data: {
             suggestions: [
               { code: 'G43.9', name: 'Мигрень неуточненная', relevance: 'высокая' }
@@ -154,6 +156,7 @@ describe('MCP Client API', () => {
       const mockResponse = {
         data: {
           status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
           data: {
             summary: 'Результаты в пределах нормы',
             abnormal_values: [],
@@ -192,6 +195,7 @@ describe('MCP Client API', () => {
       const mockResponse = {
         data: {
           status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
           data: {
             findings: 'Обнаружено доброкачественное образование',
             recommendations: ['Наблюдение']

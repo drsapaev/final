@@ -18,6 +18,7 @@
  */
 
 import * as Sentry from '@sentry/react';
+import { isSensitiveVerificationUrl, redactVerificationString } from '../utils/verificationPrivacy';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 const SENTRY_ENV = import.meta.env.VITE_SENTRY_ENV || 'development';
@@ -47,6 +48,8 @@ const MEDICAL_PII_KEYS = [
   // custom scrubber runs first and we want redaction even if SDK behaviour
   // changes in a future release)
   'token', 'access_token', 'refresh_token', 'secret', 'api_key', 'password',
+  'verification_code', 'verificationcode', 'otp_code', 'otpcode', 'totp_code',
+  'totpcode', 'backup_code', 'backupcode',
 ];
 
 // AI content can include clinical notes and tool arguments under generic keys.
@@ -115,6 +118,8 @@ type MutableSentryEvent = Record<string, unknown> & {
 const CREDENTIAL_QUERY_KEYS = [
   'token', // also matches *_token via the suffix rule (access_token, refresh_token, activation_token, …)
   'apikey', 'api_key', 'secret', 'password', 'sig', 'signature', 'authorization',
+  'verification_code', 'verificationcode', 'otp_code', 'otpcode', 'totp_code',
+  'totpcode', 'backup_code', 'backupcode',
 ];
 
 /**
@@ -129,6 +134,8 @@ export function redactCredentialQueryParams<T extends string | undefined | null>
   if (typeof value !== 'string' || !value) {
     return value;
   }
+  const verificationSafe = redactVerificationString(value);
+  if (verificationSafe !== value) return verificationSafe as T;
   const scrubbed = value.replace(
     /(^|[?&#])([A-Za-z0-9_%.-]+)=([^&#]*)/g,
     (match, sep: string, key: string) => {
@@ -154,16 +161,29 @@ export function redactCredentialQueryParams<T extends string | undefined | null>
  * key-based loop below cannot catch a `?token=` embedded in it. Exported
  * for unit tests (scrubbing contract is security-relevant).
  */
-export function scrubPIIFromObject(obj: unknown, parentKey = ''): unknown {
+export function scrubPIIFromObject(obj: unknown, parentKey = '', verification = false): unknown {
   if (typeof obj === 'string') {
     return redactCredentialQueryParams(obj);
   }
   if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map((item) => scrubPIIFromObject(item, parentKey));
+  if (Array.isArray(obj)) return obj.map((item) => scrubPIIFromObject(item, parentKey, verification));
+
+  const source = obj as Record<string, unknown>;
+  const config = source.config && typeof source.config === 'object'
+    ? source.config as Record<string, unknown> : undefined;
+  const sensitive = verification || isSensitiveVerificationUrl(source.url)
+    || isSensitiveVerificationUrl(source.path) || isSensitiveVerificationUrl(config?.url);
 
   const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().replace(/-/g, '_');
+    if (['otp', 'totp'].includes(lowerKey) || (sensitive && (
+      ['code', 'message', 'custom_message', 'query', 'query_string'].includes(lowerKey)
+      || (['data', 'body'].includes(lowerKey) && typeof value === 'string')
+    ))) {
+      cleaned[key] = '[REDACTED]';
+      continue;
+    }
     const isHttpResponseContext = parentKey === 'contexts' && lowerKey === 'response';
     if (isHttpResponseContext) {
       (cleaned as Record<string, unknown>)[key] = scrubHttpResponseContext(value);
@@ -186,7 +206,7 @@ export function scrubPIIFromObject(obj: unknown, parentKey = ''): unknown {
     ) {
       (cleaned as Record<string, unknown>)[key] = '[REDACTED]';
     } else {
-      (cleaned as Record<string, unknown>)[key] = scrubPIIFromObject(value, lowerKey);
+      (cleaned as Record<string, unknown>)[key] = scrubPIIFromObject(value, lowerKey, sensitive);
     }
   }
   return cleaned;

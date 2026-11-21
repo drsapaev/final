@@ -13,14 +13,14 @@ Run:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db.base_class import Base
-from app.models.authentication import RefreshToken, UserSession
+from app.models.authentication import RefreshToken, TokenBlacklist, UserSession
 from app.models.user import User
 from app.services.auth_svc import AuthenticationService
 
@@ -36,13 +36,8 @@ def db_session():
     engine.dispose()
 
 
-def test_logout_blacklist_receives_timezone_aware_expiry(db_session, monkeypatch):
-    """The expiry handed to blacklist_token must be timezone-aware so the
-    internal comparison against now(UTC) cannot raise."""
-    import time as time_module
-
-    recorded: list[dict] = []
-
+def test_logout_persists_blacklist_with_aware_expiry(db_session):
+    """The real blacklist row and refresh revocation commit together."""
     user = User(username="bl_probe", hashed_password="x", role="Doctor", is_active=True)
     db_session.add(user)
     db_session.flush()
@@ -65,25 +60,6 @@ def test_logout_blacklist_receives_timezone_aware_expiry(db_session, monkeypatch
     db_session.commit()
 
     access_exp = datetime.now(UTC) + timedelta(minutes=15)
-    captured: dict = {}
-
-    from app.services import token_blacklist_service as tbs_module
-
-    class FakeBlacklist:
-        def blacklist_token(self, db, jti, expires_at, user_id, reason):
-            captured.update(jti=jti, expires_at=expires_at, user_id=user_id, reason=reason)
-
-        def blacklist_all_user_tokens(self, db, user_id, reason):
-            captured["all"] = reason
-
-    monkeypatch.setattr(
-        "app.services.token_blacklist_service.token_blacklist_service",
-        FakeBlacklist(),
-    )
-    # module-level import inside logout flow resolves the same object
-    import app.services.token_blacklist_service as tbs
-    monkeypatch.setattr(tbs, "token_blacklist_service", FakeBlacklist())
-
     service = AuthenticationService()
     result = service.logout_user(
         db_session,
@@ -94,21 +70,26 @@ def test_logout_blacklist_receives_timezone_aware_expiry(db_session, monkeypatch
     )
 
     assert result.get("success") is True, result
-    assert captured["jti"] == "bl-probe-jti"
-    assert captured["expires_at"].tzinfo is not None, (
-        "blacklist expiry must be timezone-aware"
+    row = db_session.query(TokenBlacklist).filter_by(jti="bl-probe-jti").one()
+    # SQLite strips tzinfo on round-trip; the represented instant is unchanged.
+    stored_expiry = (
+        row.expires_at.replace(tzinfo=UTC)
+        if row.expires_at.tzinfo is None
+        else row.expires_at
     )
-    # (time_module imported for symmetry with the assertion message)
-    assert time_module.monotonic() > 0
+    assert stored_expiry == access_exp
+    assert row.user_id == user.id
+    assert db_session.query(RefreshToken).filter_by(jti="bl-probe-jti").one().revoked
 
 
 def test_extract_access_token_meta_parses_bearer_and_returns_aware_expiry():
     """The logout endpoint's extraction helper returns (jti, timezone-aware
     expiry) from a Bearer header - the conversion that used to produce a
     naive datetime and crash the blacklist comparison."""
+    import jwt
+
     from app.api.v1.endpoints import authentication as auth_module
     from app.core.config import get_settings
-    import jwt
 
     settings = get_settings()
     payload = {"jti": "probe-jti", "exp": 1893456000, "sub": "7"}

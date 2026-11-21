@@ -10,6 +10,7 @@ import httpx
 
 from ...core.config import settings
 from .base_provider import AIRequest, AIResponse, BaseAIProvider
+from .icd_provider_result import parse_icd_provider_suggestions
 
 logger = logging.getLogger(__name__)
 
@@ -174,46 +175,14 @@ class DeepSeekProvider(BaseAIProvider):
         response = await self.generate(request)
 
         if response.error:
-            logger.warning(f"DeepSeek ICD10 error: {response.error}")
-            return []
+            raise RuntimeError("AI provider unavailable")
 
-        try:
-            # Очищаем от возможного markdown
-            content = response.content.strip()
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
-
-            # Парсим JSON
-            suggestions = json.loads(content)
-
-            # Валидация структуры
-            if isinstance(suggestions, list):
-                validated = []
-                for s in suggestions:
-                    if isinstance(s, dict) and "code" in s and "label" in s:
-                        validated.append({
-                            "code": str(s.get("code", "")),
-                            "label": str(s.get("label", "")),
-                            "confidence": float(s.get("confidence", 0.8)),
-                        })
-                return validated
-
-            logger.warning(f"DeepSeek ICD10: unexpected format: {type(suggestions)}")
-            return []
-
-        except json.JSONDecodeError as e:
-            logger.warning(f"DeepSeek ICD10 JSON parse error: {e}")
-            # Fallback: попробуем извлечь коды regex
-            import re
-            codes = re.findall(r'[A-Z]\d{2}(?:\.\d)?', response.content)
-            if codes:
-                return [{"code": c, "label": "Код МКБ-10", "confidence": 0.5} for c in codes[:5]]
-            return []
+        suggestions = parse_icd_provider_suggestions(response.content)
+        return [{
+            "code": item["code"],
+            "label": item.get("label") or item.get("name") or item.get("description"),
+            "confidence": float(item.get("confidence", 0.8)),
+        } for item in suggestions]
 
     async def interpret_lab_results(
         self, results: list[dict[str, Any]], patient_info: dict | None = None

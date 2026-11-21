@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 
 # Шаблоны уведомлений
@@ -20,13 +21,30 @@ class NotificationTemplateCreate(NotificationTemplateBase):
     pass
 
 
+def _template_update_json_schema(schema: dict[str, Any]) -> None:
+    for field in ("name", "type", "channel", "template", "is_active"):
+        schema.get("properties", {}).get(field, {}).pop("default", None)
+
+
 class NotificationTemplateUpdate(BaseModel):
-    name: str | None = Field(None, max_length=100)
-    type: str | None = Field(None, max_length=50)
-    channel: str | None = Field(None, max_length=20)
+    model_config = ConfigDict(json_schema_extra=_template_update_json_schema)
+
+    name: str | SkipJsonSchema[None] = Field(None, max_length=100)
+    type: str | SkipJsonSchema[None] = Field(None, max_length=50)
+    channel: str | SkipJsonSchema[None] = Field(None, max_length=20)
     subject: str | None = Field(None, max_length=200)
-    template: str | None = None
-    is_active: bool | None = None
+    template: str | SkipJsonSchema[None] = None
+    is_active: bool | SkipJsonSchema[None] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_required_field_nulls(cls, value):
+        if isinstance(value, dict) and any(
+            field in value and value[field] is None
+            for field in ("name", "type", "channel", "template", "is_active")
+        ):
+            raise ValueError("Required template fields cannot be null")
+        return value
 
 
 class NotificationTemplate(NotificationTemplateBase):

@@ -198,6 +198,14 @@ def _emr_examination_items(
         if not derma_exam_has_content(specialty_data, diagnosis_main):
             continue
         visit = visits.get(record.visit_id)
+        # DERMAHIST-BE-001: the canonical lesion localization must survive
+        # the round-trip into history — project ONLY the human-readable
+        # description; other localization dict keys never leak into the
+        # payload and nothing is fabricated from them.
+        localization = specialty_data.get("localization")
+        localization_description = (
+            localization.get("description") if isinstance(localization, dict) else None
+        )
         items.append(
             (
                 DermaExaminationHistoryOut(
@@ -212,6 +220,12 @@ def _emr_examination_items(
                     lesions=str_or_none(specialty_data.get("lesions")),
                     distribution=str_or_none(specialty_data.get("distribution")),
                     symptoms=str_or_none(specialty_data.get("symptoms")),
+                    localization=(
+                        localization_description
+                        if isinstance(localization_description, str)
+                        and localization_description.strip()
+                        else None
+                    ),
                     diagnosis=diagnosis_main,
                     treatment_plan=str_or_none(specialty_data.get("treatment_plan")),
                     created_at=record.created_at,

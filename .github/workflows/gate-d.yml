@@ -61,7 +61,7 @@ env:
 jobs:
   gate-d:
     name: 🔒 Gate D (PostgreSQL + concurrency)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     services:

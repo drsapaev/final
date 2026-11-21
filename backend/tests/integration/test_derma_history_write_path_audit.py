@@ -57,8 +57,9 @@ query_dml вскрыло ещё ДВА ранее невидимых сайта 
 scripts (бенчи и legacy-утилиты тоже ходят в БД).
 """
 
+import ast
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import update
@@ -142,9 +143,20 @@ AUDITED_SITES: dict[str, dict[str, tuple[int, str]]] = {
     },
     "backend/app/tasks/worker.py": {
         "model_dml": (
-            7,
+            9,
             "Core update(Visit) reminder-лизы: reminder_claimed_at/"
-            "reminder_generation/status — не-проекционные колонки",
+            "reminder_generation/status и выдача confirmation_token/"
+            "confirmation_expires_at/confirmation_channel — не-проекционные "
+            "колонки; при конфликте дополнительно освобождается лиза",
+        ),
+    },
+    "backend/alembic/versions/0102_visit_confirmation_context.py": {
+        "raw_dml": (
+            8,
+            "PostgreSQL и SQLite: начальное заполнение confirmation epoch и "
+            "триггеры контекста визита, услуг и телефона изменяют только "
+            "confirmation/reminder-поля, не id/visit_date/doctor_id; "
+            "VisitService и телефон пациента не являются источниками проекции",
         ),
     },
     "scripts/legacy_scripts/backend/verify_fk_enforcement.py": {
@@ -360,10 +372,57 @@ class TestDermaHistoryWritePathAudit:
         )
         assert _scan_text(clean) == {}
 
+    def test_confirmation_migration_only_writes_non_projection_visit_columns(self) -> None:
+        """Pin actual UPDATE targets, including PostgreSQL BEFORE-trigger writes."""
+        path = BACKEND_ROOT / "alembic/versions/0102_visit_confirmation_context.py"
+        source = path.read_text(encoding="utf-8")
+        allowed = {
+            "confirmation_context_epoch",
+            "confirmation_token",
+            "confirmation_expires_at",
+            "reminder_sent_at",
+            "reminder_generation",
+        }
+        updates = []
+        for node in ast.walk(ast.parse(source)):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "execute"
+                and node.args
+            ):
+                continue
+            argument = node.args[0]
+            if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+                sql = argument.value
+            elif isinstance(argument, ast.JoinedStr):
+                sql = "".join(
+                    part.value if isinstance(part, ast.Constant) else "?"
+                    for part in argument.values
+                )
+            else:
+                continue
+            for match in re.finditer(
+                r"\bUPDATE\s+visits\s+SET\s+(.*?)(?:\bWHERE\b|;|$)",
+                sql,
+                re.IGNORECASE | re.DOTALL,
+            ):
+                assignments = re.split(r",\s*(?=\w+\s*=)", match.group(1))
+                columns = []
+                for assignment in assignments:
+                    target = re.match(r"\s*(\w+)\s*=", assignment)
+                    assert target, assignment
+                    columns.append(target.group(1).lower())
+                updates.append(set(columns))
+        assert len(updates) == 8
+        assert all(columns <= allowed for columns in updates)
+        before_targets = re.findall(r"\bNEW\.(\w+)\s*:=", source, re.IGNORECASE)
+        assert before_targets and set(before_targets) <= allowed
+
     def test_audited_status_transition_keeps_projection_intact(
         self, db_session, test_patient, test_doctor, admin_user
     ) -> None:
-        """Core update(Visit) по не-проекционным колонкам (status) —
+        """Core update(Visit) по не-проекционным колонкам —
         профиль реальных сайтов visits.py/worker.py — НЕ меняет строки
         read model: рассинхронизации нет."""
         from tests.integration.test_derma_history_read_model import (
@@ -386,7 +445,13 @@ class TestDermaHistoryWritePathAudit:
         db_session.execute(
             update(Visit)
             .where(Visit.id == visit.id)
-            .values(status="in_progress")
+            .values(
+                status="in_progress",
+                confirmation_token="audit-token",
+                confirmation_expires_at=datetime.now(timezone.utc),
+                confirmation_channel="auto",
+                reminder_claimed_at=datetime.now(timezone.utc),
+            )
             .execution_options(synchronize_session=False)
         )
         db_session.commit()

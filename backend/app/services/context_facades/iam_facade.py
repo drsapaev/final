@@ -11,6 +11,26 @@ from app.domain.contracts.iam_contracts import (
 logger = logging.getLogger(__name__)
 
 
+def create_patient_pending_2fa_locked(db, user, *, patient_id=None):
+    """Begin a patient second-factor challenge under the caller's User lock.
+
+    The caller owns the surrounding transaction and any Patient lock needed
+    to bind a passkey to its card. This adapter does not commit or roll back.
+    """
+    from app.services.two_factor_patient_pending import (
+        create_patient_pending_2fa_locked as create_pending,
+    )
+
+    return create_pending(db, user, patient_id=patient_id)
+
+
+def revoke_all_for_new_login_locked(db, user):
+    """Apply IAM's configured new-login revocation in the caller transaction."""
+    from app.services.authentication_service import get_authentication_service
+
+    return get_authentication_service().revoke_all_for_new_login_locked(db, user)
+
+
 class IamServiceContractAdapter:
     """Adapter from legacy role model to IAM contract."""
 

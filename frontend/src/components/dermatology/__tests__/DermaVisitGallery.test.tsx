@@ -789,6 +789,7 @@ describe('DermaVisitGallery', () => {
             provider: 'mock',
             ai_notice: 'AI suggestions are advisory only',
             requires_doctor_confirmation: true,
+            ai_safety_meta: { requires_doctor_confirmation: true },
             decision_boundary: 'suggestion_only',
           },
         };
@@ -869,6 +870,55 @@ describe('DermaVisitGallery', () => {
     expect(screen.queryByText('derma.derma_gallery_ai_confirmation')).toBeNull();
     expect(screen.queryByText('derma.derma_gallery_ai_empty')).toBeNull();
     // Фото остаётся доступным
+    expect(screen.getByRole('img')).toBeTruthy();
+  });
+
+  const validAiEnvelope = {
+    status: 'success',
+    data: { content: 'SYNTHETIC CLINICAL SUGGESTION' },
+    requires_doctor_confirmation: true,
+    ai_safety_meta: { requires_doctor_confirmation: true },
+    decision_boundary: 'suggestion_only',
+    ai_notice: 'AI suggestions are advisory only',
+  };
+
+  it.each([
+    { name: 'partial status', response: { ...validAiEnvelope, status: 'partial' } },
+    { name: 'missing status', response: { ...validAiEnvelope, status: undefined } },
+    { name: 'unknown status', response: { ...validAiEnvelope, status: 'pending' } },
+    { name: 'blank clinical suggestion', response: { ...validAiEnvelope, data: { content: '   ' } } },
+    { name: 'non-text clinical suggestion', response: { ...validAiEnvelope, data: { content: null } } },
+    { name: 'missing confirmation flag', response: { ...validAiEnvelope, requires_doctor_confirmation: undefined } },
+    { name: 'disabled confirmation flag', response: { ...validAiEnvelope, requires_doctor_confirmation: false } },
+    { name: 'missing nested safety', response: { ...validAiEnvelope, ai_safety_meta: undefined } },
+    { name: 'null nested safety', response: { ...validAiEnvelope, ai_safety_meta: null } },
+    { name: 'false nested confirmation', response: { ...validAiEnvelope, ai_safety_meta: { requires_doctor_confirmation: false } } },
+    { name: 'numeric nested confirmation', response: { ...validAiEnvelope, ai_safety_meta: { requires_doctor_confirmation: 1 } } },
+    { name: 'string nested confirmation', response: { ...validAiEnvelope, ai_safety_meta: { requires_doctor_confirmation: 'true' } } },
+    { name: 'untrusted decision boundary', response: { ...validAiEnvelope, decision_boundary: 'final_diagnosis' } },
+    { name: 'missing advisory notice', response: { ...validAiEnvelope, ai_notice: undefined } },
+    { name: 'blank advisory notice', response: { ...validAiEnvelope, ai_notice: '  ' } },
+  ])('fails closed for $name instead of showing an AI success panel (DERMAAI-FE-002)', async ({ response }) => {
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse([
+        { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+      ]);
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.post.mockResolvedValueOnce({ data: response });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await screen.findByRole('img');
+    fireEvent.click(screen.getByRole('button', {
+      name: 'derma.derma_gallery_ai_button_aria:derma.derma_gallery_category_examination',
+    }));
+    await waitFor(() => {
+      expect(screen.getByText('derma.derma_gallery_ai_error')).toBeTruthy();
+    });
+    expect(screen.queryByText('derma.derma_gallery_ai_confirmation')).toBeNull();
+    expect(screen.queryByText('SYNTHETIC CLINICAL SUGGESTION')).toBeNull();
+    // Gateway availability never blocks the clinical photo/EMR workflow.
     expect(screen.getByRole('img')).toBeTruthy();
   });
 
@@ -967,7 +1017,14 @@ describe('DermaVisitGallery', () => {
       throw new Error(`unexpected GET ${url}`);
     });
     apiState.post.mockResolvedValueOnce({
-      data: { status: 'success', data: { content: 'EXAMINATION PHOTO SUGGESTION' } },
+      data: {
+        status: 'success',
+        data: { content: 'EXAMINATION PHOTO SUGGESTION' },
+        requires_doctor_confirmation: true,
+        ai_safety_meta: { requires_doctor_confirmation: true },
+        decision_boundary: 'suggestion_only',
+        ai_notice: 'AI suggestions are advisory only',
+      },
     });
 
     render(<DermaVisitGallery patientId={42} visitId={900} />);

@@ -1,255 +1,123 @@
-/**
- * RQ-27.a (F-23, S-28) — cross-session queue-profile revalidation on the
- * registrar tab strip.
- *
- * The tab strip loads profiles once on mount and afterwards only reacts to
- * same-context window events (`queue-profiles:updated`,
- * `departments:updated`). Those events never cross browser contexts, so a
- * profile created/renamed/disabled by an administrator in ANOTHER session
- * stayed invisible here until a full page reload.
- *
- * The fix: when the user returns to the session (visibilitychange → visible,
- * window focus), `loadQueueProfiles` runs again. The 5s throttle collapses
- * the focus+visibilitychange burst into one refresh; `loadQueueProfiles`
- * already replaces state only on success, so a failed refresh keeps the
- * current tabs.
- */
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ResolvedRegistrarTab, RegistrarTabsResponse } from '../../../api/registrarTabs';
 import Tabs from '../Tabs';
 
-vi.mock('../../../api/client', () => ({ api: { get: vi.fn() } }));
+vi.mock('../../../api/registrarTabs', () => ({ getRegistrarTabs: vi.fn() }));
 vi.mock('../../../i18n/useTranslation', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('../../../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), log: vi.fn() } }));
+import { getRegistrarTabs } from '../../../api/registrarTabs';
 
-import { api } from '../../../api/client';
-
-const PROFILES_RESPONSE = {
-  data: {
-    success: true,
-    source: 'database',
-    profiles: [
-      { key: 'cardio', title: 'Cardio SYNTHETIC', title_ru: 'Кардио SYNTHETIC', queue_tags: ['cardio'], icon: 'Heart', color: 'var(--mac-error)' },
-      { key: 'lab', title: 'Lab SYNTHETIC', title_ru: 'Лаборатория SYNTHETIC', queue_tags: ['lab'], icon: 'FlaskConical', color: 'var(--mac-success)' },
-    ],
-  },
-};
-
-const profilesCallCount = () =>
-  vi.mocked(api.get).mock.calls.filter(([url]) => String(url).includes('/queues/profiles')).length;
-
-const setDocumentVisibility = (value: Document['visibilityState']) => {
+const profile = (id: number, key: string): ResolvedRegistrarTab => ({
+  target_kind: 'profile', target_id: id, custom_title: null, title: `SYNTHETIC ${key}`,
+  title_ru: null, profile_key: key, queue_tags: [key], icon: 'Heart', color: null,
+  visible: true, available: true, reason_code: null,
+});
+const baselineTabs = [profile(1, 'cardio'), profile(2, 'lab')];
+const response = (tabs: ResolvedRegistrarTab[] = baselineTabs): RegistrarTabsResponse => ({
+  mode: 'configured', version: 1, tabs,
+  profile_filters: tabs.filter((tab) => tab.target_kind === 'profile').map((tab) => ({
+    key: tab.profile_key!, title: tab.title, title_ru: tab.title_ru, queue_tags: tab.queue_tags,
+  })),
+});
+const setVisibility = (value: Document['visibilityState']) =>
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => value });
-};
+const dispatch = (name: string, target: EventTarget = window) => act(() => { target.dispatchEvent(new Event(name)); });
+const callCount = () => vi.mocked(getRegistrarTabs).mock.calls.length;
 
-const fireVisibilityChange = () => {
-  act(() => {
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-};
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(getRegistrarTabs).mockResolvedValue(response());
+  setVisibility('visible');
+});
+afterEach(() => { cleanup(); setVisibility('visible'); });
 
-const fireWindowFocus = () => {
-  act(() => {
-    window.dispatchEvent(new Event('focus'));
-  });
-};
-
-// RQ-27.b (S-28): network restoration and the panel manual-refresh button
-// both run the same throttled silent revalidation.
-const fireOnline = () => {
-  act(() => {
-    window.dispatchEvent(new Event('online'));
-  });
-};
-
-const fireSessionRefresh = () => {
-  act(() => {
-    window.dispatchEvent(new CustomEvent('registrar:session-refresh'));
-  });
-};
-
-describe('Tabs — RQ-27.a silent revalidation on return to the session', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(api.get).mockResolvedValue(PROFILES_RESPONSE);
-    setDocumentVisibility('visible');
-  });
-
-  afterEach(() => {
-    cleanup();
-    setDocumentVisibility('visible');
-  });
-
-  it('reloads queue profiles when the session becomes visible again', async () => {
+describe('unified Registrar tabs revalidation', () => {
+  it.each(['focus', 'online', 'registrar:session-refresh'])('refreshes on %s and throttles the return-to-session burst', async (name) => {
     render(<Tabs />);
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(1);
-    });
-
-    fireVisibilityChange();
-
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(2);
-    });
+    await screen.findByRole('tab', { name: 'SYNTHETIC cardio' });
+    dispatch(name);
+    dispatch('focus');
+    dispatch('visibilitychange', document);
+    await waitFor(() => expect(callCount()).toBe(2));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 25)); });
+    expect(callCount()).toBe(2);
   });
 
-  it('reloads on window focus and throttles the focus+visibility burst to one refresh', async () => {
+  it('refreshes when the document becomes visible and ignores hidden returns', async () => {
     render(<Tabs />);
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(1);
-    });
-
-    fireWindowFocus();
-    fireVisibilityChange();
-
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(2);
-    });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    });
-    expect(profilesCallCount()).toBe(2);
+    await screen.findByRole('tab', { name: 'SYNTHETIC cardio' });
+    setVisibility('hidden');
+    dispatch('focus');
+    dispatch('visibilitychange', document);
+    expect(callCount()).toBe(1);
+    setVisibility('visible');
+    dispatch('visibilitychange', document);
+    await waitFor(() => expect(callCount()).toBe(2));
   });
 
-  it('keeps the rendered tab strip when the silent revalidation fails', async () => {
-    const { container } = render(<Tabs />);
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(1);
-    });
-    // The call counter reaches 1 when api.get is INVOKED; the strip renders
-    // only after the promise resolves and React commits - under CI load the
-    // synchronous read raced the commit (issue #3570). Wait for the strip.
-    await waitFor(() => {
-      expect(container.querySelectorAll('.tab-button.department').length).toBeGreaterThan(0);
-    });
-    const before = container.querySelectorAll('.tab-button.department').length;
+  it.each(['registrar-tabs:updated', 'queue-profiles:updated', 'departments:updated'])(
+    'accepts the %s compatibility refresh event',
+    async (name) => {
+      render(<Tabs />);
+      await screen.findByRole('tab', { name: 'SYNTHETIC cardio' });
+      vi.mocked(getRegistrarTabs).mockResolvedValue(response([...baselineTabs, profile(3, 'derma')]));
+      dispatch(name);
+      expect(await screen.findByRole('tab', { name: 'SYNTHETIC derma' })).toBeVisible();
+    },
+  );
 
-    vi.mocked(api.get).mockRejectedValue(new Error('offline during revalidation'));
-    fireVisibilityChange();
-
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(2);
-    });
-    // A failed revalidation keeps the last successful backend list intact.
-    expect(container.querySelectorAll('.tab-button.department')).toHaveLength(before);
-    expect(container.querySelector('[data-tab="cardio"]')).not.toBeNull();
-  });
-
-  it('does not revalidate while the document is hidden', async () => {
-    render(<Tabs />);
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(1);
-    });
-
-    setDocumentVisibility('hidden');
-    fireVisibilityChange();
-    fireWindowFocus();
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    });
-    expect(profilesCallCount()).toBe(1);
-  });
-
-  // ── RQ-27.b: integration of a NEW direction + understandable disable ──
-
-  it('picks up a NEW direction created in another session on revalidation', async () => {
-    const onProfilesLoaded = vi.fn();
-    const { container } = render(<Tabs onProfilesLoaded={onProfilesLoaded} />);
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(1);
-    });
-    // Same call-vs-commit race as above: wait for the strip, do not read it
-    // synchronously right after the call-count wait.
-    await waitFor(() => {
-      expect(container.querySelectorAll('.tab-button.department')).toHaveLength(2);
-    });
-    expect(onProfilesLoaded).toHaveBeenLastCalledWith(expect.objectContaining({ length: 2 }));
-
-    // An administrator created a third profile in ANOTHER session: the
-    // silent revalidation integrates it as a new tab without any reload.
-    const THREE_PROFILES = {
-      data: {
-        success: true,
-        source: 'database',
-        profiles: [
-          ...PROFILES_RESPONSE.data.profiles,
-          { key: 'derma', title: 'Derma SYNTHETIC', title_ru: 'Дерма SYNTHETIC', queue_tags: ['derma'], icon: 'UserCheck', color: 'var(--mac-warning)' },
-        ],
-      },
-    };
-    vi.mocked(api.get).mockResolvedValue(THREE_PROFILES);
-    fireVisibilityChange();
-
-    await waitFor(() => {
-      expect(container.querySelectorAll('.tab-button.department')).toHaveLength(3);
-    });
-    expect(container.querySelector('[data-tab="derma"]')).not.toBeNull();
-    expect(onProfilesLoaded).toHaveBeenLastCalledWith(expect.objectContaining({ length: 3 }));
-  });
-
-  it('falls back to all departments when the ACTIVE tab is disabled in another session', async () => {
-    const onTabChange = vi.fn();
-    const { container } = render(<Tabs activeTab="cardio" onTabChange={onTabChange} />);
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(1);
-    });
-    expect(container.querySelector('[data-tab="cardio"]')).not.toBeNull();
-
-    // The active profile was disabled in ANOTHER session: the revalidation
-    // must not leave the registrar silently sitting on a stale empty filter —
-    // the understandable outcome is the all-departments view.
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        success: true,
-        source: 'database',
-        profiles: [PROFILES_RESPONSE.data.profiles[1]], // only 'lab' remains
-      },
-    });
-    fireVisibilityChange();
-
-    await waitFor(() => {
-      expect(onTabChange).toHaveBeenCalledWith(null);
-    });
-    expect(container.querySelector('[data-tab="cardio"]')).toBeNull();
-  });
-
-  it('never deselects the active tab on a FAILED revalidation', async () => {
+  it('keeps the last successful strip and selection after a failed refresh, then retries', async () => {
     const onTabChange = vi.fn();
     render(<Tabs activeTab="cardio" onTabChange={onTabChange} />);
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(1);
-    });
+    const first = await screen.findByRole('tab', { name: 'SYNTHETIC cardio' });
+    vi.mocked(getRegistrarTabs).mockRejectedValue(new Error('offline'));
+    dispatch('focus');
+    expect(await screen.findByRole('alert')).toBeVisible();
+    expect(first).toHaveAttribute('aria-selected', 'true');
+    expect(onTabChange).not.toHaveBeenCalled();
+    vi.mocked(getRegistrarTabs).mockResolvedValue(response([profile(4, 'new')]));
+    fireEvent.click(screen.getByRole('button', { name: 'registrarPanel.rt_retry' }));
+    expect(await screen.findByRole('tab', { name: 'SYNTHETIC new' })).toBeVisible();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('registrarPanel.rt_hidden_filter')).toBeVisible();
+  });
 
-    vi.mocked(api.get).mockRejectedValue(new Error('offline during revalidation'));
-    fireVisibilityChange();
-
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(2);
-    });
-    // Success-path-only reset: a failed refresh must not deselect the user's
-    // tab or replace the last successful list.
+  it('accepts a confirmed empty registry and preserves the old filter visibly', async () => {
+    const onTabChange = vi.fn();
+    render(<Tabs activeTab="cardio" onTabChange={onTabChange} />);
+    await screen.findByRole('tab', { name: 'SYNTHETIC cardio' });
+    vi.mocked(getRegistrarTabs).mockResolvedValue(response([]));
+    dispatch('registrar-tabs:updated');
+    expect(await screen.findByText('registrarPanel.rt_hidden_filter')).toBeVisible();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
     expect(onTabChange).not.toHaveBeenCalled();
   });
 
-  it('revalidates on online and manual session-refresh events with one throttle budget', async () => {
+  it('ignores an older response that resolves after a newer configuration', async () => {
+    let resolveOld: (value: RegistrarTabsResponse) => void = () => {};
+    const old = new Promise<RegistrarTabsResponse>((resolve) => { resolveOld = resolve; });
+    vi.mocked(getRegistrarTabs).mockReturnValueOnce(old).mockResolvedValue(response([profile(8, 'newest')]));
     render(<Tabs />);
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(1);
-    });
+    await waitFor(() => expect(callCount()).toBe(1));
+    dispatch('registrar-tabs:updated');
+    await screen.findByRole('tab', { name: 'SYNTHETIC newest' });
+    await act(async () => { resolveOld(response([profile(9, 'obsolete')])); await old; });
+    expect(screen.queryByRole('tab', { name: 'SYNTHETIC obsolete' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'SYNTHETIC newest' })).toBeVisible();
+  });
 
-    fireOnline();
-    await waitFor(() => {
-      expect(profilesCallCount()).toBe(2);
-    });
-
-    // online + session-refresh + focus within the throttle window = one refresh
-    fireOnline();
-    fireSessionRefresh();
-    fireWindowFocus();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    });
-    expect(profilesCallCount()).toBe(2);
+  it('does not publish a late response after unmount', async () => {
+    let resolve: (value: RegistrarTabsResponse) => void = () => {};
+    const pending = new Promise<RegistrarTabsResponse>((done) => { resolve = done; });
+    vi.mocked(getRegistrarTabs).mockReturnValue(pending);
+    const onProfilesLoaded = vi.fn();
+    const { unmount } = render(<Tabs onProfilesLoaded={onProfilesLoaded} />);
+    await waitFor(() => expect(callCount()).toBe(1));
+    unmount();
+    await act(async () => { resolve(response()); await pending; });
+    expect(onProfilesLoaded).not.toHaveBeenCalled();
+    dispatch('registrar-tabs:updated');
+    expect(callCount()).toBe(1);
   });
 });

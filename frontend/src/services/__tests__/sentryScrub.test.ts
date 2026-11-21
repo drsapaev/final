@@ -65,6 +65,33 @@ describe('redactCredentialQueryParams (owner round-12 P1)', () => {
 });
 
 describe('scrubPIIFromObject (owner round-12 P1 — URL-valued telemetry fields)', () => {
+  it('redacts OTP and arbitrary SMS text in contextual verification requests', () => {
+    const canary = `synthetic-otp-${Math.random().toString(36).slice(2)}`;
+    const event = {
+      request: {
+        url: '/api/v1/phone-verification/admin/send-code?message=' + canary,
+        data: { code: canary, message: canary, custom_message: canary },
+      },
+    };
+    expect(JSON.stringify(scrubPIIFromObject(event))).not.toContain(canary);
+  });
+
+  it('redacts named proofs in objects, raw strings and encoded query params', () => {
+    const canary = `synthetic-otp-${Math.random().toString(36).slice(2)}`;
+    const input = {
+      verificationCode: canary,
+      payload: JSON.stringify({ verification_code: canary }),
+      url: '/ordinary?%76erification_code=' + canary,
+      nested: [{ totp_code: canary }, { otp: canary }],
+      'verification-code': canary,
+    };
+    expect(JSON.stringify(scrubPIIFromObject(input))).not.toContain(canary);
+  });
+
+  it('keeps an unrelated clinical code readable', () => {
+    expect(scrubPIIFromObject({ code: 'ICD-CONTROL' })).toEqual({ code: 'ICD-CONTROL' });
+  });
+
   it('scrubs credential query params inside request.url-style string fields', () => {
     const out = scrubPIIFromObject({
       url: 'https://app.example.com/patient/activate?token=SECRET123&x=1',

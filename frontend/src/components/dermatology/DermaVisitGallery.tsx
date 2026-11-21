@@ -46,6 +46,7 @@ import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
+import { hasMedicalAiSafety } from '../../utils/aiSafety';
 import './DermaVisitGallery.css';
 
 export type DermaPhotoCategory = 'examination' | 'before' | 'after';
@@ -360,7 +361,9 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   // Ответ — подсказка: показывается в панели и никогда не записывается в ЭМК
   // (компонент не имеет onChange в specialty_data). Ошибка/503 не ломают галерею.
   // DERMAAI-FE-001: поздний ответ не применяется после смены контекста;
-  // DERMAAI-FE-002: канонический status='error' внутри HTTP 200 — ошибка;
+  // DERMAAI-FE-002: only explicit success with nonempty suggestion and the
+  // canonical root-level doctor-confirmation/advisory envelope may show as done;
+  // missing, partial or malformed HTTP-200 responses fail closed.
   // DERMAAI-FE-004: файл, удалённый пока запрос был в полёте, не получает
   // «воскрешённую» подсказку.
   const handleAnalyze = useCallback(async (photoId: number) => {
@@ -390,10 +393,26 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
         return;
       }
       const content = payload.data?.content;
+      const suggestion = typeof content === 'string' ? content.trim() : '';
+      // DERMAAI-FE-002: match the endpoint's canonical AIResponse root
+      // envelope. 2xx is transport success, NOT permission to display a
+      // clinical suggestion: partial/unknown responses and missing mandatory
+      // safety metadata must never render the confirmation-style panel.
+      if (
+        payload.status !== 'success' ||
+        !suggestion ||
+        !hasMedicalAiSafety(payload) ||
+        payload.requires_doctor_confirmation !== true ||
+        payload.decision_boundary !== 'suggestion_only' ||
+        !aiNotice.trim()
+      ) {
+        setAnalysis({ fileId: photoId, status: 'error' });
+        return;
+      }
       setAnalysis({
         fileId: photoId,
         status: 'done',
-        suggestion: typeof content === 'string' && content.trim() ? content : '',
+        suggestion,
         aiNotice,
       });
     } catch (error) {

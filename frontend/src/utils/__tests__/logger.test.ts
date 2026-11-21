@@ -76,6 +76,39 @@ describe('logger', () => {
     });
 
     describe('sanitize function', () => {
+        it('redacts verification proofs and text in phone request contexts', () => {
+            const canary = `synthetic-otp-${Math.random().toString(36).slice(2)}`;
+            const value = {
+                config: {
+                    url: '/api/v1/phone-verification/verify-code',
+                    data: JSON.stringify({ code: canary }),
+                },
+                code: canary,
+                verification_code: canary,
+                'verification-code': canary,
+                custom_message: canary,
+            };
+            expect(JSON.stringify(sanitize(value))).not.toContain(canary);
+        });
+
+        it('does not treat a generic clinical code as an OTP', () => {
+            expect(sanitize({ code: 'ICD-CONTROL' })).toEqual({ code: 'ICD-CONTROL' });
+        });
+
+        it('does not log a verification request Error or a named proof string', () => {
+            const canary = `synthetic-otp-${Math.random().toString(36).slice(2)}`;
+            const error = Object.assign(new Error(canary), {
+                config: { url: '/api/v1/phone-verification/verify-code' },
+            });
+            const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            try {
+                logger.error(error, `verification_code=${canary}`);
+                expect(JSON.stringify(spy.mock.calls)).not.toContain(canary);
+            } finally {
+                spy.mockRestore();
+            }
+        });
+
         it('should export sanitize function', () => {
             expect(typeof sanitize).toBe('function');
         });
@@ -155,6 +188,12 @@ describe('logger', () => {
             expect(sanitizeTyped(true)).toBe(true);
             expect(sanitizeTyped(false)).toBe(false);
         });
+    });
+
+    it('scrubs encoded proof names and malformed encoded verification routes', () => {
+        const canary = `synthetic-otp-${Math.random().toString(16).slice(2)}`;
+        expect(JSON.stringify(sanitizeTyped(`/ordinary?%76erification_code=${canary}`))).not.toContain(canary);
+        expect(JSON.stringify(sanitizeTyped(`/%70hone-verification/verify%/x?code=${canary}`))).not.toContain(canary);
     });
 
     describe('log output - should not throw', () => {
