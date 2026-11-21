@@ -579,6 +579,8 @@ jobs:
               '    ~^POST:/api/v1/telegram/mini-app/sessions/[a-f0-9-][a-f0-9-]*/revoke$ api;',
           ]
           conf = r"""
+          map_hash_bucket_size 256;
+          map_hash_max_size 4096;
           map "$request_method:$request_uri" $destination {
               default denied;
           ROUTES
@@ -613,10 +615,18 @@ jobs:
           (d / "ingress.conf").write_text(conf.replace("ROUTES", "\n".join(routes)))
           PY
           "$d/compose" up -d --no-deps --no-build --pull never gateway
+          ready=false
+          status=000
           for _ in {1..30}; do
-            if curl -fsS --max-time 3 -H "Host: $host" -D "$d/headers" -o "$d/page" "http://127.0.0.1:18086$cabinet" 2>/dev/null; then break; fi
+            status="$(curl -sS --max-time 3 -H "Host: $host" -D "$d/headers" -o "$d/page" -w '%{http_code}' "http://127.0.0.1:18086$cabinet" 2>/dev/null || true)"
+            if [[ "$status" == 200 ]]; then ready=true; break; fi
             sleep 1
           done
+          if [[ "$ready" != true ]]; then
+            echo "::error::Loopback Cabinet did not become ready (HTTP $status)."
+            "$d/compose" logs --no-color --tail 15 gateway || true
+            exit 1
+          fi
           grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/headers" >/dev/null
           grep -iE '^cache-control:.*no-store' "$d/headers" >/dev/null
           grep -qiE '^cross-origin-embedder-policy: require-corp' "$d/headers"
