@@ -1,14 +1,17 @@
+import { Buffer } from 'node:buffer';
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import process from 'node:process';
+import { URL, fileURLToPath, pathToFileURL } from 'node:url';
 
 const fixturePort = Number(process.env.PUBLIC_SITE_FIXTURE_PORT || 5279);
 const appPort = Number(process.env.PUBLIC_SITE_SSR_PORT || 5278);
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const allowedLocales = new Set(['ru', 'uz-Latn']);
 
+/** @type {Record<'ru' | 'uz-Latn', import('../../src/publicSiteApi').PublicSiteService[]>} */
 const services = {
   ru: [{
     slug: 'synthetic-service',
@@ -28,6 +31,7 @@ const services = {
   }],
 };
 
+/** @type {Record<'ru' | 'uz-Latn', import('../../src/publicSiteApi').PublicSiteDoctor[]>} */
 const doctors = {
   ru: [{
     slug: 'synthetic-profile',
@@ -76,7 +80,10 @@ function handleFixture(request, response) {
     return;
   }
   if (pathname === '/services/synthetic-service') {
-    sendJson(response, 200, services[locale][0]);
+    const { slug, name } = doctors[locale][0];
+    /** @type {import('../../src/publicSiteApi').PublicSiteServiceDetail} */
+    const detail = { ...services[locale][0], related_doctors: [{ slug, name }] };
+    sendJson(response, 200, detail);
     return;
   }
   if (pathname.startsWith('/services/')) {
@@ -159,12 +166,12 @@ if (process.env.PUBLIC_SITE_FIXTURE_ONLY === '1') {
 
   const appServer = createServer(async (incoming, outgoing) => {
     try {
-      const headers = new Headers();
+      const headers = new globalThis.Headers();
       for (const [name, value] of Object.entries(incoming.headers)) {
         if (value) headers.set(name, Array.isArray(value) ? value.join(', ') : value);
       }
       const host = headers.get('host') || '127.0.0.1:' + appPort;
-      const request = new Request(new URL(incoming.url || '/', 'http://' + host), {
+      const request = new globalThis.Request(new URL(incoming.url || '/', 'http://' + host), {
         method: incoming.method || 'GET',
         headers,
       });

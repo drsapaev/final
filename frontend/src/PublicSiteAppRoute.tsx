@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getApiOrigin } from './api/runtime';
 import { createPublicSiteApi } from './publicSiteApi';
@@ -17,7 +17,22 @@ type PageState =
 export default function PublicSiteAppRoute() {
   const { pathname } = useLocation();
   const route = resolvePublicSiteRoute(pathname);
+  const locale = route?.locale;
   const [pageState, setPageState] = useState<PageState>({ pathname, status: 'loading' });
+
+  useLayoutEffect(() => {
+    if (!locale) return undefined;
+
+    const root = document.documentElement;
+    const previousLanguage = root.getAttribute('lang');
+    root.lang = locale;
+
+    return () => {
+      if (root.lang !== locale) return;
+      if (previousLanguage === null) root.removeAttribute('lang');
+      else root.lang = previousLanguage;
+    };
+  }, [locale]);
 
   useEffect(() => {
     const route = resolvePublicSiteRoute(pathname);
