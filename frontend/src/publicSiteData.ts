@@ -1,4 +1,6 @@
-import type { PublicSiteApi, PublicSiteClinic, PublicSiteDoctor, PublicSiteService } from './publicSiteApi';
+import type {
+  PublicSiteApi, PublicSiteClinic, PublicSiteDoctor, PublicSiteService, PublicSiteServiceDetail,
+} from './publicSiteApi';
 import type { PublicSiteRouteMatch } from './routing/publicSiteRouteEntries';
 
 export interface PublicSitePageData {
@@ -6,7 +8,7 @@ export interface PublicSitePageData {
   logoUrl?: PublicSiteClinic['logo_url'];
   services?: PublicSiteService[];
   doctors?: PublicSiteDoctor[];
-  service?: PublicSiteService;
+  service?: PublicSiteServiceDetail;
   doctor?: PublicSiteDoctor;
 }
 

@@ -37917,6 +37917,33 @@ export type components = {
         PublicSiteNotFoundOut: {
             detail: components["schemas"]["PublicSiteNotFoundDetail"];
         };
+        /** PublicSiteRelatedDoctorOut */
+        PublicSiteRelatedDoctorOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+        };
+        /** PublicSiteServiceDetailOut */
+        PublicSiteServiceDetailOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /**
+             * Price
+             * @description Null means the localized site should display 'price on request'.
+             */
+            price: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Related Doctors */
+            related_doctors?: components["schemas"]["PublicSiteRelatedDoctorOut"][];
+        };
         /** PublicSiteServiceOut */
         PublicSiteServiceOut: {
             /** Slug */
@@ -47445,7 +47472,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PublicSiteServiceOut"];
+                    "application/json": components["schemas"]["PublicSiteServiceDetailOut"];
                 };
             };
             /** @description Published service was not found. */

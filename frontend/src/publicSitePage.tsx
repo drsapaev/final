@@ -30,6 +30,7 @@ interface Copy {
   loadError: string;
   retry: string;
   serviceDetails: string;
+  serviceDoctors: string;
   doctorDetails: string;
   homeIntro: string;
   homeServices: string;
@@ -75,6 +76,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     loadError: 'Не удалось загрузить актуальную информацию клиники.',
     retry: 'Повторить',
     serviceDetails: 'Информация об услуге',
+    serviceDoctors: 'Врачи, оказывающие услугу',
     doctorDetails: 'Информация о враче',
     homeIntro: 'Информация об услугах клиники и специалистах.',
     homeServices: 'Популярные услуги',
@@ -129,6 +131,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     loadError: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.',
     retry: 'Qayta urinish',
     serviceDetails: 'Xizmat haqida',
+    serviceDoctors: 'Ushbu xizmat bo‘yicha shifokorlar',
     doctorDetails: 'Shifokor haqida',
     homeIntro: 'Klinika xizmatlari va mutaxassislari haqida ma’lumot.',
     homeServices: 'Xizmatlar',
@@ -479,16 +482,32 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
       return <section className="public-site__section"><h1>{copy.doctors}</h1><DoctorList doctors={data.doctors ?? []} locale={locale} copy={copy} showPortraits /></section>;
     case 'contacts':
       return <section className="public-site__section"><h1>{copy.contacts}</h1><ContactLinks clinic={data.clinic} copy={copy} /></section>;
-    case 'service':
-      if (!data.service) return <section className="public-site__section"><h1>{copy.serviceDetails}</h1><p className="public-site__empty">{copy.serviceMissing}</p></section>;
+    case 'service': {
+      const { service } = data;
+      if (!service) return <section className="public-site__section"><h1>{copy.serviceDetails}</h1><p className="public-site__empty">{copy.serviceMissing}</p></section>;
+
+      const relatedDoctors = service.related_doctors ?? [];
       return (
         <article className="public-site__section public-site__detail">
-          {data.service.category && <p className="public-site__eyebrow">{data.service.category}</p>}
-          <h1>{data.service.name}</h1>
-          <p className="public-site__lead">{data.service.description}</p>
+          {service.category && <p className="public-site__eyebrow">{service.category}</p>}
+          <h1>{service.name}</h1>
+          <p className="public-site__lead">{service.description}</p>
+          {relatedDoctors.length > 0 && (
+            <section>
+              <h2>{copy.serviceDoctors}</h2>
+              <ul>
+                {relatedDoctors.map((doctor) => (
+                  <li key={doctor.slug}>
+                    <a href={localizePath('doctor', locale, doctor.slug)}>{doctor.name}</a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <a className="public-site__button public-site__button--primary" href={localizePath('contacts', locale)}>{copy.contactClinic}</a>
         </article>
       );
+    }
     case 'doctor':
       if (!data.doctor) return <section className="public-site__section"><h1>{copy.doctorDetails}</h1><p className="public-site__empty">{copy.doctorMissing}</p></section>;
       return (
