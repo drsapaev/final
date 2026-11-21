@@ -59,9 +59,10 @@ class TestPaymentReadService:
 
         db_session.refresh(payment)
         assert payment.status == "paid"
-        assert payment.provider_data["source"] == "unit"
+        assert payment.provider_data == {"source": "unit", "synced": True}
         assert result["status"] == "paid"
         assert result["payment_id"] == payment.id
+        assert result["provider_data"] == payment.provider_data
 
     def test_provider_poll_preserves_payment_posted_during_lookup(self, db_session, test_visit):
         payment = Payment(

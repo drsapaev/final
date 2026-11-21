@@ -400,12 +400,9 @@ class PaymentsMixin(BillingServiceMixinBase):
         if new_status_lower == "paid" and not payment.paid_at:
             payment.paid_at = datetime.now(UTC)
 
-        # Обновляем метаданные если переданы
+        # Assign a new mapping so SQLAlchemy records the JSON change.
         if meta:
-            if payment.provider_data:
-                payment.provider_data.update(meta)
-            else:
-                payment.provider_data = meta
+            payment.provider_data = {**(payment.provider_data or {}), **meta}
 
         if commit:
             self.db.commit()
