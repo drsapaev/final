@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-10-24 - Native tooltips on Modal close button
+ **Learning:** [Accessibility] Native `title` attributes on buttons that already have `aria-label`s can cause screen readers to read the text redundantly.
+ **Action:** When a button (like the modal close button) already has a clear `aria-label` for screen readers, remove the redundant `title` attribute or wrap the button in a `Tooltip` if visual hints are still needed. For simple close buttons where the icon is universally understood ('✕'), the `title` attribute can simply be omitted.
