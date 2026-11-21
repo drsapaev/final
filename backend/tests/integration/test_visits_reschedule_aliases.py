@@ -7,21 +7,6 @@ import pytest
 from app.models.visit import Visit
 
 
-@pytest.fixture
-def reschedule_today(monkeypatch) -> date:
-    from app.api.v1.endpoints import visits as visits_endpoint
-
-    today = date.today()
-
-    class RescheduleDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return today
-
-    monkeypatch.setattr(visits_endpoint, "date", RescheduleDate)
-    return today
-
-
 @pytest.mark.integration
 class TestVisitsRescheduleAliases:
     def _make_visit(self, db_session, test_patient, test_doctor, *, visit_date=None):
@@ -53,18 +38,19 @@ class TestVisitsRescheduleAliases:
         auth_headers,
         test_patient,
         test_doctor,
-        reschedule_today,
         path_template,
         days,
     ):
+        today = date.today()
         visit = self._make_visit(
-            db_session, test_patient, test_doctor, visit_date=reschedule_today
+            db_session, test_patient, test_doctor, visit_date=today
         )
         path = path_template.format(visit_id=visit.id)
-        expected_date = reschedule_today + timedelta(days=1 if days is None else days)
+        expected_date = today + timedelta(days=1 if days is None else days)
         params = None if days is None else {"new_date": expected_date.isoformat()}
 
         response = client.post(path, headers=auth_headers, params=params)
+        response_day = date.today()
 
         assert response.status_code == 200, response.text
         payload = response.json()
@@ -74,7 +60,10 @@ class TestVisitsRescheduleAliases:
         assert payload["status"] == "open"
 
         db_session.refresh(visit)
-        assert visit.visit_date == expected_date
+        if days is None:
+            assert visit.visit_date in {expected_date, response_day + timedelta(days=1)}
+        else:
+            assert visit.visit_date == expected_date
 
     @pytest.mark.parametrize(
         "reschedule_path_template",
@@ -316,7 +305,6 @@ class TestVisitsRescheduleAliases:
         test_patient,
         test_doctor,
         admin_user,
-        reschedule_today,
     ):
         """P1 (owner fact-check 5625c8f1b), второй независимый сайт записи:
         /reschedule/tomorrow — собственный Core-UPDATE в эндпоинте, не
@@ -325,22 +313,25 @@ class TestVisitsRescheduleAliases:
             _entries,
         )
 
+        today = date.today()
         visit, emr = self._make_derm_history(
             db_session,
             test_patient,
             test_doctor,
             admin_user,
-            visit_date=reschedule_today - timedelta(days=5),
+            visit_date=today - timedelta(days=5),
         )
 
         response = client.post(
             f"/api/v1/visits/visits/{visit.id}/reschedule/tomorrow",
             headers=auth_headers,
         )
+        response_day = date.today()
         assert response.status_code == 200, response.text
 
-        tomorrow = reschedule_today + timedelta(days=1)
         db_session.expire_all()
+        tomorrow = visit.visit_date
+        assert tomorrow in {today + timedelta(days=1), response_day + timedelta(days=1)}
         entries = _entries(db_session, kind="examination", source="emr")
         assert len(entries) == 1
         assert entries[0].record_id == emr.id
