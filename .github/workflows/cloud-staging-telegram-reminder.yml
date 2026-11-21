@@ -1,0 +1,30 @@
+name: Staging Telegram private reminder (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-telegram-private-reminder
+  cancel-in-progress: false
+
+jobs:
+  one-reminder:
+    if: github.ref == 'refs/heads/main' && github.run_attempt == '1'
+    environment: staging-integrations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify recipient guard without network
+        run: python3 -m unittest -v scripts.tests.test_staging_telegram_reminder
+      - name: Run a single synthetic reminder
+        env:
+          STAGING_TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
+          STAGING_TELEGRAM_CHALLENGE: ${{ secrets.STAGING_TELEGRAM_CHALLENGE }}
+        run: bash scripts/cloud_staging_baseline.sh --telegram-reminder

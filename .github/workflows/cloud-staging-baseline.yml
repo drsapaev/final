@@ -1,0 +1,25 @@
+name: Isolated cloud staging baseline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check strict smoke verdict contract
+        run: python3 -m unittest -v scripts.tests.test_smoke_test_staging
+      - name: Run isolated Compose baseline
+        run: bash scripts/cloud_staging_baseline.sh

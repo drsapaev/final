@@ -9,6 +9,7 @@ ARG VITE_WS_URL=ws://localhost:18080
 ARG VITE_WS_HOST=localhost:18080
 ARG VITE_SENTRY_DSN=
 ARG VITE_SENTRY_ENV=staging
+ARG VITE_APP_VERSION=
 ARG VERCEL_GIT_COMMIT_SHA=
 
 ENV CI=true \
@@ -20,6 +21,7 @@ ENV CI=true \
     VITE_WS_HOST=${VITE_WS_HOST} \
     VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
     VITE_SENTRY_ENV=${VITE_SENTRY_ENV} \
+    VITE_APP_VERSION=${VITE_APP_VERSION} \
     VITE_DISABLE_SPEED_INSIGHTS=1 \
     VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}
 
@@ -35,7 +37,13 @@ COPY index.html /app/index.html
 COPY vite.config.ts /app/vite.config.ts
 COPY sw.template.js /app/sw.template.js
 
-RUN npm run build
+# The release-verification path opts into an exact Git revision. Other
+# staging builds may still omit VITE_APP_VERSION; they cannot prove receipt
+# for a particular revision.
+RUN if [ -n "$VITE_APP_VERSION" ]; then \
+        printf '%s\n' "$VITE_APP_VERSION" | grep -Eq '^[0-9a-f]{40}$' \
+        && test "$VITE_APP_VERSION" = "$VERCEL_GIT_COMMIT_SHA" || exit 1; \
+    fi; npm run build
 
 FROM nginx:1.27-alpine AS artifact-runtime
 
