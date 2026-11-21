@@ -240,7 +240,8 @@
   margin-top: var(--public-site-section-gap);
 }
 
-.public-site__section > h1 {
+.public-site__section > h1,
+.public-site__doctor-summary--profile h1 {
   margin-bottom: 28px;
   font-size: clamp(1.9rem, 4vw, 3rem);
 }
@@ -274,6 +275,28 @@
 
 .public-site__list-item p {
   margin: 6px 0 0;
+}
+
+.public-site__doctor-summary {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.public-site__doctor-summary > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.public-site__doctor-portrait {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: 12px;
+  object-fit: cover;
 }
 
 .public-site a.public-site__list-title {
@@ -513,6 +536,10 @@
     flex-direction: column;
     gap: 14px;
     padding: 16px;
+  }
+
+  .public-site__doctor-summary--profile {
+    flex-direction: column;
   }
 
   .public-site__list-meta {
