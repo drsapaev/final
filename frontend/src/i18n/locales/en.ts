@@ -136,6 +136,8 @@ const en = {
     requestedTime: 'Requested time',
     serviceCode: 'Service code',
     doctorCode: 'Doctor code',
+    serviceName: 'Service',
+    doctorName: 'Doctor',
     chooseAnotherTime: 'Choose another time',
     status: {
       pending: 'Waiting for review',

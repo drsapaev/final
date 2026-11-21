@@ -893,10 +893,9 @@ def _quote_core(
         raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
     # Codex R13 #3095 (P2): canonicalize duplicate service rows for the
     # full-update pricing mode. Pricing in this mode depends ONLY on
-    # (service_id, quantity) — catalog rules (repeat/benefit consultation → 0,
-    # all_free → 0), no custom_price / specialist input — so the same service
-    # listed twice (e.g. quantities 1 and 2) and one merged row (quantity 3)
-    # are the SAME priced command. full_update_online_entry merges duplicate
+    # (service_id, quantity) and catalog pricing. Two rows for the same
+    # service with quantities 1 and 2 price like one row with quantity 3.
+    # full_update_online_entry merges duplicate
     # rows before token revalidation and mutation; if the quote priced the
     # unmerged rows, the confirmed token could never match the merged save —
     # or, before that fix, the registrar confirmed three units while the
@@ -917,6 +916,7 @@ def _quote_core(
                 for sid, qty in _qty_by_service.items()
             ]
     effective_discount_mode = _resolve_effective_discount_mode(quote_req)
+    qr_all_free = quote_req.pricing_mode == "full_update" and effective_discount_mode == "all_free"
     if str(effective_discount_mode).strip().casefold() == "benefit":
         # A patient benefit needs an encounter-scoped administrator decision;
         # do not preview a free consultation as if that decision already exists.
@@ -957,6 +957,8 @@ def _quote_core(
     total_amount = Decimal("0")
     quote_currency: str | None = None
     items: list[CartQuoteItemResponse] = []
+    if qr_all_free and not quote_req.items:
+        raise HTTPException(status_code=409, detail="Визит не содержит услуг")
 
     # Codex R9 #3095 (P2): the save path acquires ALL service row locks in ONE
     # deterministic (sorted id) order BEFORE calculating items. When only the
@@ -979,6 +981,7 @@ def _quote_core(
                 .filter(Service.id.in_(_lock_ids))
                 .order_by(Service.id)
                 .with_for_update()
+                .populate_existing()
                 .all()
             ):
                 service_row_map[int(_svc.id)] = _svc
@@ -1050,7 +1053,7 @@ def _quote_core(
                 detail=f"Услуга с ID {item_req.service_id} не найдена",
             )
 
-        if quote_req.pricing_mode == "cart":
+        if quote_req.pricing_mode == "cart" or qr_all_free:
             currency = service.currency
             if service.price is None:
                 raise HTTPException(status_code=409, detail=f"Для услуги «{service.name}» не указана цена")
@@ -1064,7 +1067,10 @@ def _quote_core(
             quote_currency = currency
             if item_req.quantity > 2147483647:
                 raise HTTPException(status_code=422, detail="Количество услуги превышает допустимое значение")
-            if item_req.custom_price is not None and item_req.custom_price != service.price:
+            if (
+                quote_req.pricing_mode == "cart" and item_req.custom_price is not None
+                and item_req.custom_price != service.price
+            ):
                 raise HTTPException(status_code=409, detail="Изменение цены требует согласования")
         elif service.price is None:
             raise HTTPException(
@@ -1147,14 +1153,9 @@ def _quote_core(
                 _edit_delta_covered.get(_covered_key, 0) + billable_qty
             )
         elif quote_req.pricing_mode == "full_update":
-            # Codex R2 #3095 (P1): зеркало _full_update_create_single_
-            # independent_entry: консультация при repeat/benefit → 0,
-            # all_free → 0, остальное — каталог-цена × количество.
+            # QR All Free retains the ordinary price until an admin approves it.
             base_price = Decimal(str(service.price))
-            if effective_discount_mode == "all_free":
-                unit_final = Decimal("0")
-                discount_percent = 100
-            elif service.is_consultation and effective_discount_mode in ("repeat", "benefit"):
+            if service.is_consultation and effective_discount_mode in ("repeat", "benefit"):
                 unit_final = Decimal("0")
                 discount_percent = 100
             else:
@@ -1199,9 +1200,12 @@ def _quote_core(
                 final_price = decrease_amount.quantize(Decimal("0.01"))
             else:
                 final_price = (unit_final * Decimal(priced_qty)).quantize(Decimal("0.01"))
-            if quote_req.pricing_mode == "full_update":
+            if quote_req.pricing_mode == "full_update" and not qr_all_free:
                 final_price = Decimal(int(unit_final * Decimal(item_req.quantity)))
             total_amount += final_price
+        # The queue projection still has a signed integer amount column.
+        if qr_all_free and total_amount >= Decimal("2147483648"):
+            raise HTTPException(status_code=422, detail="Стоимость оформления превышает допустимое значение")
         if quote_req.pricing_mode == "cart" and total_amount > Decimal("9999999999.99"):
             raise HTTPException(status_code=422, detail="Стоимость оформления превышает допустимое значение")
 
@@ -1270,16 +1274,16 @@ def _assert_quote_token_matches(
     could otherwise flip the invoice to the newly inserted discount while
     the token still validated the old one. With the snapshot the invoice is
     computed from exactly the values the registrar confirmed. Returns None
-    when no token was supplied (legacy no-quote callers keep their own
-    unlocked load).
+    when no token was supplied unless the writer needs locked catalog
+    prices to persist approval evidence for a legacy caller.
     """
-    if not quote_token:
+    qr_all_free = pricing_mode == "full_update" and (all_free or discount_mode == "all_free")
+    if not quote_token and not qr_all_free:
         return None
-    settings_snapshot = (
-        locked_settings
-        if locked_settings is not None
-        else _load_registration_discount_settings(db, lock_rows=True)
-    )
+    settings_snapshot = locked_settings
+    if settings_snapshot is None:
+        # QR All Free always requires an administrator decision and uses the catalog.
+        settings_snapshot = {} if qr_all_free else _load_registration_discount_settings(db, lock_rows=True)
     fresh_quote = _quote_core(
         db,
         CartQuoteRequest(
@@ -1295,7 +1299,7 @@ def _assert_quote_token_matches(
         registration_settings=settings_snapshot,
         expected_entry_updated_at=expected_entry_updated_at,
     )
-    if fresh_quote.quote_token != quote_token:
+    if quote_token and fresh_quote.quote_token != quote_token:
         logger.warning(
             "REGISTRATION: stale quote token — pricing changed since confirmation; "
             "current total: %s",

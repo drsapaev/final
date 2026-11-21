@@ -1155,16 +1155,16 @@ def get_or_create_daily_queue(
     if queue_tag:
         query_filters.append(DailyQueue.queue_tag == queue_tag)
     else:
-        # The active doctor/day index folds NULL and the empty tag into
-        # one identity. An archived equivalent cannot hide its active row.
-        query_filters.append(
-            or_(DailyQueue.queue_tag.is_(None), DailyQueue.queue_tag == "")
+        # The active doctor/day index treats NULL and empty as one tag.
+        # Never send an untagged admission to an archived queue.
+        query_filters.extend(
+            (
+                DailyQueue.active.is_(True),
+                or_(DailyQueue.queue_tag.is_(None), DailyQueue.queue_tag == ""),
+            )
         )
 
-    query = db.query(DailyQueue).filter(and_(*query_filters))
-    if not queue_tag:
-        query = query.order_by(DailyQueue.active.desc(), DailyQueue.id.asc())
-    daily_queue = query.first()
+    daily_queue = db.query(DailyQueue).filter(and_(*query_filters)).first()
 
     if not daily_queue:
         # Если информация о кабинете не передана, получаем из таблицы doctors

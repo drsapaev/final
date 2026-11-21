@@ -37946,6 +37946,12 @@ export type components = {
             service_slug: string;
             /** Doctor Slug */
             doctor_slug: string;
+            /** Service Name Ru */
+            service_name_ru?: string | null;
+            /** Service Name Uz */
+            service_name_uz?: string | null;
+            /** Doctor Display Name */
+            doctor_display_name?: string | null;
             /**
              * Appointment Date
              * Format: date

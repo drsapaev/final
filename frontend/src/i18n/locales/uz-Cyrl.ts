@@ -140,6 +140,8 @@ const uzCyrl = {
     requestedTime: 'Сўралган вақт',
     serviceCode: 'Хизмат коди',
     doctorCode: 'Шифокор коди',
+    serviceName: 'Хизмат',
+    doctorName: 'Шифокор',
     chooseAnotherTime: 'Бошқа вақтни танлаш',
     status: {
       pending: 'Кўриб чиқилмоқда',

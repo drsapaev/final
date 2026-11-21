@@ -379,11 +379,11 @@ def test_quote_full_update_mode_mirrors_the_full_update_route(
     """Codex R2 #3095 (P1): full_update-квота зеркалирует
     _full_update_create_single_independent_entry — консультация при
     repeat/benefit → 0, не-консультация → полная каталог-цена,
-    all_free → 0."""
+    all_free → обычная цена до согласования."""
     consultation = _service(
         db_session, code="FIXD-FU-C", price=100000.00, is_consultation=True
     )
-    lab = _service(db_session, code="FIXD-FU-L", price=60000.00)
+    lab = _service(db_session, code="FIXD-FU-L", price=60000.25)
     _set_settings(db_session, repeat_visit_discount=50)
 
     repeat_quote = client.post(
@@ -421,12 +421,12 @@ def test_quote_full_update_mode_mirrors_the_full_update_route(
             "pricing_mode": "full_update",
         },
     )
-    assert all_free_quote.status_code == 200
-    assert float(all_free_quote.json()["total_amount"]) == 0
-    # Codex R3 #3095 (P2): _full_update_handle_all_free_visit writes
-    # approval_status="pending" for BOTH the unpaid existing visit and a new
-    # visit — the quote must warn about approval, not report approved.
-    assert all_free_quote.json()["approval_status"] == "pending"
+    assert all_free_quote.status_code == 200, all_free_quote.text
+    all_free_body = all_free_quote.json()
+    assert Decimal(str(all_free_body["total_amount"])) == Decimal("120000.50")
+    assert all_free_body["currency"] == "UZS"
+    assert all_free_body["items"][0]["discount_percent"] == 0
+    assert all_free_body["approval_status"] == "pending"
 
 
 # ===================== Codex R3 #3095 =====================

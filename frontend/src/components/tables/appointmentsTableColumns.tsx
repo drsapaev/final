@@ -35,7 +35,7 @@ import { getRegistrarTimestampDisplay } from '../../utils/dateUtils';
 import type { RegistrarTimestampRecord } from '../../utils/dateUtils';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { getServiceDisplayName } from '../../utils/serviceCodeResolver';
-import { PAYMENT_RECONCILIATION_REQUIRED } from '../../utils/registrarAggregation';
+import { isAllFreeApprovalPending, PAYMENT_RECONCILIATION_REQUIRED } from '../../utils/registrarAggregation';
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
 import {
   type AppointmentRow,
@@ -1126,7 +1126,7 @@ export const buildAppointmentsTableColumns = ({
             const discountMode = row.discount_mode;
             const amount = getDisplayAmount(row as unknown as Appointment);
             const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
-            const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';
+            const isPendingAllFree = isAllFreeApprovalPending(discountMode, row.approval_status);
             const isZeroCostDiscount = ['repeat', 'benefit'].includes(String(discountMode)) && amount <= 0 && paymentStatus !== 'paid';
 
             if (isPendingAllFree) {
@@ -1298,36 +1298,31 @@ export const buildAppointmentsTableColumns = ({
     key: 'cost',
     sortable: true,
     title: <div className="eat-th-content eat-cell--end" style={{ minWidth: isDoctorView ? '8%' : '90px' }}>{t('misc.eat_cost')}</div>,
-    render: (_value: unknown, row: AppointmentRow) => (
-      <span
-        className="eat-cell eat-cell--end"
-        style={{
-          minWidth: isDoctorView ? '8%' : '90px',
-          color: (() => {
-            if (row.cost_display === 'free') return 'var(--mac-warning)';
-            const discountMode = row.discount_mode;
-            const amount = getDisplayAmount(row as unknown as Appointment);
-            const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
-            if (isZeroCostRegistration) return 'var(--mac-warning)';
-            return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
-          })(),
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
-        {(() => {
-          if (row.cost_display === 'free') {
-            return t('misc.eat_payment_free');
-          }
-          const discountMode = row.discount_mode;
-          const amount = getDisplayAmount(row as unknown as Appointment);
-          const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
-          if (isZeroCostRegistration) {
-            return t('misc.eat_payment_free');
-          }
-          return amount > 0 ? t('misc.eat_amount_with_currency', { amount: amount.toLocaleString() }) : '—';
-        })()}
-      </span>
-    )
+    render: (_value: unknown, row: AppointmentRow) => {
+      const amount = getDisplayAmount(row as unknown as Appointment);
+      const pendingApproval = isAllFreeApprovalPending(row.discount_mode, row.approval_status);
+      const zeroCostRegistration = amount <= 0 &&
+        ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(row.discount_mode));
+      const showFree = !pendingApproval && (row.cost_display === 'free' || zeroCostRegistration);
+      const color = showFree
+        ? 'var(--mac-warning)'
+        : amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
+      const display = showFree
+        ? t('misc.eat_payment_free')
+        : amount > 0 ? t('misc.eat_amount_with_currency', { amount: amount.toLocaleString() }) : '—';
+      return (
+        <span
+          className="eat-cell eat-cell--end"
+          style={{
+            minWidth: isDoctorView ? '8%' : '90px',
+            color,
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
+          {display}
+        </span>
+      );
+    }
   });
 
   // Действия

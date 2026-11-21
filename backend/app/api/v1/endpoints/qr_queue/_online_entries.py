@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
+from fastapi import Request
+from sqlalchemy.exc import DBAPIError
+
 from app.api.v1.endpoints.qr_queue._analytics import (
     UpdateOnlineEntryRequest,  # noqa: F401
 )
@@ -10,6 +15,30 @@ from app.api.v1.endpoints.qr_queue._helpers import (
     _ensure_doctor_can_mutate_queue_entry,
     _queue_phone_matches,
     router,
+)
+from app.models.online_queue import OnlineQueueEntry
+from app.models.visit import Visit
+from app.services.all_free_request_service import (
+    AllFreeRequestError,
+    AllFreeRequestService,
+)
+from app.services.encounter_creation import (
+    EncounterCreationError,
+    create_standalone_encounter,
+)
+from app.services.encounter_financial_fence import FinancialFenceError
+from app.services.patient_subject_lock import (
+    PatientSubjectLockError,
+    lock_patient_subject,
+    require_patient_subject_visibility,
+)
+from app.services.payment_invariant_service import PaymentInvariantService
+from app.services.payment_refund_guard import require_unbilled_visit_group
+from app.services.profile_contact_security import (
+    ProfileBearerContext,
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+    check_bearer_expiry,
 )
 
 
@@ -136,11 +165,14 @@ def _full_update_find_and_validate_entry(
     db: Session,
     entry_id: int,
     current_user: User,
-):
+    *,
+    for_update: bool = False,
+) -> OnlineQueueEntry:
     """Find queue entry by ID and validate doctor access."""
-    from app.models.online_queue import OnlineQueueEntry
-
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    query = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id)
+    if for_update:
+        query = query.with_for_update(of=OnlineQueueEntry, nowait=True).populate_existing()
+    entry = query.first()
 
     if not entry:
         raise HTTPException(
@@ -155,8 +187,46 @@ def _full_update_find_and_validate_entry(
         current_user=current_user,
     )
 
-    original_entry_discount_mode = entry.discount_mode
-    return entry, original_entry_discount_mode
+    return entry
+
+
+def _lock_all_free_qr_entry(
+    db: Session, entry: OnlineQueueEntry, current_user: User, request: FullUpdateOnlineEntryRequest,
+) -> OnlineQueueEntry:
+    entry_id, patient_id, visit_id = entry.id, entry.patient_id, entry.visit_id
+    expected_link = (patient_id, visit_id, entry.encounter_id, entry.queue_id)
+    try:
+        if patient_id is not None and not lock_patient_subject(db, patient_id):
+            raise HTTPException(status_code=409, detail="Карточка пациента недоступна")
+        if visit_id is not None:
+            visit_owner = db.query(Visit.patient_id).filter(Visit.id == visit_id)
+            if patient_id is None or visit_owner.scalar() != patient_id:
+                raise HTTPException(status_code=409, detail="Queue entry visit does not belong to the queue patient")
+            PaymentInvariantService(db).preflight_payment_groups([visit_id])
+            if visit_owner.scalar() != patient_id:
+                raise HTTPException(status_code=409, detail="Queue entry visit does not belong to the queue patient")
+            require_unbilled_visit_group(db, visit_id)
+
+        # Match the edit command's patient, visit, catalog and ticket order.
+        _full_update_check_quote(db, request)
+        # A competing ticket writer may already hold the queue row.
+        locked = _full_update_find_and_validate_entry(db, entry_id, current_user, for_update=True)
+        if (locked.patient_id, locked.visit_id, locked.encounter_id, locked.queue_id) != expected_link:
+            raise HTTPException(status_code=409, detail="Связь талона изменилась. Обновите список")
+        if locked.status not in {"waiting", "called"}:
+            raise HTTPException(status_code=409, detail="Талон недоступен для согласования")
+        return locked
+    except PatientSubjectLockError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
+    except FinancialFenceError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except DBAPIError as exc:
+        code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        if code in {"40P01", "55P03"}:
+            raise HTTPException(status_code=409, detail="Обращение занято. Повторите запрос") from None
+        if code == "42501":
+            raise HTTPException(status_code=503, detail="Финансовая проверка временно недоступна") from None
+        raise
 
 
 def _full_update_patient_data(entry, patient_data: dict):
@@ -190,6 +260,8 @@ def _full_update_sync_patient_and_entries(
     db: Session,
     entry,
     patient_data: dict,
+    *,
+    sync_services: bool = True,
 ):
     """Section 5.1: Update Patient record + sync other queue_entries in same visit/session.
 
@@ -303,7 +375,7 @@ def _full_update_sync_patient_and_entries(
                     # Синхронизация услуг между записями удалена во избежание дублирования
 
                     # Если у other_entry есть visit_id, синхронизируем услуги из Visit
-                    if other_entry.visit_id:
+                    if sync_services and other_entry.visit_id:
                         from app.models.visit import VisitService
 
                         visit_services = (
@@ -366,98 +438,57 @@ def _full_update_finalize_and_respond(
     total_amount: int,
     services_list: list,
     service_codes_list: list,
-    original_entry_discount_mode: str,
-    current_user,
-    entry_id: int,
     patient_data: dict,
+    approval_service: AllFreeRequestService | None,
+    approval_bearer: ProfileBearerContext | None,
 ):
-    """Section 5: Update patient record, handle all_free approval, build response."""
+    """Save all mutations before releasing the visit and ticket locks."""
+    _full_update_sync_patient_and_entries(
+        db=db, entry=entry, patient_data=patient_data, sync_services=not request.all_free,
+    )
     try:
-        # Section 5.1: Update Patient record + sync other queue_entries
-        _full_update_sync_patient_and_entries(
-            db=db,
-            entry=entry,
-            patient_data=patient_data,
-        )
-
-        # ✅ ИСПРАВЛЕНО: Коммитим все изменения одной транзакцией
-        try:
-            db.commit()
-            db.refresh(entry)
-
-            # ✅ Проверяем, что Visit правильно связан с OnlineQueueEntry (если all_free)
-            if request.all_free and visit:
-                db.refresh(visit)
-                if entry.visit_id != visit.id:
-                    logger.warning(
-                        "[full_update_online_entry] ⚠️ Предупреждение: entry.visit_id (%s) != visit.id (%d), исправляем...",
-                        entry.visit_id,
-                        visit.id,
-                    )
-                    entry.visit_id = visit.id
-                    db.commit()
-                    db.refresh(entry)
-
-            # ✅ Проверяем количество VisitService для отладки (если all_free)
-            if request.all_free and visit:
-                from app.models.visit import VisitService
-
-                visit_services_count = (
-                    db.query(VisitService)
-                    .filter(VisitService.visit_id == visit.id)
-                    .count()
-                )
-                logger.info(
-                    "[full_update_online_entry] ✅ Финальная проверка: Visit %d имеет %d услуг (ожидалось %d)",
-                    visit.id,
-                    visit_services_count,
-                    len(request.services),
-                )
-                if visit_services_count != len(request.services):
-                    logger.warning(
-                        "[full_update_online_entry] ⚠️ Предупреждение: Количество услуг не совпадает! Возможно дубликаты.",
-                    )
-
-            logger.info("[full_update_online_entry] Запись успешно обновлена")
-
-            return {
-                "success": True,
-                "message": "Запись успешно обновлена",
-                "entry": {
-                    "id": entry.id,
-                    "patient_name": entry.patient_name,
-                    "phone": entry.phone,
-                    "birth_year": entry.birth_year,
-                    "address": entry.address,
-                    "services": services_list,
-                    "service_codes": service_codes_list,
-                    "total_amount": total_amount,
-                    "discount_mode": entry.discount_mode,
-                    "visit_type": entry.visit_type,
-                    "all_free": request.all_free,
-                    "visit_id": entry.visit_id if request.all_free else None,
-                },
-            }
-        except Exception as commit_error:
-            db.rollback()
-
-            logger.error(
-                "[full_update_online_entry] Ошибка при коммите: %s",
-                type(commit_error).__name__,
+        db.flush()
+        db.refresh(entry)
+        response_total: Decimal | int = total_amount
+        if request.all_free:
+            if approval_service is None or approval_bearer is None or visit is None:
+                raise RuntimeError("All Free staging prerequisites are missing")
+            db.refresh(visit, attribute_names=["confirmation_context_epoch"])
+            approval = approval_service.stage_request(
+                visit_id=visit.id, expected_epoch=visit.confirmation_context_epoch,
+                bearer=approval_bearer, require_financial_group=True,
             )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка сохранения изменений",
-            )
-
-    except HTTPException:
+            response_total = approval.baseline_total
+        response = {
+            "success": True,
+            "message": "Запись успешно обновлена",
+            "entry": {
+                "id": entry.id,
+                "patient_name": entry.patient_name,
+                "phone": entry.phone,
+                "birth_year": entry.birth_year,
+                "address": entry.address,
+                "services": services_list,
+                "service_codes": service_codes_list,
+                "total_amount": response_total,
+                "discount_mode": entry.discount_mode,
+                "visit_type": entry.visit_type,
+                "all_free": request.all_free,
+                "visit_id": entry.visit_id if request.all_free else None,
+            },
+        }
+        if approval_bearer is not None:
+            check_bearer_expiry(approval_bearer)
+        db.commit()
+        return response
+    except (AllFreeRequestError, FinancialFenceError, ProfileBearerInvalid, DBAPIError):
         raise
-    except Exception as e:
-        logger.error("[full_update_online_entry] Ошибка: %s", type(e).__name__)
+    except Exception as exc:
+        logger.error("[full_update_online_entry] Ошибка сохранения: %s", type(exc).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
+            detail="Ошибка сохранения изменений",
+        ) from None
 
 
 def _full_update_resolve_visit_metadata(
@@ -465,9 +496,8 @@ def _full_update_resolve_visit_metadata(
     entry,
     request,
 ):
-    """Section 4.6.1: Resolve visit_date, doctor_id, department, and original_total_amount."""
+    """Resolve the date, doctor and department of the selected QR queue."""
     from datetime import date
-    from decimal import Decimal
 
     from app.models.online_queue import DailyQueue
     from app.models.service import Service
@@ -522,18 +552,7 @@ def _full_update_resolve_visit_metadata(
     if not department:
         department = "general"
 
-    # Вычисляем оригинальную сумму (без скидки all_free)
-    original_total_amount = Decimal("0")
-    for service_item in request.services:
-        service = (
-            db.query(Service).filter(Service.id == service_item["service_id"]).first()
-        )
-        if service:
-            original_total_amount += (service.price or Decimal("0")) * service_item.get(
-                "quantity", 1
-            )
-
-    return (visit_date, doctor_id, department, original_total_amount)
+    return visit_date, doctor_id, department
 
 
 def _full_update_ensure_patient_for_visit(
@@ -588,307 +607,86 @@ def _full_update_ensure_patient_for_visit(
     return patient_id_for_visit
 
 
-def _full_update_find_existing_visit(
-    db: Session,
-    entry,
-    patient_id_for_visit: int,
-    visit_date,
-):
-    """Section 4.6.3: 3-priority lookup for existing Visit.
-
-    Priority 1: entry.visit_id. Priority 2: patient_id + visit_date.
-    Priority 3: patient_id + visit_date + all_free. Returns Visit or None."""
-    from app.models.visit import Visit
-
-    # ✅ ИСПРАВЛЕНО: Улучшенный поиск существующего Visit для предотвращения дублирования
-    visit = None
-
-    # Приоритет 1: Ищем по entry.visit_id (если уже связан)
-    if entry.visit_id:
-        visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
-        if visit:
-            if visit.patient_id != patient_id_for_visit:
-                logger.warning(
-                    "[full_update_online_entry] entry visit owner mismatch entry_id=%d visit_id=%d",
-                    entry.id,
-                    visit.id,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Queue entry visit does not belong to the queue patient",
-                )
-            logger.info(
-                "[full_update_online_entry] Найден Visit по entry.visit_id: %d",
-                visit.id,
-            )
-
-    # Приоритет 2: Если не найден, ищем по patient_id + visit_date (без фильтра по discount_mode)
-    # Это важно, так как при первом редактировании может быть создан Visit с другим discount_mode
-    if not visit and patient_id_for_visit:
-        visit = (
-            db.query(Visit)
-            .filter(
-                Visit.id == entry.visit_id,
-                Visit.patient_id == patient_id_for_visit,
-                Visit.visit_date == visit_date,
-            )
-            .order_by(Visit.created_at.desc())
-            .first()
-        )  # Берем самый последний
-        if visit:
-            logger.info(
-                "[full_update_online_entry] Найден Visit по patient_id + visit_date: %d, discount_mode=%s",
-                visit.id,
-                visit.discount_mode,
-            )
-
-    # Приоритет 3: Если все еще не найден, ищем по patient_id + visit_date + discount_mode="all_free"
-    if not visit and patient_id_for_visit:
-        visit = (
-            db.query(Visit)
-            .filter(
-                Visit.id == entry.visit_id,
-                Visit.patient_id == patient_id_for_visit,
-                Visit.visit_date == visit_date,
-                Visit.discount_mode == "all_free",
-            )
-            .first()
-        )
-        if visit:
-            logger.info(
-                "[full_update_online_entry] Найден Visit по patient_id + visit_date + all_free: %d",
-                visit.id,
-            )
-
-    return visit
-
-
 def _full_update_add_services_to_visit(
     db: Session,
-    visit,
-    request,
-    has_paid_invoice: bool,
-):
-    """Section 4.6.4: Add VisitService records to the Visit.
-
-    For each service in request.services, create or update VisitService.
-    All services get price=0 (all_free). Returns list of added/updated service names."""
-    from decimal import Decimal
-
+    visit: Visit,
+    request: FullUpdateOnlineEntryRequest,
+) -> None:
+    """Persist the already validated, locked catalog prices for the request."""
     from app.models.service import Service
     from app.models.visit import VisitService
     from app.services.appointment_duration_snapshot import (
         duration_snapshot_for_service_id,
     )
 
-    # ✅ ИСПРАВЛЕНО: Добавляем услуги к Visit (после удаления старых ИЛИ к существующим)
-    added_services = []
     for service_item in request.services:
-        service = (
-            db.query(Service).filter(Service.id == service_item["service_id"]).first()
-        )
-        if service:
-            # ✅ Проверяем, нет ли уже такой услуги
-            existing_service = (
-                db.query(VisitService)
-                .filter(
-                    VisitService.visit_id == visit.id,
-                    VisitService.service_id == service.id,
-                )
-                .first()
-            )
-
-            if not existing_service:
-                # ⭐ ИСПРАВЛЕНИЕ #2: Добавляем новую услугу (работает и для оплаченных, и для неоплаченных)
-                # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                service_code = service.service_code or get_service_code(service.id, db)
-                visit_service = VisitService(
-                    visit_id=visit.id,
-                    service_id=service.id,
-                    duration_minutes_snapshot=duration_snapshot_for_service_id(
-                        db, service.id, doctor_id=visit.doctor_id
-                    ),
-                    code=service_code,
-                    name=service.name,
-                    qty=service_item.get("quantity", 1),
-                    price=Decimal("0"),  # All Free - всё бесплатно
-                    currency="UZS",
-                )
-                db.add(visit_service)
-                added_services.append(service.name)
-                if has_paid_invoice:
-                    logger.info(
-                        "[full_update_online_entry] ✅ Добавлена НОВАЯ услуга к оплаченному визиту: %s",
-                        service.name,
-                    )
-            else:
-                # Обновляем количество если услуга уже есть
-                existing_service.qty = service_item.get("quantity", 1)
-                added_services.append(f"{service.name} (обновлено)")
-
-    db.flush()  # Коммитим добавление услуг
-    logger.info(
-        "[full_update_online_entry] Visit ID=%d обновлен с услугами для all_free: %s",
-        visit.id,
-        added_services,
-    )
-
-    return added_services
+        service = db.get(Service, service_item["service_id"])
+        db.add(VisitService(
+            visit_id=visit.id,
+            service_id=service.id,
+            duration_minutes_snapshot=duration_snapshot_for_service_id(
+                db, service.id, doctor_id=visit.doctor_id,
+            ),
+            code=service.service_code or get_service_code(service.id, db),
+            name=service.name,
+            qty=service_item["quantity"],
+            price=service.price,
+            currency=service.currency,
+        ))
+    db.flush()
 
 
 def _full_update_handle_all_free_visit(
     db: Session,
-    entry,
-    request,
-    original_entry_discount_mode: str,
-    patient_data,
-    services_list,
-    service_codes_list,
-    total_amount,
-):
-    """Section 4.6: If request.all_free, create or update Visit + VisitService records.
+    entry: OnlineQueueEntry,
+    request: FullUpdateOnlineEntryRequest,
+    patient_data: dict,
+) -> Visit:
+    """Prepare one unconfirmed Visit for the exact locked QR ticket."""
+    from app.models.emr_v2 import EMRRecord
+    from app.models.visit import VisitService
 
-    Returns the Visit (or None if all_free is False).
-    """
+    visit_date, doctor_id, department = _full_update_resolve_visit_metadata(db, entry, request)
+    visit = db.get(Visit, entry.visit_id) if entry.visit_id is not None else None
+    if visit is not None:
+        if (
+            visit.status not in {"open", "pending_confirmation"}
+            or visit.confirmed_at is not None
+            or visit.confirmed_by is not None
+            or visit.confirmation_token is not None
+            or db.query(EMRRecord.id).filter(EMRRecord.visit_id == visit.id).first() is not None
+        ):
+            raise HTTPException(status_code=409, detail="Визит недоступен для новой заявки")
+        if visit.discount_mode == "all_free" and visit.approval_status in {"approved", "rejected"}:
+            raise HTTPException(status_code=409, detail="Для визита уже принято решение")
+        if visit.doctor_id is not None and visit.doctor_id != doctor_id:
+            raise HTTPException(status_code=409, detail="Врач визита не совпадает с выбранной очередью")
 
-    from app.models.visit import Visit, VisitService
+    encounter_id = visit.encounter_id if visit is not None else None
+    if entry.encounter_id is not None and entry.encounter_id != encounter_id:
+        raise HTTPException(status_code=409, detail="Требуется сверка обращения")
+    patient_id = _full_update_ensure_patient_for_visit(db, entry, patient_data)
+    if encounter_id is None:
+        encounter_id = create_standalone_encounter(db, patient_id=patient_id).id
 
-    visit = None
-    if not request.all_free:
-        return visit
-
-    logger.info(
-        "[full_update_online_entry] all_free=True, создаем/обновляем Visit для одобрения",
-    )
-
-    # Section 4.6.1: Resolve visit metadata
-    visit_date, doctor_id, department, original_total_amount = (
-        _full_update_resolve_visit_metadata(db=db, entry=entry, request=request)
-    )
-
-    # Section 4.6.2: Ensure patient exists for Visit
-    patient_id_for_visit = _full_update_ensure_patient_for_visit(
-        db=db,
-        entry=entry,
-        patient_data=patient_data,
-    )
-
-    # Section 4.6.3: Find existing Visit (3-priority lookup)
-    visit = _full_update_find_existing_visit(
-        db=db,
-        entry=entry,
-        patient_id_for_visit=patient_id_for_visit,
-        visit_date=visit_date,
-    )
-
-    has_paid_invoice = False
-    if visit:
-        # ✅ ИСПРАВЛЕНО: Обновляем существующий Visit (не создаем новый)
-        logger.info(
-            "[full_update_online_entry] Обновление существующего Visit ID=%d",
-            visit.id,
-        )
-        # ⭐ ИСПРАВЛЕНИЕ #2: Проверяем есть ли оплаченный инвойс перед удалением услуг
-        from app.models.payment_invoice import (
-            PaymentInvoice,
-            PaymentInvoiceVisit,
-        )
-
-        has_paid_invoice = (
-            db.query(PaymentInvoiceVisit)
-            .join(PaymentInvoice)
-            .filter(
-                PaymentInvoiceVisit.visit_id == visit.id,
-                PaymentInvoice.status == "paid",
-            )
-            .first()
-        )
-
-        if has_paid_invoice:
-            # ⚠️ Визит УЖЕ оплачен - НЕ меняем платежный режим/статус и НЕ удаляем существующие услуги.
-            # Только добавляем новые услуги к уже существующим.
-            entry.discount_mode = original_entry_discount_mode
-            logger.warning(
-                "[full_update_online_entry] ⚠️ Visit %d имеет оплаченный инвойс - НЕ меняем payment state и НЕ удаляем услуги, только добавляем новые",
-                visit.id,
-            )
-            deleted_count = 0
-        else:
-            visit.approval_status = (
-                "pending"  # Сбрасываем статус на pending при обновлении
-            )
-            visit.discount_mode = "all_free"  # Убеждаемся, что режим правильный
-            visit.department = department  # Обновляем department
-            visit.doctor_id = doctor_id  # Обновляем doctor_id
-
-            # ✅ Визит не оплачен - безопасно удалять и пересоздавать услуги
-            deleted_count = (
-                db.query(VisitService)
-                .filter(VisitService.visit_id == visit.id)
-                .delete()
-            )
-            db.flush()  # Коммитим удаление перед добавлением новых
-            logger.info(
-                "[full_update_online_entry] Удалено старых услуг: %d",
-                deleted_count,
-            )
-
-        # ✅ Связываем OnlineQueueEntry с Visit (если еще не связан)
-        if not entry.visit_id or entry.visit_id != visit.id:
-            entry.visit_id = visit.id
-            logger.info(
-                "[full_update_online_entry] Связан OnlineQueueEntry %d с Visit %d",
-                entry.id,
-                visit.id,
-            )
-
-        # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
-        if not has_paid_invoice and entry.discount_mode != "all_free":
-            entry.discount_mode = "all_free"
-            logger.info(
-                "[full_update_online_entry] Синхронизирован discount_mode в OnlineQueueEntry %d с Visit %d",
-                entry.id,
-                visit.id,
-            )
-    else:
-        # ✅ Создаем новый Visit только если действительно не найден существующий
-        logger.info(
-            "[full_update_online_entry] Создание нового Visit для all_free (существующий не найден)",
-        )
+    if visit is None:
         visit = Visit(
-            patient_id=patient_id_for_visit,
-            doctor_id=doctor_id,
-            visit_date=visit_date,
-            visit_time=None,  # Время не сохраняется в OnlineQueueEntry
-            department=department,
-            discount_mode="all_free",
-            approval_status="pending",
+            patient_id=patient_id, visit_date=visit_date, source="online",
             notes=f"All Free заявка из онлайн записи #{entry.id}",
-            source="online",  # ✅ SSOT: QR-запись
         )
         db.add(visit)
-        db.flush()  # Получаем ID визита
-
-        # Связываем OnlineQueueEntry с Visit
-        entry.visit_id = visit.id
-
-        # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
-        entry.discount_mode = "all_free"
-
-        logger.info(
-            "[full_update_online_entry] Visit создан с ID=%d, department=%s, discount_mode синхронизирован",
-            visit.id,
-            department,
-        )
-
-    # Section 4.6.4: Add services to Visit
-    _full_update_add_services_to_visit(
-        db=db,
-        visit=visit,
-        request=request,
-        has_paid_invoice=has_paid_invoice,
-    )
-
+    else:
+        db.query(VisitService).filter(VisitService.visit_id == visit.id).delete()
+    visit.status = "pending_confirmation"
+    visit.approval_status = "pending"
+    visit.discount_mode = "all_free"
+    visit.encounter_id = encounter_id
+    visit.department = visit.department or department
+    visit.doctor_id = doctor_id
+    db.flush()
+    entry.visit_id = visit.id
+    entry.encounter_id = visit.encounter_id
+    _full_update_add_services_to_visit(db=db, visit=visit, request=request)
     return visit
 
 
@@ -1412,9 +1210,7 @@ def _full_update_create_single_independent_entry(
     quantity = service_item_data.get("quantity", 1) if service_item_data else 1
     item_price = service.price * quantity
 
-    if service.is_consultation and request.discount_mode in ["repeat", "benefit"]:
-        item_price = 0
-    if request.all_free:
+    if not request.all_free and service.is_consultation and request.discount_mode in ["repeat", "benefit"]:
         item_price = 0
 
     session_id = get_or_create_session_id(
@@ -1434,8 +1230,9 @@ def _full_update_create_single_independent_entry(
         address=entry.address,
         status="waiting",
         source=entry.source or "online",
-        discount_mode=request.discount_mode or entry.discount_mode,
-        visit_id=None,
+        discount_mode=entry.discount_mode if request.all_free else request.discount_mode or entry.discount_mode,
+        visit_id=entry.visit_id if request.all_free else None,
+        encounter_id=entry.encounter_id if request.all_free else None,
         session_id=session_id,
         services=json.dumps(
             [
@@ -1500,6 +1297,8 @@ def _full_update_create_independent_entries(
     if is_initial_registration:
         # Первичная регистрация - обновляем текущую entry со всеми услугами
         queue_time = entry.queue_time or datetime.now(UTC)
+        if request.all_free:
+            new_service_ids = []
         logger.info(
             "[full_update_online_entry] Первичная регистрация, queue_time: %s",
             queue_time,
@@ -1522,7 +1321,7 @@ def _full_update_create_independent_entries(
         additional_service_ids = []
         services_for_visit = []
         currencies = {}
-        should_create_visit = entry.patient_id is not None and entry.visit_id is None
+        should_create_visit = not request.all_free and entry.patient_id is not None and entry.visit_id is None
 
         for service_item in request.services:
             svc_id = service_item["service_id"]
@@ -1747,7 +1546,7 @@ def _full_update_update_current_entry_services(
             )
 
             # Применяем скидки
-            if service.is_consultation and request.discount_mode in [
+            if not request.all_free and service.is_consultation and request.discount_mode in [
                 "repeat",
                 "benefit",
             ]:
@@ -1756,10 +1555,6 @@ def _full_update_update_current_entry_services(
                     request.discount_mode,
                 )
                 item_price = 0  # Консультация бесплатна для повторных и льготных
-
-            if request.all_free:
-                logger.info("[full_update_online_entry] Применена скидка all_free")
-                item_price = 0  # Всё бесплатно
 
             # Codex R3/R4 #3095 (P2): per-line int() — the SAME conversion the
             # independent-entry path uses for new services and the
@@ -1868,21 +1663,28 @@ def _full_update_process_services(
     db: Session,
     entry,
     request,
-    original_entry_discount_mode: str,
-    current_user,
-    entry_id: int,
 ):
     """Section 4: Collect existing services, create new entries, calculate totals."""
     import json
 
-    patient_data = request.patient_data
     # ✅ НОВЫЙ ФОРМАТ: Полные объекты услуг с метаданными
 
     # ⭐ FIX: Определяем существующие услуги из ВСЕХ записей пациента за день (не только текущей entry)
 
-    existing_service_ids, existing_service_queue_times, final_aggregated_ids = (
-        _full_update_collect_existing_services(db=db, entry=entry, request=request)
-    )
+    visit = None
+    if request.all_free:
+        recorded = _full_update_parse_entry_services(entry.services)
+        existing_service_ids = {row["service_id"] for row in recorded if row.get("service_id")}
+        entry_time = entry.queue_time.isoformat() if entry.queue_time is not None else None
+        existing_service_queue_times = {
+            row["service_id"]: row.get("queue_time") or entry_time
+            for row in recorded if row.get("service_id")
+        }
+        visit = _full_update_handle_all_free_visit(db, entry, request, request.patient_data)
+    else:
+        existing_service_ids, existing_service_queue_times, _ = (
+            _full_update_collect_existing_services(db=db, entry=entry, request=request)
+        )
 
     # Определяем новые услуги (которые не были в entry.services)
     new_service_ids = []
@@ -1970,18 +1772,6 @@ def _full_update_process_services(
             is_first_fill_qr=is_first_fill_qr,
             queue_time=queue_time,
         )
-    )
-
-    # Section 4.6: If all_free, create or update Visit + VisitService records
-    visit = _full_update_handle_all_free_visit(
-        db=db,
-        entry=entry,
-        request=request,
-        original_entry_discount_mode=original_entry_discount_mode,
-        patient_data=patient_data,
-        services_list=services_list,
-        service_codes_list=service_codes_list,
-        total_amount=total_amount,
     )
 
     return services_list, service_codes_list, total_amount, visit
@@ -2086,14 +1876,36 @@ def _full_update_assert_doctor_services(
         )
 
 
+_require_full_update_role = require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist")
+
+
+def _full_update_check_quote(db: Session, request: FullUpdateOnlineEntryRequest) -> None:
+    if not request.quote_token and not request.all_free:
+        return
+
+    from app.api.v1.endpoints.registrar_wizard._cart import _assert_quote_token_matches
+    from app.api.v1.endpoints.registrar_wizard._helpers import CartQuoteItemRequest
+
+    _assert_quote_token_matches(
+        db,
+        items=[
+            CartQuoteItemRequest(service_id=int(service["service_id"]), quantity=service["quantity"])
+            for service in request.services
+        ],
+        discount_mode=request.discount_mode,
+        all_free=request.all_free,
+        pricing_mode="full_update",
+        quote_token=request.quote_token,
+    )
+
+
 @router.put("/online-entry/{entry_id}/full-update", response_model=dict[str, Any])
 def full_update_online_entry(
     entry_id: int,
     request: FullUpdateOnlineEntryRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist")
-    ),
+    current_user: User = Depends(_require_full_update_role),
+    http_request: Request = None,
 ):
     """
     Полное обновление онлайн записи через мастер регистрации:
@@ -2124,10 +1936,19 @@ def full_update_online_entry(
             len(request.services or []),
         )
 
+        approval_service = None
+        approval_bearer = None
+        if request.all_free:
+            if http_request is None:
+                raise ProfileBearerInvalid("Bearer session unavailable")
+            require_patient_subject_visibility(db)
+            approval_bearer = capture_profile_bearer(http_request, current_user)
+            approval_service = AllFreeRequestService(db)
+            current_user, _ = approval_service.lock_staging_inputs(approval_bearer)
+            _require_full_update_role(current_user=current_user, db=db)
+
         # 1-3. Find entry, update patient data, update visit type
-        entry, original_entry_discount_mode = _full_update_find_and_validate_entry(
-            db, entry_id, current_user
-        )
+        entry = _full_update_find_and_validate_entry(db, entry_id, current_user)
 
         # Codex R9 #3095 (P2): normalize the COMMAND itself before token
         # revalidation. The documented full-update API accepts a loose
@@ -2180,7 +2001,11 @@ def full_update_online_entry(
             try:
                 _sid_key = int(_svc_item["service_id"])
             except (TypeError, ValueError):
+                if request.all_free:
+                    raise HTTPException(status_code=400, detail="Некорректный идентификатор услуги") from None
                 _sid_key = _svc_item["service_id"]
+            else:
+                _svc_item["service_id"] = _sid_key
             if _sid_key not in _merged_rows:
                 _merged_rows[_sid_key] = dict(_svc_item)
                 _merged_order.append(_sid_key)
@@ -2204,34 +2029,12 @@ def full_update_online_entry(
             )
         request.services = [_merged_rows[_k] for _k in _merged_order]
 
+        if request.all_free:
+            entry = _lock_all_free_qr_entry(db, entry, current_user, request)
+
         _full_update_assert_doctor_services(db, entry, request)
-
-        # Codex R4 #3095 (P1): bind the confirmed quote to the command —
-        # revalidate prices BEFORE any mutation. Item-level conversion mirrors
-        # the per-line int() the command stores (see total_amount accumulation).
-        if request.quote_token:
-            from app.api.v1.endpoints.registrar_wizard._cart import (
-                _assert_quote_token_matches,
-            )
-            from app.api.v1.endpoints.registrar_wizard._helpers import (
-                CartQuoteItemRequest,
-            )
-
-            _assert_quote_token_matches(
-                db,
-                items=[
-                    CartQuoteItemRequest(
-                        service_id=int(s["service_id"]),
-                        quantity=int(s.get("quantity", 1) or 1),
-                    )
-                    for s in request.services
-                    if s.get("service_id") is not None
-                ],
-                discount_mode=request.discount_mode,
-                all_free=request.all_free,
-                pricing_mode="full_update",
-                quote_token=request.quote_token,
-            )
+        if not request.all_free:
+            _full_update_check_quote(db, request)
 
         _full_update_patient_data(entry, request.patient_data)
         _full_update_visit_type(entry, request)
@@ -2242,9 +2045,6 @@ def full_update_online_entry(
                 db=db,
                 entry=entry,
                 request=request,
-                original_entry_discount_mode=original_entry_discount_mode,
-                current_user=current_user,
-                entry_id=entry_id,
             )
         )
 
@@ -2253,19 +2053,36 @@ def full_update_online_entry(
             db=db,
             entry=entry,
             request=request,
-            visit=locals().get("visit"),
+            visit=visit,
             total_amount=total_amount,
             services_list=services_list,
             service_codes_list=service_codes_list,
-            original_entry_discount_mode=original_entry_discount_mode,
-            current_user=current_user,
-            entry_id=entry_id,
             patient_data=request.patient_data,
+            approval_service=approval_service,
+            approval_bearer=approval_bearer,
         )
 
     except HTTPException:
         db.rollback()
         raise
+    except (AllFreeRequestError, PatientSubjectLockError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
+    except (EncounterCreationError, FinancialFenceError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сессия недействительна") from None
+    except DBAPIError as exc:
+        db.rollback()
+        code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        if code in {"40P01", "55P03"}:
+            raise HTTPException(status_code=409, detail="Обращение занято. Повторите запрос") from None
+        if code == "42501":
+            raise HTTPException(status_code=503, detail="Финансовая проверка временно недоступна") from None
+        logger.error("[full_update_online_entry] Ошибка СУБД: %s", type(exc.orig).__name__)
+        raise HTTPException(status_code=500, detail="Ошибка сохранения изменений") from None
     except Exception as e:
         db.rollback()
         logger.error("[full_update_online_entry] Ошибка: %s", type(e).__name__)

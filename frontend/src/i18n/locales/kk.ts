@@ -136,6 +136,8 @@ const kk = {
     requestedTime: 'Сұралған уақыт',
     serviceCode: 'Қызмет коды',
     doctorCode: 'Дәрігер коды',
+    serviceName: 'Қызмет',
+    doctorName: 'Дәрігер',
     chooseAnotherTime: 'Басқа уақытты таңдау',
     status: {
       pending: 'Қаралуда',

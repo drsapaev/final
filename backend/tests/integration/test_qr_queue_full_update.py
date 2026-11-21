@@ -6,15 +6,33 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 
 from app.core.security import get_password_hash
 from app.crud.clinic import clinic_today
+from app.models.all_free_request import AllFreeRequest
+from app.models.audit import AuditLog
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
+from app.models.payment import Payment, PaymentVisit
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.provider_attempt import (
+    ProviderActiveVisitReservation,
+    ProviderAttempt,
+    ProviderAttemptVisit,
+)
+from app.models.refund_deposit import DepositTransaction, PatientDeposit
+from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
+from app.services.all_free_request_service import AllFreeRequestService
+from app.services.payment_invariant_service import PaymentInvariantService
+from app.services.visit_lifecycle_service import VisitLifecycleService
+from tests.integration.test_all_free_registrar_workflow import (
+    migrated_visit_confirmation_context,  # noqa: F401
+)
 
 
 @pytest.fixture(autouse=True)
@@ -214,6 +232,7 @@ def test_doctor_cannot_update_other_doctor_online_entry(
 
 
 @pytest.mark.integration
+@pytest.mark.usefixtures("migrated_visit_confirmation_context")
 def test_full_update_all_free_without_visit_id_does_not_reuse_unrelated_visit(
     client,
     db_session,
@@ -809,96 +828,252 @@ def test_first_qr_fill_records_the_catalog_currency(
 
 
 @pytest.mark.integration
-def test_full_update_all_free_preserves_paid_visit_payment_state(
+@pytest.mark.usefixtures("migrated_visit_confirmation_context")
+@pytest.mark.parametrize(
+    "evidence",
+    (
+        "direct-paid", "direct-processing", "grouped-paid", "invoice-paid",
+        "invoice-pending", "invoice-processing", "provider-reservation", "legacy-debit", "confirmed",
+        "served", "none", "write-failure",
+    ),
+)
+def test_qr_all_free_protects_financial_history_before_editing(
     client,
     db_session,
     registrar_auth_headers,
+    admin_user,
     test_daily_queue,
     test_patient,
     test_doctor,
     test_service,
+    evidence,
+    monkeypatch,
 ):
-    paid_visit = Visit(
+    price = Decimal("100000.25")
+    test_service.price = price
+    visit = Visit(
         patient_id=test_patient.id,
         doctor_id=test_doctor.id,
-        visit_date=date.today(),
+        visit_date=test_daily_queue.day,
         visit_time="10:30",
-        status="open",
+        status="confirmed" if evidence == "confirmed" else "open",
+        confirmed_at=datetime.now(UTC) if evidence == "confirmed" else None,
         discount_mode="none",
         approval_status="approved",
         department="cardiology",
+        confirmation_context_epoch=1,
     )
-    db_session.add(paid_visit)
+    db_session.add(visit)
     db_session.flush()
-    db_session.add(
-        VisitService(
-            visit_id=paid_visit.id,
-            service_id=test_service.id,
-            code=test_service.code,
-            name=test_service.name,
-            qty=1,
-            price=test_service.price,
-            currency="UZS",
-        )
-    )
-    paid_invoice = PaymentInvoice(
-        patient_id=test_patient.id,
-        total_amount=Decimal("100000.00"),
+    original_line = VisitService(
+        visit_id=visit.id,
+        service_id=test_service.id,
+        code=test_service.code,
+        name="SYNTHETIC-Original QR service",
+        qty=1,
+        price=price,
         currency="UZS",
-        status="paid",
-        payment_method="cash",
     )
-    db_session.add(paid_invoice)
-    db_session.flush()
-    db_session.add(
-        PaymentInvoiceVisit(
-            invoice_id=paid_invoice.id,
-            visit_id=paid_visit.id,
-            visit_amount=Decimal("100000.00"),
+    db_session.add(original_line)
+
+    if evidence.startswith("invoice-"):
+        invoice = PaymentInvoice(
+            patient_id=test_patient.id, total_amount=price, currency="UZS",
+            status=evidence.removeprefix("invoice-"), payment_method="cash",
         )
-    )
+        db_session.add(invoice)
+        db_session.flush()
+        db_session.add(PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=visit.id, visit_amount=price))
+    elif evidence == "legacy-debit":
+        deposit = PatientDeposit(patient_id=test_patient.id, balance=Decimal("0"), currency="UZS")
+        db_session.add(deposit)
+        db_session.flush()
+        db_session.add(DepositTransaction(
+            deposit_id=deposit.id, visit_id=visit.id, transaction_type="debit", amount=price,
+            balance_after=Decimal("0"), description="SYNTHETIC-Historical visit debit",
+        ))
+    elif evidence == "provider-reservation":
+        attempt = ProviderAttempt(
+            public_id=str(uuid4()), target_kind="payment", payment_id_snapshot=1,
+            actor_user_id_snapshot=1, provider="click", merchant_hash="a" * 64,
+            order_ref="SYNTHETIC-QR-Reservation", fingerprint="b" * 64,
+            amount_minor="10000000", currency="UZS", currency_exponent=2, status="prepared",
+        )
+        db_session.add(attempt)
+        db_session.flush()
+        reservation_visit = ProviderAttemptVisit(
+            attempt_id=attempt.id, visit_id=visit.id, visit_id_snapshot=visit.id,
+            patient_id_snapshot=test_patient.id, context_epoch=1, amount_minor="10000000",
+        )
+        db_session.add(reservation_visit)
+        db_session.flush()
+        db_session.add(ProviderActiveVisitReservation(
+            visit_id=visit.id, attempt_id=attempt.id, attempt_visit_id=reservation_visit.id,
+        ))
+    elif evidence not in {"confirmed", "served", "none", "write-failure"}:
+        primary_visit = visit
+        if evidence == "grouped-paid":
+            primary_visit = Visit(
+                patient_id=test_patient.id, doctor_id=test_doctor.id, visit_date=visit.visit_date,
+                status="open", confirmation_context_epoch=1,
+            )
+            db_session.add(primary_visit)
+            db_session.flush()
+        payment = Payment(
+            visit_id=primary_visit.id, amount=price, currency="UZS", method="cash",
+            status=evidence.rsplit("-", 1)[1], receipt_no="SYNTHETIC-QR-Receipt",
+        )
+        db_session.add(payment)
+        db_session.flush()
+        if evidence == "grouped-paid":
+            db_session.add(PaymentVisit(payment_id=payment.id, visit_id=visit.id, amount=price))
+
     entry = OnlineQueueEntry(
         queue_id=test_daily_queue.id,
         number=31,
         patient_id=test_patient.id,
         patient_name=test_patient.short_name(),
-        phone=test_patient.phone,
-        visit_id=paid_visit.id,
+        visit_id=visit.id,
+        queue_time=datetime.now(UTC),
         source="online",
-        status="waiting",
+        status="served" if evidence == "served" else "waiting",
         discount_mode="none",
+        total_amount=int(price),
+        services=[{"service_id": test_service.id, "price": int(price), "quantity": 1}],
     )
     db_session.add(entry)
     db_session.commit()
-    db_session.refresh(entry)
-    db_session.refresh(paid_visit)
+    line_id = original_line.id
+    entry_snapshot = (
+        entry.patient_name, entry.visit_id, entry.encounter_id, entry.discount_mode, entry.total_amount, entry.services,
+    )
+
+    if evidence == "write-failure":
+        stage_request = AllFreeRequestService.stage_request
+
+        def fail_after_flush(self, **kwargs):
+            stage_request(self, **kwargs)
+            raise RuntimeError("SYNTHETIC-QR approval save failure")
+
+        monkeypatch.setattr(AllFreeRequestService, "stage_request", fail_after_flush)
 
     response = client.put(
         f"/api/v1/queue/online-entry/{entry.id}/full-update",
         headers=registrar_auth_headers,
         json={
-            "patient_data": {
-                "patient_name": test_patient.short_name(),
-                "phone": test_patient.phone,
-                "birth_year": 1990,
-                "address": test_patient.address,
-            },
+            "patient_data": {"patient_name": "SYNTHETIC-Changed QR name"},
             "visit_type": "paid",
             "discount_mode": "none",
-            "services": [{"service_id": test_service.id, "quantity": 1}],
+            "services": [{"service_id": test_service.id, "quantity": 2}],
             "all_free": True,
         },
     )
 
-    assert response.status_code == 200, response.text
-
     db_session.refresh(entry)
-    db_session.refresh(paid_visit)
-    assert paid_visit.discount_mode == "none"
-    assert paid_visit.approval_status == "approved"
-    assert paid_visit.department == "cardiology"
-    assert paid_visit.doctor_id == test_doctor.id
-    assert entry.discount_mode == "none"
+    db_session.refresh(visit)
+    if evidence == "none":
+        assert response.status_code == 200, response.text
+        assert Decimal(str(response.json()["entry"]["total_amount"])) == 2 * price
+        assert entry.visit_id == visit.id and entry.encounter_id == visit.encounter_id
+        assert (visit.status, visit.approval_status, visit.confirmation_token) == ("pending_confirmation", "pending", None)
+        assert db_session.query(AllFreeRequest).filter_by(visit_id=visit.id).one().baseline_total == 2 * price
+        with pytest.raises(HTTPException) as payment:
+            PaymentInvariantService(db_session).check_payment_allowed(visit.id, 2 * price)
+        with pytest.raises(HTTPException) as confirmation:
+            VisitLifecycleService(db_session).confirm_visit(visit.id, admin_user)
+        for rejected in (payment, confirmation):
+            assert rejected.value.status_code == 409
+            assert rejected.value.detail == ALL_FREE_DECISION_REQUIRED
+        assert db_session.query(Payment.id).filter_by(visit_id=visit.id).first() is None
+        return
+
+    assert response.status_code == (500 if evidence == "write-failure" else 409), response.text
+    assert (
+        entry.patient_name, entry.visit_id, entry.encounter_id, entry.discount_mode, entry.total_amount, entry.services,
+    ) == entry_snapshot
+    assert (visit.discount_mode, visit.approval_status, visit.department, visit.doctor_id) == (
+        "none", "approved", "cardiology", test_doctor.id,
+    )
+    stored = db_session.query(VisitService).filter_by(visit_id=visit.id).one()
+    assert (stored.id, stored.qty, stored.price, stored.currency) == (line_id, 1, price, "UZS")
+    assert db_session.query(AllFreeRequest.id).filter_by(visit_id=visit.id).first() is None
+    assert db_session.query(AuditLog.id).filter_by(action="all_free_requested").first() is None
+
+
+@pytest.mark.integration
+@pytest.mark.usefixtures("migrated_visit_confirmation_context")
+@pytest.mark.parametrize(("action", "approval_status"), (
+    (None, "pending"), ("approve", "approved"), ("reject", "rejected"),
+))
+def test_qr_all_free_worklist_displays_the_decision_and_exact_ticket_prices(
+    client, db_session, registrar_auth_headers, admin_auth_headers,
+    test_patient, test_doctor, test_service, action, approval_status,
+):
+    day = clinic_today(db_session)
+    primary_queue = DailyQueue(
+        day=day, specialist_id=test_doctor.id, queue_tag="cardiology", active=True,
+    )
+    secondary_queue = DailyQueue(
+        day=day, specialist_id=test_doctor.id, queue_tag="synthetic-approval-aux", active=True,
+    )
+    test_service.price = Decimal("100000.25")
+    test_service.is_consultation = True
+    test_service.queue_tag = "cardiology"
+    secondary_service = Service(
+        code="SYNTHETIC-AF-AUX", name="SYNTHETIC-QR additional service", price=Decimal("55.47"),
+        currency="UZS", queue_tag=secondary_queue.queue_tag, active=True, requires_doctor=False,
+    )
+    db_session.add_all([primary_queue, secondary_queue, secondary_service])
+    db_session.flush()
+    primary_ticket = OnlineQueueEntry(
+        queue_id=primary_queue.id, patient_id=test_patient.id, number=21,
+        queue_time=datetime.now(UTC), source="online", status="waiting",
+    )
+    db_session.add(primary_ticket)
+    db_session.commit()
+
+    staged = client.put(
+        f"/api/v1/queue/online-entry/{primary_ticket.id}/full-update", headers=registrar_auth_headers,
+        json={"patient_data": {}, "visit_type": "paid", "discount_mode": "all_free", "services": [
+            {"service_id": test_service.id, "quantity": 2},
+            {"service_id": secondary_service.id, "quantity": 3},
+        ]},
+    )
+    assert staged.status_code == 200, staged.text
+    visit_id = staged.json()["entry"]["visit_id"]
+    secondary_ticket = db_session.query(OnlineQueueEntry).filter_by(
+        queue_id=secondary_queue.id, visit_id=visit_id,
+    ).one()
+    if action is not None:
+        decision = client.post(
+            "/api/v1/admin/all-free-approve", headers=admin_auth_headers,
+            json={"visit_id": visit_id, "action": action},
+        )
+        assert decision.status_code == 200, decision.text
+
+    worklist = client.get(
+        "/api/v1/registrar/queues/today", headers=admin_auth_headers, params={"target_date": day.isoformat()},
+    )
+    assert worklist.status_code == 200, worklist.text
+    rows = {
+        row["queue_entry_id"]: row
+        for queue in worklist.json()["queues"] for row in queue["entries"]
+        if row["visit_id"] == visit_id
+    }
+    assert set(rows) == {primary_ticket.id, secondary_ticket.id}
+    for ticket, service, quantity in ((primary_ticket, test_service, 2), (secondary_ticket, secondary_service, 3)):
+        row = rows[ticket.id]
+        expected_unit = Decimal("0.00") if action == "approve" else service.price
+        assert row["approval_status"] == approval_status
+        assert row["daily_queue_id"] == ticket.queue_id
+        assert Decimal(str(row["cost"])) == quantity * expected_unit
+        assert [(line["id"], line["quantity"], Decimal(str(line["price"]))) for line in row["service_details"]] == [
+            (service.id, quantity, expected_unit),
+        ]
+        if action is None:
+            assert row["can_mark_paid"] is False
+        elif action == "reject":
+            assert row["can_mark_paid"] is True
 
 
 @pytest.mark.integration

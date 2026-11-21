@@ -1,5 +1,7 @@
 """Payment interlocks for visits awaiting an All Free decision."""
 
+import json
+from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -7,13 +9,26 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.force_majeure import UseDepositRequest
 from app.api.v1.endpoints.registrar_wizard import _invoice
+from app.crud.clinic import clinic_today
+from app.models.all_free_request import (
+    AllFreeRequest,
+    AllFreeRequestEvent,
+    AllFreeRequestLine,
+)
+from app.models.audit import AuditLog
+from app.models.clinic import Doctor
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.refund_deposit import DepositTransaction, PatientDeposit
+from app.models.service import Service
+from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
 from app.services.force_majeure_api_service import (
@@ -22,12 +37,14 @@ from app.services.force_majeure_api_service import (
 )
 from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
 from app.services.payment_invariant_service import PaymentInvariantService
+from tests.conftest import mint_access_token
 from tests.integration.test_all_free_decision_concurrency_pg import (  # noqa: F401
     approval_case,
     benefit_client,
     configured_benefit_db,
     decision_engines,
 )
+from tests.integration.test_registrar_benefit_decision_pg import RUNTIME
 
 pytestmark = pytest.mark.integration
 
@@ -251,3 +268,222 @@ def test_payment_rereads_committed_approval_under_postgres_lock(approval_case):
         assert error.value.status_code == 409
         assert error.value.detail == ALL_FREE_DECISION_REQUIRED
         assert cached_visit.approval_status == "pending"
+
+
+@pytest.fixture(scope="module")
+def qr_financial_engines(decision_engines):
+    owner, runtime = decision_engines
+    with owner.begin() as connection:
+        grants = {
+            "daily_queues": ("SELECT",),
+            "doctors": ("SELECT",),
+            "encounters": ("INSERT (patient_id, provenance, legacy_visit_id, generation)",),
+            "services": ("SELECT", "UPDATE (price)"),
+            "queue_entries": ("SELECT", "UPDATE"),
+            "visits": (
+                "UPDATE (status, encounter_id, discount_mode, approval_status, department, doctor_id, updated_at, "
+                "confirmation_context_epoch, confirmation_token, confirmation_expires_at, "
+                "reminder_sent_at, reminder_generation, repeat_evidence_generation, repeat_proof_generation, "
+                "repeat_proof_consultation, repeat_proof_doctor_user_id)",
+            ),
+            "visit_services": ("INSERT", "DELETE"),
+        }
+        for table, privileges in grants.items():
+            connection.exec_driver_sql(f"GRANT {', '.join(privileges)} ON {table} TO {RUNTIME}")
+            if connection.exec_driver_sql(
+                f"SELECT relrowsecurity FROM pg_class WHERE oid='{table}'::regclass"
+            ).scalar_one():
+                for privilege in privileges:
+                    command = privilege.split()[0]
+                    clause = {
+                        "SELECT": "USING (true)",
+                        "UPDATE": "USING (true) WITH CHECK (true)",
+                        "INSERT": "WITH CHECK (true)",
+                        "DELETE": "USING (true)",
+                    }[command]
+                    connection.exec_driver_sql(
+                        f"CREATE POLICY synthetic_qr_{command.lower()} ON {table} FOR {command} TO {RUNTIME} {clause}"
+                    )
+        connection.exec_driver_sql(
+            "GRANT USAGE ON SEQUENCE encounters_id_seq, visit_services_id_seq, visit_confirmation_generation_seq, "
+            f"repeat_evidence_generation_seq TO {RUNTIME}"
+        )
+    return owner, runtime
+
+
+def _seed_qr_all_free(owner):
+    suffix = uuid4().hex[:12]
+    with Session(owner, expire_on_commit=False) as db:
+        registrar = User(username=f"synthetic-qr-{suffix}", hashed_password="!", role="Registrar", is_active=True)
+        physician = User(
+            username=f"synthetic-qr-doctor-{suffix}", hashed_password="!", role="Doctor",
+            full_name="SYNTHETIC QR Doctor", is_active=True,
+        )
+        patient = Patient(first_name="SYNTHETIC", last_name=f"QR-{suffix}")
+        service = Service(
+            code=f"SQR-{suffix}", name="SYNTHETIC-QR service", price=AMOUNT, currency="UZS",
+            active=True, requires_doctor=False, is_consultation=False,
+        )
+        db.add_all([registrar, physician, patient, service])
+        db.flush()
+        doctor = Doctor(user_id=physician.id, specialty="general", active=True)
+        db.add(doctor)
+        db.flush()
+        day = clinic_today(db)
+        queue = DailyQueue(day=day, specialist_id=doctor.id, queue_tag="general", active=True)
+        visit = Visit(
+            patient_id=patient.id, doctor_id=doctor.id, visit_date=day, status="open",
+            source="online", department="general", discount_mode="none", approval_status="approved",
+        )
+        db.add_all([queue, visit])
+        db.flush()
+        line = VisitService(visit_id=visit.id, service_id=service.id, name=service.name, qty=1, price=AMOUNT, currency="UZS")
+        queue_time = datetime.now(UTC)
+        entry = OnlineQueueEntry(
+            queue_id=queue.id, number=1, patient_id=patient.id, visit_id=visit.id, source="online",
+            status="waiting", queue_time=queue_time, total_amount=int(AMOUNT), discount_mode="none",
+            services=json.dumps([{
+                "service_id": service.id, "price": int(AMOUNT), "quantity": 1, "queue_time": queue_time.isoformat(),
+            }]),
+        )
+        db.add_all([line, entry])
+        db.commit()
+        headers = {"Authorization": f"Bearer {mint_access_token(registrar)}"}
+        return visit.id, line.id, entry.id, service.id, headers
+
+
+@pytest.mark.parametrize("case", ("posted", "competing", "hidden", "unbilled"))
+def test_qr_all_free_financial_fence_with_restricted_postgres_login(
+    qr_financial_engines, benefit_client, case,
+):
+    owner, runtime = qr_financial_engines
+    visit_id, line_id, entry_id, service_id, headers = _seed_qr_all_free(owner)
+
+    def request_repricing():
+        return benefit_client.put(
+            f"/api/v1/queue/online-entry/{entry_id}/full-update", headers=headers,
+            json={"patient_data": {}, "visit_type": "paid", "discount_mode": "none", "all_free": True,
+                  "services": [{"service_id": service_id, "quantity": 2}]},
+        )
+
+    if case != "unbilled":
+        with Session(owner) as payment_db:
+            payment = Payment(
+                visit_id=visit_id, amount=AMOUNT, currency="UZS", status="paid", method="cash",
+                paid_at=datetime.now(UTC), receipt_no="SYNTHETIC-Posted QR receipt",
+            )
+            payment_db.add(payment)
+            payment_db.flush()
+            payment_id = payment.id
+            if case == "competing":
+                locked = request_repricing()
+                assert locked.status_code == 409, locked.text
+                assert "занято" in locked.json()["detail"]
+            payment_db.commit()
+
+    if case == "hidden":
+        with owner.begin() as connection:
+            connection.exec_driver_sql(
+                f"CREATE POLICY synthetic_qr_hide_payment ON payments AS RESTRICTIVE FOR SELECT TO {RUNTIME} USING (false)"
+            )
+        try:
+            with Session(runtime) as db:
+                assert db.scalar(select(Payment.id).where(Payment.id == payment_id)) is None
+            blocked = request_repricing()
+            assert blocked.status_code == 409, blocked.text
+            assert "недоступна" in blocked.json()["detail"]
+        finally:
+            with owner.begin() as connection:
+                connection.exec_driver_sql("DROP POLICY synthetic_qr_hide_payment ON payments")
+
+    response = request_repricing()
+    with Session(owner) as db:
+        visit = db.get(Visit, visit_id)
+        entry = db.get(OnlineQueueEntry, entry_id)
+        services = db.scalars(select(VisitService).where(VisitService.visit_id == visit_id)).all()
+        if case == "unbilled":
+            assert response.status_code == 200, response.text
+            assert visit.approval_status == "pending"
+            assert entry.visit_id == visit_id
+            assert [(line.qty, line.price, line.currency) for line in services] == [(2, AMOUNT, "UZS")]
+            approval = db.scalars(select(AllFreeRequest).filter_by(visit_id=visit_id)).one()
+            assert (approval.status, approval.baseline_total, approval.encounter_id) == (
+                "pending", 2 * AMOUNT, entry.encounter_id,
+            )
+        else:
+            assert response.status_code == 409, response.text
+            assert "Обратитесь в кассу" in response.json()["detail"]
+            assert (visit.discount_mode, visit.approval_status) == ("none", "approved")
+            assert (entry.visit_id, entry.total_amount, entry.discount_mode) == (visit_id, int(AMOUNT), "none")
+            assert [(line.id, line.qty, line.price) for line in services] == [(line_id, 1, AMOUNT)]
+            posted = db.get(Payment, payment_id)
+            assert (posted.status, posted.amount, posted.currency) == ("paid", AMOUNT, "UZS")
+
+
+@pytest.mark.parametrize(("action", "final_status", "final_price"), (
+    ("approve", "approved", Decimal("0.00")),
+    ("reject", "rejected", AMOUNT),
+))
+def test_native_qr_all_free_decision_and_audit(
+    qr_financial_engines, benefit_client, action, final_status, final_price,
+):
+    owner, runtime = qr_financial_engines
+    visit_id, _, entry_id, service_id, registrar_headers = _seed_qr_all_free(owner)
+    command = {
+        "patient_data": {}, "visit_type": "paid", "discount_mode": "none", "all_free": True,
+        "services": [{"service_id": service_id, "quantity": 2}],
+    }
+    route = f"/api/v1/queue/online-entry/{entry_id}/full-update"
+    staged = benefit_client.put(route, headers=registrar_headers, json=command)
+    assert staged.status_code == 200, staged.text
+    assert Decimal(str(staged.json()["entry"]["total_amount"])) == 2 * AMOUNT
+
+    repeated = benefit_client.put(route, headers=registrar_headers, json=command)
+    assert repeated.status_code == 409, repeated.text
+
+    with Session(runtime) as db:
+        with pytest.raises(HTTPException) as pending_payment:
+            PaymentInvariantService(db).check_payment_allowed(visit_id, 2 * AMOUNT)
+        assert pending_payment.value.status_code == 409
+        assert pending_payment.value.detail == ALL_FREE_DECISION_REQUIRED
+
+    with Session(owner, expire_on_commit=False) as db:
+        request = db.scalars(select(AllFreeRequest).filter_by(visit_id=visit_id)).one()
+        request_id = request.id
+        line = db.scalars(select(AllFreeRequestLine).filter_by(request_id=request_id)).one()
+        assert (request.status, request.baseline_total) == ("pending", 2 * AMOUNT)
+        assert (line.quantity, line.unit_price, line.gross_amount, line.currency) == (2, AMOUNT, 2 * AMOUNT, "UZS")
+        admin = User(
+            username=f"synthetic-qr-approver-{uuid4().hex[:12]}", hashed_password="!", role="Admin", is_active=True,
+        )
+        db.add(admin)
+        db.get(Service, service_id).price = 3 * AMOUNT
+        db.commit()
+        admin_headers = {"Authorization": f"Bearer {mint_access_token(admin)}"}
+
+    decision = benefit_client.post(
+        "/api/v1/admin/all-free-approve", headers=admin_headers,
+        json={"visit_id": visit_id, "action": action, "rejection_reason": "SYNTHETIC review"},
+    )
+    assert decision.status_code == 200, decision.text
+    with Session(owner) as db:
+        visit = db.get(Visit, visit_id)
+        line = db.scalars(select(VisitService).filter_by(visit_id=visit_id)).one()
+        request = db.get(AllFreeRequest, request_id)
+        assert (visit.status, visit.approval_status, visit.confirmed_at) == ("pending_confirmation", final_status, None)
+        assert (line.qty, line.price, line.currency) == (2, final_price, "UZS")
+        assert (request.status, request.baseline_total, request.decided_by_user_id) == (final_status, 2 * AMOUNT, admin.id)
+        events = db.scalars(
+            select(AllFreeRequestEvent.event_type).filter_by(request_id=request_id).order_by(AllFreeRequestEvent.id)
+        ).all()
+        audit = db.scalars(
+            select(AuditLog.action).filter_by(entity_type="all_free_request", entity_id=request_id).order_by(AuditLog.id)
+        ).all()
+        assert events == ["requested", final_status]
+        assert audit == ["all_free_requested", "all_free_decided"]
+
+    with Session(runtime) as db:
+        payable = 2 * final_price
+        assert PaymentInvariantService(db).check_payment_allowed(
+            visit_id, payable, allow_overpayment=False,
+        ) == (payable, Decimal("0.00"), payable)

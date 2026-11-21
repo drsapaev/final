@@ -136,6 +136,8 @@ const uzLatn = {
     requestedTime: 'So‘ralgan vaqt',
     serviceCode: 'Xizmat kodi',
     doctorCode: 'Shifokor kodi',
+    serviceName: 'Xizmat',
+    doctorName: 'Shifokor',
     chooseAnotherTime: 'Boshqa vaqtni tanlash',
     status: {
       pending: 'Ko‘rib chiqilmoqda',

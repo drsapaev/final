@@ -34,13 +34,15 @@ executed the checks in this runbook AND they all passed. Hallucinating
 
 ## Cloud staging integrations
 
-Use the published Codex Cloud environment **`final`** for isolated cloud
-validation. Start a fresh Cloud task after the configuration is published;
-open a fresh checkout of the exact requested SHA. Use only
-synthetic fixtures and owned loopback services, and record teardown. Never
-copy a clinic database, access the production bot, or reuse production
-credentials. These settings have separate storage in the two execution paths;
-neither path inherits the other's settings automatically.
+Run full pre-release staging in a fresh Codex Cloud task in the published
+**`final`** environment. Verify that the checkout matches the exact release
+SHA before running checks. This keeps full validation off the clinic
+computer. Use local WSL for a full run only with explicit operator approval.
+
+Use only synthetic fixtures and owned loopback services, and record teardown.
+Never copy a clinic database, access the production bot, or reuse production
+credentials. Codex Cloud and GitHub Actions store integration settings
+separately.
 
 | Purpose | Codex Cloud `final` | GitHub Actions |
 |---|---|---|
@@ -156,19 +158,24 @@ that do not send.
 
 Before running any check below:
 
-1. **Own isolated staging is up** — on the Windows clinic host, use the
-   launcher from the worktree containing the commit under test:
+1. **Own isolated staging is up.** For a full pre-release run, follow the
+   [Cloud staging instructions](#cloud-staging-integrations) and start the
+   owned project using [`ops/compose.staging.yml`](../../ops/compose.staging.yml).
+   Use an ignored env file with an explicit unique `COMPOSE_PROJECT_NAME`,
+   synthetic credentials, and free non-production ports.
+
+   For an explicitly approved WSL fallback on the Windows clinic host, use
+   the launcher from the worktree containing the commit under test:
 
    ```powershell
    .\ops\scripts\wsl_staging.ps1 -Action Preflight -EnvFile ops/staging.env
    .\ops\scripts\wsl_staging.ps1 -Action Start -EnvFile ops/staging.env
    ```
 
-   Its ignored env file must use an explicit unique `COMPOSE_PROJECT_NAME`,
-   synthetic credentials, and free non-production ports. For long validation,
-   run the whole validation script through `-Action Session -CommandArgs
-   @(...)`; `Start` keeps WSL alive only during startup. See
-   [WSL_STAGING_SESSION.md](WSL_STAGING_SESSION.md) for the complete recipe.
+   For long WSL validation, run the whole validation script through
+   `-Action Session -CommandArgs @(...)`. `Start` keeps WSL alive only during
+   startup. See [WSL_STAGING_SESSION.md](WSL_STAGING_SESSION.md) for the
+   complete recipe.
 2. **Migrations applied to that staging database** — the canonical staging
    backend entrypoint runs Alembic when `RUN_ALEMBIC_ON_START=1`. Confirm its
    successful readiness; do not run a host migration command with an implicit

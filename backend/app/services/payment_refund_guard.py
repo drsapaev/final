@@ -1,9 +1,11 @@
-"""Shared financial evidence checks for collection and refunds."""
+"""Shared financial evidence checks for collection, refunds and repricing."""
 
 from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
+from app.models.payment_invoice import PaymentInvoiceVisit
+from app.models.provider_attempt import ProviderActiveVisitReservation
 from app.models.refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
@@ -12,6 +14,7 @@ from app.models.refund_deposit import (
 from app.services.encounter_financial_fence import (
     FinancialFenceError,
     _financial_schema,
+    _verify_payment_reference_fence,
     require_preflighted_payment_visits,
 )
 
@@ -64,12 +67,12 @@ def require_visible_external_refunds(db: Session, schema: str) -> None:
     _require_visible_evidence(db, schema, _EXTERNAL_REFUND_READS, "История возвратов временно недоступна")
 
 
-def require_clear_visit_debit_history(db: Session, visit_id: int) -> None:
-    """Use the locked financial closure before accepting new funds."""
-    visit_ids = require_preflighted_payment_visits(db, visit_id)
-    if db.get_bind().dialect.name == "postgresql":
+def _require_clear_debit_history(
+    db: Session, visit_ids: tuple[int, ...], schema: str | None,
+) -> None:
+    if schema is not None:
         _require_visible_evidence(
-            db, _financial_schema(db),
+            db, schema,
             {"deposit_transactions": ("id", "visit_id", "payment_id", "transaction_type")},
             "История списаний с депозита временно недоступна",
         )
@@ -80,6 +83,33 @@ def require_clear_visit_debit_history(db: Session, visit_id: int) -> None:
     ).first()
     if history is not None:
         raise FinancialFenceError("Историческое списание с депозита требует сверки")
+
+
+def require_clear_visit_debit_history(db: Session, visit_id: int) -> None:
+    """Use the locked financial closure before accepting new funds."""
+    visit_ids = require_preflighted_payment_visits(db, visit_id)
+    schema = _financial_schema(db) if db.get_bind().dialect.name == "postgresql" else None
+    _require_clear_debit_history(db, visit_ids, schema)
+
+
+def require_unbilled_visit_group(db: Session, visit_id: int) -> None:
+    """Check financial evidence after the caller locks the complete visit group."""
+    visit_ids = require_preflighted_payment_visits(db, visit_id)
+    schema = _financial_schema(db) if db.get_bind().dialect.name == "postgresql" else None
+    if schema is not None:
+        _verify_payment_reference_fence(db, schema)
+
+    if (
+        db.query(Payment.id).filter(Payment.visit_id.in_(visit_ids)).first()
+        or db.query(PaymentVisit.id).filter(PaymentVisit.visit_id.in_(visit_ids)).first()
+        or db.query(PaymentInvoiceVisit.id).filter(PaymentInvoiceVisit.visit_id.in_(visit_ids)).first()
+        or db.query(ProviderActiveVisitReservation.visit_id)
+        .filter(ProviderActiveVisitReservation.visit_id.in_(visit_ids))
+        .first()
+    ):
+        raise FinancialFenceError("По визиту есть финансовые операции. Обратитесь в кассу")
+
+    _require_clear_debit_history(db, visit_ids, schema)
 
 
 def lock_refund_evidence(db: Session) -> None:

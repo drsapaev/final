@@ -1,23 +1,39 @@
 name: Mini App PR staging preflight
 
 on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/staging-miniapp-pr.yml']
   workflow_dispatch:
     inputs:
       source-sha:
         description: Full reviewed source SHA for PR 4118
         required: true
         type: string
+      runtime-smoke:
+        description: Also boot and remove the isolated token-free staging stack
+        type: boolean
+        default: false
+      protected-smoke:
+        description: Verify the staging bot credential reaches the isolated backend only
+        type: boolean
+        default: false
 
 permissions: {}
 
 jobs:
   compose-preflight:
-    # Load the reviewed workflow from main, not from the PR source ref.
-    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/main'
+    # Manual runs use main; the scoped infra PR can also prove the token-free job.
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == 'drsapaev/final' &&
+        github.head_ref == 'ci/miniapp-pr-runtime-smoke-20261120'))
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 40
     env:
-      REQUESTED_SHA: ${{ inputs.source-sha }}
+      REQUESTED_SHA: ${{ github.event_name == 'pull_request' && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
       REVIEWED_SHA: 33f35996a1f86726b17f8caa819d1ed99aa1729a
     steps:
       - name: Check out the exact approved public source
@@ -105,5 +121,278 @@ jobs:
             printf '### Mini App staging preflight\n\n'
             printf 'Source SHA: `%s`\n\n' "$REVIEWED_SHA"
             printf 'Compose wiring: PASS (synthetic marker only)\n\n'
-            printf 'Native Telegram acceptance: NOT_RUN. No containers, secrets or tunnel were used.\n'
+            printf 'Native Telegram acceptance: NOT_RUN. No real bot token or tunnel was used.\n'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Boot and verify the token-free loopback stack
+        if: github.event_name == 'pull_request' || inputs.runtime-smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$(mktemp -d)"
+          project="miniapp-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          frontend=http://127.0.0.1:18080
+          backend=http://127.0.0.1:18001
+          docker_args=(docker compose --project-name "$project" --env-file "$d/runtime.env"
+            -f source/ops/compose.staging.yml)
+          cleanup() {
+            local result=$? teardown=PASS type residual image
+            local -a ls_options
+            trap - EXIT
+            if ! "${docker_args[@]}" down --volumes --remove-orphans --rmi local; then
+              teardown=FAIL
+            fi
+            for type in container network volume image; do
+              ls_options=(-q)
+              if [[ "$type" == container || "$type" == image ]]; then ls_options+=(-a); fi
+              if ! residual="$(docker "$type" ls "${ls_options[@]}" --filter "label=com.docker.compose.project=$project")"; then
+                teardown=FAIL
+              elif [[ -n "$residual" ]]; then
+                teardown=FAIL
+              fi
+            done
+            for image in "$project-backend" "$project-frontend"; do
+              if docker image inspect "$image" >/dev/null 2>&1; then teardown=FAIL; fi
+            done
+            printf '\nRuntime teardown: %s.\n' "$teardown" >> "$GITHUB_STEP_SUMMARY"
+            rm -rf -- "$d"
+            if [[ "$teardown" != PASS ]]; then exit 1; fi
+            exit "$result"
+          }
+
+          cat > "$d/runtime.env" <<ENV
+          STAGING_PUBLIC_BASE_URL=$frontend
+          STAGING_PUBLIC_WS_URL=ws://127.0.0.1:18080
+          STAGING_PUBLIC_WS_HOST=127.0.0.1:18080
+          CORS_ORIGINS=$frontend
+          APP_VERSION=$REVIEWED_SHA
+          VERCEL_GIT_COMMIT_SHA=$REVIEWED_SHA
+          CSRF_ENABLED=1
+          CLINIC_PURPOSE=miniapp-token-free-smoke
+          CLINIC_OWNER=github-actions
+          POSTGRES_USER=miniapp_synthetic
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          POSTGRES_DB=miniapp_synthetic
+          SECRET_KEY=$(openssl rand -hex 32)
+          ADMIN_USERNAME=miniapp_synthetic
+          ADMIN_PASSWORD=Aa1_$(openssl rand -hex 24)
+          ADMIN_EMAIL=miniapp@example.invalid
+          ADMIN_FULL_NAME=Synthetic Staging
+          TELEGRAM_BOT_TOKEN=
+          VITE_SENTRY_DSN=
+          SENTRY_DSN=
+          ENV
+          unset TELEGRAM_BOT_TOKEN VITE_SENTRY_DSN SENTRY_DSN
+          trap cleanup EXIT
+
+          "${docker_args[@]}" up --detach --build --wait --wait-timeout 280 postgres redis backend frontend
+
+          expected=$'backend\nfrontend\npostgres\nredis'
+          actual=$("${docker_args[@]}" ps --services --status running | LC_ALL=C sort)
+          test "$actual" = "$expected"
+          "${docker_args[@]}" exec -T backend sh -euc 'test -z "${TELEGRAM_BOT_TOKEN:-}"'
+          for service in postgres backend frontend; do
+            container=$("${docker_args[@]}" ps -q "$service")
+            docker inspect --format '{{json .NetworkSettings.Ports}}' "$container" |
+              python3 -c 'import json,sys; a=[b for row in json.load(sys.stdin).values() if row for b in row]; assert a and all(b["HostIp"] == "127.0.0.1" for b in a)'
+          done
+          "${docker_args[@]}" exec -T postgres psql -XAt --set ON_ERROR_STOP=on \
+            -U miniapp_synthetic -d miniapp_synthetic -c 'select count(*) from patients' |
+            grep -Fxq 0
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 "$backend/" |
+            python3 -c 'import json,sys; assert json.load(sys.stdin)["version"] == sys.argv[1]' "$REVIEWED_SHA"
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 "$frontend/api/v1/health" |
+            python3 -c 'import json,sys; assert json.load(sys.stdin)["db"] == "ok"'
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 \
+            -D "$d/miniapp.headers" -o /dev/null "$frontend/telegram/mini-app/patient"
+          grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/miniapp.headers" >/dev/null
+          status="$(curl --noproxy '*' --silent --show-error --max-time 10 -o "$d/csrf.json" \
+            -w '%{http_code}' -H 'Content-Type: application/json' --data '{}' \
+            "$frontend/api/v1/telegram/mini-app/auth/exchange")"
+          test "$status" = 403
+          python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["reason"] == "missing_cookie"' "$d/csrf.json"
+          printf '\nRuntime smoke: PASS (loopback, empty patient table, no worker or bot token, expected SHA, Mini App CSP and CSRF rejection).\n' >> "$GITHUB_STEP_SUMMARY"
+
+  protected-backend-smoke:
+    # The workflow itself must be on main; pull requests never get this Environment.
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.protected-smoke
+    needs: compose-preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging-integrations
+    permissions: {}
+    env:
+      REVIEWED_SHA: 33f35996a1f86726b17f8caa819d1ed99aa1729a
+    steps:
+      - name: Prepare a sealed backend build without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$RUNNER_TEMP/miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir "$d"
+          git -C "$d" init --quiet source
+          git -C "$d/source" fetch --no-tags --depth=1 https://github.com/drsapaev/final.git "$REVIEWED_SHA"
+          git -C "$d/source" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$d/source" rev-parse HEAD)" = "$REVIEWED_SHA"
+
+          cat > "$d/runtime.env" <<ENV
+          STAGING_PUBLIC_BASE_URL=http://127.0.0.1
+          CORS_ORIGINS=http://127.0.0.1
+          APP_VERSION=$REVIEWED_SHA
+          CSRF_ENABLED=1
+          WORKERS=1
+          CLINIC_PURPOSE=miniapp-protected-smoke
+          CLINIC_OWNER=github-actions
+          POSTGRES_USER=miniapp_synthetic
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          POSTGRES_DB=miniapp_synthetic
+          SECRET_KEY=$(openssl rand -hex 32)
+          ADMIN_USERNAME=miniapp_synthetic
+          ADMIN_PASSWORD=Aa1_$(openssl rand -hex 24)
+          ADMIN_EMAIL=miniapp@example.invalid
+          ADMIN_FULL_NAME=Synthetic Staging
+          VITE_SENTRY_DSN=
+          SENTRY_DSN=
+          ENV
+          cat > "$d/sealed.yml" <<'COMPOSE'
+          services:
+            postgres:
+              ports: !reset []
+            backend:
+              ports: !reset []
+              dns: [127.0.0.1]
+              # Run the pinned source baked into the staging image. Do not let
+              # this root-running container create files in the runner checkout.
+              volumes: !override
+                - staging_backend_data:/data
+            frontend:
+              ports: !reset []
+            worker:
+              environment:
+                TELEGRAM_BOT_TOKEN: ""
+          networks:
+            default:
+              internal: true
+              driver_opts:
+                com.docker.network.bridge.gateway_mode_ipv4: isolated
+          COMPOSE
+          args=(docker compose --project-name "miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --env-file "$d/runtime.env" -f "$d/source/ops/compose.staging.yml" -f "$d/sealed.yml")
+          cat > "$d/check-config.py" <<'PY'
+          import json
+          import sys
+
+          config = json.load(sys.stdin)
+          services = config["services"]
+          marker = "synthetic-runtime-binding"
+          names = {"postgres", "redis", "backend"}
+          assert set(config["networks"]) == {"default"}
+          network = config["networks"]["default"]
+          assert network["internal"] is True and not network.get("external")
+          assert network["driver_opts"]["com.docker.network.bridge.gateway_mode_ipv4"] == "isolated"
+          assert services["backend"]["dns"] == ["127.0.0.1"]
+          assert services["backend"]["environment"]["TELEGRAM_BOT_TOKEN"] == marker
+          for name, service in services.items():
+              assert not service.get("ports")
+              assert not service.get("network_mode") and not service.get("privileged")
+              assert (marker in json.dumps(service)) == (name == "backend")
+              if name in names:
+                  assert set(service.get("networks", {})) == {"default"}
+                  assert all(mount["type"] == "volume" for mount in service.get("volumes", []))
+                  assert set(service.get("depends_on", {})) <= names
+          assert [(m["source"], m["target"]) for m in services["backend"].get("volumes", [])] == [
+              ("staging_backend_data", "/data")
+          ]
+          print("PASS: marker goes only to backend; selected services have no host mounts or published ports and use one internal network.")
+          PY
+          TELEGRAM_BOT_TOKEN=synthetic-runtime-binding "${args[@]}" config --format json |
+            python3 "$d/check-config.py"
+          unset TELEGRAM_BOT_TOKEN
+          "${args[@]}" pull postgres redis
+          "${args[@]}" build backend
+
+      - name: Start the sealed backend and verify the protected input without printing it
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${TELEGRAM_BOT_TOKEN:-}" || {
+            echo "::error::STAGING_TELEGRAM_BOT_TOKEN is missing in staging-integrations."
+            exit 1
+          }
+          d="$RUNNER_TEMP/miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test "$(git -C "$d/source" rev-parse HEAD)" = "$REVIEWED_SHA"
+          args=(docker compose --project-name "miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --env-file "$d/runtime.env" -f "$d/source/ops/compose.staging.yml" -f "$d/sealed.yml")
+          if ! "${args[@]}" up --detach --no-build --pull never --wait --wait-timeout 280 postgres redis backend >/dev/null 2>&1; then
+            echo "::error::Sealed backend failed to start. Secret-bearing runtime logs were not collected."
+            exit 1
+          fi
+          unset TELEGRAM_BOT_TOKEN
+          expected=$'backend\npostgres\nredis'
+          actual=$("${args[@]}" ps --services --status running | LC_ALL=C sort)
+          test "$actual" = "$expected"
+          project="miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test "$(docker network inspect --format '{{.Internal}}' "${project}_default")" = true
+          "${args[@]}" exec -T postgres psql -XAt --set ON_ERROR_STOP=on \
+            -U miniapp_synthetic -d miniapp_synthetic -c 'select count(*) from patients' | grep -Fxq 0
+          "${args[@]}" exec -T backend python - "$REVIEWED_SHA" <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          assert os.environ.get("TELEGRAM_BOT_TOKEN")
+          assert os.environ["TELEGRAM_BOT_TOKEN"] != "synthetic-runtime-binding"
+          with urllib.request.urlopen("http://127.0.0.1:18000/", timeout=10) as response:
+              assert json.load(response)["version"] == sys.argv[1]
+          PY
+          {
+            printf 'Protected backend smoke: PASS (credential present only in selected backend, empty patient table, expected SHA, internal network).\n'
+            printf 'Telegram identity, HTTPS, native WebView acceptance and delivery: NOT_RUN.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tear down only this sealed project
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          project="miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          result=PASS
+          if [[ -f "$d/runtime.env" && -f "$d/sealed.yml" ]]; then
+            docker compose --project-name "$project" --env-file "$d/runtime.env" \
+              -f "$d/source/ops/compose.staging.yml" -f "$d/sealed.yml" \
+              down --volumes --remove-orphans --rmi local || {
+                echo "::error::Isolated project docker compose down failed."
+                result=FAIL
+              }
+          fi
+          for type in container network volume image; do
+            ls_options=(-q)
+            if [[ "$type" == container || "$type" == image ]]; then ls_options+=(-a); fi
+            if ! residual="$(docker "$type" ls "${ls_options[@]}" --filter "label=com.docker.compose.project=$project")"; then
+              echo "::error::Could not list remaining Docker resources of type $type."
+              result=FAIL
+            elif [[ -n "$residual" ]]; then
+              echo "::error::Isolated project still owns Docker resources of type $type."
+              result=FAIL
+            fi
+          done
+          if docker image inspect "$project-backend" >/dev/null 2>&1; then
+            echo "::error::The isolated backend image tag still exists."
+            result=FAIL
+          fi
+          if ! rm -rf -- "$d" || [[ -e "$d" || -L "$d" ]]; then
+            echo "::error::Could not remove the isolated runner workspace."
+            result=FAIL
+          fi
+          printf 'Protected backend teardown: %s.\n' "$result" >> "$GITHUB_STEP_SUMMARY"
+          test "$result" = PASS

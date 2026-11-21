@@ -650,6 +650,8 @@ def _build_queue_result(
                 visit_id=entry_visit_id,
                 patient_id=patient_id,
             )
+            if entry_wrapper.get("awaits_all_free_decision"):
+                available_actions = [action for action in available_actions if action != "mark_paid"]
             queue_owner_kind, queue_owner_id, daily_queue_id = (
                 _resolve_registrar_row_owner(
                     db=db,

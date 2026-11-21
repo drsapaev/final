@@ -103,11 +103,21 @@ describe('aggregatePatientsForAllDepartments', () => {
 
     expect(result[0].discount_mode).toBe('all_free');
     expect(result[0].payment_type).toBe('approval_pending');
-    expect(result[0].cost_display).toBe('free');
+    expect(result[0].cost_display).toBeNull();
     expect(result[0]).not.toHaveProperty('can_mark_paid');
     expect(result[0]).not.toHaveProperty('can_start_visit');
     expect(result[0]).not.toHaveProperty('can_cancel');
     expect(result[0]).not.toHaveProperty('can_print_ticket');
+  });
+
+  it('shows the ordinary amount due after an All Free rejection', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, cost: 200000.50, discount_mode: 'all_free', approval_status: 'rejected' }),
+    ]);
+
+    expect(result[0].payment_type).toBe('pending_payment');
+    expect(result[0].cost).toBe(200000.50);
+    expect(result[0].cost_display).toBeNull();
   });
 
   it('shows mixed payment for groups with mixed statuses or methods', () => {

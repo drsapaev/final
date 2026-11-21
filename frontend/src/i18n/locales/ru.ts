@@ -173,6 +173,8 @@ const ru = {
     requestedTime: 'Запрошенное время',
     serviceCode: 'Код услуги',
     doctorCode: 'Код врача',
+    serviceName: 'Услуга',
+    doctorName: 'Врач',
     chooseAnotherTime: 'Выбрать другое время',
     status: {
       pending: 'Ожидает проверки',

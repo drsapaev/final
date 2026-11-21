@@ -112778,6 +112778,39 @@
             "type": "string",
             "title": "Doctor Slug"
           },
+          "service_name_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Name Ru"
+          },
+          "service_name_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Name Uz"
+          },
+          "doctor_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Display Name"
+          },
           "appointment_date": {
             "type": "string",
             "format": "date",

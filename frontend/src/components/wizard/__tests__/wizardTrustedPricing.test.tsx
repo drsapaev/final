@@ -257,16 +257,16 @@ describe('Fix D Codex R2: quote contract follows the actual command route', () =
     expect(backend).toContain('"pending" if effective_discount_mode == "all_free" else "approved"');
   });
 
-  it('requires a catalogue price before accepting a quoted cart amount', () => {
+  it('requires a catalogue price for cart and pending QR All Free quotes', () => {
     const backend = readBackendCartSource();
-    const start = backend.indexOf('if quote_req.pricing_mode == "cart":\n            currency = service.currency');
+    const start = backend.indexOf('if quote_req.pricing_mode == "cart" or qr_all_free:');
     const end = backend.indexOf('elif service.price is None:', start);
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     const cartPricing = backend.slice(start, end);
     expect(cartPricing).toContain('if service.price is None:');
     expect(cartPricing).toContain('не указана цена');
-    expect(cartPricing).toContain('if item_req.custom_price is not None and item_req.custom_price != service.price:');
+    expect(cartPricing).toContain('item_req.custom_price != service.price');
     expect(cartPricing).toContain('Изменение цены требует согласования');
   });
 });

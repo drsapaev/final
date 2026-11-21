@@ -30,6 +30,9 @@ from sqlalchemy.orm import Session
 from app.models.online_queue import OnlineQueueEntry
 from app.models.service import Service
 from tests.conftest import mint_access_token
+from tests.integration.test_all_free_registrar_workflow import (
+    migrated_visit_confirmation_context,  # noqa: F401
+)
 
 pytestmark = [pytest.mark.integration]
 
@@ -136,7 +139,8 @@ def test_edit_delta_all_free_string_mode_bills_free(
     assert int(entry.total_amount or 0) == 0
 
 
-def test_full_update_all_free_string_mode_bills_free(
+@pytest.mark.usefixtures("migrated_visit_confirmation_context")
+def test_full_update_all_free_string_mode_keeps_price_pending_decision(
     client: TestClient,
     db_session: Session,
     registrar_auth_headers,
@@ -145,8 +149,7 @@ def test_full_update_all_free_string_mode_bills_free(
     test_patient,
     test_doctor,
 ):
-    """Full-update сохранение с discount_mode="all_free" и all_free=False
-    обязано выставить 0 — команды нормализуют режим как квота."""
+    """The string All Free mode and boolean mode use the same approval path."""
     from app.models.online_queue import DailyQueue
 
     service = _r7_service(db_session, code="R7-AF-FU", price=Decimal("25000"))
@@ -190,9 +193,8 @@ def test_full_update_all_free_string_mode_bills_free(
     body = quoted.json()
     token = body["quote_token"]
     assert token
-    assert float(body["total_amount"]) == 0, (
-        "the quote already prices the string all_free mode as free"
-    )
+    assert Decimal(str(body["total_amount"])) == Decimal("25000.00")
+    assert body["approval_status"] == "pending"
 
     response = client.put(
         f"/api/v1/queue/online-entry/{entry.id}/full-update",
@@ -220,10 +222,13 @@ def test_full_update_all_free_string_mode_bills_free(
         .all()
     )
     assert len(created) == 1
-    assert int(created[0].total_amount or 0) == 0, (
-        "the full-update command must normalize discount_mode='all_free' "
-        "the same way the quote does: total 0, not catalog 25000"
-    )
+    child = created[0]
+    assert child.total_amount == 25000
+    assert child.discount_mode == "all_free"
+    db_session.refresh(entry)
+    assert child.visit_id == entry.visit_id
+    assert child.encounter_id == entry.encounter_id
+    assert child.encounter_id is not None
 
 
 # ===================== P2: дубликаты строк edit-delta =====================
