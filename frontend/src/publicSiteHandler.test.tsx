@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handlePublicSiteRequest } from './publicSiteHandler';
 import { getPublicSiteBreadcrumbs } from './publicSitePage';
-import type { PublicSiteFetch } from './publicSiteApi';
 import nitroConfig from '../nitro.config';
 import { PUBLIC_SITE_ROUTE_DEFINITIONS } from './routing/publicSiteRouteEntries';
 import { resolvePublicSiteRoute } from './routing/publicSiteRouteEntries';
@@ -32,12 +31,11 @@ describe('Nitro public-site route registration', () => {
   });
 });
 
-function createFetch(handler: (url: URL) => Response | Promise<Response>) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+function createFetch(handler: (url: URL, init?: RequestInit) => Response | Promise<Response>) {
+  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof URL ? input : new URL(String(input));
-    return handler(url);
+    return handler(url, init);
   });
-  return fetchMock as unknown as PublicSiteFetch;
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -50,6 +48,7 @@ function jsonResponse(body: unknown, status = 200) {
 describe('public-site SSR request handler', () => {
   it('renders a localized service detail and request-time SEO metadata', async () => {
     const fetchImpl = createFetch((url) => {
+      if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
       expect(url.origin).toBe('https://api.kosmed.test');
       expect(url.pathname).toBe('/api/v1/public-site/services/laser-care');
       expect(url.searchParams.get('locale')).toBe('ru');
@@ -92,22 +91,29 @@ describe('public-site SSR request handler', () => {
     expect(html).not.toContain('/assets/clinic-app.js');
   });
 
-  it.each([
-    { path: '/', home: '/' },
-    { path: '/ru', home: '/ru' },
-    { path: '/contacts', home: '/' },
-    { path: '/ru/contacts', home: '/ru' },
-  ])('renders the published clinic logo on $path and falls back when absent', async ({ path, home }) => {
+  it.each(PUBLIC_SITE_ROUTE_DEFINITIONS)('renders the published clinic logo on $path and falls back when absent', async ({ path: routePath, locale }) => {
+    const path = routePath.replace(':slug', 'synthetic');
+    const home = locale === 'ru' ? '/ru' : '/';
     const apiOrigin = 'https://api.kosmed.test';
     const logoPath = `/api/v1/public-site/media/${'b'.repeat(64)}`;
 
     async function renderBrand(logoUrl: string | null) {
-      const fetchImpl = createFetch((url) => {
+      const fetchImpl = createFetch((url, init) => {
         if (url.pathname === '/api/v1/public-site/clinic') {
+          expect(init?.cache).toBe('no-store');
           return jsonResponse({ name: 'SYNTHETIC Clinic', logo_url: logoUrl });
         }
-        expect(['/api/v1/public-site/doctors', '/api/v1/public-site/services']).toContain(url.pathname);
-        return jsonResponse([]);
+        switch (url.pathname) {
+          case '/api/v1/public-site/doctors/synthetic':
+            return jsonResponse({ slug: 'synthetic', name: 'SYNTHETIC Doctor', bio: 'SYNTHETIC bio' });
+          case '/api/v1/public-site/services/synthetic':
+            return jsonResponse({ slug: 'synthetic', name: 'SYNTHETIC Service', description: 'SYNTHETIC description' });
+          case '/api/v1/public-site/doctors':
+          case '/api/v1/public-site/services':
+            return jsonResponse([]);
+          default:
+            return jsonResponse({}, 404);
+        }
       });
       const response = await handlePublicSiteRequest(
         new Request(`https://preview.kosmed.test${path}`),
@@ -116,6 +122,9 @@ describe('public-site SSR request handler', () => {
         fetchImpl,
       );
       expect(response.status).toBe(200);
+      const clinicReads = fetchImpl.mock.calls.filter(([url]) =>
+        String(url) === apiOrigin + '/api/v1/public-site/clinic');
+      expect(clinicReads).toHaveLength(1);
       const document = new DOMParser().parseFromString(await response.text(), 'text/html');
       return document.querySelector('header a.public-site__brand');
     }
@@ -132,8 +141,38 @@ describe('public-site SSR request handler', () => {
     expect(fallback?.querySelector('span[aria-hidden="true"]')?.textContent).toBe('K');
   });
 
+  it('aborts a slow optional clinic request and keeps the localized price page', async () => {
+    let logoSignal: AbortSignal | null | undefined;
+    const fetchImpl = createFetch((url, init) => {
+      if (url.pathname === '/api/v1/public-site/clinic') {
+        const signal = init?.signal;
+        if (!signal) throw new Error('Expected a bounded clinic request');
+        logoSignal = signal;
+        return new Promise<Response>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      }
+      expect(url.pathname).toBe('/api/v1/public-site/services');
+      return jsonResponse([]);
+    });
+
+    const response = await handlePublicSiteRequest(
+      new Request('https://preview.kosmed.test/ru/prices'),
+      { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'preview' },
+      assets,
+      fetchImpl,
+    );
+    const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+
+    expect(logoSignal?.aborted).toBe(true);
+    expect(response.status).toBe(200);
+    expect(document.querySelector('h1')?.textContent).toBe('Цены');
+    expect(document.querySelector('header .public-site__brand-mark')?.textContent).toBe('K');
+  }, 5_000);
+
   it('shows doctor specialty, full name, and persisted experience on the public profile', async () => {
     const fetchImpl = createFetch((url) => {
+      if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
       expect(url.pathname).toBe('/api/v1/public-site/doctors/dermatolog');
       return jsonResponse({
         slug: 'dermatolog',
@@ -184,6 +223,7 @@ describe('public-site SSR request handler', () => {
       portrait_url: null,
     };
     const fetchImpl = createFetch((url) => {
+      if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
       expect(url.searchParams.get('locale')).toBe(locale);
       if (url.pathname === '/api/v1/public-site/doctors') {
         return jsonResponse([doctor, textOnlyDoctor]);
@@ -227,6 +267,7 @@ describe('public-site SSR request handler', () => {
 
   it('keeps live service prices on the prices page', async () => {
     const fetchImpl = createFetch((url) => {
+      if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
       expect(url.pathname).toBe('/api/v1/public-site/services');
       expect(url.searchParams.get('locale')).toBe('ru');
       return jsonResponse([
@@ -346,6 +387,7 @@ describe('public-site SSR request handler', () => {
       ? { slug, name: pageName, description: 'Published service description.', price: null, currency: null }
       : { slug, name: pageName, bio: 'Published doctor biography.' };
     const fetchImpl = createFetch((url) => {
+      if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
       expect(url.pathname).toBe(apiPath);
       expect(url.searchParams.get('locale')).toBe(locale);
       return jsonResponse(apiRecord);

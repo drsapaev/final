@@ -67,4 +67,26 @@ describe('loadPublicSitePageData', () => {
 
     expect(api.listServices).toHaveBeenCalledWith('ru');
   });
+
+  it('starts the header logo and catalog reads together', async () => {
+    const api = makeApi();
+    const logoUrl = `https://api.kosmed.test/api/v1/public-site/media/${'b'.repeat(64)}`;
+    vi.mocked(api.getClinic).mockResolvedValue({ ...clinic, logo_url: logoUrl });
+
+    const data = loadPublicSitePageData(api, route('/ru/prices'));
+
+    expect(api.listServices).toHaveBeenCalledWith('ru');
+    expect(api.getClinic).toHaveBeenCalledOnce();
+    await expect(data).resolves.toEqual({ services: [service], logoUrl });
+  });
+
+  it('keeps the catalog available when loading the optional logo fails', async () => {
+    const api = makeApi();
+    vi.mocked(api.getClinic).mockRejectedValue(new Error('Synthetic clinic API failure'));
+
+    await expect(loadPublicSitePageData(api, route('/doctors'))).resolves.toEqual({
+      doctors: [doctor],
+    });
+    expect(api.getClinic).toHaveBeenCalledOnce();
+  });
 });

@@ -516,7 +516,12 @@ export function PublicSitePage({ route, data }: PublicSitePageProps) {
   return (
     <div className="public-site">
       <a className="public-site__skip-link" href="#main-content">{copy.skipToContent}</a>
-      <SiteHeader locale={route.locale} route={route} copy={copy} logoUrl={data.clinic?.logo_url} />
+      <SiteHeader
+        locale={route.locale}
+        route={route}
+        copy={copy}
+        logoUrl={data.clinic?.logo_url ?? data.logoUrl}
+      />
       <main className="public-site__main" id="main-content" tabIndex={-1}>
         <BreadcrumbNavigation
           items={getPublicSiteBreadcrumbs(route, data)}
