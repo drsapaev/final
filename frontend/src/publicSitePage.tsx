@@ -13,6 +13,8 @@ import type {
   PublicSiteService,
 } from './publicSiteApi';
 
+const PUBLIC_SITE_MEDIA_FALLBACK = '/public-site-media-fallback.js';
+
 interface Copy {
   services: string;
   doctors: string;
@@ -312,11 +314,21 @@ function SiteHeader({ locale, route, copy, logoUrl }: {
   return (
     <header className="public-site__header">
       <a className="public-site__brand" href={homePath}>
-        {logoUrl ? (
-          <img className="public-site__brand-logo" src={logoUrl} alt="" width={38} height={38} />
-        ) : (
-          <span className="public-site__brand-mark" aria-hidden="true">K</span>
+        {logoUrl && (
+          <>
+            <script async src={PUBLIC_SITE_MEDIA_FALLBACK} />
+            <img
+              key={logoUrl}
+              className="public-site__brand-logo"
+              data-public-site-image=""
+              src={logoUrl}
+              alt=""
+              width={38}
+              height={38}
+            />
+          </>
         )}
+        <span className="public-site__brand-mark" aria-hidden="true">K</span>
         <span>{copy.clinicName}</span>
       </a>
       <PublicSiteLinks className="public-site__nav" locale={locale} copy={copy} />
@@ -423,16 +435,21 @@ function DoctorPortrait({ src, isProfile = false }: {
   if (!src) return null;
   const size = isProfile ? 160 : 80;
   return (
-    <img
-      className="public-site__doctor-portrait"
-      src={src}
-      alt=""
-      width={size}
-      height={size}
-      loading={isProfile ? undefined : 'lazy'}
-      fetchPriority={isProfile ? 'high' : undefined}
-      decoding="async"
-    />
+    <>
+      <script async src={PUBLIC_SITE_MEDIA_FALLBACK} />
+      <img
+        key={src}
+        className="public-site__doctor-portrait"
+        data-public-site-image=""
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        loading={isProfile ? undefined : 'lazy'}
+        fetchPriority={isProfile ? 'high' : undefined}
+        decoding="async"
+      />
+    </>
   );
 }
 

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { URL as NodeURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { handlePublicSiteRequest } from './publicSiteHandler';
 import { getPublicSiteBreadcrumbs } from './publicSitePage';
@@ -46,6 +49,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 const DETAIL_ENTITY_TYPE = /"@type"\s*:\s*"(?:ProfilePage|Service)"/;
+const MEDIA_FALLBACK_SCRIPT = 'script[src="/public-site-media-fallback.js"]';
 
 function readStructuredData(document: Document): Record<string, unknown>[] {
   return Array.from(document.querySelectorAll('head script[type="application/ld+json"]'), (tag) =>
@@ -59,6 +63,38 @@ function expectUnavailablePage(response: Response, locale: string) {
   expect(response.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
   expect(response.headers.get('Content-Language')).toBe(locale);
 }
+
+it('marks already broken and newly failed public-site images as unavailable', () => {
+  const page = new DOMParser().parseFromString(
+    '<div class="public-site">' +
+      '<img src="/broken-logo.png" data-public-site-image>' +
+      '<img src="/healthy-logo.png" data-public-site-image>' +
+      '<img src="/pending-portrait.png" data-public-site-image>' +
+      '</div>' +
+      '<img src="/unrelated.png" data-public-site-image>',
+    'text/html',
+  );
+  const [broken, healthy, pending, unrelated] = page.querySelectorAll('img');
+  Object.defineProperties(broken, { complete: { value: true }, naturalWidth: { value: 0 } });
+  Object.defineProperties(healthy, { complete: { value: true }, naturalWidth: { value: 2 } });
+  Object.defineProperties(pending, { complete: { value: false }, naturalWidth: { value: 0 } });
+  Object.defineProperties(unrelated, { complete: { value: true }, naturalWidth: { value: 0 } });
+
+  const script = readFileSync(new NodeURL('../public/public-site-media-fallback.js', import.meta.url), 'utf8');
+  runInNewContext(script, { document: page, HTMLImageElement });
+  page.dispatchEvent(new Event('DOMContentLoaded'));
+
+  expect(broken.dataset.publicSiteImage).toBe('unavailable');
+  expect(healthy.dataset.publicSiteImage).toBe('');
+  expect(pending.dataset.publicSiteImage).toBe('');
+  expect(unrelated.dataset.publicSiteImage).toBe('');
+
+  pending.dispatchEvent(new Event('error'));
+  unrelated.dispatchEvent(new Event('error'));
+
+  expect(pending.dataset.publicSiteImage).toBe('unavailable');
+  expect(unrelated.dataset.publicSiteImage).toBe('');
+});
 
 describe('public-site SSR request handler', () => {
   it('renders a localized service detail and request-time SEO metadata', async () => {
@@ -191,20 +227,30 @@ describe('public-site SSR request handler', () => {
       const html = await response.text();
       if (kind !== 'contacts') expect(html).not.toContain('MedicalClinic');
       if (kind !== 'doctor' && kind !== 'service') expect(html).not.toMatch(DETAIL_ENTITY_TYPE);
-      const document = new DOMParser().parseFromString(html, 'text/html');
-      return document.querySelector('header a.public-site__brand');
+      return new DOMParser().parseFromString(html, 'text/html');
     }
 
-    const brand = await renderBrand(logoPath);
+    const brandedPage = await renderBrand(logoPath);
+    const brand = brandedPage.querySelector('header a.public-site__brand');
+    const logo = brand?.querySelector('img');
     expect(brand?.getAttribute('href')).toBe(home);
-    expect(brand?.textContent).toBe('Doktor KosMed Clinic');
-    expect(brand?.querySelector('img')?.getAttribute('src')).toBe(apiOrigin + logoPath);
-    expect(brand?.querySelector('img')?.getAttribute('alt')).toBe('');
+    expect(brand?.querySelector('span:not([aria-hidden])')?.textContent).toBe('Doktor KosMed Clinic');
+    expect(logo?.getAttribute('src')).toBe(apiOrigin + logoPath);
+    expect(logo?.getAttribute('alt')).toBe('');
+    expect(logo?.getAttribute('width')).toBe('38');
+    expect(logo?.getAttribute('height')).toBe('38');
+    expect(logo?.getAttribute('data-public-site-image')).toBe('');
+    expect(logo?.nextElementSibling?.getAttribute('aria-hidden')).toBe('true');
+    expect(logo?.nextElementSibling?.textContent).toBe('K');
+    expect(brandedPage.querySelectorAll(MEDIA_FALLBACK_SCRIPT)).toHaveLength(1);
+    expect(brandedPage.querySelector(MEDIA_FALLBACK_SCRIPT)?.hasAttribute('async')).toBe(true);
 
-    const fallback = await renderBrand(null);
+    const fallbackPage = await renderBrand(null);
+    const fallback = fallbackPage.querySelector('header a.public-site__brand');
     expect(fallback?.getAttribute('href')).toBe(home);
     expect(fallback?.querySelector('img')).toBeNull();
     expect(fallback?.querySelector('span[aria-hidden="true"]')?.textContent).toBe('K');
+    expect(fallbackPage.querySelector(MEDIA_FALLBACK_SCRIPT)).toBeNull();
   });
 
   it('aborts a slow optional clinic request and keeps the localized price page', async () => {
@@ -275,6 +321,7 @@ describe('public-site SSR request handler', () => {
     { locale: 'ru', prefix: '/ru' },
   ])('renders published doctor portraits in the $locale catalog and profile', async ({ locale, prefix }) => {
     const portraitPath = `/api/v1/public-site/media/${'a'.repeat(64)}`;
+    const logoPath = `/api/v1/public-site/media/${'b'.repeat(64)}`;
     const apiOrigin = 'https://api.kosmed.test';
     const doctor = {
       slug: 'synthetic-with-portrait',
@@ -288,18 +335,17 @@ describe('public-site SSR request handler', () => {
       name: 'SYNTHETIC Doctor Without Portrait',
       portrait_url: null,
     };
-    const fetchImpl = createFetch((url) => {
-      if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
-      expect(url.searchParams.get('locale')).toBe(locale);
-      if (url.pathname === '/api/v1/public-site/doctors') {
-        return jsonResponse([doctor, textOnlyDoctor]);
-      }
-      const profile = [doctor, textOnlyDoctor].find(({ slug }) =>
-        url.pathname === `/api/v1/public-site/doctors/${slug}`);
-      return profile ? jsonResponse(profile) : jsonResponse({}, 404);
-    });
-
-    async function renderDoctors(path: string) {
+    async function renderDoctors(path: string, logoUrl: string | null = null) {
+      const fetchImpl = createFetch((url) => {
+        if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: logoUrl });
+        expect(url.searchParams.get('locale')).toBe(locale);
+        if (url.pathname === '/api/v1/public-site/doctors') {
+          return jsonResponse([doctor, textOnlyDoctor]);
+        }
+        const profile = [doctor, textOnlyDoctor].find(({ slug }) =>
+          url.pathname === `/api/v1/public-site/doctors/${slug}`);
+        return profile ? jsonResponse(profile) : jsonResponse({}, 404);
+      });
       const response = await handlePublicSiteRequest(
         new Request(`https://preview.kosmed.test${prefix}${path}`),
         { apiOrigin, siteOrigin: 'https://www.kosmed.test', deploymentEnvironment: 'preview' },
@@ -316,18 +362,30 @@ describe('public-site SSR request handler', () => {
     expect(cardPortrait?.getAttribute('src')).toBe(apiOrigin + portraitPath);
     expect(cardPortrait?.getAttribute('alt')).toBe('');
     expect(cardPortrait?.getAttribute('loading')).toBe('lazy');
+    expect(cardPortrait?.getAttribute('width')).toBe('80');
+    expect(cardPortrait?.getAttribute('height')).toBe('80');
+    expect(cardPortrait?.getAttribute('data-public-site-image')).toBe('');
+    expect(catalog.querySelectorAll(MEDIA_FALLBACK_SCRIPT)).toHaveLength(1);
     expect(cardPortrait?.closest('li')?.textContent).toContain(doctor.name);
     expect(catalog.querySelector('main')?.textContent).toContain(textOnlyDoctor.name);
 
-    const profile = await renderDoctors(`/doctors/${doctor.slug}`);
+    const profile = await renderDoctors(`/doctors/${doctor.slug}`, logoPath);
     const profilePortrait = profile.querySelector('main img');
     expect(profilePortrait?.getAttribute('src')).toBe(apiOrigin + portraitPath);
     expect(profilePortrait?.getAttribute('alt')).toBe('');
     expect(profilePortrait?.getAttribute('loading')).not.toBe('lazy');
+    expect(profilePortrait?.getAttribute('fetchpriority')).toBe('high');
+    expect(profilePortrait?.getAttribute('width')).toBe('160');
+    expect(profilePortrait?.getAttribute('height')).toBe('160');
+    expect(profilePortrait?.getAttribute('data-public-site-image')).toBe('');
+    expect(profile.querySelectorAll('img[data-public-site-image]')).toHaveLength(2);
+    expect(profile.querySelectorAll(MEDIA_FALLBACK_SCRIPT)).toHaveLength(1);
     expect(profile.querySelector('main h1')?.textContent).toBe(doctor.name);
 
     const textOnlyProfile = await renderDoctors(`/doctors/${textOnlyDoctor.slug}`);
     expect(textOnlyProfile.querySelector('main img')).toBeNull();
+    expect(textOnlyProfile.querySelector('img[data-public-site-image]')).toBeNull();
+    expect(textOnlyProfile.querySelector(MEDIA_FALLBACK_SCRIPT)).toBeNull();
     expect(textOnlyProfile.querySelector('main h1')?.textContent).toBe(textOnlyDoctor.name);
   });
 
