@@ -111,13 +111,14 @@ function truncateDescription(value: string): string {
   return `${compact.slice(0, 157).trimEnd()}…`;
 }
 
-function serializeJsonLd(value: unknown): string {
-  return JSON.stringify(value)
+function renderJsonLd(value: unknown): string {
+  const json = JSON.stringify(value)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
     .replace(/&/g, '\\u0026')
     .replace(/\u2028/g, '\\u2028')
     .replace(/\u2029/g, '\\u2029');
+  return `<script type="application/ld+json">${json}</script>`;
 }
 
 function renderMedicalClinicJsonLd(clinic: PublicSiteClinic | undefined, origin: string): string {
@@ -135,7 +136,7 @@ function renderMedicalClinicJsonLd(clinic: PublicSiteClinic | undefined, origin:
     closes: `${hours.end}:00`,
   };
 
-  return `<script type="application/ld+json">${serializeJsonLd({
+  return renderJsonLd({
     '@context': 'https://schema.org',
     '@type': 'MedicalClinic',
     '@id': `${origin}/#clinic`,
@@ -145,7 +146,7 @@ function renderMedicalClinicJsonLd(clinic: PublicSiteClinic | undefined, origin:
     telephone: telHref?.slice('tel:'.length),
     email: mailtoHref ? clinic.email?.trim() : undefined,
     openingHoursSpecification,
-  })}</script>`;
+  });
 }
 
 function pageMeta(route: PublicSiteRouteMatch, data: PublicSitePageData): PageMeta {
@@ -169,6 +170,43 @@ function pagePath(route: PublicSiteRouteMatch, locale: PublicSiteLocale): string
   return getPublicSitePath(route.kind, locale, route.slug);
 }
 
+function renderDetailJsonLd(
+  route: PublicSiteRouteMatch,
+  data: PublicSitePageData,
+  origin: string,
+  canonical: string,
+): string {
+  if (route.kind === 'doctor' && data.doctor) {
+    const { name, bio } = data.doctor;
+    return renderJsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      url: canonical,
+      mainEntity: {
+        '@type': 'Person',
+        '@id': new URL(`${pagePath(route, 'uz-Latn')}#doctor`, origin).href,
+        name,
+        description: bio,
+      },
+    });
+  }
+
+  if (route.kind === 'service' && data.service) {
+    const { name, description, category } = data.service;
+    return renderJsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'Service',
+      '@id': new URL(`${pagePath(route, 'uz-Latn')}#service`, origin).href,
+      url: canonical,
+      name,
+      description,
+      category: category ?? undefined,
+    });
+  }
+
+  return '';
+}
+
 function renderPublicDocument(
   route: PublicSiteRouteMatch,
   data: PublicSitePageData,
@@ -182,7 +220,7 @@ function renderPublicDocument(
   const alternateRu = new URL(pagePath(route, 'ru'), origin).href;
   const breadcrumbs = getPublicSiteBreadcrumbs(route, data);
   const breadcrumbJsonLd = breadcrumbs.length > 0
-    ? `<script type="application/ld+json">${serializeJsonLd({
+    ? renderJsonLd({
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
       itemListElement: breadcrumbs.map((item, index) => ({
@@ -191,9 +229,11 @@ function renderPublicDocument(
         name: item.name,
         item: new URL(item.path, origin).href,
       })),
-    })}</script>`
+    })
     : '';
-  const clinicJsonLd = route.kind === 'contacts' ? renderMedicalClinicJsonLd(data.clinic, origin) : '';
+  const entityJsonLd = route.kind === 'contacts'
+    ? renderMedicalClinicJsonLd(data.clinic, origin)
+    : renderDetailJsonLd(route, data, origin, canonical);
   const body = renderToString(<PublicSitePage route={route} data={data} />);
   const css = renderPageStyles(styles, pageStyleText);
 
@@ -209,7 +249,7 @@ function renderPublicDocument(
     `<meta property="og:description" content="${escapeHtml(meta.description)}">` +
     `<meta property="og:type" content="website"><meta property="og:url" content="${escapeHtml(canonical)}">` +
     `<meta property="og:locale" content="${route.locale === 'ru' ? 'ru_RU' : 'uz_UZ'}">` +
-    `<meta name="twitter:card" content="summary">${breadcrumbJsonLd}${clinicJsonLd}${css}</head>` +
+    `<meta name="twitter:card" content="summary">${breadcrumbJsonLd}${entityJsonLd}${css}</head>` +
     `<body><div id="public-site-root">${body}</div></body></html>`;
 }
 
