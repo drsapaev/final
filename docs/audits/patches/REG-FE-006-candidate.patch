@@ -63,7 +63,7 @@ diff --git a/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStat
 +++ b/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStates.test.tsx
 @@ -52,10 +52,21 @@ vi.mock('@/components/statistics/ModernStatistics', () => ({
  }));
- 
+
  vi.mock('@/components/tables/EnhancedAppointmentsTable', () => ({
 -  default: ({ showCheckboxes, data }: { showCheckboxes?: boolean; data?: unknown[] }) => (
 +  default: ({ showCheckboxes, data, onActionClick }: {
@@ -128,7 +128,7 @@ diff --git a/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.
      await act(async () => { await hook.current.handleTableAction('complete', row); });
      expect(updateAppointmentStatus).toHaveBeenCalledWith(9, 'done', '', row);
    });
- 
+
 +  it('complete from the table makes no mutation when confirmation is declined', async () => {
 +    const confirm = vi.fn().mockResolvedValue(false);
 +    const updateAppointmentStatus = vi.fn().mockResolvedValue(undefined);
