@@ -175,8 +175,21 @@
       "teardown": "Owned browser profile, synthetic API and Vite listeners were removed."
     },
     "regression": "The Playwright spec doubles computed header-link font sizes at 960 CSS px in Vite and Nitro for each locale and checks actual Tab, visible labels and target bounds. Existing mobile keyboard checks cover the native menu.",
+    "production_follow_up": {
+      "date": "2026-11-22",
+      "measured_origin": "https://finalclinic.fyi",
+      "deployment_id": "dpl_GgKYE3hvN1aSwaH3rgVNt7AXgGZu",
+      "served_sha": "1c9ab7a97b50ed7ed8430bbb6581b9aa2c0da89a",
+      "verified_deployment_before_and_after": true,
+      "routes": ["/services", "/ru/services"],
+      "widths_css_px": [761, 960, 1280],
+      "firefox_default_cases_passed": 6,
+      "firefox_text_only_200_percent_cases_passed": 6,
+      "findings": 0,
+      "checks": "Calibrated native Firefox zoom doubled text widths with stable viewport, device pixel ratio and fixed box. At both zoom levels, the header had zero horizontal overflow and actual Tab reached the skip link, brand, five menu links and language switch with exposed focus.",
+      "teardown": "The disposable Firefox profile was deleted."
+    },
     "remaining": [
-      "Native desktop zoom evidence on the deployed fix",
       "Actual screen-reader speech, native Safari and physical devices",
       "Full WCAG 2.2 AA and staging acceptance"
     ]
