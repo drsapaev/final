@@ -205,6 +205,32 @@ describe('MultipleTicketsPrinter — QUEUEPRINT-FE-002 per-ticket identity', () 
     expect(screen.getByRole('button', { name: 'Печать всех (1)' })).toBeEnabled();
   });
 
+  it('keeps new tickets pending when the current batch finishes', async () => {
+    batchFillMock.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      return { opened: true, success: true };
+    });
+    const onAllPrinted = vi.fn();
+    const onClose = vi.fn();
+    const { container, rerender } = render(
+      <MultipleTicketsPrinter tickets={[sameQueueTickets[0]]} onClose={onClose} onAllPrinted={onAllPrinted} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать всех (1)' }));
+    await advanceCountdownToEnd(5);
+    expect(batchFillMock.mock.calls[0][1]).toEqual([sameQueueTickets[0]]);
+    rerender(<MultipleTicketsPrinter tickets={sameQueueTickets} onClose={onClose} onAllPrinted={onAllPrinted} />);
+    await advanceCountdownToEnd(1);
+
+    expect(printedCardCount(container)).toBe(1);
+    expect(onAllPrinted).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать всех (1)' }));
+    await advanceCountdownToEnd(5);
+    expect(batchFillMock.mock.calls[1][1]).toEqual([sameQueueTickets[1]]);
+    expect(onAllPrinted).toHaveBeenCalledTimes(1);
+  });
+
   it('holds both print controls until an in-flight batch settles', async () => {
     batchFillMock.mockImplementationOnce(async () => {
       await new Promise<void>((resolve) => setTimeout(resolve, 1000));

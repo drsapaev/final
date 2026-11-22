@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Printer, CheckCircle, Clock, X } from 'lucide-react';
 import './MultipleTicketsPrinter.css';
 import {
@@ -54,6 +54,10 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   // больше не открывается вовсе.
   const batchWindowRef = useRef<Window | null>(null);
   const printInProgress = useRef(false);
+  const latestTickets = useRef(tickets);
+  useLayoutEffect(() => {
+    latestTickets.current = tickets;
+  }, [tickets]);
   const [batchError, setBatchError] = useState<string | null>(null);
   const pendingTickets = tickets.filter((ticket) => !printedTickets.has(ticketIdentity(ticket)));
 
@@ -98,22 +102,25 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
     batchWindowRef.current = null;
 
     try {
+      let preparedTickets = printedTickets;
       if (pendingTickets.length === 0) {
         batchWindow.close();
+      } else {
+        const result = await printPanelTicketsBatchInExistingWindow(
+          batchWindow,
+          pendingTickets.map((ticket) => buildPanelTicketPayload(ticket))
+        );
+
+        if (!result.opened || !result.success) {
+          throw new Error('Browser batch ticket print failed', { cause: result.error });
+        }
+        preparedTickets = new Set([...printedTickets, ...pendingTickets.map(ticketIdentity)]);
+        setPrintedTickets(preparedTickets);
+      }
+
+      if (latestTickets.current.every((ticket) => preparedTickets.has(ticketIdentity(ticket)))) {
         onAllPrinted?.();
-        return;
       }
-
-      const result = await printPanelTicketsBatchInExistingWindow(
-        batchWindow,
-        pendingTickets.map((ticket) => buildPanelTicketPayload(ticket))
-      );
-
-      if (!result.opened || !result.success) {
-        throw new Error('Browser batch ticket print failed', { cause: result.error });
-      }
-      setPrintedTickets((prev) => new Set([...prev, ...pendingTickets.map(ticketIdentity)]));
-      onAllPrinted?.();
     } catch (error) {
       logger.warn('Batch ticket print failed', error);
       setBatchError('Не удалось подготовить печать: повторите «Печать всех» или напечатайте талоны по одному.');
