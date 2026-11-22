@@ -4,11 +4,7 @@ import { getApiOrigin } from './api/runtime';
 import { createPublicSiteApi } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
 import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_TITLES } from './publicSiteMetadata';
-import {
-  PublicSiteFallback,
-  PublicSitePage,
-  PublicSiteRequestState,
-} from './publicSitePage';
+import { PublicSiteFallback, PublicSitePage } from './publicSitePage';
 import { resolvePublicSiteRoute } from './routing/publicSiteRouteEntries';
 
 type PageState =
@@ -79,6 +75,8 @@ export default function PublicSiteAppRoute() {
   }, [pathname]);
 
   if (!route) return <PublicSiteFallback />;
-  if (state.status === 'ready') return <PublicSitePage route={route} data={state.data} />;
-  return <PublicSiteRequestState route={route} status={state.status} />;
+  // Keep the native skip link's target mounted as this pathname's content loads.
+  return state.status === 'ready'
+    ? <PublicSitePage key={pathname} route={route} data={state.data} />
+    : <PublicSitePage key={pathname} route={route} status={state.status} />;
 }

@@ -188,6 +188,11 @@ interface PublicSitePageProps {
   data: PublicSitePageData;
 }
 
+interface PublicSiteRequestStateProps {
+  route: PublicSiteRouteMatch;
+  status: 'loading' | 'error';
+}
+
 function cleanTelHref(phone?: string | null): string | undefined {
   const value = phone?.trim();
   if (!value || !/^[+()\d\s.-]{6,32}$/.test(value)) return undefined;
@@ -669,7 +674,10 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
   }
 }
 
-export function PublicSitePage({ route, data }: PublicSitePageProps) {
+export function PublicSitePage(props: PublicSitePageProps | PublicSiteRequestStateProps) {
+  const { route } = props;
+  const data = 'data' in props ? props.data : undefined;
+  const isError = 'status' in props && props.status === 'error';
   const copy = COPY[route.locale];
   return (
     <div className="public-site">
@@ -678,42 +686,36 @@ export function PublicSitePage({ route, data }: PublicSitePageProps) {
         locale={route.locale}
         route={route}
         copy={copy}
-        logoUrl={data.clinic?.logo_url ?? data.logoUrl}
+        logoUrl={data?.clinic?.logo_url ?? data?.logoUrl}
       />
-      <main className="public-site__main" id="main-content" tabIndex={-1}>
-        <BreadcrumbNavigation
-          items={getPublicSiteBreadcrumbs(route, data)}
-          label={copy.breadcrumbs}
-        />
-        <PageContent route={route} data={data} copy={copy} />
+      <main
+        className="public-site__main"
+        id="main-content"
+        tabIndex={-1}
+        aria-busy={data ? undefined : !isError}
+      >
+        {data ? (
+          <>
+            <BreadcrumbNavigation
+              items={getPublicSiteBreadcrumbs(route, data)}
+              label={copy.breadcrumbs}
+            />
+            <PageContent route={route} data={data} copy={copy} />
+          </>
+        ) : (
+          <section className="public-site__error" role={isError ? 'alert' : 'status'}>
+            <h1>{isError ? copy.loadError : copy.loading}</h1>
+            {isError && <a href={getPublicSitePath(route.kind, route.locale, route.slug)}>{copy.retry}</a>}
+          </section>
+        )}
       </main>
-      <SiteFooter clinicName={data.clinic?.name} locale={route.locale} copy={copy} />
+      <SiteFooter clinicName={data?.clinic?.name} locale={route.locale} copy={copy} />
     </div>
   );
 }
 
-export function PublicSiteRequestState({
-  route,
-  status,
-}: {
-  route: PublicSiteRouteMatch;
-  status: 'loading' | 'error';
-}) {
-  const copy = COPY[route.locale];
-  const isError = status === 'error';
-  return (
-    <div className="public-site">
-      <a className="public-site__skip-link" href="#main-content">{copy.skipToContent}</a>
-      <SiteHeader locale={route.locale} route={route} copy={copy} />
-      <main className="public-site__main" id="main-content" tabIndex={-1} aria-busy={!isError}>
-        <section className="public-site__error" role={isError ? 'alert' : 'status'}>
-          <h1>{isError ? copy.loadError : copy.loading}</h1>
-          {isError && <a href={getPublicSitePath(route.kind, route.locale, route.slug)}>{copy.retry}</a>}
-        </section>
-      </main>
-      <SiteFooter locale={route.locale} copy={copy} />
-    </div>
-  );
+export function PublicSiteRequestState(props: PublicSiteRequestStateProps) {
+  return <PublicSitePage {...props} />;
 }
 
 export function PublicSiteFallback() {
