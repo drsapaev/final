@@ -193,5 +193,58 @@
       "Actual screen-reader speech, native Safari and physical devices",
       "Full WCAG 2.2 AA and staging acceptance"
     ]
+  },
+  "published_catalog_follow_up": {
+    "date": "2026-11-22",
+    "origin": "https://finalclinic.fyi",
+    "deployment_id": "dpl_852SPhftSnWzczjabJXM8L4YCVTy",
+    "deployment_sha": "718bd9529556b922c27cd1af8eace73e0e04b2e4",
+    "deployment_identity_check": "Vercel resolved the Production alias to this READY deployment before and after the sweep.",
+    "engine": {
+      "browser": "Chrome 157.0.8103.79",
+      "axe_core": "4.14.0",
+      "axe_tags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
+    },
+    "scope": {
+      "source": "All 14 URLs in the public sitemap, seven in each of ru and uz-Latn.",
+      "desktop_viewport_css_px": [1440, 900],
+      "narrow_viewport_css_px": [390, 844],
+      "narrow_profile": "Chrome with its default user agent, emulated touch input and device scale factor 2."
+    },
+    "results": {
+      "successful_page_loads": 28,
+      "correct_document_languages": 28,
+      "skip_link_first_tab_and_enter_moved_focus_to_main": 28,
+      "additional_scans_with_narrow_menu_open": 2,
+      "axe_scans": 30,
+      "axe_violations": 0,
+      "axe_incomplete": 0
+    },
+    "computed_contrast": {
+      "method": "Calculate WCAG relative luminance from effective browser colors and their composited solid backgrounds. Compare the unrounded ratios to the thresholds.",
+      "desktop_header_nav_text_min": 4.87,
+      "language_link_text_min": 4.87,
+      "narrow_menu_label_text_min": 19.54,
+      "open_narrow_menu_link_text_min": 5.05,
+      "focused_skip_link_text_min": 18.84,
+      "focused_skip_link_outline_against_page_background_min": 4.27,
+      "primary_action_text_min": 5.43,
+      "current_breadcrumb_text_min": 18.84,
+      "text_threshold": 4.5,
+      "focus_outline_threshold": 3.0
+    },
+    "reduced_motion": {
+      "preference": "prefers-reduced-motion: reduce",
+      "max_computed_transition_ms": 0.01,
+      "max_computed_animation_ms": 0.01,
+      "computed_smooth_scroll_observed": false,
+      "scope": "Visible public-site content and generated pseudo-elements in the scanned states."
+    },
+    "procedure": "Read the sitemap, open each URL in a fresh Chrome page at each viewport with reduced motion enabled, check HTTP 200 and document language, run the listed Axe tags, then press Tab and Enter to verify focus. Open the menu with Enter on both narrow home pages and run Axe again. Keep browser requests on the site's own frontend and public API.",
+    "limitations": [
+      "A separate Pixel 7 Chrome emulation profile received connection resets for all 14 document requests and yielded no scans.",
+      "Contrast samples cover default states and the visible skip-link focus outline. Hover, forced colors and Vite dark mode were outside this measurement.",
+      "Exact screen-reader speech, physical devices, native Safari and complete WCAG conformance remain unverified."
+    ]
   }
 }
