@@ -103,7 +103,7 @@
     "remaining": [
       "Live Narrator announcements and native Safari",
       "Physical devices",
-      "Desktop text-only enlargement",
+      "Desktop text-only enlargement is tracked in desktop_reflow_follow_up.",
       "Full WCAG 2.2 AA audit and full staging validation"
     ]
   },
@@ -138,6 +138,46 @@
     "remaining": [
       "Actual screen-reader speech",
       "Native Safari and physical devices",
+      "Full WCAG 2.2 AA and staging acceptance"
+    ]
+  },
+  "desktop_reflow_follow_up": {
+    "date": "2026-11-22",
+    "base_sha": "e0a617c1ba3a114ffbf80b601d1a46a45245ecb6",
+    "scope": "Desktop public header on the Russian and Uzbek services routes.",
+    "live_baseline": {
+      "deployment_id": "dpl_GVLAziLa16fs1QvFximiUpwxRmHn",
+      "served_sha": "590d8461f7712ef54fbea556f9373df03891f2cf",
+      "same_stylesheet_as_base": true,
+      "widths_css_px": [960, 1280],
+      "firefox_default_cases_passed": 4,
+      "firefox_text_only_200_percent_cases_with_findings": 3,
+      "observed_right_overflow_css_px": {
+        "960_uz-Latn": 276,
+        "960_ru": 206,
+        "1280_uz-Latn": 20
+      },
+      "observation": "Navigation or language links and their focused targets extended beyond the visible viewport."
+    },
+    "fix": "Let the header groups and desktop links wrap in DOM order. Allow long text to break and leave room for focus outlines.",
+    "isolated_vite": {
+      "fixture": "Repository synthetic public-site API",
+      "routes": ["/services", "/ru/services"],
+      "widths_css_px": [761, 960, 1280],
+      "firefox_default_cases_passed": 6,
+      "firefox_text_only_200_percent_cases_passed": 6,
+      "findings_after_fix": 0,
+      "checks": [
+        "Native Firefox text-only enlargement doubled calibration text, button text and route brand text while viewport, fixed box width and DPR stayed constant.",
+        "The whole header fit with no horizontal overflow, clipped controls or clipped text fragments.",
+        "Actual Tab reached the skip link, brand, five navigation links and language switch with visible, exposed focus."
+      ],
+      "teardown": "Owned browser profile, synthetic API and Vite listeners were removed."
+    },
+    "regression": "The Playwright spec doubles computed header-link font sizes at 960 CSS px in Vite and Nitro for each locale and checks actual Tab, visible labels and target bounds. Existing mobile keyboard checks cover the native menu.",
+    "remaining": [
+      "Native desktop zoom evidence on the deployed fix",
+      "Actual screen-reader speech, native Safari and physical devices",
       "Full WCAG 2.2 AA and staging acceptance"
     ]
   }
