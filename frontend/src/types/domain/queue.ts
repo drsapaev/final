@@ -22,6 +22,9 @@ export type QueueSource = 'online' | 'desk' | 'qr' | 'morning_assignment';
 export interface QueueEntry {
   id?: string | number;
   queue_number?: number | string;
+  queue_owner_kind?: 'doctor' | 'resource' | null;
+  queue_owner_id?: number | null;
+  daily_queue_id?: number | null;
   patient_id?: string | number;
   patient_name?: string;
   phone?: string;
