@@ -140,6 +140,83 @@ describe('useQueueManager snapshot lifecycle (REG-FE-035 / REG-FE-042)', () => {
     expect(result.current.queueData?.queue_id).toBe(2);
   });
 
+  it.each([false, true])('selects distinct doctors in a specialty group (history: %s)', async (history) => {
+    const secondDoctorId = 18;
+    const doctorWithoutDailyQueueId = 19;
+    const firstEntry = {
+      id: 401,
+      status: 'waiting',
+      queue_owner_kind: 'doctor',
+      queue_owner_id: CARDIO_DOCTOR_ID,
+      daily_queue_id: 183,
+    };
+    const secondEntry = {
+      id: 402,
+      status: 'waiting',
+      queue_owner_kind: 'doctor',
+      queue_owner_id: secondDoctorId,
+      daily_queue_id: 274,
+    };
+    const ownedHistory = {
+      ...firstEntry,
+      id: 403,
+      status: 'served',
+      daily_queue_id: 484,
+    };
+    const unlinked = { id: 404, status: 'waiting' };
+    const scheduledOnly = {
+      id: 405,
+      status: 'waiting',
+      queue_owner_kind: 'doctor',
+      queue_owner_id: doctorWithoutDailyQueueId,
+      daily_queue_id: null,
+    };
+    const entries = [firstEntry, secondEntry, ...(history ? [ownedHistory] : []), unlinked, scheduledOnly];
+    const response = {
+      data: {
+        queues: [{
+          ...cardioQueue,
+          specialist_id: secondDoctorId,
+          entries,
+          stats: { total_entries: entries.length, waiting: 4, completed: history ? 1 : 0 },
+        }],
+      },
+    };
+    mockTodayQueue(Array.from({ length: 3 }, () => Promise.resolve(response)));
+    const { result } = renderHook(() => useQueueManager());
+
+    const snapshots = [];
+    for (const specialistId of [CARDIO_DOCTOR_ID, secondDoctorId]) {
+      await act(async () => {
+        await result.current.loadQueueSnapshot({ specialistId, targetDate: '2026-11-03' });
+      });
+      snapshots.push({
+        queueId: result.current.queueData?.queue_id,
+        entryIds: result.current.queueData?.entries?.map((entry) => entry.id),
+        waiting: result.current.statistics?.waiting,
+        completed: result.current.statistics?.completed,
+      });
+    }
+
+    expect(snapshots).toEqual([
+      {
+        queueId: history ? undefined : 183,
+        entryIds: history ? [401, 403] : [401],
+        waiting: 1,
+        completed: history ? 1 : 0,
+      },
+      { queueId: 274, entryIds: [402], waiting: 1, completed: 0 },
+    ]);
+
+    await act(async () => {
+      await result.current.loadQueueSnapshot({
+        specialistId: doctorWithoutDailyQueueId,
+        targetDate: '2026-11-03',
+      });
+    });
+    expect(result.current.queueData).toBeNull();
+  });
+
   it('REG-FE-035: a late older snapshot must not overwrite the newer selection', async () => {
     const lateA = deferred<{ data: { queues: unknown[] } }>();
     const freshB = deferred<{ data: { queues: unknown[] } }>();
