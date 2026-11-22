@@ -20,7 +20,7 @@ interface Copy {
   prices: string;
   contacts: string;
   staffLogin: string;
-  language: string;
+  switchLanguage: string;
   navigation: string;
   breadcrumbs: string;
   home: string;
@@ -73,7 +73,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     prices: 'Цены',
     contacts: 'Контакты',
     staffLogin: 'Вход для персонала',
-    language: 'Язык',
+    switchLanguage: 'Перейти на узбекский',
     navigation: 'Навигация сайта',
     breadcrumbs: 'Навигационная цепочка',
     home: 'Главная',
@@ -135,7 +135,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     prices: 'Narxlar',
     contacts: 'Kontaktlar',
     staffLogin: 'Xodimlar uchun kirish',
-    language: 'Til',
+    switchLanguage: 'Rus tiliga o‘tish',
     navigation: 'Sayt navigatsiyasi',
     breadcrumbs: 'Sahifa yo‘nalishi',
     home: 'Bosh sahifa',
@@ -312,6 +312,7 @@ function SiteHeader({ locale, route, copy, logoUrl }: {
   const otherLocale = locale === 'ru' ? 'uz-Latn' : 'ru';
   const homePath = localizePath('home', locale);
   const switchPath = localizePath(route.kind, otherLocale, route.slug);
+  const languageCode = otherLocale === 'ru' ? 'RU' : 'O‘Z';
   return (
     <header className="public-site__header">
       <a className="public-site__brand" href={homePath}>
@@ -327,8 +328,8 @@ function SiteHeader({ locale, route, copy, logoUrl }: {
         <summary>{copy.mobileMenu}</summary>
         <PublicSiteLinks className="public-site__mobile-nav" locale={locale} copy={copy} />
       </details>
-      <a className="public-site__language" href={switchPath} aria-label={copy.language}>
-        {otherLocale === 'ru' ? 'RU' : 'O‘Z'}
+      <a className="public-site__language" href={switchPath} aria-label={`${languageCode} — ${copy.switchLanguage}`}>
+        {languageCode}
       </a>
     </header>
   );
