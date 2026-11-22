@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { getApiOrigin } from './api/runtime';
 import { createPublicSiteApi } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
+import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_COPY } from './publicSiteMetadata';
 import {
   PublicSiteFallback,
   PublicSitePage,
@@ -19,6 +20,10 @@ export default function PublicSiteAppRoute() {
   const route = resolvePublicSiteRoute(pathname);
   const locale = route?.locale;
   const [pageState, setPageState] = useState<PageState>({ pathname, status: 'loading' });
+  const state = pageState.pathname === pathname ? pageState : { pathname, status: 'loading' as const };
+  const title = route && (state.status === 'error'
+    ? PUBLIC_SITE_ERROR_COPY[route.locale].title
+    : getPublicSitePageMetadata(route, state.status === 'ready' ? state.data : undefined).title);
 
   useLayoutEffect(() => {
     if (!locale) return undefined;
@@ -35,6 +40,18 @@ export default function PublicSiteAppRoute() {
       else root.lang = previousLanguage;
     };
   }, [locale]);
+
+  useLayoutEffect(() => {
+    if (!title) return undefined;
+
+    const previousTitle = document.title;
+    document.title = title;
+    const appliedTitle = document.title;
+
+    return () => {
+      if (document.title === appliedTitle) document.title = previousTitle;
+    };
+  }, [title]);
 
   useEffect(() => {
     const route = resolvePublicSiteRoute(pathname);
@@ -62,7 +79,6 @@ export default function PublicSiteAppRoute() {
   }, [pathname]);
 
   if (!route) return <PublicSiteFallback />;
-  const state = pageState.pathname === pathname ? pageState : { pathname, status: 'loading' as const };
   if (state.status === 'ready') return <PublicSitePage route={route} data={state.data} />;
   return <PublicSiteRequestState route={route} status={state.status} />;
 }

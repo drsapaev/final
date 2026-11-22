@@ -7,6 +7,7 @@ const PUBLIC_SITE_ORIGINS = [
   { name: 'Nitro', origin: 'http://127.0.0.1:5278' },
 ] as const;
 const FIXTURE_ORIGIN = 'http://127.0.0.1:' + Number(process.env.PUBLIC_SITE_FIXTURE_PORT || 5279);
+const PUBLIC_SITE_BRAND = 'Doktor KosMed Clinic';
 
 const LOCALES = [
   {
@@ -14,14 +15,20 @@ const LOCALES = [
     prefix: '',
     skipLink: 'Asosiy mazmunga o‘tish',
     navigation: 'Sayt navigatsiyasi',
+    languageSwitch: 'RU — Rus tiliga o‘tish',
     doctorName: 'Sintetik sinov profili',
+    homeTitle: `${PUBLIC_SITE_BRAND} — xizmatlar va shifokorlar`,
+    errorTitle: `Sahifa vaqtincha ochilmayapti — ${PUBLIC_SITE_BRAND}`,
   },
   {
     lang: 'ru',
     prefix: '/ru',
     skipLink: 'Перейти к основному содержимому',
     navigation: 'Навигация сайта',
+    languageSwitch: 'O‘Z — Перейти на узбекский',
     doctorName: 'Синтетический тестовый профиль',
+    homeTitle: `${PUBLIC_SITE_BRAND} — услуги и врачи`,
+    errorTitle: `Страница временно недоступна — ${PUBLIC_SITE_BRAND}`,
   },
 ] as const;
 type Locale = (typeof LOCALES)[number];
@@ -96,7 +103,7 @@ function jsonResponse(body: unknown, status = 200) {
 async function installSyntheticApi(
   page: Page,
   request: APIRequestContext,
-  failPublicContent = false,
+  beforePublicFailure?: () => Promise<void>,
 ) {
   await page.routeWebSocket('**/*', (socket) => socket.close());
   await page.route('**/*', (route) => {
@@ -122,7 +129,8 @@ async function installSyntheticApi(
     }
 
     if (pathname.startsWith('/api/v1/public-site/')) {
-      if (failPublicContent) {
+      if (beforePublicFailure) {
+        await beforePublicFailure();
         await route.fulfill(jsonResponse({ detail: 'synthetic upstream unavailable' }, 503));
         return;
       }
@@ -318,6 +326,9 @@ async function assertLocalizedCatalog(page: Page, request: APIRequestContext, wi
           const main = page.getByRole('main');
           await expect(main.getByRole('heading', { level: 1 })).toHaveText(titles[locale.lang]);
           await expect(page.locator('html')).toHaveAttribute('lang', locale.lang);
+          await expect(page.locator('.public-site__language')).toHaveAccessibleName(locale.languageSwitch);
+          const pageName = path === '/doctors/synthetic-profile' ? locale.doctorName : titles[locale.lang];
+          await expect(page).toHaveTitle(path === '' ? locale.homeTitle : `${pageName} — ${PUBLIC_SITE_BRAND}`);
 
           if (path === '/services/synthetic-service') {
             await expect(main.getByRole('link', { name: locale.doctorName, exact: true }))
@@ -383,34 +394,48 @@ test.describe('public-site accessibility', () => {
   });
 
   test('the Vite error state uses the public locale and restores the app language on exit', async ({ page, request }) => {
-    await installSyntheticApi(page, request, true);
+    let allowPublicFailure = Promise.resolve();
+    await installSyntheticApi(page, request, () => allowPublicFailure);
     await page.goto(VITE_ORIGIN + '/login');
     const login = page.locator('input[autocomplete="username"]');
     const body = page.locator('body');
     await expect(login).toBeVisible();
+    await expect(page).toHaveTitle('Clinic OS');
     const appOverflowX = await body.evaluate((element) => getComputedStyle(element).overflowX);
 
     await page.evaluate(() => {
       document.documentElement.lang = 'fr';
       document.documentElement.dataset.localeTest = 'same-document';
     });
-    await navigateInApp(page, '/ru/services');
+    for (const { locale, pendingName, errorMessage } of [
+      { locale: LOCALES[1], pendingName: 'Услуги', errorMessage: 'Не удалось загрузить актуальную информацию клиники.' },
+      { locale: LOCALES[0], pendingName: 'Xizmatlar', errorMessage: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.' },
+    ]) {
+      let releasePublicFailure!: () => void;
+      allowPublicFailure = new Promise<void>((resolve) => { releasePublicFailure = resolve; });
+      try {
+        await navigateInApp(page, locale.prefix + '/services');
+        await expect(page.getByRole('main')).toHaveAttribute('aria-busy', 'true');
+        await expect(page).toHaveTitle(`${pendingName} — ${PUBLIC_SITE_BRAND}`);
+      } finally {
+        releasePublicFailure();
+      }
 
-    await expect(page.getByRole('alert')).toContainText('Не удалось загрузить актуальную информацию клиники.');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
-    await expect(body).toHaveCSS('overflow-x', 'clip');
-    await assertSkipNavigation(page, LOCALES[1]);
-    await assertNoAxeViolations(page);
-
-    await navigateInApp(page, '/services');
-    await expect(page.getByRole('alert')).toContainText('Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'uz-Latn');
-    await expect(body).toHaveCSS('overflow-x', 'clip');
+      await expect(page.getByRole('alert')).toContainText(errorMessage);
+      await expect(page.locator('html')).toHaveAttribute('lang', locale.lang);
+      await expect(page).toHaveTitle(locale.errorTitle);
+      await expect(body).toHaveCSS('overflow-x', 'clip');
+      if (locale.lang === 'ru') {
+        await assertSkipNavigation(page, locale);
+        await assertNoAxeViolations(page);
+      }
+    }
 
     await navigateInApp(page, '/login');
     await expect(login).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
     await expect(page.locator('html')).toHaveAttribute('data-locale-test', 'same-document');
+    await expect(page).toHaveTitle('Clinic OS');
     await expect(body).toHaveCSS('overflow-x', appOverflowX);
   });
 });

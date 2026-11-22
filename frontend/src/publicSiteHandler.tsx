@@ -17,6 +17,7 @@ import {
   type PublicSiteService,
 } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
+import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_COPY } from './publicSiteMetadata';
 import {
   getPublicClinicContacts,
   getPublicSiteBreadcrumbs,
@@ -36,45 +37,6 @@ export interface PublicSiteAssets {
   appStyles: string[];
   pageStyleText?: string;
 }
-
-interface PageMeta {
-  title: string;
-  description: string;
-}
-
-const BRAND = 'Doktor KosMed Clinic';
-
-const META_COPY: Record<PublicSiteLocale, Record<PublicSitePageKind, PageMeta>> = {
-  ru: {
-    home: { title: `${BRAND} — услуги и врачи`, description: 'Информация об опубликованных услугах, врачах и контактах клиники.' },
-    services: { title: `Услуги — ${BRAND}`, description: 'Опубликованные услуги клиники и информация о них.' },
-    service: { title: `Услуга — ${BRAND}`, description: 'Описание опубликованной услуги клиники.' },
-    doctors: { title: `Врачи — ${BRAND}`, description: 'Профили врачей, опубликованные клиникой.' },
-    doctor: { title: `Врач — ${BRAND}`, description: 'Информация о профиле врача клиники.' },
-    prices: { title: `Цены — ${BRAND}`, description: 'Опубликованные цены на услуги клиники.' },
-    contacts: { title: `Контакты — ${BRAND}`, description: 'Контактные данные клиники.' },
-  },
-  'uz-Latn': {
-    home: { title: `${BRAND} — xizmatlar va shifokorlar`, description: 'Klinikaning e’lon qilingan xizmatlari, shifokorlari va kontaktlari haqida ma’lumot.' },
-    services: { title: `Xizmatlar — ${BRAND}`, description: 'Klinikaning e’lon qilingan xizmatlari va ular haqida ma’lumot.' },
-    service: { title: `Xizmat — ${BRAND}`, description: 'Klinikaning e’lon qilingan xizmati tavsifi.' },
-    doctors: { title: `Shifokorlar — ${BRAND}`, description: 'Klinika tomonidan e’lon qilingan shifokor profillari.' },
-    doctor: { title: `Shifokor — ${BRAND}`, description: 'Klinika shifokorining profili haqida ma’lumot.' },
-    prices: { title: `Narxlar — ${BRAND}`, description: 'Klinika xizmatlari uchun e’lon qilingan narxlar.' },
-    contacts: { title: `Kontaktlar — ${BRAND}`, description: 'Klinikaning kontakt ma’lumotlari.' },
-  },
-};
-
-const ERROR_COPY: Record<PublicSiteLocale, { title: string; message: string }> = {
-  ru: {
-    title: `Страница временно недоступна — ${BRAND}`,
-    message: 'Не удалось загрузить актуальную информацию клиники. Попробуйте открыть страницу позже.',
-  },
-  'uz-Latn': {
-    title: `Sahifa vaqtincha ochilmayapti — ${BRAND}`,
-    message: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi. Sahifani keyinroq ochib ko‘ring.',
-  },
-};
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -103,12 +65,6 @@ function safeOrigin(value: string, allowLocalHttp = false): string | null {
 function canonicalOrigin(request: Request, configuredOrigin?: string): string | null {
   if (configuredOrigin) return safeOrigin(configuredOrigin, true);
   return safeOrigin(new URL(request.url).origin, true);
-}
-
-function truncateDescription(value: string): string {
-  const compact = value.replace(/\s+/g, ' ').trim();
-  if (compact.length <= 160) return compact;
-  return `${compact.slice(0, 157).trimEnd()}…`;
 }
 
 function renderJsonLd(value: unknown): string {
@@ -147,23 +103,6 @@ function renderMedicalClinicJsonLd(clinic: PublicSiteClinic | undefined, origin:
     email: mailtoHref ? clinic.email?.trim() : undefined,
     openingHoursSpecification,
   });
-}
-
-function pageMeta(route: PublicSiteRouteMatch, data: PublicSitePageData): PageMeta {
-  const base = META_COPY[route.locale][route.kind];
-  if (route.kind === 'service' && data.service) {
-    return {
-      title: `${data.service.name} — ${BRAND}`,
-      description: truncateDescription(data.service.description),
-    };
-  }
-  if (route.kind === 'doctor' && data.doctor) {
-    return {
-      title: `${data.doctor.name} — ${BRAND}`,
-      description: truncateDescription(data.doctor.bio),
-    };
-  }
-  return base;
 }
 
 function pagePath(route: PublicSiteRouteMatch, locale: PublicSiteLocale): string {
@@ -214,7 +153,7 @@ function renderPublicDocument(
   styles: string[],
   pageStyleText?: string,
 ): string {
-  const meta = pageMeta(route, data);
+  const meta = getPublicSitePageMetadata(route, data);
   const canonical = new URL(pagePath(route, route.locale), origin).href;
   const alternateUz = new URL(pagePath(route, 'uz-Latn'), origin).href;
   const alternateRu = new URL(pagePath(route, 'ru'), origin).href;
@@ -486,7 +425,7 @@ function renderPageStyles(styles: string[], pageStyleText?: string): string {
 }
 
 function renderErrorDocument(locale: PublicSiteLocale, styles: string[], pageStyleText?: string): string {
-  const error = ERROR_COPY[locale];
+  const error = PUBLIC_SITE_ERROR_COPY[locale];
   const css = renderPageStyles(styles, pageStyleText);
   return '<!doctype html><html lang="' + escapeHtml(locale) + '"><head>' +
     '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
