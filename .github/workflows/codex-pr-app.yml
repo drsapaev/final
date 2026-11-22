@@ -1,6 +1,6 @@
 name: Codex PR App
 
-run-name: Codex PR ${{ inputs.operation }} for #${{ inputs.pull_request }}
+run-name: 'Codex PR ${{ inputs.operation }} for #${{ inputs.pull_request }}'
 
 on:
   workflow_dispatch:
