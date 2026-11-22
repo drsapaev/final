@@ -524,21 +524,30 @@ html.public-site-document body {
     padding-block: 16px;
   }
 
+  .public-site .public-site__brand {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   .public-site__nav {
     display: none;
   }
 
   .public-site__mobile-menu {
-    position: relative;
     display: block;
-    order: 2;
-    margin-left: auto;
+    margin-inline-start: auto;
+  }
+
+  .public-site__mobile-menu[open] {
+    flex-basis: 100%;
   }
 
   .public-site__mobile-menu summary {
     display: flex;
+    inline-size: fit-content;
     min-height: 44px;
     align-items: center;
+    margin-inline-start: auto;
     padding: 0 12px;
     border: 1px solid var(--mac-border, rgb(184, 200, 218));
     border-radius: 10px;
@@ -554,13 +563,12 @@ html.public-site-document body {
   }
 
   .public-site__mobile-nav {
-    position: absolute;
-    z-index: 2;
-    top: calc(100% + 8px);
-    right: 0;
     display: grid;
-    min-width: 190px;
+    box-sizing: border-box;
+    inline-size: min(100%, 240px);
     gap: 4px;
+    margin-block-start: 8px;
+    margin-inline-start: auto;
     padding: 8px;
     border: 1px solid var(--mac-border, rgb(184, 200, 218));
     border-radius: 12px;
@@ -574,7 +582,7 @@ html.public-site-document body {
     align-items: center;
     padding: 0 12px;
     border-radius: 8px;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .public-site__mobile-nav a:hover {
