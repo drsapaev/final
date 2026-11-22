@@ -151,7 +151,60 @@ async function installSyntheticApi(
   });
 }
 
-async function assertSkipNavigation(page: Page, locale: Locale) {
+async function assertMobileServiceNavigation(page: Page, locale: Locale, skipLink: Locator) {
+  const header = page.locator('.public-site__header');
+  const brand = header.getByRole('link', { name: PUBLIC_SITE_BRAND, exact: true });
+  const language = header.getByRole('link', { name: locale.languageSwitch, exact: true });
+  const menu = header.locator('.public-site__mobile-menu summary');
+  const navigation = header.getByRole('navigation', { name: locale.navigation, exact: true });
+
+  for (const target of [brand, language, menu]) {
+    await page.keyboard.press('Tab');
+    await expect(target).toBeFocused();
+  }
+  await page.keyboard.press('Enter');
+  await expect(navigation).toBeVisible();
+
+  const menuLinks = await navigation.getByRole('link').all();
+  expect(menuLinks.length).toBeGreaterThan(0);
+  const main = page.getByRole('main');
+  const breadcrumbsHome = main.locator('.public-site__breadcrumbs a').first();
+  const search = main.getByRole('searchbox', { name: CATALOG_COPY[locale.lang].service.search, exact: true });
+  const firstService = main.locator('a.public-site__list-title').first();
+  const catalogTabStops = [
+    breadcrumbsHome,
+    search,
+    main.getByRole('combobox', { name: CATALOG_COPY[locale.lang].service.group, exact: true }),
+    main.getByRole('button', { name: CATALOG_COPY[locale.lang].reset, exact: true }),
+    firstService,
+  ];
+  for (const target of [...menuLinks, ...catalogTabStops]) {
+    await page.keyboard.press('Tab');
+    await expect(target).toBeFocused();
+    if (target === search || target === firstService) {
+      await expect(target).toBeInViewport();
+      await expect.poll(() => target.evaluate((element) =>
+        Array.from(element.getClientRects()).every((rect) =>
+          element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2))),
+      ), { message: 'the open menu should not cover the focused catalog item' }).toBe(true);
+    }
+  }
+  await expect(navigation).toBeVisible();
+
+  const reverseTabStops = [...menuLinks, ...catalogTabStops.slice(0, -1)].reverse();
+  for (const target of [...reverseTabStops, menu]) {
+    await page.keyboard.press('Shift+Tab');
+    await expect(target).toBeFocused();
+  }
+  await page.keyboard.press('Enter');
+  await expect(navigation).toBeHidden();
+  for (const target of [language, brand, skipLink]) {
+    await page.keyboard.press('Shift+Tab');
+    await expect(target).toBeFocused();
+  }
+}
+
+async function assertSkipNavigation(page: Page, locale: Locale, checkMobileServiceNavigation = false) {
   const skipLink = page.getByRole('link', { name: locale.skipLink, exact: true });
   const navigation = page.getByRole('navigation', { name: locale.navigation, exact: true });
   const main = page.getByRole('main');
@@ -166,10 +219,15 @@ async function assertSkipNavigation(page: Page, locale: Locale) {
 
   await page.keyboard.press('Tab');
   await expect(skipLink).toBeFocused();
+  if (checkMobileServiceNavigation) {
+    await assertMobileServiceNavigation(page, locale, skipLink);
+  }
   await expect(skipLink).toBeInViewport();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#main-content$/);
   await expect(main).toBeFocused();
+
+  if (checkMobileServiceNavigation) return;
 
   const mobileMenu = page.locator('.public-site__mobile-menu summary');
   if (await mobileMenu.isVisible()) {
@@ -345,7 +403,7 @@ async function assertLocalizedCatalog(page: Page, request: APIRequestContext, wi
             return scrollWidth - clientWidth;
           }), { message: 'the public page should fit the viewport width' }).toBeLessThanOrEqual(1);
 
-          await assertSkipNavigation(page, locale);
+          await assertSkipNavigation(page, locale, width === 320 && path === '/services');
 
           if (runtime.origin === VITE_ORIGIN && path === '') {
             const scroll = await page.evaluate(() => {

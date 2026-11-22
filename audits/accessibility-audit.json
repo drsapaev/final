@@ -52,5 +52,59 @@
     "Only selected public catalog/error states were audited; this is not a complete WCAG 2.2 AA audit.",
     "Local Firefox and WebKit Playwright binaries are absent; the dedicated CI spec runs only in Chromium, so cross-browser behavior remains unverified.",
     "Mobile Chrome used an emulated viewport, not a physical device."
-  ]
+  ],
+  "mobile_reflow_follow_up": {
+    "date": "2026-11-22",
+    "base_sha": "a2f9fad7907a0fbcd2f7f50a10a4a3dda3f9b0b5",
+    "scope": "Targeted mobile public header, catalog filters and keyboard bypass, after catalog data is ready.",
+    "live_baseline": {
+      "deployment_id": "dpl_9zQfuyXCjvzzhpuQme1ps9hncjqb",
+      "width_css_px": 320,
+      "chrome": "On /ru/services, Tab reached the menu before the language switch despite the opposite visual order. The open menu covered the center of a focused service link.",
+      "firefox_text_only_200_percent": "Brand text extended to 403 CSS px and the open menu extended its link text left of the viewport on the measured public catalog pages."
+    },
+    "fix": "Align mobile DOM and visual order, let the expanded native disclosure occupy normal flow, and wrap brand and menu text at narrow widths.",
+    "isolated_vite": {
+      "locales": [
+        "ru",
+        "uz-Latn"
+      ],
+      "routes": [
+        "services",
+        "prices",
+        "doctors",
+        "contacts"
+      ],
+      "viewport_css_px": 320,
+      "reduced_motion": "reduce",
+      "chrome_default_cases_passed": 8,
+      "firefox_default_cases_passed": 8,
+      "firefox_text_only_200_percent_cases_passed": 8,
+      "probe_errors": 0,
+      "findings_after_fix": 0,
+      "calibration": {
+        "viewport_width_unchanged": true,
+        "device_pixel_ratio_unchanged": true,
+        "fixed_box_width_unchanged": true,
+        "text_width_ratio": 2,
+        "button_text_width_ratio": 2
+      },
+      "checks": [
+        "Actual Tab order and visible focus",
+        "Menu opens and leaves subsequent focused controls exposed",
+        "Brand and menu text fits viewport",
+        "Skip link transfers focus to main",
+        "Catalog query and keyboard reset restore results and focus",
+        "Sampled reduced-motion scroll and animation settings"
+      ],
+      "teardown": "Owned browser profiles and loopback services stopped."
+    },
+    "regression": "The existing Playwright accessibility spec now exercises real forward and reverse Tab through the mobile services header and catalog for both locales and Vite/Nitro. It tests that the open menu does not cover the focused search control or service link.",
+    "remaining": [
+      "Live Narrator announcements and native Safari",
+      "Physical devices",
+      "Desktop text-only enlargement",
+      "Full WCAG 2.2 AA audit and full staging validation"
+    ]
+  }
 }

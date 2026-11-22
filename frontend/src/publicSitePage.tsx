@@ -332,13 +332,13 @@ function SiteHeader({ locale, route, copy, logoUrl }: {
         <span>{copy.clinicName}</span>
       </a>
       <PublicSiteLinks className="public-site__nav" locale={locale} copy={copy} />
+      <a className="public-site__language" href={switchPath} aria-label={`${languageCode} — ${copy.switchLanguage}`}>
+        {languageCode}
+      </a>
       <details className="public-site__mobile-menu">
         <summary>{copy.mobileMenu}</summary>
         <PublicSiteLinks className="public-site__mobile-nav" locale={locale} copy={copy} />
       </details>
-      <a className="public-site__language" href={switchPath} aria-label={`${languageCode} — ${copy.switchLanguage}`}>
-        {languageCode}
-      </a>
     </header>
   );
 }
