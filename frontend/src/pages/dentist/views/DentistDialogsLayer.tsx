@@ -68,6 +68,12 @@ export type DentistDialogsLayerProps = {
   >;
   setSessionWarning: (value: { active: boolean } | null) => void;
   handleProtocolTemplateSelect: (template: Record<string, unknown> | null) => void;
+  /** RETRO-3986-01 (post-merge review 4000): the inspection-only contract
+   * is REQUIRED here — the dormant third consumer must not re-wire a live
+   * writable ToothModal the day this layer is mounted again. The parent
+   * passes the record-lock state (e.g. fieldsDisabled); TypeScript makes
+   * forgetting it a compile error, so the modal fails closed. */
+  toothModalReadOnly: boolean;
 };
 
 export default function DentistDialogsLayer({
@@ -104,6 +110,7 @@ export default function DentistDialogsLayer({
   setScheduleNextModal,
   setSessionWarning,
   handleProtocolTemplateSelect,
+  toothModalReadOnly,
 }: DentistDialogsLayerProps) {
   const {
     isDark,
@@ -145,6 +152,7 @@ export default function DentistDialogsLayer({
 
       {showPhotoArchive && selectedPatient &&
       <PhotoArchive
+        key={`photo-archive:${(selectedPatient.patient_id || selectedPatient.patient?.id) ?? ''}:${selectedPatient.visit_id ?? ''}`}
         patientId={(selectedPatient.patient_id || selectedPatient.patient?.id) as string | number | undefined}
         visitId={selectedPatient.visit_id}
         patientName={selectedPatientDisplayName}
@@ -210,7 +218,7 @@ export default function DentistDialogsLayer({
               setSelectedTooth({ number: toothNumber, data: toothData });
               setToothModalOpen(true);
             }}
-            readOnly={false} />
+            readOnly={toothModalReadOnly} />
 
           </div>
         </div>
@@ -240,6 +248,7 @@ export default function DentistDialogsLayer({
               </button>
             </div>
             <TreatmentPlanner
+            key={`treatment-planner:${selectedPatientId ?? ''}:${selectedPatient.visit_id ?? ''}`}
             patientId={selectedPatientId}
             visitId={(selectedPatient.visit_id as string | number | undefined)}
             teethData={dentalChartData || {}}
@@ -260,6 +269,7 @@ export default function DentistDialogsLayer({
       {toothModalOpen && selectedTooth &&
       <ToothModal
         open={toothModalOpen}
+        readOnly={toothModalReadOnly}
         onClose={() => {
           setToothModalOpen(false);
           setSelectedTooth(null);

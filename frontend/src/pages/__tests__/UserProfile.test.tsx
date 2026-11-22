@@ -1,11 +1,12 @@
 import React, { StrictMode } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 
-const { apiGet, apiPut, setAuthProfile, getAuthState } = vi.hoisted(() => ({
+const { apiGet, apiPut, apiPost, setAuthProfile, getAuthState } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPut: vi.fn(),
+  apiPost: vi.fn(),
   setAuthProfile: vi.fn(),
   getAuthState: vi.fn(),
 }));
@@ -14,6 +15,7 @@ vi.mock('../../api/client', () => ({
   api: {
     get: apiGet,
     put: apiPut,
+    post: apiPost,
   },
 }));
 
@@ -105,6 +107,64 @@ describe('UserProfile page', () => {
     expect(screen.getByDisplayValue('registrar@example.com')).toBeInTheDocument();
     expect(screen.getByDisplayValue('+998901112233')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /сохранить профиль/i })).toBeDisabled();
+  });
+
+  it('requests a verification email only for the saved unverified address', async () => {
+    apiGet.mockResolvedValueOnce({ data: { ...profileResponse, email_verified: false } });
+    apiPost.mockResolvedValueOnce({ data: { success: true } });
+    renderUserProfile();
+    const button = await screen.findByRole('button', { name: /отправить письмо с подтверждением/i });
+    fireEvent.click(button);
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/authentication/email-verification'));
+    expect(await screen.findByText(/письмо отправлено/i)).toBeInTheDocument();
+  });
+
+  it('disables the request for an unsaved email and hides it after verification', async () => {
+    apiGet.mockResolvedValueOnce({ data: { ...profileResponse, email_verified: false } });
+    const { unmount } = renderUserProfile();
+    const button = await screen.findByRole('button', { name: /отправить письмо с подтверждением/i });
+    fireEvent.change(screen.getByDisplayValue('registrar@example.com'), { target: { value: 'new@example.test' } });
+    expect(button).toBeDisabled();
+    unmount();
+    __resetSelfProfileCacheForTests();
+    apiGet.mockResolvedValueOnce({ data: profileResponse });
+    renderUserProfile();
+    await screen.findByDisplayValue('registrar@example.com');
+    expect(screen.queryByRole('button', { name: /отправить письмо с подтверждением/i })).toBeNull();
+  });
+
+  it.each([
+    [401, /сеанс истёк/i], [429, /слишком много запросов/i], [502, /не удалось отправить/i], [503, /не удалось отправить/i],
+  ])('shows a safe request-email error for %s', async (status, message) => {
+    apiGet.mockResolvedValueOnce({ data: { ...profileResponse, email_verified: false } });
+    apiPost.mockRejectedValueOnce({ response: { status, data: { detail: 'private diagnostic' } } });
+    renderUserProfile();
+    fireEvent.click(await screen.findByRole('button', { name: /отправить письмо с подтверждением/i }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText('private diagnostic')).toBeNull();
+  });
+
+  it('sends at most one request while email delivery is in flight', async () => {
+    apiGet.mockResolvedValueOnce({ data: { ...profileResponse, email_verified: false } });
+    let resolve!: (value: { data: { success: boolean } }) => void;
+    apiPost.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
+    renderUserProfile();
+    const button = await screen.findByRole('button', { name: /отправить письмо с подтверждением/i });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(apiPost).toHaveBeenCalledTimes(1);
+    await act(async () => { resolve({ data: { success: true } }); });
+  });
+
+  it('does not show a response after the authenticated session changes', async () => {
+    apiGet.mockResolvedValueOnce({ data: { ...profileResponse, email_verified: false } });
+    let resolve!: (value: { data: { success: boolean } }) => void;
+    apiPost.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
+    renderUserProfile();
+    fireEvent.click(await screen.findByRole('button', { name: /отправить письмо с подтверждением/i }));
+    fireEvent(window, new Event('authStateChanged'));
+    await act(async () => { resolve({ data: { success: true } }); await Promise.resolve(); });
+    expect(screen.queryByText(/письмо отправлено/i)).toBeNull();
   });
 
   it('saves edited profile and syncs auth store', async () => {

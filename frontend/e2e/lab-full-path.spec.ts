@@ -248,6 +248,8 @@ let lastBulkSaveQuery = '';
 let previewGetCount = 0;
 let finalizePostCount = 0;
 let printLabResultsPostCount = 0;
+// LABPRINT-FE-001 (audit 3886, round 14): тела POST /print/lab-results.
+const printLabResultsBodies: Array<Record<string, unknown>> = [];
 let pdfGetCount = 0;
 let markPrintedPostCount = 0;
 let revisePostCount = 0;
@@ -263,14 +265,16 @@ async function installSession(page: Page) {
     window.sessionStorage.setItem('refresh_token', token);
     window.sessionStorage.setItem('auth_profile', JSON.stringify(profile));
     window.sessionStorage.setItem('user', JSON.stringify(profile));
-    // Захват window.open: preview/PDF открывают blob-вкладки; нельзя дать
-    // настоящему popup-менеджеру Playwright мешать тесту (паттерн
+    // Захват window.open: RETRO-3970-01 — приложение резервирует контекст
+    // синхронным window.open('') в жесте и потом НАВИГИРУЕТ его на blob-URL.
+    // Стаб возвращает управляемый контекст с location/opener/close (паттерн
     // lab-preview-pdf.spec.ts).
     const opened: string[] = [];
     (window as unknown as { __openedWindows: string[] }).__openedWindows = opened;
-    window.open = ((url?: string | URL) => {
-      opened.push(String(url));
-      return {} as Window;
+    window.open = ((_url?: string | URL) => {
+      opened.push(_url == null || String(_url) === '' ? '' : String(_url));
+      const stub = { opener: 'initiator' as unknown, close() {}, location: { href: '' } };
+      return stub as unknown as Window;
     }) as typeof window.open;
   }, { token: FAKE_TOKEN, profile: LAB_PROFILE });
 }
@@ -424,11 +428,15 @@ async function installApiMocks(page: Page) {
   });
 
   // Печать: прямой канал печати недоступен (нет принтера) — workbench
-  // переходит на PDF-fallback (downloadPdf -> window.open -> mark-printed).
+  // переходит на PDF-fallback (downloadPdf -> явный «Открыть PDF» -> mark-printed).
   // Этот канал проходит через НАСТОЯЩИЙ PDF-маршрут (тот же движок, что
   // чинил PR8 hotfix) и помечает бланк PRINTED.
   await page.route('**/api/v1/print/lab-results', (route) => {
     printLabResultsPostCount += 1;
+    // LABPRINT-FE-001 (audit 3886, round 14): фронт обязан отправлять
+    // ТОЛЬКО report_instance_id (+ опция принтера) — тело фиксируется
+    // и ассертится ниже (фаза 7).
+    printLabResultsBodies.push(route.request().postDataJSON());
     return json(route, { success: false, error: 'no printer attached (mocked)' });
   });
 
@@ -494,6 +502,7 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     previewGetCount = 0;
     finalizePostCount = 0;
     printLabResultsPostCount = 0;
+  printLabResultsBodies.length = 0;
     pdfGetCount = 0;
     markPrintedPostCount = 0;
     revisePostCount = 0;
@@ -606,10 +615,21 @@ test.describe('Lab full-path (final gate, mocked)', () => {
 
     // ── Фаза 7: печать (PDF-fallback) ──────────────────────────────────
     await page.getByRole('button', { name: 'Печать результата' }).click();
-    // Прямой канал печати отвергнут -> PDF-маршрут -> blob-вкладка ->
-    // mark-printed. Порядок строго такой (handlePrint fallback).
+    // Прямой канал печати отвергнут (явный success:false) -> PDF-маршрут
+    // -> blob-вкладка. LABPRINT-FE-002 (audit 3886, round 14): открытая
+    // PDF-вкладка — НЕ физическая печать; mark-printed выполняется только
+    // по явному подтверждению оператора (кнопка в inline Alert).
     await expect.poll(() => printLabResultsPostCount).toBe(1);
+    // LABPRINT-FE-001: тело запроса — только report_instance_id.
+    expect(printLabResultsBodies[0]).toEqual({ report_instance_id: CREATED_INSTANCE_ID });
     await expect.poll(() => pdfGetCount).toBe(1);
+    // RETRO-3970-01: подготовленный PDF вкладку сам не открывает — нужен
+    // явный второй клик «Открыть PDF для печати» (новая user activation),
+    // и только тогда появляется LABPRINT-FE-002-подтверждение.
+    await page.getByRole('button', { name: 'Открыть PDF для печати' }).click();
+    // До подтверждения статус не меняется: mark-printed не вызывался.
+    expect(markPrintedPostCount).toBe(0);
+    await page.getByRole('button', { name: 'Отметить как напечатанное' }).click();
     await expect.poll(() => markPrintedPostCount).toBe(1);
     const printIndex = labApiCalls.findIndex((call) => call.url.includes('/print/lab-results'));
     const pdfIndex = labApiCalls.findIndex((call) => call.url.includes(`/lab/report-instances/${CREATED_INSTANCE_ID}/pdf`));

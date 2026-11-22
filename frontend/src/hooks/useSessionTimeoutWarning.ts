@@ -23,7 +23,7 @@
 
 import { useEffect, useRef } from 'react';
 import logger from '../utils/logger';
-import { safeJsonParse } from '../utils/safeJsonParse';
+import { decodeJwtClaims, numericClaim } from '../utils/jwt';
 
 const DEFAULT_WARNING_THRESHOLD = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_POLL_INTERVAL = 30 * 1000; // 30 seconds
@@ -41,15 +41,13 @@ const DEFAULT_POLL_INTERVAL = 30 * 1000; // 30 seconds
  */
 export function getTokenExpiryMs(token: string) {
   if (!token) return null;
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = safeJsonParse(atob(parts[1]));
-    if (!payload.exp) return null;
-    return payload.exp * 1000;
-  } catch {
-    return null;
-  }
+  // AUTH-FE-001 (audit 3886): толерантный Base64URL-декодер — «сырой»
+  // atob reject-ит легальные в JWT payload символы `-`/`_`
+  // (InvalidCharacterError) и молча skip-ал предупреждение об истечении.
+  const claims = decodeJwtClaims(token);
+  const exp = numericClaim(claims, 'exp');
+  if (exp === null) return null;
+  return exp * 1000;
 }
 
 export interface UseSessionTimeoutWarningOptions {

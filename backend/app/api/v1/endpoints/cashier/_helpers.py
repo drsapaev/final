@@ -7,10 +7,11 @@ import logging  # noqa: F401
 from datetime import UTC, date, datetime  # noqa: F401
 from decimal import Decimal  # noqa: F401
 from typing import Any, Generic, TypeVar  # noqa: F401
+from uuid import UUID  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
 from fastapi.responses import Response  # noqa: F401
-from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator  # noqa: F401
 from sqlalchemy import or_  # noqa: F401
 from sqlalchemy.exc import IntegrityError  # noqa: F401  # H-4: catch double-payment race
 from sqlalchemy.orm import Session, joinedload  # noqa: F401
@@ -30,12 +31,43 @@ from app.services.payment_read_service import PaymentReadService  # noqa: F401
 logger = logging.getLogger(__name__)
 
 class CashierStatsResponse(BaseModel):
-    """Агрегированная статистика для кассира"""
-    total_amount: Decimal
-    cash_amount: Decimal
-    card_amount: Decimal
+    """Агрегированная статистика для кассира.
+
+    CSH-FE-036 (#3813 follow-up, 2026-11-02) — контракт сумм зафиксирован:
+    ``total_amount``/``cash_amount``/``card_amount`` остаются ВАЛОВЫМИ
+    поступлениями (исходные суммы платежей ``paid``/``completed`` без вычета
+    возвратов; полностью возвращённые платежи покидают набор при переходе
+    статуса в ``refunded`` и в валовые суммы не входят). Значение существующих
+    полей НЕ меняется молча: интерфейс и отчётность продолжают читать те же
+    величины. Дополнительно экспонируются поступления за вычетом возвратов
+    (``refunded_amount`` + ``net_*``); ``pending_amount`` с CSH-FE-028
+    (#3814) также считается за вычетом возвратов.
+    """
+    total_amount: Decimal = Field(
+        ..., description="Валовые поступления: исходные суммы paid/completed, БЕЗ вычета возвратов"
+    )
+    cash_amount: Decimal = Field(
+        ..., description="Валовые поступления наличными (gross, без вычета возвратов)"
+    )
+    card_amount: Decimal = Field(
+        ..., description="Валовые поступления картой (gross, без вычета возвратов)"
+    )
+    refunded_amount: Decimal = Field(
+        ..., description="Сумма возвратов по платежам, входящим в gross (частичные возвраты при статусе paid/completed)"
+    )
+    net_total_amount: Decimal = Field(
+        ..., description="Поступления за вычетом возвратов: total_amount − refunded_amount"
+    )
+    net_cash_amount: Decimal = Field(
+        ..., description="Наличные за вычетом возвратов"
+    )
+    net_card_amount: Decimal = Field(
+        ..., description="Карта за вычетом возвратов"
+    )
     pending_count: int
-    pending_amount: Decimal
+    pending_amount: Decimal = Field(
+        ..., description="Ожидаемая задолженность; с CSH-FE-028 (#3814) считается за вычетом возвратов"
+    )
     paid_count: int
     cancelled_count: int
 
@@ -158,6 +190,76 @@ class PaginatedResponse(BaseModel, Generic[T]):
     pages: int
 
 
+
+# CSH-FE-039 (P1, follow-up audit 2026-11-02): прямая кассовая команда
+# платежа закрывает его НЕМЕДЛЕННО (PaymentInvariantService создаёт
+# Payment(status='paid', paid_at=now) без подтверждения провайдером).
+# Через неё разрешены ТОЛЬКО методы с ручным документальным подтверждением
+# кассира (cash — наличные, card — ручной терминал). Провайдерские методы
+# (click/payme/kaspi) обязаны идти через payment_init_service
+# (pending → провайдер → webhook → paid): кассир не может «провести» их
+# одним POST без доказательства списания провайдером.
+CASHIER_IMMEDIATE_PAID_METHODS = frozenset({"cash", "card"})
+CASHIER_HOSTED_PROVIDER_METHODS = frozenset({"click", "payme", "kaspi"})
+
+
+def _validate_immediate_paid_method(value: str) -> str:
+    """Нормализует и проверяет метод прямой кассовой оплаты (CSH-FE-039).
+
+    Возвращает каноническое значение метода; для провайдерских/неизвестных
+    методов бросает ValueError (pydantic переводит его в 422).
+    """
+    normalized = str(value or "").strip().lower()
+    if normalized in CASHIER_IMMEDIATE_PAID_METHODS:
+        return normalized
+    if normalized in CASHIER_HOSTED_PROVIDER_METHODS:
+        raise ValueError(
+            f"Метод «{normalized}» — провайдерская оплата: прямая кассовая "
+            "команда не подтверждает списание провайдером и не может "
+            "провести её как paid. Инициируйте оплату через провайдера "
+            "(pending → webhook → paid)."
+        )
+    raise ValueError(
+        f"Неизвестный метод оплаты: {value!r}. Разрешены: cash, card."
+    )
+
+
+def _validate_cash_tender(
+    method: str, amount: Decimal, received: Decimal | None, change: Decimal | None
+) -> tuple[Decimal | None, Decimal | None]:
+    """CSH-FE-040 (follow-up audit 2026-11-02): кассовое «внесено/сдача».
+
+    Модалка кассы считает сдачу локально, но прежний контракт сужал
+    payload до visit_id/amount/method/note — документальное подтверждение
+    (сколько получено, сколько сдано) терялось ДО записи. Инвариант:
+    для cash «внесено = сумма + сдача» (и внесено ≥ суммы); поля либо
+    оба, либо ни одного; для не-наличных методов полей быть не должно
+    (там «внесено» бессмысленно). ValueError → 422.
+    """
+    if received is None and change is None:
+        return None, None
+    if method != "cash":
+        raise ValueError(
+            "Поля received_amount/change_due допустимы только для метода "
+            "cash: для card/provider оплата проходит суммой платежа без "
+            "наличной сдачи."
+        )
+    if received is None or change is None:
+        raise ValueError(
+            "Поля received_amount и change_due передаются вместе: "
+            "внесённая сумма и сдача — одна запись кассира."
+        )
+    if received < amount:
+        raise ValueError(
+            f"Внесённая сумма ({received}) меньше суммы платежа ({amount})."
+        )
+    if received - amount != change:
+        raise ValueError(
+            f"Несходство сдачи: внесено {received}, платёж {amount}, "
+            f"сдача должна быть {received - amount}, получено {change}."
+        )
+    return received, change
+
 class CreatePaymentRequest(BaseModel):
     """Запрос на создание платежа"""
     visit_id: int | None = Field(None, description="ID визита")
@@ -166,6 +268,34 @@ class CreatePaymentRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Сумма платежа")
     method: str = Field(default="cash", description="Метод оплаты (cash, card)")
     note: str | None = Field(None, description="Примечание")
+    # CSH-FE-040: кассовое подтверждение «внесено/сдача» (только cash).
+    received_amount: Decimal | None = Field(
+        None, ge=0, description="Внесённая кассиром сумма (наличные, для чека)"
+    )
+    change_due: Decimal | None = Field(
+        None, ge=0, description="Сдача: received_amount - amount (для чека)"
+    )
+    client_request_id: UUID | None = Field(
+        None,
+        description=(
+            "Ключ идемпотентности (UUID), генерируется клиентом один раз "
+            "на платёжный intent; повторный запрос с тем же ключом получает "
+            "сохранённый ответ исходной операции вместо второго платежа"
+        ),
+    )
+
+    # CSH-FE-039: немедленный paid допустим только для методов с ручным
+    # подтверждением кассира; провайдерские методы требуют провайдер-флоу.
+    @field_validator("method")
+    @classmethod
+    def _method_is_manually_receipted(cls, value: str) -> str:
+        return _validate_immediate_paid_method(value)
+
+    # CSH-FE-040: инвариант кассовой сдачи «внесено = сумма + сдача».
+    @model_validator(mode="after")
+    def _cash_tender_is_coherent(self) -> "CreatePaymentRequest":
+        _validate_cash_tender(self.method, self.amount, self.received_amount, self.change_due)
+        return self
 
 
 class PaymentResponse(BaseModel):
@@ -190,6 +320,34 @@ class CreateGroupedPaymentRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Total payment amount to allocate")
     method: str = Field(default="cash", description="Payment method (cash, card)")
     note: str | None = Field(None, description="Payment note")
+    # CSH-FE-040: кассовое подтверждение «внесено/сдача» (только cash).
+    received_amount: Decimal | None = Field(
+        None, ge=0, description="Cash tendered by the cashier (receipt provenance)"
+    )
+    change_due: Decimal | None = Field(
+        None, ge=0, description="Change due: received_amount - amount (receipt provenance)"
+    )
+    client_request_id: UUID | None = Field(
+        None,
+        description=(
+            "Ключ идемпотентности (UUID), генерируется клиентом один раз "
+            "на платёжный intent; повторный запрос с тем же ключом получает "
+            "сохранённый ответ исходной аллокации вместо повторного списания"
+        ),
+    )
+
+    # CSH-FE-039: сгруппированный путь делит тот же немедленный paid-контракт
+    # — те же ограничения провенанса метода, что и у одиночного платежа.
+    @field_validator("method")
+    @classmethod
+    def _method_is_manually_receipted(cls, value: str) -> str:
+        return _validate_immediate_paid_method(value)
+
+    # CSH-FE-040: инвариант кассовой сдачи «внесено = сумма + сдача».
+    @model_validator(mode="after")
+    def _cash_tender_is_coherent(self) -> "CreateGroupedPaymentRequest":
+        _validate_cash_tender(self.method, self.amount, self.received_amount, self.change_due)
+        return self
 
 
 class GroupedPaymentAllocationItem(BaseModel):
@@ -292,17 +450,37 @@ def _cashier_visit_total_amount(visit: Visit) -> Decimal:
 
 
 def _cashier_paid_amounts_by_visit_id(db: Session, visit_ids: list[int]) -> dict[int, Decimal]:
-    if not visit_ids:
-        return {}
+    """Net settled (unrefunded) paid amounts per visit — canonical SSOT delegate.
 
-    paid_amounts = {visit_id: Decimal("0") for visit_id in visit_ids}
-    payments = db.query(Payment).filter(
-        Payment.visit_id.in_(visit_ids),
-        Payment.status.in_(["paid", "completed"]),
-    ).all()
-    for payment in payments:
-        paid_amounts[payment.visit_id] = paid_amounts.get(payment.visit_id, Decimal("0")) + Decimal(str(payment.amount or 0))
-    return paid_amounts
+    CSH-FE-028: this helper used to sum gross ``Payment.amount`` and diverged
+    from ``PaymentInvariantService.compute_paid_amount`` after partial refunds
+    (a 70 000 refund from a paid 100 000 visit still counted as 100 000 paid,
+    hiding the re-opened debt). It is now a thin delegate over the canonical
+    batch netting so the pending list, stats, grouped allocation and the
+    direct-payment pre-check all agree with the invariant service.
+    """
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    return PaymentInvariantService(db).compute_net_paid_amounts_by_visit_id(visit_ids)
+
+
+def _cashier_external_refunds_by_payment_id(
+    db: Session, payment_ids: list[int]
+) -> dict[int, Decimal]:
+    """Completed refunds recorded OUTSIDE ``Payment.refunded_amount`` — SSOT delegate.
+
+    CSH-FE-036 (#3830 review follow-up): the force-majeure legs return money
+    without touching the payment column — a deposit credit rows a
+    ``DepositTransaction`` CREDIT (completed by construction, the patient
+    balance already rose) and a bank claim is money-returned only at
+    ``RefundRequest.status == 'completed'``. Thin delegate over the canonical
+    invariant so the stats endpoint and the invariant service agree.
+    """
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    return PaymentInvariantService(db).compute_completed_refunds_by_payment_id(
+        payment_ids
+    )
 
 
 async def _emit_payment_notification(

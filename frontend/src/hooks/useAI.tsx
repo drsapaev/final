@@ -3,7 +3,7 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { mcpAPI } from '../utils/mcp';
@@ -19,15 +19,22 @@ import type {
 } from '../types/domain/ai';
 
 import logger from '../utils/logger';
+import { assertMedicalAiSafety } from '../utils/aiSafety';
 
 // TypeScript doesn't ship SpeechRecognition types in lib.dom. Declare a
 // minimal structural type so consumers of useAIAssistant can compile
 // without `@ts-nocheck`. This mirrors the W3C SpeechRecognition surface
 // used by Chromium-based browsers (`webkitSpeechRecognition`).
 // NOTE: These are DOM API polyfills, NOT domain types — they stay here.
-interface SpeechRecognitionResult {
+interface SpeechRecognitionAlternative {
   transcript: string;
   confidence: number;
+}
+
+interface SpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
 }
 
 interface SpeechRecognitionResultList {
@@ -164,16 +171,21 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const chatGeneration = useRef(0);
+  useEffect(() => () => { chatGeneration.current += 1; }, []);
   useReducedMotion();
 
   // Отправка сообщения
   const sendMessage = useCallback(async (message: string, options: Record<string, unknown> = {}): Promise<AIChatMessage | undefined> => {
     void options;
     if (!message || message.trim() === '') return;
+    const generation = ++chatGeneration.current;
+    const isCurrent = () => chatGeneration.current === generation;
 
     // Detect prompt injection attempts
     if (detectPromptInjection(message)) {
       logger.warn('[AI Security] Potential prompt injection detected in user message');
+      setLoading(false);
       setError('Обнаружена подозрительная активность. Сообщение заблокировано.');
       return;
     }
@@ -201,8 +213,10 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
         systemPrompt,
         context
       });
+      if (!isCurrent()) return;
 
       if (response.status === 'success') {
+        assertMedicalAiSafety(response);
         // Validate and sanitize AI response
         const validatedMessage = validateAIChatMessage({
           id: Date.now() + 1,
@@ -223,6 +237,7 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
         throw new Error(response.error || 'AI request failed');
       }
     } catch (err) {
+      if (!isCurrent()) return;
       logger.error('AI assistant error:', err);
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
@@ -237,12 +252,14 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
 
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [messages, provider, model, temperature, maxTokens, systemPrompt, context]);
 
   // Очистка сообщений
   const clearMessages = useCallback(() => {
+    chatGeneration.current += 1;
+    setLoading(false);
     setMessages([]);
     setError(null);
   }, []);
@@ -265,7 +282,7 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
     recognition.lang = 'ru-RU';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0]?.transcript ?? '';
+      const transcript = event.results[0]?.[0]?.transcript ?? '';
       void sendMessage(transcript);
     };
 
@@ -305,11 +322,16 @@ export const useAISuggestions = (options: UseAISuggestionsOptions = {}): UseAISu
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<AISuggestionHistoryEntry[]>([]);
+  const requestGeneration = useRef(0);
+  useEffect(() => () => { requestGeneration.current += 1; }, []);
 
   // Генерация предложений
   const generateSuggestions = useCallback(async (context: string, options: Record<string, unknown> = {}): Promise<AISuggestion[] | undefined> => {
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => requestGeneration.current === generation;
     setLoading(true);
     setError(null);
+    setSuggestions([]);
 
     try {
       const response = await mcpAPI.generateSuggestions({
@@ -320,8 +342,10 @@ export const useAISuggestions = (options: UseAISuggestionsOptions = {}): UseAISu
         maxSuggestions,
         ...options
       });
+      if (!isCurrent()) return;
 
       if (response.status === 'success') {
+        assertMedicalAiSafety(response);
         const newSuggestions: AISuggestion[] = (response.data.suggestions as Array<{ text: string; confidence: number; category: string }>).map((suggestion, index) => ({
           id: Date.now() + index,
           text: suggestion.text,
@@ -337,11 +361,12 @@ export const useAISuggestions = (options: UseAISuggestionsOptions = {}): UseAISu
         throw new Error(response.error || 'Failed to generate suggestions');
       }
     } catch (err) {
+      if (!isCurrent()) return;
       logger.error('AI suggestions error:', err);
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [type, provider, model, maxSuggestions]);
 
@@ -364,6 +389,8 @@ export const useAISuggestions = (options: UseAISuggestionsOptions = {}): UseAISu
 
   // Очистка предложений
   const clearSuggestions = useCallback(() => {
+    requestGeneration.current += 1;
+    setLoading(false);
     setSuggestions([]);
     setError(null);
   }, []);
@@ -415,6 +442,7 @@ export const useAITranslation = (options: UseAITranslationOptions = {}): UseAITr
       });
 
       if (response.status === 'success') {
+        assertMedicalAiSafety(response);
         const translation: AITranslationEntry = {
           id: Date.now(),
           original: text,
@@ -433,7 +461,7 @@ export const useAITranslation = (options: UseAITranslationOptions = {}): UseAITr
       logger.error('AI translation error:', err);
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
-      return text; // Возвращаем оригинальный текст при ошибке
+      throw new Error('AI translation unavailable');
     } finally {
       setLoading(false);
     }
@@ -449,7 +477,7 @@ export const useAITranslation = (options: UseAITranslationOptions = {}): UseAITr
         results.push({ original: text, translated });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        results.push({ original: text, translated: text, error: message });
+        results.push({ original: text, translated: '', error: message });
       }
     }
 
@@ -497,6 +525,7 @@ export const useAIImageAnalysis = (options: UseAIImageAnalysisOptions = {}): Use
         });
 
         if (mcpResult.status === 'success') {
+          assertMedicalAiSafety(mcpResult);
           return mcpResult.data;
         } else {
           throw new Error(mcpResult.error || 'MCP image analysis failed');
@@ -535,6 +564,13 @@ export const useAIImageAnalysis = (options: UseAIImageAnalysisOptions = {}): Use
     setHistory([]);
   }, []);
 
+  // Consumers may clear local state, but cannot publish an unverified analysis
+  // through the historical setter shortcut.
+  const setVerifiedAnalysis = useCallback((value: unknown) => {
+    if (value !== null) assertMedicalAiSafety(value);
+    setAnalysis(value);
+  }, []);
+
   return {
     analysis,
     loading,
@@ -547,7 +583,7 @@ export const useAIImageAnalysis = (options: UseAIImageAnalysisOptions = {}): Use
     clearHistory,
 
     // Сеттеры
-    setAnalysis,
+    setAnalysis: setVerifiedAnalysis,
     setError
   };
 };

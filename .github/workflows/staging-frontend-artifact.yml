@@ -1,12 +1,94 @@
 name: Build isolated staging frontend artifact
 
 on:
+  pull_request:
+    paths:
+      - .github/workflows/staging-frontend-artifact.yml
+      - frontend/Dockerfile.staging
+      - frontend/src/api/runtime.ts
+      - ops/compose.staging.yml
+      - ops/compose.staging.artifact.yml
+      - scripts/wsl_staging.py
+      - scripts/tests/test_wsl_staging_guard.py
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  validate-pr-targets:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build and verify both Compose frontend targets
+        run: |
+          set -euo pipefail
+          mkdir -p .scratch/frontend-artifact/assets
+          printf '%s\n' '<!doctype html><html><body>synthetic artifact</body></html>' > .scratch/frontend-artifact/index.html
+          printf '%s\n' 'console.log("synthetic frontend artifact");' > .scratch/frontend-artifact/assets/app.js
+          printf '%s\n' "$GITHUB_SHA" > .scratch/frontend-artifact/source.sha
+          (
+            cd .scratch/frontend-artifact
+            find . -type f ! -path './SHA256SUMS' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+            sha256sum --check --status SHA256SUMS
+          )
+
+          ci_identity="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ci_secret="${ci_identity}-ephemeral"
+
+          write_compose_env() {
+            local target="$1"
+            local output="$2"
+            cat > "$output" <<EOF
+          COMPOSE_PROJECT_NAME=clinic-artifact-ci
+          STAGING_BACKEND_PORT=19001
+          STAGING_FRONTEND_PORT=19080
+          STAGING_POSTGRES_HOST_PORT=55441
+          STAGING_PUBLIC_HOST=127.0.0.1
+          STAGING_PUBLIC_BASE_URL=http://127.0.0.1:19080
+          STAGING_PUBLIC_WS_URL=ws://127.0.0.1:19080
+          STAGING_PUBLIC_WS_HOST=127.0.0.1:19080
+          CORS_ORIGINS=http://127.0.0.1:19080
+          POSTGRES_USER=$ci_identity
+          POSTGRES_PASSWORD=$ci_secret
+          POSTGRES_DB=clinic
+          SECRET_KEY=$ci_secret
+          ADMIN_USERNAME=$ci_identity
+          ADMIN_PASSWORD=$ci_secret
+          ADMIN_EMAIL=synthetic@example.invalid
+          ADMIN_FULL_NAME=Synthetic CI
+          STAGING_FRONTEND_BUILD_TARGET=$target
+          STAGING_FRONTEND_ARTIFACT_CONTEXT=../.scratch/frontend-artifact
+          VERCEL_GIT_COMMIT_SHA=$GITHUB_SHA
+          EOF
+          }
+          write_compose_env runtime .scratch/compose-runtime.env
+          write_compose_env artifact-runtime .scratch/compose-artifact.env
+
+          docker compose --project-directory "$GITHUB_WORKSPACE/ops" \
+            --env-file "$GITHUB_WORKSPACE/.scratch/compose-runtime.env" \
+            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml" config --quiet
+          docker compose --project-directory "$GITHUB_WORKSPACE/ops" \
+            --env-file "$GITHUB_WORKSPACE/.scratch/compose-runtime.env" \
+            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml" build frontend
+
+          docker compose --project-directory "$GITHUB_WORKSPACE/ops" \
+            --env-file "$GITHUB_WORKSPACE/.scratch/compose-artifact.env" \
+            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml" \
+            -f "$GITHUB_WORKSPACE/ops/compose.staging.artifact.yml" config --quiet
+          docker compose --project-directory "$GITHUB_WORKSPACE/ops" \
+            --env-file "$GITHUB_WORKSPACE/.scratch/compose-artifact.env" \
+            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml" \
+            -f "$GITHUB_WORKSPACE/ops/compose.staging.artifact.yml" build frontend
+
   build:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -34,10 +116,7 @@ jobs:
           docker build \
             --file frontend/Dockerfile.staging \
             --build-arg VITE_API_BASE=/api/v1 \
-            --build-arg VITE_API_URL=http://127.0.0.1:18082 \
-            --build-arg VITE_API_BASE_URL=http://127.0.0.1:18082 \
-            --build-arg VITE_WS_URL=ws://127.0.0.1:18082 \
-            --build-arg VITE_WS_HOST=127.0.0.1:18082 \
+            --build-arg VITE_API_BASE_URL=same-origin \
             --build-arg "VITE_SENTRY_DSN=$STAGING_FRONTEND_SENTRY_DSN" \
             --build-arg VITE_SENTRY_ENV=staging \
             --tag "clinic-staging-frontend:$GITHUB_SHA" \

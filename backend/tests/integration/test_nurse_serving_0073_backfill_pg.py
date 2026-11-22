@@ -60,8 +60,6 @@ from sqlalchemy.orm import sessionmaker
 
 from app.models.online_queue import OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
-from app.models.user import User
-from app.models.visit import Visit, VisitService
 
 pytestmark = pytest.mark.integration
 
@@ -188,21 +186,24 @@ def backfill_world():
 def _seed_pre_0073_world(engine) -> dict:
     """Seed 0072-compatible supporting rows and execution rows.
 
-    Doctor and Service use raw SQL because their HEAD ORM models include
-    public-site fields added after 0072. DailyQueue and execution rows also
+    User, Doctor, Visit, and Service use raw SQL because their HEAD ORM
+    models include fields added after 0072. DailyQueue and execution rows also
     use raw SQL because their HEAD models include later migration columns.
     """
-    Session = sessionmaker(bind=engine, future=True)
-    session = Session()
-    nurse = User(
-        username="n23_bf_nurse",
-        email="n23_bf_nurse@example.com",
-        full_name="n23_bf_nurse",
-        hashed_password="x",
-        role="Nurse",
-        is_active=True,
-        is_superuser=False,
-    )
+    with sessionmaker(bind=engine, future=True)() as session:
+        return _seed_pre_0073_world_in_session(engine, session)
+
+
+def _seed_pre_0073_world_in_session(engine, session) -> dict:
+    nurse_id = session.execute(
+        text(
+            "INSERT INTO users "
+            "(username, email, full_name, hashed_password, role, "
+            "is_active, is_superuser, must_change_password) "
+            "VALUES ('n23_bf_nurse', 'n23_bf_nurse@example.com', "
+            "'n23_bf_nurse', 'x', 'Nurse', true, false, false) RETURNING id"
+        )
+    ).scalar_one()
     patient = Patient(first_name="Backfill", last_name="Test")
     # The bridged surface: a DOCTOR-axis queue (the XOR check forbids an
     # ownerless queue since 0063) that still carries the station's tag —
@@ -232,9 +233,9 @@ def _seed_pre_0073_world(engine) -> dict:
         max_online_per_day=15,
         default_cabinet="c1",
     )
-    session.add_all([nurse, patient, resource])
+    session.add_all([patient, resource])
     session.commit()
-    for row in (nurse, patient, resource):
+    for row in (patient, resource):
         session.refresh(row)
 
     # This fixture intentionally remains at migration 0072. The current
@@ -269,14 +270,22 @@ def _seed_pre_0073_world(engine) -> dict:
     ).scalar_one()
     session.commit()
 
-    visit = Visit(
-        patient_id=patient.id,
-        doctor_id=None,
-        visit_date=date.today(),
-        department=resource.queue_tag,
-        status="in_progress",
-    )
-    session.add(visit)
+    # Visit's current model has confirmation_context_epoch from revision
+    # 0102, which is intentionally absent from this historical 0072 schema.
+    visit_id = session.execute(
+        text(
+            "INSERT INTO visits "
+            "(patient_id, status, created_at, discount_mode, approval_status, "
+            "doctor_id, visit_date, department, source) "
+            "VALUES (:patient_id, 'in_progress', CURRENT_TIMESTAMP, 'none', "
+            "'none', NULL, :visit_date, :department, 'desk') RETURNING id"
+        ),
+        {
+            "patient_id": patient.id,
+            "visit_date": date.today(),
+            "department": resource.queue_tag,
+        },
+    ).scalar_one()
     # The current Service model includes website fields introduced in 0079;
     # keep this pre-0073 fixture compatible with its 0072 table shape.
     service_insert = text(
@@ -303,42 +312,35 @@ def _seed_pre_0073_world(engine) -> dict:
         },
     ).scalar_one()
     session.commit()
-    session.refresh(visit)
 
-    vs_routed = VisitService(
-        visit_id=visit.id,
-        service_id=routed_service_id,
-        code="N23BF_ROUTED",
-        name="Service N23BF_ROUTED",
-        qty=1,
+    # The current VisitService model includes the duration snapshot added in
+    # 0085. Insert these rows with the historical 0072 column shape so this
+    # test remains focused on the 0073 backfill.
+    visit_service_insert = text(
+        "INSERT INTO visit_services "
+        "(visit_id, service_id, code, name, qty, created_at) "
+        "VALUES (:visit_id, :service_id, :code, :name, 1, CURRENT_TIMESTAMP) "
+        "RETURNING id"
     )
-    vs_retagged = VisitService(
-        visit_id=visit.id,
-        service_id=retagged_service_id,
-        code="N23BF_RETAGGED",
-        name="Service N23BF_RETAGGED",
-        qty=1,
-    )
-    vs_orphan = VisitService(
-        visit_id=visit.id,
-        service_id=routed_service_id,
-        code="N23BF_ROUTED",
-        name="Service N23BF_ROUTED",
-        qty=1,
-    )
+
+    def insert_visit_service(service_id: int, code: str) -> int:
+        return session.execute(
+            visit_service_insert,
+            {
+                "visit_id": visit_id,
+                "service_id": service_id,
+                "code": code,
+                "name": f"Service {code}",
+            },
+        ).scalar_one()
+
+    vs_routed_id = insert_visit_service(routed_service_id, "N23BF_ROUTED")
+    vs_retagged_id = insert_visit_service(retagged_service_id, "N23BF_RETAGGED")
+    vs_orphan_id = insert_visit_service(routed_service_id, "N23BF_ROUTED")
     # A separate LINE of the same routed service for the tag-axis row —
     # one in_progress attempt per VisitService (the 0072 partial index).
-    vs_tag_axis = VisitService(
-        visit_id=visit.id,
-        service_id=routed_service_id,
-        code="N23BF_ROUTED",
-        name="Service N23BF_ROUTED",
-        qty=1,
-    )
-    session.add_all([vs_routed, vs_retagged, vs_orphan, vs_tag_axis])
+    vs_tag_axis_id = insert_visit_service(routed_service_id, "N23BF_ROUTED")
     session.commit()
-    for row in (vs_routed, vs_retagged, vs_orphan, vs_tag_axis):
-        session.refresh(row)
 
     entry_owner = OnlineQueueEntry(
         queue_id=owner_queue_id,
@@ -348,7 +350,7 @@ def _seed_pre_0073_world(engine) -> dict:
         status="in_progress",
         priority=0,
         source="desk",
-        visit_id=visit.id,
+        visit_id=visit_id,
     )
     entry_tag_axis = OnlineQueueEntry(
         queue_id=tag_axis_queue_id,
@@ -358,7 +360,7 @@ def _seed_pre_0073_world(engine) -> dict:
         status="in_progress",
         priority=0,
         source="desk",
-        visit_id=visit.id,
+        visit_id=visit_id,
     )
     entry_retagged = OnlineQueueEntry(
         queue_id=owner_queue_id,
@@ -368,7 +370,7 @@ def _seed_pre_0073_world(engine) -> dict:
         status="in_progress",
         priority=0,
         source="desk",
-        visit_id=visit.id,
+        visit_id=visit_id,
     )
     session.add_all([entry_owner, entry_tag_axis, entry_retagged])
     session.commit()
@@ -376,11 +378,11 @@ def _seed_pre_0073_world(engine) -> dict:
         session.refresh(row)
     # Capture plain ints BEFORE close — ORM instances detach + expire.
     ids = {
-        "nurse_id": nurse.id,
-        "vs_routed_id": vs_routed.id,
-        "vs_retagged_id": vs_retagged.id,
-        "vs_orphan_id": vs_orphan.id,
-        "vs_tag_axis_id": vs_tag_axis.id,
+        "nurse_id": nurse_id,
+        "vs_routed_id": vs_routed_id,
+        "vs_retagged_id": vs_retagged_id,
+        "vs_orphan_id": vs_orphan_id,
+        "vs_tag_axis_id": vs_tag_axis_id,
         "entry_owner_id": entry_owner.id,
         "entry_tag_axis_id": entry_tag_axis.id,
         "entry_retagged_id": entry_retagged.id,

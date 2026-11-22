@@ -763,8 +763,18 @@ class ServicesApiService:
             self.repository.refresh(service)
         return [service.id for service in services], failed_services
 
-    def list_doctors_temp(self):
-        return self.repository.list_active_doctors()
+    def list_doctors_temp(self, *, limit: int, offset: int):
+        rows = self.repository.list_active_doctors(limit=limit, offset=offset)
+        return [
+            {
+                "id": row.id,
+                "specialty": row.specialty,
+                "cabinet": row.cabinet,
+                "active": row.active,
+                "display_name": (row.display_name or "").strip() or None,
+            }
+            for row in rows
+        ]
 
     def resolve_service(self, *, service_id: int | None, code: str | None):
         return self.repository.resolve_service(service_id=service_id, code=code)

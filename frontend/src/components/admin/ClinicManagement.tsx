@@ -13,7 +13,9 @@ import {
   AlertTriangle,
   CheckCircle,
   RefreshCw,
-  Activity } from
+  Activity,
+  CalendarDays,
+  CalendarClock } from
 
 
 
@@ -33,12 +35,14 @@ import BranchManagement from './BranchManagement';
 import EquipmentManagement from './EquipmentManagement';
 import LicenseManagement from './LicenseManagement';
 import BackupManagement from './BackupManagement';
+import PublicBookingCalendarManager from './PublicBookingCalendarManager';
+import PublicBookingSettingsManager from './PublicBookingSettingsManager';
 import DepartmentManagement from './DepartmentManagement';
 import ClinicSettings from './ClinicSettings';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 
 interface SystemHealthData {
   status?: string;
@@ -80,6 +84,8 @@ const ClinicManagement = () => {
   { id: 'equipment', label: t('admin2.cm_tab_equipment'), icon: Wrench },
   { id: 'licenses', label: t('admin2.cm_tab_licenses'), icon: Key },
   { id: 'backups', label: t('admin2.cm_tab_backups'), icon: HardDrive },
+  { id: 'booking-calendar', label: t('admin2.cm_tab_booking_calendar'), icon: CalendarDays },
+  { id: 'booking-settings', label: t('admin2.cm_tab_booking_settings'), icon: CalendarClock },
   { id: 'settings', label: t('admin2.cm_tab_settings'), icon: Settings }];
 
 
@@ -167,11 +173,11 @@ const ClinicManagement = () => {
           title="Refresh system status"
           aria-label="Refresh system status"
           className="admin-p-6px-12px-minw-auto">
-          
+
             <RefreshCw className="admin-w-16-h-16-anim-dyn" style={{ '--admin-anim0': loading ? 'spin 1s linear infinite' : 'none' } as CSSProperties} />
           </Button>
         </div>
-        
+
         {systemHealth ?
       <div className="flex flex-col gap-4">
             <div className="admin-flex-center-12">
@@ -179,12 +185,12 @@ const ClinicManagement = () => {
             variant={systemHealth.status === 'healthy' ? 'success' :
             systemHealth.status === 'warning' ? 'warning' : 'error'}
             text={getHealthLabel(systemHealth.status || '')} />
-          
+
               <span className="text-sm text-[var(--mac-text-secondary)]">
                 {t('admin2.cm_last_check', { date: new Date().toLocaleString() })}
               </span>
             </div>
-            
+
             {systemHealth.warnings && systemHealth.warnings.length > 0 &&
         <div className="flex flex-col gap-2">
                 <h4 className="admin-fs-sm-fw-med-primary-1">
@@ -218,7 +224,7 @@ const ClinicManagement = () => {
         icon={Building2}
         iconColor="var(--mac-accent-blue)"
         trend="positive" />
-      
+
 
           <StatCard
         title={t('admin2.cm_stat_equipment')}
@@ -227,7 +233,7 @@ const ClinicManagement = () => {
         icon={Wrench}
         iconColor="var(--mac-success)"
         trend="positive" />
-      
+
 
           <StatCard
         title={t('admin2.cm_stat_licenses')}
@@ -236,7 +242,7 @@ const ClinicManagement = () => {
         icon={Key}
         iconColor="var(--mac-warning)"
         trend="positive" />
-      
+
 
           <StatCard
         title={t('admin2.cm_stat_backups')}
@@ -245,7 +251,7 @@ const ClinicManagement = () => {
         icon={HardDrive}
         iconColor="var(--mac-error)"
         trend="neutral" />
-      
+
         </div> :
 
     <AppEmpty
@@ -336,7 +342,7 @@ const ClinicManagement = () => {
                 {t('admin2.cm_retry')}
               </Button>
             } />
-          
+
         </Card>
       </div>);
 
@@ -407,6 +413,8 @@ const ClinicManagement = () => {
         {activeTab === 'equipment' && <EquipmentManagement />}
         {activeTab === 'licenses' && <LicenseManagement />}
         {activeTab === 'backups' && <BackupManagement />}
+        {activeTab === 'booking-calendar' && <PublicBookingCalendarManager />}
+        {activeTab === 'booking-settings' && <PublicBookingSettingsManager />}
         {activeTab === 'settings' && <ClinicSettings />}
         </div>
       </Card>

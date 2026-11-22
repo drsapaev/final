@@ -91,3 +91,32 @@ export function emrTextValue(value: unknown): string {
   }
   return '';
 }
+
+/**
+ * EMRTREAT-FE-001 (audit 3886): canonical treatment text — mirrors the
+ * backend's `get_emr_text_field(data, "treatment")` chain
+ * (backend/app/services/emr_contract.py): the narrative `treatment` field
+ * first, then `medications.text` (the field the visible TreatmentSection
+ * editor is bound to), then the legacy `plan.treatment`. The completeness
+ * indicator must count the text the doctor actually entered in the
+ * visible editor, not only the top-level legacy key — a genuine treatment
+ * plan typed into the editor must not leave «Лечение» listed as missing.
+ */
+export function emrTreatmentText(data: Record<string, unknown> | null | undefined): string {
+  const direct = emrTextValue((data as { treatment?: unknown } | null | undefined)?.treatment).trim();
+  if (direct) return direct;
+
+  const medications = (data as { medications?: unknown } | null | undefined)?.medications;
+  if (isRecord(medications)) {
+    const medicationText = emrTextValue(medications.text).trim();
+    if (medicationText) return medicationText;
+  }
+
+  const plan = (data as { plan?: unknown } | null | undefined)?.plan;
+  if (isRecord(plan)) {
+    const planTreatment = emrTextValue(plan.treatment).trim();
+    if (planTreatment) return planTreatment;
+  }
+
+  return '';
+}

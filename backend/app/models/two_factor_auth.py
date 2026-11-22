@@ -7,7 +7,18 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -43,6 +54,30 @@ class TwoFactorAuth(Base):
     recovery_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     recovery_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     recovery_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # TWOFACTOR-BE-001 (#4063): service-side brute-force defense. The endpoint
+    # limiter is per-IP and trivially bypassed, so the verify counter and the
+    # temporary lockout live on the 2FA record itself. See
+    # TwoFactorService.verify_two_factor and alembic
+    # 0095_two_factor_attempt_lockout.
+    failed_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sa_text("0")
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # Last TOTP time step accepted for a sensitive operation; NULL means unused.
+    last_sensitive_totp_step: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True
+    )
+    # Sensitive reauthentication attempts are separate from normal 2FA login.
+    sensitive_failed_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sa_text("0")
+    )
+    sensitive_locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Метаданные
     created_at: Mapped[datetime | None] = mapped_column(
@@ -197,6 +232,9 @@ class TwoFactorDevice(Base):
     # Статус
     trusted: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    trusted_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Метаданные
     created_at: Mapped[datetime | None] = mapped_column(
@@ -210,3 +248,43 @@ class TwoFactorDevice(Base):
 
     # Связи
     user: Mapped[User] = relationship("User")
+
+
+class TwoFactorVerificationCode(Base):
+    """Single active, short-lived SMS/email verification code per user/method."""
+
+    __tablename__ = "two_factor_verification_codes"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "method", name="uq_two_factor_verification_codes_user_method"
+        ),
+        CheckConstraint(
+            "method IN ('sms', 'email')",
+            name="ck_two_factor_verification_codes_method",
+        ),
+        CheckConstraint(
+            "attempts_remaining BETWEEN 0 AND 5",
+            name="ck_two_factor_verification_codes_attempts_remaining",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    method: Mapped[str] = mapped_column(String(10), nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    contact_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempts_remaining: Mapped[int] = mapped_column(
+        Integer, default=5, server_default="5", nullable=False
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

@@ -57,6 +57,12 @@ export const useDermaHotkeys = ({
       }
 
       if (e.key === 'Escape') {
+        // DERMAHOTKEY-FE-001 (audit 3892): a modal owns Escape while it is
+        // open (completion confirm, edit-patient dialog). Do not clear the
+        // selected visit underneath it — matches the dental hotkey gate.
+        if (e.defaultPrevented || document.querySelector('[role="dialog"][aria-modal="true"]')) {
+          return;
+        }
         if (clearSelection) {
           clearSelection();
         }

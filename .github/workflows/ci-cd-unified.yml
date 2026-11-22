@@ -35,7 +35,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
 
 env:
-  PYTHON_VERSION: '3.11.10'
+  PYTHON_VERSION: '3.11.18'
   NODE_VERSION: '24'
   DATABASE_URL: 'postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb'
   CORS_DISABLE: '1'
@@ -125,8 +125,8 @@ jobs:
             - 'backend/tests/test_openapi_contract.py'
             - 'backend/tests/unit/test_patient_onboarding_request_policy.py'
             - 'backend/tests/unit/test_telemetry_onboarding_privacy.py'
-            - 'frontend/src/components/TelegramManager.jsx'
-            - 'frontend/src/pages/TelegramMiniAppPatientShell.jsx'
+            - 'frontend/src/components/TelegramManager.tsx'
+            - 'frontend/src/pages/TelegramMiniAppPatientShell.tsx'
             - 'frontend/src/__tests__/telegramManagerOnboardingRequests.test.ts'
             - 'frontend/src/__tests__/telegramMiniAppOnboardingGuardrails.test.ts'
             - 'frontend/e2e/telegram-miniapp-release-gate.spec.ts'
@@ -401,7 +401,7 @@ jobs:
   # --- Проверка качества кода ---
   code-quality:
     name: 🔍 Качество кода
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: [ci-scope]
     if: |
@@ -774,7 +774,7 @@ jobs:
     # chromium + 128 тестов); добавленный блокирующий lab-dirty-guard suite
     # (61 тест, workers=1 на CI) требует запаса, чтобы timeout не убивал
     # валидный прогон на медленных раннерах.
-    timeout-minutes: 25
+    timeout-minutes: 35
     needs: [ci-scope]
     if: |
       needs.ci-scope.outputs.frontend_e2e_required == 'true' &&
@@ -809,7 +809,22 @@ jobs:
     - name: 🧪 Registrar time e2e (Chromium)
       run: |
         cd frontend
-        npx playwright install --with-deps chromium
+        # 2026-11-11: a sustained DNS outage of the runner's Ubuntu apt
+        # mirrors failed the apt layer of --with-deps on six consecutive main
+        # runs AND on the global-archive fallback. The Chromium binary
+        # downloads from the Playwright CDN (no apt), the runner image
+        # already ships the required system libraries, and only the extra
+        # font packages need apt - while Chromium's Cyrillic/Latin rendering
+        # uses the preinstalled DejaVu/Liberation/Noto fonts anyway. Install
+        # the browser first, then the font/system layer best-effort with the
+        # global-archive fallback: a mirror outage must degrade the install,
+        # never kill the e2e job before any test runs.
+        npx playwright install chromium
+        if ! npx playwright install-deps chromium; then
+          echo "WARN: apt mirror unreachable - retrying system deps from the global Ubuntu archive"
+          sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
+          npx playwright install-deps chromium || echo "WARN: extra font packages unavailable; continuing on the runner's preinstalled fonts"
+        fi
         # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
         npx playwright test e2e/registrar-time.spec.ts --project=chromium
 
@@ -838,7 +853,7 @@ jobs:
         # PR7: dispatch with update_snapshots=true regenerates the LINUX
         # visual baselines in-place (the dedicated update step below runs
         # only after this step and cannot fix an already-failed spec run).
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts --project=chromium --retries=0 $UPDATE_SNAPSHOTS_FLAG 2>&1 | tee ux-audit-output.txt
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts e2e/public-site-accessibility.spec.ts --project=chromium --retries=0 $UPDATE_SNAPSHOTS_FLAG 2>&1 | tee ux-audit-output.txt
       # E2E root-cause fix: removed continue-on-error. All non-fixme tests
       # must pass. Tests marked test.fixme have documented root causes and
       # are tracked for follow-up. See PR description for details.
@@ -853,12 +868,12 @@ jobs:
         # reality: if the count drops below the expected number, something
         # was skipped).
         #
-        # Expected: 131 passed, 0 skipped, 0 failed
+        # Expected: 134 passed, 0 skipped, 0 failed
         # (12 cashier + 9 registrar + 40 visual [7 state baselines + EAT +
         #  pr16-landing + 22 pr18 twelve-screen baselines] + 12 route-smoke
-        # + 12 visual-a11y + 12 a11y-axe-audit + 34 a11y-axe-authenticated).
+        # + 12 visual-a11y + 12 a11y-axe-audit + 34 a11y-axe-authenticated + 3 public-site-accessibility).
         # Metric integrity (§17, original → revised → methodology → reason):
-        # 93 → 127 → 131. Methodology unchanged (same CI step, count-invariant
+        # 93 → 127 → 131 → 134. Methodology unchanged (same CI step, count-invariant
         # on passed tests). Reason: AXE-EXP-1 adds a11y-axe-authenticated.spec.ts
         # (17 authorized QA-harness routes × 2 themes = 34 audits, seeded
         # shrink-only baseline e2e/a11y-baseline-auth.json). 127 → 131: PR #3390
@@ -868,12 +883,14 @@ jobs:
         # pre-AXE-EXP canonical count (12+9+40+8+12+12); 127 = AXE-EXP-1
         # (12+9+40+8+12+12+34, floor never re-bumped for the route-smoke
         # growth to 11).
+        # 131 → 134: PR #3725 adds three public-site accessibility tests to CI.
+        # The spec covers localized skip navigation and Axe scans in Vite/Nitro.
         # Reconciliation note: registrar-time.spec.ts (1 test) runs in its own
         # step above and is intentionally NOT counted here. Empirically
         # verified locally with `playwright --list` per file on the PR-3390
         # review-fix head. If a test is intentionally added/removed, update
         # EXPECTED_COUNT below.
-        EXPECTED_COUNT=131
+        EXPECTED_COUNT=134
         if [ ! -f ux-audit-output.txt ]; then
           echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
           exit 1
@@ -1057,7 +1074,7 @@ jobs:
   # --- Backend тесты ---
   backend-tests:
     name: 🐍 Backend тесты
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Round-5 (PR #3362): the suite fits in ~9 min on a warm runner, but
     # shared-hosted variance (uniform 2x slowdown observed on a contended
     # run) cancels the job at 20 and fails the required gate. Other heavy
@@ -1190,10 +1207,24 @@ jobs:
     # (55P03 -> processing) and the in-flight-claim MVCC race are proven
     # here with two independent connections against the alembic-provisioned
     # schema from the step above.
-    - name: 🧪 Reminder + QR-join probe PG concurrency (gate_d)
+    # 3808 round 3 (#3809 P1): force-majeure cancel-with-refund
+    # serialization — the queue row lock + expected_entry_ids drift refusal
+    # against two concurrent registrar confirmations of the same queue.
+    # 3808 round 4 (#3809 P1): the FM gate_d module refuses to run against
+    # a DATABASE_URL that is not provably disposable. This job's postgres
+    # is a disposable service container (clinicdb), so opt in explicitly —
+    # the module now builds its own one-off schema and never touches
+    # public (no DROP SCHEMA public CASCADE anymore).
+    # 3808 round 12 (#3809 P1): the deposit balance race module joins this
+    # step — parallel refunds of DIFFERENT payments of ONE patient must
+    # SUM on the shared deposit row (FOR UPDATE + savepoint creation race).
+    # Same opt-in variable, same one-off-schema isolation.
+    - name: 🧪 Reminder + QR-join + FM serialization + FM deposit race PG concurrency (gate_d)
+      env:
+        FM_GATE_D_ALLOW_ANY_TARGET: '1'
       run: |
         cd backend
-        pytest tests/integration/test_reminder_pipeline_pg.py tests/integration/test_qr_join_probe_concurrency_pg.py -m gate_d --noconftest
+        pytest tests/integration/test_reminder_pipeline_pg.py tests/integration/test_qr_join_probe_concurrency_pg.py tests/integration/test_force_majeure_refund_serialization_pg.py tests/integration/test_force_majeure_deposit_balance_concurrency_pg.py -m gate_d --noconftest
 
     - name: 🧪 Critical E2E Smoke
       run: |
@@ -1218,7 +1249,7 @@ jobs:
   # --- Архитектурные boundary тесты ---
   architecture-boundary:
     name: 🧱 Context Boundary Integrity
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [ci-scope]
     # Required for PRs into `main` when application/workflow code changes.
@@ -1284,7 +1315,7 @@ jobs:
   # --- Frontend ↔ Backend parity gate ---
   frontend-backend-parity:
     name: 🔄 Frontend-Backend Parity
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [ci-scope, frontend-lint, frontend-unit-tests, frontend-build, backend-tests, architecture-boundary]
     # Required for PRs into `main` after the core test jobs pass.
@@ -1370,7 +1401,7 @@ jobs:
   # --- Security сканирование ---
   security:
     name: 🔒 Security сканирование
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [code-quality, frontend-lint, frontend-unit-tests, frontend-build, backend-tests]
     # Security scanning stays GitHub-native, but is not part of the lightweight
@@ -1514,7 +1545,7 @@ jobs:
   # --- Интеграционные тесты ---
   integration:
     name: 🔗 Интеграционные тесты
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [backend-tests, frontend-lint, frontend-unit-tests, frontend-build, frontend-e2e, architecture-boundary, frontend-backend-parity]
     # Integration remains a heavier gate: manual runs and push-to-main only.
@@ -1823,7 +1854,7 @@ jobs:
   # --- Load Tests (Nightly/Manual) ---
   load-tests-nightly:
     name: ⚡ Load Tests (k6)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     needs: [security, integration]
     if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
@@ -1981,7 +2012,7 @@ jobs:
   # --- DAST (Nightly) ---
   dast-zap-nightly:
     name: 🛡️ DAST ZAP (Nightly)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     services:
@@ -2147,7 +2178,7 @@ jobs:
   # --- Документация ---
   docs:
     name: 📚 Генерация документации
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [ci-scope]
     if: |
@@ -2321,7 +2352,7 @@ jobs:
 
   telegram-miniapp-release-gate:
     name: Telegram Mini App Release Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     needs: [ci-scope]
     if: |
@@ -2392,7 +2423,26 @@ jobs:
     - name: рџ§Є Telegram Mini App browser QA artifacts
       run: |
         cd frontend
-        npx playwright install --with-deps chromium
+        # 2026-11-11: a sustained DNS outage of the runner's Ubuntu apt
+        # mirrors failed the apt layer of --with-deps on six consecutive main
+        # runs AND on the global-archive fallback. The Chromium binary
+        # downloads from the Playwright CDN (no apt), the runner image
+        # already ships the required system libraries, and only the extra
+        # font packages need apt - while Chromium's Cyrillic/Latin rendering
+        # uses the preinstalled DejaVu/Liberation/Noto fonts anyway. Install
+        # the browser first, then the font/system layer best-effort with the
+        # global-archive fallback: a mirror outage must degrade the install,
+        # never kill the e2e job before any test runs.
+        npx playwright install chromium
+        install_browser_deps() {
+          # Run the timeout with the same privileges as apt so it can stop the whole process group.
+          sudo timeout --kill-after=10s 90s "$(command -v node)" node_modules/playwright/cli.js install-deps chromium
+        }
+        if ! install_browser_deps; then
+          echo "WARN: apt dependency installation failed or timed out - retrying from the global Ubuntu archive"
+          sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
+          install_browser_deps || echo "WARN: extra font packages unavailable; continuing on the runner's preinstalled fonts"
+        fi
         # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
         npx playwright test e2e/telegram-miniapp-release-gate.spec.ts --project=chromium --workers=1 --reporter=line
 

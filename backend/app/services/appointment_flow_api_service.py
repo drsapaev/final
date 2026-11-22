@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.audit import extract_model_changes, log_critical_change
@@ -81,6 +82,13 @@ class AppointmentFlowApiService:
         return appointment, visit
 
     def promote_appointment_to_in_visit(self, *, appointment: Any) -> None:
+        appointment = self.repository.get_locked_appointment(appointment.id)
+        if appointment is None:
+            raise HTTPException(status_code=404, detail="Запись не найдена")
+        # Preserve supported legacy queue states, but never revive a terminal
+        # appointment that changed while this caller was waiting on the lock.
+        if appointment.status not in {"paid", "confirmed", "called", "calling", "waiting", "queued", "in_visit"}:
+            raise HTTPException(status_code=409, detail="Начало приема недоступно для текущего статуса")
         appointment.status = AppointmentStatus.IN_VISIT
         self.repository.commit()
         self.repository.refresh(appointment)

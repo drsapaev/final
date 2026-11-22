@@ -1,8 +1,13 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Printer, CheckCircle, Clock, X } from 'lucide-react';
 import './MultipleTicketsPrinter.css';
-import { buildPanelTicketPayload, printPanelTicketInBrowserAsync } from '../../services/panelPrint';
+import {
+  buildPanelTicketPayload,
+  printPanelTicketInBrowserAsync,
+  openPanelTicketBatchWindow,
+  printPanelTicketsBatchInExistingWindow
+} from '../../services/panelPrint';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -28,8 +33,16 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   const [printedTickets, setPrintedTickets] = useState<Set<string | number>>(new Set());
   const [currentPrinting, setCurrentPrinting] = useState<string | number | null>(null);
   const [countdown, setCountdown] = useState(0);
+  // CSH-FE-045 (follow-up audit 2026-11-02): окно пакетной печати открывается
+  // синхронно в прямом жесте клика «Печать всех» (ДО сетевых запросов и
+  // отсчёта) — иначе 5с+800мс после клика выводят window.open за пределы
+  // окна доверенной активации и блокируются браузером. Окно наполняется
+  // единым документом (по .ticket-page на талон) — попап на каждый талон
+  // больше не открывается вовсе.
+  const batchWindowRef = useRef<Window | null>(null);
+  const [batchError, setBatchError] = useState<string | null>(null);
 
-  // Функция печати одного талона
+  // Функция печати одного талона (кнопка на карточке — прямой жест)
   const printSingleTicket = async (ticket: Ticket) => {
     setCurrentPrinting(ticket.queue_id);
 
@@ -49,42 +62,65 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
     }
   };
 
-  // Печать всех талонов с интервалом
+  // Печать всех талонов одним документом в УЖЕ открытом окне (см.
+  // startCountdown: окно открыто в жесте клика). Порядок печати задаётся
+  // порядком .ticket-page; искусственная пауза 800мс на талон удалена.
   const printAllTickets = async () => {
-    let allSucceeded = true;
-
-    for (const ticket of tickets) {
-      if (!printedTickets.has(ticket.queue_id)) {
-        // Небольшая пауза между печатью талонов, чтобы не перегружать принтер
-        // и сохранить предсказуемый порядок печати.
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        const success = await printSingleTicket(ticket);
-        if (success) {
-          setPrintedTickets((prev) => new Set([...prev, ticket.queue_id]));
-        } else {
-          allSucceeded = false;
-        }
-      }
+    const batchWindow = batchWindowRef.current;
+    if (!batchWindow) {
+      setBatchError('Окно пакетной печати не открыто — нажмите «Печать всех» ещё раз.');
+      return;
     }
 
-    if (allSucceeded) {
+    const pending = tickets.filter((ticket) => !printedTickets.has(ticket.queue_id));
+    if (pending.length === 0) {
       onAllPrinted && onAllPrinted();
+      return;
+    }
+
+    const result = await printPanelTicketsBatchInExistingWindow(
+      batchWindow,
+      pending.map((ticket) => buildPanelTicketPayload(ticket))
+    );
+
+    if (result.success) {
+      setPrintedTickets((prev) => new Set([...prev, ...pending.map((ticket) => ticket.queue_id)]));
+      setBatchError(null);
+      onAllPrinted && onAllPrinted();
+    } else {
+      // Честный провал: ничего не помечаем напечатанным — кнопка
+      // «Печать всех» остаётся пользователю как путь восстановления.
+      logger.warn('Batch ticket print failed', result.error);
+      setBatchError('Не удалось подготовить печать: повторите «Печать всех» или напечатайте талоны по одному.');
     }
   };
 
-  // Обратный отсчет для кнопки "Печать всех"
+  // Обратный отсчет для кнопки "Печать всех". Окно уже открыто в жесте —
+  // отсчёт только задерживает заполнение/печать, не открытие попапа.
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     }
+    // Отсчёт дошёл до нуля — окно уже открыто: наполняем и печатаем.
+    if (countdown === 0 && batchWindowRef.current) {
+      void printAllTickets();
+    }
   }, [countdown]);
 
   const startCountdown = () => {
+    // ШАГ 1 (синхронно, в жесте): открыть окно-плейсхолдер. Если браузер
+    // заблокировал — честное сообщение, отсчёт не начинается.
+    setBatchError(null);
+    const batchWindow = openPanelTicketBatchWindow();
+    if (!batchWindow) {
+      logger.warn('Browser popup blocked for batch ticket print (user gesture)');
+      setBatchError('Браузер заблокировал окно печати. Разрешите всплывающие окна для приложения и повторите.');
+      return;
+    }
+    batchWindowRef.current = batchWindow;
+    // ШАГ 2: отсчёт до заполнения/печати (окно уже открыто).
     setCountdown(5);
-    setTimeout(() => {
-      printAllTickets();
-    }, 5000);
   };
 
   const allPrinted = printedTickets.size >= tickets.length;
@@ -157,6 +193,13 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
           </div> :
 
         <div className="print-all-section">
+            {/* CSH-FE-045: честное сообщение о блокировке/провале пакетной
+                печати — кнопка «Печать всех» остаётся как путь восстановления. */}
+            {batchError && (
+              <div className="batch-print-error" data-testid="mtp-batch-error" role="alert">
+                {batchError}
+              </div>
+            )}
             {countdown > 0 ?
           <button className="print-all-btn countdown" disabled>
                 <Clock size={16} />

@@ -32,7 +32,6 @@ import {
   formatFlagLabel,
   formatThreshold,
   getServiceContextItems,
-  buildLabPrintPayload,
 } from './utils/labReportNormalize';
 import {
   hasLabReportAction,
@@ -165,7 +164,25 @@ export default function LabReportWorkbench({
     signerSnapshot: Record<string, unknown>;
   } | null>(null);
   const printAttemptRef = useRef(0);
+  // LABR-FE-002 (audit 3886): preview attempt epoch — a late preview
+  // response must never open/report into a context that replaced it.
+  const previewAttemptRef = useRef(0);
+  // RETRO-3970-01 review follow-up: an in-flight preview must not outlive
+  // its unmount — the reservation is mirrored so the unmount cleanup can
+  // close it, and the mounted mirror owns previewStillCurrent().
+  const previewReservedRef = useRef<Window | null>(null);
+  const previewMountedRef = useRef(true);
   const printFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // RETRO-3970-01 review follow-up: on unmount the in-flight preview loses
+  // its ownership (mounted mirror + attempt invalidation) and its reserved
+  // blank tab is closed — a late blob response must never navigate a
+  // departed report's document into a popup nobody is watching.
+  useEffect(() => () => {
+    previewMountedRef.current = false;
+    previewAttemptRef.current += 1;
+    previewReservedRef.current?.close();
+    previewReservedRef.current = null;
+  }, []);
   const captureOperationContext = useCallback(
     () => getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT,
     [getOperationContext],
@@ -177,6 +194,11 @@ export default function LabReportWorkbench({
     ),
     [getOperationContext],
   );
+  // LABR-FE-002 (audit 3886): the CURRENT operation context through a ref —
+  // an awaited continuation must re-check against the LIVE context, not the
+  // callback captured in the render that launched it.
+  const operationContextRef = useRef<LabReportOperationContext>(EMPTY_OPERATION_CONTEXT);
+  operationContextRef.current = getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT;
 
   // STRAT#2: единый канал нотификаций.
   const labToast = useLabToast(notify as (type: string, message: string) => void);
@@ -844,38 +866,96 @@ export default function LabReportWorkbench({
   async function handlePreviewPdf() {
     if (!activeInstance || instanceTransitionPending) return;
     const expectedInstanceId = activeInstance.id as string | number;
+    // LABR-FE-002 (audit 3886): capture the operation context and a
+    // preview epoch — after the awaited read, the response may only open
+    // while THIS preview still owns the active instance/context.
+    const previewOperation = getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT;
+    const previewAttempt = ++previewAttemptRef.current;
+    const previewStillCurrent = () =>
+      previewMountedRef.current &&
+      previewAttemptRef.current === previewAttempt &&
+      operationContextsMatch(previewOperation, operationContextRef.current);
+    // RETRO-3970-01 (CARDHIST-FE-001 precedent): reserve the browsing
+    // context SYNCHRONOUSLY inside the click gesture — before any await.
+    // No `noopener` feature string: a null reservation is an HONEST
+    // blocked signal, a context is a guaranteed-to-be-fulfilled open.
+    // (A noopener window.open returns null even on success — the old
+    // post-await call both lost the gesture and lied about the result.)
+    const reserved = window.open('', '_blank');
+    if (!reserved) {
+      setPrintFeedback({ severity: 'error', text: t('workbench.preview_popup_blocked') });
+      return;
+    }
+    previewReservedRef.current = reserved;
     setBusyAction('preview');
     setPrintFeedback({ severity: 'info', text: t('workbench.preview_building') });
     try {
       const blob = await labReportingApi.previewInstancePdf(expectedInstanceId);
-      if (!blob || !(blob instanceof Blob)) {
-        setPrintFeedback({ severity: 'error', text: t('workbench.print_pdf_invalid') });
+      if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+        // RETRO-3970-01: never leave the reserved blank tab behind. The
+        // review follow-up adds the size guard — a zero-byte payload would
+        // otherwise open as a dead document.
+        reserved.close();
+        if (previewStillCurrent()) {
+          setPrintFeedback({ severity: 'error', text: t('workbench.print_pdf_invalid') });
+        }
+        return;
+      }
+      // LABR-FE-002: the operator switched the report/patient while the
+      // read was pending — drop the stale blob BEFORE any object URL is
+      // created; no window.open, no feedback overwrite on the new screen.
+      if (!previewStillCurrent()) {
+        reserved.close();
+        logger.warn('[LabReportWorkbench] Stale PDF preview ignored for a changed report context');
         return;
       }
       const url = URL.createObjectURL(blob);
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // RETRO-3970-01: the reserved tab is navigated here — a noopener
+      // window.open returns null even on a SUCCESSFUL open (MDN), so the
+      // old truthiness check reported every successful preview as
+      // «blocked». The reservation returned a context, so this success is
+      // a REAL success.
       // WF-05 parity: НЕ помечаем PRINTED и не дёргаем onRefresh* —
       // preview не имеет серверных побочных эффектов.
-      setPrintFeedback(
-        popup
-          ? { severity: 'success', text: t('workbench.preview_opened') }
-          : { severity: 'error', text: t('workbench.print_pdf_blocked') }
-      );
+      reserved.opener = null;
+      reserved.location.href = url;
+      setPrintFeedback({ severity: 'success', text: t('workbench.preview_opened') });
       if (printFeedbackTimerRef.current) {
         clearTimeout(printFeedbackTimerRef.current);
         printFeedbackTimerRef.current = null;
       }
       printFeedbackTimerRef.current = setTimeout(() => {
-        setPrintFeedback(null);
-        printFeedbackTimerRef.current = null;
+        if (previewAttemptRef.current === previewAttempt) {
+          setPrintFeedback(null);
+          printFeedbackTimerRef.current = null;
+        }
       }, 5000);
     } catch (previewError) {
+      // RETRO-3970-01: the failed read must not leave the reserved blank
+      // tab behind — closing it is safe even when the attempt went stale
+      // (the tab belongs to the old attempt either way).
+      reserved.close();
+      if (!previewStillCurrent()) {
+        // LABR-FE-002: a stale preview's failure belongs to the old context.
+        logger.warn('[LabReportWorkbench] Stale PDF preview failure ignored for a changed report context');
+        return;
+      }
       logger.error('[LabReportWorkbench] PDF preview failed', previewError);
       setPrintFeedback({ severity: 'error', text: t('workbench.preview_failed') });
       notify?.('error', getErrorMessage(previewError) || t('errors.print_failed'));
     } finally {
-      setBusyAction('');
+      // LABR-FE-002 + LABR-FE-003 (post-merge review of PR 3909, P2): only
+      // the current preview owns the busy flag — and ownership is not the
+      // preview epoch alone: the try/catch above also compares the LIVE
+      // operation context, so a NEWER report action started in a replaced
+      // context owns the busy flag now. Compare-and-clear against the live
+      // value: the flag is released only when it is still this preview's
+      // (an overlapping newer preview keeps its own flag because the epoch
+      // check above already skipped this release).
+      if (previewAttemptRef.current === previewAttempt) {
+        setBusyAction((current) => (current === 'preview' ? '' : current));
+      }
     }
   }
 
@@ -901,9 +981,26 @@ export default function LabReportWorkbench({
       text: t('workbench.print_sending')
     });
     try {
-      const printResult = await printService.printLabResults(
-        buildLabPrintPayload(activeInstance, selectedAppointment)
-      ) as Record<string, unknown>;
+      // LABPRINT-FE-001 (audit 3886, round 14): отправляем ТОЛЬКО
+      // авторизованный идентификатор отчёта — сервер материализует бланк
+      // из БД (тот же пайплайн, что канонический PDF). Клиентские
+      // значения больше не собираются и не отправляются.
+      const printResult = await printService.printLabResults({
+        report_instance_id: Number(expectedInstanceId),
+      }) as Record<string, unknown>;
+
+      // LABPRINT-FE-003 (audit 3886, round 14): 2xx без положительного
+      // ACK — ambiguous: задание МОГЛО встать в очередь. Никакого
+      // слепого повтора и автофолбэка: оператор проверяет очередь печати,
+      // статус не помечается.
+      if ((printResult as { ambiguous?: boolean }).ambiguous) {
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
+        setPrintFeedback({ severity: 'warning', text: t('workbench.print_unconfirmed') });
+        return;
+      }
 
       if (printResult.success) {
         let printed: Record<string, unknown>;
@@ -995,8 +1092,9 @@ export default function LabReportWorkbench({
         clearOwnedPrintFeedback();
         return;
       }
-      if (!blob || !(blob instanceof Blob)) {
-        // L-M-9 fix: если blob пустой или не Blob — не открываем window.open('undefined')
+      if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+        // L-M-9 fix: если blob пустой или не Blob — не открываем window.open('undefined').
+        // RETRO-3970-01 review follow-up: size === 0 is the same invalid class.
         setPrintFeedback({
           severity: 'error',
           text: t('workbench.print_pdf_invalid')
@@ -1009,56 +1107,37 @@ export default function LabReportWorkbench({
         clearOwnedPrintFeedback();
         return;
       }
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      // WF-05 fix: не помечаем как PRINTED при неудаче popup.
-      if (popup) {
-        let printed: Record<string, unknown>;
-        try {
-          printed = (await labReportingApi.markPrinted(expectedInstanceId)) as Record<string, unknown>;
-        } catch (markError) {
-          logger.error('[LabReportWorkbench] opened PDF status update failed', markError);
-          if (isOperationCurrent(operation) && printAttemptRef.current === printAttempt) {
-            setPrintFeedback({ severity: 'error', text: t('workbench.print_status_failed') });
-          }
-          notify?.('error', t('workbench.print_status_failed'));
-          return;
+      // RETRO-3970-01: the direct-print attempt NEVER auto-opens a tab —
+      // it PREPARES the PDF and hands the decision to the operator via the
+      // explicit follow-up click («Открыть PDF для печати»). That click is
+      // a fresh user activation whose synchronous reservation either
+      // succeeds (a context to navigate) or honestly reports «blocked» —
+      // the old noopener window.open returned null even on success, so the
+      // LABPRINT-FE-002 confirmation was unreachable on real browsers.
+      const preparedUrl = url;
+      pdfPreparedUrlRef.current = preparedUrl;
+      setTimeout(() => {
+        URL.revokeObjectURL(preparedUrl);
+        // RETRO-3970-01 review follow-up: the 60s object-URL budget also
+        // expires the PREPARATION — an expired link must never back the
+        // explicit open (a dead document) nor the printed-confirmation that
+        // follows it. Only the still-pending preparation expires; one that
+        // was already opened (or dropped) is untouched.
+        if (pdfPreparedUrlRef.current === preparedUrl) {
+          pdfPreparedUrlRef.current = null;
+          setPdfFallbackPrepared(null);
+          setPrintFeedback({
+            severity: 'warning',
+            text: t('workbench.print_pdf_prepared_expired')
+          });
         }
-        const accepted = onInstanceChange?.(printed, {
-          kind: 'update',
-          expectedInstanceId,
-          operation,
-        }) !== false;
-        if (!accepted || !isOperationCurrent(operation)) {
-          clearOwnedPrintFeedback();
-          return;
-        }
-        await onRefreshHistory?.(printed.patient_id as string | number);
-        if (!isOperationCurrent(operation)) {
-          clearOwnedPrintFeedback();
-          return;
-        }
-        await onRefreshRecentReports?.();
-        if (!isOperationCurrent(operation)) {
-          clearOwnedPrintFeedback();
-          return;
-        }
-        await onQueueChanged?.();
-        if (!isOperationCurrent(operation)) {
-          clearOwnedPrintFeedback();
-          return;
-        }
-        setPrintFeedback({
-          severity: 'success',
-          text: t('workbench.print_pdf_opened')
-        });
-      } else {
-        if (!isOperationCurrent(operation)) return;
-        setPrintFeedback({
-          severity: 'warning',
-          text: t('workbench.print_pdf_blocked')
-        });
-      }
+      }, 60_000);
+      setPdfFallbackPrepared({ instanceId: expectedInstanceId, url });
+      setPrintFeedback({
+        severity: 'info',
+        text: t('workbench.print_pdf_prepared')
+      });
+      return;
     } catch (error) {
       if (!isOperationCurrent(operation)) {
         clearOwnedPrintFeedback();
@@ -1077,8 +1156,106 @@ export default function LabReportWorkbench({
     }
   }
 
-  // P1 fix: Notify patient via Telegram — sends lab results PDF to patient's
-  // Telegram chat via POST /telegram/send-lab-results backend endpoint.
+  // LABPRINT-FE-002 (audit 3886, round 14): PDF-вкладка открыта, но
+  // физическая печать не подтверждена. Пока оператор не нажмёт
+  // «Отметить как напечатанное», статус отчёта не меняется: открытый
+  // PDF-превью — это не печатное задание. Сбрасывается при смене
+  // активного отчёта (WF-12 parity).
+  const [pdfConfirmPendingInstanceId, setPdfConfirmPendingInstanceId] = useState<string | number | null>(null);
+  // RETRO-3970-01: the PDF fallback prepared after a failed direct print —
+  // it holds the object URL until the operator clicks «Открыть PDF для
+  // печати» (a fresh user gesture). Reset with the same epoch contract as
+  // pdfConfirmPendingInstanceId (WF-12 parity); the URL is revoked so a
+  // dropped preparation never leaks a stale report document.
+  const [pdfFallbackPrepared, setPdfFallbackPrepared] = useState<{ instanceId: string | number; url: string } | null>(null);
+  // Ref mirror of the still-pending prepared URL — the expiry timer and the
+  // open action compare against it so a dead link can never be consumed.
+  const pdfPreparedUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    setPdfConfirmPendingInstanceId(null);
+    pdfPreparedUrlRef.current = null;
+    setPdfFallbackPrepared((prepared) => {
+      if (prepared) {
+        URL.revokeObjectURL(prepared.url);
+      }
+      return null;
+    });
+  }, [activeInstance?.id]);
+
+  function openPreparedPdf() {
+    if (!pdfFallbackPrepared) return;
+    if (pdfFallbackPrepared.instanceId !== (activeInstance?.id as string | number)) return;
+    if (pdfPreparedUrlRef.current !== pdfFallbackPrepared.url) return;
+    // Synchronous reservation inside THIS click gesture — no noopener
+    // feature string, so null is a real blocked signal (CARDHIST-FE-001).
+    const reserved = window.open('', '_blank');
+    if (!reserved) {
+      setPrintFeedback({ severity: 'warning', text: t('workbench.print_pdf_blocked') });
+      return;
+    }
+    reserved.opener = null;
+    reserved.location.href = pdfFallbackPrepared.url;
+    pdfPreparedUrlRef.current = null;
+    setPdfFallbackPrepared(null);
+    // LABPRINT-FE-002: the opened PDF tab is NOT a physical print — only
+    // the operator's explicit confirmation flips the status.
+    setPdfConfirmPendingInstanceId(pdfFallbackPrepared.instanceId);
+    setPrintFeedback({ severity: 'info', text: t('workbench.print_pdf_opened_confirm') });
+  }
+
+  async function confirmPdfPrinted() {
+    const targetInstanceId = pdfConfirmPendingInstanceId;
+    if (targetInstanceId == null) return;
+    const operation = captureOperationContext();
+    setBusyAction('print');
+    try {
+      let printed: Record<string, unknown>;
+      try {
+        printed = (await labReportingApi.markPrinted(targetInstanceId)) as Record<string, unknown>;
+      } catch (markError) {
+        logger.error('[LabReportWorkbench] confirmed PDF print status update failed', markError);
+        setPrintFeedback({ severity: 'error', text: t('workbench.print_status_failed') });
+        notify?.('error', t('workbench.print_status_failed'));
+        return;
+      }
+      setPdfConfirmPendingInstanceId(null);
+      const accepted = onInstanceChange?.(printed, {
+        kind: 'update',
+        expectedInstanceId: targetInstanceId,
+        operation,
+      }) !== false;
+      if (!accepted) return;
+      await onRefreshHistory?.(printed.patient_id as string | number);
+      await onRefreshRecentReports?.();
+      await onQueueChanged?.();
+      setPrintFeedback({ severity: 'success', text: t('workbench.print_marked') });
+      if (printFeedbackTimerRef.current) {
+        clearTimeout(printFeedbackTimerRef.current);
+        printFeedbackTimerRef.current = null;
+      }
+      printFeedbackTimerRef.current = setTimeout(() => {
+        setPrintFeedback(null);
+        printFeedbackTimerRef.current = null;
+      }, 5000);
+    } finally {
+      setBusyAction((current) => (current === 'print' ? '' : current));
+    }
+  }
+
+  // LABN-FE-001/002 (audit 3886 round 10): Notify patient via Telegram —
+  // sends the FINALIZED report-instance PDF to the patient's Telegram chat
+  // via POST /telegram/send-lab-report-instance. The old call posted
+  // {patient_id, instance_id} to /telegram/send-lab-results, a legacy
+  // lab_result-scoped route with query-parameter validation — every call
+  // was rejected 422 before business logic, and the route never implemented
+  // the promised PDF delivery.
+  //
+  // LABN-FE-002: an HTTP 2xx does NOT mean the patient received anything —
+  // the route answers 200 + {success:false} when the patient is not linked
+  // to the bot or disabled lab notifications. Success is asserted ONLY on
+  // an explicit success === true; a false/absent/malformed payload is
+  // surfaced as an honest failure (server-provided, non-PHI reason when
+  // present), never as «отправлено».
   //
   // UX-AUDIT-QW1: Добавлен ConfirmDialog. Отправка в Telegram необратима
   // (нельзя отозвать сообщение). Соответствие Nielsen Heuristic #5
@@ -1103,12 +1280,33 @@ export default function LabReportWorkbench({
     setSaving(true);
     setBusyAction('notify');
     try {
-      await api.post('/telegram/send-lab-results', {
+      const response = await api.post('/telegram/send-lab-report-instance', {
         patient_id: patientId,
-        instance_id: instanceId,
+        report_instance_id: instanceId,
       });
       if (!isOperationCurrent(operation)) return;
-      notify?.('success', t('success.notified'));
+      const payload = (response as { data?: unknown })?.data;
+      const delivered =
+        payload != null &&
+        typeof payload === 'object' &&
+        (payload as { success?: unknown }).success === true;
+      if (delivered) {
+        notify?.('success', t('success.notified'));
+      } else {
+        // Honest failure: the dispatch attempt resolved, but the patient
+        // did not receive the report (not linked / notifications disabled /
+        // unreadable payload). Show the server's redacted reason when the
+        // shape carries one; never report a false «sent» confirmation.
+        const serverReason =
+          payload != null && typeof payload === 'object'
+            ? (payload as { message?: unknown }).message
+            : undefined;
+        const reason =
+          typeof serverReason === 'string' && serverReason.trim()
+            ? serverReason.trim()
+            : t('errors.notify_not_delivered');
+        notify?.('error', reason);
+      }
     } catch (error) {
       if (!isOperationCurrent(operation)) return;
       const msg = getErrorMessage(error) || 'Не удалось отправить результаты пациенту.';
@@ -1426,7 +1624,29 @@ export default function LabReportWorkbench({
               </details>
 
               {printFeedback && (
-                <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
+                <div>
+                  <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
+                  {pdfConfirmPendingInstanceId == null
+                    && pdfFallbackPrepared != null
+                    && pdfFallbackPrepared.instanceId === (activeInstance?.id as string | number) && (
+                    <Button
+                      variant="primary"
+                      size="default"
+                      onClick={openPreparedPdf}
+                    >
+                      {t('workbench.print_pdf_open_action')}
+                    </Button>
+                  )}
+                  {pdfConfirmPendingInstanceId != null && (
+                    <Button
+                      variant="primary"
+                      size="default"
+                      onClick={() => { void confirmPdfPrinted(); }}
+                    >
+                      {t('workbench.print_confirm_mark_printed')}
+                    </Button>
+                  )}
+                </div>
               )}
 
               {((activeInstance.critical_findings as Array<Record<string, unknown>> | undefined)?.length ?? 0) > 0 && (

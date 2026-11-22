@@ -224,7 +224,7 @@ pii_check() {
         python -c "
 from app.core.pii_masker import mask_pii, mask_phone, mask_email, mask_name
 
-assert mask_phone('+998901234567') == '+998901•••567'
+assert mask_phone('+998901234567') == '•••567'
 assert mask_email('john@example.com').startswith('j')
 assert mask_name('Иван Иванов') == 'И.И.'
 
@@ -235,6 +235,7 @@ patient = {
 }
 masked = mask_pii(patient)
 assert masked['first_name'] == 'A.'
+assert masked['phone'] == '•••567'
 assert masked['iin'] == '[REDACTED]'
 assert masked['id'] == 42
 
@@ -249,7 +250,11 @@ run_check 6 "PII scrubbing (3 layers)" pii_check
 # Check 7: Pre-commit hooks installed
 # ---------------------------------------------------------------------------
 precommit_check() {
-    if [ ! -f .git/hooks/pre-commit ]; then
+    # Resolve the hook through Git instead of assuming .git is a directory.
+    # Linked worktrees store a .git file and share the common hooks directory.
+    local precommit_hook
+    precommit_hook="$(git rev-parse --git-path hooks/pre-commit 2>/dev/null || true)"
+    if [ -z "$precommit_hook" ] || [ ! -f "$precommit_hook" ]; then
         echo "    pre-commit hook not installed — run: bash scripts/setup-dev.sh"
         return 1
     fi
@@ -257,7 +262,7 @@ precommit_check() {
         echo "    .pre-commit-config.yaml not found"
         return 1
     fi
-    echo "    pre-commit hook installed at .git/hooks/pre-commit"
+    echo "    pre-commit hook installed"
     echo "    .pre-commit-config.yaml exists"
     # Try running pre-commit on a single file to verify it works.
     # This pipeline is the last statement, so its exit status (pipefail

@@ -2,7 +2,8 @@
 E2E тесты для полного сценария работы с визитами:
 Врач назначил → Пациент подтвердил → Номер в очереди выдан
 """
-from datetime import date, datetime, timedelta
+
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -11,8 +12,19 @@ import pytest
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
+from app.models.telegram_config import TelegramUser
 from app.models.visit import Visit, VisitService
 from app.services.morning_assignment import MorningAssignmentService
+from app.services.visit_confirmation_service import (
+    VisitConfirmationDomainError,
+    VisitConfirmationService,
+    build_telegram_visit_action_token,
+)
+
+
+@pytest.fixture(autouse=True)
+def _future_telegram_start(monkeypatch):
+    monkeypatch.setattr("app.tasks.worker._appointment_start_utc", lambda visit: datetime.now(UTC) + timedelta(days=1))
 
 
 def _clinic_today(db_session):
@@ -27,6 +39,35 @@ def _clinic_today(db_session):
     from app.api.v1.endpoints.registrar_wizard._visits import _clinic_today
 
     return _clinic_today(db_session)
+
+
+def _link_telegram(db_session, patient_id):
+    """Bind the synthetic private chat used by the trusted callback."""
+    link = db_session.query(TelegramUser).filter_by(chat_id=123456789).first()
+    if link is None:
+        link = TelegramUser(chat_id=123456789)
+        db_session.add(link)
+    link.patient_id = patient_id
+    link.active = True
+    link.blocked = False
+    link.notifications_enabled = True
+    link.appointment_reminders = True
+    db_session.commit()
+
+
+def _trusted_telegram_confirm(db_session, token):
+    visit = db_session.query(Visit).filter(Visit.confirmation_token == token).first()
+    link = db_session.query(TelegramUser).filter_by(chat_id=123456789).first()
+    if visit is not None and link is not None:
+        token = build_telegram_visit_action_token(
+            visit_id=visit.id, confirmation_token=token, link_id=link.id,
+            chat_id=link.chat_id, patient_id=visit.patient_id,
+            link_epoch=link.patient_link_epoch, visit_context_epoch=visit.confirmation_context_epoch,
+        )
+    return VisitConfirmationService(db_session).confirm_by_telegram(
+        token=token, telegram_user_id="123456789", source_ip=None,
+        user_agent="telegram",
+    )
 
 
 @pytest.mark.integration
@@ -59,7 +100,9 @@ class TestE2EVisitFlow:
             json={
                 "patient_id": foreign_patient.id,
                 "service_ids": [test_service.id],
-                "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
+                "visit_date": (
+                    _clinic_today(db_session) + timedelta(days=1)
+                ).isoformat(),
                 "visit_time": "10:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -96,13 +139,17 @@ class TestE2EVisitFlow:
         )
         db_session.add(existing_visit)
         db_session.commit()
+        test_service.duration_minutes = 35
+        db_session.commit()
 
         response = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json={
                 "patient_id": test_patient.id,
                 "service_ids": [test_service.id],
-                "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
+                "visit_date": (
+                    _clinic_today(db_session) + timedelta(days=1)
+                ).isoformat(),
                 "visit_time": "10:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -117,9 +164,24 @@ class TestE2EVisitFlow:
         assert scheduled_visit is not None
         assert scheduled_visit.patient_id == test_patient.id
         assert scheduled_visit.doctor_id == test_doctor.id
+        scheduled_service = (
+            db_session.query(VisitService)
+            .filter(
+                VisitService.visit_id == scheduled_visit_id,
+                VisitService.service_id == test_service.id,
+            )
+            .one()
+        )
+        assert scheduled_service.duration_minutes_snapshot == 35
 
     def test_complete_visit_flow_today(
-        self, client, db_session, cardio_auth_headers, test_doctor, test_patient, test_service
+        self,
+        client,
+        db_session,
+        cardio_auth_headers,
+        test_doctor,
+        test_patient,
+        test_service,
     ):
         """
         Полный E2E тест: врач назначил визит на сегодня → пациент подтвердил → номер выдан
@@ -156,9 +218,9 @@ class TestE2EVisitFlow:
                 "visit_time": "10:00",
                 "discount_mode": "none",
                 "all_free": False,
-                "confirmation_channel": "telegram"
+                "confirmation_channel": "telegram",
             },
-            headers=cardio_auth_headers
+            headers=cardio_auth_headers,
         )
 
         assert schedule_response.status_code == 200
@@ -183,27 +245,20 @@ class TestE2EVisitFlow:
             day=_clinic_today(db_session),
             specialist_id=visit.doctor_id,
             queue_tag="cardiology_common",
-            active=True
+            active=True,
         )
         db_session.add(daily_queue)
         db_session.commit()
 
-        # ШАГ 3: Пациент подтверждает визит через Telegram
-        confirm_response = client.post(
-            "/api/v1/telegram/visits/confirm",
-            json={
-                "token": confirmation_token,
-                "telegram_user_id": "123456789",
-                "telegram_username": "testuser"
-            }
-        )
-
-        assert confirm_response.status_code == 200
-        confirm_data = confirm_response.json()
+        # ШАГ 3: trusted Telegram callback confirms for the linked patient.
+        _link_telegram(db_session, test_patient.id)
+        confirm_data = _trusted_telegram_confirm(db_session, confirmation_token)
 
         assert confirm_data["success"] is True
         assert confirm_data["visit_id"] == visit_id
-        assert confirm_data["status"] == "open"  # Должен быть open для визита на сегодня
+        assert (
+            confirm_data["status"] == "open"
+        )  # Должен быть open для визита на сегодня
         assert "подтвержден" in confirm_data["message"]
 
         # ШАГ 4: Проверяем что номер в очереди выдан
@@ -222,9 +277,11 @@ class TestE2EVisitFlow:
         assert "telegram_" in visit.confirmed_by
 
         # Проверяем что создалась запись в очереди
-        queue_entry = db_session.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.visit_id == visit_id
-        ).first()
+        queue_entry = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.visit_id == visit_id)
+            .first()
+        )
 
         assert queue_entry is not None
         assert queue_entry.number == queue_number["number"]
@@ -236,18 +293,21 @@ class TestE2EVisitFlow:
         visit_info_response = client.get(f"/api/v1/visits/info/{confirmation_token}")
         assert visit_info_response.status_code == 400  # Токен уже использован
 
-    def test_complete_visit_flow_future_date(self, client, db_session, auth_headers, test_patient):
+    def test_complete_visit_flow_future_date(
+        self, client, db_session, auth_headers, test_patient
+    ):
         """
         E2E тест: врач назначил визит на завтра → пациент подтвердил → номер НЕ выдан
         """
         # Создаем уникальную услугу для этого теста
         from app.models.service import Service
+
         future_service = Service(
             code="FUTURE_TEST",
             name="Будущая услуга",
             price=100000.00,
             queue_tag="cardiology_common",
-            is_active=True
+            is_active=True,
         )
         db_session.add(future_service)
         db_session.commit()
@@ -264,9 +324,9 @@ class TestE2EVisitFlow:
                 "visit_time": "14:00",
                 "discount_mode": "repeat",
                 "all_free": False,
-                "confirmation_channel": "pwa"
+                "confirmation_channel": "pwa",
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert schedule_response.status_code == 200
@@ -278,10 +338,7 @@ class TestE2EVisitFlow:
         # ШАГ 2: Пациент подтверждает визит через PWA
         confirm_response = client.post(
             "/api/v1/patient/visits/confirm",
-            json={
-                "token": confirmation_token,
-                "patient_phone": test_patient.phone
-            }
+            json={"token": confirmation_token, "patient_phone": test_patient.phone},
         )
 
         assert confirm_response.status_code == 200
@@ -301,9 +358,11 @@ class TestE2EVisitFlow:
         assert visit.discount_mode == "repeat"
 
         # Проверяем что НЕ создалась запись в очереди
-        queue_entry = db_session.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.visit_id == visit_id
-        ).first()
+        queue_entry = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.visit_id == visit_id)
+            .first()
+        )
 
         assert queue_entry is None
 
@@ -319,12 +378,13 @@ class TestE2EVisitFlow:
         """
         # Создаем уникальную услугу для этого теста
         from app.models.service import Service
+
         morning_service = Service(
             code="MORNING_TEST",
             name="Утренняя услуга",
             price=75000.00,
             queue_tag="cardiology_common",
-            is_active=True
+            is_active=True,
         )
         db_session.add(morning_service)
         db_session.commit()
@@ -339,8 +399,9 @@ class TestE2EVisitFlow:
             discount_mode="benefit",
             department="cardiology",
             confirmation_token=None,  # Уже использован
-            confirmed_at=datetime.utcnow() - timedelta(hours=12),  # Подтвердили 12 часов назад
-            confirmed_by="telegram_123456789"
+            confirmed_at=datetime.utcnow()
+            - timedelta(hours=12),  # Подтвердили 12 часов назад
+            confirmed_by="telegram_123456789",
         )
         db_session.add(visit)
         db_session.commit()
@@ -351,7 +412,7 @@ class TestE2EVisitFlow:
             service_id=morning_service.id,
             quantity=1,
             price=morning_service.price,
-            discount_amount=0
+            discount_amount=0,
         )
         db_session.add(visit_service)
         db_session.commit()
@@ -361,7 +422,7 @@ class TestE2EVisitFlow:
             day=_clinic_today(db_session),
             specialist_id=visit.doctor_id,
             queue_tag="cardiology_common",
-            active=True
+            active=True,
         )
         db_session.add(daily_queue)
         db_session.commit()
@@ -369,7 +430,7 @@ class TestE2EVisitFlow:
         # ШАГ 3: Запускаем утреннее присвоение номеров
         assignment_response = client.post(
             "/api/v1/admin/morning-assignment/run",
-            headers=auth_headers  # Используем админа
+            headers=auth_headers,  # Используем админа
         )
 
         # Может быть 403 если роль не подходит, но логика должна работать
@@ -387,9 +448,11 @@ class TestE2EVisitFlow:
             assert assignment_data["assigned_visits"] >= 1
 
         # ШАГ 4: Проверяем что номер присвоен
-        queue_entry = db_session.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.visit_id == visit.id
-        ).first()
+        queue_entry = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.visit_id == visit.id)
+            .first()
+        )
 
         assert queue_entry is not None
         assert queue_entry.number > 0
@@ -423,7 +486,7 @@ class TestE2EVisitFlow:
             department="cardiology",
             confirmation_token="test-registrar-token",
             confirmation_channel="phone",
-            confirmation_expires_at=datetime.utcnow() + timedelta(hours=24)
+            confirmation_expires_at=datetime.utcnow() + timedelta(hours=24),
         )
         db_session.add(visit)
         db_session.commit()
@@ -433,7 +496,7 @@ class TestE2EVisitFlow:
             day=_clinic_today(db_session),
             specialist_id=visit.doctor_id,
             queue_tag="cardiology_common",
-            active=True
+            active=True,
         )
         db_session.add(daily_queue)
         db_session.commit()
@@ -441,10 +504,8 @@ class TestE2EVisitFlow:
         # ШАГ 3: Регистратор подтверждает визит по телефону
         confirm_response = client.post(
             f"/api/v1/registrar/visits/{visit.id}/confirm",
-            json={
-                "confirmation_notes": "Подтверждено по телефону +998900000121"
-            },
-            headers=auth_headers
+            json={"confirmation_notes": "Подтверждено по телефону +998900000121"},
+            headers=auth_headers,
         )
 
         assert confirm_response.status_code == 200
@@ -465,14 +526,18 @@ class TestE2EVisitFlow:
         assert visit.confirmed_by is not None
         assert "registrar" in visit.confirmed_by or "user_" in visit.confirmed_by
 
-        queue_entry = db_session.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.visit_id == visit.id
-        ).first()
+        queue_entry = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.visit_id == visit.id)
+            .first()
+        )
 
         assert queue_entry is not None
         assert queue_entry.source == "confirmation"
 
-    def test_multiple_services_queue_assignment(self, client, db_session, auth_headers, test_patient):
+    def test_multiple_services_queue_assignment(
+        self, client, db_session, auth_headers, test_patient
+    ):
         """
         E2E тест с несколькими услугами: разные очереди для разных услуг
         """
@@ -482,14 +547,14 @@ class TestE2EVisitFlow:
             name="ЭКГ мульти тест",
             price=50000.00,
             queue_tag="ecg",
-            is_active=True
+            is_active=True,
         )
         lab_service = Service(
             code="LAB_MULTI_TEST",
             name="Лабораторный мульти анализ",
             price=30000.00,
             queue_tag="lab",
-            is_active=True
+            is_active=True,
         )
         db_session.add_all([ecg_service, lab_service])
         db_session.commit()
@@ -504,9 +569,9 @@ class TestE2EVisitFlow:
                 "visit_time": "12:00",
                 "discount_mode": "none",
                 "all_free": False,
-                "confirmation_channel": "telegram"
+                "confirmation_channel": "telegram",
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert schedule_response.status_code == 200
@@ -537,17 +602,9 @@ class TestE2EVisitFlow:
         db_session.add_all([ecg_resource, lab_resource])
         db_session.commit()
 
-        # ШАГ 4: Пациент подтверждает визит
-        confirm_response = client.post(
-            "/api/v1/telegram/visits/confirm",
-            json={
-                "token": confirmation_token,
-                "telegram_user_id": "123456789"
-            }
-        )
-
-        assert confirm_response.status_code == 200
-        confirm_data = confirm_response.json()
+        # ШАГ 4: trusted callback confirms for the linked patient.
+        _link_telegram(db_session, test_patient.id)
+        confirm_data = _trusted_telegram_confirm(db_session, confirmation_token)
 
         # ШАГ 5: Проверяем что выданы номера для разных очередей
         assert "queue_numbers" in confirm_data
@@ -561,34 +618,36 @@ class TestE2EVisitFlow:
         assert "lab" in queue_tags
 
         # ШАГ 6: Проверяем записи в очередях
-        queue_entries = db_session.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.visit_id == visit_id
-        ).all()
+        queue_entries = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.visit_id == visit_id)
+            .all()
+        )
 
         assert len(queue_entries) == 2
 
         entry_tags = []
         for entry in queue_entries:
-            queue = db_session.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+            queue = (
+                db_session.query(DailyQueue)
+                .filter(DailyQueue.id == entry.queue_id)
+                .first()
+            )
             entry_tags.append(queue.queue_tag)
 
         assert "ecg" in entry_tags
         assert "lab" in entry_tags
 
-    def test_error_handling_in_flow(self, client, db_session, auth_headers, test_patient):
+    def test_error_handling_in_flow(
+        self, client, db_session, auth_headers, test_patient
+    ):
         """
         E2E тест обработки ошибок в полном сценарии
         """
         # ШАГ 1: Попытка подтвердить несуществующий токен
-        confirm_response = client.post(
-            "/api/v1/telegram/visits/confirm",
-            json={
-                "token": "nonexistent-token-123",
-                "telegram_user_id": "123456789"
-            }
-        )
-
-        assert confirm_response.status_code == 404
+        with pytest.raises(VisitConfirmationDomainError) as exc:
+            _trusted_telegram_confirm(db_session, "nonexistent-token-123")
+        assert exc.value.status_code == 404
 
         # ШАГ 2: Создаем визит с истекшим токеном
         expired_visit = Visit(
@@ -599,22 +658,18 @@ class TestE2EVisitFlow:
             status="pending_confirmation",
             confirmation_token="expired-token-123",
             confirmation_channel="telegram",
-            confirmation_expires_at=datetime.utcnow() - timedelta(hours=1)  # Истек час назад
+            confirmation_expires_at=datetime.utcnow()
+            - timedelta(hours=1),  # Истек час назад
         )
         db_session.add(expired_visit)
         db_session.commit()
 
         # ШАГ 3: Попытка подтвердить истекший токен
-        confirm_response = client.post(
-            "/api/v1/telegram/visits/confirm",
-            json={
-                "token": "expired-token-123",
-                "telegram_user_id": "123456789"
-            }
-        )
-
-        assert confirm_response.status_code == 400
-        assert "истек" in confirm_response.json()["detail"]
+        _link_telegram(db_session, test_patient.id)
+        with pytest.raises(VisitConfirmationDomainError) as exc:
+            _trusted_telegram_confirm(db_session, "expired-token-123")
+        assert exc.value.status_code == 400
+        assert "истек" in exc.value.detail
 
         # ШАГ 4: Попытка подтвердить через неправильный канал
         valid_visit = Visit(
@@ -625,35 +680,31 @@ class TestE2EVisitFlow:
             status="pending_confirmation",
             confirmation_token="valid-token-123",
             confirmation_channel="phone",  # Только телефон
-            confirmation_expires_at=datetime.utcnow() + timedelta(hours=24)
+            confirmation_expires_at=datetime.utcnow() + timedelta(hours=24),
         )
         db_session.add(valid_visit)
         db_session.commit()
 
-        confirm_response = client.post(
-            "/api/v1/telegram/visits/confirm",  # Пытаемся через Telegram
-            json={
-                "token": "valid-token-123",
-                "telegram_user_id": "123456789"
-            }
-        )
-
-        assert confirm_response.status_code == 400
-        assert "Telegram" in confirm_response.json()["detail"]
+        with pytest.raises(VisitConfirmationDomainError) as exc:
+            _trusted_telegram_confirm(db_session, "valid-token-123")
+        assert exc.value.status_code == 400
 
     @patch('app.services.telegram.bot.ClinicTelegramBot.send_confirmation_invitation')
-    def test_notification_integration(self, mock_telegram, client, db_session, auth_headers, test_patient):
+    def test_notification_integration(
+        self, mock_telegram, client, db_session, auth_headers, test_patient
+    ):
         """
         E2E тест интеграции с системой уведомлений
         """
         # Создаем уникальную услугу для этого теста
         from app.models.service import Service
+
         notification_service = Service(
             code="NOTIFICATION_TEST",
             name="Уведомительная услуга",
             price=60000.00,
             queue_tag="cardiology_common",
-            is_active=True
+            is_active=True,
         )
         db_session.add(notification_service)
         db_session.commit()
@@ -664,13 +715,15 @@ class TestE2EVisitFlow:
             json={
                 "patient_id": test_patient.id,
                 "service_ids": [notification_service.id],
-                "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
+                "visit_date": (
+                    _clinic_today(db_session) + timedelta(days=1)
+                ).isoformat(),
                 "visit_time": "15:00",
                 "discount_mode": "none",
                 "all_free": False,
-                "confirmation_channel": "telegram"
+                "confirmation_channel": "telegram",
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert schedule_response.status_code == 200
@@ -692,7 +745,7 @@ class TestE2EVisitFlow:
 class TestScheduleNextInvitationDispatch:
     """Regression: the schedule-next endpoint called
     send_visit_confirmation_invitation(visit=..., channel=...) while the
-    method's contract is (db, visit_id, channel) — TypeError on EVERY call,
+    method's contract includes db, visit_id, channel, and expected_context — TypeError on EVERY call,
     swallowed by the except, so invitations silently never reached patients.
     """
 
@@ -722,22 +775,22 @@ class TestScheduleNextInvitationDispatch:
         db_session.add(existing_visit)
         db_session.commit()
 
-        calls: list[tuple[int, str]] = []
+        calls: list[tuple[int, str, dict]] = []
 
-        async def _spy(self, db, visit_id, channel="auto"):
-            calls.append((visit_id, channel))
+        async def _spy(self, db, visit_id, channel="auto", *, expected_context):
+            calls.append((visit_id, channel, expected_context))
             return {"success": True, "channel": channel}
 
-        monkeypatch.setattr(
-            _RealService, "send_visit_confirmation_invitation", _spy
-        )
+        monkeypatch.setattr(_RealService, "send_visit_confirmation_invitation", _spy)
 
         response = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json={
                 "patient_id": test_patient.id,
                 "service_ids": [test_service.id],
-                "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
+                "visit_date": (
+                    _clinic_today(db_session) + timedelta(days=1)
+                ).isoformat(),
                 "visit_time": "10:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -748,9 +801,15 @@ class TestScheduleNextInvitationDispatch:
 
         assert response.status_code == 200, response.text
         assert calls, "invitation dispatch was never reached (swallowed TypeError?)"
-        visit_id, channel = calls[0]
+        visit_id, channel, expected_context = calls[0]
         assert visit_id == response.json()["visit_id"]
         assert channel == "phone"
+        visit = db_session.query(Visit).filter_by(id=visit_id).populate_existing().one()
+        assert expected_context == {
+            "patient_id": visit.patient_id,
+            "confirmation_context_epoch": visit.confirmation_context_epoch,
+            "confirmation_token": visit.confirmation_token,
+        }
 
 
 class TestScheduleNextInvitationLogHygiene:
@@ -788,7 +847,10 @@ class TestScheduleNextInvitationLogHygiene:
 
         secret_token = "TOPSECRET-CONFIRM-TOKEN-123"
 
-        async def _fake_send(self, db, visit_id, channel="auto"):
+        calls = []
+
+        async def _fake_send(self, db, visit_id, channel="auto", *, expected_context):
+            calls.append((visit_id, channel, expected_context))
             return {
                 "success": True,
                 "channel": "pwa",
@@ -799,13 +861,17 @@ class TestScheduleNextInvitationLogHygiene:
             _RealService, "send_visit_confirmation_invitation", _fake_send
         )
 
-        with caplog.at_level(_logging.INFO, logger="app.api.v1.endpoints.doctor_integration._visits"):
+        with caplog.at_level(
+            _logging.INFO, logger="app.api.v1.endpoints.doctor_integration._visits"
+        ):
             response = client.post(
                 "/api/v1/doctor/visits/schedule-next",
                 json={
                     "patient_id": test_patient.id,
                     "service_ids": [test_service.id],
-                    "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
+                    "visit_date": (
+                        _clinic_today(db_session) + timedelta(days=1)
+                    ).isoformat(),
                     "visit_time": "10:00",
                     "discount_mode": "none",
                     "all_free": False,
@@ -815,6 +881,15 @@ class TestScheduleNextInvitationLogHygiene:
             )
 
         assert response.status_code == 200, response.text
+        assert len(calls) == 1
+        assert calls[0][0] == response.json()["visit_id"]
+        assert calls[0][1] == "pwa"
+        visit = db_session.query(Visit).filter_by(id=calls[0][0]).populate_existing().one()
+        assert calls[0][2] == {
+            "patient_id": visit.patient_id,
+            "confirmation_context_epoch": visit.confirmation_context_epoch,
+            "confirmation_token": visit.confirmation_token,
+        }
         logged = "\n".join(r.getMessage() for r in caplog.records)
         assert secret_token not in logged, "confirmation token leaked into logs"
         assert "channel=pwa" in logged  # safe fields still present

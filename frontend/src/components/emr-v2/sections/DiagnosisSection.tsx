@@ -16,27 +16,10 @@ import EMRTextField from './EMRTextField';
 import { useDoctorPhrases } from '@/hooks/useDoctorPhrases';
 import './DiagnosisSection.css';
 import { useTranslation } from '@/i18n/useTranslation';
+// EMRAI-FE-001 (audit 3886 round 27): read clinical text through the single
+// canonical selector shared with the container/AI paths (emrCompletion.ts).
+import { emrTextValue } from '../emrCompletion';
 
-
-function normalizeTextValue(value: unknown): string {
-    if (typeof value === 'string') {
-        return value;
-    }
-
-    if (value && typeof value === 'object') {
-        const v = value as Record<string, unknown>;
-        return (
-            (typeof v.main === 'string' ? v.main : '') ||
-            (typeof v.primary === 'string' ? v.primary : '') ||
-            (typeof v.text === 'string' ? v.text : '') ||
-            (typeof v.value === 'string' ? v.value : '') ||
-            (typeof v.description === 'string' ? v.description : '') ||
-            ''
-        );
-    }
-
-    return '';
-}
 
 /**
  * DiagnosisSection Component
@@ -90,8 +73,8 @@ export function DiagnosisSection({
     onTelemetry,
 }: DiagnosisSectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
-    const diagnosisText = normalizeTextValue(diagnosis);
-    const icd10Text = normalizeTextValue(icd10Code);
+    const diagnosisText = emrTextValue(diagnosis);
+    const icd10Text = emrTextValue(icd10Code);
 
     // 🧠 Connect Doctor History (Personal Learning)
     const { suggestions: doctorSuggestions, loading: historyLoading } = useDoctorPhrases({

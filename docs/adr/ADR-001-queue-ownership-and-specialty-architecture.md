@@ -76,24 +76,29 @@ The system is designed so that a new specialty (e.g., neurology) can be
 added entirely through the admin UI:
 
 1. Admin creates a **Department** (`key="neurology"`)
-   → Auto-creates `QueueProfile` (with `show_on_qr_page=True`) and
-     default Service (PR-16)
+   → Auto-creates a hidden `QueueProfile` (`show_on_qr_page=False`) and
+     default Service (PR-16). The profile is not patient-visible until an
+     Admin reviews it and explicitly publishes it.
 2. Admin creates a **User** with `role="Doctor"`
    → Auto-creates `Doctor` row with `specialty="general"` (PR-17)
 3. Admin edits the **Doctor** → sets `specialty="neurology"` via
    dropdown populated from `/admin/departments` (PR-19)
 4. Doctor logs in → `/auth/me` returns `{specialty: "neurology"}`
    → Routes to `DoctorPanel` (generic) → sees neurology-tagged queue
-5. Patient scans QR → sees "Невропатолог" (name from `QueueProfile.title_ru`)
+5. After the Admin explicitly publishes the ready profile, the patient scans
+   QR → sees "Невропатолог" (name from `QueueProfile.title_ru`)
    → Selects specific doctor → joins that doctor's queue
 
 **What works automatically:**
 - Queue creation (per-doctor, via `get_or_create_daily_queue`)
-- QR page display (specialty name/icon/color from `QueueProfile`)
 - Wizard service filter (dynamic via `queueProfiles`, PR-25)
 - Doctor filter in wizard (by `service.department_key`, PR-23)
 - Queue visibility (specialty fallback in `_resolve_queue_allowed_tags`)
 - Same-specialty collaboration (any neurologist can call patients)
+
+After explicit publication, the QR page displays the specialty name, icon and
+color from `QueueProfile`. This visibility step is an Admin action, not an
+automatic result of creating a Department.
 
 **What requires a dedicated panel component (optional, not blocking):**
 - Specialty-specific clinical features (ECG for cardiology, dental chart

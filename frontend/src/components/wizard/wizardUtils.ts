@@ -464,14 +464,72 @@ export const getRemovedQueueEntryIds = (
   originalQueueIds: Array<string | number> | null | undefined,
   cartItems: CartItemLike[] = []
 ): Array<string | number> => {
-  const currentQueueIds = new Set<string | number>(
+  // REG-FE-085 (follow-up audit 2026-11-02): идентичность записи очереди
+  // сравнивается по НОРМАЛИЗОВАННОЙ строке. Число 42 и строка "42" — одна
+  // и та же запись (read-model и корзина живут в смешанных типах), а
+  // прежний raw Set<string | number> считал их разными: сохраняемая запись
+  // помечалась к отмене — POST /online-queue/entries/42/cancel отменял
+  // ЕЩЁ АКТИВНУЮ запись пациента.
+  const currentQueueIds = new Set<string>(
     cartItems
       .map((item) => item.original_queue_id)
       .filter((id): id is string | number => Boolean(id))
+      .map((id) => String(id))
   );
 
-  return Array.from(originalQueueIds || []).filter((id) => !currentQueueIds.has(id));
+  return Array.from(originalQueueIds || []).filter(
+    (id) => !currentQueueIds.has(String(id))
+  );
 };
+
+// REG-FE-084 (follow-up audit 2026-11-02): детектор «удалена ОДНА услуга
+// из СОХРАНЯЕМОЙ записи очереди». Read-модель может нести две услуги на
+// одной записи (общий original_queue_id): buildEditDeltaTargetItems
+// итерирует ТОЛЬКО текущие позиции, getRemovedQueueEntryIds видит запись
+// живой — правка молча терялась, а мастер рапортовал успех. Backend
+// edit-контракт не имеет команды удаления отдельной услуги внутри записи
+// (отдельная операция от отмены записи целиком), поэтому единственный
+// честный исход — громкий отказ до сабмита, а не ложный успех.
+export const detectRemovedServicesWithinRetainedEntries = (
+  identity: EditOriginalServiceIdentity,
+  cartItems: Array<Record<string, unknown>> = []
+): RemovedWithinRetainedEntry[] => {
+  if (identity.originalEntryServices.size === 0) return [];
+  const currentPairs = new Set<string>();
+  const retainedQueueIds = new Set<string>();
+  (cartItems || []).forEach((item) => {
+    if (!item) return;
+    const queueId = item.original_queue_id ?? item.queue_entry_id;
+    const serviceId = item.service_id;
+    if (queueId == null || serviceId == null) return;
+    const queueKey = String(queueId);
+    currentPairs.add(`${queueKey}:${String(serviceId)}`);
+    retainedQueueIds.add(queueKey);
+  });
+  const removed: RemovedWithinRetainedEntry[] = [];
+  identity.originalEntryServices.forEach((original, pairKey) => {
+    if (currentPairs.has(pairKey)) return;
+    // Запись целиком ушла из корзины → существующая семантика отмены
+    // записи (getRemovedQueueEntryIds) — это НЕ наш случай.
+    if (!retainedQueueIds.has(String(original.queueId))) return;
+    removed.push({
+      queueId: original.queueId,
+      serviceId: original.serviceId,
+      name: original.name,
+    });
+  });
+  return removed;
+};
+
+// REG-FE-084: текст громкого отказа. Русская строка без i18n-ключа —
+// намеренно, конвенция describeUnroutableEditDeltaRows (тот же класс
+// wizard-гуардов сабмита).
+export const describeRemovedWithinRetainedRows = (
+  rows: Array<{ name: string }>
+): string =>
+  `Удаление услуги «${rows.map((r) => r.name).join('», «')}» внутри сохраняемой записи очереди недоступно: ` +
+    'правка отдельных услуг внутри записи не поддерживается. Отмените запись целиком ' +
+    '(если нужны все услуги) или обратитесь к администратору.';
 
 export class QueueEntryCancelError extends Error {
   /** ID записей очереди, отменить которые не удалось (409/сеть и т.п.). */
@@ -1589,6 +1647,24 @@ export interface EditOriginalServiceIdentity {
   // read-модель отдаёт quantity с W2-PR1). Отсутствие ключа = исходное
   // количество неизвестно — такая позиция не включается в edit-дельту.
   originalQuantities: Map<string, number>;
+  // REG-FE-084 (follow-up audit 2026-11-02): исходные (queue_entry_id,
+  // service_id)-пары из service_details. Read-может нести ДВЕ услуги на
+  // одной записи очереди; удаление одной из них в корзине НЕ отменяет
+  // запись — прежде сабмит молча терял правку и рапортовал успех.
+  originalEntryServices: Map<string, EditOriginalEntryService>;
+}
+
+/** REG-FE-084: исходная услуга внутри конкретной записи очереди. */
+export interface EditOriginalEntryService {
+  queueId: string | number;
+  serviceId: string | number;
+  name: string;
+}
+
+export interface RemovedWithinRetainedEntry {
+  queueId: string | number;
+  serviceId: string | number;
+  name: string;
 }
 
 // Собирает множества «исходных» услуг edit-записи (service_details →
@@ -1609,6 +1685,7 @@ export const buildEditOriginalServiceIdentity = (
     queueIds: new Set<string | number>(),
     entryUpdatedAtMap: {},
     originalQuantities: new Map<string, number>(),
+    originalEntryServices: new Map<string, EditOriginalEntryService>(),
   };
   if (!editMode || !initialData) return identity;
 
@@ -1628,6 +1705,7 @@ export const buildEditOriginalServiceIdentity = (
   const originalQueueIds = identity.queueIds; // PR-14: optimistic locking map lives here too
   const entryUpdatedAtMap = identity.entryUpdatedAtMap;
   const originalQuantities = identity.originalQuantities;
+  const originalEntryServices = identity.originalEntryServices;
   const originalServiceCodes = identity.serviceCodes;
   const originalServiceNames = identity.serviceNames;
   // Group-level updated_at is a presentation maximum across several entries.
@@ -1655,6 +1733,19 @@ export const buildEditOriginalServiceIdentity = (
 
         if (serviceId) originalServiceIds.add(serviceId);
         if (queueId) originalQueueIds.add(queueId);
+        // REG-FE-084: пара (запись, услуга) с исходной позиции — по ней
+        // сабмит отличает «удалена одна услуга из сохраняемой записи»
+        // (не поддерживается edit-контрактом) от отмены записи целиком.
+        if (serviceId && queueId) {
+          const pairKey = `${String(queueId)}:${String(serviceId)}`;
+          originalEntryServices.set(pairKey, {
+            queueId,
+            serviceId,
+            name: String(
+              serviceName ?? serviceCode ?? serviceId
+            ),
+          });
+        }
         // W2-PR1: исходное количество позиции (read-модель service_details)
         const originalQty = Number(serviceDetail.quantity ?? serviceDetail.qty);
         if (serviceId && Number.isFinite(originalQty) && originalQty > 0) {

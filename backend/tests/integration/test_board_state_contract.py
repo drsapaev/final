@@ -41,6 +41,13 @@ def test_board_state_is_stats_only_contract(client, db_session):
         "waiting": 4,
         "serving": 2,
         "done": 1,
+        # DISPLAYOPTIONS-FE-001 (audit PR #3961): additive non-PHI
+        # presentation settings of the selected (default main) board.
+        "stats_available": True,
+        "queue_display_count": 5,
+        "show_announcements": True,
+        "voice_announcements": False,
+        "sound_enabled": True,
     }
     assert "queue_entries" not in payload
     assert "current_call" not in payload

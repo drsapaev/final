@@ -7,7 +7,6 @@ from sqlalchemy.exc import IntegrityError
 from app.api.v1.endpoints.admin_departments._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.admin_departments._helpers import (
     _ensure_department_integrations,
-    _sync_department_active_to_profiles,
     _sync_department_rename_to_own_profile,
     router,
 )  # noqa: F401
@@ -337,6 +336,9 @@ def bulk_activate_departments(
 
     updated = 0
     not_found = 0
+    # Compatibility counters remain in the response. Department state is
+    # now resolved by QueueProfile availability reads/admission checks; it
+    # no longer writes or restores profile.is_active.
     profiles_hidden_total = 0
     profiles_restored_total = 0
 
@@ -346,11 +348,6 @@ def bulk_activate_departments(
             not_found += 1
             continue
         department.active = bool(active)
-        # RQ-13.a (D-06): bulk activation follows the SAME lifecycle
-        # contract as the single-department toggle.
-        sync = _sync_department_active_to_profiles(db, department, active=active)
-        profiles_hidden_total += sync["profiles_hidden"]
-        profiles_restored_total += sync["profiles_restored"]
         updated += 1
 
     db.commit()
@@ -389,24 +386,20 @@ def update_department(
             detail=f"Department with id {department_id} not found",
         )
 
-    # RQ-13.a (F-12/D-06): capture the pre-update state so the profile
-    # sync can detect what actually changed.
+    # Capture the title before applying a department update.
     old_name_ru = department.name_ru
-    old_active = department.active
 
     # Обновляем только переданные поля
     update_data = department_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(department, field, value)
 
-    # RQ-13.a: propagate the changed lifecycle axes to the linked
-    # QueueProfiles (titles on rename, visibility on active flip).
+    # A title continues to follow the department-owned profile. Active
+    # state remains a department fact and is resolved by the shared
+    # QueueProfile availability policy; do not overwrite manual profile
+    # archive intent.
     renamed = _sync_department_rename_to_own_profile(db, department, old_name_ru)
-    active_sync = (
-        _sync_department_active_to_profiles(db, department, active=department.active)
-        if "active" in update_data and update_data["active"] != old_active
-        else {"profiles_hidden": 0, "profiles_restored": 0}
-    )
+    active_sync = {"profiles_hidden": 0, "profiles_restored": 0}
 
     db.commit()
     db.refresh(department)
@@ -768,14 +761,11 @@ def toggle_department(
             detail=f"Department with id {department_id} not found",
         )
 
-    # Переключаем active
+    # Toggle the department only. Profile manual archive state is separate.
     department.active = not department.active
-    # RQ-13.a (D-06): the toggle is a lifecycle transition — propagate
-    # visibility to the linked QueueProfiles (hide all linked on
-    # deactivation, restore the department-owned profile on activation).
-    profile_sync = _sync_department_active_to_profiles(
-        db, department, active=department.active
-    )
+    # Preserve the response shape; no QueueProfile.is_active rows are
+    # changed by a department toggle.
+    profile_sync = {"profiles_hidden": 0, "profiles_restored": 0}
     db.commit()
     db.refresh(department)
 

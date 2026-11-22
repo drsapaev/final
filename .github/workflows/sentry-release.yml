@@ -7,7 +7,7 @@ on:
       - 'frontend/src/**'
       - 'frontend/package.json'
       - 'frontend/package-lock.json'
-      - 'frontend/vite.config.js'
+      - 'frontend/vite.config.ts'
       - '.github/workflows/sentry-release.yml'
   workflow_dispatch:
 

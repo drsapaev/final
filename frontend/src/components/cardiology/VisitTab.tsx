@@ -146,6 +146,7 @@ export function VisitTab({
           {t('cardio.cardio_visit_emr_title')}
         </h3>
         <EMRContainerV2
+          key={selectedPatient?.visit_id ?? 'no-visit'}
           visitId={selectedPatient?.visit_id ?? ''}
           patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
           specialty="cardiology"

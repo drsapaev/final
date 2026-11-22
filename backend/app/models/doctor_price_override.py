@@ -48,6 +48,19 @@ class DoctorPriceOverride(Base):
     # Цены
     original_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     new_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # DERMAPRICE-BE-002 (audit #3892, group 15): фактическая цена услуги В
+    # ВИЗИТЕ на момент создания запроса (VisitService.price — может отличаться
+    # от каталожной после скидок/переопределений). original_price сохраняет
+    # прежнюю семантику «неизменяемая каталожная ссылка»; NULL у исторических
+    # строк — заполняется только новыми запросами.
+    visit_price_before: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
+        nullable=True,
+        comment=(
+            "DERMAPRICE-BE-002: цена VisitService на момент создания запроса "
+            "(дополнительная к каталожной original_price)"
+        ),
+    )
 
     # Обоснование изменения
     reason: Mapped[str] = mapped_column(String(255), nullable=False)  # Краткая причина

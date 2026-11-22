@@ -32,10 +32,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import os
 import re
 import secrets
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -46,7 +48,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.user import User
 from app.models.user_profile import UserProfile
-from app.services.sms_providers import get_sms_manager
+from app.services.sms_providers import SMSMessage, get_sms_manager
+from app.services.textbee_sms_provider import TextBeeSMSProvider
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +61,15 @@ CODE_TTL_SECONDS = 300
 MAX_ATTEMPTS = 3
 RESEND_COOLDOWN_SECONDS = 60
 HOURLY_SEND_CAP = 5
+TEXTBEE_STAGING_SEND_CAP_TTL_SECONDS = 24 * 60 * 60
 GRANT_TTL_SECONDS = 600
 
 LOCALES = ("ru", "uz")
 _DEFAULT_LOCALE = "ru"
 
 _OTP_MESSAGES = {
-    "ru": "Код входа: {code}. Действителен 5 минут.",
-    "uz": "Kod: {code}. Amal qilish muddati: 5 daqiqa.",
+    "ru": "Код подтверждения: {code}. Действителен 5 минут.",
+    "uz": "Tasdiqlash kodi: {code}. Amal qilish muddati: 5 daqiqa.",
 }
 
 # --- Neutral, non-enumerable error texts (client-visible) ---
@@ -100,6 +104,43 @@ class PatientOtpError(Exception):
     detail: str
 
 
+@dataclass(frozen=True)
+class PatientOtpBinding:
+    """Identity snapshot captured before a login OTP is sent."""
+
+    user_id: int
+    auth_epoch: int
+
+
+@dataclass(frozen=True)
+class PatientOtpGrant:
+    """A single-use phone proof, bound to the OTP issuance identity."""
+
+    phone: str
+    binding: PatientOtpBinding | None
+
+
+def _binding_from_record(record: Any) -> PatientOtpBinding | None:
+    if not isinstance(record, dict):
+        return None
+    user_id, epoch = record.get("user_id"), record.get("auth_epoch")
+    if (
+        type(user_id) is not int
+        or not 0 < user_id <= 9223372036854775807
+        or type(epoch) is not int
+        or not 0 <= epoch <= 9223372036854775807
+    ):
+        return None
+    return PatientOtpBinding(user_id, epoch)
+
+
+def _binding_record(binding: PatientOtpBinding | None) -> dict[str, int | None]:
+    return {
+        "user_id": binding.user_id if binding else None,
+        "auth_epoch": binding.auth_epoch if binding else None,
+    }
+
+
 def _testing_mode() -> bool:
     return os.getenv("TESTING", "").strip() == "1"
 
@@ -110,35 +151,115 @@ class _MemoryBackend:
     def __init__(self) -> None:
         self._store: dict[str, tuple[str, float]] = {}
         self._counters: dict[str, tuple[int, float]] = {}
+        self._lock = threading.RLock()
 
     def _alive(self, expires_at: float) -> bool:
         return time.monotonic() < expires_at
 
     def get(self, key: str) -> str | None:
-        entry = self._store.get(key)
-        if entry and self._alive(entry[1]):
-            return entry[0]
-        self._store.pop(key, None)
-        return None
+        with self._lock:
+            entry = self._store.get(key)
+            if entry and self._alive(entry[1]):
+                return entry[0]
+            self._store.pop(key, None)
+            return None
 
     def set(self, key: str, value: str, ttl: int) -> None:
-        self._store[key] = (value, time.monotonic() + ttl)
+        with self._lock:
+            self._store[key] = (value, time.monotonic() + ttl)
 
     def delete(self, key: str) -> None:
-        self._store.pop(key, None)
+        with self._lock:
+            self._store.pop(key, None)
 
     def getdel(self, key: str) -> str | None:
-        value = self.get(key)
-        self._store.pop(key, None)
-        return value
+        with self._lock:
+            value = self.get(key)
+            self._store.pop(key, None)
+            return value
 
     def incr_with_ttl(self, key: str, ttl: int) -> int:
-        count, expires_at = self._counters.get(key, (0, time.monotonic() + ttl))
-        if not self._alive(expires_at):
-            count, expires_at = 0, time.monotonic() + ttl
-        count += 1
-        self._counters[key] = (count, expires_at)
-        return count
+        with self._lock:
+            count, expires_at = self._counters.get(key, (0, time.monotonic() + ttl))
+            if not self._alive(expires_at):
+                count, expires_at = 0, time.monotonic() + ttl
+            count += 1
+            self._counters[key] = (count, expires_at)
+            return count
+
+    def consume_otp(self, key: str, code_hash: str, max_attempts: int) -> bool:
+        """Check, count failures and consume under a single lock."""
+        with self._lock:
+            actual = self.get(key)
+            if actual is None:
+                return False
+            if hmac.compare_digest(actual, code_hash):
+                self.delete(key)
+                return True
+            meta_key = f"meta:{key}"
+            record = self.get(meta_key)
+            if record is not None and not re.fullmatch(r"[0-9]+", record):
+                self.delete(key)
+                return False
+            attempts = (int(record) if record is not None else 0) + 1
+            self.set(meta_key, str(attempts), CODE_TTL_SECONDS)
+            if attempts >= max_attempts:
+                self.delete(key)
+            return False
+
+    def consume_bound_otp(
+        self, key: str, code_hash: str, max_attempts: int
+    ) -> str | None:
+        """Atomically consume a versioned login OTP and return its record."""
+        with self._lock:
+            actual = self.get(key)
+            if actual is None:
+                return None
+            try:
+                record = json.loads(actual)
+            except (TypeError, ValueError):
+                self.delete(key)  # Unbound legacy OTPs fail closed.
+                return None
+            if (
+                not isinstance(record, dict)
+                or type(record.get("version")) is not int
+                or record["version"] != 1
+                or not isinstance(record.get("code_hash"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", record["code_hash"])
+            ):
+                self.delete(key)
+                return None
+            if hmac.compare_digest(record["code_hash"], code_hash):
+                self.delete(key)
+                return actual
+            meta_key = f"meta:{key}"
+            attempts = self.get(meta_key)
+            if attempts is not None and not re.fullmatch(r"[0-9]+", attempts):
+                self.delete(key)
+                return None
+            count = (int(attempts) if attempts is not None else 0) + 1
+            self.set(meta_key, str(count), CODE_TTL_SECONDS)
+            if count >= max_attempts:
+                self.delete(key)
+            return None
+
+    def reserve_once(self, key: str, value: str, ttl: int) -> bool:
+        """Atomically reserve a single-use key in the TESTING backend."""
+        with self._lock:
+            current = self._store.get(key)
+            if current and self._alive(current[1]):
+                return False
+            self._store[key] = (value, time.monotonic() + ttl)
+            return True
+
+    def release_if_value(self, key: str, value: str) -> bool:
+        """Release only the live reservation owned by this send attempt."""
+        with self._lock:
+            current = self._store.get(key)
+            if current and self._alive(current[1]) and current[0] == value:
+                self._store.pop(key, None)
+                return True
+            return False
 
     # TEST HOOK: populated ONLY when TESTING=1 (never in production path).
     last_sent_code: dict[str, str] = {}
@@ -179,6 +300,89 @@ class _RedisBackend:
     def set(self, key: str, value: str, ttl: int) -> None:
         self._run(self._client.set, key, value, ex=ttl)
 
+    def consume_otp(self, key: str, code_hash: str, max_attempts: int) -> bool:
+        """Atomically verify and consume the code or count a failed attempt."""
+        script = """
+        local actual = redis.call('GET', KEYS[1])
+        if not actual then return 0 end
+        local ttl = redis.call('PTTL', KEYS[1])
+        if ttl <= 0 then
+            redis.call('DEL', KEYS[1])
+            return 0
+        end
+        if actual == ARGV[1] then
+            redis.call('DEL', KEYS[1])
+            return 1
+        end
+        local record = redis.call('GET', KEYS[2])
+        local attempts = 0
+        if record then
+            if not string.match(record, '^%d+$') then
+                redis.call('DEL', KEYS[1])
+                return 0
+            end
+            attempts = tonumber(record)
+            if not attempts then
+                redis.call('DEL', KEYS[1])
+                return 0
+            end
+        end
+        attempts = attempts + 1
+        redis.call('SET', KEYS[2], tostring(attempts), 'EX', ARGV[3])
+        if attempts >= tonumber(ARGV[2]) then
+            redis.call('DEL', KEYS[1])
+        end
+        return 0
+        """
+        return bool(
+            self._run(
+                self._client.eval,
+                script,
+                2,
+                key,
+                f"meta:{key}",
+                code_hash,
+                max_attempts,
+                CODE_TTL_SECONDS,
+            )
+        )
+
+    def consume_bound_otp(
+        self, key: str, code_hash: str, max_attempts: int
+    ) -> str | None:
+        """Atomically verify the code and consume its identity snapshot."""
+        script = """
+        local actual = redis.call('GET', KEYS[1])
+        if not actual then return nil end
+        local ttl = redis.call('PTTL', KEYS[1])
+        if ttl <= 0 then redis.call('DEL', KEYS[1]); return nil end
+        local ok, record = pcall(cjson.decode, actual)
+        if not ok or type(record) ~= 'table' or record.version ~= 1 or type(record.code_hash) ~= 'string' or #record.code_hash ~= 64 or not string.match(record.code_hash, '^[0-9a-f]+$') then
+            redis.call('DEL', KEYS[1]); return nil
+        end
+        if record.code_hash == ARGV[1] then
+            redis.call('DEL', KEYS[1]); return actual
+        end
+        local previous = redis.call('GET', KEYS[2])
+        if previous and not string.match(previous, '^%d+$') then
+            redis.call('DEL', KEYS[1]); return nil
+        end
+        local attempts = (tonumber(previous) or 0) + 1
+        redis.call('SET', KEYS[2], tostring(attempts), 'EX', ARGV[3])
+        if attempts >= tonumber(ARGV[2]) then redis.call('DEL', KEYS[1]) end
+        return nil
+        """
+        return self._run(
+            self._client.eval,
+            script,
+            2,
+            key,
+            f"meta:{key}",
+            code_hash,
+            max_attempts,
+            CODE_TTL_SECONDS,
+        )
+
     def delete(self, key: str) -> None:
         self._run(self._client.delete, key)
 
@@ -191,6 +395,20 @@ class _RedisBackend:
         pipe.expire(key, ttl, nx=True)
         count, _ = self._run(pipe.execute)
         return int(count)
+
+    def reserve_once(self, key: str, value: str, ttl: int) -> bool:
+        """Atomically reserve a single-use key with Redis SET NX EX."""
+        return bool(self._run(self._client.set, key, value, ex=ttl, nx=True))
+
+    def release_if_value(self, key: str, value: str) -> bool:
+        """Compare-and-delete so a stale send cannot release a newer lease."""
+        script = """
+        if redis.call('GET', KEYS[1]) == ARGV[1] then
+            return redis.call('DEL', KEYS[1])
+        end
+        return 0
+        """
+        return bool(self._run(self._client.eval, script, 1, key, value))
 
 
 class PatientOtpService:
@@ -223,12 +441,16 @@ class PatientOtpService:
 
     # -- request OTP -----------------------------------------------------
     async def send_login_otp(
-        self, phone: str, locale: str | None = None
+        self,
+        phone: str,
+        locale: str | None = None,
+        *,
+        binding: PatientOtpBinding | None = None,
     ) -> dict[str, Any]:
         """Send a login OTP. Raises PatientOtpError only for number-neutral
         failures (rate limits / infrastructure); response body is identical
         regardless of any patient state."""
-        return await self._send_otp(_NS_LOGIN, phone, locale)
+        return await self._send_otp(_NS_LOGIN, phone, locale, binding=binding)
 
     async def send_activation_otp(
         self, phone: str, locale: str | None = None
@@ -239,7 +461,12 @@ class PatientOtpService:
         return await self._send_otp(_NS_ACTIVATION, phone, locale)
 
     async def _send_otp(
-        self, namespace: str, phone: str, locale: str | None = None
+        self,
+        namespace: str,
+        phone: str,
+        locale: str | None = None,
+        *,
+        binding: PatientOtpBinding | None = None,
     ) -> dict[str, Any]:
         if namespace not in _OTP_NAMESPACES:
             raise ValueError(f"unknown OTP namespace: {namespace}")
@@ -248,39 +475,88 @@ class PatientOtpService:
             raise PatientOtpError(400, ERR_OTP_INVALID)
         lang = locale if locale in LOCALES else _DEFAULT_LOCALE
 
+        provider_override = (
+            (getattr(settings, "PATIENT_OTP_SMS_PROVIDER", None) or "").strip().lower()
+        )
+        provider = (settings.SMS_DEFAULT_PROVIDER or "").strip().lower()
+        if provider_override:
+            environment = (settings.ENV or "").strip().lower()
+            api_key = (getattr(settings, "TEXTBEE_API_KEY", None) or "").strip()
+            allowed_recipient = (
+                getattr(settings, "TEXTBEE_ALLOWED_RECIPIENT", None) or ""
+            ).strip()
+            if (
+                provider_override != "textbee"
+                or environment != "staging"
+                or not api_key
+                or normalize_phone(allowed_recipient) != normalized
+            ):
+                logger.error("patient OTP: configured provider override is unavailable")
+                raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
+        elif provider == "mock" and not _testing_mode():
+            # Owner gate #6: Mock SMS is dev/test-only for patient access.
+            logger.error("patient OTP: MockSMSProvider refused outside TESTING")
+            raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
+
         backend = self._get_backend()
         cooldown_key = f"{namespace}:cd:{normalized}"
         if backend.get(cooldown_key) is not None:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
 
-        cap_key = f"{namespace}:cap:{normalized}"
-        if backend.incr_with_ttl(cap_key, 3600) > HOURLY_SEND_CAP:
+        cap_key = (
+            f"{_PREFIX}:textbee-staging-cap:{normalized}"
+            if provider_override == "textbee"
+            else f"{namespace}:cap:{normalized}"
+        )
+        cap_ttl = (
+            TEXTBEE_STAGING_SEND_CAP_TTL_SECONDS
+            if provider_override == "textbee"
+            else 3600
+        )
+        cap_reservation_token: str | None = None
+        if provider_override == "textbee":
+            cap_reservation_token = secrets.token_urlsafe(24)
+            if not backend.reserve_once(cap_key, cap_reservation_token, cap_ttl):
+                raise PatientOtpError(429, ERR_RATE_LIMITED)
+        elif backend.incr_with_ttl(cap_key, cap_ttl) > HOURLY_SEND_CAP:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
-
-        provider = (settings.SMS_DEFAULT_PROVIDER or "").strip().lower()
-        if provider == "mock" and not _testing_mode():
-            # Owner gate #6: Mock SMS is dev/test-only for patient access.
-            logger.error("patient OTP: MockSMSProvider refused outside TESTING")
-            raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
 
         code = "".join(str(secrets.randbelow(10)) for _ in range(6))
         message = _OTP_MESSAGES[lang].format(code=code)
 
         try:
-            sms_manager = get_sms_manager()
-            result = await sms_manager.send_sms(phone=normalized, text=message)
+            if provider_override == "textbee":
+                provider_client = TextBeeSMSProvider(
+                    api_key=api_key,
+                    device_id=getattr(settings, "TEXTBEE_DEVICE_ID", None),
+                )
+                result = await provider_client.send_sms(
+                    SMSMessage(phone=normalized, text=message)
+                )
+            else:
+                sms_manager = get_sms_manager()
+                result = await sms_manager.send_sms(phone=normalized, text=message)
         except Exception as exc:  # noqa: BLE001
-            logger.error("patient OTP: send_sms error: %s", exc)
+            logger.error("patient OTP: send_sms error: %s", type(exc).__name__)
             raise PatientOtpError(503, ERR_SMS_UNAVAILABLE) from exc
         if not getattr(result, "success", False):
-            logger.error(
-                "patient OTP: send_sms failed: %s", getattr(result, "error", "")
-            )
+            if cap_reservation_token is not None and getattr(
+                result, "definitely_not_accepted", False
+            ):
+                backend.release_if_value(cap_key, cap_reservation_token)
+            logger.error("patient OTP: send_sms failed")
             raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
 
-        backend.set(
-            f"{namespace}:code:{normalized}", _hash_code(code), CODE_TTL_SECONDS
-        )
+        # Keep the verified principal snapshot and code hash in ONE atomic
+        # Redis value. A logout while SMS is in flight makes this snapshot
+        # stale; the verify and final consumer both revalidate it.
+        stored_code = _hash_code(code)
+        if namespace == _NS_LOGIN:
+            stored_code = json.dumps(
+                {"version": 1, "code_hash": stored_code, **_binding_record(binding)},
+                separators=(",", ":"),
+            )
+        backend.set(f"{namespace}:code:{normalized}", stored_code, CODE_TTL_SECONDS)
         backend.set(cooldown_key, "1", RESEND_COOLDOWN_SECONDS)
 
         if _testing_mode():
@@ -291,23 +567,41 @@ class PatientOtpService:
             )
             backend.last_sent_code[hook_key] = code  # type: ignore[attr-defined]
 
-        logger.info(
-            "patient OTP sent: flow=%s phone_fingerprint=%s provider=%s",
-            namespace,
-            hashlib.sha256(normalized.encode()).hexdigest()[:12],
-            getattr(result, "provider", "unknown"),
-        )
+        logger.info("patient OTP sent: flow=%s", namespace)
         return {"phone": normalized, "locale": lang}
 
     # -- verify OTP ------------------------------------------------------
-    def verify_login_otp(self, phone: str, code: str) -> dict[str, Any]:
+    def verify_login_otp(
+        self, phone: str, code: str, *, db: Session | None = None
+    ) -> dict[str, Any]:
         """Verify code, return single-use verification grant.
 
         All failure modes share ONE generic 400 response (anti-enum)."""
-        normalized = self._verify_otp_code(_NS_LOGIN, phone, code)
+        normalized = normalize_phone(phone)
+        if not normalized or not re.fullmatch(r"\d{6}", code or ""):
+            raise PatientOtpError(400, ERR_OTP_INVALID)
+        raw = self._get_backend().consume_bound_otp(
+            f"{_NS_LOGIN}:code:{normalized}", _hash_code(code), MAX_ATTEMPTS
+        )
+        if not raw:
+            raise PatientOtpError(400, ERR_OTP_INVALID)
+        try:
+            record = json.loads(raw)
+        except (TypeError, ValueError) as exc:
+            raise PatientOtpError(400, ERR_OTP_INVALID) from exc
+        original = _binding_from_record(record)
+        # Return an indistinguishable but unusable grant for unknown,
+        # ambiguous or stale accounts, avoiding a phone-enumeration oracle.
+        current = self.binding_for_phone(db, normalized) if db is not None else None
+        binding = original if original is not None and original == current else None
         grant = secrets.token_urlsafe(32)
         self._get_backend().set(
-            f"{_NS_LOGIN}:grant:{grant}", normalized, GRANT_TTL_SECONDS
+            f"{_NS_LOGIN}:grant:{grant}",
+            json.dumps(
+                {"version": 1, "phone": normalized, **_binding_record(binding)},
+                separators=(",", ":"),
+            ),
+            GRANT_TTL_SECONDS,
         )
         return {"verification_grant": grant, "expires_in": GRANT_TTL_SECONDS}
 
@@ -326,36 +620,32 @@ class PatientOtpService:
 
         backend = self._get_backend()
         code_key = f"{namespace}:code:{normalized}"
-        raw = backend.get(code_key)
-        if raw is None:
+        if not backend.consume_otp(code_key, _hash_code(code), MAX_ATTEMPTS):
+            logger.info("patient OTP mismatch")
             raise PatientOtpError(400, ERR_OTP_INVALID)
 
-        if not hmac.compare_digest(raw, _hash_code(code)):
-            attempts = self._bump_attempts(backend, code_key)
-            if attempts >= MAX_ATTEMPTS:
-                backend.delete(code_key)
-            logger.info("patient OTP mismatch: phone_fingerprint=%s", normalized[:7])
-            raise PatientOtpError(400, ERR_OTP_INVALID)
-
-        backend.delete(code_key)  # single-use code
         return normalized
 
-    def _bump_attempts(self, backend: Any, code_key: str) -> int:
-        """Best-effort attempt counter; corrupt/missing entries stay generic."""
-        try:
-            record = backend.get(f"meta:{code_key}")
-            attempts = (int(record) if record else 0) + 1
-            backend.set(f"meta:{code_key}", str(attempts), CODE_TTL_SECONDS)
-            return attempts
-        except Exception:  # noqa: BLE001
-            return 0
-
     # -- grant -----------------------------------------------------------
-    def consume_grant(self, grant: str) -> str | None:
+    def consume_grant(self, grant: str) -> PatientOtpGrant | None:
         """Single-use: second consume returns None (GETDEL semantics)."""
         if not grant or len(grant) < 16 or len(grant) > 128:
             return None
-        return self._get_backend().getdel(f"{_PREFIX}:grant:{grant}")
+        raw = self._get_backend().getdel(f"{_PREFIX}:grant:{grant}")
+        try:
+            record = json.loads(raw) if raw else None
+        except (TypeError, ValueError):
+            return None  # Legacy unbound grants cannot authorize a new session.
+        if (
+            not isinstance(record, dict)
+            or type(record.get("version")) is not int
+            or record["version"] != 1
+        ):
+            return None
+        phone = record.get("phone")
+        if not isinstance(phone, str) or normalize_phone(phone) != phone:
+            return None
+        return PatientOtpGrant(phone=phone, binding=_binding_from_record(record))
 
     # -- login resolver (fail-closed, owner correction #1) ---------------
     def resolve_patient_user_by_phone(self, db: Session, phone: str) -> User | None:
@@ -372,17 +662,81 @@ class PatientOtpService:
                 UserProfile.phone_verified.is_(True),
                 User.role == "Patient",
                 User.is_active.is_(True),
+                User.is_superuser.is_(False),
             )
+            .execution_options(populate_existing=True)
         )
         candidates = db.execute(stmt).scalars().all()
         if len(candidates) != 1:
-            logger.info(
-                "patient login resolver: %d candidate(s) for phone_fingerprint=%s",
-                len(candidates),
-                hashlib.sha256(normalized.encode()).hexdigest()[:12],
-            )
+            logger.info("patient login resolver: %d candidate(s)", len(candidates))
             return None
         return candidates[0]
+
+    def binding_for_phone(self, db: Session, phone: str) -> PatientOtpBinding | None:
+        """Snapshot a uniquely verified patient before sending a login OTP."""
+        user = self.resolve_patient_user_by_phone(db, phone)
+        if user is None:
+            return None
+        record = {"user_id": user.id, "auth_epoch": user.auth_epoch}
+        return _binding_from_record(record)
+
+    def _locked_grant_user(
+        self, db: Session, phone: str, proof: PatientOtpGrant | None
+    ) -> User | None:
+        if proof is None or proof.phone != phone or proof.binding is None:
+            return None
+        user = (
+            db.query(User)
+            .filter(User.id == proof.binding.user_id)
+            .with_for_update(key_share=True)
+            .populate_existing()
+            .first()
+        )
+        if (
+            user is None
+            or not user.is_active
+            or user.is_superuser
+            or user.role != "Patient"
+            or type(user.auth_epoch) is not int
+            or user.auth_epoch != proof.binding.auth_epoch
+        ):
+            return None
+        # Serialize phone changes and competing verified identities in the
+        # same global order as patient_phone_scope's profile writers.
+        profile = (
+            db.query(UserProfile)
+            .filter(UserProfile.user_id == user.id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if profile is None:
+            return None
+        from app.services.patient_phone_scope import acquire_phone_scope_lock
+
+        acquire_phone_scope_lock(db, phone)
+        current = self.binding_for_phone(db, phone)
+        return user if current == proof.binding else None
+
+    def consume_bound_grant(
+        self, db: Session, user_id: int, phone: str, grant: str
+    ) -> bool:
+        """Consume once and recheck identity under the mutation transaction's User lock.
+
+        Callers must retain the transaction and account lock through the
+        protected operation and its commit. No lock is held during SMS send.
+        """
+        normalized = normalize_phone(phone)
+        proof = self.consume_grant(grant)
+        if (
+            not normalized
+            or proof is None
+            or proof.binding is None
+            or proof.binding.user_id != user_id
+        ):
+            return False
+        user = self._locked_grant_user(db, normalized, proof)
+        return user is not None and user.id == user_id
 
     def login_with_grant(self, db: Session, phone: str, grant: str) -> dict[str, Any]:
         """phone + verification_grant -> canonical patient session payload.
@@ -390,17 +744,32 @@ class PatientOtpService:
         Identity comes from the ALREADY-LINKED Patient.user_id (PR-A2);
         this resolver never searches patients by phone."""
         normalized = normalize_phone(phone)
-        granted_phone = self.consume_grant(grant)
-        if not normalized or granted_phone is None or granted_phone != normalized:
+        proof = self.consume_grant(grant)
+        if not normalized:
             raise PatientOtpError(401, ERR_LOGIN_GENERIC)
-
-        user = self.resolve_patient_user_by_phone(db, normalized)
+        user = self._locked_grant_user(db, normalized, proof)
         if user is None:
             raise PatientOtpError(401, ERR_LOGIN_GENERIC)
-
         from app.api.deps import create_access_token
+        from app.services.context_facades.iam_facade import (
+            create_patient_pending_2fa_locked,
+            revoke_all_for_new_login_locked,
+        )
 
-        access_token = create_access_token(data={"sub": str(user.id)})
+        try:
+            challenge = create_patient_pending_2fa_locked(db, user)
+        except ValueError as exc:
+            db.rollback()
+            raise PatientOtpError(503, ERR_SMS_UNAVAILABLE) from exc
+        if challenge is not None:
+            db.commit()
+            return challenge
+
+        revoke_all_for_new_login_locked(db, user)
+        access_token = create_access_token(
+            data={"sub": str(user.id), "auth_epoch": user.auth_epoch}
+        )
+        db.commit()
         return {
             "access_token": access_token,
             "token_type": "bearer",

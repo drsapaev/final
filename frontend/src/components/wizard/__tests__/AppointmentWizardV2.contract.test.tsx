@@ -39,7 +39,8 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     const source = readCombinedWizardSource();
     const servicesLoadBlock = extractSourceBlock(
       source,
-      'const loadServices = useCallback(async () => {',
+      // REG-FE-070: сигнатура теперь возвращает результат загрузки (Promise<boolean>).
+      'const loadServices = useCallback(async (): Promise<boolean> => {',
       'const getServiceName = useCallback((item: CartItem): string => {',
     );
     const doctorsLoadBlock = extractSourceBlock(
@@ -148,7 +149,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     const source = readCombinedWizardSource();
     const servicesLoadBlock = extractSourceBlock(
       source,
-      'const loadServices = useCallback(async () => {',
+      'const loadServices = useCallback(async (): Promise<boolean> => {',
       'const getServiceName = useCallback((item: CartItem): string => {',
     );
 
@@ -167,7 +168,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     );
     const servicesLoadBlock = extractSourceBlock(
       source,
-      'const loadServices = useCallback(async () => {',
+      'const loadServices = useCallback(async (): Promise<boolean> => {',
       'const getServiceName = useCallback((item: CartItem): string => {',
     );
     const displayedServicesBlock = extractSourceBlock(

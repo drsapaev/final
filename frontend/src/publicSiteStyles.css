@@ -1,3 +1,8 @@
+html.public-site-document body {
+  /* Preserve document scrolling so Firefox reaches the skip link on the first Tab. */
+  overflow-x: clip;
+}
+
 .public-site {
   --public-site-nav-gap: clamp(14px, 2.5vw, 32px);
   --public-site-main-padding-block: 52px 78px;
@@ -31,6 +36,24 @@
   outline-offset: 3px;
 }
 
+.public-site .public-site__skip-link {
+  position: fixed;
+  z-index: 1000;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
+  border-radius: 8px;
+  background: var(--mac-bg-primary, rgb(238, 243, 250));
+  color: var(--mac-text-primary, rgb(0, 0, 0));
+  font-weight: 700;
+  transform: translateY(calc(-100% - 16px));
+}
+
+.public-site .public-site__skip-link:focus-visible {
+  transform: translateY(0);
+}
+
 .public-site__header,
 .public-site__main,
 .public-site__footer {
@@ -40,26 +63,31 @@
 
 .public-site__header {
   display: flex;
+  box-sizing: border-box;
   min-height: 82px;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 12px 24px;
+  padding-block: 6px;
   border-bottom: 1px solid var(--mac-border, rgb(184, 200, 218));
 }
 
 .public-site .public-site__brand {
   display: inline-flex;
-  min-width: max-content;
+  min-inline-size: 0;
   align-items: center;
   gap: 10px;
   color: var(--mac-text-primary, rgb(0, 0, 0));
   font-size: 1rem;
   font-weight: 700;
+  overflow-wrap: anywhere;
   text-decoration: none;
 }
 
 .public-site__brand-mark {
   display: grid;
+  flex: none;
   width: 38px;
   height: 38px;
   place-items: center;
@@ -69,11 +97,30 @@
   font-size: 1.15rem;
 }
 
+.public-site__brand-logo {
+  flex: none;
+  object-fit: contain;
+}
+
+.public-site__brand-logo[data-public-site-image="unavailable"],
+.public-site__brand-logo:not([data-public-site-image="unavailable"]) + .public-site__brand-mark {
+  display: none;
+}
+
 .public-site__nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: var(--public-site-nav-gap);
+  gap: 8px var(--public-site-nav-gap);
+}
+
+.public-site__nav a {
+  overflow-wrap: anywhere;
+}
+
+.public-site__mobile-menu {
+  display: none;
 }
 
 .public-site__nav a,
@@ -94,6 +141,38 @@
 .public-site__main {
   min-height: calc(100vh - 158px);
   padding-block: var(--public-site-main-padding-block);
+}
+
+.public-site__breadcrumbs {
+  margin: 0 0 18px;
+  color: var(--mac-text-secondary, rgb(69, 85, 104));
+  font-size: 0.95rem;
+}
+
+.public-site__breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.public-site__breadcrumbs li + li::before {
+  content: '/';
+  margin-inline-end: 6px;
+  color: var(--mac-text-secondary, rgb(69, 85, 104));
+}
+
+.public-site__breadcrumbs a {
+  color: var(--mac-link-ink, rgb(0, 102, 214));
+  text-underline-offset: 0.2em;
+}
+
+.public-site__breadcrumbs [aria-current='page'] {
+  color: var(--mac-text-primary, rgb(0, 0, 0));
+  font-weight: 600;
 }
 
 .public-site__hero {
@@ -148,7 +227,8 @@
   margin-top: 26px;
 }
 
-.public-site a.public-site__button {
+.public-site a.public-site__button,
+.public-site button.public-site__button {
   display: inline-flex;
   min-height: 46px;
   align-items: center;
@@ -161,19 +241,32 @@
   font-weight: 700;
   text-align: center;
   text-decoration: none;
+  cursor: pointer;
 }
 
-.public-site a.public-site__button--primary {
+.public-site button.public-site__button {
+  font: inherit;
+  font-weight: 700;
+}
+
+.public-site a.public-site__button--primary,
+.public-site button.public-site__button--primary {
   border-color: var(--mac-success-strong, rgb(20, 122, 56));
   background: var(--mac-success-strong, rgb(20, 122, 56));
   color: var(--mac-text-on-accent, rgb(255, 255, 255));
+}
+
+.public-site button.public-site__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .public-site__section {
   margin-top: var(--public-site-section-gap);
 }
 
-.public-site__section > h1 {
+.public-site__section > h1,
+.public-site__doctor-summary--profile h1 {
   margin-bottom: 28px;
   font-size: clamp(1.9rem, 4vw, 3rem);
 }
@@ -184,6 +277,39 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.public-site__catalog {
+  display: block;
+}
+
+.public-site__catalog-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-block-end: 16px;
+}
+
+.public-site__catalog-field {
+  display: grid;
+  flex: 1 1 190px;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.public-site__catalog-control {
+  min-width: 0;
+}
+
+.public-site__catalog-status {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.public-site__catalog [hidden] {
+  display: none;
 }
 
 .public-site__list {
@@ -207,6 +333,32 @@
 
 .public-site__list-item p {
   margin: 6px 0 0;
+}
+
+.public-site__doctor-summary {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.public-site__doctor-summary > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.public-site__doctor-portrait {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.public-site__doctor-portrait[data-public-site-image="unavailable"] {
+  visibility: hidden;
 }
 
 .public-site a.public-site__list-title {
@@ -240,6 +392,77 @@
   border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 14px;
   background: var(--mac-bg-content, rgb(244, 247, 251));
+}
+
+.public-site__booking-form {
+  max-width: 760px;
+}
+
+.public-site__booking-field {
+  display: grid;
+  gap: 7px;
+  margin-block: 18px;
+  font-weight: 600;
+}
+
+.public-site__catalog-control,
+.public-site__booking-control {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: var(--mac-bg-primary, rgb(255, 255, 255));
+  color: var(--mac-text-primary, rgb(0, 0, 0));
+  font: inherit;
+}
+
+.public-site__booking-fieldset,
+.public-site__booking-policy {
+  border: 0;
+  padding: 0;
+}
+
+.public-site__booking-fieldset legend,
+.public-site__booking-policy legend {
+  font-weight: 700;
+}
+
+.public-site__booking-times,
+.public-site__booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.public-site__booking-times {
+  gap: 10px;
+  margin-block: 12px;
+}
+
+.public-site__booking-actions {
+  gap: 12px;
+}
+
+.public-site__booking-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.public-site__booking-policy-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.public-site :is(button, input, select):focus-visible {
+  outline: 3px solid var(--mac-warning-strong, rgb(168, 98, 0));
+  outline-offset: 3px;
 }
 
 .public-site__contact-list {
@@ -279,6 +502,12 @@
   color: var(--mac-link-ink, rgb(0, 102, 214));
 }
 
+.public-site__footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
 .public-site__runtime-message,
 .public-site__error {
   width: min(100% - 40px, 760px);
@@ -298,26 +527,68 @@
 @media (max-width: 760px) {
   .public-site__header {
     min-height: auto;
-    flex-wrap: wrap;
-    justify-content: space-between;
     gap: 12px;
     padding-block: 16px;
   }
 
   .public-site__nav {
-    order: 3;
-    width: 100%;
-    justify-content: flex-start;
-    gap: 18px;
-    overflow-x: auto;
-    padding-block: 6px;
+    display: none;
   }
 
-  .public-site__nav a {
-    min-height: 40px;
-    display: inline-flex;
+  .public-site__mobile-menu {
+    display: block;
+    margin-inline-start: auto;
+  }
+
+  .public-site__mobile-menu[open] {
+    flex-basis: 100%;
+  }
+
+  .public-site__mobile-menu summary {
+    display: flex;
+    inline-size: fit-content;
+    min-height: 44px;
     align-items: center;
-    white-space: nowrap;
+    margin-inline-start: auto;
+    padding: 0 12px;
+    border: 1px solid var(--mac-border, rgb(184, 200, 218));
+    border-radius: 10px;
+    background: var(--mac-bg-content, rgb(244, 247, 251));
+    color: var(--mac-text-primary, rgb(0, 0, 0));
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+  }
+
+  .public-site__mobile-menu summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .public-site__mobile-nav {
+    display: grid;
+    box-sizing: border-box;
+    inline-size: min(100%, 240px);
+    gap: 4px;
+    margin-block-start: 8px;
+    margin-inline-start: auto;
+    padding: 8px;
+    border: 1px solid var(--mac-border, rgb(184, 200, 218));
+    border-radius: 12px;
+    background: var(--mac-bg-content, rgb(244, 247, 251));
+    box-shadow: var(--mac-shadow-md, 0 4px 12px rgb(0 0 0 / 15%));
+  }
+
+  .public-site__mobile-nav a {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 8px;
+    overflow-wrap: anywhere;
+  }
+
+  .public-site__mobile-nav a:hover {
+    background: var(--mac-bg-secondary, rgb(227, 235, 245));
   }
 
   .public-site__main {
@@ -331,6 +602,10 @@
     padding: 16px;
   }
 
+  .public-site__doctor-summary--profile {
+    flex-direction: column;
+  }
+
   .public-site__list-meta {
     width: 100%;
     grid-auto-flow: column;
@@ -342,6 +617,10 @@
   .public-site__footer {
     flex-wrap: wrap;
     padding-block: 16px;
+  }
+
+  .public-site__footer-links {
+    width: 100%;
   }
 }
 

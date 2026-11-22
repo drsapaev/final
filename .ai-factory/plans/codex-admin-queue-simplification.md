@@ -1,30 +1,139 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.82 — Tier-2 API staging PASS на `29a8ef16`; CI false-positive исправлен; applicable hosted checks прошли на `005477d4`; один cross-writer serialization P2 остаётся открытым.
-**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T17:19:46+05:00 Asia/Tashkent.
-**Current task:** T10 — review-follow-up PR #3633. Test correction `979f6e81` и merge latest `main` входят в code/checkpoint HEAD `005477d4`; GitHub сообщил PR OPEN/MERGEABLE на базе `88578264`. Все применимые hosted checks для этого SHA прошли. Документационный checkpoint создаёт новый PR HEAD, его scoped checks надо перепроверить.
-**Текущий worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`.
-**Tier-2:** ограниченная synthetic Admin/TOTP + disposable PostgreSQL API-проверка прошла на runtime commit `29a8ef16`; sanitized report: [admin-queue-simplification/T10-PR3633-tier2-staging-report.md](admin-queue-simplification/T10-PR3633-tier2-staging-report.md). Все ресурсы staging-проекта удалены и проверены.
-**Ограничения:** полный `STAGING_VALIDATION.md`, T18, browser/UI/keyboard/viewport, frontend provenance, rollout и production — NOT_RUN. Один open P2 требует общей сериализации всех подходящих queue/service/resource writers и блокирует merge. Deferral не принят; пользователь мержит PR.
-**Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
-**Текущая точка:** [PROGRESS.md](admin-queue-simplification/PROGRESS.md).
+## Уточнение T19 — единое управление вкладками регистратуры (2026-11-16)
+
+**Статус на 19 ноября 2026:** T19 **MERGED** в [PR #4117](https://github.com/drsapaev/final/pull/4117), squash `e33adf5e949cdb5b6cad225aba36a200a8ebd44a`. Проверенный HEAD `4f95116c6`, CI 33 PASS / 12 SKIPPED после повтора Frontend E2E. Оба P2 закрыты. **Tier‑2 — PARTIAL**, новый live staging отложен по решению пользователя. Детали в [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
+
+**Текущий этап плана:** T00–T17 и T19 слиты. T18 остаётся **IN_PROGRESS / PARTIAL**. Чекпоинт #4132 слит в `b94e7b8f0`. Локальный Chromium подтвердил активацию worker после исправления `no-store` с телом и отсутствие такого ответа в кэше. Live-проверка открыта. См. [RESUME.md](admin-queue-simplification/RESUME.md).
+
+Пользователь отверг разделение на две группы «Направления»/«Врачи»: все вкладки должны настраиваться в одном месте. Незакоммиченный grouped patch сохранён отдельно и не является итоговой реализацией.
+
+### Проверка QueueProfile и решение
+
+Модель queue_profile.py и Create/Update в registrar_integration/_queue_profiles.py содержат queue_tags/department_key, но не doctor target. QueueProfile участвует в QR, admission, availability и защищённых bindings. Врачебные строки не добавляются в этот доменный профиль.
+
+Единый внутренний реестр хранится в существующей JSON-настройке ClinicSettings с ключом registrar_tabs_v1. Новых таблиц, миграций и сущности Direction нет. Backend владеет конфигурацией; frontend отображает один список.
+
+### Контракт
+
+- Строка: target_kind=profile|doctor, положительный target_id (ID QueueProfile либо Doctor), локальное название, видимость. Порядок — положение в массиве. Дубликаты typed target запрещены; максимум одна вкладка на врача/профиль.
+- GET /registrar/tabs возвращает единый список видимых доступных вкладок. GET/PUT /admin/registrar-tabs обслуживает Admin editor и варианты целей. Admin пишет, существующие внутренние роли читают по RBAC.
+- До первого сохранения GET read-only воспроизводит текущий набор: активные профили, затем доступные врачи. Администратор явно сохраняет снимок. Затем новые профили/врачи не добавляют вкладки автоматически. Сохранённый пустой массив остаётся пустым.
+- Скрытие, переименование, сортировка и удаление строки меняют только реестр. Врач/профиль, очереди, ownership, номера, queue_time, статусы, визиты и история не меняются.
+- «Все отделения» — постоянный общий фильтр. QR-публикация остаётся самостоятельным поведением QueueProfile.
+- Ссылки по неизменяемому ID; удалённый target не подменяется новым с тем же названием/ключом. Admin видит недоступные цели. Старые dept и doctor_id deep links сохраняют доступ к истории; скрытый выбранный фильтр явно показывается с ручным сбросом.
+- Endpoint возвращает profile_filters с tags и названиями всех существующих профилей отдельно от видимых tabs: скрытая/архивная вкладка не нарушает старый dept-фильтр. Эти метаданные не создают вкладки.
+- PUT проверяет expected_version, сериализует конкурирующие записи, валидирует цели и пишет обязательный audit в той же транзакции: actor, old/new config, reason, request ID, без имён/PHI. Generic ClinicSettings writer не меняет зарезервированный ключ.
+- Ошибка чтения не становится пустым успехом; failed refresh сохраняет последние подтверждённые данные, поздний ответ не заменяет свежий.
+
+### Этапы и приёмка
+
+1. T19.1 — typed DTO/service/routes, generic-settings guard, optimistic version, atomic audit. Проверки RBAC, duplicates/invalid target, empty, stale PUT, audit rollback и read-only legacy; отсутствие queue writes.
+2. T19.2 — одна Admin таблица: добавить цель, название, показать/скрыть, переместить, удалить вкладку, сохранить. Registrar читает единый endpoint без второго автоматического списка врачей. Старый редактор профилей остаётся раскрываемым блоком «Направления и QR».
+3. T19.3 — OpenAPI/generated types; focused tests mixed order, visibility, empty/error, deep links/back/forward. Пять локалей и видимые мобильные названия.
+4. Synthetic PostgreSQL/browser с обычным Admin 2FA, явным first-save и отсутствием новых автодобавлений. Целевые результаты записаны для протестированных ревизий. Новый live staging и полный T18/STAGING_VALIDATION остаются открытыми.
+
+Откат сохраняет конфигурацию/audit и данные очередей. Production/deploy/merge отдельно. Stop: необходимость менять ownership/history/admission, неоднозначный target, повреждённая настройка или недоступная обязательная проверка/штатный security hook.
+
+## Исторический checkpoint T00–T18 (сохранён без переоценки evidence)
+
+**Версия:** 4.21 — T00–T17 MERGED; T18.10/RQ-18 PASS; T18 final acceptance IN_PROGRESS; Tier-2 PARTIAL. PR #3937 code/evidence HEAD `8aa45a453909a542a55467175b4b4f2768b355e0` passed Unified CI, security and corrected body gates against main #3938 `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc`. A checkpoint-only follow-up is pending exact-head checks; reviews/threads remain empty, user owns merge. A memory-safe canonical artifact path and current-source T18.1–5/T18.8–9 verification remain.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-11-09, Asia/Tashkent.
+**Текущий этап:** T00–T17 MERGED. T18.10/RQ-18 passed on app SHA `16e04af35e47663481a08923d8625d94a1c9d010`; 68/68 observed assets matched in that Session. PR #3937 code/evidence HEAD `8aa45a45` passed CI; this checkpoint-only follow-up needs its own exact-head checks. Independent review and user merge remain. T18.1–5 is NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. The existing hosted artifact path is incompatible; implement a checksum-verified staging artifact path before another local staging build. T18/Tier-2 PARTIAL.
+**Task memory ID:** bd2f7564-bd3d-449d-8d85-5a9325722a80.
+**T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.
+**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment и активация v1-флага не разрешены. Текущий локальный кандидат меняет E2E и журналы приёмки; приложение/runtime не меняются. Исторические Tier-2 deferrals и partial evidence не наследуются и не превращаются в PASS. Любую следующую T18-проверку привязывать к проверенному source SHA, отмечать PASS/FAIL/NOT_RUN и удалять только ресурсы собственного synthetic project.
+
 
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
-**Последний подтверждённый merge с runtime-изменением:** PR #3613, `1d146d857e1570ff2259975f081f80dc0b31ae82` (безопасная замена ключей в idempotency-логах). Предыдущие quota-policy изменения T08.2c были в PR #3596 (`7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`); последующий T08.3.1 PR #3599 добавил PostgreSQL tests и был merged as `a452c54e5851611476c1b2ac3e3298aeff467eca`.
-**Последующий test-only merge:** PR #3600 / T08.3.2 merged at `b3bd5272389da88513cc1ac23985b390489554f9`; its P2 follow-up [PR #3607](https://github.com/drsapaev/final/pull/3607) merged at `589520ae132313ca9488f3994be8d28f6041975a` from exact HEAD `37eb0d4b5d8628bdd8598990ad93a0f4093a7c96`.
-> Следующие две строки — исторический снимок метаданных T08.2c, оставленный для прослеживаемости; текущие ветка и статус указаны выше.
-**Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
+**Обязательный вход:** [RESUME.md](admin-queue-simplification/RESUME.md), затем [PROGRESS.md](admin-queue-simplification/PROGRESS.md), [DECISIONS.md](admin-queue-simplification/DECISIONS.md), [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
 
-> **T00–T09.3, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2, T08.3.2-P2 and T08.3.3 — MERGED; T10 — PR_OPEN (#3633; bounded API Tier-2 staging PASS on `61355f96`; current CI red pending a test-only correction; one serialization P2 open; PR behind `main`); T11–T18 — PLANNED.** PR #3620 merged at `19c35ec6`; current T10 lifecycle and address collision tests pass 26/26 on disposable PostgreSQL. User performs merge.
-> Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
+История промежуточных отказов, PR, merges и проверок сохранена в карточках этапов и append-only EVIDENCE. Прежний snapshot T10/3.82–3.89 не является текущей точкой исполнения. Значение production feature flag этой сверкой не проверялось; deployment и изменение флага не разрешены. Deferral предыдущих PR не наследуется и не превращает NOT_RUN в PASS.
 
-**Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
-**Текущая точка:** [PROGRESS.md](admin-queue-simplification/PROGRESS.md).
-**Решения:** [DECISIONS.md](admin-queue-simplification/DECISIONS.md).
-**Доказательства:** [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
+### T11.2. Окончательное закрытие PR #3639 — VALIDATED / PR_OPEN
 
-Подробная версия 1.1 ранее осталась незакоммиченной в worktree T03. Версии 1.2–1.7 сохранили последовательные checkpoints T03–T06.2. Версия 1.8 подтвердила merge T06.2; версии 2.0–2.3 сохранили T07/T08 history. Версия 2.4 подтверждает слияние T07 и T08.1a и фиксирует границы T08.1b. Исторические evidence сохраняются. Пропущенные staging/browser/PG проверки остаются NOT_RUN и не считаются приёмкой.
+**Основание:** пользователь поручил выполнить предложенный ограниченный путь закрытия 16 октября 2026. Это продолжение T11 в существующем PR, без нового onboarding, UI-проекта или инфраструктурного PR.
+
+**Scope freeze:** не добавлять новые функции и соседние улучшения. Разрешены только подтверждённые blockers, тесты к ним, final validation и постоянная память. Единственный подтверждённый остаточный blocker закрыт в acb509c36: final Department lock теперь использует тот же Doctor-profile fallback, что validator для поддерживаемых NULL/unmatched legacy queue tags; обе PG interleaving regression PASS. Не менять queue identity, stored tags, номера, source semantics, auth или схемы.
+
+**Финальная матрица:** C01–C09 PASS на acb509c36 в r8; точные команды/артефакты и границы — EVIDENCE. 21 PG + 7 unit и 4 browser без skips/errors; CI28SUCCESS/12SKIPPED, ordinary Admin2FA и teardown PASS.
+
+| ID | Обязательная проверка | Доказательство / правило зачёта |
+|---|---|---|
+| C01 | Ручной is_active, single/bulk Department off/on, preexisting false | Unit policy module и выбранные реальные PostgreSQL lifecycle cases; история прежних passes сохраняется отдельно |
+| C02 | Standalone/missing/conflicting/own-key parent | Семь unit cases; не подключать неизвестный parent автоматически |
+| C03 | Selector, direct Doctor/profile join и shared-resource parity | Выбранные PostgreSQL selector/lifecycle cases; unavailable sibling не обходится |
+| C04 | Старые Doctor/resource QR-токены и permanent address | Положительные/отрицательные PostgreSQL cases; отдельная regression legacy NULL/unmatched Doctor tag |
+| C05 | Department toggle сериализован с admission; public catalog bounded queries | Race/catalog PostgreSQL cases, независимые DB sessions; новый legacy-token lock case обязателен |
+| C06 | Реальный DELETE409 профиля specialists понятен и сохраняет строку | Собственный synthetic Admin browser, настоящий backend refusal; нет implicit PUT/archive/retry/reload |
+| C07 | Существующая непустая очередь и staff tabs сохраняются при parent off/on | Тот же waiting entry, queue/resource, status и staff tab access; не полный byte snapshot и не клиническая команда обслуживания |
+| C08 | Среда соответствует итоговому SHA и новой Alembic head | Normal Admin password+TOTP, exact frontend marker, migrated owned non-maintenance DB, ровно одна Alembic head |
+| C09 | Нет остатков своего проекта | Canonical teardown PASS, нулевые project containers/volumes/networks, выделенные порты освобождены |
+
+**Точный цикл:** source fix → fail-first/post-fix unit evidence → независимый AI source re-review → commit итогового кода → обновление единого SHA pin → offline completeness/fixtures/collection checks → один Preflight/Start/Session/teardown. Один внешний canonical keeper и boot identity охватывают весь цикл. Не заменять это независимыми командами с разрывом WSL lifetime.
+
+**Диагностика ошибки:** только allowlisted service/status/health/exit/OOM/restart snapshot до удаления. KEEP_STAGING=1 допустим лишь в дочернем failing Start/Session этой задачи; причина/owner/lease зафиксированы в PREWORK. Внешний keeper немедленно проверяет continuity/labels, снимает безопасный snapshot и удаляет точный проект без KEEP_STAGING. При потере continuity не удалять неподтверждённые ресурсы и честно отметить NOT_RUN.
+
+**Deferral общих legacy live-spec — отдельное условное решение:**
+
+1. Original requirement: полные admin-navigation.spec.ts, queue-system.spec.ts и panel-qa-admin-live.spec.ts.
+2. Reason: текущие общие live-spec/harness содержат несовместимые auth/origin/контролы и ранее давали неразобранные общие UI failures; их полное исполнение не является доказательством отдельных правил T11. Они не объявлены устаревшими или исправленными.
+3. Evidence: точные результаты CI, targeted T11/PG/browser и прежние failed/NOT_RUN исполнения записываются с SHA. Ни один fail не превращается в PASS.
+4. Owner/workstream: T18 synthetic Admin/Registrar QA; исполнитель T18 доводит совместимый harness и каждый полный spec.
+5. Resume condition: до production rollout/v1 activation/закрытия T18; normal Admin2FA, verified synthetic Registrar, configurable origin, контролируемые synthetic writes/cleanup. Новая информация о regression в изменённом коде немедленно возвращает связанный пункт в обязательный scope.
+6. Headline impact: deferred три suite получают 0% completed coverage, 0/3 полных suite закрыто этим решением. Общий процент плана не вычисляется; T18 остаётся PLANNED.
+
+**Текущий disposition:** EFFECTIVE LIMITED DEFERRAL для #3639/acb509c36; условия ниже выполнены, все шесть полей сохранены. Это делегированная техническая оценка; независимый human APPROVE не выдумывается.
+
+**Условие вступления deferral в силу:** C01–C09 PASS на указанном итоговом коде/доказанно неизменившихся owners; текущий source review без нерешённых P0/P1/P2 и required CI PASS. Делегированный пользователем technical disposition не выдавать за human GitHub review.
+
+**T11.1 production diagnostic disposition:** факт действия DELETE/profile key specialists подтверждён пользователем; источник и shape обоих structured409 воспроизведены в source tests. Точные live detail.reason/counts/deployed revisions не установлены и не выдумываются. Владелец T11.1/оператор после согласованного deployment собирает минимальное read-only method/reason/revision evidence без patient/token payload. Доказанный renderer fix и сохранение guard проверяются C06; неизвестный production reason не разрешает удаление/архивирование и не объявляется исправленным backend-дефектом.
+
+**Закрытие PR:** итоговое описание содержит актуальные SHA, матрицу PASS/FAIL/NOT_RUN/DEFERRED, scope/rollback и reviewer disposition. Пользователь выполняет merge после финальных проверок. Локальные журналы остаются локально по ранее принятому решению; их результаты переносить в PR body без секретов. T12 не начинается до закрытия текущего PR-цикла. Полный STAGING_VALIDATION.md нужен до production и не подменяется этой матрицей.
+
+### Реестр текущих статусов
+
+| Этап | Статус | Результат / точка продолжения |
+|---|---|---|
+| T00 | MERGED | Документы и baseline, #3536 |
+| T01 | MERGED | Форма профиля, #3537; не обещает исправления всех ошибок страницы |
+| T02 | MERGED | Черновик общих настроек, #3538 |
+| T03 | MERGED | Cabinet read и clinic-local day, #3540 |
+| T04 | MERGED | Правдивый пустой каталог/ошибка, #3541 |
+| T05 | MERGED | Fresh settings между командами, #3543 |
+| T06 | MERGED | Schema/creation-policy подэтапы; legacy сохранён |
+| T07 | MERGED | Admission window, #3557; его deferral только исторический |
+| T08 | MERGED | Quota/adapters/PG-proof подэтапы; rollout отдельно |
+| T09 | MERGED | Preview/apply и UI, #3612/#3614/#3620 |
+| T10 | MERGED | Used-binding guards, #3633, merge `6315c62e` |
+| T11 | MERGED | #3639; merge 7443b0e290b9143e877d5898a5589df52592d3b3; C01–C09 PASS с ограниченным deferral трёх общих suite для T18 |
+| T11.1 | IN_PROGRESS | DELETE подтверждён пользователем; production reason/revision ещё неизвестны |
+| T11.1a | MERGED | Single-delete formatter и preservation regression включены в #3639 / 7443b0e2 |
+| T11.2 | MERGED | r8 C01–C09 PASS; scoped deferral применён до T18; #3639 merged |
+| T12 | MERGED | Явная публикация и внутренний обзор; #3690 и #3693 |
+| T12.1 | MERGED | Новые QueueProfile скрыты по умолчанию; #3690 |
+| T12.1a | MERGED | OpenAPI и generated API types включены в T12.1 delivery |
+| T12.2 | MERGED / ACCEPTANCE PARTIAL | Политика публикации и QR-селекторы; #3693, merge `7f923f14a347a26b7f80da0fb40a0cff8858ef27`; оставшиеся live/provenance checks не считать выполненными |
+| T13 | MERGED | Canonical Admin read contract; #3697, merge `baae35932e341ceaac163145d933639f735cb35c` |
+| T14 | MERGED | Setup UI на backend facts; #3702, merge `99f0b5a098dccce4f1166ae52bd7d5c93d92af70` |
+| T15 | MERGED | Восстанавливаемый URL-контекст; #3711, merge `ccbf519fdb0f9a32c3a71837202dfea296f13383` |
+| T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
+| T17 | MERGED | Bulk/CSV; PR #3721 merged after the user's confirmation |
+| T18 | IN_PROGRESS / PARTIAL | RQ-18 #4034 и чекпоинты #4131/#4132 слиты. Локальный fix SW подтверждён Chromium. Текущие live-сценарии и финальная предрелизная приёмка ожидают staging. |
+| T19 | MERGED / TIER-2 PARTIAL | PR #4117, merge `e33adf5e9`. Новый live staging отложен. |
+
+### Неопределённости и условия их закрытия
+
+| ID | Факт / статус | Следующее доказательство и владелец |
+|---|---|---|
+| U1 | Пользователь подтвердил удаление: DELETE существующего profile key `specialists`. Точный `detail.reason` и deployed revisions неизвестны | T11.1a устраняет воспроизведённый UI дефект String(object); для production различить significant links и stale bindings. Не объявлять удаление разрешённым и не ослаблять guard |
+| U2 | CLOSED для текущего C08: SW marker совпал с acb509c36 в r8, owned DB на0080 | Полный hash всех served assets здесь не повторялся; прежний такой artifact остаётся привязан к своему SHA |
+| U3 | Текущий acb509c36: CI28SUCCESS/12SKIPPED/0FAIL/PENDING, AI source re-review без подтверждённых P0/P1/P2 | Повторно сверить SHA/required checks непосредственно перед merge; независимый human GitHub APPROVE не заявлен |
+| U4 | Три полных legacy live-spec NOT_RUN / DEFERRED именно для #3639/acb509c36 | Явный technical disposition: шесть полей ниже и в DECISIONS/EVIDENCE; owner T18, resume до production/v1 activation/T18 closure, 0% credit и0/3 complete |
+| U5 | Полный pre-deploy `STAGING_VALIDATION.md` PARTIAL, не blanket NOT_RUN и не PASS | Сохранять результаты каждой проверки с её SHA; Sentry, external AI-safety, Telegram, live PII telemetry и оставшиеся пункты требуют безопасного контура/решения applicability до rollout |
+
+Верхняя сводка плана и первый checkpoint PROGRESS/RESUME — текущие. Более ранние checkpoints — история. T11 MERGED в 7443b0e290b9143e877d5898a5589df52592d3b3; его ограниченный deferral остаётся только до T18 и не делает T18 закрытым.
 
 ## 1. Цель и границы
 
@@ -170,7 +279,9 @@ next exact action; checks to rerun after next change.
 | T07 | T05, T06 | Единое окно v1 |
 | T08 | T06, T07 | Атомарная квота, покрытие writers |
 | T09 | T03 | Безопасная смена сегодняшнего кабинета |
-| T11 | T04, T10 | Ручная активность/effective parent policy |
+| T11 | MERGED | #3639; merge 7443b0e290b9143e877d5898a5589df52592d3b3; C01–C09 PASS с ограниченным deferral трёх общих suite для T18 |
+| T11.1 | T10; сверка с текущим T11 | Диагностика reported profile 409; доказанную регрессию T11 исправлять в #3639 |
+| T11.1a | MERGED | Single-delete formatter и preservation regression включены в #3639 / 7443b0e2 |
 | T12 | T10, T11 | Hidden-by-default/явная публикация |
 | T13 | T03, T11, T12 | Canonical Admin read contract |
 | T14 | T13 | UI на backend facts |
@@ -428,9 +539,10 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 - **NOT_RUN:** CI on the following docs-only HEAD; PostgreSQL proof beyond hosted suite; task-owned staging/backend E2E; manual viewport/accessibility review; T18 and full STAGING_VALIDATION.md. No T09.3 Tier-2 deferral is accepted.
 - **Next exact action:** validate the final PR body, push the journal-only checkpoint with force-with-lease expecting eb70338765d38751aeb757aac842f536ba7dd7d8, then inspect every check on the new exact documentation HEAD. No merge, Tier-2 deferral, or T10 transition is authorized by this checkpoint.
 
-### T10. Используемые связи профиля
+### T10. Используемые связи профиля — MERGED
 
 **Зависимости:** T00. **Режим:** mandatory gate.
+**Закрытие:** #3633 MERGED 2026-10-09T03:19:32Z; final HEAD `cf77b96201f3d2fc24e9410c57646e94decf0ce2`; merge `6315c62edb888bb8864928a41dd70a4c00be6e3d`. Не возобновлять старый PR по промежуточному описанию ниже. Итог — EVIDENCE/T10 merged and Tier-2 follow-up 2026-10-09.
 **Anchors:** `registrar_integration/_queue_profiles.py`: canonical tags/link counts/preview/update/delete; `models/queue_direction_public_address.py`.
 
 1. Зафиксированный дефект: PUT обходил delete guard, а общий usage helper не считал активные permanent public addresses. Общий helper теперь охватывает services/queues/entries/active addresses.
@@ -442,12 +554,12 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 **Stop:** owner transfer/address rebind/unknown canonical alias equality.
 **Evidence/logs:** field/usage impact, safe WARN refusal/INFO change/audit по existing command contract; lifecycle T11/T12 не менять здесь.
 
-**Latest review follow-up:** Code commit `00833c76` adds active Doctor/QueueResource/department-Service counts, null normalization, structured conflict display, typed 401/403/404 errors, and single/bulk department-delete protection for active permanent addresses. PostgreSQL lifecycle/OpenAPI tests passed 70/70 with one warning; focused UI tests passed 6/6; TypeScript, build, Ruff, Black, py_compile, generated-type parity and diff checks passed. Nine review threads were replied to and resolved. Bounded authenticated API staging passed on exact PR HEAD `61355f96`, including normal Admin TOTP, the QueueProfile guards, the PostgreSQL provision/Profile DELETE race, and single/bulk department delete refusal with address and record preservation. The exact-head hosted run `37770734528` then failed one backend test: its whole-payload substring assertion for synthetic Telegram ID `7701` collided with digits in a nondeterministic timestamp; the PR Required Gate failed and Parity was skipped because Backend failed. A test-only correction excludes only the timestamp from that assertion and passes the 9-test focused module locally; it is not yet committed/pushed. The PR branch is BEHIND latest `main` by three commits. One P2 remains open: all relevant tagged `DailyQueue`/Service/QueueResource writers and the binding check need a shared serialization contract. Read-only inventory found direct constructors across GraphQL, CRUD, queue services, repositories and force-majeure code. The latest gate's exact first-touch list does not cover all these writers, and its stop condition forbids the required out-of-list edits; no partial lock was added. Recommended runtime behavior is to reject a stale request with HTTP 409/no write after re-reading current binding; the expanded writer scope and behavior need explicit authorization. Full T18/STAGING_VALIDATION.md, browser/UI and served-frontend provenance remain NOT_RUN; no deferral accepted. See EVIDENCE.md#t10-pr-3633-tier2-and-ci-follow-up, EVIDENCE.md#t10-pr-3633-review-follow-up and EVIDENCE.md#t10-pr-3633-serialization-gate. User performs merge only after the blocker is fixed or explicitly deferred.
+**Historical review follow-up (2026-10-08; superseded, not current status):** Code commit `00833c76` adds active Doctor/QueueResource/department-Service counts, null normalization, structured conflict display, typed 401/403/404 errors, and single/bulk department-delete protection for active permanent addresses. PostgreSQL lifecycle/OpenAPI tests passed 70/70 with one warning; focused UI tests passed 6/6; TypeScript, build, Ruff, Black, py_compile, generated-type parity and diff checks passed. Nine review threads were replied to and resolved. Bounded authenticated API staging passed on exact PR HEAD `61355f96`, including normal Admin TOTP, the QueueProfile guards, the PostgreSQL provision/Profile DELETE race, and single/bulk department delete refusal with address and record preservation. The exact-head hosted run `37770734528` then failed one backend test: its whole-payload substring assertion for synthetic Telegram ID `7701` collided with digits in a nondeterministic timestamp; the PR Required Gate failed and Parity was skipped because Backend failed. A test-only correction excludes only the timestamp from that assertion and passes the 9-test focused module locally; it is not yet committed/pushed. The PR branch is BEHIND latest `main` by three commits. One P2 remains open: all relevant tagged `DailyQueue`/Service/QueueResource writers and the binding check need a shared serialization contract. Read-only inventory found direct constructors across GraphQL, CRUD, queue services, repositories and force-majeure code. The latest gate's exact first-touch list does not cover all these writers, and its stop condition forbids the required out-of-list edits; no partial lock was added. Recommended runtime behavior is to reject a stale request with HTTP 409/no write after re-reading current binding; the expanded writer scope and behavior need explicit authorization. Full T18/STAGING_VALIDATION.md, browser/UI and served-frontend provenance remain NOT_RUN; no deferral accepted. See EVIDENCE.md#t10-pr-3633-tier2-and-ci-follow-up, EVIDENCE.md#t10-pr-3633-review-follow-up and EVIDENCE.md#t10-pr-3633-serialization-gate. User performs merge only after the blocker is fixed or explicitly deferred.
 
-### T11. Ручная активность и родитель
+### T11. Ручная активность и родитель — PR_OPEN (#3639)
 
 **Зависимости:** T04, T10. **Режим:** mandatory gate.
-**Anchors:** `admin_departments/_helpers.py:_department_linked_profiles`, `_sync_department_active_to_profiles`; `_crud.py` lifecycle writers; `queue_svc/_core.py` visibility; `qr_queue/_specialists.py`. Shared backend profile policy — проектируемый module.
+**Anchors:** `admin_departments/_helpers.py:_department_linked_profiles`, `_sync_department_active_to_profiles`; `_crud.py` lifecycle writers; `queue_svc/_core.py` visibility; `qr_queue/_specialists.py`. Shared policy уже реализована в `backend/app/services/queue_profile_availability.py` в открытом PR #3639; не создавать второй policy module.
 
 1. is_active сохраняет manual intent; department off/on его не меняет. Preexisting false сохранить без угадывания.
 2. Parent: explicit department_key/ documented own-key; обе разные→conflict; missing explicit→conflict; neither→standalone. OR-связь не доказательство корректности.
@@ -458,6 +570,43 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 Old mutation tests менять с контрактом, history guards сохранять.
 **Stop:** automatic repair/historical intent inference/unknown parent policy.
 **Evidence/logs:** persisted vs effective before-after; WARN conflict/INFO department change; reads не пишут state/per-row logs.
+
+### T11.1. Разобрать reported 409 на вкладке профилей — IN_PROGRESS
+
+**Источник:** пользователь сообщил HTTP 409 на `/api/v1/queues/profiles/specialists` и уточнил: отказ возникает при удалении. Canonical UI вызывает DELETE по ключу профиля; гипотеза об отдельном GET для этого сообщения закрыта. Точный production reason/deployed revision не предоставлены; production reproduction NOT_RUN.
+**Зависимости:** T10 MERGED; сравнение с текущим T11. Диагностика должна получить явный disposition перед закрытием T11; полный T12–T18 для установления причины не требуется.
+**Владелец диагностики:** исполнитель T11/#3639. По продолжению пользователя выделен явный маленький T11.1a внутри текущего PR: только renderer single-delete error и его regression tests; он не меняет backend/HTTP semantics и не начинает T17. Другие прежние/deployment-дефекты получают отдельный follow-up по PR-cycle rules. Точная причина production отказа не объявляется установленной из результата UI-теста.
+**Canonical anchors:** `frontend/src/components/admin/QueueProfilesManager.tsx` (`loadProfiles`, `handleUpdate`, `handleDelete`, bulk/CSV handlers); `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py` (GET каталога, PUT/DELETE по `profile_key`, impact preview, guards); `backend/openapi.json`; T10 lifecycle tests и QueueProfilesManager interaction/CSV tests.
+**Reference-only:** shared API client, route registry, T11 availability policy и deployed asset metadata. Production writes/DB/config, auth bypass, новый endpoint, удаление guards и изменение ownership запрещены в диагностике.
+
+Подтверждённые исходниками факты:
+
+- Initial load использует `GET /queues/profiles?active_only=false`.
+- Save/delete строят `/queues/profiles/${profileKey}`. При `profileKey="specialists"` это в точности reported URL; PUT/DELETE зарегистрированы как `/queues/profiles/{profile_key}`. Отсутствие буквального `profiles/specialists` в поиске не доказывает отсутствия маршрута.
+- Сгенерированный OpenAPI содержит GET каталога/public и PUT/DELETE параметризованного профиля; отдельного GET `/queues/profiles/specialists` в этом snapshot нет. Это не доказательство версии deployed API.
+- Для DELETE backend возвращает `profile_binding_changed` либо `profile_has_significant_links`; `profile_binding_change_blocked` относится к PUT. Какой DELETE reason был в production — неизвестно.
+- До T11.1a single-delete и bulk преобразовывали object `detail` в `[object Object]`. T11.1a воспроизвёл оба documented DELETE refusal и переводит только single-delete на существующий `apiErrorMessage`. Bulk остаётся T17; production response body не получен.
+
+Порядок и развилки:
+
+1. Зафиксировать только безопасные факты: действие (вход/refresh/save/archive/delete/bulk/CSV), HTTP method/path/status, whitelisted `detail.reason`/blocked fields/агрегаты, Initiator module/asset hash и frontend/backend revisions. Не хранить auth headers, cookies, полный HAR/payload или пациентские данные. Read-only осмотр production допустим только в пределах доступного разрешённого доступа; воспроизведение mutations — исключительно synthetic staging.
+2. Если это PUT/DELETE ключа `specialists`, сначала проверить snapshot и usage через существующий impact preview. Used-binding или delete guard не обходить. Штатный отказ должен объяснять причину/разрешённое действие и сохранять введённое; title/archive при допустимом неизменённом binding не должен случайно блокироваться.
+3. Для текущего сообщения GET-ветка закрыта уточнением пользователя. Не добавлять новый endpoint и не искать stale bundle без отдельного свидетельства. Вернуться к GET/caller/provenance анализу только при новом отличающемся наблюдении.
+4. Если response пришёл от иной middleware/proxy-поверхности, установить это по безопасным response metadata и зарегистрированному handler; не угадывать конфликт данных по одному статусу.
+5. Сравнить main и PR HEAD на synthetic fixture с ключом `specialists`, определить earliest failing revision и только затем объявить defect/expected refusal/deployment mismatch. Невоспроизводимость записать как UNRESOLVED с недостающими фактами.
+
+**Приёмка диагностики:** установлен method + action + handler/reason + revision либо явно перечислены отсутствующие доказательства; назначен владелец и следующий узкий шаг. Проблема не закрывается одним CI PASS, очисткой cache по предположению или подавлением 409.
+**Приёмка исправления, если оно требуется:** initial GET не запускает mutation; загрузка каталога/empty/error/retry правдивы; отказ save/delete сохраняет rows/draft и не даёт ложного success; structured reason читаем; used bindings/history/public address остаются неизменными; stale conflict перечитывает факты; archive и presentation updates проходят при допустимом контракте. Bulk/CSV post-error reconciliation и per-row outcomes остаются T17.
+**Проверки:** focused UI tests для initial load и single-operation 409 на ключе `specialists`; PG lifecycle regression только при подтверждённом backend-дефекте; OpenAPI/generated parity только при изменении контракта. Browser baseline и исправление — в одном собственном synthetic контуре с ordinary Admin 2FA и teardown. Фиксировать SHA и реальные PASS/FAIL/NOT_RUN.
+**Stop перед изменением backend/guards:** неизвестен production reason/revision, требуется production mutation, смена bindings/ownership или ослабление T10/T11 policy. Renderer-only T11.1a имеет собственный воспроизведённый root cause и не требует угадывать production counts. Read-only сбор остальных фактов продолжается; неизвестное не превращается в разрешение удалить используемый профиль. Остаточный merge-risk получает явный disposition.
+
+### T11.1a. Понятный отказ одиночного удаления — VALIDATED (local)
+
+- **Срез:** одна строка `handleDelete` использует существующий `apiErrorMessage`; два UI regression cases на synthetic profile key `specialists`. Backend, DELETE payload/guard, bulk/CSV и автоматическое архивирование не меняются.
+- **Root cause:** `String(detail)` скрывал backend `message` для object envelope. Оба canonical DELETE reasons воспроизведены в UI и падали до исправления; отдельный GET endpoint не нужен.
+- **Приёмка:** видимый server message, строка сохранена, «Скрыть» остаётся доступно; нет implicit PUT, DELETE retry или reload после отказа. Initial load не вызывает mutation.
+- **Локальные проверки:** три focused interaction/CSV suites 44 PASS / 0 SKIP; TypeScript PASS; scoped ESLint 0 errors / 4 прежних warnings; diff check PASS. Новый browser/PG/staging run NOT_RUN; прежние доказательства не переносятся на новую frontend source revision.
+- **Публикация:** normal hooks, actual source commit и CI проверяются в текущем #3639. Это не MERGED, не production deploy и не закрытие T11.1 по точному production reason.
 
 ### T12. Явная публикация и обзор
 
@@ -473,6 +622,36 @@ Old mutation tests менять с контрактом, history guards сохр
 **Validation:** both hidden constructors/POST с incoming publication=true/publish/reactivation atomic refusals/same-direction doctors/mixed overview/token/address parity. Department create atomicity, QR visibility/rq16b-c-d/resource suites; old addresses unchanged.
 **Stop:** требуется product target choice/rebind/owner merge.
 **Evidence/logs:** saved intent vs effective availability, safe INFO publish-hide-archive/WARN refusal; no runtime repair.
+
+### T12.1. Скрытое создание QueueProfile — MERGED / EXACT-HEAD CI PASS / TIER-2 NOT RUN
+
+**Зависимости:** T11 merged; отдельный подэтап внутри T12.
+**Основание:** T12 требует, чтобы все новые профили были скрыты и публикация выполнялась отдельным действием. Для старых клиентов, которые присылают show_on_qr_page=true при создании, выбран backward-compatible defer: профиль сохраняется скрытым, а ответ явно сообщает об отложенной публикации. Проверка готовности и неоднозначных целей остаётся T12.2.
+**Gate:** первоначальный mandatory gate остановился на отсутствии first-touch. Повтор с подтверждённым root file _queue_profiles.py дал narrow_override / execute и зафиксировал восемь source/test paths ниже; основание — утверждённая T12-политика плана. Handoff prompt прочитан.
+**Разрешённые source/test paths:** backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py, backend/app/models/queue_profile.py, backend/app/api/v1/endpoints/admin_departments/_helpers.py, frontend/src/components/admin/QueueProfilesManager.tsx, backend/tests/integration/test_queue_profile_lifecycle.py, backend/tests/integration/test_admin_department_create_atomicity.py, frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx, frontend/src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx.
+**Вне scope:** любые другие source/test/generated files, DB/Alembic, T12 publish eligibility/update policy, overview selection/admission, existing public profiles, QR tokens/addresses, production, deploy, staging, PR merge/review. При необходимости выхода за восемь файлов — остановиться и оформить отдельный slice. Generated OpenAPI/API types идут только через T12.1a.
+**Проверки:** API POST по умолчанию скрыт; входящий true не публикуется и получает `publication_deferred`; manual/department auto constructor hidden; existing profiles не изменяются; UI create sends false, а CSV create остаётся скрытым благодаря backend guard. Уведомление о намерении публикации в CSV и отдельное publish action относятся к T17/T12.2. Focused backend/frontend tests, OpenAPI/generated-types freshness, diff check.
+**Результат exact-head:** PR `#3690` на `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a`; Unified CI `38934894724` SUCCESS, включая backend/PostgreSQL, Frontend unit/E2E, build, OpenAPI freshness, quality, parity и PR Required Gate. Два outdated test assumptions о публичности auto-created Department profile были исправлены test-only; current backend CI подтвердил обе регрессии и hidden default.
+**Closure:** пользователь мёржил PR `#3690` 2026-10-17; подтверждённый merge commit — `0a3304f5ec7d3702d0fbe3642fdec078eb3edaea`.
+**Остаток при merge:** Tier-2 staging/Admin 2FA и backend-dependent live E2E оставались NOT_RUN; отдельный reviewer deferral не был зафиксирован. Merge не превращает эти проверки в PASS; полно-системные проверки остаются в `STAGING_VALIDATION.md`/T18.
+**Stop:** потребуется изменить файл вне gate scope, изменить активные bindings, разрешить публикацию при создании или выбрать неизвестную цель направления.
+
+### T12.1a. Обновить OpenAPI и generated API types — VALIDATED
+
+**Зависимости:** T12.1 request default implementation. `QueueProfileCreate.show_on_qr_page` теперь default=false, но `backend/openapi.json` и generated TypeScript ещё отражают прежний default.
+**Execution boundary:** обязательный canonical gate; подтверждённый root — `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`. Разрешены только `backend/openapi.json` и `frontend/src/types/generated/api.ts`; generator scripts read-only.
+**Проверки:** каноническая OpenAPI generation/freshness, TypeScript generation/parity, exact scope и `git diff --check`. PostgreSQL integration в локальном T12.1a срезе не запускалась; позже exact-head backend CI `38934894724` прошла на disposable PostgreSQL.
+**Stop:** generator требует DB, изменение source/test/generator или создаёт нерелевантный OpenAPI churn; зафиксировать блокер без расширения scope.
+
+### T12.2. Проверка публикации QueueProfile и согласованности QR-селекторов — MERGED / ACCEPTANCE PARTIAL
+
+**Зависимости:** T12.1 и T10–T11. Цель: публиковать или повторно активировать профиль только при однозначной эффективной доступности для записи; публичный каталог, QR-селекторы врачей и фактическое admission должны применять одну и ту же backend-политику.
+**Область реализации:** существующий QueueProfile update/publish contract, effective owner-scope resolution, публичный каталог и QR specialist selectors. Не вводить новую сущность направления, не переназначать владельцев, не объединять очереди и не менять историю/номера.
+**PR:** #3693 merged в `7f923f14a347a26b7f80da0fb40a0cff8858ef27` 2026-10-17T23:24:47+05:00. Final PR HEAD `2500478aacfce6268cfa419c1976a7b1814f7f4f`, source/test HEAD `dde8f799a804bd0e71eed9802c879b03d01effb1`, base `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6`.
+**Exact-head CI:** Unified CI `39025238384` SUCCESS on source/test HEAD `dde8f799`; final documentation-only PR HEAD passed Unified CI `39029748358` with conclusion SUCCESS. Path-aware jobs marked SKIPPED remain skipped, not PASS.
+**Focused Tier-2 evidence recorded for merge:** cycle11 on source/test HEAD `dde8f799` passed 20 PostgreSQL regressions, ordinary Admin password+TOTP and publication agreement across public catalog and `/queue/available-specialists`. Cycle18 on exact PR HEAD `2500478` passed canonical Preflight/Start/Session, synthetic Admin TOTP enrollment, ordinary Admin 2FA login, queue-profile route preservation, publication toggling/catalog reflection and restoration of original synthetic profile; teardown removed 5 containers, 3 volumes and 1 network. Cycle20b on exact PR HEAD passed synthetic Registrar login/identity and denial (`403`) for the Admin-only impact-preview command without profile mutation; teardown reported zero owned resources. These are the outcomes retained in the PR description/evidence; this T16 task did not rerun staging.
+**Frontend provenance:** cycle17 manually read `/sw.js` and recorded expected PR SHA `2500478`; cycle18 reused frontend image digest `sha256:340a268a312641e0c64f4ad8157ced16b54edb2dce11f5d8163791660ddcdd1d`. This manual marker check is PASS, but canonical launcher `served_revision_verified` remains `false`; canonical image attestation is unverified.
+**Остаток:** full `docs/runbooks/STAGING_VALIDATION.md`, three unchanged legacy browser specs, full T18 and canonical `served_revision_verified` attestation remain NOT_RUN/unverified. Tier-2 is PARTIAL; no deferral was accepted. Review comments/threads at the recorded review point did not constitute independent human approval. The user subsequently merged #3693; merge does not close the T18 acceptance gaps or establish production readiness.
 
 ### T13. Canonical Admin directions GET
 
@@ -525,6 +704,10 @@ GET не создаёт queues/tokens/addresses/sessions/progress; DTO без PH
 **Зависимости:** T09, T14, T15. **Режим:** plan/dossier перед advisory execute, routing SSOT.
 **Anchors:** `frontend/src/routing/routeRegistry.ts`, `routeSelectors.ts`, `routeDocsSnapshot.ts`; `frontend/src/components/admin/AdminServices.tsx`; page adapters/Sidebar i18n.
 
+**Статус исполнения:** IN_PROGRESS на `codex/aqs-T16-navigation`, worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, base `ccbf519fdb0f9a32c3a71837202dfea296f13383` (T15 merge). Fail-first выявил 3 ошибки URL/history поведения; итоговые focused route/ownership/nav/i18n suite: 54/54 PASS; scoped ESLint: 0 errors. Локальные type-check/build имеют описанные environment/pre-existing failures. Актуальные ограничения, фактические изменения и команды — в начале `admin-queue-simplification/PROGRESS.md` и `EVIDENCE.md`.
+
+**Решение навигации:** setup получает первый пункт в admin queue section; четыре сохранённых URL остаются входами Admin-only routes. Queue-profiles — вкладка `/admin/services`, не отдельный redirect. Значение вкладки канонизируется в query string, неизвестное/повторное значение становится `catalog`, Back/Forward и прямые query changes выбирают соответствующую вкладку. Legacy `localStorage.servicesTab` используется только если при прямом входе нет query и затем переносится в URL. Несовместимые `setupEntity*` удаляются, общие return-context параметры сохраняются. Связанные подписи локализованы во всех пяти поддерживаемых языках.
+
 1. Setup «Направления и очереди», settings «Общие правила очереди».
 2. Cabinet URL → today queues; servicesTab=queue-profiles → profiles unified context; catalog сохраняется, whole /admin/services redirect запрещён.
 3. Query/local state/back-forward согласовать: сейчас initial-only query/unknown nonempty accepted. Unknown→safe start.
@@ -541,7 +724,7 @@ GET не создаёт queues/tokens/addresses/sessions/progress; DTO без PH
 
 1. Bulk sequential loop сегодня aborts first error/no reload; exact row success/rejected/not-started + safe reason.
 2. Partial outcome→reread actual state даже при error. Retry failed/not-started only после revalidation.
-3. Impact preview/structured errors T10–T12; stale preview не обещает success.
+3. Impact preview/structured errors T10–T12 и findings T11.1: update/delete/bulk/CSV показывают безопасный reason/message вместо `[object Object]`; stale preview не обещает success. Диагностику reported 409 не откладывать молча до T17.
 4. Parser/RFC4180/round-trip уже реализованы: не переписывать. Department/optional/export поддерживаемые поля сохраняются.
 5. New CSV POST always hidden; publication intent отдельный pending action после readiness, без auto-publish/молчаливой потери намерения.
 
@@ -567,13 +750,19 @@ GET не создаёт queues/tokens/addresses/sessions/progress; DTO без PH
 7. Cabinet preview/apply/stale/audit rollback/called-clinical block.
 8. Concurrent last slot/exactly one/consistent remaining.
 9. Lost response/replay/no double count/rollback-partial conservation.
-10. Four old URLs/catalog/typed return/reload/back-forward.
+10. Four old URLs/catalog/typed return/reload/back-forward, включая профиль с ключом `specialists`, initial load и понятный защищающий 409 из T11.1.
 
 Keyboard-only/focus/forms/errors/retry/empty/locales; viewport375/768/1280/1920. Cold actual rows/repeat same conditions: role/browser/network/data/commit/asset-API-backend-DB waterfall. Spinner/first paint не rows; runbook baseline не универсальный SLA.
 
 Artifacts established output/playwright/test-results по runbook; auth-state/tokens/full payload не коммитить. Safe paths/aggregates в evidence.
-**Приёмка:** доказательства конкретного deploy commit, без скрытых NOT_RUN; separate ten-point staging validation ниже.
+**Приёмка:** доказательства конкретного deploy commit, без скрытых NOT_RUN; отдельно закрыть полный checklist `STAGING_VALIDATION.md` (Checks 0–10).
 **Stop:** no required env/check/real patient origin/contract regression. QA не отключает PII masking.
+
+#### T18 targeted parent-repair slice — PR #3763
+
+На `7910963be23c6ebef3a9f70a1c29a9b45c7b9a84` после синхронизации со свежим main `b055a48b` целевой сценарий родительского конфликта QueueProfile прошёл canonical Preflight → Session → teardown. Первичная TOTP-настройка и отдельный повторный password+TOTP вход в чистом браузерном контексте прошли. Served `/sw.js` подтвердил точный commit. Preview показал конфликт и допустимую цель; stale apply вернул `409 parent_repair_stale`; автоматическое обновление отразило выключенную цель; после включения отделения отдельный refresh показал `active=true`; apply вернул 200 и audit ID. PostgreSQL verifier подтвердил сохранность Service, DailyQueue, ожидающего талона, постоянного адреса и аудита. Teardown: 5 контейнеров, 3 тома, 1 сеть удалены; остаток — 0. Финальный evidence-only commit подтверждается отдельным сравнением неизменности runtime и CI, без повторения staging из-за одного журнала.
+
+Этот прогон покрывает parent repair и обычный повторный Admin 2FA. Прочие сценарии здесь не запускались; ранее зафиксированные результаты T18 сохраняются. Полный [STAGING_VALIDATION.md](../../docs/runbooks/STAGING_VALIDATION.md) и T18 ещё не завершены. Точечный repair PR готовится к Ready после CI; после его merge пользователем продолжается полная интеграционная T18. Run record находится в `admin-queue-simplification/EVIDENCE.md` и `RESUME.md`.
 
 ## 7. Контракты и обязательные проверки
 
@@ -594,7 +783,7 @@ OpenAPI required/nullable/enums/typed owner. Anonymous QR disclosure сохра�
 | Defaults/snapshots | Same instance/no restart; concurrent command coherence; old/future snapshot |
 | Time | Four [start,end) boundaries/manual/no scheduler/timezone/future dates |
 | Quota/identity | PG race/replay/rollback/status-delete/clone-transfer/partial/inactive recreate/typed IDs |
-| Profiles | Disabled/parent off-on/manual/dangling-conflict-standalone/used tags-order-address |
+| Profiles | Disabled/parent off-on/manual/dangling-conflict-standalone/used tags-order-address; T11.1 method/reason/handler proof и structured 409 UI |
 | Publish | Hidden constructors/publish-reactivate/mixed overview/token-address/same-direction doctors |
 | Cabinets | Filter-history/stale409/audit rollback/resource/called block |
 | Routing/CSV | Four URLs/catalog/query/history/rows-retry-round-trip-hidden import |
@@ -620,18 +809,19 @@ Old counter/version-blind writers рядом с v1 запрещены. Versions 
 
 Актуальный docs/runbooks/STAGING_VALIDATION.md целиком, включая prerequisites/check0 и дополнительные обязательные пункты. Минимальные десять checks отдельными строками с SHA/env/result/evidence:
 
-| № | Check | Доказательство этого плана сейчас |
+| № | Check | Последнее целевое evidence / оставшийся deploy gate |
 |---|---|---|
-| 1 | Sentry frontend/backend delivery | NOT_RUN |
-| 2 | DR backup restore | NOT_RUN |
-| 3 | AI kill-switch →503 | NOT_RUN |
-| 4 | AI requires_doctor_confirmation | NOT_RUN |
-| 5 | arq enqueue/process | NOT_RUN |
-| 6 | Telegram delivery если используется | NOT_RUN; applicability установить |
-| 7 | PII code/logs/Sentry | NOT_RUN |
-| 8 | Local pre-commit hooks | Historical PR results есть; deploy contour NOT_RUN |
-| 9 | Backend unit | T05 applicable CI PASS c04f4102; focused merged-tree tests 24 PASS на fd53206f; deploy staging NOT_RUN |
-| 10 | Frontend build/unit | T04 applicable CI PASS b59fff8a; T05 frontend jobs SKIPPED; deploy staging NOT_RUN |
+| 0 | Doctor linkage prerequisite | Synthetic PASS на `4218b256` (повтор ранее на `aee51e3d`); final deploy commit NOT_RUN |
+| 1 | Sentry frontend/backend delivery | NOT_RUN: нужен безопасный hosted staging target/DSN |
+| 2 | DR backup restore | Synthetic backup/restore PASS на `4218b256`, disposable DB удалена; final deploy commit NOT_RUN |
+| 3 | AI kill-switch →503 | Последний retry PASS на `4218b256`; прежний seed/API mismatch не воспроизвёлся, root cause не объявлен исправленным; final deploy commit NOT_RUN |
+| 4 | AI requires_doctor_confirmation | NOT_RUN: безопасный external-provider контур не подготовлен |
+| 5 | arq enqueue/process | Synthetic PASS на `4218b256`, dedicated Redis DB 15; final deploy commit NOT_RUN |
+| 6 | Telegram delivery если используется | NOT_RUN; dedicated synthetic bot/applicability требуют решения |
+| 7 | PII code/logs/Sentry | PARTIAL: code/CI evidence есть; live telemetry NOT_RUN |
+| 8 | Local pre-commit hooks | Исторические normal-hook PASS; в deploy contour NOT_RUN |
+| 9 | Backend unit / targeted PG | Focused PG 10/10 на записанном T11 tree; hosted Backend PASS на `3e287ca8`; полный deploy staging gate NOT_RUN |
+| 10 | Frontend build/unit/browser | Focused browser 22/22 на `aee51e3d`; hosted build/unit PASS на `3e287ca8`; provenance PASS на `35717fa`; final deploy gate и три legacy specs NOT_RUN |
 
 CI/build checklist не заменяют. Не заявлять «система проверена/работает/deployment complete» без required PASS. Docs update не выполняет runtime checks.
 
@@ -652,4 +842,4 @@ Read diagnostic conflict не означает auto production repair. Gate/PG p
 
 T00–T18/подэтапы подтверждённо MERGED; все admissions единая v1 policy; legacy truthful; ambiguities shown/blocked; context survives navigation; UI facts/scope; history/ownership/numbers/queue_time/QR preserved; required evidence для deploy commit.
 
-План/журналы остаются постоянной памятью после завершения. Следующий агент начинает с [RESUME.md](admin-queue-simplification/RESUME.md), сверяет фактическое состояние и готовит безопасный срез T06. T00–T05 не повторять; deferral не переносить в DB gate или будущие PR.
+План/журналы остаются постоянной памятью. Следующий агент начинает с [RESUME.md](admin-queue-simplification/RESUME.md), exact-recall task ID и сверки actual HEAD/diff/PR. Текущая точка — финальный evidence-only checkpoint и CI для Ready PR #3763: parent repair, обновлённые зависимости и повторный TOTP-вход подтверждены. Полный T18 и pre-deploy checklist не завершены; их неполные результаты не закрывать этим узким прогоном. Не начинать следующий PR до закрытия текущего цикла, не переносить deferral между PR и не подменять им pre-deploy gate.

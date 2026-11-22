@@ -4,7 +4,7 @@
 
 ## Rules
 
-- Always select and explicitly use the relevant AI Factory skill set before implementing a plan, and keep the active plan visible until all planned steps are completed or blocked.
+- Use matching skills when they help the authorized task, prefer canonical project skills under `.agents/skills`, and keep substantive progress recoverable without turning skill selection or plan recording into an approval step.
 - When an OpenHands-style workflow or compatible agent environment is available, keep implementation progress, completed steps, blockers, and next actions recorded in a resume-friendly format instead of relying on memory.
 - For auth or smoke work, resolve working credentials from the live database or live auth response first; do not guess usernames from docs, stale artifacts, or profile token files.
 - Never surface raw browser network failures like `Failed to fetch` to users when a clear, localized recovery message can be shown instead.
@@ -16,3 +16,5 @@
 - Do not import runtime UI from `frontend/src/components/emr`; use `EMRContainerV2` and the v2 section primitives under `frontend/src/components/emr-v2/sections` instead. The legacy `SingleSheetEMR` and old EMR folder are retired.
 - When sweeping React `prop-types`, treat runtime helpers and shared UI outside `emr-v2` as part of the same pass; do not leave obvious prop validation gaps behind when a file is already being touched.
 - Shared singletons and providers must import `frontend/src/api/client.js` statically rather than through dynamic `import()` to avoid Vite chunking warnings and keep the API client singleton stable.
+- Reuse the user's accepted decisions and permissions; resolve routine reversible implementation choices autonomously and ask only for consequential missing decisions or explicit approval requirements under `AGENTS.md`.
+- Continue authorized isolated work from fresh `origin/main` when production-main synchronization or deployment is blocked; preserve foreign files and retain all mandatory gates, hooks and production guards.

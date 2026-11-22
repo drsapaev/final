@@ -27,7 +27,9 @@ def test_legacy_ai_image_upload_rejects_oversized_payload_before_provider_call(
 
     with pytest.raises(HTTPException) as exc_info:
         import asyncio
-        asyncio.get_event_loop().run_until_complete(ai._read_ai_upload_bounded(upload))
+
+        with asyncio.Runner(loop_factory=asyncio.new_event_loop) as runner:
+            runner.run(ai._read_ai_upload_bounded(upload))
 
     assert exc_info.value.status_code == 413
 

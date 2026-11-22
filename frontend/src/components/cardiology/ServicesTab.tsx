@@ -6,6 +6,10 @@ import React from 'react';
  * Renders the "Услуги" (services) tab content — a read-only catalog of
  * cardiology services via DoctorServiceSelector.
  *
+ * CARDSVC-FE-002 (audit 3886): the tab is explicitly read-only — no
+ * selection owner and no price editing — so the selector must render a
+ * non-interactive catalog instead of pseudo-selectable cards.
+ *
  * All state stays in the parent. This is a presentational wrapper.
  */
 
@@ -20,6 +24,7 @@ export function ServicesTab(): React.JSX.Element | null {
         specialty="cardiology"
         selectedServices={[]}
         canEditPrices={false}
+        readOnly
       />
     </div>
   );

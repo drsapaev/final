@@ -108,10 +108,22 @@ export function BloodTestsTab({
 }: BloodTestsTabProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   // Helper: compute average of a field across all blood tests
+  // CARDIO-FE-003 (audit 3886 round 20): `Number(value)` coerces null,
+  // '' and whitespace to 0, so an optional MISSING lab measurement used to
+  // drag the reported average down as if the lab had measured zero. Only
+  // explicitly present, finite numeric values participate in the mean;
+  // a genuine measured numeric 0 stays eligible.
   const avg = (key: string) => {
     const nums = bloodTests
-      .map((bt) => Number((bt as Record<string, unknown>)[key]))
-      .filter((v) => !Number.isNaN(v));
+      .map((bt) => (bt as Record<string, unknown>)[key])
+      .filter((raw): raw is number | string => {
+        if (raw === null || raw === undefined) return false;
+        if (typeof raw === 'number') return Number.isFinite(raw);
+        const trimmed = String(raw).trim();
+        if (trimmed === '') return false;
+        return Number.isFinite(Number(trimmed));
+      })
+      .map((raw) => (typeof raw === 'number' ? raw : Number(String(raw).trim())));
     if (nums.length === 0) return '—';
     const sum = nums.reduce((a, b) => a + b, 0);
     return Math.round((sum / nums.length) * 10) / 10;

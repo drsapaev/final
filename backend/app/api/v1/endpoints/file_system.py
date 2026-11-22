@@ -245,9 +245,10 @@ async def upload_file(
             if not patient:
                 raise HTTPException(status_code=404, detail=t("patient.not_found"))
             if current_user.role in ("Doctor", "cardio", "derma", "dentist"):
-                from app.models.clinic import Doctor
-                from app.models.visit import Visit
-
+                # Doctor/Visit are module-level imports; the historical local
+                # re-imports shadowed them for the rest of the function and
+                # made later references raise UnboundLocalError on paths that
+                # skip this block (patient_id=None).
                 doctor = (
                     db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
                 )
@@ -263,6 +264,38 @@ async def upload_file(
                         raise HTTPException(
                             status_code=403, detail="Нет доступа к данному пациенту"
                         )
+
+        # DERMAFILE-BE-001 (audit #3892, group 13): a doctor-scoped role must
+        # own the submitted visit itself, not merely hold *any* visit for the
+        # same patient. Without this guard a generic Doctor could attach a
+        # file to another doctor's visit of the same patient, and with
+        # ``patient_id`` omitted (which skips the block above entirely) to
+        # any visit at all. Dermatologist uploads are already validated by
+        # the stricter ``_dermatology_visit_is_owned`` predicate above;
+        # ``patient:write`` holders (Admin, Registrar) keep the existing
+        # trusted-attachment policy.
+        if (
+            visit_id is not None
+            and not _is_dermatology_user(current_user)
+            and not staff_authorization_service.has_permission(
+                current_user, "patient:write"
+            )
+        ):
+            owned_visit = (
+                db.query(Visit.id)
+                .join(Doctor, Doctor.id == Visit.doctor_id)
+                .filter(
+                    Visit.id == visit_id,
+                    Doctor.user_id == current_user.id,
+                    Doctor.active.is_(True),
+                )
+                .first()
+            )
+            if owned_visit is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Visit not found or access denied",
+                )
 
         # Создаем данные для загрузки
         file_data = FileUploadRequest(

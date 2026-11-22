@@ -135,6 +135,13 @@ export default function LabReportHistoryPanel({
           filteredItems.map((item, index) => {
             const severity = historySeverityState(item);
             const patientLabel = item.patient_snapshot?.full_name || `${t('queue.history_patient_number')} #${item.patient_id}`;
+            // LABH-FE-001 (audit 3886 round 10): the active-report highlight
+            // compares IDs through a stable string normalization so a numeric
+            // activeInstanceId highlights a string-typed history row (and vice
+            // versa); null/undefined means no selection.
+            const isActiveItem =
+              activeInstanceId != null &&
+              String(activeInstanceId) === String(item.id);
             return (
               <button
                 key={item.id}
@@ -144,10 +151,11 @@ export default function LabReportHistoryPanel({
                 // L-L-5 fix: ArrowUp/Down/Home/End для навигации между карточками.
                 onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(e, index)}
                 aria-label={`${t('queue.history_report_number')} ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status ?? '')}`}
+                aria-current={isActiveItem ? 'true' : undefined}
                 style={{
                   border: '1px solid var(--mac-border)',
                   borderRadius: '14px',
-                  background: activeInstanceId === item.id
+                  background: isActiveItem
                     ? 'color-mix(in oklab, var(--mac-accent) 10%, var(--mac-bg-primary))'
                     : 'var(--mac-bg-primary)',
                   padding: '12px 14px',

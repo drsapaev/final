@@ -109,11 +109,17 @@
 .cashier-check-icon { color: var(--mac-success); margin-right: 8px; }
 
 /* ─── Pagination (batch 2) ─── */
+/* CSH-FE-048 (follow-up audit 2026-11-02): перенос строк. Прежде это был
+   неразрывный flex-ряд из 2 кнопок и длинной localized-строки
+   pagination_info — на узких экранах/длинных переводах (RU/UZ) элементы
+   уходили за край без возможности переноса. */
 .cashier-pagination {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 12px;
+  row-gap: 8px;
   margin-top: 16px;
   padding: 12px;
 }
@@ -189,10 +195,12 @@
   color: var(--mac-text-primary, #1a1d29);
 }
 
+/* CSH-FE-046 (follow-up audit 2026-11-02): поповер меню строки рендерится
+   ПОРТАЛОМ в document.body (position:fixed задается инлайном из
+   OverflowMenuPortal с коллизией по вьюпорту). Прежний absolute внутри
+   .cashier-table-scroll (overflow-x:auto ⇒ overflow-y вычисляется в auto)
+   обрезал меню нижних строк скролл-предком. Здесь — только визуальные стили. */
 .cashier-overflow-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
   min-width: 200px;
   background: var(--mac-bg-primary, white);
   border: 1px solid var(--mac-border, #d8dde8);

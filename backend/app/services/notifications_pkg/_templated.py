@@ -13,11 +13,12 @@ from app.services.notifications_pkg._base import (
     User,
     crud_notification_history,
     crud_notification_template,
-    crud_user_notification_settings,
     datetime,
+    escape,
     logger,
 )
 from app.services.notifications_pkg._helpers import (
+    _is_private_telegram_chat_id,
     _normalize_notification_event_type,  # noqa: F401
 )
 
@@ -36,7 +37,8 @@ class TemplatedMixin(NotificationSenderMixinBase):
         recipient_id: int | None = None,
         related_entity_type: str | None = None,
         related_entity_id: int | None = None,
-    ) -> NotificationHistory:
+        priority: str = "normal",
+    ) -> NotificationHistory | None:
         """Отправка уведомления с использованием шаблона"""
 
         raw_notification_type = str(notification_type or "").strip().lower()
@@ -44,6 +46,58 @@ class TemplatedMixin(NotificationSenderMixinBase):
             raw_notification_type,
             fallback="notification",
         )
+
+        if channel == "telegram" and (recipient_id is None or recipient_type != "patient"):
+            return None
+
+        recipient_user = None
+        if recipient_id is not None:
+            from app.models.patient import Patient
+            from app.models.telegram_config import TelegramUser
+
+            if recipient_type == "patient":
+                patient = db.query(Patient).filter(Patient.id == recipient_id).first()
+                if patient is None:
+                    return None
+                if patient.user_id:
+                    recipient_user = db.query(User).filter(User.id == patient.user_id).first()
+            else:
+                recipient_user = db.query(User).filter(User.id == recipient_id).first()
+
+            if channel in {"email", "sms", "telegram"} and not self._channel_opted_in(
+                db=db,
+                user_id=recipient_user.id if recipient_user is not None else None,
+                channel=channel,
+                event_type=canonical_notification_type,
+            ):
+                logger.info(
+                    "Templated notification skipped by recipient preference"
+                )
+                return None
+
+            if channel == "telegram":
+                telegram_user = (
+                    db.query(TelegramUser)
+                    .filter(
+                        TelegramUser.patient_id == recipient_id,
+                        TelegramUser.active.is_(True),
+                        TelegramUser.blocked.is_(False),
+                        TelegramUser.notifications_enabled.is_(True),
+                    )
+                    .order_by(TelegramUser.id.desc())
+                    .first()
+                )
+                if telegram_user is None or not _is_private_telegram_chat_id(telegram_user.chat_id):
+                    return None
+                from app.services.notifications_pkg._helpers import (
+                    _patient_telegram_preferences_enabled,
+                )
+
+                if not _patient_telegram_preferences_enabled(
+                    telegram_user, canonical_notification_type
+                ):
+                    return None
+                recipient_contact = str(telegram_user.chat_id)
         template_lookup_types = [canonical_notification_type]
         if raw_notification_type and raw_notification_type != canonical_notification_type:
             template_lookup_types.append(raw_notification_type)
@@ -58,19 +112,38 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 break
 
         if not template:
-            logger.warning(
-                f"Шаблон не найден: {canonical_notification_type}/{channel}"
-            )
+            logger.warning("Notification template not found")
             # Используем базовый шаблон
             subject = template_data.get("subject", "Уведомление")
             content = template_data.get("message", "Сообщение")
+            if channel == "telegram":
+                content = escape(str(content))
         else:
             subject = (
-                self.render_template(template.subject or "", template_data)
+                self.render_template(template.subject, template_data, html=False)
                 if template.subject
                 else None
             )
-            content = self.render_template(template.template, template_data)
+            content = self.render_template(
+                template.template, template_data, html=channel not in {"email", "sms"}
+            )
+            if content is None or (template.subject and subject is None):
+                # No source, recipient contact, template data or exception details
+                # are persisted when rendering fails.
+                failure = NotificationHistoryCreate(
+                    recipient_type=recipient_type,
+                    recipient_id=None,
+                    recipient_contact="",
+                    notification_type=canonical_notification_type,
+                    channel=channel,
+                    template_id=template.id,
+                    subject=None,
+                    content="",
+                    status="failed",
+                    error_message="Notification template rendering failed",
+                    notification_metadata={},
+                )
+                return crud_notification_history.create(db, obj_in=failure)
 
         # Создаем запись в истории
         history_data = NotificationHistoryCreate(
@@ -91,17 +164,16 @@ class TemplatedMixin(NotificationSenderMixinBase):
 
         if db and recipient_id is not None:
             platform_service = self._platform_service(db)
-            recipient_user = None
-            if recipient_type == "patient":
-                from app.models.patient import Patient
-
-                patient = db.query(Patient).filter(Patient.id == recipient_id).first()
-                if patient and patient.user_id:
-                    recipient_user = db.query(User).filter(User.id == patient.user_id).first()
-            else:
-                recipient_user = db.query(User).filter(User.id == recipient_id).first()
-
             if recipient_user:
+                normalized_priority = str(priority or "normal").strip().lower()
+                if normalized_priority not in {"low", "normal", "high", "urgent"}:
+                    normalized_priority = "normal"
+                severity = {
+                    "urgent": "critical",
+                    "high": "warning",
+                    "normal": "info",
+                    "low": "info",
+                }[normalized_priority]
                 await platform_service.record_delivery_for_user(
                     user=recipient_user,
                     event_type=canonical_notification_type,
@@ -109,8 +181,8 @@ class TemplatedMixin(NotificationSenderMixinBase):
                     message=content,
                     source_module="notifications",
                     recipient_type=recipient_type,
-                    severity="info",
-                    priority="normal",
+                    severity=severity,
+                    priority=normalized_priority,
                     entity_type=related_entity_type,
                     entity_id=related_entity_id,
                     payload_snapshot={
@@ -133,11 +205,11 @@ class TemplatedMixin(NotificationSenderMixinBase):
             elif channel == "telegram":
                 success = await self.send_telegram(content, recipient_contact)
             else:
-                error_message = f"Неподдерживаемый канал: {channel}"
+                error_message = "Unsupported notification channel"
 
-        except Exception as e:
-            error_message = str(e)
-            logger.error(f"Ошибка отправки уведомления: {e}")
+        except Exception:
+            error_message = "Notification delivery failed"
+            logger.error("Notification delivery failed")
 
         # Обновляем статус в истории
         status = "sent" if success else "failed"
@@ -155,29 +227,22 @@ class TemplatedMixin(NotificationSenderMixinBase):
         channels: list[str],
         recipients: list[dict[str, Any]],
         template_data: dict[str, Any],
+        priority: str = "normal",
     ) -> list[NotificationHistory]:
         """Массовая отправка уведомлений с проверкой настроек пользователей"""
         results = []
-
+        unique_channels = list(dict.fromkeys(channels))
+        unique_recipients = []
+        seen_recipients: set[tuple[str, Any]] = set()
         for recipient in recipients:
-            for channel in channels:
-                # Проверяем настройки пользователя
-                settings = crud_user_notification_settings.get_by_user_id(
-                    db, user_id=recipient["id"]
-                )
+            key = (str(recipient.get("type") or ""), recipient.get("id"))
+            if key in seen_recipients:
+                continue
+            seen_recipients.add(key)
+            unique_recipients.append(recipient)
 
-                if settings:
-                    # Проверяем конкретную настройку для этого типа уведомления и канала
-                    # формат: email_appointment_reminder
-                    # Если тип уведомления "appointment_reminder", то ищем "email_appointment_reminder"
-
-                    setting_key = f"{channel}_{notification_type}"
-
-                    # Проверяем наличие атрибута, если нет - считаем включенным по умолчанию (или глобальным)
-                    if hasattr(settings, setting_key):
-                        if not getattr(settings, setting_key):
-                            continue # Выключено пользователем
-
+        for recipient in unique_recipients:
+            for channel in unique_channels:
                 # Получаем контакт для канала
                 contact = None
                 if channel == "email":
@@ -202,9 +267,11 @@ class TemplatedMixin(NotificationSenderMixinBase):
                     template_data=merged_data,
                     recipient_type=recipient["type"],
                     recipient_id=recipient["id"],
+                    priority=priority,
                 )
 
-                results.append(history)
+                if history is not None:
+                    results.append(history)
 
         return results
 
@@ -272,6 +339,21 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 contact = patient.email
             elif channel == "sms":
                 contact = patient.phone
+            elif channel == "telegram":
+                from app.models.telegram_config import TelegramUser
+
+                telegram_user = (
+                    db.query(TelegramUser)
+                    .filter(
+                        TelegramUser.patient_id == patient.id,
+                        TelegramUser.active.is_(True),
+                        TelegramUser.blocked.is_(False),
+                        TelegramUser.notifications_enabled.is_(True),
+                    )
+                    .order_by(TelegramUser.id.desc())
+                    .first()
+                )
+                contact = str(telegram_user.chat_id) if telegram_user else None
 
             if contact:
                 history = await self.send_templated_notification(
@@ -285,7 +367,8 @@ class TemplatedMixin(NotificationSenderMixinBase):
                     related_entity_type="appointment",
                     related_entity_id=appointment_id,
                 )
-                results.append(history)
+                if history is not None:
+                    results.append(history)
 
         return results
 
@@ -351,13 +434,36 @@ class TemplatedMixin(NotificationSenderMixinBase):
                     db=db,
                 )
 
-        if patient_email:
+        if patient_email and self._patient_channel_opted_in(
+            db=db,
+            patient_id=patient_id,
+            channel="email",
+            event_type="payment_notification",
+        ):
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
-        if patient_phone:
+        if patient_phone and self._patient_channel_opted_in(
+            db=db,
+            patient_id=patient_id,
+            channel="sms",
+            event_type="payment_notification",
+        ):
             results["sms"] = await self.send_sms(patient_phone, sms_message)
 
-        results["telegram"] = await self.send_telegram(telegram_message)
+        if db and patient_id:
+            results["telegram"] = await self.send_patient_telegram_event_notification(
+                db=db,
+                patient_id=patient_id,
+                event_type="payment_notification",
+                metadata={
+                    "amount": amount,
+                    "currency": currency,
+                    "visit_date": visit_date.strftime("%d.%m.%Y %H:%M"),
+                    "doctor_name": doctor_name,
+                },
+            )
+        else:
+            results["telegram"] = False
 
         return results
 
@@ -415,6 +521,21 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 contact = patient.email
             elif channel == "sms":
                 contact = patient.phone
+            elif channel == "telegram":
+                from app.models.telegram_config import TelegramUser
+
+                telegram_user = (
+                    db.query(TelegramUser)
+                    .filter(
+                        TelegramUser.patient_id == patient.id,
+                        TelegramUser.active.is_(True),
+                        TelegramUser.blocked.is_(False),
+                        TelegramUser.notifications_enabled.is_(True),
+                    )
+                    .order_by(TelegramUser.id.desc())
+                    .first()
+                )
+                contact = str(telegram_user.chat_id) if telegram_user else None
 
             if contact:
                 history = await self.send_templated_notification(
@@ -428,7 +549,8 @@ class TemplatedMixin(NotificationSenderMixinBase):
                     related_entity_type="payment",
                     related_entity_id=payment_id,
                 )
-                results.append(history)
+                if history is not None:
+                    results.append(history)
 
         return results
 

@@ -235,3 +235,18 @@
     padding: 16px;
   }
 }
+
+/* CSH-FE-045 (follow-up audit 2026-11-02): честное сообщение о
+   блокировке/провале пакетной печати. */
+.batch-print-error {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-tertiary);
+  color: var(--mac-text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}

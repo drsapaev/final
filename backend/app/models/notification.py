@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -146,6 +147,14 @@ class NotificationTemplate(Base):
     """Шаблоны уведомлений"""
 
     __tablename__ = "notification_templates"
+    __table_args__ = (
+        Index(
+            "uq_notification_templates_active_type_channel",
+            "type", "channel", unique=True,
+            postgresql_where=text("is_active IS TRUE"),
+            sqlite_where=text("is_active IS TRUE"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 

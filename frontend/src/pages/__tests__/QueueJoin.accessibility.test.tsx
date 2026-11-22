@@ -125,7 +125,13 @@ describe('QueueJoin Accessibility & UX', () => {
     expect(screen.getByLabelText(/номер телефона/i)).toHaveAttribute('aria-required', 'true');
   });
 
-  it('persists in-progress form state for the same QR token', async () => {
+  it('does NOT persist or restore patient PHI for the same QR token (QR-FE-001)', async () => {
+    // QR-FE-001 (follow-up audit 2026-11-02): legacy QR-токен общий для
+    // всех пациентов врача/дня/клиники — PHI-черновик в localStorage
+    // восстанавливал имя/телефон ПРЕДЫДУЩЕГО пациента для следующего
+    // посетителя того же URL. Теперь: никакой персистенции PHI, форма
+    // после перемонтирования ПУСТА, возможный stale-черновик старой
+    // сборки вычищается.
     const view = renderQueueJoin('persist-token');
 
     fireEvent.click(await screen.findByRole('button', { name: /продолжить/i }));
@@ -141,8 +147,16 @@ describe('QueueJoin Accessibility & UX', () => {
     renderQueueJoin('persist-token');
     fireEvent.click(await screen.findByRole('button', { name: /продолжить/i }));
 
-    expect(await screen.findByLabelText(/фио/i)).toHaveValue('Тест Пациент');
-    expect(screen.getByLabelText(/номер телефона/i)).toHaveValue('+998 (90) 123-45-67');
+    // Следующий посетитель того же токена видит ПУСТУЮ форму —
+    // никакого доступа к личным данным предыдущего.
+    const remountedName = await screen.findByLabelText(/фио/i);
+    expect(remountedName).toHaveValue('');
+    expect(screen.getByLabelText(/номер телефона/i)).toHaveValue('');
+
+    // И под ключ черновика ничего не остаётся (stale-вычистка).
+    // Тестовый localStorage-мок — Map-хранилище; проверяем отсутствие записи.
+    const storageKey = 'queue_join_form_persist-token';
+    expect(window.localStorage.getItem(storageKey)).toBeNull();
   });
 
   it('shows meaningful empty state when no specialists are available for clinic-wide QR', async () => {

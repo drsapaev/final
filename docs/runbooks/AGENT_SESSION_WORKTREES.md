@@ -11,7 +11,8 @@ deploy surface, not a workspace.
    clean and synced with `origin/main`.
 2. Sessions work in their own worktree; never switch branches in the
    main tree.
-3. The main tree returns to `main` only after your own PR is merged.
+3. A session never needs to switch the main tree. Production-main synchronization
+   may remain pending while independent isolated work continues.
 
 ## Isolated Linux staging on this host
 
@@ -51,12 +52,26 @@ the next validation session. The contract:
 
 1. **Create** with a unique `COMPOSE_PROJECT_NAME` and the lifecycle
    labels (`CLINIC_OWNER`, `CLINIC_EXPIRES_AT`) from the compose file.
-   `CLINIC_EXPIRES_AT` is an ISO timestamp (e.g. now + 2 days) used by GC.
+   The canonical launcher requires a specific owner and a timezone-aware ISO
+   expiry (e.g. now + 4 hours, at most 7 days). Keep the same owner/expiry
+   until teardown; matching resource labels are checked before deletion.
 2. **Validate.** If a failure needs the live stack preserved, set
    `KEEP_STAGING=1` and record it in the task checkpoint; this is the
    ONLY accepted reason to leave a stack running.
-3. **Teardown is mandatory** at the end of every run — a normal
-   successful validation always ends with:
+3. **Teardown is mandatory.** The canonical `Session` now removes its verified
+   project's containers, networks, volumes and local images automatically
+   after successful validation, and verifies that no project-labeled
+   containers, volumes or networks remain. Failed `Start`/`Session` attempts
+   also clean up once the exact project and its owner/expiry labels are
+   verified, unless `KEEP_STAGING=1` was explicitly requested for failure
+   diagnosis. Thus later public-origin or Linux-storage validation failures
+   do not leave verified resources behind. A successful run is removed even
+   if that variable was inherited. Ownership conflicts or WSL session loss
+   stop cleanup and must be reported as teardown `NOT_RUN`.
+   A successful `Start` alone leaves teardown pending; continue with `Session`.
+
+   For preserved failures or older launchers, confirm the exact project and
+   ownership before explicitly running:
 
    ```powershell
    powershell -File scripts/staging_down.ps1 -ProjectName <name> [-EnvFile ops/staging.env]
@@ -65,6 +80,9 @@ the next validation session. The contract:
    This runs `docker compose down -v --remove-orphans --rmi local`
    (containers, networks, named volumes, locally built images) and refuses
    to run while `KEEP_STAGING=1` is set unless `-Force` is passed.
+   `Stop` is only a temporary stop and retains data/images. Shared BuildKit
+   cache is outside project teardown; inspect and review its retention
+   separately. Linux deletion and Windows VHDX compaction are separate steps.
 4. **Disposable test containers** (scratch PostgreSQL for PG-backed tests)
    always run with `--rm`, or are removed in the test's own teardown.
 5. **Session-start/end GC** sweeps forgotten leftovers — it removes ONLY
@@ -111,9 +129,14 @@ git worktree add C:\final\_wt_<topic> -b <branch> origin/main
 cd C:\final\_wt_<topic>
 ```
 
-- Branch name follows the PR convention (`fix/...`, `perf/...`, `docs/...`).
+- In Codex, default branch names use `codex/<topic>`; honor an explicit user branch choice.
 - `_wt*/` is gitignored; scratch files (profiles, dumps, PR bodies) stay
   inside your worktree.
+- `/.scratch/` and `/.gate_artifacts/` are generated-only roots ignored in each
+  checkout. Preserve foreign artifacts already present; never put tracked code
+  or required durable evidence there. Other untracked paths still block deploy.
+- Fetch `origin` before selecting the base. A dirty or stale production tree is
+  not a prerequisite failure for creating or using a clean session worktree.
 
 ## Running backend tests from a worktree
 
@@ -150,20 +173,53 @@ Standard cyclic workflow (`AGENT_CYCLIC_WORKFLOW.md`): branch from fresh
 `origin/main`, small scope, evidence in the PR body, green CI, merge.
 Squash-merge is the repo default.
 
-## Returning the main tree to main (after your merge)
+## Synchronizing production main after your merge
 
-Only when no other session is mid-operation (ask / check for open
-editors and running processes):
+Inspect the checkout's branch, tracked/untracked status and evidence of another
+session's operation before synchronization. Do not ask for another confirmation
+when existing authorization and a clean, idle checkout already permit the
+action. Do not switch branches, stash, move or delete another session's work.
+If synchronization is unsafe, record it as pending and continue authorized
+implementation and validation in a fresh isolated worktree.
+
+Read-only inspection:
 
 ```powershell
 cd C:\final
-git status --porcelain          # must be empty for tracked files
-git switch main
-git pull --ff-only origin main
+git branch --show-current      # must already be main for production operations
+git status --porcelain         # must be empty, including ordinary untracked files
+git rev-list --left-right --count HEAD...origin/main
 ```
 
-If the tree is dirty with another session's work — stop; that session
-owns the tree until it finishes.
+For an authorized production update, use `scripts/deploy_restart.ps1 -Deploy`:
+it holds the production mutex, checks the tree, fetches and fast-forwards before
+the guarded migration/restart sequence. The operator must observe the deployment
+window below; the script does not enforce it. A clean git status alone does not grant deployment authorization or prove
+that no other operation is active. For synchronization without deployment, use
+`git pull --ff-only origin main` only when the clean main checkout is known idle
+and the action is authorized. Never use `git switch main` as a recovery shortcut.
+
+When adopting a reviewed ignore-rule change for the first time, the old
+checkout may still report only `?? .scratch/` and `?? .gate_artifacts/`.
+Do not wait indefinitely for those generated files to disappear. An already
+authorized sync of an idle `main` may proceed with `git merge --ff-only origin/main`
+after fetching and confirming all of the following: there are no tracked
+changes, every untracked path is under those exact reserved roots, the fetched
+ignore rules reserve both roots, neither the current index nor the incoming
+diff tracks any path inside them, and `HEAD` is an ancestor of `origin/main`.
+Inspect actual untracked paths with `git ls-files --others --exclude-standard`,
+the index with `git ls-files -- .scratch .gate_artifacts`, and incoming paths
+with `git diff --name-only HEAD..origin/main -- .scratch .gate_artifacts`.
+Preserve the files and let Git refuse any collision. Any other dirt, divergence
+or uncertain operation ownership stops this sync. Then rerun normal cleanliness
+checks; this exception permits only that initial fast-forward, never a deploy
+with a dirty tree. Do not use force, autostash, deletion or local blanket
+excludes to bypass the production guard.
+
+If another task owns tracked changes or ordinary untracked files, or the
+checkout is not on `main`, stop only that production-checkout operation. Record its exact prerequisite and resume
+independent work from current `origin/main`; do not wait for another chat to
+finish when a safe isolated path exists.
 
 ## Production deploy / restart
 
@@ -172,14 +228,17 @@ Always through the guard script (refuses to deploy anything but merged
 
 ```powershell
 C:\final\scripts\deploy_restart.ps1 -CheckOnly   # guards only, no restart
-C:\final\scripts\deploy_restart.ps1              # guarded restart + health poll
+C:\final\scripts\deploy_restart.ps1 -Deploy      # authorized sync, migrations, restart
 ```
 
-The script: verifies branch == `main`, clean tracked tree, HEAD ==
-`origin/main` (fast-forwards when behind), stops the uvicorn process
-tree on :18000, starts a detached uvicorn from `backend\.venv`
-(`Start-Process`, minimized — survives the launching session), then
-polls `/api/v1/health` until OK (90s budget).
+The script verifies branch == `main` and a clean tracked/untracked tree.
+`-Deploy` fetches and fast-forwards `main` when behind, then applies pending
+migrations before starting the runtime. No arguments also selects `-Deploy`;
+it is not a restart-only invocation. `-CheckOnly` fetches remote refs and checks
+the branch, cleanliness and synchronization without updating checkout files or
+restarting. The production mutex covers the sequence. It stops the uvicorn process tree
+on :18000, starts a detached uvicorn from `backend\.venv` with a hidden window,
+then polls `/api/v1/health` until OK (90s budget).
 
 Deploy window: after clinic hours (~18:00+) unless the operator says
 otherwise. A restart drops active sessions — doctors/cashiers get kicked

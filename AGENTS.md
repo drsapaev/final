@@ -6,6 +6,8 @@ Primary operational rules for repo-aware agents. ZCode reads this root file dire
 
 - Clinic EMR and operations platform. Backend: Python 3.11, FastAPI, SQLAlchemy, Pydantic v2, PostgreSQL/Alembic, Redis/WebSocket. Frontend: React 19, Vite, React Router, strict TypeScript. Queue/specialty ownership: [ADR-001](docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md).
 - Local backend/frontend defaults are `18000`/`5173`. This Windows host also has separate WSL staging; staging may be stopped and uses synthetic data only. Treat each Compose run as ephemeral and tear it down after validation; preserve a failing stack only with `KEEP_STAGING=1` recorded in the task checkpoint. Production is served from the main tree. Follow [session worktrees and deploy](docs/runbooks/AGENT_SESSION_WORKTREES.md).
+- Run full pre-release staging on the exact release SHA in a fresh task in the published Codex Cloud `final` environment. Use WSL on the clinic computer for a full run only with explicit operator approval. Follow the [staging validation runbook](docs/runbooks/STAGING_VALIDATION.md).
+- Before asking for the staging bot, token, Sentry DSNs or chat, check [Cloud staging integrations](docs/runbooks/STAGING_VALIDATION.md#cloud-staging-integrations). Reuse the published Codex Cloud `final` settings; do not request raw credentials, infer recipient authorization, or repeat a live send just to verify receipt.
 - Repo context: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and task-specific canonical source/tests. DevBrain operations are outside runtime in `ai/langgraph`. Verify legacy directories and artifacts before use.
 - For Doktor KosMed public-site work, read the [current handoff](docs/plans/2026-10-06-kosmed-public-site-handoff.md), [detailed publication and stage 2a–4 requirements](docs/plans/2026-09-28-kosmed-public-site-plan.md#11-подробные-требования-к-публикации-адресам-и-этапам-2a4), and [data audit](docs/plans/2026-09-28-kosmed-site-data-audit.md) before each implementation slice or PR. Recheck dated findings and PR status against current source; unresolved decisions are not implementation approval.
 
@@ -18,10 +20,20 @@ Before execution, choose exactly one mode: `direct_execute`, `advisory_gate`, `g
 - Use mandatory `gate` for DB/Alembic, auth/RBAC/security, production/deploy configuration, queue ownership/fairness, clinical lifecycle/signatures, and other risky, broad, unclear, mixed-owner, canonical/legacy, or handoff work. Strict triggers also include route canonicalization, frontend/backend contract work, Telegram, EMR/lab/rollout/evidence/go-no-go, and production-sensitive behavior. Use `gate_known_root_cause` only when the root-cause file is confirmed.
 - Run `ai/langgraph/scripts/run_agent_gate.ps1` from `ai/langgraph`; do not invoke `agent_gate.py` with bare Python. If a mandatory gate fails, stop. For a misroute, retry once with `--known-root-cause`; use `narrow_override` only after that retry and with explicit human or repo-approved basis. Report the misroute and override. Never change the router merely to pass a task.
 - When the mandatory gate requires handoff, read its generated execution prompt before editing and honor its first-touch and stop conditions unless an approved narrow override applies.
+- When a gate is required or selected and the owner is confirmed, use the launcher's `--known-root-cause <path>` and repeated `--scope <path>` arguments to include the complete reviewed source scope before editing; inspect the returned execution prompt. Source first-touch paths limit source edits, not require them: for an operational task, record the authorized host/configuration actions, runbook, validation and rollback separately, and keep unchanged source anchors reference-only. A gate result never grants permission for external actions.
 - Before the first edit, record the chosen mode, reason, risk/root-cause/scope, actual gate command or why none is needed, canonical anchors, reference-only files, first-touch files, validation target, and first stop condition. Define allowed and denied paths.
-- Stop on unclear ownership/contracts, missing verification target, broader-than-approved paths, unsafe data, or any policy/runtime decision. Do not silently expand scope.
+- Stop the affected action when ownership/contracts or the verification target are unclear, data is unsafe, a required action would exceed an explicit user scope limit, or a consequential product/policy/runtime decision is unresolved outside the authorized outcome. An agent-written file list may be updated for necessary work within that outcome before editing; record the reason and rerun any mandatory gate with the complete scope. Never silently expand scope or use this to cross a new protected domain.
 
 Use `locate`, `impact`, `canonical`, `plan`, `dossier`, or `handoff` when execution boundaries are not yet clear. For risky multi-file or graph-heavy work, ground ownership first and hand off a concrete scope. The gate is an execution boundary, not a substitute for source review.
+
+## Authorization and continued progress
+
+- Carry the user's authorized outcome through implementation, relevant tests, CI fixes and review preparation. Reuse accepted decisions and permissions across turns; do not ask again for the same action or ordinary reversible implementation choices.
+- Scope records, plans, memory checkpoints, worktree creation and gate runs are agent work, not additional approval steps. Classify risk by the changed behavior and authority; changing execution/security/deployment policy still requires its mandatory gate even when the patch is documentation.
+- Ask only when a consequential decision is missing, a required action would exceed an explicit user limit, an explicit approval requirement is not already satisfied, or an action outside existing authorization has material effects such as data loss, clinical/security policy, costs or external publication. First prepare the concrete result that can be reviewed; keep independent authorized work moving while waiting.
+- A blocked production operation blocks that operation only. Continue safe inspection, implementation and validation in an isolated worktree from fresh `origin/main`; record deployment or main synchronization as pending. Do not repeatedly end turns on unchanged main-tree scratch or staleness when isolated progress is possible.
+- Put new scratch and gate output in the session worktree's reserved `/.scratch/` and `/.gate_artifacts/` roots. They are generated-only, ignored by Git, and must contain no tracked source or required durable evidence. Preserve another session's files; all other untracked files and tracked changes remain subject to the normal clean-tree guard.
+- Before a new implementation slice or PR, reread the current `AGENTS.md` and relevant runbook from the refreshed base. Report actual privileges or branch-protection requirements when they prevent an action; never bypass hooks, approval controls or a required gate to make progress.
 
 ## Automatic task memory
 
@@ -48,7 +60,7 @@ Protocol and curated-memory schema: [automatic memory](docs/devbrain/AUTOMATIC_M
 - Execution PRs start from fresh `origin/main`, unless the user requests another base. Inspect status before edits and understand every dirty change. Never switch/rebase the main tree for session work; use your own worktree.
 - One PR has one purpose. State allowed/denied paths, validation, stop conditions, impact, and rollback. Do not discard unrelated edits, use destructive reset/checkout, touch secrets or live data, or change global agent/MCP settings.
 - Run the narrowest relevant validation first, then required PR checks and `git diff --check`. Report exactly what ran, passed, failed, and was not checked. Fix red checks in the same PR.
-- Do not start the next PR cycle until the current PR is green and merged, branches are cleaned up, and local main is synced. Follow [cyclic workflow](docs/runbooks/AGENT_CYCLIC_WORKFLOW.md) and [Codex/Superpowers guard](docs/runbooks/CODEX_SUPERPOWERS_GUARD.md).
+- Do not start the next PR cycle until your current PR is green and merged and its owned branch/worktree is cleaned up or explicitly retained with a recorded reason. Fetch and start each new isolated cycle from current `origin/main`. If production main cannot safely sync, record it as pending and continue independent work; clean, synced production main remains mandatory for deployment. Follow [cyclic workflow](docs/runbooks/AGENT_CYCLIC_WORKFLOW.md) and [Codex/Superpowers guard](docs/runbooks/CODEX_SUPERPOWERS_GUARD.md).
 - Production restarts only from clean, synced `main` in `C:\final`, through `scripts/deploy_restart.ps1`; never restart it from a feature branch or worktree. Keep scratch in your worktree. Use [session worktree mechanics](docs/runbooks/AGENT_SESSION_WORKTREES.md).
 - Before saying “it works”, “system verified”, or “deployment complete”, run the full [staging validation](docs/runbooks/STAGING_VALIDATION.md) checklist or `scripts/smoke_test_staging.sh` and report every check. Never skip an inconvenient check; fix failures or report them as broken. CI or a subset is not system-health evidence.
 - Do not touch generated `output/`, `test-results/`, or `storage/` unless that artifact is the task. PostgreSQL + Alembic are the DB source of truth; do not reintroduce SQLite-first behavior.
@@ -101,6 +113,35 @@ Use matching skills only; prefer `.agents/skills`. They cannot override ownershi
 Consult [project memory](docs/devbrain/PROJECT_MEMORY.md), [status](docs/devbrain/DEVBRAIN_STATUS.md), [memory routing](docs/devbrain/MEMORY_ROUTING.md), and [role map](docs/devbrain/DEV_BRAIN_ROLE_MAP.md) for graph-heavy or ownership-sensitive work, then verify filesystem and current source. Do not assume LlamaIndex or LightRAG exists or is active. Do not call the stack a “unified brain” until keyed ingest passes its recorded acceptance gate. Acceptance order: simple locate → Telegram mixed-contract → Registrar payment/status persistence. Update the historical `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md` only for an actual gate/retrieval regression or explicit DevBrain evaluation, not routine gate runs.
 
 For local Python use `scripts/run_python.ps1`; for backend pytest use `scripts/run_backend_pytest.ps1`. For plans/dossiers/handoffs, produce repo-grounded artifacts directly; use verified `ai/langgraph/scripts/agent_gate.py` only at the execution boundary. Do not log routine gate runs; for an actual DevBrain evaluation include `gate_misroute`, `override_used`, and `known_root_cause_file` when applicable. Do not run historical DevBrain entrypoints unless restored and verified.
+
+
+## Codex PR review and merge
+
+For authorized PRs in `drsapaev/final`, Codex agents carry out review, formal approval, and squash merge
+without a human reviewer or separate routine confirmation. Follow the [cyclic workflow](docs/runbooks/AGENT_CYCLIC_WORKFLOW.md#codex-review-and-merge).
+
+1. A Codex agent reviews the current PR head against the task scope, diff, and validation evidence.
+   Resolve blocking findings and record the review verdict and full commit SHA.
+2. Use authorized owner access to dispatch the [Codex PR App workflow](.github/workflows/codex-pr-app.yml)
+   from `main` with `operation=approve`, the PR number, the reviewed SHA, and the review summary.
+   Confirm the formal GitHub **Approve** is recorded as `APPROVED` from `drsapaev-final-codex-pr[bot]` on that SHA.
+3. Confirm that the reviewed SHA is still the PR head and all required CI, gate, and applicable smoke checks
+   have passed. Dispatch `operation=merge` through the same workflow for that SHA and verify that the App bot
+   performed the squash merge. If the PR head changes, repeat review, validation, and approval for the new SHA.
+
+GitHub branch rules, explicit task limits, and existing publication and production authorization still apply.
+
+## Additional merge gate for ChatGPT-authored PRs (owner instruction, 2026-11-10)
+
+This **additional merge-time rule applies only to pull requests whose changes ChatGPT has authored**, not to every PR created by the owner's connected GitHub identity. Since connected actions can be attributed to the owner's account, identify in-scope PRs by an explicit `AI-authored by ChatGPT: yes` marker in their PR description, not by `github.actor`. It also applies to an assistant-created documentation-only PR if that PR is submitted for merge.
+
+- **Before merging an in-scope PR**, a responsible operator must actually execute `ai/langgraph/scripts/run_agent_gate.ps1` in a verified project checkout with task description, relevant `--known-root-cause` and `--scope` paths. Use the real wrapper from `ai/langgraph` as described above; merely reading it, writing a proposed command, requesting a CI job, or claiming a run is not proof.
+- Record on that PR: exact gate command, source commit SHA / head tested, execution time, exit code and sanitized gate result/handoff. Apply the actual gate's stop, retry/misroute and scope rules; require a successful result that covers the changed code and all mandatory scoped tests/checks. New material code changes after that evidence invalidate merge readiness until revalidated.
+- **No gate evidence or failed/misrouted gate => keep PR Draft and do not merge**; never promote a failing or unexecuted result to green. This is in addition to normal CI, code review, branch protection and role-specific smoke; it never substitutes for those.
+- The owner has explicitly allowed ChatGPT to stage *proposed, unverified* code in isolated, unmerged Draft PRs in this remote-GitHub-only workflow, even when the PowerShell launcher is unavailable. Such proposals must clearly state **`gate not run; do not merge or deploy`** and cannot alter `main` or a live environment. This narrowly scopes remote proposal staging; it does not certify execution of a mandatory implementation gate and is not permission to touch production/secrets/DB directly.
+- **All other PRs retain their existing applicable gate and validation obligations** under the task-execution rules above. This section does not add an assistant-specific merge requirement to human-authored PRs, nor relax the pre-edit sensitive-domain gate rules for their authors.
+- Before merging, a Codex agent verifies the launcher evidence and its coverage of the current PR head. GitHub enforces its configured branch rules and required checks. Until a required check validates the launcher evidence, Codex enforces this repository policy during the review and merge.
+
 
 ## Completion response
 

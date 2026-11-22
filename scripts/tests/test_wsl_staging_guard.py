@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import posixpath
@@ -11,6 +12,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -43,10 +45,14 @@ def compose_config():
     for service, (_, _, target) in guard.PORT_KEYS.items():
         services[service] = {
             "ports": [
-                {"published": str(PORTS[service]), "target": target, "protocol": "tcp"}
+                {
+                    "published": str(PORTS[service]),
+                    "target": target,
+                    "protocol": "tcp",
+                    "host_ip": "127.0.0.1",
+                }
             ]
         }
-    services["postgres"]["ports"][0]["host_ip"] = "127.0.0.1"
     for service in ("backend", "worker"):
         services.setdefault(service, {})["volumes"] = [
             {"type": "bind", "source": LINUX_ROOT + "/backend", "target": "/app"}
@@ -55,17 +61,24 @@ def compose_config():
 
 
 def container(service="backend", *, project=PROJECT, status="running", **changes):
+    target_port = guard.PORT_KEYS[service][2] if service in PORTS else None
+    configured_bindings = (
+        {
+            f"{target_port}/tcp": [
+                {"HostIp": "127.0.0.1", "HostPort": str(PORTS[service])}
+            ]
+        }
+        if service in PORTS
+        else {}
+    )
     result = {
         "project": project,
         "service": service,
         "root": LINUX_ROOT + "/ops",
         "files": LINUX_ROOT + "/ops/compose.staging.yml",
         "mounts": [{"Destination": "/app", "Source": LINUX_ROOT + "/backend"}],
-        "ports": (
-            {"18000/tcp": [{"HostPort": str(PORTS[service])}]}
-            if service in PORTS
-            else {}
-        ),
+        "ports": deepcopy(configured_bindings) if status == "running" else {},
+        "host_port_bindings": configured_bindings,
         "status": status,
         "health": "healthy",
     }
@@ -109,7 +122,7 @@ def session(staging, monkeypatch):
     keeper = KeeperProcess()
     monkeypatch.setattr(guard.subprocess, "Popen", lambda *args, **kwargs: keeper)
 
-    def preflight():
+    def preflight(**kwargs):
         staging.linux_root = LINUX_ROOT
         staging.linux_env = LINUX_ROOT + "/ops/staging.env"
         staging.linux_compose = LINUX_ROOT + "/ops/compose.staging.yml"
@@ -120,8 +133,14 @@ def session(staging, monkeypatch):
     monkeypatch.setattr(staging, "preflight", preflight)
     monkeypatch.setattr(staging, "host_storage", lambda **kwargs: None)
     monkeypatch.setattr(staging, "linux_storage", lambda **kwargs: None)
+    # Unit tests must never mutate a real Compose project unless they replace
+    # this stub with an explicit expectation.
+    monkeypatch.setattr(staging, "compose_command", lambda *args, **kwargs: "")
     monkeypatch.setattr(staging, "boot_id", lambda: "boot-1")
     monkeypatch.setattr(staging, "ready", lambda: None)
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    monkeypatch.setattr(staging, "teardown_project", lambda **kwargs: "PASS")
     return staging, keeper
 
 
@@ -138,9 +157,23 @@ def args(action="session", **changes):
     return argparse.Namespace(**result)
 
 
+def set_ephemeral_lifecycle(staging):
+    expiry = (datetime.now(UTC) + timedelta(hours=4)).isoformat()
+    staging.values.update(
+        {
+            "CLINIC_LIFECYCLE": "ephemeral",
+            "CLINIC_OWNER": "test-owner",
+            "CLINIC_EXPIRES_AT": expiry,
+        }
+    )
+    staging.ownership_verified = True
+    return expiry
+
+
 @pytest.fixture
 def registry(monkeypatch):
     """Model only read-only winreg operations; never read actual registrations."""
+
     def install(rows):
         @contextmanager
         def open_key(parent, name):
@@ -157,9 +190,11 @@ def registry(monkeypatch):
             return rows[key][name], 1
 
         module = SimpleNamespace(
-            HKEY_CURRENT_USER="HKCU", OpenKey=open_key,
+            HKEY_CURRENT_USER="HKCU",
+            OpenKey=open_key,
             QueryInfoKey=lambda key: (len(rows), 0, 0),
-            EnumKey=lambda key, index: str(index), QueryValueEx=value,
+            EnumKey=lambda key, index: str(index),
+            QueryValueEx=value,
         )
         monkeypatch.setitem(sys.modules, "winreg", module)
         return module
@@ -168,39 +203,59 @@ def registry(monkeypatch):
 
 
 @pytest.mark.parametrize("base", [r"D:\WSL\Ubuntu-24.04", r"\\?\D:\WSL\Ubuntu-24.04"])
-def test_registered_distro_storage_resolves_other_volume_and_extended_path(registry, base):
-    registry([
-        {"DistributionName": "Ubuntu-other", "BasePath": r"C:\WSL\other"},
-        {"DistributionName": "Ubuntu-24.04", "BasePath": base},
-    ])
+def test_registered_distro_storage_resolves_other_volume_and_extended_path(
+    registry, base
+):
+    registry(
+        [
+            {"DistributionName": "Ubuntu-other", "BasePath": r"C:\WSL\other"},
+            {"DistributionName": "Ubuntu-24.04", "BasePath": base},
+        ]
+    )
     assert guard.windows_distro_base_path("ubuntu-24.04") == r"D:\WSL\Ubuntu-24.04"
 
 
-@pytest.mark.parametrize("rows", [
-    [],
-    [{"DistributionName": "Ubuntu-other", "BasePath": r"D:\WSL\other"}],
-    [{"DistributionName": "Ubuntu-24.04"}],
-    [{"DistributionName": 123, "BasePath": r"D:\WSL\distro"}],
+@pytest.mark.parametrize(
+    "rows",
     [
-        {"DistributionName": "Ubuntu-24.04", "BasePath": r"D:\WSL\one"},
-        {"DistributionName": "ubuntu-24.04", "BasePath": r"E:\WSL\two"},
+        [],
+        [{"DistributionName": "Ubuntu-other", "BasePath": r"D:\WSL\other"}],
+        [{"DistributionName": "Ubuntu-24.04"}],
+        [{"DistributionName": 123, "BasePath": r"D:\WSL\distro"}],
+        [
+            {"DistributionName": "Ubuntu-24.04", "BasePath": r"D:\WSL\one"},
+            {"DistributionName": "ubuntu-24.04", "BasePath": r"E:\WSL\two"},
+        ],
     ],
-])
+)
 def test_unknown_or_ambiguous_distro_registration_fails_before_boot(
     staging, registry, monkeypatch, rows
 ):
     registry(rows)
     monkeypatch.setattr(guard, "IS_WINDOWS", True)
-    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot"))
-    monkeypatch.setattr(guard, "native", lambda *a, **k: pytest.fail("no native command"))
+    monkeypatch.setattr(
+        guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot")
+    )
+    monkeypatch.setattr(
+        guard, "native", lambda *a, **k: pytest.fail("no native command")
+    )
     with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN"):
         staging.execute(args())
 
 
-@pytest.mark.parametrize("base", [
-    None, "", "D:relative", r"\relative", r"\\server\share\distro",
-    r"\\?\UNC\server\share\distro", r"%USERPROFILE%\distro", "D:\\private\npath",
-])
+@pytest.mark.parametrize(
+    "base",
+    [
+        None,
+        "",
+        "D:relative",
+        r"\relative",
+        r"\\server\share\distro",
+        r"\\?\UNC\server\share\distro",
+        r"%USERPROFILE%\distro",
+        "D:\\private\npath",
+    ],
+)
 def test_invalid_backing_paths_fail_without_echoing_registry_values(registry, base):
     registry([{"DistributionName": "Ubuntu-24.04", "BasePath": base}])
     with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
@@ -208,7 +263,9 @@ def test_invalid_backing_paths_fail_without_echoing_registry_values(registry, ba
     assert "private" not in str(error.value) and "USERPROFILE" not in str(error.value)
 
 
-def test_registry_failure_is_safe_and_does_not_invoke_wsl(staging, registry, monkeypatch):
+def test_registry_failure_is_safe_and_does_not_invoke_wsl(
+    staging, registry, monkeypatch
+):
     module = registry([])
 
     def unavailable(*args):
@@ -216,8 +273,12 @@ def test_registry_failure_is_safe_and_does_not_invoke_wsl(staging, registry, mon
 
     monkeypatch.setattr(module, "OpenKey", unavailable)
     monkeypatch.setattr(guard, "IS_WINDOWS", True)
-    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot"))
-    monkeypatch.setattr(guard, "native", lambda *a, **k: pytest.fail("no native command"))
+    monkeypatch.setattr(
+        guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot")
+    )
+    monkeypatch.setattr(
+        guard, "native", lambda *a, **k: pytest.fail("no native command")
+    )
     with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
         staging.execute(args("start", no_build=False))
     assert "private" not in str(error.value)
@@ -227,7 +288,9 @@ def test_registry_failure_is_safe_and_does_not_invoke_wsl(staging, registry, mon
 def test_full_vhd_volume_blocks_before_keeper_even_when_worktree_has_space(
     staging, registry, monkeypatch, action
 ):
-    registry([{"DistributionName": "Ubuntu-24.04", "BasePath": r"\\?\D:\WSL\Ubuntu-24.04"}])
+    registry(
+        [{"DistributionName": "Ubuntu-24.04", "BasePath": r"\\?\D:\WSL\Ubuntu-24.04"}]
+    )
     monkeypatch.setattr(guard, "IS_WINDOWS", True)
     measured = []
 
@@ -236,8 +299,12 @@ def test_full_vhd_volume_blocks_before_keeper_even_when_worktree_has_space(
         return SimpleNamespace(free=0 if str(path).startswith("D:") else 6 * guard.GIB)
 
     monkeypatch.setattr(guard.shutil, "disk_usage", usage)
-    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no WSL keeper"))
-    monkeypatch.setattr(guard, "native", lambda *a, **k: pytest.fail("no WSL/native command"))
+    monkeypatch.setattr(
+        guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no WSL keeper")
+    )
+    monkeypatch.setattr(
+        guard, "native", lambda *a, **k: pytest.fail("no WSL/native command")
+    )
     with pytest.raises(guard.GuardError, match="WSL_BACKING_DISK_LOW"):
         staging.execute(args(action))
     assert measured == [r"D:\WSL\Ubuntu-24.04"]
@@ -248,11 +315,19 @@ def test_build_with_healthy_backing_but_low_worktree_drive_stops_before_keeper(
 ):
     registry([{"DistributionName": "Ubuntu-24.04", "BasePath": r"D:\WSL\Ubuntu-24.04"}])
     monkeypatch.setattr(guard, "IS_WINDOWS", True)
-    monkeypatch.setattr(guard.shutil, "disk_usage", lambda path: SimpleNamespace(
-        free=20 * guard.GIB if str(path).startswith("D:") else guard.GIB
-    ))
-    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot"))
-    monkeypatch.setattr(guard, "native", lambda *a, **k: pytest.fail("no Compose/native command"))
+    monkeypatch.setattr(
+        guard.shutil,
+        "disk_usage",
+        lambda path: SimpleNamespace(
+            free=20 * guard.GIB if str(path).startswith("D:") else guard.GIB
+        ),
+    )
+    monkeypatch.setattr(
+        guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot")
+    )
+    monkeypatch.setattr(
+        guard, "native", lambda *a, **k: pytest.fail("no Compose/native command")
+    )
     with pytest.raises(guard.GuardError, match="^DISK_LOW"):
         staging.execute(args("start", no_build=False))
     assert staging.summary["wsl_backing_disk_free_gib"] == 20
@@ -264,9 +339,11 @@ def test_build_with_healthy_backing_but_low_worktree_drive_stops_before_keeper(
 def test_host_storage_reserve_uses_exact_byte_boundary(
     staging, monkeypatch, build_possible, reserve, difference
 ):
-    monkeypatch.setattr(guard.shutil, "disk_usage", lambda path: SimpleNamespace(
-        free=reserve * guard.GIB + difference
-    ))
+    monkeypatch.setattr(
+        guard.shutil,
+        "disk_usage",
+        lambda path: SimpleNamespace(free=reserve * guard.GIB + difference),
+    )
     if difference < 0:
         with pytest.raises(guard.GuardError, match="WSL_BACKING_DISK_LOW"):
             staging.host_storage(build_possible=build_possible)
@@ -280,11 +357,19 @@ def test_opaque_session_requires_build_reserve_unless_caller_promises_no_build(
     session, monkeypatch, no_build
 ):
     staging, keeper = session
-    monkeypatch.setattr(staging, "host_storage", guard.WslStaging.host_storage.__get__(staging))
-    monkeypatch.setattr(guard.shutil, "disk_usage", lambda path: SimpleNamespace(free=6 * guard.GIB))
+    monkeypatch.setattr(
+        staging, "host_storage", guard.WslStaging.host_storage.__get__(staging)
+    )
+    monkeypatch.setattr(
+        guard.shutil, "disk_usage", lambda path: SimpleNamespace(free=6 * guard.GIB)
+    )
     child_calls = []
-    monkeypatch.setattr(guard.subprocess, "run", lambda command, **kwargs:
-        child_calls.append(command) or SimpleNamespace(returncode=0))
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda command, **kwargs: child_calls.append(command)
+        or SimpleNamespace(returncode=0),
+    )
     invocation = args(no_build=no_build, command=["opaque.exe", "build-like literal"])
     if no_build:
         assert staging.execute(invocation)["result"] == "PASS"
@@ -301,7 +386,9 @@ def test_unmeasurable_backing_volume_does_not_boot_or_echo_path(staging, monkeyp
         raise OSError("private backing path")
 
     monkeypatch.setattr(guard.shutil, "disk_usage", unavailable)
-    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot"))
+    monkeypatch.setattr(
+        guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot")
+    )
     with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
         staging.execute(args())
     assert "private" not in str(error.value)
@@ -310,7 +397,7 @@ def test_unmeasurable_backing_volume_does_not_boot_or_echo_path(staging, monkeyp
 @pytest.fixture
 def linux_storage_stub(staging, monkeypatch):
     options = {"/": "rw,relatime,errors=remount-ro", "/custom Docker data": "rw"}
-    space = {path: 20 * guard.GIB for path in options}
+    space = dict.fromkeys(options, 20 * guard.GIB)
     calls = []
 
     def docker(*command, **kwargs):
@@ -322,7 +409,9 @@ def linux_storage_stub(staging, monkeypatch):
         assert command[:2] == ("env", "-i") and "LC_ALL=C" in command
         if "findmnt" in command:
             path = command[command.index("--target") + 1]
-            return json.dumps({"filesystems": [{"target": path, "options": options[path]}]})
+            return json.dumps(
+                {"filesystems": [{"target": path, "options": options[path]}]}
+            )
         assert "df" in command and command[-2] == "--"
         return f"Avail\n {space[command[-1]]}"
 
@@ -331,18 +420,27 @@ def linux_storage_stub(staging, monkeypatch):
     return options, space, calls
 
 
-def test_linux_storage_checks_real_docker_root_and_exact_read_only_token(staging, linux_storage_stub):
+def test_linux_storage_checks_real_docker_root_and_exact_read_only_token(
+    staging, linux_storage_stub
+):
     _, _, calls = linux_storage_stub
     staging.linux_storage(build_possible=True)
     assert set(staging.summary["wsl_storage"]) == {"/", "/custom Docker data"}
     assert staging.summary["wsl_storage"]["/custom Docker data"]["free_gib"] == 20
-    assert [command[-1] for command in calls if "df" in command] == ["/", "/custom Docker data"]
+    assert [command[-1] for command in calls if "df" in command] == [
+        "/",
+        "/custom Docker data",
+    ]
 
 
-@pytest.mark.parametrize("response", ["private", "null", '"relative"', '""', '"/private\\npath"'])
+@pytest.mark.parametrize(
+    "response", ["private", "null", '"relative"', '""', '"/private\\npath"']
+)
 def test_unverifiable_docker_storage_path_fails_safely(staging, monkeypatch, response):
     monkeypatch.setattr(staging, "docker", lambda *a, **k: response)
-    monkeypatch.setattr(staging, "wsl", lambda *a, **k: pytest.fail("invalid Docker root"))
+    monkeypatch.setattr(
+        staging, "wsl", lambda *a, **k: pytest.fail("invalid Docker root")
+    )
     with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
         staging.linux_storage(build_possible=False)
     assert "private" not in str(error.value)
@@ -370,55 +468,91 @@ def test_linux_storage_reserve_uses_exact_byte_boundary(
         staging.linux_storage(build_possible=build_possible)
 
 
-@pytest.mark.parametrize("response", [
-    "not json", "{}", '{"filesystems":[]}',
-    '{"filesystems":[{"target":"/","options":"unknown"}]}',
-    '{"filesystems":[{"target":"/","options":null}]}',
-])
-def test_unverifiable_linux_mount_fails_safely(staging, linux_storage_stub, monkeypatch, response):
+@pytest.mark.parametrize(
+    "response",
+    [
+        "not json",
+        "{}",
+        '{"filesystems":[]}',
+        '{"filesystems":[{"target":"/","options":"unknown"}]}',
+        '{"filesystems":[{"target":"/","options":null}]}',
+    ],
+)
+def test_unverifiable_linux_mount_fails_safely(
+    staging, linux_storage_stub, monkeypatch, response
+):
     monkeypatch.setattr(staging, "wsl", lambda *a, **k: response)
     with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN"):
         staging.linux_storage(build_possible=False)
 
 
-@pytest.mark.parametrize("available", [
-    "", "Avail", "Avail\n-1", "Avail\nprivate", "Avail\n1\n2", "Unknown\n99999999999",
-])
-def test_unverifiable_linux_space_fails_safely(staging, linux_storage_stub, monkeypatch, available):
+@pytest.mark.parametrize(
+    "available",
+    [
+        "",
+        "Avail",
+        "Avail\n-1",
+        "Avail\nprivate",
+        "Avail\n1\n2",
+        "Unknown\n99999999999",
+    ],
+)
+def test_unverifiable_linux_space_fails_safely(
+    staging, linux_storage_stub, monkeypatch, available
+):
     original = staging.wsl
-    monkeypatch.setattr(staging, "wsl", lambda *a, **k:
-        available if "df" in a else original(*a, **k))
+    monkeypatch.setattr(
+        staging, "wsl", lambda *a, **k: available if "df" in a else original(*a, **k)
+    )
     with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
         staging.linux_storage(build_possible=False)
     assert "private" not in str(error.value)
 
 
 @pytest.mark.parametrize("action", ["start", "session"])
-def test_linux_storage_failure_closes_keeper_before_compose_or_child(session, monkeypatch, action):
+def test_linux_storage_failure_closes_keeper_before_compose_or_child(
+    session, monkeypatch, action
+):
     staging, keeper = session
 
     def read_only(**kwargs):
         raise guard.GuardError("WSL_STORAGE_READ_ONLY")
 
     monkeypatch.setattr(staging, "linux_storage", read_only)
-    monkeypatch.setattr(staging, "compose_command", lambda *a, **k: pytest.fail("no Compose mutation"))
-    monkeypatch.setattr(guard.subprocess, "run", lambda *a, **k: pytest.fail("no child"))
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("no Compose mutation")
+    )
+    monkeypatch.setattr(
+        guard.subprocess, "run", lambda *a, **k: pytest.fail("no child")
+    )
     with pytest.raises(guard.GuardError, match="WSL_STORAGE_READ_ONLY"):
         staging.execute(args(action))
     assert keeper.stdin.closed and keeper.waited
 
 
-def test_stop_bypasses_storage_blockers_but_only_runs_owned_down(session, registry, monkeypatch):
+def test_stop_bypasses_storage_blockers_but_only_runs_owned_down(
+    session, registry, monkeypatch
+):
     staging, keeper = session
     registry([{"DistributionName": "Ubuntu-24.04", "BasePath": r"D:\WSL\Ubuntu-24.04"}])
     monkeypatch.setattr(guard, "IS_WINDOWS", True)
-    monkeypatch.setattr(staging, "host_storage", guard.WslStaging.host_storage.__get__(staging))
-    monkeypatch.setattr(guard.shutil, "disk_usage", lambda *a: pytest.fail("Stop must not demand space"))
-    monkeypatch.setattr(staging, "linux_storage", lambda **k: pytest.fail("Stop must not demand writable storage"))
+    monkeypatch.setattr(
+        staging, "host_storage", guard.WslStaging.host_storage.__get__(staging)
+    )
+    monkeypatch.setattr(
+        guard.shutil, "disk_usage", lambda *a: pytest.fail("Stop must not demand space")
+    )
+    monkeypatch.setattr(
+        staging,
+        "linux_storage",
+        lambda **k: pytest.fail("Stop must not demand writable storage"),
+    )
     commands = []
-    monkeypatch.setattr(staging, "compose_command", lambda *a, **k: commands.append((a, k)))
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: commands.append((a, k))
+    )
     assert staging.execute(args("stop"))["storage_checks"] == "BYPASSED_FOR_OWNED_STOP"
-    assert commands == [(('down',), {"timeout": 180})]
+    assert commands == [(("down",), {"timeout": 180})]
     assert keeper.stdin.closed and keeper.waited
 
 
@@ -433,6 +567,52 @@ def test_native_failure_keeps_secret_stderr_and_arguments_private(monkeypatch):
     with pytest.raises(guard.GuardError, match=r"NATIVE_FAILED.*exit 7") as error:
         guard.native(["docker", "secret-password-in-argv"])
     assert "secret-password" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("stderr", "category"),
+    [
+        (b"failed to solve: token=synthetic-secret", "image_build"),
+        (b"no space left on device", "disk_exhausted"),
+        (b"Cannot connect to the Docker daemon", "docker_daemon_unavailable"),
+        (b"port is already allocated", "network_or_port_setup"),
+        (b"unrecognized secret output", "unclassified"),
+    ],
+)
+def test_compose_failure_reports_only_allowlisted_category(
+    monkeypatch, stderr, category
+):
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=1, stdout=b"", stderr=stderr),
+    )
+
+    with pytest.raises(guard.GuardError, match=rf"category {category}") as error:
+        guard.native(
+            ["docker", "compose", "--env-file", "private-path"],
+            operation="compose-up",
+        )
+
+    message = str(error.value)
+    assert "synthetic-secret" not in message
+    assert "private-path" not in message
+    assert "failed to solve" not in message
+
+
+def test_non_compose_failure_does_not_add_compose_category(monkeypatch):
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(
+            returncode=1, stdout=b"", stderr=b"failed to solve"
+        ),
+    )
+
+    with pytest.raises(guard.GuardError, match=r"exit 1; no subsequent") as error:
+        guard.native(["wsl.exe"])
+
+    assert "category" not in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -494,6 +674,17 @@ def test_context_reads_quoted_literals_and_comments_without_secrets(tmp_path):
     }
 
 
+def test_context_values_rejects_unknown_frontend_target(tmp_path):
+    path = tmp_path / "staging.env"
+    path.write_text(
+        f"COMPOSE_PROJECT_NAME={PROJECT}\nSTAGING_FRONTEND_BUILD_TARGET=other\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(guard.GuardError, match="FRONTEND_BUILD_TARGET_INVALID"):
+        guard.context_values(path)
+
+
 @pytest.mark.parametrize("value", ['"unclosed', '"project"junk', "'project' another"])
 def test_context_rejects_malformed_quotes(tmp_path, value):
     path = tmp_path / "staging.env"
@@ -548,9 +739,7 @@ def test_public_origins_reject_stale_or_mismatched_values(key, value):
     assert value not in str(error.value)
 
 
-@pytest.mark.parametrize(
-    "key", guard.PUBLIC_ORIGIN_KEYS
-)
+@pytest.mark.parametrize("key", guard.PUBLIC_ORIGIN_KEYS)
 def test_public_origins_require_all_context_values(key):
     values = VALUES.copy()
     del values[key]
@@ -585,7 +774,7 @@ def test_stop_remains_available_when_public_origin_is_stale(session, monkeypatch
     )
     result = staging.execute(args("stop"))
     assert result["result"] == "PASS"
-    assert calls == [(('down',), {"timeout": 180})]
+    assert calls == [(("down",), {"timeout": 180})]
     assert keeper.stdin.closed and keeper.waited
 
 
@@ -639,6 +828,47 @@ def test_effective_ports_rejects_exposed_postgresql():
         guard.effective_ports(config, VALUES, LINUX_ROOT)
 
 
+@pytest.mark.parametrize(
+    "service,host_ip,error_code",
+    [
+        ("backend", "0.0.0.0", "STAGING_PORT_EXPOSED"),
+        ("backend", "::", "STAGING_PORT_EXPOSED"),
+        ("backend", None, "STAGING_PORT_EXPOSED"),
+        ("frontend", "0.0.0.0", "STAGING_PORT_EXPOSED"),
+        ("frontend", "::", "STAGING_PORT_EXPOSED"),
+        ("frontend", None, "STAGING_PORT_EXPOSED"),
+        ("postgres", None, "POSTGRES_EXPOSED"),
+    ],
+)
+def test_effective_ports_rejects_non_loopback_bindings(service, host_ip, error_code):
+    config = compose_config()
+    binding = config["services"][service]["ports"][0]
+    if host_ip is None:
+        binding.pop("host_ip")
+    else:
+        binding["host_ip"] = host_ip
+    with pytest.raises(guard.GuardError, match=error_code):
+        guard.effective_ports(config, VALUES, LINUX_ROOT)
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_effective_ports_allows_legacy_binding_only_for_stop_recovery(service, host_ip):
+    config = compose_config()
+    binding = config["services"][service]["ports"][0]
+    if host_ip is None:
+        binding.pop("host_ip")
+    else:
+        binding["host_ip"] = host_ip
+
+    with pytest.raises(guard.GuardError, match="EXPOSED"):
+        guard.effective_ports(config, VALUES, LINUX_ROOT)
+
+    assert (
+        guard.effective_ports(config, VALUES, LINUX_ROOT, stop_recovery=True) == PORTS
+    )
+
+
 @pytest.mark.parametrize("service", ["backend", "worker"])
 def test_effective_config_rejects_foreign_source(service):
     config = compose_config()
@@ -662,6 +892,32 @@ def test_ownership_rejects_reused_project_from_another_context(field, value):
             LINUX_ROOT,
             LINUX_ROOT + "/ops/compose.staging.yml",
             PORTS,
+        )
+
+
+@pytest.mark.parametrize(
+    ("changes", "error_code"),
+    [
+        ({"root": "/mnt/c/foreign-session/ops"}, "PROJECT_OWNERSHIP"),
+        (
+            {"files": "/mnt/c/session with spaces/ops/other-compose.yml"},
+            "PROJECT_OWNERSHIP",
+        ),
+        (
+            {"mounts": [{"Destination": "/app", "Source": "/mnt/c/foreign/backend"}]},
+            "SOURCE_MISMATCH",
+        ),
+    ],
+)
+def test_stop_ownership_mode_still_rejects_other_worktree(changes, error_code):
+    with pytest.raises(guard.GuardError, match=error_code):
+        guard.validate_ownership(
+            [container(**changes)],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+            enforce_port_bindings=False,
         )
 
 
@@ -711,6 +967,146 @@ def test_ownership_rejects_changed_existing_mount_and_port():
         )
 
 
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+def test_ownership_accepts_loopback_runtime_binding(service):
+    existing = container(service=service)
+    assert guard.validate_ownership(
+        [existing],
+        PROJECT,
+        LINUX_ROOT,
+        LINUX_ROOT + "/ops/compose.staging.yml",
+        PORTS,
+    ) == [existing]
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+def test_ownership_accepts_stopped_container_with_saved_loopback_binding(service):
+    existing = container(service=service, status="exited")
+    assert guard.validate_ownership(
+        [existing],
+        PROJECT,
+        LINUX_ROOT,
+        LINUX_ROOT + "/ops/compose.staging.yml",
+        PORTS,
+    ) == [existing]
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_ownership_rejects_non_loopback_runtime_bindings(service, host_ip):
+    existing = container(service=service)
+    target_port = guard.PORT_KEYS[service][2]
+    binding = existing["ports"][f"{target_port}/tcp"][0]
+    if host_ip is None:
+        binding.pop("HostIp")
+    else:
+        binding["HostIp"] = host_ip
+    assert existing["host_port_bindings"][f"{target_port}/tcp"][0] == {
+        "HostIp": "127.0.0.1",
+        "HostPort": str(PORTS[service]),
+    }
+    with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_ownership_rejects_non_loopback_saved_binding_for_stopped_container(
+    service, host_ip
+):
+    existing = container(service=service, status="exited")
+    target_port = guard.PORT_KEYS[service][2]
+    binding = existing["host_port_bindings"][f"{target_port}/tcp"][0]
+    if host_ip is None:
+        binding.pop("HostIp")
+    else:
+        binding["HostIp"] = host_ip
+    with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("status", ["running", "exited"])
+def test_ownership_rejects_missing_saved_published_binding(status):
+    existing = container(status=status, host_port_bindings={})
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize(
+    ("status", "mapping_name"),
+    [
+        ("running", "host_port_bindings"),
+        ("running", "ports"),
+        ("exited", "host_port_bindings"),
+    ],
+)
+@pytest.mark.parametrize("mismatch", ["target", "protocol"])
+def test_ownership_rejects_wrong_container_port_or_protocol(
+    service, status, mapping_name, mismatch
+):
+    existing = container(service=service, status=status)
+    expected_port = guard.PORT_KEYS[service][2]
+    wrong_port = expected_port + 1 if mismatch == "target" else expected_port
+    protocol = "udp" if mismatch == "protocol" else "tcp"
+    expected_key = f"{expected_port}/tcp"
+    mapping = existing[mapping_name]
+    mapping[f"{wrong_port}/{protocol}"] = mapping.pop(expected_key)
+
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+def test_ownership_rejects_configured_binding_that_differs_from_runtime():
+    existing = container()
+    existing["host_port_bindings"]["18000/tcp"][0]["HostPort"] = "19002"
+    assert existing["ports"]["18000/tcp"][0]["HostPort"] == str(PORTS["backend"])
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+def test_ownership_rejects_missing_runtime_published_binding():
+    existing = container(ports={})
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
 def test_docker_argv_uses_native_wsl_local_socket_and_explicit_compose(
     staging, monkeypatch
 ):
@@ -737,6 +1133,174 @@ def test_docker_argv_uses_native_wsl_local_socket_and_explicit_compose(
     assert not any("bash" in argument for argument in argv)
 
 
+def test_compose_command_loads_artifact_override_only_for_artifact_target(
+    staging, monkeypatch
+):
+    calls = []
+    monkeypatch.setattr(
+        staging,
+        "docker",
+        lambda *argv, **kwargs: calls.append((argv, kwargs)) or "",
+    )
+    staging.linux_root = LINUX_ROOT
+    staging.linux_env = LINUX_ROOT + "/ops/staging.env"
+    staging.linux_compose = LINUX_ROOT + "/ops/compose.staging.yml"
+    staging.linux_compose_artifact = LINUX_ROOT + "/ops/compose.staging.artifact.yml"
+
+    staging.compose_command("config")
+    assert calls[-1][0].count("-f") == 1
+    assert "extra_env" not in calls[-1][1]
+
+    staging.frontend_build_target = "artifact-runtime"
+    staging.compose_command("config")
+    assert calls[-1][0].count("-f") == 2
+    assert calls[-1][0][-3:-1] == ("-f", staging.linux_compose_artifact)
+    assert "extra_env" not in calls[-1][1]
+
+    staging.stop_recovery = True
+    staging.compose_command("down")
+    assert calls[-1][1]["extra_env"] == {
+        "STAGING_FRONTEND_ARTIFACT_CONTEXT": "../frontend/docker"
+    }
+
+
+def test_validate_ownership_accepts_exact_artifact_compose_file_set():
+    files = [
+        LINUX_ROOT + "/ops/compose.staging.yml",
+        LINUX_ROOT + "/ops/compose.staging.artifact.yml",
+    ]
+    owned = guard.validate_ownership(
+        [container(files=",".join(files))], PROJECT, LINUX_ROOT, files, PORTS
+    )
+    assert len(owned) == 1
+
+
+def test_stop_can_recover_artifact_project_created_before_compose_override():
+    base = LINUX_ROOT + "/ops/compose.staging.yml"
+    artifact_override = LINUX_ROOT + "/ops/compose.staging.artifact.yml"
+
+    owned = guard.validate_ownership(
+        [container(files=base)],
+        PROJECT,
+        LINUX_ROOT,
+        [base, artifact_override],
+        PORTS,
+        enforce_port_bindings=False,
+        alternative_compose_files=[[base]],
+    )
+
+    assert len(owned) == 1
+
+
+def _write_frontend_artifact(root: Path) -> tuple[Path, str, str]:
+    source_sha = "a" * 40
+    context = root / ".scratch" / "session" / "frontend-artifact"
+    (root / "ops").mkdir(exist_ok=True)
+    (context / "assets").mkdir(parents=True)
+    payloads = {
+        "index.html": b"<!doctype html><html></html>\n",
+        "assets/app.js": b"console.log('synthetic');\n",
+        "source.sha": (source_sha + "\n").encode("ascii"),
+    }
+    for name, payload in payloads.items():
+        (context / name).write_bytes(payload)
+    manifest = "".join(
+        f"{hashlib.sha256(payload).hexdigest()}  ./{name}\n"
+        for name, payload in sorted(payloads.items())
+    )
+    (context / "SHA256SUMS").write_text(manifest, encoding="ascii")
+    return context, "../.scratch/session/frontend-artifact", source_sha
+
+
+def test_frontend_artifact_context_accepts_exact_verified_worktree_artifact(tmp_path):
+    expected_context, relative_context, source_sha = _write_frontend_artifact(tmp_path)
+
+    actual = guard.validate_frontend_artifact_context(
+        tmp_path, relative_context, source_sha
+    )
+
+    assert actual == expected_context.resolve()
+
+
+def test_frontend_artifact_context_rejects_path_outside_worktree_scratch(tmp_path):
+    _, _, source_sha = _write_frontend_artifact(tmp_path)
+    outside = tmp_path.parent / "outside-artifact"
+    outside.mkdir()
+
+    with pytest.raises(guard.GuardError, match="ARTIFACT_CONTEXT_OUTSIDE_SCRATCH"):
+        guard.validate_frontend_artifact_context(
+            tmp_path, "../../outside-artifact", source_sha
+        )
+
+
+def test_frontend_artifact_context_rejects_missing_artifact_directory(tmp_path):
+    (tmp_path / "ops").mkdir()
+    (tmp_path / ".scratch").mkdir()
+
+    with pytest.raises(guard.GuardError, match="ARTIFACT_CONTEXT_INVALID"):
+        guard.validate_frontend_artifact_context(
+            tmp_path, "../.scratch/missing/frontend-artifact", "a" * 40
+        )
+
+
+def test_frontend_artifact_context_rejects_unlisted_file(tmp_path):
+    context, relative_context, source_sha = _write_frontend_artifact(tmp_path)
+    (context / "unlisted.txt").write_text("must not be served", encoding="utf-8")
+
+    with pytest.raises(guard.GuardError, match="ARTIFACT_FILESET_MISMATCH"):
+        guard.validate_frontend_artifact_context(tmp_path, relative_context, source_sha)
+
+
+def test_frontend_artifact_context_rejects_checksum_mismatch(tmp_path):
+    context, relative_context, source_sha = _write_frontend_artifact(tmp_path)
+    (context / "assets" / "app.js").write_text("tampered", encoding="utf-8")
+
+    with pytest.raises(guard.GuardError, match="ARTIFACT_CHECKSUM_MISMATCH"):
+        guard.validate_frontend_artifact_context(tmp_path, relative_context, source_sha)
+
+
+def test_frontend_artifact_context_rejects_wrong_source_sha(tmp_path):
+    _, relative_context, source_sha = _write_frontend_artifact(tmp_path)
+
+    with pytest.raises(guard.GuardError, match="ARTIFACT_SOURCE_MISMATCH"):
+        guard.validate_frontend_artifact_context(
+            tmp_path, relative_context, "b" * len(source_sha)
+        )
+
+
+def test_frontend_artifact_context_rejects_reparse_points_in_artifact(
+    tmp_path, monkeypatch
+):
+    context, relative_context, source_sha = _write_frontend_artifact(tmp_path)
+    original_check = guard._is_link_or_reparse_point
+
+    def mark_junction(path):
+        if path == context / "assets":
+            return True
+        return original_check(path)
+
+    monkeypatch.setattr(guard, "_is_link_or_reparse_point", mark_junction)
+    with pytest.raises(guard.GuardError, match="ARTIFACT_SYMLINK"):
+        guard.validate_frontend_artifact_context(tmp_path, relative_context, source_sha)
+
+
+def test_artifact_scope_is_rejected_before_host_storage_or_wsl(staging, monkeypatch):
+    (staging.root / ".scratch").mkdir()
+    staging.frontend_build_target = "artifact-runtime"
+    staging.frontend_artifact_context_value = "../.scratch"
+    staging.values["VERCEL_GIT_COMMIT_SHA"] = "a" * 40
+    monkeypatch.setattr(
+        staging,
+        "host_storage",
+        lambda **kwargs: pytest.fail(
+            "artifact scope must be checked before host operations"
+        ),
+    )
+
+    with pytest.raises(guard.GuardError, match="ARTIFACT_CONTEXT_OUTSIDE_SCRATCH"):
+        staging.execute(args("preflight"))
+
+
 def test_failed_up_aborts_readiness_and_closes_keeper(session, monkeypatch):
     staging, keeper = session
     called = []
@@ -751,8 +1315,56 @@ def test_failed_up_aborts_readiness_and_closes_keeper(session, monkeypatch):
     )
     with pytest.raises(guard.GuardError, match="NATIVE_FAILED"):
         staging.execute(args("start"))
-    assert called == [("up", "-d", "--wait", "--wait-timeout", "180")]
+    assert called == [("up", "-d", "--wait", "--wait-timeout", "180", "--no-build")]
     assert keeper.stdin.closed and keeper.waited
+
+
+@pytest.mark.parametrize(
+    ("no_build", "expected_command", "expected_timeout"),
+    [
+        (
+            True,
+            ("up", "-d", "--wait", "--wait-timeout", "180", "--no-build"),
+            210,
+        ),
+        (
+            False,
+            ("up", "-d", "--wait", "--wait-timeout", "180", "--build"),
+            1980,
+        ),
+    ],
+)
+def test_session_starts_owned_compose_before_readiness_and_validation(
+    session, monkeypatch, no_build, expected_command, expected_timeout
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    events = []
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *command, **kwargs: events.append(("compose", command, kwargs)),
+    )
+    monkeypatch.setattr(staging, "ready", lambda: events.append(("ready",)))
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda command, **kwargs: (
+            events.append(("validation", command)) or SimpleNamespace(returncode=0)
+        ),
+    )
+
+    result = staging.execute(args("session", no_build=no_build))
+
+    assert events[0] == (
+        "compose",
+        expected_command,
+        {"timeout": expected_timeout},
+    )
+    assert events[1] == ("ready",)
+    assert events[2][0] == "validation"
+    assert result["runtime_readiness"] == "PASS"
 
 
 def test_preflight_action_reports_readiness_not_run_and_has_no_compose_mutation(
@@ -796,7 +1408,9 @@ def test_start_rejects_build_before_mutation_when_disk_is_low(session, monkeypat
         guard.shutil, "disk_usage", lambda path: SimpleNamespace(free=guard.GIB)
     )
     monkeypatch.setattr(
-        guard.subprocess, "Popen", lambda *a, **k: pytest.fail("do not boot low storage")
+        guard.subprocess,
+        "Popen",
+        lambda *a, **k: pytest.fail("do not boot low storage"),
     )
     monkeypatch.setattr(
         staging,
@@ -848,7 +1462,7 @@ def test_missing_child_closes_keeper(session, monkeypatch):
 def test_preflight_failure_closes_keeper_without_child(session, monkeypatch):
     staging, keeper = session
 
-    def preflight():
+    def preflight(**kwargs):
         raise guard.GuardError("FOREIGN_PORT")
 
     monkeypatch.setattr(staging, "preflight", preflight)
@@ -1228,12 +1842,33 @@ def test_preflight_blocks_production_checkout_before_docker(staging, monkeypatch
         staging.preflight()
 
 
-@pytest.mark.parametrize("action", ["preflight", "stop"])
+@pytest.mark.parametrize(
+    ("action", "status", "host_ip", "compose_host_ip"),
+    [
+        ("preflight", None, None, "127.0.0.1"),
+        ("preflight", "running", "0.0.0.0", "0.0.0.0"),
+        ("stop", "running", "0.0.0.0", "0.0.0.0"),
+        ("stop", "exited", "0.0.0.0", None),
+        ("stop", "running", "::", "::"),
+        ("stop", "exited", "::", "::"),
+    ],
+)
 def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
-    staging, monkeypatch, action
+    staging, monkeypatch, action, status, host_ip, compose_host_ip
 ):
     calls = []
     mutations = []
+    existing = []
+    if status is not None:
+        unsafe = container(status=status)
+        target_port = guard.PORT_KEYS["backend"][2]
+        for mapping_name in ("host_port_bindings", "ports"):
+            for binding in unsafe[mapping_name].get(f"{target_port}/tcp", []):
+                binding["HostIp"] = host_ip
+        existing = [unsafe]
+        if action == "stop":
+            # A foreign project may occupy a selected port. Stop must leave it alone.
+            existing.append(container(project="another-agent"))
 
     def native(argv, **kwargs):
         calls.append(argv)
@@ -1266,38 +1901,91 @@ def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
             return "29.1.3"
         if argv == ("compose", "version", "--short"):
             return "2.40.3"
+        if argv[0] == "compose" and argv[-3:] == ("config", "--format", "json"):
+            config = compose_config()
+            for service in guard.PORT_KEYS:
+                binding = config["services"][service]["ports"][0]
+                if compose_host_ip is None:
+                    binding.pop("host_ip")
+                else:
+                    binding["host_ip"] = compose_host_ip
+            return json.dumps(config)
+        if argv[0] == "compose" and argv[-1] == "down":
+            mutations.append((argv, kwargs))
+            return ""
         raise AssertionError(argv)
-
-    def compose(*command, **kwargs):
-        if command == ("config", "--format", "json"):
-            return json.dumps(compose_config())
-        assert action == "stop" and command == ("down",)
-        mutations.append((command, kwargs))
 
     monkeypatch.setattr(guard, "native", native)
     monkeypatch.setattr(staging, "wsl", wsl)
     monkeypatch.setattr(staging, "docker", docker)
-    monkeypatch.setattr(staging, "compose_command", compose)
-    monkeypatch.setattr(staging, "containers", list)
-    monkeypatch.setattr(guard, "validate_windows_listeners", lambda ports: None)
-    monkeypatch.setattr(guard, "tcp_ready", lambda port: False)
+    monkeypatch.setattr(staging, "containers", lambda: existing)
+    monkeypatch.setattr(
+        guard,
+        "validate_windows_listeners",
+        lambda ports: (
+            pytest.fail("Stop must not require a clear listener check")
+            if action == "stop"
+            else None
+        ),
+    )
+    monkeypatch.setattr(
+        guard,
+        "tcp_ready",
+        lambda port: (
+            pytest.fail("Stop must not require host port readiness")
+            if action == "stop"
+            else False
+        ),
+    )
     if action == "stop":
         keeper = KeeperProcess()
         monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: keeper)
-        monkeypatch.setattr(guard.shutil, "disk_usage", lambda *a: pytest.fail("Stop capacity probe"))
-        monkeypatch.setattr(staging, "linux_storage", lambda **k: pytest.fail("Stop Linux probe"))
+        monkeypatch.setattr(
+            guard.shutil, "disk_usage", lambda *a: pytest.fail("Stop capacity probe")
+        )
+        monkeypatch.setattr(
+            staging, "linux_storage", lambda **k: pytest.fail("Stop Linux probe")
+        )
         assert staging.execute(args("stop"))["result"] == "PASS"
-        assert mutations == [(('down',), {"timeout": 180})]
+        assert mutations == [
+            (
+                (
+                    "compose",
+                    "--project-directory",
+                    LINUX_ROOT + "/ops",
+                    "--project-name",
+                    PROJECT,
+                    "--env-file",
+                    LINUX_ROOT + "/ops/staging.env",
+                    "-f",
+                    LINUX_ROOT + "/ops/compose.staging.yml",
+                    "down",
+                ),
+                {"timeout": 180, "operation": "compose-down"},
+            )
+        ]
         assert keeper.stdin.closed and keeper.waited
     else:
         monkeypatch.setattr(
-            guard.shutil, "disk_usage", lambda root: SimpleNamespace(free=20 * guard.GIB)
+            guard.shutil,
+            "disk_usage",
+            lambda root: SimpleNamespace(free=20 * guard.GIB),
         )
-        assert staging.preflight() == []
+        if status is None:
+            assert staging.preflight() == []
+        else:
+            with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+                staging.preflight()
         assert not mutations
     assert staging.summary["commit"] == "a" * 40
-    assert staging.summary["ports"] == PORTS
-    assert staging.summary["wsl_available_mib"] == 2048
+    if action == "preflight" and compose_host_ip != "127.0.0.1":
+        assert "ports" not in staging.summary
+    else:
+        assert staging.summary["ports"] == PORTS
+    if action == "preflight" and status is not None:
+        assert "wsl_available_mib" not in staging.summary
+    else:
+        assert staging.summary["wsl_available_mib"] == 2048
     assert len(calls) == 4  # No checkout, reset, up/down or any other mutation.
 
 
@@ -1340,6 +2028,473 @@ def test_ready_rejects_native_windows_shadow_even_with_owned_healthy_docker(
     )
     with pytest.raises(guard.GuardError, match="WINDOWS_PORT_OWNER"):
         staging.ready()
+
+
+def test_lifecycle_context_accepts_explicit_owner_and_bounded_timezone_aware_lease():
+    expiry = (datetime.now(UTC) + timedelta(hours=4)).isoformat()
+
+    owner, original_expiry, parsed_expiry = guard.lifecycle_context(
+        {
+            "CLINIC_LIFECYCLE": "ephemeral",
+            "CLINIC_OWNER": "queue-validation",
+            "CLINIC_EXPIRES_AT": expiry,
+        }
+    )
+
+    assert owner == "queue-validation"
+    assert original_expiry == expiry
+    assert parsed_expiry == datetime.fromisoformat(expiry)
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"CLINIC_LIFECYCLE": "persistent"}, "LIFECYCLE_INVALID"),
+        ({"CLINIC_OWNER": "unknown"}, "LIFECYCLE_OWNER_REQUIRED"),
+        ({"CLINIC_OWNER": "  "}, "LIFECYCLE_OWNER_REQUIRED"),
+        ({"CLINIC_EXPIRES_AT": "2026-10-16T12:00:00"}, "LIFECYCLE_EXPIRY_REQUIRED"),
+        ({"CLINIC_EXPIRES_AT": "not-a-date"}, "LIFECYCLE_EXPIRY_REQUIRED"),
+        (
+            {"CLINIC_EXPIRES_AT": (datetime.now(UTC) + timedelta(days=8)).isoformat()},
+            "LIFECYCLE_EXPIRY_TOO_FAR",
+        ),
+    ],
+)
+def test_lifecycle_context_rejects_unowned_or_unbounded_lease(changes, message):
+    values = {
+        "CLINIC_LIFECYCLE": "ephemeral",
+        "CLINIC_OWNER": "queue-validation",
+        "CLINIC_EXPIRES_AT": (datetime.now(UTC) + timedelta(hours=4)).isoformat(),
+    }
+    values.update(changes)
+
+    with pytest.raises(guard.GuardError, match=message):
+        guard.lifecycle_context(values)
+
+
+def test_project_lifecycle_validation_checks_every_owned_resource_label(
+    staging, monkeypatch
+):
+    staging.linux_root = LINUX_ROOT
+    staging.linux_compose = LINUX_ROOT + "/ops/compose.staging.yml"
+    staging.ports = PORTS.copy()
+    staging.lifecycle_owner = "queue-validation"
+    staging.lifecycle_expires_at = "2026-10-15T12:00:00+00:00"
+    owned = container(
+        lifecycle="ephemeral",
+        owner=staging.lifecycle_owner,
+        expires_at=staging.lifecycle_expires_at,
+    )
+    labels = {
+        "com.docker.compose.project": staging.project,
+        "clinic.lifecycle": "ephemeral",
+        "clinic.owner": staging.lifecycle_owner,
+        "clinic.expires_at": staging.lifecycle_expires_at,
+    }
+    monkeypatch.setattr(guard, "validate_ownership", lambda *a, **k: [owned])
+    monkeypatch.setattr(staging, "containers", lambda: [owned])
+    monkeypatch.setattr(
+        staging,
+        "project_resource_ids",
+        lambda kind: {"volume": ["owned-volume"], "network": ["owned-network"]}[kind],
+    )
+    monkeypatch.setattr(staging, "resource_labels", lambda kind, resource_id: labels)
+
+    assert staging.validate_project_lifecycle_labels() == {
+        "container": 1,
+        "volume": 1,
+        "network": 1,
+    }
+
+    monkeypatch.setattr(
+        staging,
+        "resource_labels",
+        lambda kind, resource_id: {**labels, "clinic.owner": "another-owner"},
+    )
+    with pytest.raises(guard.GuardError, match="RESOURCE_LIFECYCLE_MISMATCH"):
+        staging.validate_project_lifecycle_labels()
+
+
+def test_teardown_removes_and_verifies_only_the_validated_compose_project(
+    staging, monkeypatch
+):
+    staging.ownership_verified = True
+    staging.lifecycle_owner = "queue-validation"
+    staging.lifecycle_expires_at = "2026-10-15T12:00:00+00:00"
+    commands = []
+    monkeypatch.setattr(
+        staging,
+        "validate_project_lifecycle_labels",
+        lambda: {"container": 2, "volume": 1, "network": 1},
+    )
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *a, **k: commands.append((a, k)),
+    )
+    monkeypatch.setattr(staging, "project_resource_ids", lambda kind: [])
+
+    assert staging.teardown_project(allow_keep=False) == "PASS"
+
+    assert commands == [
+        (
+            ("down", "--volumes", "--remove-orphans", "--rmi", "local"),
+            {"timeout": 300},
+        )
+    ]
+    assert staging.summary["teardown"] == {
+        "status": "PASS",
+        "removed": {"container": 2, "volume": 1, "network": 1},
+        "remaining": {"container": 0, "volume": 0, "network": 0},
+        "local_images": "compose --rmi local",
+    }
+
+
+@pytest.mark.parametrize("keep_staging", [False, True])
+def test_failed_start_cleans_only_owned_project_unless_keep_requested(
+    session, monkeypatch, keep_staging
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda *, allow_keep: teardowns.append(allow_keep) or "PASS",
+    )
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *a, **k: (_ for _ in ()).throw(guard.GuardError("COMPOSE_FAILED")),
+    )
+    if keep_staging:
+        monkeypatch.setenv("KEEP_STAGING", "1")
+    else:
+        monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="COMPOSE_FAILED"):
+        staging.execute(args("start"))
+
+    assert teardowns == ([] if keep_staging else [True])
+
+
+@pytest.mark.parametrize("failure_point", ["public_origins", "linux_storage"])
+def test_failed_start_after_ownership_verification_cleans_project(
+    session, monkeypatch, failure_point
+):
+    staging, _ = session
+    teardowns = []
+
+    def cleanup(*, allow_keep):
+        teardowns.append(allow_keep)
+        staging.summary["teardown"] = "PASS"
+        return "PASS"
+
+    monkeypatch.setattr(staging, "teardown_project", cleanup)
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+    if failure_point == "public_origins":
+        monkeypatch.setattr(
+            guard,
+            "validate_public_origins",
+            lambda *a, **k: (_ for _ in ()).throw(
+                guard.GuardError("PUBLIC_ORIGINS_INVALID")
+            ),
+        )
+    else:
+        monkeypatch.setattr(
+            staging,
+            "linux_storage",
+            lambda **kwargs: (_ for _ in ()).throw(
+                guard.GuardError("LINUX_STORAGE_UNAVAILABLE")
+            ),
+        )
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN=PASS"):
+        staging.execute(args("start"))
+
+    assert teardowns == [True]
+    assert staging.summary["teardown"] == "PASS"
+
+
+def test_failed_start_with_lost_keeper_reports_not_run_without_deleting(
+    session, monkeypatch
+):
+    staging, _ = session
+    monkeypatch.setattr(
+        staging,
+        "assert_session",
+        lambda *a, **k: (_ for _ in ()).throw(
+            guard.GuardError("WSL_INTERRUPTED: keeper ended")
+        ),
+    )
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda **kwargs: pytest.fail("must not delete after keeper loss"),
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN_NOT_RUN"):
+        staging.execute(args("start"))
+
+    assert staging.summary["teardown"] == "NOT_RUN_WSL_SESSION_INTERRUPTED"
+
+
+def test_failed_start_with_lifecycle_label_mismatch_does_not_delete(
+    session, monkeypatch
+):
+    staging, _ = session
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "validate_project_lifecycle_labels",
+        lambda: (_ for _ in ()).throw(guard.GuardError("RESOURCE_LIFECYCLE_MISMATCH")),
+    )
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda **kwargs: teardowns.append(kwargs),
+    )
+
+    with pytest.raises(guard.GuardError, match="RESOURCE_LIFECYCLE_MISMATCH"):
+        staging.execute(args("start"))
+
+    assert staging.cleanup_policy is None
+    assert teardowns == []
+
+
+def test_successful_session_tears_down_even_when_keep_staging_is_inherited(
+    session, monkeypatch
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=0),
+    )
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda *, allow_keep: teardowns.append(allow_keep) or "PASS",
+    )
+    monkeypatch.setenv("KEEP_STAGING", "1")
+
+    result = staging.execute(args("session"))
+
+    assert result["result"] == "PASS"
+    assert teardowns == [False]
+
+
+@pytest.mark.parametrize("keep_staging", [False, True])
+def test_failed_session_cleans_owned_project_unless_keep_requested(
+    session, monkeypatch, keep_staging
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=9),
+    )
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda *, allow_keep: teardowns.append(allow_keep) or "PASS",
+    )
+    if keep_staging:
+        monkeypatch.setenv("KEEP_STAGING", "1")
+    else:
+        monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="VALIDATION_FAILED"):
+        staging.execute(args("session"))
+
+    assert teardowns == ([] if keep_staging else [True])
+
+
+@pytest.mark.parametrize("action", ["start", "session"])
+def test_execution_without_verified_ownership_cannot_create_or_delete_resources(
+    session, monkeypatch, action
+):
+    staging, _ = session
+    staging.ownership_verified = False
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("must not mutate")
+    )
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: pytest.fail("must not delete")
+    )
+
+    with pytest.raises(guard.GuardError, match="PROJECT_OWNERSHIP_UNVERIFIED"):
+        staging.execute(args(action))
+
+
+@pytest.mark.parametrize("key", ["CLINIC_OWNER", "CLINIC_EXPIRES_AT"])
+def test_missing_lifecycle_context_fails_before_compose_mutation(
+    session, monkeypatch, key
+):
+    staging, _ = session
+    staging.values.pop(key)
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("must not mutate")
+    )
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: pytest.fail("must not delete")
+    )
+
+    with pytest.raises(guard.GuardError, match="LIFECYCLE_"):
+        staging.execute(args("start"))
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "com.docker.compose.project",
+        "clinic.lifecycle",
+        "clinic.owner",
+        "clinic.expires_at",
+    ],
+)
+def test_teardown_rejects_changed_resource_identity_before_any_delete(
+    staging, monkeypatch, key
+):
+    staging.ownership_verified = True
+    staging.lifecycle_owner = "test-owner"
+    staging.lifecycle_expires_at = "2026-10-16T12:00:00Z"
+    staging.linux_root = LINUX_ROOT
+    staging.linux_compose = LINUX_ROOT + "/ops/compose.staging.yml"
+    staging.ports = PORTS.copy()
+    labels = {
+        "com.docker.compose.project": staging.project,
+        "clinic.lifecycle": "ephemeral",
+        "clinic.owner": staging.lifecycle_owner,
+        "clinic.expires_at": staging.lifecycle_expires_at,
+    }
+    labels[key] = "different"
+    monkeypatch.setattr(staging, "containers", list)
+    monkeypatch.setattr(
+        staging,
+        "project_resource_ids",
+        lambda kind: ["remaining-volume"] if kind == "volume" else [],
+    )
+    monkeypatch.setattr(staging, "resource_labels", lambda *a: labels)
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("must not delete")
+    )
+
+    with pytest.raises(guard.GuardError, match="RESOURCE_LIFECYCLE_MISMATCH"):
+        staging.teardown_project(allow_keep=False)
+
+
+def test_teardown_cannot_report_success_when_an_owned_volume_remains(
+    staging, monkeypatch
+):
+    staging.ownership_verified = True
+    staging.lifecycle_owner = "test-owner"
+    staging.lifecycle_expires_at = "2026-10-16T12:00:00Z"
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    monkeypatch.setattr(staging, "compose_command", lambda *a, **k: "")
+    monkeypatch.setattr(
+        staging,
+        "project_resource_ids",
+        lambda kind: ["busy-volume"] if kind == "volume" else [],
+    )
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN_INCOMPLETE"):
+        staging.teardown_project(allow_keep=False)
+    assert staging.summary.get("teardown") != "PASS"
+
+
+@pytest.mark.parametrize("action", ["start", "session"])
+def test_expired_owned_project_is_cleaned_without_starting_or_validating(
+    session, monkeypatch, action
+):
+    staging, _ = session
+    staging.values["CLINIC_EXPIRES_AT"] = (
+        datetime.now(UTC) - timedelta(hours=1)
+    ).isoformat()
+    teardowns = []
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: teardowns.append(k) or "PASS"
+    )
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("must not start")
+    )
+    monkeypatch.setattr(
+        guard.subprocess, "run", lambda *a, **k: pytest.fail("must not validate")
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="LIFECYCLE_EXPIRED"):
+        staging.execute(args(action))
+    assert teardowns == [{"allow_keep": True}]
+
+
+def test_keyboard_interrupt_still_cleans_and_releases_the_owned_session(
+    session, monkeypatch
+):
+    staging, keeper = session
+    teardowns = []
+
+    def interrupted(*a, **k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(guard.subprocess, "run", interrupted)
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: teardowns.append(k) or "PASS"
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(KeyboardInterrupt):
+        staging.execute(args())
+    assert teardowns == [{"allow_keep": True}]
+    assert keeper.stdin.closed
+
+
+def test_lost_wsl_session_does_not_boot_again_to_attempt_cleanup(session, monkeypatch):
+    staging, keeper = session
+
+    def interrupted(*a, **k):
+        keeper.exit_code = 1
+        return SimpleNamespace(returncode=9)
+
+    monkeypatch.setattr(guard.subprocess, "run", interrupted)
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: pytest.fail("must not restart WSL")
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN_NOT_RUN"):
+        staging.execute(args())
+    assert staging.summary["teardown"] == "NOT_RUN_WSL_SESSION_INTERRUPTED"
+
+
+def test_cleanup_failure_preserves_original_validation_failure_without_raw_details(
+    session, monkeypatch
+):
+    staging, _ = session
+    monkeypatch.setattr(
+        guard.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=9)
+    )
+
+    def failed_cleanup(**kwargs):
+        raise RuntimeError("sensitive native response")
+
+    monkeypatch.setattr(staging, "teardown_project", failed_cleanup)
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError) as exc:
+        staging.execute(args())
+    assert "VALIDATION_FAILED: child exit 9" in str(exc.value)
+    assert "STAGING_TEARDOWN_FAILED: RuntimeError" in str(exc.value)
+    assert "sensitive" not in str(exc.value)
+    assert staging.summary["teardown"] == "FAIL"
 
 
 def test_stop_only_targets_owned_project_and_does_not_delete_volumes(
@@ -1419,3 +2574,58 @@ def test_powershell_wrapper_preserves_literal_argv_and_exit_code(tmp_path, exit_
         'literal "quote"',
         "literal $()",
     ]
+
+
+def test_prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance():
+    repo_root = Path(__file__).parents[2]
+    compose = (repo_root / "ops" / "compose.staging.yml").read_text(encoding="utf-8")
+    dockerfile = (repo_root / "frontend" / "Dockerfile.staging").read_text(
+        encoding="utf-8"
+    )
+    artifact_compose = (repo_root / "ops" / "compose.staging.artifact.yml").read_text(
+        encoding="utf-8"
+    )
+    workflow = (
+        repo_root / ".github" / "workflows" / "staging-frontend-artifact.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "target: ${STAGING_FRONTEND_BUILD_TARGET:-runtime}" in compose
+    assert "additional_contexts:" not in compose
+    assert (
+        "staging_artifact: ${STAGING_FRONTEND_ARTIFACT_CONTEXT:?Set STAGING_FRONTEND_ARTIFACT_CONTEXT"
+        in artifact_compose
+    )
+    assert dockerfile.startswith("# syntax=docker/dockerfile:1.7\n")
+    assert "FROM nginx:1.27-alpine AS artifact-runtime" in dockerfile
+    clear_default_docroot = (
+        "RUN find /usr/share/nginx/html -mindepth 1 -maxdepth 1 -exec rm -rf {} \\;"
+    )
+    assert clear_default_docroot in dockerfile
+    assert dockerfile.index(clear_default_docroot) < dockerfile.index(
+        "COPY --from=staging_artifact"
+    )
+    assert "COPY --from=staging_artifact . /usr/share/nginx/html/" in dockerfile
+    assert 'test "$(cat source.sha)" = "$VERCEL_GIT_COMMIT_SHA"' in dockerfile
+    assert "sha256sum -c SHA256SUMS" in dockerfile
+    assert "find . -type l -print -quit" in dockerfile
+    assert "manifest_files" in dockerfile and "copied_files" in dockerfile
+    assert "rm -f source.sha SHA256SUMS" in dockerfile
+    assert "--build-arg VITE_API_BASE_URL=same-origin" in workflow
+    assert "127.0.0.1:18082" not in workflow
+
+
+def test_staging_artifact_workflow_uses_per_run_compose_credentials():
+    workflow = (
+        Path(__file__).parents[2]
+        / ".github"
+        / "workflows"
+        / "staging-frontend-artifact.yml"
+    ).read_text(encoding="utf-8")
+
+    assert 'ci_identity="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"' in workflow
+    assert 'ci_secret="${ci_identity}-ephemeral"' in workflow
+    assert "POSTGRES_USER=$ci_identity" in workflow
+    assert "POSTGRES_PASSWORD=$ci_secret" in workflow
+    assert "SECRET_KEY=$ci_secret" in workflow
+    assert "ADMIN_USERNAME=$ci_identity" in workflow
+    assert "ADMIN_PASSWORD=$ci_secret" in workflow

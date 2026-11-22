@@ -7,7 +7,7 @@
  * tabs (Nielsen #8 — aesthetic and minimalist design + IA separation).
  */
 
-import { Card, Button } from '../../../components/ui/macos';
+import { AppError, Card, Button } from '../../../components/ui/macos';
 import { formatUZS } from '../../../utils/formatCurrency';
 import type { CashierStatsSnapshot } from '../useCashierWorklistData';
 import type { CashierTranslationFn } from '../cashierPaymentContracts';
@@ -16,13 +16,28 @@ interface CashierStatsCardProps {
   /** Metrics switch shape by tab (history shows the full grid). */
   isHistoryTab: boolean;
   stats: CashierStatsSnapshot;
+  /** CSH-FE-001: last stats-read failure (null = last load succeeded).
+   * The previous snapshot stays visible under a warning banner — its
+   * values are stale/unknown, not server-confirmed zeros. */
+  statsError?: string | null;
   onRefresh: () => void;
   onExport: () => void;
   onHourlyStats: () => void;
   tI18n: CashierTranslationFn;
 }
 
-const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlyStats, tI18n }: CashierStatsCardProps) => {
+/**
+ * CSH-FE-036 P2 (PR 3830 review, comment 4439005298): a MISSING stats
+ * field is not a zero. On a rolling frontend/backend deploy this frontend
+ * may be served by an older /cashier/stats without refunded_amount /
+ * net_* — formatUZS(undefined) would render a fake «0 сум» that
+ * misreports real receipts. An absent value renders as «—» (no data);
+ * a real zero reported by the current API still renders as «0 сум».
+ */
+const formatMoneyOrDash = (value: number | undefined | null): string =>
+  typeof value === 'number' && Number.isFinite(value) ? formatUZS(value) : '—';
+
+const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport, onHourlyStats, tI18n }: CashierStatsCardProps) => {
   const format = formatUZS;
 
   return (
@@ -33,6 +48,22 @@ const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlySt
           Nielsen #8 (эстетический и минималистичный дизайн) + IA-разделение.
           Скрытые плитки (visibility:hidden) удалены — визуальный шум устранён. */}
       <Card variant="outlined" className="cashier-stats-card">
+        {statsError !== null && statsError !== undefined &&
+        (/* CSH-FE-001: failed stats read — the tiles below stay from the
+            previous load (or the legacy zeros before the first success) and
+            must not read as freshly confirmed numbers. */
+        <AppError
+          severity="warning"
+          title={tI18n('cashier.stats_load_error_title')}
+          description={[statsError, tI18n('cashier.stats_stale_note')].filter(Boolean).join(' ')}
+          action={
+            <Button size="small" variant="outline" onClick={onRefresh}>
+              {tI18n('cashier.retry_load_btn')}
+            </Button>
+          }
+          className="cashier-mb-4"
+        />
+        )}
         <div className="cashier-stats-grid">
           {isHistoryTab ?
           <>
@@ -58,6 +89,27 @@ const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlySt
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.method_card')}
+                </div>
+              </div>
+              {/* CSH-FE-036 (PR 3813 follow-up): обе финансовые величины —
+                  возвраты и поступления за вычетом возвратов — рядом с
+                  валовыми; смысл существующих плиток не меняется молча.
+                  P2 (4439005298): отсутствующее поле ≠ ноль — старый API
+                  без net-полей получает «—», а не ложный «0 сум». */}
+              <div className="cashier-text-center">
+                <div className="cashier-stat-num cashier-stat-danger">
+                  {formatMoneyOrDash(stats.refunded_amount)}
+                </div>
+                <div className="cashier-stat-cap">
+                  {tI18n('cashier.refunded_total')}
+                </div>
+              </div>
+              <div className="cashier-text-center">
+                <div className="cashier-stat-num cashier-stat-green">
+                  {formatMoneyOrDash(stats.net_total_amount)}
+                </div>
+                <div className="cashier-stat-cap">
+                  {tI18n('cashier.net_total')}
                 </div>
               </div>
               <div className="cashier-text-center">

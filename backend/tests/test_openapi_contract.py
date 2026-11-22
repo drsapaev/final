@@ -30,6 +30,209 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_openapi_notification_templates_document_error_and_update_contract(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = schema["paths"]
+    create = paths["/api/v1/notifications/templates"]["post"]
+    update = paths["/api/v1/notifications/templates/{template_id}"]["put"]
+    for operation in (create, update):
+        responses = operation["responses"]
+        assert {"200", "409", "422", "500", "503"} <= responses.keys()
+        conflict = responses["409"]["content"]["application/json"]["schema"]
+        assert conflict["properties"]["detail"]["type"] == "string"
+
+    assert "404" in update["responses"]
+    create_validation = create["responses"]["422"]["content"]["application/json"]["schema"]
+    assert create_validation["properties"]["detail"]["type"] == "array"
+    update_validation = update["responses"]["422"]["content"]["application/json"]["schema"]
+    assert len(update_validation["oneOf"]) == 2
+
+    update_schema = schema["components"]["schemas"]["NotificationTemplateUpdate"]
+    assert not update_schema.get("required")
+    for field in ("name", "type", "channel", "template", "is_active"):
+        assert update_schema["properties"][field]["type"] != "null"
+        assert "anyOf" not in update_schema["properties"][field]
+        assert "default" not in update_schema["properties"][field]
+    assert {option["type"] for option in update_schema["properties"]["subject"]["anyOf"]} == {
+        "string",
+        "null",
+    }
+
+    send_description = paths["/api/v1/notifications/send"]["post"]["description"]
+    assert "не подтверждает доставку" in send_description
+    assert "не отправляется" in send_description
+
+
+def test_openapi_admin_public_booking_settings_contract(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    path = "/api/v1/admin/public-booking-settings"
+    get_operation = schema["paths"][path]["get"]
+    put_operation = schema["paths"][path]["put"]
+
+    assert get_operation["operationId"] == "admin_get_public_booking_settings"
+    assert put_operation["operationId"] == "admin_update_public_booking_settings"
+    assert {"200", "503"}.issubset(get_operation["responses"])
+    assert {"200", "409", "422", "503"}.issubset(put_operation["responses"])
+    assert get_operation.get("security") or schema.get("security")
+
+    components = schema["components"]["schemas"]
+    assert set(components["PublicBookingMode"]["enum"]) == {
+        "confirmed_appointment",
+        "registrar_request",
+    }
+    update_schema = components["PublicBookingSettingsUpdate"]
+    assert (
+        update_schema["properties"]["booking_horizon_days"]["anyOf"][0]["maximum"]
+        == 365
+    )
+    assert update_schema["properties"]["service_ids"]["maxItems"] == 500
+    assert update_schema["properties"]["doctor_ids"]["maxItems"] == 500
+    output_schema = components["PublicBookingSettingsOut"]
+    assert {"is_enabled", "is_ready", "services", "doctors"}.issubset(
+        output_schema["required"]
+    )
+
+
+def test_openapi_patient_booking_service_allowlist_contract(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    path = "/api/v1/telegram/mini-app/booking/services"
+    operation = schema["paths"][path]["post"]
+
+    assert operation["operationId"] == "telegram_mini_app_list_booking_services"
+    assert {"200", "400", "403", "422", "503"}.issubset(operation["responses"])
+    assert "requestBody" in operation
+
+    components = schema["components"]["schemas"]
+    success_schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    assert success_schema["$ref"].rsplit("/", 1)[-1] == "PublicBookingServiceIdsOut"
+    assert (
+        components["PublicBookingServiceIdsOut"]["properties"]["service_ids"]["type"]
+        == "array"
+    )
+
+    for status_code in ("400", "403", "503"):
+        error_schema = operation["responses"][status_code]["content"][
+            "application/json"
+        ]["schema"]
+        assert error_schema["$ref"].rsplit("/", 1)[-1] == "PublicBookingServiceErrorOut"
+
+
+def test_openapi_patient_booking_preview_create_share_service_selection_errors(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = (
+        "/api/v1/patients/booking/preview",
+        "/api/v1/patients/booking",
+        "/api/v1/telegram/mini-app/appointments/preview",
+        "/api/v1/telegram/mini-app/appointments",
+    )
+
+    def refs(value: object) -> set[str]:
+        if isinstance(value, dict):
+            found = {value["$ref"]} if isinstance(value.get("$ref"), str) else set()
+            return found.union(*(refs(item) for item in value.values()))
+        if isinstance(value, list):
+            return set().union(*(refs(item) for item in value))
+        return set()
+
+    for path in paths:
+        response = schema["paths"][path]["post"]["responses"]["422"]
+        response_refs = refs(response)
+        assert (
+            "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+            in response_refs
+        )
+        assert (
+            "#/components/schemas/PublicBookingRequestValidationErrorOut"
+            in response_refs
+        )
+
+    error_codes = schema["components"]["schemas"][
+        "PublicBookingServiceSelectionErrorDetail"
+    ]["properties"]["code"]["enum"]
+    assert set(error_codes) == {
+        "service_ids_invalid",
+        "service_ids_duplicate",
+        "service_not_found_or_inactive",
+        "service_incompatible_with_doctor",
+        "department_not_found",
+        "service_incompatible_with_department",
+    }
+
+
+def test_doctor_experience_is_published_in_admin_and_doctor_info_contracts(
+    client: TestClient,
+) -> None:
+    components = _get_openapi_schema(client)["components"]["schemas"]
+    admin_doctor = components["app__schemas__clinic__DoctorOut"]["properties"]
+    assert "experience_years" in admin_doctor
+    assert "experience_years" in components["DoctorCreate"]["properties"]
+    assert "experience_years" in components["DoctorUpdate"]["properties"]
+    assert "experience_years" in components["DoctorInfoResponse"]["properties"]
+    for schema_name in ("DoctorCreate", "DoctorUpdate"):
+        experience_schema = components[schema_name]["properties"]["experience_years"]
+        integer_variants = [
+            variant
+            for variant in experience_schema.get("anyOf", [])
+            if variant.get("type") == "integer"
+        ]
+        assert len(integer_variants) == 1
+        assert integer_variants[0]["maximum"] == 100
+
+
+def test_doctor_professional_category_is_typed_in_admin_contracts(
+    client: TestClient,
+) -> None:
+    components = _get_openapi_schema(client)["components"]["schemas"]
+    admin_doctor = components["app__schemas__clinic__DoctorOut"]["properties"]
+    assert "professional_category" in admin_doctor
+
+    expected_values = {"third", "second", "first", "highest"}
+    for schema_name in ("DoctorCreate", "DoctorUpdate"):
+        schema = components[schema_name]
+        assert "professional_category" in schema["properties"]
+        assert "professional_category" not in schema.get("required", [])
+        category_schema = schema["properties"]["professional_category"]
+        enum_values = {
+            value
+            for branch in category_schema.get("anyOf", [category_schema])
+            for value in branch.get("enum", [])
+        }
+        assert enum_values == expected_values
+
+
+def test_openapi_admin_queue_directions_read_contract(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    path = "/api/v1/queue/admin/directions"
+    operation = schema["paths"][path]["get"]
+
+    assert operation["operationId"] == "getAdminQueueDirections"
+    assert (
+        operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/AdminQueueDirectionsResponse"
+    )
+
+    components = schema["components"]["schemas"]
+    booking_target = components["AdminDirectionBookingTarget"]["properties"]
+    owner_type = booking_target["owner_type"]
+    assert set(owner_type.get("enum", [])) == {"doctor", "resource"}
+    assert "owner_id" in booking_target
+
+    direction_properties = components["AdminQueueDirection"]["properties"]
+    assert "public_availability" in direction_properties
+    assert "permanent_address_exists" in direction_properties
+    assert "precreate_by_tag" in direction_properties
+    assert "allowed_next_actions" in direction_properties
+    assert not {"patient_id", "patient_name", "phone"}.intersection(
+        direction_properties
+    )
+
+
 def test_openapi_ai_v2_medical_responses_require_doctor_confirmation(
     client: TestClient,
 ) -> None:
@@ -90,6 +293,7 @@ def test_openapi_ai_v2_medical_responses_require_doctor_confirmation(
         ("/api/v1/public-site/categories", "get"),
         ("/api/v1/public-site/doctors", "get"),
         ("/api/v1/public-site/doctors/{slug}", "get"),
+        ("/api/v1/public-site/availability", "get"),
         ("/api/v1/health", "get"),
     ],
 )
@@ -100,9 +304,8 @@ def test_openapi_contains_critical_routes(
 ) -> None:
     schema = _get_openapi_schema(client)
     assert path in schema["paths"], f"Missing route in OpenAPI: {path}"
-    assert (
-        method in schema["paths"][path]
-    ), f"Missing method in OpenAPI: {method.upper()} {path}"
+    method_message = f"Missing method in OpenAPI: {method.upper()} {path}"
+    assert method in schema["paths"][path], method_message
 
 
 def test_openapi_documents_public_site_detail_not_found_contract(
@@ -130,6 +333,77 @@ def test_openapi_documents_public_site_detail_not_found_contract(
     detail = components[detail_name]
     assert detail["required"] == ["code"]
     assert detail["properties"]["code"]["const"] == "public_content_not_found"
+
+
+def test_openapi_public_booking_availability_contract_is_read_only_and_redacted(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    path = "/api/v1/public-site/availability"
+    operation = schema["paths"][path]["get"]
+    assert operation["operationId"] == "public_site_get_booking_availability"
+    assert {"200", "404", "422", "503"}.issubset(operation["responses"])
+    assert not operation.get("security")
+    for status in ("200", "404", "503"):
+        assert (
+            operation["responses"][status]["headers"]["Cache-Control"]["schema"][
+                "example"
+            ]
+            == "no-store"
+        )
+
+    parameters = {item["name"]: item for item in operation["parameters"]}
+    assert set(parameters) == {"service_slug", "doctor_slug", "date"}
+    assert all(
+        item["in"] == "query" and item["required"] for item in parameters.values()
+    )
+
+    response_schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    assert (
+        response_schema["$ref"] == "#/components/schemas/PublicBookingAvailabilityOut"
+    )
+    output = schema["components"]["schemas"]["PublicBookingAvailabilityOut"]
+    assert set(output["properties"]) == {
+        "date",
+        "timezone",
+        "settings_version",
+        "slots",
+    }
+    assert output["properties"]["timezone"]["const"] == "Asia/Tashkent"
+    assert output["properties"]["settings_version"]["type"] == "integer"
+    assert output["properties"]["slots"]["items"]["format"] == "time"
+    assert not {"doctor_id", "service_id", "patient_id", "appointment_id"}.intersection(
+        output["properties"]
+    )
+
+
+def test_openapi_documents_admin_media_preview_storage_and_doctor_options(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = schema["paths"]
+
+    preview = paths["/api/v1/admin/public-site/media/{media_id}/preview"]["get"]
+    preview_content = preview["responses"]["200"]["content"]
+    assert {"image/jpeg", "image/png", "image/webp"}.issubset(preview_content)
+    assert "404" in preview["responses"]
+    assert "503" in preview["responses"]
+
+    storage_check = paths["/api/v1/admin/public-site/media/storage-check"]["post"]
+    ready_ref = storage_check["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"]
+    assert ready_ref.endswith("/PublicSiteMediaStorageReadyOut")
+    assert "503" in storage_check["responses"]
+
+    doctor_options = paths["/api/v1/services/admin/doctors"]["get"]
+    doctor_ref = doctor_options["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["items"]["$ref"]
+    doctor_schema = schema["components"]["schemas"][doctor_ref.rsplit("/", 1)[1]]
+    assert "display_name" in doctor_schema["properties"]
 
 
 def test_openapi_queue_join_contract_has_request_and_responses(
@@ -346,7 +620,25 @@ def test_openapi_queue_profile_binding_409_variants_are_typed(
     assert conflict_refs == {
         "#/components/schemas/QueueProfileBindingConflictResponse",
         "#/components/schemas/QueueProfileBindingChangedResponse",
+        "#/components/schemas/QueueProfilePublicationConflictResponse",
     }
+
+    publication_detail_ref = components["QueueProfilePublicationConflictResponse"][
+        "properties"
+    ]["detail"]["$ref"]
+    publication_detail = components[publication_detail_ref.rsplit("/", 1)[-1]]
+    assert publication_detail["properties"]["reason"]["const"] == (
+        "profile_publication_blocked"
+    )
+    assert publication_detail["properties"]["code"]["enum"] == [
+        "profile_inactive",
+        "profile_unpublished",
+        "profile_unavailable",
+        "mixed_direction_targets",
+        "ambiguous_profile_target",
+        "no_bookable_owner",
+    ]
+    assert set(publication_detail["required"]) == {"reason", "code", "message"}
 
     stale_detail = components["QueueProfileBindingChangedResponse"]["properties"][
         "detail"
@@ -371,6 +663,58 @@ def test_openapi_queue_profile_binding_409_variants_are_typed(
         ]
         == "#/components/schemas/QueueProfileBindingChangedResponse"
     )
+
+
+def test_openapi_queue_profile_parent_repair_is_typed_and_admin_scoped(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = schema["paths"]
+    components = schema["components"]["schemas"]
+
+    preview = paths["/api/v1/queues/profiles/{profile_key}/parent-repair-preview"][
+        "get"
+    ]
+    preview_response = preview["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    assert preview_response["$ref"] == (
+        "#/components/schemas/QueueProfileParentRepairPreview"
+    )
+    preview_model = components["QueueProfileParentRepairPreview"]
+    assert {
+        "current_availability_state",
+        "parent_references",
+        "target",
+        "proposed_availability_state",
+        "links",
+        "service_scope_confirmation_required",
+        "public_access_confirmation_required",
+        "can_apply",
+    }.issubset(preview_model["required"])
+    assert "security" in preview
+
+    apply = paths["/api/v1/queues/profiles/{profile_key}/parent-repair"]["post"]
+    request_schema = apply["requestBody"]["content"]["application/json"]["schema"]
+    assert request_schema["$ref"] == (
+        "#/components/schemas/QueueProfileParentRepairApplyRequest"
+    )
+    request_model = components["QueueProfileParentRepairApplyRequest"]
+    assert request_model["properties"]["reason_code"]["const"] == (
+        "resolve_parent_conflict_to_own_key"
+    )
+    assert request_model["properties"]["confirm_target"]["const"] is True
+    result_schema = apply["responses"]["200"]["content"]["application/json"]["schema"]
+    assert result_schema["$ref"] == (
+        "#/components/schemas/QueueProfileParentRepairResult"
+    )
+    for status_code in ("404", "409"):
+        error_schema = apply["responses"][status_code]["content"]["application/json"][
+            "schema"
+        ]
+        assert error_schema["$ref"] == (
+            "#/components/schemas/QueueProfileParentRepairErrorResponse"
+        )
 
 
 def test_openapi_doctor_queue_workflow_exposes_canonical_ids(
@@ -559,9 +903,10 @@ def test_openapi_has_no_duplicate_operation_id_warnings() -> None:
         for item in captured
         if "Duplicate Operation ID" in str(item.message)
     ]
-    assert (
-        not duplicate_messages
-    ), "Duplicate OpenAPI operation IDs found:\n" + "\n".join(duplicate_messages)
+    duplicate_message = "\n".join(
+        ["Duplicate OpenAPI operation IDs found:", *duplicate_messages]
+    )
+    assert not duplicate_messages, duplicate_message
 
 
 def _decorator_route(decorator: ast.expr) -> tuple[str, str] | None:
@@ -650,9 +995,10 @@ def test_fastapi_static_routes_are_declared_before_same_shape_parameter_routes()
                     f"is shadowed by {previous_route_path} at {previous_line}"
                 )
 
-    assert (
-        not shadow_messages
-    ), "Static routes declared after parameter routes:\n" + "\n".join(shadow_messages)
+    shadow_message = "\n".join(
+        ["Static routes declared after parameter routes:", *shadow_messages]
+    )
+    assert not shadow_messages, shadow_message
 
 
 def test_published_fastapi_routes_do_not_shadow_static_paths_across_routers() -> None:
@@ -686,9 +1032,10 @@ def test_published_fastapi_routes_do_not_shadow_static_paths_across_routers() ->
                 f"{previous_route_path} ({previous_route_name}) at {previous_index}"
             )
 
-    assert (
-        not shadow_messages
-    ), "Published static routes shadowed by app order:\n" + "\n".join(shadow_messages)
+    shadow_message = "\n".join(
+        ["Published static routes shadowed by app order:", *shadow_messages]
+    )
+    assert not shadow_messages, shadow_message
 
 
 def test_openapi_user_create_publishes_catalog_503_and_price_bounds(

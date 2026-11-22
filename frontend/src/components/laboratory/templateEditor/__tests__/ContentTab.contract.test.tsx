@@ -28,7 +28,11 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     expect(handlerBody).toMatch(/await\s+\(?confirm/);
     expect(handlerBody).toContain("t('confirm.delete_section_title')");
     expect(handlerBody).toContain("intent: 'danger'");
-    expect(handlerBody).toContain('if (ok) onRemoveSection(sectionIndex)');
+    // TEMPL-FE-002 (audit 3886 round 11): удаление привязано к ЗАХВАЧЕННОЙ
+    // идентичности (ключ раздела + epoch), а не к индексам, которые могут
+    // указывать на другой элемент после асинхронного подтверждения.
+    expect(handlerBody).toContain('if (ok) onRemoveSection(sectionKey, epoch, sectionRef)');
+    expect(handlerBody).toContain('const epoch = getDraftEpoch()');
   });
 
   it('wraps field removal in confirm dialog', () => {
@@ -41,7 +45,9 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     // STRAT#11: строка мигрирована на t('confirm.delete_field_title')
     expect(handlerBody).toContain("t('confirm.delete_field_title')");
     expect(handlerBody).toContain("intent: 'danger'");
-    expect(handlerBody).toContain('if (ok) onRemoveField(sectionIndex, fieldIndex)');
+    // TEMPL-FE-002 (audit 3886 round 11): удаление привязано к захваченным
+    // ключам поля и раздела + epoch, не к индексам.
+    expect(handlerBody).toContain('if (ok) onRemoveField(fieldKey, owningSectionKey, epoch, fieldRef, sectionRef)');
   });
 
   it('wires the new handlers into trash buttons', () => {

@@ -19,6 +19,9 @@ from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services.appointment_duration_snapshot import (
+    duration_snapshot_for_service_id,
+)
 from app.services.queue_service import queue_service
 from app.services.registrar_doctor_eligibility import (
     assert_doctor_eligible_for_service,
@@ -110,7 +113,9 @@ class RegistrarEditDeltaService:
         created_visit_payloads: dict[int, dict[str, Any]] = {}
 
         for item in services:
-            service = self.db.query(Service).filter(Service.id == item.service_id).first()
+            service = (
+                self.db.query(Service).filter(Service.id == item.service_id).first()
+            )
             if not service:
                 raise ValueError(f"Service {item.service_id} not found")
 
@@ -138,7 +143,9 @@ class RegistrarEditDeltaService:
                 # Codex R11 #3115 (P1): явно названный ID — строгий селектор,
                 # а не мягкое предпочтение: устаревшая идентичность — 400.
                 strict_entry_id=(
-                    int(item.queue_entry_id) if item.queue_entry_id is not None else None
+                    int(item.queue_entry_id)
+                    if item.queue_entry_id is not None
+                    else None
                 ),
             )
 
@@ -330,17 +337,23 @@ class RegistrarEditDeltaService:
             try:
                 if not isinstance(expected_iso, str) or len(expected_iso) < 19:
                     raise ValueError("Expected a full timestamp")
-                expected_dt = datetime.fromisoformat(expected_iso.replace("Z", "+00:00"))
+                expected_dt = datetime.fromisoformat(
+                    expected_iso.replace("Z", "+00:00")
+                )
             except (ValueError, TypeError) as exc:
                 raise ValueError(
                     f"Некорректная версия записи очереди #{entry_id}. "
                     "Обновите страницу, чтобы получить актуальные данные."
                 ) from exc
             expected_versions[entry_id] = (
-                expected_dt.replace(tzinfo=UTC) if expected_dt.tzinfo is None else expected_dt
+                expected_dt.replace(tzinfo=UTC)
+                if expected_dt.tzinfo is None
+                else expected_dt
             )
 
-        query = self.db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id.in_(entry_ids))
+        query = self.db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.id.in_(entry_ids)
+        )
         if patient_id is not None:
             query = query.filter(OnlineQueueEntry.patient_id == patient_id)
         entries = (
@@ -480,7 +493,9 @@ class RegistrarEditDeltaService:
             if payload is None:
                 continue
             queue_specialist = entry.queue.specialist_id if entry.queue else None
-            if queue_specialist is not None and int(queue_specialist) != int(specialist_id):
+            if queue_specialist is not None and int(queue_specialist) != int(
+                specialist_id
+            ):
                 raise ValueError(
                     f"Услуга «{service.name}» уже записана к другому врачу. "
                     "Смена врача существующей услуги выполняется переносом записи — "
@@ -523,7 +538,9 @@ class RegistrarEditDeltaService:
             )
         paid = (
             self.db.query(PaymentInvoice)
-            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+            .join(
+                PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id
+            )
             .filter(
                 PaymentInvoiceVisit.visit_id == visit.id,
                 PaymentInvoice.status == "paid",
@@ -542,7 +559,9 @@ class RegistrarEditDeltaService:
         # через скоординированную платёжную операцию, не через edit-delta.
         processing = (
             self.db.query(PaymentInvoice)
-            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+            .join(
+                PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id
+            )
             .filter(
                 PaymentInvoiceVisit.visit_id == visit.id,
                 PaymentInvoice.status == "processing",
@@ -596,7 +615,9 @@ class RegistrarEditDeltaService:
                 "недоступно: сначала отмените платёж или завершите оплату"
             )
 
-    def _apply_patient_data(self, patient: Patient, patient_data: dict[str, Any]) -> None:
+    def _apply_patient_data(
+        self, patient: Patient, patient_data: dict[str, Any]
+    ) -> None:
         if patient_data.get("full_name"):
             names = normalize_patient_name(full_name=patient_data["full_name"])
             if names["last_name"]:
@@ -726,13 +747,17 @@ class RegistrarEditDeltaService:
         )
         if lock:
             query = query.with_for_update()
-        entries = query.filter(
-            OnlineQueueEntry.patient_id == patient_id,
-            OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
-            DailyQueue.day == target_date,
-            DailyQueue.queue_tag == queue_tag,
-            DailyQueue.active.is_(True),
-        ).order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc()).all()
+        entries = (
+            query.filter(
+                OnlineQueueEntry.patient_id == patient_id,
+                OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
+                DailyQueue.day == target_date,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active.is_(True),
+            )
+            .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
+            .all()
+        )
         if preferred_entry_ids:
             preferred = [entry for entry in entries if entry.id in preferred_entry_ids]
             if preferred:
@@ -857,7 +882,11 @@ class RegistrarEditDeltaService:
     ) -> dict[str, Any]:
         services = self._coerce_services(entry.services)
         existing_payloads = self._find_service_payloads(services, service)
-        existing_qty = sum(int(self._payload_quantity(p)) for p in existing_payloads) if existing_payloads else 0
+        existing_qty = (
+            sum(int(self._payload_quantity(p)) for p in existing_payloads)
+            if existing_payloads
+            else 0
+        )
 
         # W2-PR1: смена врача существующей позиции не игнорируется молча.
         # Перенос позиции к другому врачу — операция переноса записи (own
@@ -865,7 +894,9 @@ class RegistrarEditDeltaService:
         # с явной причиной вместо имитации сохранения.
         if specialist_id is not None and existing_payloads:
             queue_specialist = entry.queue.specialist_id if entry.queue else None
-            if queue_specialist is not None and int(queue_specialist) != int(specialist_id):
+            if queue_specialist is not None and int(queue_specialist) != int(
+                specialist_id
+            ):
                 raise ValueError(
                     f"Услуга «{service.name}» уже записана к другому врачу. "
                     "Смена врача существующей услуги выполняется переносом записи — "
@@ -904,7 +935,8 @@ class RegistrarEditDeltaService:
                 fallback_unit_price=unit_price,
             )
             delta_amount = -sum(
-                (charge * Decimal(units) for _, units, charge in consumption), Decimal("0")
+                (charge * Decimal(units) for _, units, charge in consumption),
+                Decimal("0"),
             )
         elif delta_qty > 0:
             delta_amount = unit_price * Decimal(delta_qty)
@@ -939,8 +971,7 @@ class RegistrarEditDeltaService:
                     payload_row["unit_price"] = float(unit_charge)
                     raw_price = payload_row.get("price")
                     price_is_line_total = (
-                        raw_price is not None
-                        and Decimal(str(raw_price)) != unit_charge
+                        raw_price is not None and Decimal(str(raw_price)) != unit_charge
                     )
                     if remaining > 0:
                         payload_row["quantity"] = remaining
@@ -955,10 +986,14 @@ class RegistrarEditDeltaService:
             # R-41 fix: flag_modified для JSON column — без этого SQLAlchemy
             # не обнаруживает изменение mutable JSON field, update не persist'ится.
             # Silent data loss: пользователь меняет услуги, но БД не обновляется.
-            attributes.flag_modified(entry, 'services')
-            entry.service_codes = self._merged_service_codes(entry.service_codes, service)
-            attributes.flag_modified(entry, 'service_codes')
-            entry.total_amount = int(Decimal(str(entry.total_amount or 0)) + delta_amount)
+            attributes.flag_modified(entry, "services")
+            entry.service_codes = self._merged_service_codes(
+                entry.service_codes, service
+            )
+            attributes.flag_modified(entry, "service_codes")
+            entry.total_amount = int(
+                Decimal(str(entry.total_amount or 0)) + delta_amount
+            )
             entry.updated_at = changed_at
 
         visit = self._ensure_entry_visit(
@@ -978,7 +1013,9 @@ class RegistrarEditDeltaService:
                 visit=visit,
                 service=service,
                 entry=entry,
-                payload_rows=self._find_service_payloads(self._coerce_services(entry.services), service),
+                payload_rows=self._find_service_payloads(
+                    self._coerce_services(entry.services), service
+                ),
             )
 
         return self._delta_result(
@@ -1143,7 +1180,9 @@ class RegistrarEditDeltaService:
         """
         rows = (
             self.db.query(VisitService)
-            .filter(VisitService.visit_id == visit.id, VisitService.service_id == service.id)
+            .filter(
+                VisitService.visit_id == visit.id, VisitService.service_id == service.id
+            )
             .order_by(VisitService.id.asc())
             .all()
         )
@@ -1169,11 +1208,14 @@ class RegistrarEditDeltaService:
             row.code = code
             row.name = service.name
             row.currency = service.currency or "UZS"
-        for payload_row in payload_rows[len(rows):]:
+        for payload_row in payload_rows[len(rows) :]:
             self.db.add(
                 VisitService(
                     visit_id=visit.id,
                     service_id=service.id,
+                    duration_minutes_snapshot=duration_snapshot_for_service_id(
+                        self.db, service.id, doctor_id=visit.doctor_id
+                    ),
                     code=code,
                     name=service.name,
                     qty=int(self._payload_quantity(payload_row)),
@@ -1343,7 +1385,9 @@ class RegistrarEditDeltaService:
                     f"Счёт по визиту уже обрабатывается (статус {invoice.status}) — "
                     "увеличение количества выполняется через новую позицию или корректировку оплаты"
                 )
-            invoice.total_amount = Decimal(str(invoice.total_amount or 0)) + total_amount
+            invoice.total_amount = (
+                Decimal(str(invoice.total_amount or 0)) + total_amount
+            )
 
         for visit_id, visit_amount in visit_delta_amounts.items():
             link = (
@@ -1488,7 +1532,11 @@ class RegistrarEditDeltaService:
             payload_code = payload.get("code") or payload.get("service_code")
             if payload_id == service.id:
                 return payload
-            if target_code and payload_code and normalize_service_code(payload_code) == target_code:
+            if (
+                target_code
+                and payload_code
+                and normalize_service_code(payload_code) == target_code
+            ):
                 return payload
         return None
 
@@ -1514,7 +1562,11 @@ class RegistrarEditDeltaService:
             payload_code = payload.get("code") or payload.get("service_code")
             if payload_id == service.id:
                 matched.append(payload)
-            elif target_code and payload_code and normalize_service_code(payload_code) == target_code:
+            elif (
+                target_code
+                and payload_code
+                and normalize_service_code(payload_code) == target_code
+            ):
                 matched.append(payload)
         return matched
 
@@ -1545,7 +1597,9 @@ class RegistrarEditDeltaService:
                 continue
             take = min(row_qty, remaining)
             charge = (
-                self._recorded_unit_charge(entry=entry, payload=payload_row, previous_qty=row_qty)
+                self._recorded_unit_charge(
+                    entry=entry, payload=payload_row, previous_qty=row_qty
+                )
                 if payload_row.get("price") is not None
                 else fallback_unit_price
             )
@@ -1589,7 +1643,8 @@ class RegistrarEditDeltaService:
         )
         unit_sum = sum(
             (
-                Decimal(str(p.get("price") or 0)) * Decimal(int(self._payload_quantity(p) or 1))
+                Decimal(str(p.get("price") or 0))
+                * Decimal(int(self._payload_quantity(p) or 1))
                 for p in services
             ),
             Decimal("0"),
@@ -1671,7 +1726,11 @@ class RegistrarEditDeltaService:
         return deduped
 
     def _service_code(self, service: Service) -> str | None:
-        raw = service.service_code or service.code or get_service_code(service.id, self.db)
+        raw = (
+            service.service_code
+            or service.code
+            or get_service_code(service.id, self.db)
+        )
         return normalize_service_code(raw) if raw else None
 
     def _doctor_name(self, doctor_id: int | None) -> str:

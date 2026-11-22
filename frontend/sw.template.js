@@ -18,6 +18,9 @@ const OFFLINE_QUEUE_NAME = 'clinic-offline-queue';
 // pwa.ts хранит здесь офлайн-данные приложения — живёт дольше версий сборки.
 const PERSISTENT_CACHES = ['clinic-offline-data', OFFLINE_QUEUE_NAME];
 const CURRENT_CACHES = [STATIC_CACHE, DYNAMIC_CACHE, API_CACHE, ...PERSISTENT_CACHES];
+// If a no-store eviction fails, do not serve any potentially stale entry in
+// this worker's lifetime. A healthy storage can be used by the next worker.
+let noStoreEvictionFailed = false;
 
 // Файлы для кэширования при установке
 const STATIC_FILES = [
@@ -53,12 +56,13 @@ const API_CACHE_PATTERNS = [
 
 // API endpoints которые НЕ нужно кэшировать
 const NO_CACHE_PATTERNS = [
-  // Public-site HTML and sitemap reflect current publication state and must
+  // Public-site pages and API reflect current publication state and must
   // never be replayed from Cache Storage, including the offline fallback.
   /^\/$/,
   /^\/ru(?:\/|$)/,
   /^\/(?:services|doctors|prices|contacts)(?:\/|$)/,
   /^\/sitemap\.xml$/,
+  /\/api\/v1\/public-site(?:\/|$)/,
   /\/api\/v1\/auth\/login/,
   /\/api\/v1\/auth\/logout/,
   /\/api\/v1\/auth\/me/,
@@ -82,7 +86,20 @@ self.addEventListener('install', (event) => {
         // Кэшируем файлы по одному, чтобы избежать ошибок
         return Promise.allSettled(
           STATIC_FILES.map(url =>
-            cache.add(url).catch(() => {
+            fetch(url).then(async (response) => {
+              if (hasNoStore(response.headers)) {
+                // Release the unused stream so the remaining precache requests can start.
+                // A failed cancellation must not prevent stale-cache eviction.
+                await response.body?.cancel().catch(() => undefined);
+                try {
+                  await deleteCachedRequest(url);
+                } catch {
+                  noStoreEvictionFailed = true;
+                }
+              } else if (response.ok) {
+                await cache.put(url, response.clone());
+              }
+            }).catch(() => {
               console.warn('Service Worker: Failed to cache a static file');
               return null;
             })
@@ -104,15 +121,31 @@ self.addEventListener('activate', (event) => {
   console.log('Service Worker: Activating...');
 
   event.waitUntil((async () => {
-    const cacheNames = await caches.keys();
-    const stale = cacheNames.filter((name) =>
-      name.startsWith('clinic-') && !CURRENT_CACHES.includes(name)
-    );
+    try {
+      const cacheNames = await caches.keys();
+      const stale = cacheNames.filter((name) =>
+        name.startsWith('clinic-') && !CURRENT_CACHES.includes(name)
+      );
+      await Promise.all(stale.map((name) => {
+        console.log('Service Worker: Deleting an old cache');
+        return caches.delete(name);
+      }));
+    } catch {
+      noStoreEvictionFailed = true;
+      console.warn('Service Worker: Failed to delete an old cache');
+    }
 
-    await Promise.all(stale.map((name) => {
-      console.log('Service Worker: Deleting an old cache');
-      return caches.delete(name);
-    }));
+    // Prior workers may have persisted bearer tokens as navigation cache
+    // keys, including in caches intentionally retained between builds.
+    // Remove only matching entries; preserve unrelated offline clinic data.
+    try {
+      await purgeSensitiveEntries();
+    } catch {
+      // Install the fixed worker even if storage is unavailable. Until a
+      // later worker can clean it, never replay potentially stale entries.
+      noStoreEvictionFailed = true;
+      console.warn('Service Worker: Failed to clean sensitive cache entries');
+    }
 
     // Регистрируем background sync если поддерживается
     if ('sync' in self.registration) {
@@ -166,6 +199,14 @@ async function handleRequest(request) {
   const url = new URL(request.url);
 
   try {
+    // This must precede static-file and HTML routing: a sensitive path can
+    // have an extension and previously would reach cacheFirst instead.
+    if (isNoCacheRequest(request)) {
+      return await networkFirst(
+        request, DYNAMIC_CACHE,
+        request.mode === 'navigate' || isHtmlRequest(request) ? '/offline.html' : undefined,
+      );
+    }
     // Навигация: всегда сеть, кэш — только офлайн-фолбэк.
     // Стратегия гарантирует свежий index.html (и свежие хэшированные
     // ассеты) после каждого деплоя.
@@ -198,9 +239,9 @@ async function handleRequest(request) {
 
     // Sensitive and publication-sensitive routes must not replay an older
     // response from Cache Storage after the network-first request failed.
-    if (!isNoCachePath(url.pathname)) {
+    if (!isNoCacheRequest(request)) {
       const cachedResponse = await caches.match(request);
-      if (cachedResponse) {
+      if (cachedResponse && !hasNoStore(cachedResponse.headers)) {
         return cachedResponse;
       }
     }
@@ -214,15 +255,26 @@ async function cacheFirst(request, cacheName) {
   try {
     const cachedResponse = await caches.match(request);
 
-    if (cachedResponse) {
+    if (cachedResponse && !hasNoStore(cachedResponse.headers)) {
       return cachedResponse;
     }
 
     const networkResponse = await fetch(request);
 
-    if (networkResponse.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
+    if (hasNoStore(networkResponse.headers)) {
+      try {
+        await deleteCachedRequest(request);
+      } catch {
+        noStoreEvictionFailed = true;
+        console.warn('Service Worker: Failed to evict an uncached response');
+      }
+    } else if (networkResponse.ok) {
+      try {
+        const cache = await caches.open(cacheName);
+        await cache.put(request, networkResponse.clone());
+      } catch {
+        console.warn('Service Worker: Cache write failed');
+      }
     }
 
     return networkResponse;
@@ -230,7 +282,7 @@ async function cacheFirst(request, cacheName) {
     console.warn('Service Worker: Cache first failed');
     // Возвращаем кэшированный ответ, если есть
     const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
+    if (cachedResponse && !hasNoStore(cachedResponse.headers)) {
       return cachedResponse;
     }
     // Иначе возвращаем ошибку
@@ -243,13 +295,25 @@ async function networkFirst(request, cacheName, offlineFallbackUrl) {
   // Чувствительные маршруты (payments, ai, telegram, print, auth) никогда
   // не попадают в Cache Storage — иначе на общем компьютере клиники
   // офлайн-фолбэк может отдать ответ одного пользователя другому.
-  const noCache = isNoCachePath(new URL(request.url).pathname);
+  const noCache = isNoCacheRequest(request);
   try {
     const networkResponse = await fetch(request);
 
-    if (networkResponse.ok && !noCache) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
+    if (hasNoStore(networkResponse.headers)) {
+      // Remove an older copy too: a later offline fetch must not replay it.
+      try {
+        await deleteCachedRequest(request);
+      } catch {
+        noStoreEvictionFailed = true;
+        console.warn('Service Worker: Failed to evict an uncached response');
+      }
+    } else if (networkResponse.ok && !noCache) {
+      try {
+        const cache = await caches.open(cacheName);
+        await cache.put(request, networkResponse.clone());
+      } catch {
+        console.warn('Service Worker: Cache write failed');
+      }
     }
 
     return networkResponse;
@@ -258,7 +322,7 @@ async function networkFirst(request, cacheName, offlineFallbackUrl) {
 
     const cachedResponse = noCache ? undefined : await caches.match(request);
 
-    if (cachedResponse) {
+    if (cachedResponse && !hasNoStore(cachedResponse.headers)) {
       return cachedResponse;
     }
 
@@ -285,7 +349,66 @@ function isApiRequest(pathname) {
 
 // Проверка запрета кэширования (payments, ai, telegram, print, auth)
 function isNoCachePath(pathname) {
-  return NO_CACHE_PATTERNS.some(pattern => pattern.test(pathname));
+  const decoded = decodePath(pathname);
+  return decoded === null || /(?:^|\/)(?:reset-password|password-reset)(?:\/|$)/i.test(decoded)
+    || NO_CACHE_PATTERNS.some(pattern => pattern.test(decoded));
+}
+
+function decodePath(pathname) {
+  try {
+    let decoded = pathname;
+    for (let i = 0; i < 3; i += 1) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) return next;
+      decoded = next;
+    }
+    return decoded.includes('%') ? null : decoded;
+  } catch {
+    return null;
+  }
+}
+
+function hasNoStore(headers) {
+  return /(?:^|,)\s*no-store\s*(?:,|$)/i.test(headers?.get('cache-control') || '');
+}
+
+function isSensitiveRequest(request) {
+  const url = new URL(typeof request === 'string' ? request : request.url, location.origin);
+  if (/(?:^|\/)(?:reset-password|password-reset)(?:\/|$)/i.test(decodePath(url.pathname) || '')) return true;
+  // URLSearchParams decodes percent-encoded field names; token-bearing links
+  // elsewhere (e.g. older patient invitations) must not become cache keys.
+  for (const key of url.searchParams.keys()) {
+    try {
+      if (decodeURIComponent(key).toLowerCase().includes('token')) return true;
+    } catch {
+      return true;
+    }
+  }
+  return typeof request !== 'string' && Boolean(request.headers?.get('X-Reset-Token'));
+}
+
+function isNoCacheRequest(request) {
+  const url = new URL(typeof request === 'string' ? request : request.url, location.origin);
+  return noStoreEvictionFailed || isSensitiveRequest(request) || isNoCachePath(url.pathname)
+    || (typeof request !== 'string' && (request.cache === 'no-store' || hasNoStore(request.headers)));
+}
+
+async function purgeSensitiveEntries() {
+  const names = await caches.keys();
+  for (const name of names.filter((value) => value.startsWith('clinic-'))) {
+    const cache = await caches.open(name);
+    for (const request of await cache.keys()) {
+      if (isSensitiveRequest(request)) await cache.delete(request);
+    }
+  }
+}
+
+async function deleteCachedRequest(request) {
+  const names = await caches.keys();
+  for (const name of names.filter((value) => value.startsWith('clinic-'))) {
+    const cache = await caches.open(name);
+    await cache.delete(request, { ignoreVary: true });
+  }
 }
 
 // Проверка HTML запросов
@@ -397,8 +520,20 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CACHE_URLS') {
     event.waitUntil(
       caches.open(DYNAMIC_CACHE)
-        .then((cache) => {
-          return cache.addAll(event.data.urls);
+        .then(async (cache) => {
+          for (const url of event.data.urls) {
+            if (isNoCacheRequest(url)) continue;
+            const response = await fetch(url);
+            if (hasNoStore(response.headers)) {
+              try {
+                await deleteCachedRequest(url);
+              } catch {
+                noStoreEvictionFailed = true;
+              }
+            } else if (response.ok) {
+              await cache.put(url, response.clone());
+            }
+          }
         })
     );
   }
@@ -431,7 +566,13 @@ async function syncClinicData() {
     for (const endpoint of endpoints) {
       try {
         const response = await fetch(endpoint);
-        if (response.ok) {
+        if (hasNoStore(response.headers)) {
+          try {
+            await deleteCachedRequest(endpoint);
+          } catch {
+            noStoreEvictionFailed = true;
+          }
+        } else if (response.ok) {
           await cache.put(endpoint, response.clone());
           console.log('Service Worker: Synced an endpoint');
         }

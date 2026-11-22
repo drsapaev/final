@@ -64,6 +64,7 @@ export function useEMRAutosave({
     const maxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastSaveTimeRef = useRef<number | null>(null);
     const pendingSaveRef = useRef(false);
+    const discardedRef = useRef(false);
 
     // audit/phase-1, BS-17: keep latest `doAutosave` in a ref so the
     // maxWait / debounce timers always invoke the CURRENT closure.
@@ -80,6 +81,8 @@ export function useEMRAutosave({
      */
     const canSave = useCallback(() => {
         // Guard conditions - do NOT save if:
+        // RETRO-3971-04 P1: явный Discard — синхронный запрет, не асинхронный GET.
+        if (discardedRef.current) return false;
         if (!isDirty) return false;           // No changes to save
         if (isSaving) return false;           // Already saving
         if (isSigned) return false;           // EMR is signed (readonly)
@@ -129,7 +132,7 @@ export function useEMRAutosave({
         try {
             onAutosaveStart?.();
 
-            const result = await saveEMR({ isDraft: true }) as { accessDenied?: boolean; conflict?: unknown } | undefined;
+            const result = await saveEMR({ isDraft: true }) as { accessDenied?: boolean; conflict?: unknown; finalized?: boolean; signed?: boolean } | undefined;
 
             if (result?.accessDenied) {
                 errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
@@ -144,15 +147,81 @@ export function useEMRAutosave({
                 return;
             }
 
-            lastSaveTimeRef.current = Date.now();
-            errorCountRef.current = 0; // Reset on success
-
-            // Check for conflict
+            // EMRAUTOSAVE-FE-001 (audit 3886): a 409 conflict is NOT a
+            // successful save. Conflict handling must precede ANY success
+            // bookkeeping — the last-successful timestamp and the error
+            // counter describe only genuinely successful saves. Policy: a
+            // conflict is a deterministic state the doctor must resolve
+            // (the UI shows the Conflict status); it neither resets the
+            // transient-error counter (that would hide flaky-network
+            // backoff state) nor increments it (backoff cannot fix a
+            // version conflict).
             if (result?.conflict) {
                 onAutosaveError?.({ type: 'conflict', ...(result as Record<string, unknown>) });
-            } else {
-                onAutosaveSuccess?.(result);
+                return;
             }
+
+            // RETRO-4007-02 (post-merge re-review of 4007): a FINALIZED_STATE
+            // 409 is a DETERMINISTIC stop, not a transient error — the server
+            // will answer the same 409 on every retry. The old branch only
+            // notified and returned, but useEMR transitions saving → error
+            // with isDirty=true, which re-renders a NEW canSave closure and
+            // re-arms the debounce: known-doomed POSTs fired window after
+            // window. The same pause the access-denied family uses — the
+            // error counter at its maximum (isPausedDueToErrors) — stops the
+            // loop; the doctor's explicit recovery (resetErrors) re-arms it.
+            if (result?.finalized) {
+                errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
+                pendingSaveRef.current = false;
+                clearTimers();
+                logger.warn('[Autosave] Paused because the EMR was finalized (signed) on the server. Use the amendment flow.');
+                onAutosaveError?.({
+                    type: 'finalized',
+                    ...(result as Record<string, unknown>),
+                    retryCount: errorCountRef.current,
+                });
+                return;
+            }
+
+            // RETRO-4007-02: the legacy signed HTTP 400 (`{ signed: true }`)
+            // is the same deterministic refusal — previously it fell through
+            // to the success bookkeeping below, stamping the last-successful
+            // timestamp for a save the server had just rejected. Deterministic
+            // stop (same pause + same explicit recovery), never a false stamp.
+            if (result?.signed) {
+                errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
+                pendingSaveRef.current = false;
+                clearTimers();
+                logger.warn('[Autosave] Paused because the EMR is signed (legacy 400 refusal). Use the amendment flow.');
+                onAutosaveError?.({
+                    type: 'signed',
+                    error: result,
+                    retryCount: errorCountRef.current,
+                });
+                return;
+            }
+
+            // RETRO-3971-02 (post-merge review of the 3969–3996 window):
+            // saveEMR resolves null/undefined when the save never actually
+            // ran for the CURRENT visit — useEMR's stale-visit bail returns
+            // null for a late failure of a previous visit, and the
+            // dermatology panel mounts its EMR container without a
+            // per-visit key, so the surviving hook instance carried the
+            // previous visit's failure into the success bookkeeping and
+            // the status indicator rendered "saved" for the new visit's
+            // fresh editor. A save that did not happen is not a success:
+            // no timestamp stamp, no error-counter reset; the drop is
+            // reported through onAutosaveError (type 'staleVisit') and the
+            // counter keeps the conflict policy (no reset, no increment).
+            if (result == null) {
+                onAutosaveError?.({ type: 'staleVisit', error: result, retryCount: errorCountRef.current });
+                return;
+            }
+
+            lastSaveTimeRef.current = Date.now();
+            errorCountRef.current = 0; // Reset on success only
+
+            onAutosaveSuccess?.(result);
         } catch (error) {
             const err = error as Record<string, unknown>;
             const response = err?.response as Record<string, unknown> | undefined;
@@ -195,6 +264,24 @@ export function useEMRAutosave({
     // to invoke the latest `doAutosave` instead of the stale one captured at
     // the time the timer was scheduled.
     doAutosaveRef.current = doAutosave;
+
+    // RETRO-3971-04 (post-merge review of the 3969–3996 window): a pending
+    // autosave debounce must not be silently discarded when the editor
+    // unmounts (SPA navigation / visit switch). Only the browser
+    // beforeunload was guarded; the dirty-effect cleanup merely cleared
+    // the timers, so keystrokes inside the debounce window never reached
+    // the server. On unmount, invoke the LATEST doAutosave once — the
+    // last-chance flush. Its own guards (canSave, the error-pause policy,
+    // isDirty) decide whether a POST actually fires, and the BS-17
+    // latest-ref guarantees the latest saveEMR closure over the LATEST
+    // state.data snapshot. saveEMR itself already guards stale-visit
+    // dispatches (RETRO-3930-01), so a post-unmount resolution cannot
+    // touch the unmounted editor's state.
+    useEffect(() => () => {
+        // RETRO-3971-04 P1: явный Discard запрещает и last-chance flush —
+        // сброшенный врачом черновик не должен уйти на сервер из деструктора.
+        if (!discardedRef.current) doAutosaveRef.current?.();
+    }, []);
 
     /**
      * Clear all timers
@@ -276,6 +363,16 @@ export function useEMRAutosave({
         }
     }, [clearTimers, canSave, doAutosave]);
 
+    // RETRO-3971-04 P1: явный Discard отличён от принудительного/неконтролируемого
+    // unmount: отменяет ждущие таймеры, сбрасывает pending-флаг и
+    // синхронно запрещает все последующие сейвы этого черновика (включая
+    // деструктор #4009). Обычный unmount продолжает использовать flush.
+    const suppressOnDiscard = useCallback(() => {
+        discardedRef.current = true;
+        pendingSaveRef.current = false;
+        clearTimers();
+    }, [clearTimers]);
+
     /**
      * Reset error count (for manual retry)
      */
@@ -307,6 +404,11 @@ export function useEMRAutosave({
 
         // Clear pending autosave
         cancel: clearTimers,
+
+        // RETRO-3971-04 P1: синхронно подавить все последующие автосейвы
+        // для явного пользовательского Discard (route-level guard диалог);
+        // обычные unmount'ы продолжают использовать flush #4009.
+        suppressOnDiscard,
 
         // Config info (for UI)
         config: {

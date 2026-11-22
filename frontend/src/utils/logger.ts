@@ -7,6 +7,7 @@
 // VITE_ENABLE_PHI_SANITIZATION=false (useful for debugging).
 
 /* eslint-disable no-console */
+import { isSensitiveVerificationUrl, redactVerificationString } from './verificationPrivacy';
 
 /**
  * Поля, содержащие PHI (Protected Health Information).
@@ -15,6 +16,7 @@
 const PHI_FIELDS: readonly string[] = [
   // Идентификаторы пациента
   'patient_id', 'patientId', 'patient_name', 'patientName',
+  'patient', 'fio', 'patient_fio', 'patientFio',
   'full_name', 'fullName', 'firstName', 'lastName', 'middleName',
   'first_name', 'last_name', 'middle_name',
   'name', 'surname', 'patronymic',
@@ -39,6 +41,8 @@ const PHI_FIELDS: readonly string[] = [
   // Аутентификация
   'password', 'token', 'access_token', 'refresh_token',
   'secret', 'api_key', 'apiKey',
+  'verification_code', 'verificationCode', 'otp_code', 'otpCode',
+  'totp_code', 'totpCode', 'backup_code', 'backupCode',
 ];
 
 const isDevelopment: boolean = import.meta.env.MODE === 'development';
@@ -46,9 +50,32 @@ const isDevelopment: boolean = import.meta.env.MODE === 'development';
 const ENABLE_SANITIZATION: boolean = import.meta.env.VITE_ENABLE_PHI_SANITIZATION !== 'false';
 
 /**
+ * REG-FE-013 (registrar audit ledger 3803): шаблон «похоже на телефонный
+ * номер» — 9–15 цифр с разделителями (пробелы/дефисы/скобки), необязательный
+ * ведущий «+». Применяется к ПРИМИТИВНЫМ строкам лога, которые никогда не
+ * проходят ключевой скраббер объектов.
+ */
+const PHONE_LIKE_RE = /\+?\d[\d\s().-]{7,}\d/g;
+
+/**
+ * Маскировка телефонных литералов в примитивных строках лога:
+ * сохраняются только последние 4 цифры («phone tail only», AGENTS.md).
+ * Короткие цифровые последовательности (id, суммы) и даты не затрагиваются.
+ */
+export function maskPhoneLiterals(text: string): string {
+  return text.replace(PHONE_LIKE_RE, (match) => {
+    const digits = match.replace(/\D/g, '');
+    if (digits.length < 9 || digits.length > 15) {
+      return match;
+    }
+    return `+****${digits.slice(-4)}`;
+  });
+}
+
+/**
  * Санитизация объекта — замена PHI на [REDACTED].
  */
-function sanitize(data: unknown, depth: number = 0, seen: WeakSet<object> = new WeakSet()): unknown {
+function sanitize(data: unknown, depth: number = 0, seen: WeakSet<object> = new WeakSet(), verification = false): unknown {
   // Защита от глубокой рекурсии
   if (depth > 3) {
     return '[MAX_DEPTH]';
@@ -61,7 +88,7 @@ function sanitize(data: unknown, depth: number = 0, seen: WeakSet<object> = new 
 
   // Примитивы (number, string, boolean)
   if (typeof data !== 'object') {
-    return data;
+    return typeof data === 'string' ? redactVerificationString(data) : data;
   }
 
   // Защита от циклических ссылок
@@ -95,8 +122,14 @@ function sanitize(data: unknown, depth: number = 0, seen: WeakSet<object> = new 
       if (data.length > 5) {
         return `[Array(${data.length}) - showing first 5]`;
       }
-      return data.map((item) => sanitize(item, depth + 1, seen));
+      return data.map((item) => sanitize(item, depth + 1, seen, verification));
     }
+
+    const source = data as Record<string, unknown>;
+    const config = source.config && typeof source.config === 'object'
+      ? source.config as Record<string, unknown> : undefined;
+    const sensitive = verification || isSensitiveVerificationUrl(source.url)
+      || isSensitiveVerificationUrl(source.path) || isSensitiveVerificationUrl(config?.url);
 
     // Объекты — быстрая проверка размера
     const keys = Object.keys(data);
@@ -116,6 +149,16 @@ function sanitize(data: unknown, depth: number = 0, seen: WeakSet<object> = new 
       }
 
       const lowerKey = key.toLowerCase();
+      const normalizedKey = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().replace(/-/g, '_');
+
+      if (['otp', 'totp', 'verification_code', 'otp_code', 'totp_code', 'backup_code'].includes(normalizedKey) || (sensitive && (
+        ['code', 'message', 'custom_message', 'query', 'query_string'].includes(normalizedKey)
+        || (['data', 'body'].includes(normalizedKey) && typeof value === 'string')
+      ))) {
+        sanitized[key] = '[REDACTED]';
+        count++;
+        continue;
+      }
 
       // Быстрая проверка PHI (без toLowerCase в цикле)
       let isPHI = false;
@@ -129,9 +172,9 @@ function sanitize(data: unknown, depth: number = 0, seen: WeakSet<object> = new 
       if (isPHI) {
         sanitized[key] = '[REDACTED]';
       } else if (typeof value === 'object' && value !== null) {
-        sanitized[key] = sanitize(value, depth + 1, seen);
+        sanitized[key] = sanitize(value, depth + 1, seen, sensitive);
       } else {
-        sanitized[key] = value;
+        sanitized[key] = typeof value === 'string' ? redactVerificationString(value) : value;
       }
 
       count++;
@@ -154,17 +197,27 @@ function formatArgs(args: unknown[]): unknown[] {
 
   try {
     return args.map((arg) => {
-      // Пропускаем примитивы как есть
+      // REG-FE-013: примитивные строки проходят маскировку телефонных
+      // литералов — интерполированный в сообщение телефон не минует
+      // приватность-скраббер (ключевой скраббер работает только по ключам
+      // объектов).
+      if (typeof arg === 'string') {
+        return maskPhoneLiterals(redactVerificationString(arg));
+      }
+
+      // Пропускаем остальные примитивы как есть
       if (arg === null || arg === undefined || typeof arg !== 'object') {
         return arg;
       }
 
       // Error объекты — показываем только message
       if (arg instanceof Error) {
+        const config = (arg as Error & { config?: { url?: unknown } }).config;
+        const verification = isSensitiveVerificationUrl(config?.url);
         return {
           name: arg.name,
-          message: arg.message,
-          stack: arg.stack?.split('\n').slice(0, 3).join('\n'),
+          message: verification ? '[REDACTED]' : maskPhoneLiterals(redactVerificationString(arg.message)),
+          stack: verification ? '[REDACTED]' : (arg.stack ? maskPhoneLiterals(redactVerificationString(arg.stack.split('\n').slice(0, 3).join('\n'))) : undefined),
         };
       }
 

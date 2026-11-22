@@ -448,7 +448,8 @@ class TestDoctorVisitFlow:
         if response.status_code == 200:
             data = response.json()
             # Проверяем структуру ответа AI
-            assert "suggestions" in data or "codes" in data or isinstance(data, list)
+            assert isinstance(data.get("data"), list)
+            assert data.get("ai_safety_meta", {}).get("requires_doctor_confirmation") is True
 
     def test_doctor_can_generate_prescription_pdf(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue

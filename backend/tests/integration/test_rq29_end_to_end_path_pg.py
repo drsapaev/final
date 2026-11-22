@@ -284,9 +284,7 @@ def pg_engine():
             ).scalar()
             dialect = conn.execute(text("select version()")).scalar()
         assert version, "alembic_version must be present after upgrade"
-        assert "PostgreSQL" in (dialect or ""), (
-            "RQ-29 proof requires real PostgreSQL"
-        )
+        assert "PostgreSQL" in (dialect or ""), "RQ-29 proof requires real PostgreSQL"
 
         yield engine
     finally:
@@ -348,8 +346,12 @@ def _deterministic_clinic_day(monkeypatch):
         "start_numbers": {},
         "max_per_day": {},
     }
-    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: dict(deterministic_settings))
-    monkeypatch.setattr(queue_core, "get_queue_settings", lambda db: dict(deterministic_settings))
+    monkeypatch.setattr(
+        clinic_crud, "get_queue_settings", lambda db: dict(deterministic_settings)
+    )
+    monkeypatch.setattr(
+        queue_core, "get_queue_settings", lambda db: dict(deterministic_settings)
+    )
 
     from app.services.display_websocket import get_display_manager
 
@@ -377,9 +379,7 @@ def pg_client(pg_session, monkeypatch):
     # their own SessionLocal() (get_db is not involved there) — patch
     # BOTH module namespaces onto the scratch database.
     monkeypatch.setattr(display_ws_module, "SessionLocal", scratch_sessionmaker)
-    monkeypatch.setattr(
-        display_ws_service_module, "SessionLocal", scratch_sessionmaker
-    )
+    monkeypatch.setattr(display_ws_service_module, "SessionLocal", scratch_sessionmaker)
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -448,10 +448,10 @@ def _assert_no_patient_phi(state) -> None:
     pins the absence of the synthetic patients' names and phone numbers
     (the exact strings a leaky payload would carry)."""
     markers = [
-        "RQ29-SYNTHETIC",   # last name shared by all three synthetic patients
-        PHONE_MAIN,         # synthetic cart patient phone
-        PHONE_WALKIN,       # synthetic direction-QR walk-in phone
-        PHONE_CANCEL,       # synthetic cancel-leg walk-in phone
+        "RQ29-SYNTHETIC",  # last name shared by all three synthetic patients
+        PHONE_MAIN,  # synthetic cart patient phone
+        PHONE_WALKIN,  # synthetic direction-QR walk-in phone
+        PHONE_CANCEL,  # synthetic cancel-leg walk-in phone
     ]
 
     def _walk(node) -> None:
@@ -604,9 +604,7 @@ def world(pg_session, pg_client):
         rows = listing.json()
         if isinstance(rows, dict):
             rows = rows.get("items") or rows.get("resources") or []
-        resource = next(
-            r for r in rows if r.get("code") == "SYNTHETIC-rq29-lab-cab"
-        )
+        resource = next(r for r in rows if r.get("code") == "SYNTHETIC-rq29-lab-cab")
     else:
         assert resp.status_code == 201, resp.text
         resource = resp.json()
@@ -623,13 +621,13 @@ def world(pg_session, pg_client):
     rows = listing.json()
     if isinstance(rows, dict):
         rows = rows.get("items") or rows.get("resources") or []
-    resource = next(
-        r for r in rows if r.get("code") == "SYNTHETIC-rq29-lab-cab"
-    )
+    resource = next(r for r in rows if r.get("code") == "SYNTHETIC-rq29-lab-cab")
     assert resource["active"] is True, resource
 
     # --- direction (model seed per rq24b) + permanent address -------
-    stale = pg_session.query(QueueProfile).filter(QueueProfile.key == DIRECTION_KEY).all()
+    stale = (
+        pg_session.query(QueueProfile).filter(QueueProfile.key == DIRECTION_KEY).all()
+    )
     for profile in stale:
         pg_session.delete(profile)
     pg_session.commit()
@@ -637,7 +635,11 @@ def world(pg_session, pg_client):
         key=DIRECTION_KEY,
         title="RQ-29 synthetic direction",
         title_ru="RQ-29 синтетическое направление",
-        queue_tags=[DOCTOR_SPECIALTY, LAB_TAG],
+        # Keep the new public direction on its own lab tag. Sharing the
+        # existing cardiology tag would make a later legacy Doctor token
+        # ambiguous after this direction is archived; the cardiology path
+        # is covered independently by the registrar cart in this scenario.
+        queue_tags=[LAB_TAG],
         display_order=9,
         is_active=True,
         show_on_qr_page=True,
@@ -666,9 +668,7 @@ def world(pg_session, pg_client):
     resp = pg_client.get(ENTRY_METHODS.replace("{profile_key}", DIRECTION_KEY))
     assert resp.status_code == 200, resp.text
     permanent_after = next(
-        m
-        for m in resp.json()["entry_methods"]
-        if m["method"] == "permanent_address"
+        m for m in resp.json()["entry_methods"] if m["method"] == "permanent_address"
     )
 
     # --- registrar patient book (REAL API search -> create) ---------
@@ -730,9 +730,7 @@ def _step1_admin_setup_and_direction_are_reachable(world):
     assert world["resource"]["default_cabinet"] == "204"
 
 
-def _step2_admin_edits_service_and_registrar_finds_patient(
-    pg_client, world
-):
+def _step2_admin_edits_service_and_registrar_finds_patient(pg_client, world):
     """Steps 2-3 of the combined path: the admin RETURNS TO EDITING the
     service through the REAL services API (price fix), and the registrar
     finds the patient (empty search for an unknown phone, the created
@@ -762,9 +760,7 @@ def _step2_admin_edits_service_and_registrar_finds_patient(
         PATIENTS_PATH, params={"q": "RQ29-SYNTHETIC"}, headers=registrar_h
     )
     assert resp.status_code == 200, resp.text
-    matches = [
-        p for p in resp.json() if (p.get("phone") or "").endswith(PHONE_MAIN)
-    ]
+    matches = [p for p in resp.json() if (p.get("phone") or "").endswith(PHONE_MAIN)]
     assert matches, "the registrar must find the synthetic patient by name"
     assert matches[0]["id"] == world["patient"]["id"]
 
@@ -842,9 +838,11 @@ def _step3_wizard_cart_refusal_then_confirmed_quote_success(
         }
 
     before_refusal = _partial_state_counts()
-    assert before_refusal == {"invoices": 0, "visits": 0, "queue_entries": 0}, (
-        "the synthetic patient must be fresh before the refused save"
-    )
+    assert before_refusal == {
+        "invoices": 0,
+        "visits": 0,
+        "queue_entries": 0,
+    }, "the synthetic patient must be fresh before the refused save"
 
     resp = pg_client.post(CART_PATH, json=cart_payload, headers=registrar_h)
     assert resp.status_code == 400, (
@@ -861,9 +859,9 @@ def _step3_wizard_cart_refusal_then_confirmed_quote_success(
     # The registrar fixes the required link (doctor of the SAME
     # specialty, active — the eligibility contract).
     cardiology_doctor_id = world_doctor_id_resolved(pg_session, "rq29_doc")
-    cart_payload["visits"] = [
-        dict(visits[0], doctor_id=cardiology_doctor_id)
-    ] + visits[1:]
+    cart_payload["visits"] = [dict(visits[0], doctor_id=cardiology_doctor_id)] + visits[
+        1:
+    ]
     resp = pg_client.post(CART_PATH, json=cart_payload, headers=registrar_h)
     assert resp.status_code == 200, resp.text
     cart = resp.json()
@@ -898,9 +896,9 @@ def _step3_wizard_cart_refusal_then_confirmed_quote_success(
         )
         .first()
     )
-    assert resource_queue is not None, (
-        "cart lab visit must land on the resource axis (XOR owner)"
-    )
+    assert (
+        resource_queue is not None
+    ), "cart lab visit must land on the resource axis (XOR owner)"
     assert resource_queue.specialist_id is None
 
     # Return the step artifacts to the continuous-path caller (explicit
@@ -912,9 +910,7 @@ def _step3_wizard_cart_refusal_then_confirmed_quote_success(
     }
 
 
-def _step4_direction_qr_partial_join_repeat_and_probe(
-    pg_client, pg_session, world
-):
+def _step4_direction_qr_partial_join_repeat_and_probe(pg_client, pg_session, world):
     """Step 4 + 7 of the combined path: the patient records through the
     direction's QR — the profile choice succeeds while ONE extra choice
     (a doctor of another specialty, not part of this direction) refuses;
@@ -922,9 +918,7 @@ def _step4_direction_qr_partial_join_repeat_and_probe(
     probe oracle classifies the attempt; the REPEATED command replays
     the saved result and creates no duplicate tickets."""
     # The direction's permanent address resolves its owners.
-    resp = pg_client.post(
-        PUBLIC_START.replace("{public_code}", world["public_code"])
-    )
+    resp = pg_client.post(PUBLIC_START.replace("{public_code}", world["public_code"]))
     assert resp.status_code == 200, resp.text
     start_body = resp.json()
     session_token = start_body["session_token"]
@@ -985,9 +979,9 @@ def _step4_direction_qr_partial_join_repeat_and_probe(
     replay = resp.json()
     assert replay.get("replayed") is True, replay
     assert replay["entries"][0]["queue_number"] == ticket
-    assert _join_entry_count() == before_repeat, (
-        "the repeated command must not create duplicate tickets"
-    )
+    assert (
+        _join_entry_count() == before_repeat
+    ), "the repeated command must not create duplicate tickets"
 
     return {"direction_ticket": ticket, "direction_session_payload": payload}
 
@@ -1015,9 +1009,9 @@ def _step5_performer_scope_consistency_and_second_session(
         if assignment.get("queue_tag") == DOCTOR_SPECIALTY
     }
     doctor_numbers = {e["number"] for e in doctor_body["entries"]}
-    assert cart_numbers & doctor_numbers, (
-        "the cart consultation ticket must be on the cardiology doctor's queue"
-    )
+    assert (
+        cart_numbers & doctor_numbers
+    ), "the cart consultation ticket must be on the cardiology doctor's queue"
 
     # The OTHER doctor (dermatology) must not see the cardiology work.
     resp = pg_client.get(
@@ -1027,9 +1021,9 @@ def _step5_performer_scope_consistency_and_second_session(
     assert resp.status_code == 200, resp.text
     other_body = resp.json()
     other_numbers = {e["number"] for e in (other_body.get("entries") or [])}
-    assert not (cart_numbers & other_numbers), (
-        "a doctor of another specialty must not receive the ticket"
-    )
+    assert not (
+        cart_numbers & other_numbers
+    ), "a doctor of another specialty must not receive the ticket"
 
     # Lab panel: the direction walk-in (resource axis) is delivered.
     resp = pg_client.get(LAB_QUEUE_TODAY, headers=_auth_headers(world["lab_user"]))
@@ -1040,9 +1034,7 @@ def _step5_performer_scope_consistency_and_second_session(
     # Registrar worklist: both axes with the registry owner/cabinet.
     resp = pg_client.get(REGISTRAR_TODAY, headers=world["registrar_h"])
     assert resp.status_code == 200, resp.text
-    buckets = {
-        (q.get("specialty") or "").lower(): q for q in resp.json()["queues"]
-    }
+    buckets = {(q.get("specialty") or "").lower(): q for q in resp.json()["queues"]}
     doctor_bucket = buckets.get(DOCTOR_SPECIALTY)
     lab_bucket = buckets.get(LAB_TAG) or buckets.get("laboratory")
     assert doctor_bucket, f"registrar must see the doctor queue; got {list(buckets)}"
@@ -1052,9 +1044,7 @@ def _step5_performer_scope_consistency_and_second_session(
 
     # Public board (privacy 'none' first, like rq24b): no PHI, matching
     # numbers distinguishable by owner axis.
-    boards = pg_client.get(
-        "/api/v1/admin/display/boards", headers=world["admin_h"]
-    )
+    boards = pg_client.get("/api/v1/admin/display/boards", headers=world["admin_h"])
     assert boards.status_code == 200, boards.text
     board = next(b for b in boards.json() if b.get("name") == "main_board")
     resp = pg_client.put(
@@ -1072,20 +1062,18 @@ def _step5_performer_scope_consistency_and_second_session(
         key = (e.get("specialist_name"), e.get("specialist_id"))
         by_number.setdefault(e.get("number"), set()).add(key)
     ones = by_number.get(1) or by_number.get("1")
-    assert ones is not None and len(ones) >= 2, (
-        f"matching number 1 across cabinets must be distinguishable, got {ones}"
-    )
+    assert (
+        ones is not None and len(ones) >= 2
+    ), f"matching number 1 across cabinets must be distinguishable, got {ones}"
 
     # SECOND SESSION: fresh reads (the backend equivalent of a page
     # refresh / a second registrar session) see the same decisive state.
     resp = pg_client.get(REGISTRAR_TODAY, headers=world["registrar_h"])
     assert resp.status_code == 200, resp.text
-    buckets2 = {
-        (q.get("specialty") or "").lower(): q for q in resp.json()["queues"]
-    }
+    buckets2 = {(q.get("specialty") or "").lower(): q for q in resp.json()["queues"]}
     assert buckets2.get(DOCTOR_SPECIALTY), "second session lost the doctor queue"
-    assert (
-        buckets2.get(LAB_TAG) or buckets2.get("laboratory")
+    assert buckets2.get(LAB_TAG) or buckets2.get(
+        "laboratory"
     ), "second session lost the resource queue"
     resp = pg_client.get(LAB_QUEUE_TODAY, headers=_auth_headers(world["lab_user"]))
     assert resp.status_code == 200, resp.text
@@ -1115,12 +1103,10 @@ def _step6_archive_closes_future_joins_preserves_today(
     # Future joins refuse: the archived direction is unreachable through
     # its (still provisioned) permanent address — fail-closed anonymous
     # 404 with the merged refusal detail (S-15).
-    resp = pg_client.post(
-        PUBLIC_START.replace("{public_code}", world["public_code"])
-    )
-    assert resp.status_code == 404, (
-        f"archived direction must refuse future joins, got {resp.status_code}"
-    )
+    resp = pg_client.post(PUBLIC_START.replace("{public_code}", world["public_code"]))
+    assert (
+        resp.status_code == 404
+    ), f"archived direction must refuse future joins, got {resp.status_code}"
     assert DIRECTION_REFUSAL_DETAIL in resp.text
 
     # Today's tickets/history preserved on REAL PostgreSQL: the cart's
@@ -1141,9 +1127,7 @@ def _step6_archive_closes_future_joins_preserves_today(
     # The staff surfaces keep showing the live work.
     resp = pg_client.get(REGISTRAR_TODAY, headers=world["registrar_h"])
     assert resp.status_code == 200, resp.text
-    buckets = {
-        (q.get("specialty") or "").lower(): q for q in resp.json()["queues"]
-    }
+    buckets = {(q.get("specialty") or "").lower(): q for q in resp.json()["queues"]}
     assert buckets.get(DOCTOR_SPECIALTY), "archive must not hide the live doctor queue"
 
 
@@ -1203,9 +1187,9 @@ def _step7_partial_payment_then_partial_service_cancel(
         f"(id={oldest_visit.id}, created_at={oldest_visit.created_at}) of "
         f"{sorted(visit_ids)}, got {sorted(paid_visit_ids)}"
     )
-    assert sum(float(a["amount"]) for a in payment["allocations"]) == 30000.0, (
-        payment["allocations"]
-    )
+    assert sum(float(a["amount"]) for a in payment["allocations"]) == 30000.0, payment[
+        "allocations"
+    ]
     resp = pg_client.get(CASHIER_PENDING, headers=cashier_h)
     assert resp.status_code == 200, resp.text
     rows2 = resp.json().get("items") or resp.json().get("payments") or []
@@ -1213,9 +1197,7 @@ def _step7_partial_payment_then_partial_service_cancel(
         (r for r in rows2 if r.get("patient_id") == world["patient"]["id"]),
         None,
     )
-    assert target2 is not None, (
-        "the remaining 60000 debt must stay visible as pending"
-    )
+    assert target2 is not None, "the remaining 60000 debt must stay visible as pending"
     # Owner review round-2 P2: the pending record's presence alone does
     # not prove the acceptance contract — the REMAINING AMOUNT must be
     # pinned too (90000 invoice - 30000 paid = 60000 exactly).
@@ -1237,9 +1219,7 @@ def _step7_partial_payment_then_partial_service_cancel(
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["token"]
-    joined = _anonym_join(
-        pg_client, token, "RQ29-SYNTHETIC Глеб", PHONE_CANCEL
-    )
+    joined = _anonym_join(pg_client, token, "RQ29-SYNTHETIC Глеб", PHONE_CANCEL)
     assert joined["result"]["success"] is True
     entry = (
         pg_session.query(OnlineQueueEntry)
@@ -1285,16 +1265,14 @@ def _step7_partial_payment_then_partial_service_cancel(
     for row in walkin_entries:
         if not row.services:
             continue
-        svc_ids = {
-            s.get("service_id") for s in _json.loads(row.services)
-        }
+        svc_ids = {s.get("service_id") for s in _json.loads(row.services)}
         if world["service_ids"]["extended"] in svc_ids:
             independent_extended = row
         if world["service_ids"]["consult"] in svc_ids:
             independent_consult = row
-    assert independent_extended is not None, (
-        "the full-update must create the independent entry for the added service"
-    )
+    assert (
+        independent_extended is not None
+    ), "the full-update must create the independent entry for the added service"
     assert independent_extended.total_amount == 40000, (
         f"the extended independent entry carries its own price, got "
         f"{independent_extended.total_amount}"
@@ -1304,9 +1282,7 @@ def _step7_partial_payment_then_partial_service_cancel(
     # Supported partial cancellation of ONE service (the extended one):
     # marked cancelled with audit fields, the entry total recalculated.
     resp = pg_client.post(
-        ONLINE_ENTRY_CANCEL_SERVICE.replace(
-            "{entry_id}", str(independent_extended.id)
-        ),
+        ONLINE_ENTRY_CANCEL_SERVICE.replace("{entry_id}", str(independent_extended.id)),
         json={
             "service_id": world["service_ids"]["extended"],
             "cancel_reason": "SYNTHETIC RQ-29 partial cancel",
@@ -1324,9 +1300,7 @@ def _step7_partial_payment_then_partial_service_cancel(
     )
     services_after = _json.loads(cancelled_entry.services)
     cancelled = next(
-        s
-        for s in services_after
-        if s["service_id"] == world["service_ids"]["extended"]
+        s for s in services_after if s["service_id"] == world["service_ids"]["extended"]
     )
     assert cancelled.get("cancelled") is True
     assert cancelled.get("cancel_reason") == "SYNTHETIC RQ-29 partial cancel"
@@ -1339,9 +1313,9 @@ def _step7_partial_payment_then_partial_service_cancel(
         "the audit trail must persist the cancel request's was_paid flag "
         f"as was_paid_before_cancel=False, got {cancelled.get('was_paid_before_cancel')!r}"
     )
-    assert float(cancelled_entry.total_amount) == 0.0, (
-        f"the entry total must be recalculated, got {cancelled_entry.total_amount}"
-    )
+    assert (
+        float(cancelled_entry.total_amount) == 0.0
+    ), f"the entry total must be recalculated, got {cancelled_entry.total_amount}"
 
     # The OTHER assignments are intact: the consult independent entry
     # keeps its service and its price; the join entry keeps its place in
@@ -1357,18 +1331,16 @@ def _step7_partial_payment_then_partial_service_cancel(
         and not s.get("cancelled", False)
         for s in consult_svcs
     ), "the partial cancel must not touch the other service"
-    assert float(consult_entry.total_amount) == 60000.0, (
-        f"the consult entry total must be intact, got {consult_entry.total_amount}"
-    )
+    assert (
+        float(consult_entry.total_amount) == 60000.0
+    ), f"the consult entry total must be intact, got {consult_entry.total_amount}"
 
     # No payment leaked onto other visits (the grouped allocation was
     # the only payment of this scenario).
     payments = pg_session.query(Payment).all()
     assert payments, "the partial payment must exist"
     for p in payments:
-        assert p.visit_id in visit_ids, (
-            "a payment must never land on a foreign visit"
-        )
+        assert p.visit_id in visit_ids, "a payment must never land on a foreign visit"
 
 
 def world_doctor_id_resolved(pg_session, username: str) -> int:
@@ -1410,9 +1382,7 @@ def test_rq29_combined_path(pg_client, pg_session, world):
     step3 = _step3_wizard_cart_refusal_then_confirmed_quote_success(
         pg_client, pg_session, world
     )
-    _step4_direction_qr_partial_join_repeat_and_probe(
-        pg_client, pg_session, world
-    )
+    _step4_direction_qr_partial_join_repeat_and_probe(pg_client, pg_session, world)
     _step5_performer_scope_consistency_and_second_session(
         pg_client, pg_session, world, step3
     )

@@ -329,6 +329,35 @@ export const formatPreviewList = (value: unknown) => {
   return value || '';
 };
 
+// REG-FE-083 (follow-up audit 2026-11-02): выделенный форматер НОМЕРОВ
+// ТАЛОНОВ очереди. Прежде «Очередь» в предпросмотре записи печаталась
+// через formatPreviewList — он выбирает name/service_name/code/queue_name/
+// queue_tag и НИКОГДА не читает `number`, поэтому выданные номера талонов
+// (registrarQueueAdapter кладёт их в queue_numbers.number) терялись:
+// предпросмотр показывал «Кардиология» вместо «№17 — Кардиология».
+// Универсальный formatPreviewList (услуги) не меняется: у услуг нет `number`.
+// Инвариант честности: запись БЕЗ номера показывает честный плейсхолдер
+// unallocatedLabel («без номера») рядом с меткой очереди и НИКОГДА не
+// изобретает порядковый номер строки.
+export const formatPreviewQueueTickets = (value: unknown, unallocatedLabel: string) => {
+  if (Array.isArray(value)) {
+    return value.map((item: Record<string, unknown>) => {
+      if (typeof item === 'string') return item;
+      if (!item || typeof item !== 'object') return '';
+      const label = item.queue_name || item.queue_tag || item.name || item.service_name || item.code || '';
+      const number = item.number;
+      const hasNumber = number !== null && number !== undefined && number !== '';
+      if (!hasNumber) {
+        // Без номера — только метка очереди + честный плейсхолдер:
+        // никакого выдуманного «№индекс».
+        return label ? `${label} (${unallocatedLabel})` : `(${unallocatedLabel})`;
+      }
+      return label ? `№${String(number)} — ${label}` : `№${String(number)}`;
+    }).filter(Boolean).join(', ');
+  }
+  return value || '';
+};
+
 // ───────────────────────────────────────────────────────────
 // Wizard queue assignment normalization
 // ───────────────────────────────────────────────────────────

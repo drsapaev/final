@@ -14,6 +14,11 @@ from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.user import User
 from app.repositories.dental_api_repository import DentalApiRepository
 from app.services.notifications import notification_sender_service
+from app.services.price_override_approval import (
+    PENDING_DUPLICATE_DETAIL,
+    PriceOverrideApprovalError,
+    PriceOverrideApprovalService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +37,11 @@ class DentalApiService:
         db: Session,
         repository: DentalApiRepository | None = None,
     ):
+        # REGPRICE-BE-002: the canonical approval service needs the SAME
+        # session for the locked transaction. The session is kept on the
+        # SERVICE itself (repository internals are off-limits to the
+        # service layer — repository-boundary test enforces this).
+        self.db = db
         self.repository = repository or DentalApiRepository(db)
 
     @staticmethod
@@ -87,6 +97,35 @@ class DentalApiService:
         if not self._visit_belongs_to_doctor(visit=visit, doctor=doctor, user_id=user.id):
             raise DentalApiDomainError(403, "Access denied")
 
+        # DERMAPRICE-BE-001 shared policy (audit #3892, group 15): the dental
+        # sibling feeds the SAME DoctorPriceOverride workflow and the SAME
+        # shared approval — the requested service must be attached to the
+        # visit (VisitService membership), otherwise the approval would
+        # either silently skip the price update (old false-success) or be
+        # refused later at fail-closed approval time.
+        visit_service = self.repository.get_visit_service(
+            visit_id=override_data.visit_id,
+            service_id=override_data.service_id,
+        )
+        if visit_service is None:
+            raise DentalApiDomainError(
+                409,
+                "Услуга не привязана к выбранному визиту",
+            )
+
+        # REGPRICE-BE-003 (audit #3892, group 16): two sequential pending
+        # overrides for the same visit/service can be approved in reverse
+        # order — each approval validated against the SAME captured
+        # before-price, silently overwriting the newer intent. Creation is
+        # refused while one intent is still awaiting review. The probe goes
+        # through the repository (session access is boundary-forbidden in
+        # this service layer).
+        if self.repository.has_pending_override(
+            visit_id=override_data.visit_id,
+            service_id=override_data.service_id,
+        ):
+            raise DentalApiDomainError(409, PENDING_DUPLICATE_DETAIL)
+
         price_override = DoctorPriceOverride(
             visit_id=override_data.visit_id,
             doctor_id=doctor.id,
@@ -95,6 +134,9 @@ class DentalApiService:
             new_price=override_data.new_price,
             reason=override_data.reason,
             details=override_data.details,
+            # DERMAPRICE-BE-002: visit-level before-price (may differ from the
+            # catalogue reference after discounts/overrides).
+            visit_price_before=visit_service.price,
             status="pending",
         )
 
@@ -143,17 +185,25 @@ class DentalApiService:
             "Статус: Ожидает одобрения"
         )
 
+        confirmed_deliveries = 0
         for registrar in registrars:
             try:
-                if hasattr(registrar, "telegram_id") and registrar.telegram_id:
-                    await notification_sender_service.send_telegram_message(
-                        user_id=registrar.telegram_id,
-                        message=message,
-                        parse_mode="HTML",
-                    )
-                logger.info(
-                    "Уведомление о изменении цены отправлено регистратору %s",
-                    registrar.username,
+                result = await notification_sender_service.send_canonical_notification_to_user(
+                    db=self.db,
+                    recipient=registrar,
+                    event_type="dental_price_override_pending",
+                    title="Запрос стоматолога на изменение цены",
+                    message=message,
+                    source_module="dental",
+                    metadata={
+                        "override_id": price_override.id,
+                        "visit_id": price_override.visit_id,
+                        "patient_id": getattr(visit, "patient_id", None),
+                        "doctor_id": getattr(doctor, "id", None),
+                        "service_id": price_override.service_id,
+                    },
+                    entity_type="doctor_price_override",
+                    entity_id=price_override.id,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.error(
@@ -161,10 +211,31 @@ class DentalApiService:
                     registrar.username,
                     exc,
                 )
+                continue
+            if result is True:
+                confirmed_deliveries += 1
+                logger.info(
+                    "Уведомление о изменении цены доставлено регистратору %s",
+                    registrar.username,
+                )
+            else:
+                logger.error(
+                    "Отправка уведомления регистратору %s не подтверждена: %s",
+                    registrar.username,
+                    result,
+                )
 
-        price_override.notification_sent = True
-        price_override.notification_sent_at = datetime.now(UTC)
-        self.repository.commit()
+        # The flag means at least one protected inbox delivery was created;
+        # the pending request remains committed and reviewable either way.
+        if confirmed_deliveries > 0:
+            price_override.notification_sent = True
+            price_override.notification_sent_at = datetime.now(UTC)
+            self.repository.commit()
+        else:
+            logger.warning(
+                "Ни одно уведомление об изменении цены не подтверждено — "
+                "notification_sent остается False"
+            )
 
     def get_dental_price_overrides(
         self,
@@ -192,43 +263,45 @@ class DentalApiService:
         approval_data,
         user: User,
     ) -> dict[str, Any]:
-        price_override = self.repository.get_price_override(override_id)
-        if not price_override:
-            raise DentalApiDomainError(404, "Изменение цены не найдено")
-        if price_override.status != "pending":
-            raise DentalApiDomainError(
-                400,
-                f"Изменение цены уже обработано (статус: {price_override.status})",
-            )
-
+        # REGPRICE-BE-001/002/003/005 (audit #3892, group 16): the dental
+        # route previously mutated ONLY the chargeable VisitService rows and
+        # left the Visit.doctor_price_override JSON mirror stale, while the
+        # registrar sibling route mutated ONLY the JSON. Both routes now
+        # delegate to the canonical PriceOverrideApprovalService: locked
+        # decision (concurrent loser gets 409), identical approve outcome
+        # (chargeable price + JSON mirror in ONE commit), stale-intent
+        # validation (visit_price_before vs current price → 409) and the
+        # mandatory non-blank rejection reason (absent/whitespace → 400).
         action = approval_data.action
         if action not in ["approve", "reject"]:
             raise DentalApiDomainError(
                 400,
                 "Действие должно быть 'approve' или 'reject'",
             )
-        if action == "reject" and not approval_data.rejection_reason:
+        # Cheap pre-validation through the repository (unit tests drive this
+        # path with fake repositories — no session available; the canonical
+        # service below is the locked SSOT for the actual transition and
+        # re-validates under the row lock).
+        existing = self.repository.get_price_override(override_id)
+        if existing is None:
+            raise DentalApiDomainError(404, "Изменение цены не найдено")
+        if action == "reject" and not (approval_data.rejection_reason or "").strip():
             raise DentalApiDomainError(
                 400,
                 "При отклонении необходимо указать причину",
             )
 
-        price_override.status = "approved" if action == "approve" else "rejected"
-        price_override.approved_by = user.id
-        price_override.approved_at = datetime.now(UTC)
-        if action == "reject":
-            price_override.rejection_reason = approval_data.rejection_reason
-
-        if action == "approve":
-            visit_service = self.repository.get_visit_service(
-                visit_id=price_override.visit_id,
-                service_id=price_override.service_id,
+        try:
+            price_override = PriceOverrideApprovalService(
+                self.db
+            ).process(
+                override_id=override_id,
+                action=action,
+                rejection_reason=approval_data.rejection_reason,
+                approver_id=user.id,
             )
-            if visit_service:
-                visit_service.price = price_override.new_price
-                visit_service.custom_price = price_override.new_price
-
-        self.repository.commit()
+        except PriceOverrideApprovalError as exc:
+            raise DentalApiDomainError(exc.status_code, exc.detail) from exc
 
         try:
             await self.send_price_override_result_notification(
@@ -271,20 +344,44 @@ class DentalApiService:
             f"{f'Причина отклонения: {price_override.rejection_reason}' if price_override.rejection_reason else ''}"
         )
 
-        if hasattr(doctor.user, "telegram_id") and doctor.user.telegram_id:
-            await notification_sender_service.send_telegram_message(
-                user_id=doctor.user.telegram_id,
-                message=message,
-                parse_mode="HTML",
-            )
-
-        logger.info(
-            "Уведомление о результате изменения цены отправлено врачу %s",
-            doctor.user.username,
+        delivered = await notification_sender_service.send_canonical_notification_to_user(
+            db=self.db,
+            recipient=doctor.user,
+            event_type="dental_price_override_result",
+            title=f"Изменение цены {status_text.lower()}",
+            message=message,
+            source_module="dental",
+            metadata={
+                "override_id": price_override.id,
+                "visit_id": price_override.visit_id,
+                "service_id": price_override.service_id,
+                "status": price_override.status,
+            },
+            entity_type="doctor_price_override",
+            entity_id=price_override.id,
         )
 
-    def get_pending_price_overrides(self, *, limit: int) -> dict[str, Any]:
-        overrides = self.repository.list_pending_price_overrides(limit=limit)
+        if delivered:
+            logger.info(
+                "Уведомление о результате изменения цены "
+                "записано в inbox врача %s",
+                doctor.user.username,
+            )
+        else:
+            logger.warning(
+                "Не удалось записать результат изменения "
+                "цены в inbox врача %s",
+                doctor.user.username,
+            )
+
+    def get_pending_price_overrides(self, *, limit: int, offset: int = 0) -> dict[str, Any]:
+        # REGPRICE-BE-004 (audit #3892, group 16): deterministic ordering and
+        # offset pagination; total_count is the FULL pending total (not the
+        # page size) so no older request is silently unreachable.
+        overrides = self.repository.list_pending_price_overrides(
+            limit=limit, offset=offset
+        )
+        total_count = self.repository.count_pending_price_overrides()
         result = []
 
         for override in overrides:
@@ -312,6 +409,21 @@ class DentalApiService:
                         "code": self._service_code(service),
                     },
                     "original_price": float(override.original_price),
+                    # DERMAPRICE-BE-002 (audit #3892, group 15): the
+                    # reviewer additionally sees the visit's ACTUAL
+                    # before-price and the delta relative to it; the
+                    # catalogue-based original_price/price_difference keep
+                    # their immutable reference semantics.
+                    "visit_price_before": (
+                        float(override.visit_price_before)
+                        if override.visit_price_before is not None
+                        else None
+                    ),
+                    "visit_price_difference": (
+                        float(override.new_price - override.visit_price_before)
+                        if override.visit_price_before is not None
+                        else None
+                    ),
                     "new_price": float(override.new_price),
                     "price_difference": float(override.new_price - override.original_price),
                     "reason": override.reason,
@@ -326,7 +438,13 @@ class DentalApiService:
                 }
             )
 
-        return {"success": True, "overrides": result, "total_count": len(result)}
+        return {
+            "success": True,
+            "overrides": result,
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+        }
 
     def rollback(self) -> None:
         self.repository.rollback()

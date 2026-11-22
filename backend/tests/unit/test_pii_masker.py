@@ -31,7 +31,7 @@ from app.core.pii_masker import (
 
 class TestMaskPhone:
     def test_full_uz_phone_number(self):
-        assert mask_phone("+998901234567") == "+998901•••567"
+        assert mask_phone("+998901234567") == "•••567"
 
     def test_returns_none_for_none(self):
         assert mask_phone(None) is None
@@ -39,13 +39,11 @@ class TestMaskPhone:
     def test_returns_empty_for_empty(self):
         assert mask_phone("") == ""
 
-    def test_leaves_non_phone_string_untouched(self):
-        # No 9+ digits after country code → no match
-        assert mask_phone("hello") == "hello"
+    def test_unrecognized_phone_value_is_redacted(self):
+        assert mask_phone("hello") == "***"
 
-    def test_masks_only_valid_phone_pattern(self):
-        # Too short to match (less than 7 digits before last 3)
-        assert mask_phone("+99812345") == "+99812345"
+    def test_short_phone_still_hides_all_but_the_tail(self):
+        assert mask_phone("+99812345") == "•••345"
 
 
 class TestMaskEmail:
@@ -162,7 +160,7 @@ class TestMaskPii:
         result = mask_pii(patient)
         assert result["first_name"] == "A."
         assert result["last_name"] == "K."
-        assert result["phone"] == "+998901•••567"
+        assert result["phone"] == "•••567"
         assert "akmal" not in result["email"]
         assert result["iin"] == "[REDACTED]"
         assert result["diagnosis"] == "[REDACTED]"
@@ -177,7 +175,7 @@ class TestMaskPii:
             "metadata": {"count": 1},
         }
         result = mask_pii(data)
-        assert result["patient"]["phone"] == "+998901•••567"
+        assert result["patient"]["phone"] == "•••567"
         assert result["patient"]["address"] == "[REDACTED]"
         assert result["metadata"]["count"] == 1
 
@@ -196,7 +194,7 @@ class TestMaskPii:
         data = ["Call +998901234567 for help", "no PII here"]
         result = mask_pii(data)
         assert "1234567" not in result[0]
-        assert "+998901•••567" in result[0]
+        assert "•••567" in result[0]
         assert result[1] == "no PII here"
 
     def test_handles_empty_structures(self):
@@ -206,16 +204,25 @@ class TestMaskPii:
     def test_redacts_all_known_pii_keys(self):
         """Every field in PII_FIELD_PATTERNS should be redacted."""
         pii_keys = [
-            "iin", "passport_number", "doc_number",
-            "diagnosis", "icd10_code", "complaints",
-            "prescription", "medications", "allergies",
-            "visit_reason", "doctor_notes",
+            "iin",
+            "passport_number",
+            "doc_number",
+            "diagnosis",
+            "icd10_code",
+            "complaints",
+            "prescription",
+            "medications",
+            "allergies",
+            "visit_reason",
+            "doctor_notes",
             "address",
         ]
         for key in pii_keys:
             data = {key: "some value"}
             result = mask_pii(data)
-            assert result[key] == "[REDACTED]", f"Field {key!r} not redacted: {result[key]!r}"
+            assert (
+                result[key] == "[REDACTED]"
+            ), f"Field {key!r} not redacted: {result[key]!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +235,7 @@ class TestMaskStringInplace:
         text = "Patient called from +998901234567"
         result = mask_pii(text)
         assert "1234567" not in result
-        assert "+998901•••567" in result
+        assert "•••567" in result
 
     def test_masks_email_in_free_text(self):
         text = "Contact: john.doe@example.com please"
@@ -288,7 +295,7 @@ class TestPIIMaskingFilter:
         record = self._make_record("Phone +998901234567 called")
         self.filter.filter(record)
         assert "1234567" not in record.msg
-        assert "+998901•••567" in record.msg
+        assert "•••567" in record.msg
 
     def test_filter_does_not_touch_non_pii_message(self):
         record = self._make_record("User logged in successfully")
@@ -309,7 +316,7 @@ class TestPIIMaskingFilter:
         self.filter.filter(record)
         masked = record.args[0]
         assert masked["first_name"] == "A."
-        assert masked["phone"] == "+998901•••567"
+        assert masked["phone"] == "•••567"
 
     def test_filter_skips_when_no_args(self):
         record = self._make_record("Plain message no args")
@@ -329,7 +336,13 @@ class TestSecretFieldRedaction:
     def test_redacts_push_credential_keys(self):
         from app.core.pii_masker import SECRET_FIELD_PATTERNS
 
-        for key in ("token", "previous_token", "device_token", "fcm_token", "push_token"):
+        for key in (
+            "token",
+            "previous_token",
+            "device_token",
+            "fcm_token",
+            "push_token",
+        ):
             assert key in SECRET_FIELD_PATTERNS
             result = mask_pii({key: "super-secret-credential-value"})
             assert result[key] == "[REDACTED]", f"{key!r} leaked: {result[key]!r}"
@@ -415,10 +428,8 @@ class TestNestedStringValueScrubbing:
     def test_plain_string_values_keep_free_text_masking(self):
         # Phone/email inside string values are still scrubbed, prose and
         # diagnostic values survive untouched.
-        result = mask_pii(
-            {"data": "call +998901234567", "model": "iPhone 15 Pro"}
-        )
-        assert "+998901•••567" in result["data"]
+        result = mask_pii({"data": "call +998901234567", "model": "iPhone 15 Pro"})
+        assert "•••567" in result["data"]
         assert result["model"] == "iPhone 15 Pro"
 
     def test_nested_string_inside_lists_is_scrubbed(self):
@@ -478,7 +489,7 @@ class TestNestedStringValueScrubbing:
         # must still go through the free-text regex pass.
         prose = '{"not json here — call +998901234567'
         result = mask_pii({"data": prose})
-        assert "+998901•••567" in result["data"]
+        assert "•••567" in result["data"]
 
     def test_form_encoded_credential_assignment_is_scrubbed(self):
         # Round 10 (codex P1): form/urlencoded bodies carry credentials as
@@ -541,4 +552,3 @@ class TestNestedStringValueScrubbing:
         assert "pr6-secret-credential" not in result["data"]
         assert "token=" in result["data"]
         assert "[REDACTED]" in result["data"]
-

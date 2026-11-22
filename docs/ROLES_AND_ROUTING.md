@@ -3,10 +3,10 @@
 This document reflects the frontend routing contract under `frontend/src/routing/`.
 The code-first source of truth is:
 
-- `frontend/src/routing/routeRegistry.js`
-- `frontend/src/routing/routeSelectors.js`
-- `frontend/src/routing/routeGuards.jsx`
-- `frontend/src/routing/routeDocsSnapshot.js`
+- `frontend/src/routing/routeRegistry.ts`
+- `frontend/src/routing/routeSelectors.ts`
+- `frontend/src/routing/routeGuards.tsx`
+- `frontend/src/routing/routeDocsSnapshot.ts`
 
 ## Route Groups
 
@@ -68,6 +68,15 @@ Primary admin routes:
 - `/admin/user-select`
 
 Additional admin subsections remain under `/admin/*` and are tracked in the route registry.
+
+Queue administration entry points:
+
+- `/admin/setup-directions` — primary workspace for directions and queues.
+- `/admin/queue-settings` — shared queue rules.
+- `/admin/queue-cabinet-management` — today's queue cabinet assignments.
+- `/admin/services?servicesTab=queue-profiles` — queue profile management inside the services workspace. The `/admin/services` route remains the service catalog entry; the query selects a tab and does not redirect the route.
+
+These routes remain Admin-scoped in the route registry. Existing URLs stay valid and link directly to their corresponding capability.
 
 ### Internal Demo
 Internal demo surfaces are no longer part of production IA.

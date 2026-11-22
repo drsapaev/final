@@ -37,6 +37,7 @@ import type { UsePaymentsReturn } from '../../hooks/usePayments';
 import {
   buildPaymentMethodLabels,
   buildReceiptPrintPayload,
+  buildCashierPaymentPayload,
   canCreateDirectCashierPayment,
   createGroupedCashierPayment,
   isBackendGroupedCashierPayment,
@@ -99,6 +100,13 @@ export const useCashierActions = ({
   // UX Audit #4.5: anti-double-click state для action-кнопок.
   // Хранит {type, id} текущего action; пока не null — все action-кнопки disabled.
   const [processingAction, setProcessingAction] = useState<{ type?: string; id?: string | number } | null>(null);
+
+  // CSH-FE-008: single-flight guard for processPayment. CashPaymentModal now
+  // locks its own submit button, but processPayment is also reachable from
+  // other paths (hotkeys, future callers); a second in-flight call must not
+  // re-POST the non-idempotent /cashier/payments. A ref (not state) so the
+  // check is synchronous inside the same tick as the duplicate call.
+  const processPaymentInFlightRef = useRef(false);
 
   const { getDateParams, setPendingPage, bumpRefreshKey, triggerDataReload } = worklist;
   const {
@@ -176,6 +184,12 @@ export const useCashierActions = ({
   // ✅ УЛУЧШЕНИЕ: Функции для работы с оплатами через SSOT hook
   // Теперь appointment содержит сгруппированные данные пациента (все его неоплаченные визиты)
   const processPayment = async (appointment: unknown, paymentData: unknown) => {
+    // CSH-FE-008: swallow the duplicate in-flight call instead of re-POSTing.
+    if (processPaymentInFlightRef.current) {
+      logger.warn('[Cashier] processPayment ignored: another payment is already in flight');
+      return;
+    }
+    processPaymentInFlightRef.current = true;
     // CashPaymentModal declares `onProcessPayment?: (...args: unknown[]) => Promise<void>`
     // so the args arrive as `unknown`. Narrow to domain types for the body.
     const appt = appointment as Appointment;
@@ -191,12 +205,12 @@ export const useCashierActions = ({
       if (groupedPayment) {
         await createGroupedCashierPayment(appt, pData);
       } else {
-        const result = await paymentsApi.createPayment({
-          visit_id: visitId,
-          amount: pData.amount,
-          method: pData.method,
-          note: pData.note || tI18n('cashier.payment_note_default')
-        });
+        // CSH-FE-040: пейлоад строится каноническим сборщиком —
+        // «внесено/сдача» (cash) и ключ идемпотентности доходят до
+        // POST /cashier/payments без сужения (прежде терялись здесь).
+        const result = await paymentsApi.createPayment(
+          buildCashierPaymentPayload(visitId, pData, tI18n('cashier.payment_note_default')) as Parameters<typeof paymentsApi.createPayment>[0],
+        );
 
         if (!(result as { success?: boolean }).success) {
           throw new Error(tI18n('cashier.payment_visit_failed', { visitId, error: (result as { error?: string }).error }));
@@ -213,6 +227,11 @@ export const useCashierActions = ({
       const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
       setPaymentError(message);
       notify.error(message);
+    } finally {
+      // CSH-FE-008: always release the guard — both on success (the modal is
+      // closed anyway) and on failure (the modal stays open and the cashier
+      // must be able to retry the corrected amount).
+      processPaymentInFlightRef.current = false;
     }
   };
 
@@ -361,15 +380,27 @@ export const useCashierActions = ({
     try {
       if (paymentRowOrId && typeof paymentRowOrId === 'object') {
         try {
-          const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId, paymentMethodLabels, tI18n('cashier.default_patient')));
-          if (opened) {
+          const outcome = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId, paymentMethodLabels, tI18n('cashier.default_patient')));
+          // CSH-FE-044 (follow-up audit 2026-11-02): прежде обёртка
+          // возвращала «true всегда»: print() бросал исключение, а кассир
+          // видел тост «диалог печати открыт» и PDF-fallback пропускался.
+          // Теперь ветвление честное: успех = окно открыто И печать
+          // подтверждена/отложена (printInvoked|deferred); провал
+          // print-вызова ведёт в серверный PDF.
+          if (outcome?.opened && (outcome.printInvoked || outcome.deferred)) {
             notify.success(tI18n('cashier.print_dialog_opened'));
             return;
           }
 
-          logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
-            paymentId
-          });
+          if (!outcome?.opened) {
+            logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
+              paymentId
+            });
+          } else {
+            logger.warn('[Cashier] Browser print invocation failed, falling back to PDF', {
+              paymentId
+            });
+          }
         } catch (error: unknown) {
           logger.error('[Cashier] Unexpected browser receipt print error:', error);
         }

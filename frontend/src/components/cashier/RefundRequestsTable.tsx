@@ -97,7 +97,11 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
         />
       )}
 
-      {!loading && requests.length === 0 && (
+      {/* CSH-FE-017: the genuine «no refund requests» empty state is
+          error-exclusive — a failed initial fetch renders the AppError
+          surface above and must not present the outage as a confirmed
+          empty list on top of it. */}
+      {!loading && !error && requests.length === 0 && (
         <AppEmpty
           title={t('misc.rrt_net_zayavok_na_vozvrat')}
           description={t('misc.rrt_kogda_poyavyatsya_novye_zapr')}

@@ -24,8 +24,7 @@ import { LabDirtyGuardProvider, useGuardedLabNavigate } from './components/labor
 import { CommandPalette, type CommandProfile } from './components/common/CommandPalette';
 import GlobalNotificationCenter from './components/notifications/GlobalNotificationCenter';
 import Health from './pages/Health';
-import Landing from './pages/Landing';
-import { PublicSiteFallback } from './publicSitePage';
+import PublicSiteAppRoute from './PublicSiteAppRoute';
 import LoginFormStyled from './components/auth/LoginFormStyled';
 import Setup from './pages/Setup';
 import { useSetupStatus } from './hooks/useSetupStatus';
@@ -36,6 +35,7 @@ import { ROUTE_REGISTRY } from './routing/routeRegistry';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards';
 import { getRouteChromeState, type RouteProfile } from './routing/routeSelectors';
 import { sanitizeSpeedInsightsEvent } from './utils/speedInsightsPrivacy';
+import { clearPendingPublicBookingSelection } from './api/publicBooking';
 
 bootstrapStoredColorScheme();
 
@@ -66,7 +66,9 @@ const PaymentTest = lazy(() => import('./pages/PaymentTest'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired'));
 const PatientLoginPage = lazy(() => import('./pages/auth/PatientLoginPage'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
 const PatientActivatePage = lazy(() => import('./pages/auth/PatientActivatePage'));
+const PatientBookingPage = lazy(() => import('./pages/PatientBookingPage'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 const NurseTabletPage = lazy(() => import('./pages/nurse/NurseTabletPage'));
@@ -81,6 +83,8 @@ const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
 const ClinicManagement = lazy(() => import('./components/admin/ClinicManagement'));
 const QueueCabinetManagement = lazy(() => import('./components/admin/QueueCabinetManagement'));
 const AdminDoctors = lazy(() => import('./components/admin/AdminDoctors'));
+const PublicSiteMediaManager = lazy(() => import('./components/admin/PublicSiteMediaManager'));
+const PublicBookingRequestsManager = lazy(() => import('./components/admin/PublicBookingRequestsManager'));
 const AdminPatients = lazy(() => import('./components/admin/AdminPatients'));
 const AdminAppointments = lazy(() => import('./components/admin/AdminAppointments'));
 const AdminServices = lazy(() => import('./components/admin/AdminServices'));
@@ -102,13 +106,14 @@ const AllFreeApproval = lazy(() => import('./components/admin/AllFreeApproval'))
 const IntegrationDemo = lazy(() => import('./components/integration/IntegrationDemo'));
 
 const ROUTE_COMPONENTS = {
-  Landing,
-  PublicSiteFallback,
+  PublicSiteAppRoute,
   ResetPasswordPage,
   LoginFormStyled,
   ChangePasswordRequired,
   PatientLoginPage,
+  VerifyEmailPage,
   PatientActivatePage,
+  PatientBookingPage,
   Health,
   QueueJoin,
   ConfirmVisitPage,
@@ -153,6 +158,8 @@ const ROUTE_COMPONENTS = {
   ClinicManagement,
   QueueCabinetManagement,
   AdminDoctors,
+  PublicSiteMediaManager,
+  PublicBookingRequestsManager,
   AdminPatients,
   AdminAppointments,
   AdminServices,
@@ -432,6 +439,12 @@ function AppContent() {
   const location = useLocation();
   const setupStatus = useSetupStatus();
 
+  useEffect(() => {
+    const path = location.pathname.replace(/\/$/, '') || '/';
+    const selectionFlowPaths = new Set(['/booking', '/ru/booking', '/patient/login', '/patient/activate']);
+    if (!selectionFlowPaths.has(path)) clearPendingPublicBookingSelection();
+  }, [location.pathname]);
+
   if (setupStatus.isLoading && location.pathname !== '/health') {
     return <LoadingScreen />;
   }
@@ -492,7 +505,9 @@ export default function App() {
           draggable
           theme="colored"
         />
-        <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
+        {import.meta.env.VITE_DISABLE_SPEED_INSIGHTS !== '1' && (
+          <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
+        )}
       </AppProviders>
     </ThemeProvider>
   );

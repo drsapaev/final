@@ -3,6 +3,7 @@ Scheduled Backup Service
 
 ✅ SECURITY: Automated scheduled database backups
 """
+
 import asyncio
 import logging
 import os
@@ -31,7 +32,8 @@ class ScheduledBackupService:
         self._inflight: set[asyncio.Future] = set()
 
     async def start_daily_backups(
-        self, backup_time: time = time(2, 0)  # 2 AM by default
+        self,
+        backup_time: time = time(2, 0),  # 2 AM by default
     ):
         """
         Start daily backup scheduler
@@ -57,7 +59,9 @@ class ScheduledBackupService:
                         next_backup += timedelta(days=1)
 
                     wait_seconds = (next_backup - now).total_seconds()
-                    logger.info(f"⏰ Next backup scheduled for: {next_backup} (in {wait_seconds/3600:.1f} hours)")
+                    logger.info(
+                        f"⏰ Next backup scheduled for: {next_backup} (in {wait_seconds / 3600:.1f} hours)"
+                    )
 
                     await asyncio.sleep(wait_seconds)
 
@@ -130,5 +134,3 @@ class ScheduledBackupService:
                     len(self._inflight),
                 )
         logger.info("🛑 Backup scheduler stopped")
-
-

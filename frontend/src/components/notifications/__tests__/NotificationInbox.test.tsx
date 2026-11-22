@@ -141,14 +141,14 @@ describe('NotificationInbox routing', () => {
     });
   });
 
-  it.each([
+  const notificationRoutes: Array<{
+    role: string;
+    type: string;
+    expectedTarget: string;
+    deepLink?: string;
+    payloadSnapshot?: unknown;
+  }> = [
     { role: 'admin', type: 'all_free_requested', expectedTarget: '/admin/all-free-requests' },
-    {
-      role: 'admin',
-      type: 'message_received',
-      payloadSnapshot: { metadata: { conversation_id: 'conv-42' } },
-      expectedTarget: '/messages?conversation=conv-42',
-    },
     { role: 'doctor', type: 'lab_critical_result', expectedTarget: '/lab/results?critical=1' },
     { role: 'registrar', type: 'patient_registered', expectedTarget: '/registrar/patients' },
     { role: 'doctor', type: 'queue_position', expectedTarget: '/queue' },
@@ -156,7 +156,9 @@ describe('NotificationInbox routing', () => {
     { role: 'admin', type: 'payment_notification', deepLink: '/patient', expectedTarget: '/patient' },
     { role: 'admin', type: 'system_alert', expectedTarget: '/admin' },
     { role: 'registrar', type: 'system_alert', expectedTarget: '/registrar' },
-  ])(
+  ];
+
+  it.each(notificationRoutes)(
     'navigates $type to $expectedTarget via the guarded navigator',
     async ({ role, type, expectedTarget, payloadSnapshot, deepLink }) => {
       store.notifications = [
@@ -219,24 +221,28 @@ describe('NotificationInbox routing', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/start-page');
   });
 
-  it('does not push a duplicate entry when the target equals the current URL', async () => {
+  it('opens the chat overlay for message notifications without navigating to an unmounted route', async () => {
+    const onOpenChat = vi.fn();
+    window.addEventListener('openChat', onOpenChat, { once: true });
     store.notifications = [
       createNotification({
-        id: 'notification-same-url',
+        id: 'notification-message',
         type: 'message_received',
         eventType: 'message_received',
-        payloadSnapshot: { metadata: { conversation_id: 'conv-42' } },
+        payloadSnapshot: { metadata: { sender_id: 42, conversation_id: 'conv-42' } },
       }),
     ];
 
-    renderInbox({ initialEntries: ['/messages?conversation=conv-42'] });
+    renderInbox({ initialEntries: ['/start-page'] });
     fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
 
     await waitFor(() => {
-      expect(markAsSeen).toHaveBeenCalledTimes(1);
+      expect(onOpenChat).toHaveBeenCalledTimes(1);
     });
-    // Тот же URL: короткое замыкание без перехода и без новой записи истории.
-    expect(screen.getByTestId('location')).toHaveTextContent('/messages?conversation=conv-42');
+    expect((onOpenChat.mock.calls[0][0] as CustomEvent).detail).toEqual({ userId: 42 });
+    expect(screen.getByTestId('location')).toHaveTextContent('/start-page');
+    expect(markAsRead).toHaveBeenCalledTimes(1);
+    window.removeEventListener('openChat', onOpenChat);
   });
 
   // PR 3351 (review round 3, P1): центр уведомлений больше не обходит
@@ -249,9 +255,9 @@ describe('NotificationInbox routing', () => {
     store.notifications = [
       createNotification({
         id: 'notification-guarded',
-        type: 'message_received',
-        eventType: 'message_received',
-        payloadSnapshot: { metadata: { conversation_id: 'conv-42' } },
+        type: 'queue_update',
+        eventType: 'queue_update',
+        deepLink: '/queue',
       }),
     ];
 
@@ -289,7 +295,7 @@ describe('NotificationInbox routing', () => {
     await screen.findByRole('button', { name: 'Выйти без сохранения' });
     fireEvent.click(screen.getByRole('button', { name: 'Выйти без сохранения' }));
     await waitFor(() => {
-      expect(screen.getByTestId('location')).toHaveTextContent('/messages?conversation=conv-42');
+      expect(screen.getByTestId('location')).toHaveTextContent('/queue');
     });
     expect(screen.queryByRole('button', { name: 'Выйти без сохранения' })).not.toBeInTheDocument();
   });

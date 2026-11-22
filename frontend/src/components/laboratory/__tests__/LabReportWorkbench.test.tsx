@@ -21,6 +21,18 @@ const LabReportWorkbench = LabReportWorkbenchRaw as unknown as React.ComponentTy
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workbenchPath = path.resolve(__dirname, '../LabReportWorkbench.tsx');
 
+// RETRO-3970-01: честная резервация контекста — window.open('', '_blank')
+// БЕЗ feature-строки: успех возвращает Window (truthy), реальный блок —
+// null. Моделирует браузерный контракт patientFilePreview.ts (CARDHIST-FE-001).
+function makeReservedWindow(): Window {
+  return {
+    close: vi.fn(),
+    opener: 'initiator' as unknown,
+    location: { href: '' },
+  } as unknown as Window;
+}
+
+
 vi.mock('../../../api/labReporting', () => ({
   labReportingApi: {
     getInstance: vi.fn(),
@@ -140,13 +152,18 @@ describe('LabReportWorkbench', () => {
   });
 
   it('does not invent draft status in the print payload when backend status is missing', () => {
-    // P-04 fix: buildLabPrintPayload вынесена в utils/labReportNormalize.js.
+    // LABPRINT-FE-001 (audit 3886, round 14): клиентский печатный payload
+    // удалён — печать отправляет только report_instance_id (сервер
+    // материализует бланк из БД).
     // Проверяем там, что status берётся как есть, без fallback на 'DRAFT'.
-    const normalizePath = path.resolve(__dirname, '../utils/labReportNormalize.ts');
+        const normalizePath = path.resolve(__dirname, '../utils/labReportNormalize.ts');
     const source = fs.readFileSync(normalizePath, 'utf8');
 
-    expect(source).toContain('status: instance?.status || null');
-    expect(source).not.toContain('status: instance?.status || \'DRAFT\'');
+    // Клиентский печатный билдер удалён; статус печатного бланка
+    // материализует сервер из персистентной записи.
+    expect(source).not.toContain('buildLabPrintPayload');
+    const workbenchSource = fs.readFileSync(workbenchPath, 'utf8');
+    expect(workbenchSource).toContain('report_instance_id: Number(expectedInstanceId)');
   });
 
   it('does not auto-create or auto-open a report when exactly one template is allowed', async () => {
@@ -273,7 +290,8 @@ describe('LabReportWorkbench', () => {
 
   it('UX-AUDIT-QW1: requires confirm dialog before sending results to patient via Telegram', () => {
     // QW1 fix: handleNotifyPatient — необратимая отправка в Telegram.
-    // Должен вызывать useConfirm() перед POST /telegram/send-lab-results.
+    // Должен вызывать useConfirm() перед POST /telegram/send-lab-report-instance
+    // (LABN-FE-001, audit 3886 round 10: instance-scoped PDF contract).
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
     // Ищем функцию handleNotifyPatient и проверяем, что она вызывает confirm()
@@ -289,7 +307,7 @@ describe('LabReportWorkbench', () => {
     // Действие не должно выполняться без подтверждения
     expect(fnBody).toContain('if (!ok) return;');
     // Не должен быть POST до confirm
-    const postIndex = fnBody.indexOf("api.post('/telegram/send-lab-results'");
+    const postIndex = fnBody.indexOf("api.post('/telegram/send-lab-report-instance'");
     const confirmIndex = fnBody.indexOf('await confirm(');
     expect(postIndex).toBeGreaterThan(confirmIndex);
   });
@@ -384,7 +402,9 @@ describe('LabReportWorkbench', () => {
     expect(source).toContain("t('workbench.print_sent')");
     expect(source).toContain("t('workbench.print_pdf_failed')");
     expect(source).toContain("t('workbench.print_pdf_invalid')");
-    expect(source).toContain("t('workbench.print_pdf_opened')");
+    expect(source).toContain("t('workbench.print_pdf_opened_confirm')");
+    expect(source).toContain("t('workbench.print_unconfirmed')");
+    expect(source).toContain("t('workbench.print_confirm_mark_printed')");
     expect(source).toContain("t('workbench.print_pdf_blocked')");
 
     // Editor header
@@ -491,6 +511,341 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       </ThemeProvider>
     );
   }
+
+  // ── LABPRINT (audit 3886, round 14) ─────────────────────────────────
+  it('LABPRINT-FE-003: an ambiguous 2xx ACK does not mark printed, does not fall back and does not blind-retry', async () => {
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({
+      success: false,
+      ambiguous: true,
+      error: 'print_ack_unconfirmed',
+    } as never);
+    mockedApi.downloadPdf.mockReset();
+    mockedApi.markPrinted.mockReset();
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedPrintService.printLabResults).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+
+    // Известно только «подтверждения нет»: задание могло встать в очередь —
+    // никакого слепого повтора и никакого PDF-фолбэка/статуса.
+    expect(mockedApi.downloadPdf).not.toHaveBeenCalled();
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+    expect(screen.getByText(/не подтверждён/)).toBeInTheDocument();
+  });
+
+  it('LABPRINT-FE-001: the direct print call carries ONLY the report_instance_id', async () => {
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({ success: true } as never);
+    mockedApi.markPrinted.mockReset().mockResolvedValue({
+      ...reopenedDraftInstance,
+      status: 'PRINTED',
+    });
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedPrintService.printLabResults).toHaveBeenCalledTimes(1));
+
+    // До фикса: workbench собирал в браузере целый бланк
+    // (buildLabPrintPayload) с результатами и снапшотами пациента.
+    expect(mockedPrintService.printLabResults).toHaveBeenCalledWith({
+      report_instance_id: 77,
+    });
+    expect(mockedApi.markPrinted).toHaveBeenCalledWith(77);
+  });
+
+  it('LABPRINT-FE-002: the prepared PDF fallback opens ONLY on the explicit follow-up click and never marks printed by itself', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => makeReservedWindow());
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({
+      success: false,
+      error: 'printer offline',
+    } as never);
+    Object.defineProperty(URL, 'createObjectURL', {
+      writable: true,
+      configurable: true,
+      value: vi.fn(() => 'blob:lab-pdf'),
+    });
+    mockedApi.downloadPdf.mockReset().mockResolvedValue(new Blob(['%PDF-synthetic'], { type: 'application/pdf' }));
+    mockedApi.markPrinted.mockReset().mockResolvedValue({
+      ...reopenedDraftInstance,
+      status: 'PRINTED',
+    });
+    const onRefreshHistory = vi.fn();
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+      onRefreshHistory,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedApi.downloadPdf).toHaveBeenCalled());
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+
+    // RETRO-3970-01: подготовка фолбэка НЕ открывает вкладку сама — старый
+    // noopener window.open возвращал null даже при успехе, так что открытая
+    // вкладка не могла попасть в подтверждение LABPRINT-FE-002.
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Открыть PDF для печати' })).toBeInTheDocument();
+
+    // Явный второй клик — новая user activation: резервация в жесте,
+    // навигация зарезервированной вкладки на blob-URL.
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть PDF для печати' }));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(openSpy.mock.calls[0]).toEqual(['', '_blank']);
+    const reserved = openSpy.mock.results[0].value as {
+      close: ReturnType<typeof vi.fn>;
+      opener: unknown;
+      location: { href: string };
+    };
+    expect(reserved.location.href).toBe('blob:lab-pdf');
+    expect(reserved.opener).toBeNull();
+    // Открытая PDF-вкладка — НЕ физическая печать: до подтверждения
+    // оператора статус не меняется.
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Отметить как напечатанное' })).toBeInTheDocument();
+
+    // Явное подтверждение оператора — единственный путь к PRINTED.
+    fireEvent.click(screen.getByRole('button', { name: 'Отметить как напечатанное' }));
+    await waitFor(() => expect(mockedApi.markPrinted).toHaveBeenCalledWith(77));
+    await waitFor(() => expect(onRefreshHistory).toHaveBeenCalled());
+    expect(screen.getByText(/Отчёт отмечен как напечатанный/)).toBeInTheDocument();
+  });
+
+  it('RETRO-3970-01 review: the prepared PDF expires with its 60s budget — no dead link, no confirm path', async () => {
+    vi.useFakeTimers();
+    try {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => makeReservedWindow());
+      mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({
+        success: false,
+        error: 'printer offline',
+      } as never);
+      Object.defineProperty(URL, 'createObjectURL', {
+        writable: true,
+        configurable: true,
+        value: vi.fn(() => 'blob:lab-pdf'),
+      });
+      const revokeSpy = vi.fn();
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        writable: true,
+        configurable: true,
+        value: revokeSpy,
+      });
+      mockedApi.downloadPdf.mockReset().mockResolvedValue(new Blob(['%PDF-synthetic'], { type: 'application/pdf' }));
+      mockedApi.markPrinted.mockReset();
+      renderWithActiveInstance({
+        activeInstance: {
+          ...reopenedDraftInstance,
+          status: 'FINALIZED',
+          available_actions: ['print'],
+        },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+      await act(async () => {
+        for (let i = 0; i < 8; i += 1) await Promise.resolve();
+      });
+      expect(screen.getByRole('button', { name: 'Открыть PDF для печати' })).toBeInTheDocument();
+
+      // The 60s object-URL budget expires the PREPARATION itself: the open
+      // action dies with the dead link and the printed-confirmation never
+      // arms for a document that can no longer be shown.
+      await act(async () => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(revokeSpy).toHaveBeenCalledWith('blob:lab-pdf');
+      expect(screen.queryByRole('button', { name: 'Открыть PDF для печати' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Отметить как напечатанное' })).toBeNull();
+      expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+      expect(screen.getByText(/устарела/)).toBeInTheDocument();
+      expect(openSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('RETRO-3970-01 review: a zero-byte PDF is rejected before the prepare step', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => makeReservedWindow());
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({
+      success: false,
+      error: 'printer offline',
+    } as never);
+    mockedApi.downloadPdf.mockReset().mockResolvedValue(new Blob([], { type: 'application/pdf' }));
+    mockedApi.markPrinted.mockReset();
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedApi.downloadPdf).toHaveBeenCalled());
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Открыть PDF для печати' })).toBeNull();
+    expect(screen.getByText(/сформирован некорректно/)).toBeInTheDocument();
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+  });
+
+  it('RETRO-3970-01 (d): successful direct print opens NO popup and prepares no PDF tab', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => makeReservedWindow());
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({ success: true } as never);
+    mockedApi.downloadPdf.mockReset();
+    mockedApi.markPrinted.mockReset().mockResolvedValue({
+      ...reopenedDraftInstance,
+      status: 'PRINTED',
+    });
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedPrintService.printLabResults).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    await waitFor(() => expect(mockedApi.markPrinted).toHaveBeenCalledWith(77));
+
+    // Прямая печать успешна: ни вкладки, ни подготовленного PDF.
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(mockedApi.downloadPdf).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Открыть PDF для печати' })).toBeNull();
+    expect(screen.getByText(/отправлен на печать/)).toBeInTheDocument();
+  });
+
+  it('RETRO-3970-01: a blocked explicit PDF open reports honestly, keeps the fallback actionable and never marks printed', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => makeReservedWindow());
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({
+      success: false,
+      error: 'printer offline',
+    } as never);
+    Object.defineProperty(URL, 'createObjectURL', {
+      writable: true,
+      configurable: true,
+      value: vi.fn(() => 'blob:lab-pdf'),
+    });
+    mockedApi.downloadPdf.mockReset().mockResolvedValue(new Blob(['%PDF-synthetic'], { type: 'application/pdf' }));
+    mockedApi.markPrinted.mockReset();
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedApi.downloadPdf).toHaveBeenCalled());
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+
+    // True blocked reservation on the explicit click (null — no noopener lie).
+    (openSpy as unknown as ReturnType<typeof vi.fn>).mockReturnValueOnce(null);
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть PDF для печати' }));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Отметить как напечатанное' })).toBeNull();
+    expect(screen.getByText(/заблокирована/)).toBeInTheDocument();
+    // The fallback stays actionable: the operator can retry the open.
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть PDF для печати' }));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Отметить как напечатанное' })).toBeInTheDocument();
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+  });
+
+  it('RETRO-3970-01 (e): the prepared fallback belongs to its report only — switching reports drops it', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => makeReservedWindow());
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({
+      success: false,
+      error: 'printer offline',
+    } as never);
+    Object.defineProperty(URL, 'createObjectURL', {
+      writable: true,
+      configurable: true,
+      value: vi.fn(() => 'blob:lab-pdf'),
+    });
+    mockedApi.downloadPdf.mockReset().mockResolvedValue(new Blob(['%PDF-synthetic'], { type: 'application/pdf' }));
+    mockedApi.markPrinted.mockReset();
+    const { rerender } = renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        id: 77,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedApi.downloadPdf).toHaveBeenCalled());
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Открыть PDF для печати' })).toBeInTheDocument();
+
+    // The operator switches to another report before the explicit open.
+    rerender(
+      <ThemeProvider>
+        <LabReportWorkbench
+          selectedAppointment={null}
+          templates={[]}
+          templateResolution={null}
+          templateResolutionLoading={false}
+          reportHistory={[]}
+          recentReports={[]}
+          activeInstance={{ ...reopenedDraftInstance, id: 78, status: 'FINALIZED', available_actions: ['print'] }}
+          onInstanceChange={vi.fn()}
+          onOpenInstance={vi.fn()}
+          onRefreshHistory={vi.fn()}
+          onRefreshRecentReports={vi.fn()}
+          onQueueChanged={vi.fn()}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    // The stale prepared PDF is dropped: no open button, no popup, no
+    // status write for the old report.
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Открыть PDF для печати' })).toBeNull();
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+  });
 
   it('locks report values and signer inputs while another report is loading', () => {
     renderWithActiveInstance({ instanceTransitionPending: true });

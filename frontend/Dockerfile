@@ -19,12 +19,13 @@ WORKDIR /app
 
 COPY package.json /app/package.json
 COPY package-lock.json /app/package-lock.json
-RUN npm ci --legacy-peer-deps
+RUN npm ci --legacy-peer-deps --include=dev
 
 COPY src /app/src
 COPY public /app/public
 COPY index.html /app/index.html
-COPY vite.config.js /app/vite.config.js
+COPY sw.template.js /app/sw.template.js
+COPY vite.config.ts /app/vite.config.ts
 
 RUN npm run build
 

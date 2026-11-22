@@ -1,21 +1,12 @@
-/**
- * RQ-17 — text pin «ноль технических ключей» (brief §5) + checklist render.
- *
- * Brief §5: «Ноль технических ключей как обязательное знание пользователя —
- * фиксируется тестом-пином на тексты форм пути». This suite pins, on the
- * rendered path forms:
- *  1. the S-14 wizard has NO free-text inputs at all — the executor axis,
- *     tag choice and every step is a select/button/link (tag values come
- *     from the API);
- *  2. the QueueResource create form's tag control is a select fed with
- *     existing tags (no manual queue_tag entry);
- *  3. the checklist renders per-tag rows with recomputed statuses.
- */
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  AdminQueueDirectionDto,
+  AdminQueueDirectionsResponseDto,
+} from '@/types/api';
 
 vi.mock('../../../api/client', () => ({
   api: {
@@ -23,10 +14,23 @@ vi.mock('../../../api/client', () => ({
     post: vi.fn(),
     patch: vi.fn(),
   },
+  setSessionInvalidationListener: vi.fn(),
 }));
+
+vi.mock('../QueueProfilesManager', () => ({ default: () => null }));
+vi.mock('../ServiceCatalog', () => ({ default: () => null }));
 
 import { api } from '../../../api/client';
 import AdminSetupDirections from '../AdminSetupDirections';
+import AdminServices from '../AdminServices';
+import {
+  buildSetupReturnLocation as buildServicesReturnLocation,
+  parseSetupReturnContext as parseServicesReturnContext,
+} from '../AdminServices';
+import UserManagementPage, {
+  buildSetupReturnLocation as buildUsersReturnLocation,
+  parseSetupReturnContext as parseUsersReturnContext,
+} from '../UserManagement';
 
 const mockedGet = vi.mocked(api.get);
 
@@ -47,42 +51,132 @@ const profileRow = {
   queue_tags: ['lab'],
 };
 
-function mockReadSide() {
+const direction: AdminQueueDirectionDto = {
+  profile: {
+    id: 4,
+    key: 'lab-key',
+    title: 'Laboratory',
+    title_ru: 'Лаборатория',
+    queue_tags: ['lab'],
+    department_key: 'lab',
+    is_active: true,
+    show_on_qr_page: true,
+    display_order: 1,
+    icon: null,
+    color: null,
+  },
+  resolved_mode: 'booking',
+  configuration_state: 'ready',
+  configuration_reasons: [],
+  effective_availability: 'available',
+  effective_availability_reasons: [],
+  booking_targets: [
+    {
+      owner_type: 'doctor',
+      owner_id: 7,
+      queue_tag: 'lab',
+      label: 'Dr. Smith',
+      is_active: true,
+      eligible_for_new_booking: true,
+      existing_daily_queue_ids: [301],
+    },
+  ],
+  current_day_queues: [
+    {
+      daily_queue_id: 301,
+      queue_tag: 'lab',
+      owner_type: 'doctor',
+      owner_id: 7,
+    },
+  ],
+  public_availability: true,
+  permanent_address_exists: false,
+  precreate_by_tag: [
+    {
+      queue_tag: 'lab',
+      state: 'eligible',
+      can_precreate: true,
+      active_service_count: 1,
+      owner_type: 'doctor',
+      owner_id: 7,
+      existing_daily_queue_ids: [],
+      reason_codes: ['single_active_service_owner'],
+    },
+  ],
+  allowed_next_actions: [
+    {
+      kind: 'provision_permanent_address',
+      entity_type: 'queue_profile',
+      entity_id: 4,
+      entity_key: 'lab-key',
+    },
+  ],
+};
+
+const emptyUnattached = { queue_tags: [], services: [], resources: [] };
+
+function response(
+  selectedDirection: AdminQueueDirectionDto = direction,
+  asOfDay = '2026-10-18',
+): AdminQueueDirectionsResponseDto {
+  return {
+    as_of_day: asOfDay,
+    directions: [selectedDirection],
+    unattached: emptyUnattached,
+  };
+}
+
+function entryMethods(supported = false) {
+  return {
+    direction_key: 'lab-key',
+    entry_methods: [
+      { method: 'session_qr', supported: true },
+      { method: 'permanent_address', supported },
+    ],
+  };
+}
+
+function mockReadSide(directionsResponse = response()) {
   mockedGet.mockImplementation(async (url: string) => {
-    // более специфичная ветка ДО общего префикса /services:
-    // read-side активных Doctor-записей (brief §3(а), round-3 P1)
-    if (url.startsWith('/services/admin/doctors')) {
-      return { data: [{ id: 7, specialty: 'lab', cabinet: '101', active: true }] };
-    }
-    if (url.startsWith('/services')) {
-      return { data: [serviceRow] };
-    }
-    if (url.startsWith('/queues/profiles')) {
+    if (url.startsWith('/queue/admin/directions')) return { data: directionsResponse };
+    if (url.startsWith('/services?limit=1000')) return { data: [serviceRow] };
+    if (url.startsWith('/queues/profiles?active_only=false')) {
       return { data: { profiles: [profileRow] } };
     }
-    if (url.startsWith('/queue/admin/queue-resources')) {
-      return { data: [] };
-    }
-    if (url.includes('/entry-methods')) {
-      return {
-        data: {
-          direction_key: 'lab-key',
-          entry_methods: [
-            { method: 'session_qr', supported: true },
-            { method: 'permanent_address', supported: false },
-          ],
-        },
-      };
-    }
+    if (url.includes('/entry-methods')) return { data: entryMethods() };
+    if (url.startsWith('/queue/admin/queue-resources')) return { data: [] };
     return { data: {} };
   });
 }
 
-const renderScreen = () =>
+const LocationProbe = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <div>
+      <output data-testid="route-location">{location.pathname}{location.search}</output>
+      <button type="button" onClick={() => navigate(-1)}>Back</button>
+      <button type="button" onClick={() => navigate(1)}>Forward</button>
+    </div>
+  );
+};
+
+const renderScreen = (initialEntries = ['/admin/setup-directions']) =>
   render(
     <ThemeProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
+        <LocationProbe />
         <AdminSetupDirections />
+      </MemoryRouter>
+    </ThemeProvider>,
+  );
+
+const renderServices = (initialEntries: string[]) =>
+  render(
+    <ThemeProvider>
+      <MemoryRouter initialEntries={initialEntries}>
+        <LocationProbe />
+        <AdminServices />
       </MemoryRouter>
     </ThemeProvider>,
   );
@@ -92,90 +186,502 @@ beforeEach(() => {
   mockReadSide();
 });
 
-describe('AdminSetupDirections — checklist render (statuses recomputed from API)', () => {
-  it('renders a per-tag row with axis and step statuses', async () => {
+describe('AdminSetupDirections — backend facts and lazy details', () => {
+  it('localizes the directions retry action and restores rows after a failed read', async () => {
+    let reads = 0;
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url.startsWith('/queue/admin/directions')) {
+        reads += 1;
+        if (reads === 1) throw new Error('synthetic read failure');
+        return { data: response() };
+      }
+      return { data: {} };
+    });
+
     renderScreen();
 
-    const row = await waitFor(() =>
-      expect(screen.getByTestId('setup-checklist-row-lab')).toBeVisible(),
+    const retry = await screen.findByRole('button', { name: 'Повторить' });
+    expect(retry).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'admin2.sdx_retry' })).toBeNull();
+
+    await userEvent.setup().click(retry);
+
+    expect(await screen.findByTestId('setup-checklist-row-lab')).toBeVisible();
+    expect(reads).toBe(2);
+  });
+
+  it('renders server-owned direction facts before making any per-profile QR request', async () => {
+    renderScreen();
+
+    const card = await screen.findByTestId('setup-checklist-row-lab');
+    expect(within(card).getByTestId('setup-direction-targets')).toHaveTextContent('Dr. Smith');
+    expect(within(card).getByTestId('setup-direction-queues')).toHaveTextContent('Очередь №301');
+    expect(within(card).getByTestId('setup-row-public-availability')).toHaveTextContent('Доступно для записи');
+    expect(screen.getByTestId('setup-day-context')).toHaveTextContent('2026-10-18');
+    expect(mockedGet).toHaveBeenCalledWith('/queue/admin/directions');
+    expect(mockedGet.mock.calls.some(([url]) => String(url).includes('/entry-methods'))).toBe(false);
+    expect(mockedGet.mock.calls.some(([url]) => String(url).startsWith('/services'))).toBe(false);
+
+    await userEvent.setup().click(screen.getByTestId('setup-qr-expand-lab'));
+    await waitFor(() => {
+      expect(mockedGet.mock.calls.some(([url]) => String(url).includes('/entry-methods'))).toBe(true);
+    });
+    expect(await screen.findByTestId('setup-qr-block-lab')).toBeVisible();
+    expect(screen.getByTestId('setup-checklist-row-lab')).toBeVisible();
+  });
+
+  it('shows overview, conflict, and resource ownership from the DTO without inferring a doctor', async () => {
+    const overview: AdminQueueDirectionDto = {
+      ...direction,
+      profile: { ...direction.profile, is_active: false, show_on_qr_page: true },
+      resolved_mode: 'overview',
+      configuration_state: 'conflict',
+      effective_availability: 'unavailable',
+      public_availability: false,
+      booking_targets: [
+        {
+          owner_type: 'resource',
+          owner_id: 7,
+          queue_tag: 'lab',
+          label: 'Lab room',
+          is_active: true,
+          eligible_for_new_booking: false,
+          existing_daily_queue_ids: [],
+        },
+      ],
+      allowed_next_actions: [
+        {
+          kind: 'review_configuration',
+          entity_type: 'department',
+          entity_id: 9,
+          entity_key: 'lab',
+        },
+      ],
+    };
+    mockedGet.mockImplementation(async (url: string) =>
+      url.startsWith('/queue/admin/directions') ? { data: response(overview) } : { data: {} },
     );
-    expect(row).toBeDefined();
-    // doctorless-нога инварианта видна для ресурсной оси? нет — оси ещё нет;
-    // (а) не готово, (б) готово: 1 активная услуга, профиль владеет тегом.
-    expect(screen.getByTestId('setup-row-services')).toHaveTextContent('1');
-    expect(screen.getByTestId('setup-row-profile')).toBeVisible();
-    // (д) честный статус из entry-methods: provision не сделан → «не готово»
-    expect(screen.getByTestId('setup-row-permanent-address')).toBeVisible();
+
+    renderScreen();
+    const card = await screen.findByTestId('setup-checklist-row-lab');
+    expect(card).toHaveTextContent('Конфликт настроек');
+    expect(card).toHaveTextContent('Внутренний обзор нескольких очередей');
+    expect(within(card).getByTestId('setup-row-profile-active')).toHaveTextContent('В архиве');
+    expect(within(card).getByTestId('setup-row-public-setting')).toHaveTextContent('Публикация настроена');
+    expect(within(card).getByTestId('setup-row-public-availability')).toHaveTextContent('Сейчас недоступно');
+    expect(within(card).getByTestId('setup-direction-targets')).toHaveTextContent('Ресурс');
+    expect(within(card).getByTestId('setup-action-without-editor')).toBeVisible();
+    expect(card).not.toHaveTextContent('Создать врача');
+  });
+
+  it('routes parent-conflict review to the existing QueueProfile editor', async () => {
+    const conflictDirection: AdminQueueDirectionDto = {
+      ...direction,
+      configuration_state: 'conflict',
+      effective_availability: 'conflict',
+      effective_availability_reasons: ['parent_conflict'],
+      public_availability: false,
+      allowed_next_actions: [
+        {
+          kind: 'review_configuration',
+          entity_type: 'queue_profile',
+          entity_id: direction.profile.id,
+          entity_key: direction.profile.key,
+        },
+      ],
+    };
+    mockedGet.mockImplementation(async (url: string) =>
+      url.startsWith('/queue/admin/directions')
+        ? { data: response(conflictDirection) }
+        : { data: {} },
+    );
+
+    renderScreen();
+    const card = await screen.findByTestId('setup-checklist-row-lab');
+    const profileEditorLink = within(card)
+      .getAllByRole('link')
+      .find((link) => link.getAttribute('href')?.includes('setupEntityKind=queue_profile'));
+
+    expect(profileEditorLink).toBeDefined();
+    expect(profileEditorLink).toHaveAttribute('href', expect.stringContaining('servicesTab=queue-profiles'));
+    expect(profileEditorLink).toHaveAttribute('href', expect.stringContaining('setupEntityKey=lab-key'));
+    expect(within(card).queryByTestId('setup-action-without-editor')).not.toBeInTheDocument();
+  });
+
+  it('keeps direction facts visible and retries a failed QR read', async () => {
+    let reads = 0;
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url.startsWith('/queue/admin/directions')) return { data: response() };
+      if (url.includes('/entry-methods')) {
+        reads += 1;
+        if (reads === 1) throw new Error('synthetic read failure');
+        return { data: entryMethods() };
+      }
+      return { data: {} };
+    });
+
+    renderScreen();
+    await screen.findByTestId('setup-checklist-row-lab');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('setup-qr-expand-lab'));
+    expect(await screen.findByTestId('setup-qr-read-retry-lab')).toBeVisible();
+    expect(screen.getByTestId('setup-direction-queues')).toBeVisible();
+
+    await user.click(screen.getByTestId('setup-qr-read-retry-lab'));
+    expect(await screen.findByTestId('setup-qr-block-lab')).toBeVisible();
+    expect(reads).toBe(2);
+  });
+
+  it('ignores an older day response after a newer selection has loaded', async () => {
+    let resolveInitial!: (value: { data: AdminQueueDirectionsResponseDto }) => void;
+    const initial = new Promise<{ data: AdminQueueDirectionsResponseDto }>((resolve) => {
+      resolveInitial = resolve;
+    });
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url === '/queue/admin/directions') return initial;
+      if (url === '/queue/admin/directions?day=2026-10-17') {
+        return { data: response({ ...direction, profile: { ...direction.profile, title_ru: 'Новый день' } }, '2026-10-17') };
+      }
+      return { data: {} };
+    });
+
+    renderScreen();
+    fireEvent.change(screen.getByTestId('setup-day-select'), { target: { value: '2026-10-17' } });
+    expect(await screen.findByText('Новый день')).toBeVisible();
+    expect(mockedGet).toHaveBeenCalledWith('/queue/admin/directions?day=2026-10-17');
+    resolveInitial({ data: response({ ...direction, profile: { ...direction.profile, title_ru: 'Старый ответ' } }, '2026-10-18') });
+    await waitFor(() => expect(screen.queryByText('Старый ответ')).toBeNull());
+    expect(screen.getByTestId('setup-day-context')).toHaveTextContent('2026-10-17');
   });
 });
 
-describe('AdminSetupDirections — wizard «с пустой формы» (round-3 P1)', () => {
-  it('resource axis can START without an existing tag (deferred tag choice)', async () => {
-    const user = userEvent.setup();
-    renderScreen();
-
-    await waitFor(() =>
-      expect(screen.getByTestId('setup-checklist-row-lab')).toBeVisible(),
+describe('AdminSetupDirections — setup entry points', () => {
+  it('offers fixed editor links when no directions are configured', async () => {
+    mockedGet.mockImplementation(async (url: string) =>
+      url.startsWith('/queue/admin/directions')
+        ? { data: { as_of_day: '2026-10-18', directions: [], unattached: emptyUnattached } }
+        : { data: {} },
     );
 
-    await user.click(screen.getByTestId('setup-wizard-open'));
-    // кнопка resource-оси НЕ заблокирована пустым выбором тега —
-    // совершенно новое направление стартует с пустой формы
-    const axisButton = screen.getByTestId('setup-wizard-axis-resource');
-    expect(axisButton).not.toBeDisabled();
-    await user.click(axisButton);
-    expect(screen.getByTestId('setup-wizard-step-services')).toBeVisible();
-  });
-});
-
-describe('AdminSetupDirections — «ноль технических ключей» (§5 text pin)', () => {
-  it('wizard forms contain NO free-text inputs — everything is select/button/link', async () => {
-    const user = userEvent.setup();
     renderScreen();
 
-    await waitFor(() =>
-      expect(screen.getByTestId('setup-checklist-row-lab')).toBeVisible(),
-    );
-
-    await user.click(screen.getByTestId('setup-wizard-open'));
-    const wizard = screen.getByTestId('setup-wizard');
-    expect(wizard.querySelectorAll('input')).toHaveLength(0);
-
-    // шаг «услуги»: только ссылка/кнопки — никакой ручной ввод
-    await user.click(screen.getByTestId('setup-wizard-axis-doctor'));
-    expect(screen.getByTestId('setup-wizard-step-services').querySelectorAll('input')).toHaveLength(0);
-
-    // шаг «отображение»: только ссылка/кнопки
-    await user.click(screen.getByTestId('setup-wizard-services-next'));
-    expect(screen.getByTestId('setup-wizard-step-display').querySelectorAll('input')).toHaveLength(0);
-
-    // тег выбирается из существующих значений — контрол-селектор, не ввод
-    await user.click(screen.getByTestId('setup-wizard-close'));
-    await user.click(screen.getByTestId('setup-wizard-open'));
-    expect(screen.getByTestId('setup-wizard-tag-select')).toBeVisible();
+    const links = within(await screen.findByTestId('setup-editor-links')).getAllByRole('link');
+    const urls = links.map((link) => new URL(link.getAttribute('href') || '', 'http://localhost'));
+    expect(urls.map(({ pathname }) => pathname)).toEqual([
+      '/admin/services',
+      '/admin/services',
+      '/admin/users',
+    ]);
+    expect(urls[0].searchParams.get('servicesTab')).toBe('catalog');
+    expect(urls[1].searchParams.get('servicesTab')).toBe('queue-profiles');
+    for (const url of urls) {
+      expect(url.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+      expect(url.searchParams.get('setupSection')).toBe('checklist');
+      expect(url.searchParams.has('setupEntityKind')).toBe(false);
+    }
   });
 
-  it('QueueResource create form: tag is a select of existing values, not a text input', async () => {
+  it('keeps editor links available and preserves the selected specialists profile context', async () => {
+    mockReadSide(response({
+      ...direction,
+      profile: { ...direction.profile, key: 'specialists' },
+      allowed_next_actions: [],
+    }));
+    renderScreen(['/admin/setup-directions?section=checklist&day=2026-10-17&profile=specialists']);
+
+    expect(await screen.findByTestId('setup-checklist-row-lab')).toBeVisible();
+    const links = within(screen.getByTestId('setup-editor-links')).getAllByRole('link');
+    const urls = links.map((link) => new URL(link.getAttribute('href') || '', 'http://localhost'));
+
+    expect(urls.map(({ pathname }) => pathname)).toEqual([
+      '/admin/services',
+      '/admin/services',
+      '/admin/users',
+    ]);
+    expect(urls[0].searchParams.get('servicesTab')).toBe('catalog');
+    expect(urls[1].searchParams.get('servicesTab')).toBe('queue-profiles');
+    for (const url of urls) {
+      expect(url.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+      expect(url.searchParams.get('setupSection')).toBe('checklist');
+      expect(url.searchParams.get('setupProfile')).toBe('specialists');
+      expect(url.searchParams.get('setupDay')).toBe('2026-10-17');
+      expect(url.searchParams.has('setupEntityKind')).toBe(false);
+    }
+  });
+
+  it('restores a valid deep link and selected profile after mounting', async () => {
+    renderScreen(['/admin/setup-directions?section=checklist&day=2026-10-17&profile=lab-key']);
+
+    const card = await screen.findByTestId('setup-checklist-row-lab');
+    expect(card).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByTestId('setup-day-select')).toHaveValue('2026-10-17');
+    expect(mockedGet).toHaveBeenCalledWith('/queue/admin/directions?day=2026-10-17');
+    const routeUrl = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+    expect(routeUrl.pathname).toBe('/admin/setup-directions');
+    expect(routeUrl.searchParams.get('section')).toBe('checklist');
+    expect(routeUrl.searchParams.get('day')).toBe('2026-10-17');
+    expect(routeUrl.searchParams.get('profile')).toBe('lab-key');
+  });
+
+  it('stores the selected direction in the URL', async () => {
+    const user = userEvent.setup();
+    renderScreen(['/admin/setup-directions?section=checklist&day=2026-10-17']);
+
+    const card = await screen.findByTestId('setup-checklist-row-lab');
+    expect(card).not.toHaveAttribute('data-selected', 'true');
+    await user.click(screen.getByTestId('setup-select-profile-lab-key'));
+
+    const routeUrl = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+    expect(routeUrl.pathname).toBe('/admin/setup-directions');
+    expect(routeUrl.searchParams.get('section')).toBe('checklist');
+    expect(routeUrl.searchParams.get('day')).toBe('2026-10-17');
+    expect(routeUrl.searchParams.get('profile')).toBe('lab-key');
+    expect(card).toHaveAttribute('data-selected', 'true');
+  });
+
+  it('restores the resource section from a direct URL after mounting', async () => {
+    renderScreen(['/admin/setup-directions?section=resources&day=2026-10-17&profile=lab-key']);
+
+    expect(await screen.findByTestId('setup-back-to-checklist')).toBeVisible();
+    expect(screen.getByTestId('route-location')).toHaveTextContent(
+      '/admin/setup-directions?section=resources&day=2026-10-17&profile=lab-key',
+    );
+    expect(mockedGet).toHaveBeenCalledWith('/services?limit=1000');
+  });
+
+  it('normalizes invalid page context and never selects the first profile as a fallback', async () => {
+    renderScreen(['/admin/setup-directions?section=not-a-section&day=2026-02-30&profile=missing']);
+
+    const card = await screen.findByTestId('setup-checklist-row-lab');
+    await waitFor(() => {
+      expect(screen.getByTestId('route-location')).toHaveTextContent(
+        '/admin/setup-directions?section=checklist',
+      );
+    });
+    expect(card).not.toHaveAttribute('data-selected', 'true');
+    expect(screen.queryByTestId('setup-wizard-open')).toBeNull();
+    expect(screen.queryByTestId('setup-wizard')).toBeNull();
+  });
+
+  it('removes a setup-page day with ISO year zero', async () => {
+    renderScreen(['/admin/setup-directions?section=checklist&day=0000-01-01']);
+
+    await screen.findByTestId('setup-checklist-row-lab');
+    await waitFor(() => {
+      const routeUrl = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+      expect(routeUrl.searchParams.has('day')).toBe(false);
+    });
+  });
+
+  it('rejects duplicated setup state parameters before reading a day or selecting a profile', async () => {
+    renderScreen([
+      '/admin/setup-directions?section=resources&section=checklist&day=2026-10-17&day=2026-10-18&profile=lab-key&profile=other',
+    ]);
+
+    const card = await screen.findByTestId('setup-checklist-row-lab');
+    await waitFor(() => {
+      const routeUrl = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+      expect(routeUrl.searchParams.getAll('section')).toEqual(['checklist']);
+      expect(routeUrl.searchParams.has('day')).toBe(false);
+      expect(routeUrl.searchParams.has('profile')).toBe(false);
+    });
+    expect(card).not.toHaveAttribute('data-selected', 'true');
+    expect(mockedGet).toHaveBeenCalledWith('/queue/admin/directions');
+  });
+
+  it('keeps section, day, and profile in browser history across editor navigation context changes', async () => {
+    const user = userEvent.setup();
+    renderScreen(['/admin/setup-directions?section=checklist&profile=lab-key']);
+    await screen.findByTestId('setup-checklist-row-lab');
+
+    fireEvent.change(screen.getByTestId('setup-day-select'), { target: { value: '2026-10-17' } });
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('day=2026-10-17'));
+    await user.click(screen.getByTestId('setup-view-resources'));
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('section=resources'));
+    expect(screen.getByTestId('route-location')).toHaveTextContent('profile=lab-key');
+    expect(screen.getByTestId('route-location')).toHaveTextContent('day=2026-10-17');
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('section=checklist'));
+    expect(screen.getByTestId('route-location')).toHaveTextContent('day=2026-10-17');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(screen.getByTestId('route-location')).not.toHaveTextContent('day='));
+    await user.click(screen.getByRole('button', { name: 'Forward' }));
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('day=2026-10-17'));
+    await user.click(screen.getByRole('button', { name: 'Forward' }));
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('section=resources'));
+  });
+
+  it('creates only fixed editor destinations and does not infer an ambiguous tag', async () => {
+    const ownershipDirection: AdminQueueDirectionDto = {
+      ...direction,
+      allowed_next_actions: [{
+        kind: 'configure_ownership',
+        entity_type: 'queue_tag',
+        entity_id: null,
+        entity_key: null,
+      }],
+    };
+    mockedGet.mockImplementation(async (url: string) =>
+      url.startsWith('/queue/admin/directions') ? { data: response(ownershipDirection) } : { data: {} },
+    );
+    renderScreen(['/admin/setup-directions?section=checklist&day=2026-10-17&profile=lab-key']);
+
+    const actionLinks = within(await screen.findByTestId('setup-action-editors')).getAllByRole('link');
+    const catalogUrl = new URL(actionLinks[0].getAttribute('href') || '', 'http://localhost');
+    const usersUrl = new URL(actionLinks[1].getAttribute('href') || '', 'http://localhost');
+    expect(catalogUrl.pathname).toBe('/admin/services');
+    expect(catalogUrl.searchParams.get('servicesTab')).toBe('catalog');
+    expect(usersUrl.pathname).toBe('/admin/users');
+    for (const url of [catalogUrl, usersUrl]) {
+      expect(url.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+      expect(url.searchParams.get('setupSection')).toBe('checklist');
+      expect(url.searchParams.get('setupProfile')).toBe('lab-key');
+      expect(url.searchParams.get('setupDay')).toBe('2026-10-17');
+      expect(url.searchParams.has('setupEntityKind')).toBe(false);
+    }
+  });
+
+  it('loads resource editor inputs only when the resource view is opened', async () => {
     const user = userEvent.setup();
     renderScreen();
-
-    await waitFor(() =>
-      expect(screen.getByTestId('setup-checklist-row-lab')).toBeVisible(),
-    );
+    await screen.findByTestId('setup-checklist-row-lab');
+    expect(mockedGet.mock.calls.some(([url]) => String(url).startsWith('/services'))).toBe(false);
 
     await user.click(screen.getByTestId('setup-view-resources'));
-    await user.click(screen.getByTestId('qr-resource-create-toggle'));
+    await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/services?limit=1000'));
+    expect(screen.getByTestId('setup-back-to-checklist')).toBeVisible();
+  });
+});
 
-    const form = screen.getByTestId('qr-resource-create-form');
-    // тег — выбор из существующих значений (§4(3))
-    expect(screen.getByTestId('qr-resource-tag-select')).toBeVisible();
-    // среди текстовых полей формы нет поля тега: единственные input —
-    // code (авто-префикс из тега), имя и числовые/кабинет
-    const inputs = Array.from(form.querySelectorAll('input'));
-    const tagLike = inputs.filter((input) => {
-      const label = input.closest('label')?.textContent || '';
-      return /тег|queue_tag/i.test(label) || /queue_tag/i.test(input.name);
+describe('queue setup editor return context', () => {
+  it('preserves shared return context while switching queue profiles to catalog and back', async () => {
+    const user = userEvent.setup();
+    renderServices([
+      '/admin/services?servicesTab=queue-profiles&setupReturn=queue-directions-v1&setupSection=checklist&setupProfile=lab-key&setupDay=2026-10-17&setupEntityKind=queue_profile&setupEntityKey=lab-key',
+    ]);
+
+    expect(await screen.findByTestId('queue-setup-return-link')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Справочник услуг' }));
+
+    const afterCatalog = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+    expect(afterCatalog.searchParams.get('servicesTab')).toBe('catalog');
+    expect(afterCatalog.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+    expect(afterCatalog.searchParams.get('setupProfile')).toBe('lab-key');
+    expect(afterCatalog.searchParams.get('setupSection')).toBe('checklist');
+    expect(afterCatalog.searchParams.get('setupDay')).toBe('2026-10-17');
+    expect(afterCatalog.searchParams.has('setupEntityKind')).toBe(false);
+    expect(afterCatalog.searchParams.has('setupEntityKey')).toBe(false);
+    expect(screen.getByTestId('queue-setup-return-link')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Вкладки регистратуры' }));
+
+    const afterQueueProfiles = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+    expect(afterQueueProfiles.searchParams.get('servicesTab')).toBe('queue-profiles');
+    expect(afterQueueProfiles.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+    expect(afterQueueProfiles.searchParams.get('setupProfile')).toBe('lab-key');
+    expect(afterQueueProfiles.searchParams.get('setupSection')).toBe('checklist');
+    expect(afterQueueProfiles.searchParams.get('setupDay')).toBe('2026-10-17');
+    expect(afterQueueProfiles.searchParams.has('setupEntityKind')).toBe(false);
+    expect(afterQueueProfiles.searchParams.has('setupEntityKey')).toBe(false);
+    expect(screen.getByTestId('queue-setup-return-link')).toBeVisible();
+  });
+
+  it('accepts typed service context and always builds a fixed setup return path', () => {
+    const search = '?servicesTab=catalog&setupReturn=queue-directions-v1&setupSection=resources&setupProfile=lab-key&setupDay=2026-10-17&setupEntityKind=service&setupEntityId=11';
+    const context = parseServicesReturnContext(search, 'service-catalog');
+
+    expect(context).toMatchObject({
+      destination: 'service-catalog',
+      profileKey: 'lab-key',
+      section: 'resources',
+      day: '2026-10-17',
+      entity: { kind: 'service', id: 11 },
     });
-    expect(tagLike).toHaveLength(0);
+    expect(buildServicesReturnLocation(context!)).toEqual({
+      pathname: '/admin/setup-directions',
+      search: '?profile=lab-key&section=resources&day=2026-10-17',
+    });
+  });
+
+  it('rejects malformed, duplicate, and non-decimal editor context', () => {
+    expect(parseServicesReturnContext(
+      '?setupReturn=queue-directions-v1&setupSection=checklist&setupEntityKind=service&setupEntityId=1e2',
+      'service-catalog',
+    )).toBeNull();
+    expect(parseServicesReturnContext(
+      '?setupReturn=queue-directions-v1&setupReturn=https%3A%2F%2Fevil.test&setupSection=checklist',
+      'service-catalog',
+    )).toBeNull();
+    expect(parseUsersReturnContext(
+      '?setupReturn=queue-directions-v1&setupSection=checklist&setupEntityKind=doctor&setupEntityId=1e2',
+    )).toBeNull();
+    expect(parseUsersReturnContext(
+      '?setupReturn=queue-directions-v1&setupSection=checklist&setupDay=2026-02-30',
+    )).toBeNull();
+  });
+
+  it('rejects year-zero setup dates in the services return-context parser', () => {
+    const search = '?setupReturn=queue-directions-v1&setupSection=checklist&setupDay=0000-01-01';
+
+    expect(parseServicesReturnContext(search, 'service-catalog')).toBeNull();
+  });
+
+  it('rejects year-zero setup dates in the users return-context parser', () => {
+    const search = '?setupReturn=queue-directions-v1&setupSection=checklist&setupDay=0000-01-01';
+
+    expect(parseUsersReturnContext(search)).toBeNull();
+  });
+
+  it('accepts supported editor return-context year boundaries', () => {
+    for (const day of ['0001-01-01', '9999-12-31']) {
+      const search = `?setupReturn=queue-directions-v1&setupSection=checklist&setupDay=${day}`;
+
+      expect(parseServicesReturnContext(search, 'service-catalog')?.day).toBe(day);
+      expect(parseUsersReturnContext(search)?.day).toBe(day);
+    }
+  });
+
+  it('preserves typed queue-tag context for the existing user editor return link', () => {
+    const context = parseUsersReturnContext(
+      '?setupReturn=queue-directions-v1&setupSection=checklist&setupProfile=lab-key&setupDay=2026-10-17&setupEntityKind=queue_tag&setupEntityKey=lab',
+    );
+    expect(context).toMatchObject({
+      destination: 'user-management',
+      entity: { kind: 'queue_tag', key: 'lab' },
+    });
+    expect(buildUsersReturnLocation(context!)).toEqual({
+      pathname: '/admin/setup-directions',
+      search: '?profile=lab-key&section=checklist&day=2026-10-17',
+    });
+    expect(parseUsersReturnContext(
+      '?setupReturn=queue-directions-v1&setupSection=checklist&setupEntityKind=queue_tag&setupEntityKey=lab&setupEntityKey=other',
+    )).toBeNull();
+  });
+
+  it('renders a safe return link in the existing user editor', async () => {
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url === '/users/users') {
+        return { data: { users: [], total: 0, total_pages: 1 } };
+      }
+      if (url === '/roles/options') return { data: { options: [] } };
+      return { data: {} };
+    });
+    render(
+      <ThemeProvider>
+        <MemoryRouter initialEntries={[
+          '/admin/users?setupReturn=queue-directions-v1&setupSection=resources&setupProfile=lab-key&setupDay=2026-10-17&setupEntityKind=queue_tag&setupEntityKey=lab',
+        ]}>
+          <UserManagementPage />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    const returnLink = await screen.findByTestId('queue-setup-return-link');
+    expect(returnLink).toHaveAttribute(
+      'href',
+      '/admin/setup-directions?profile=lab-key&section=resources&day=2026-10-17',
+    );
+    expect(mockedGet).toHaveBeenCalledWith('/users/users', expect.anything());
   });
 });

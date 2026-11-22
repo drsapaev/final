@@ -2,9 +2,9 @@ import { useTranslation } from '../../i18n/useTranslation';
 /**
  * RQ-18 — permanent direction QR block (admin half of S-15).
  *
- * Rendered inside the AdminSetupDirections checklist card for every
- * QR-visible owning profile (the extension point deliberately left by
- * runtime-PR 3339: «QR появится здесь после RQ-18»).
+ * Mounted on demand inside the AdminSetupDirections card when an
+ * administrator expands a profile's QR section; the direction read model
+ * stays independent from these optional per-profile details.
  *
  * Contract honesty (directive §5/§12/§13):
  *  - `supported === null` (entry-methods read failed / unknown) renders
@@ -49,6 +49,10 @@ interface PermanentDirectionQrProps {
      * (read failure) — never collapsed into «not provisioned».
      */
     supported: boolean | null;
+    /** Server read-model fact: an already-issued permanent address exists. */
+    savedAddressExists?: boolean;
+    /** Server read-model fact; false means a recovered address is not bookable now. */
+    publicAvailability?: boolean;
     /**
      * RQ-18 follow-up (P2-3): the block re-reads entry-methods after a
      * successful provision and reports the fresh flag so the parent
@@ -61,6 +65,8 @@ interface PermanentDirectionQrProps {
         supported: boolean | null,
         generation?: number,
     ) => void;
+    /** Notify the parent read-model that an address has now been confirmed. */
+    onAddressProvisioned?: (profileKey: string, generation?: number) => void;
     /**
      * RQ-18 follow-up round-4 (P2-2): the parent's full-read generation.
      * Every full read bumps it; a recheck answer is tagged with the
@@ -76,7 +82,7 @@ export function absolutePermanentUrl(publicCode: string): string {
     return `${window.location.origin}/q/${publicCode}`;
 }
 
-export default function PermanentDirectionQr({ profileKey, tag, supported, onSupportedChange, supportGeneration }: PermanentDirectionQrProps) {
+export default function PermanentDirectionQr({ profileKey, tag, supported, savedAddressExists = false, publicAvailability, onSupportedChange, onAddressProvisioned, supportGeneration }: PermanentDirectionQrProps) {
     const { t } = useTranslation();
     const [state, setState] = useState<BlockState>('idle');
     const [provisioned, setProvisioned] = useState<PublicAddressProvisionResponse | null>(null);
@@ -94,6 +100,13 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
         value: boolean | null;
     } | null>(null);
     const [copied, setCopied] = useState(false);
+    // QR-FE-007 (follow-up audit 2026-11-02): пользовательски-видимое
+    // уведомление о SVG-fallback. Прежде при недоступном canvas-2D
+    // (или ошибке декодирования) скачивался исходный SVG-блоб под именем
+    // .png — файл с PNG-расширением содержал SVG/XML байты (ломал импортёры/
+    // принтер-софт). Теперь фолбэк честно называется .svg + MIME svg, и
+    // пользователь видит уведомление; .png остаётся только для настоящего PNG.
+    const [svgFallbackNotice, setSvgFallbackNotice] = useState(false);
     const qrWrapRef = useRef<HTMLDivElement | null>(null);
     // RQ-18 follow-up round-4 (P2-2): latest-generation ref — the provision
     // callback's closure would otherwise capture a STALE generation when
@@ -121,6 +134,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             // override and the local block state.
             const recheckGeneration = supportGenerationRef.current;
             const res = await provisionPublicAddress(profileKey);
+            onAddressProvisioned?.(profileKey, recheckGeneration);
             setProvisioned(res);
             setCopied(false);
             setState('shown');
@@ -136,6 +150,11 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             // generation-guarded parent.
             setPostProvisionOverride({ generation: recheckGeneration, value: null });
             onSupportedChange?.(profileKey, null, recheckGeneration);
+            if (publicAvailability === false) {
+                setPostProvisionOverride({ generation: recheckGeneration, value: false });
+                onSupportedChange?.(profileKey, false, recheckGeneration);
+                return;
+            }
             try {
                 const methods = await fetchDirectionEntryMethods(profileKey);
                 if (supportGenerationRef.current > recheckGeneration) {
@@ -159,7 +178,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             logger.warn(`permanent QR provision failed for ${profileKey}`, err);
             setState('error');
         }
-    }, [profileKey, onSupportedChange]);
+    }, [profileKey, publicAvailability, onAddressProvisioned, onSupportedChange]);
 
     const copyLink = useCallback(async () => {
         if (!provisioned) return;
@@ -174,18 +193,26 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
     const downloadPng = useCallback(() => {
         // Serialize the rendered QRCodeSVG → canvas → PNG. The payload is
         // the permanent address only: no token, no TTL, no PII.
+        // QR-FE-007: расширение файла обязано соответствовать реальному
+        // формату: успешный PNG → .png (image/png), любой SVG-fallback →
+        // .svg (image/svg+xml) + видимое уведомление. Никаких SVG-байтов
+        // под .png-именем.
         const svg = qrWrapRef.current?.querySelector('svg');
         if (!svg || !provisioned) return;
         const xml = new XMLSerializer().serializeToString(svg);
         const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(svgBlob);
         const image = new Image();
-        const finishDownload = (href: string, revoke: boolean) => {
+        const finishDownload = (href: string, revoke: boolean, ext: 'png' | 'svg') => {
             const link = document.createElement('a');
-            link.download = `qr-direction-${provisioned.public_code}.png`;
+            link.download = `qr-direction-${provisioned.public_code}.${ext}`;
             link.href = href;
             link.click();
             if (revoke) URL.revokeObjectURL(url);
+        };
+        const svgFallback = () => {
+            setSvgFallbackNotice(true);
+            finishDownload(url, true, 'svg');
         };
         image.onload = () => {
             try {
@@ -195,8 +222,8 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                 canvas.height = image.height + padding * 2;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
-                    // jsdom / no-2d fallback: download the SVG itself.
-                    finishDownload(url, true);
+                    // jsdom / no-2d fallback: качаем сам SVG — честно .svg.
+                    svgFallback();
                     return;
                 }
                 // canvas 2D cannot resolve var(--mac-*) — resolve the token at
@@ -212,12 +239,19 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                 ctx.fillStyle = bg;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(image, padding, padding);
-                finishDownload(canvas.toDataURL('image/png'), true);
+                const dataUrl = canvas.toDataURL('image/png');
+                if (!dataUrl.startsWith('data:image/png')) {
+                    // toDataURL не отдал PNG — не называем файл .png.
+                    svgFallback();
+                    return;
+                }
+                setSvgFallbackNotice(false);
+                finishDownload(dataUrl, true, 'png');
             } catch {
-                finishDownload(url, true);
+                svgFallback();
             }
         };
-        image.onerror = () => finishDownload(url, true);
+        image.onerror = () => svgFallback();
         image.src = url;
     }, [provisioned]);
 
@@ -233,13 +267,13 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                 <span className="admin-sdx-qr-title">{t('admin2.qrdx_block_title')}</span>
             </div>
 
-            {effectiveSupported === null && (
+            {effectiveSupported === null && publicAvailability !== false && (
                 <div className="admin-sdx-qr-unknown" data-testid={`setup-qr-unknown-${tag}`}>
                     {t('admin2.qrdx_unknown')}
                 </div>
             )}
 
-            {effectiveSupported !== null && state !== 'shown' && state !== 'error' && (
+            {(effectiveSupported !== null || savedAddressExists) && state !== 'shown' && state !== 'error' && (
                 <Button
                     variant="secondary"
                     size="sm"
@@ -247,13 +281,9 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                         void provision();
                     }}
                     disabled={state === 'loading'}
-                    data-testid={
-                        effectiveSupported
-                            ? `setup-qr-show-${tag}`
-                            : `setup-qr-provision-${tag}`
-                    }
+                    data-testid={effectiveSupported || savedAddressExists ? `setup-qr-show-${tag}` : `setup-qr-provision-${tag}`}
                 >
-                    {effectiveSupported ? t('admin2.qrdx_show') : t('admin2.qrdx_create')}
+                    {effectiveSupported || savedAddressExists ? t('admin2.qrdx_show') : t('admin2.qrdx_create')}
                 </Button>
             )}
 
@@ -284,7 +314,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                     {/* honest states: note ONLY for a definitive false — an
                         unknown status (null) renders the unknown banner
                         above, never a confident «недоступно» claim. */}
-                    {effectiveSupported === false && (
+                    {(effectiveSupported === false || publicAvailability === false) && (
                         <div className="admin-sdx-qr-note-warn" data-testid={`setup-qr-not-bookable-note-${tag}`}>
                             {t('admin2.qrdx_not_bookable_note')}
                         </div>
@@ -298,6 +328,17 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                             {copied ? t('admin2.qrdx_copied') : t('admin2.qrdx_copy')}
                         </Button>
                     </div>
+                    {/* QR-FE-007: видимое уведомление о честном SVG-fallback
+                        (файл сохранён как .svg — PNG недоступен в этом окружении).
+                        Вложенный ключ qrdx.* — как у остальных ключей секции. */}
+                    {svgFallbackNotice && (
+                        <div
+                            className="admin-sdx-qr-note-warn"
+                            data-testid={`setup-qr-svg-fallback-${tag}`}
+                            role="status">
+                            {t('admin2.qrdx.svg_fallback_notice')}
+                        </div>
+                    )}
                 </div>
             )}
 

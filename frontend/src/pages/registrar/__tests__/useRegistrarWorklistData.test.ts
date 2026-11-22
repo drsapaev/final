@@ -43,13 +43,14 @@ const withState = (patch: Partial<WorklistDataState>): WorklistDataState => ({
 const rows = [{ id: 1 }, { id: 2 }] as unknown as WorklistDataState['appointments'];
 
 describe('worklistDataReducer (PR-UI-13-1)', () => {
-  it('initial state: empty appointments, dataSource loading, not loading, zeroed pagination, not stale', () => {
+  it('initial state: empty appointments, dataSource loading, not loading, zeroed pagination, not stale, no verified day', () => {
     expect(initialWorklistDataState).toEqual({
       appointments: [],
       dataSource: 'loading',
       appointmentsLoading: false,
       paginationInfo: { total: 0, hasMore: false, loadingMore: false },
       stale: false,
+      loadedDate: null,
     });
   });
 
@@ -86,28 +87,38 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
 
   describe('LOAD_EMPTY', () => {
     it('clears appointments, sets api, forces loading=false (original quirk: unconditional)', () => {
-      const state = withState({ appointments: rows, dataSource: 'loading', appointmentsLoading: true });
-      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY' });
+      const state = withState({ appointments: rows, dataSource: 'loading', appointmentsLoading: true, loadedDate: '2026-09-20' });
+      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY', date: '2026-09-25' });
       expect(next).toEqual({
         appointments: [],
         dataSource: 'api',
         appointmentsLoading: false,
         paginationInfo: state.paginationInfo,
         stale: false,
+        loadedDate: '2026-09-25',
       });
     });
 
     it('RQ-22: a successful EMPTY response clears a previously set stale flag', () => {
       const state = withState({ stale: true });
-      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY' });
+      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY', date: '2026-09-25' });
       expect(next.stale).toBe(false);
+    });
+
+    // PR #3851 review (P2): an authoritative empty day is still a VERIFIED
+    // day — its target_date becomes loadedDate (an empty today flips
+    // sampleIsToday to true honestly).
+    it('PR #3851 review (P2): records the empty day as the verified sample date', () => {
+      const state = withState({ loadedDate: '2026-09-20' });
+      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY', date: '2026-09-25' });
+      expect(next.loadedDate).toBe('2026-09-25');
     });
   });
 
   describe('LOAD_SUCCEEDED', () => {
     it('sets rows and dataSource=api', () => {
       const state = withState({ appointments: [], dataSource: 'loading', appointmentsLoading: true });
-      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows });
+      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows, date: '2026-09-25' });
       expect(next.appointments).toBe(rows);
       expect(next.dataSource).toBe('api');
       // NOTE: loading is cleared by LOAD_FINALLY, not here — mirrors original.
@@ -116,8 +127,16 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
 
     it('RQ-22: a successful response clears the stale flag', () => {
       const state = withState({ stale: true, appointments: rows, dataSource: 'api' });
-      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows: [] });
+      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows: [], date: '2026-09-25' });
       expect(next.stale).toBe(false);
+    });
+
+    // PR #3851 review (P2): the verified sample's date is the action's
+    // target_date — NOT the currently selected calendar/URL date.
+    it('PR #3851 review (P2): binds loadedDate to the response day, not the selection', () => {
+      const state = withState({ appointments: [], loadedDate: null });
+      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows, date: '2026-09-24' });
+      expect(next.loadedDate).toBe('2026-09-24');
     });
   });
 
@@ -149,6 +168,24 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
       expect(next.dataSource).toBe('error');
       expect(next.appointments).toEqual([]);
       expect(next.stale).toBe(false);
+    });
+
+    // PR #3851 review (P2): a primary failure verifies NOTHING — no loaded
+    // day (sampleIsToday must be false, not an assumed today).
+    it('PR #3851 review (P2): primary failure resets loadedDate to null', () => {
+      const state = withState({ appointments: [], dataSource: 'loading', loadedDate: null });
+      const next = worklistDataReducer(state, { type: 'LOAD_FAILED', silent: false });
+      expect(next.loadedDate).toBeNull();
+    });
+
+    // PR #3851 review (P2): a failed refresh keeps the rows AND their day —
+    // loadedDate must not flip to the newly selected day whose load failed.
+    it('PR #3851 review (P2): refresh failure with rows keeps the previously verified day', () => {
+      const state = withState({ appointments: rows, dataSource: 'api', loadedDate: '2026-09-24' });
+      const next = worklistDataReducer(state, { type: 'LOAD_FAILED', silent: false });
+      expect(next.appointments).toBe(rows);
+      expect(next.stale).toBe(true);
+      expect(next.loadedDate).toBe('2026-09-24');
     });
 
     it('stale flag does not double-apply on a repeated failure', () => {
@@ -218,7 +255,7 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
       type: 'PAGINATION_REPLACED',
       pagination: { total: 2, hasMore: false, loadingMore: false },
     });
-    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows });
+    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows, date: '2026-09-25' });
     state = worklistDataReducer(state, { type: 'LOAD_FINALLY', silent: false });
     expect(state).toEqual({
       appointments: rows,
@@ -226,6 +263,7 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
       appointmentsLoading: false,
       paginationInfo: { total: 2, hasMore: false, loadingMore: false },
       stale: false,
+      loadedDate: '2026-09-25',
     });
   });
 
@@ -233,7 +271,7 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
     const settled = withState({ appointments: rows, dataSource: 'api', appointmentsLoading: false });
     let state = settled;
     state = worklistDataReducer(state, { type: 'LOAD_STARTED', silent: true });
-    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows });
+    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows, date: '2026-09-25' });
     state = worklistDataReducer(state, { type: 'LOAD_FINALLY', silent: true });
     expect(state.appointments).toBe(rows);
     expect(state.dataSource).toBe('api');
@@ -252,7 +290,7 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
     state = worklistDataReducer(state, { type: 'LOAD_FINALLY', silent: false });
     // A later retry succeeds: fresh rows replace the stale ones, flag clears.
     const fresh = [{ id: 3 }] as unknown as WorklistDataState['appointments'];
-    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows: fresh });
+    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows: fresh, date: '2026-09-25' });
     state = worklistDataReducer(state, { type: 'LOAD_FINALLY', silent: false });
     expect(state.appointments).toBe(fresh);
     expect(state.stale).toBe(false);
@@ -365,5 +403,503 @@ describe('useRegistrarWorklistData — RQ-22 late-response race guard (S-19)', (
     expect(result.current.appointments.map((a) => a.id)).toEqual(['fresh-only']);
     expect(result.current.stale).toBe(false);
     expect(result.current.dataSource).toBe('api');
+  });
+});
+
+/**
+ * REG-FE-034 (registrar audit ledger 3803): malformed HTTP 200 envelopes
+ * must fail closed. A 200 body without a queues array (contract regression,
+ * proxy, bad deploy) is a LOAD FAILURE — not a valid empty clinical day.
+ * The valid empty day remains { queues: [] }.
+ */
+describe('useRegistrarWorklistData — REG-FE-034 malformed 200 envelopes fail closed', () => {
+  const hookDeps = () => ({
+    searchParams: new URLSearchParams(),
+    activeTab: null,
+    showCalendar: false,
+    historyDate: '',
+    showWizard: false,
+    anyDialogOpenRef: { current: false },
+    enrichAppointmentsWithPatientData: async (rows: Record<string, unknown>[]) => rows,
+    loadIntegratedData: () => undefined,
+    tI18n: (key: string) => key,
+  });
+
+  it.each([
+    { queues: null },
+    { message: 'temporary issue' },
+    { other: [] },
+  ])('a primary 200 body %j is a load error, not a valid empty queue', async (body) => {
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: body }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('error');
+    expect(result.current.appointments).toEqual([]);
+  });
+
+  it('{ queues: [] } remains a valid authoritative empty day', async () => {
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: { queues: [] } }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('api');
+    expect(result.current.appointments).toEqual([]);
+    expect(result.current.stale).toBe(false);
+  });
+
+  it('a malformed 200 during a refresh keeps the loaded rows and marks them stale', async () => {
+    const loaded = [{ id: 'row-1' }];
+    const callQueue = [
+      Promise.resolve({ data: { queues: [{ entries: loaded }] } }),
+      Promise.resolve({ data: { queues: null } }),
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+
+    await act(async () => {
+      result.current.loadAppointments({ silent: false, source: 'reg_fe_034_refresh' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // Rows survive the contract failure with an explicit stale flag.
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+    expect(result.current.stale).toBe(true);
+    expect(result.current.dataSource).toBe('api');
+  });
+
+  // REG-FE-067: the per-queue contract validation. The old
+  // `Array.isArray(queue.entries) ? queue.entries : []` coerced a broken
+  // queue element into "no entries" — a single malformed queue rendered as
+  // a valid EMPTY day (LOAD_EMPTY) or silently dropped that queue's rows
+  // while the healthy queues still rendered.
+  it.each([
+    { queues: [{ entries: null }] },
+    { queues: [{ entries: 'not-an-array' }] },
+    { queues: [{ entries: { 0: 'object-not-array' } }] },
+    { queues: [42] },
+  ])('a primary 200 body with a malformed queue element %j is a load error, not a valid empty queue (REG-FE-067)', async (body) => {
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: body }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('error');
+    expect(result.current.appointments).toEqual([]);
+  });
+
+  it('a queue element without entries but valid entries elsewhere must not silently drop patients (REG-FE-067)', async () => {
+    // One healthy queue with a real row + one broken queue (entries: null):
+    // the old code rendered ONLY the healthy queue's row and pretended the
+    // broken queue had no patients — silent partial data loss.
+    const body = {
+      queues: [
+        { entries: [{ id: 'row-1' }] },
+        { entries: null },
+      ],
+    };
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: body }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('error');
+    expect(result.current.appointments).toEqual([]);
+  });
+
+  it('a queue with an empty entries array remains a valid empty queue (REG-FE-067)', async () => {
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: { queues: [{ entries: [] }] } }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('api');
+    expect(result.current.appointments).toEqual([]);
+    expect(result.current.stale).toBe(false);
+  });
+
+  it('a malformed queue element during a refresh keeps the loaded rows and marks them stale (REG-FE-067)', async () => {
+    const loaded = [{ id: 'row-1' }];
+    const callQueue = [
+      Promise.resolve({ data: { queues: [{ entries: loaded }] } }),
+      Promise.resolve({ data: { queues: [{ entries: null }] } }),
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+
+    await act(async () => {
+      result.current.loadAppointments({ silent: false, source: 'reg_fe_067_refresh' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+    expect(result.current.stale).toBe(true);
+    expect(result.current.dataSource).toBe('api');
+  });
+});
+
+/**
+ * REG-FE-007 / REG-FE-020 / REG-FE-021 (registrar audit ledger 3803) —
+ * worklist refresh lifecycle.
+ *
+ * 007: HTTP 429 must surface as an explicit load failure (error on the
+ *      primary fetch, kept rows + stale on a refresh) — the 60s auto-refresh
+ *      cooldown alone is not user-visible state.
+ * 020: the shared in-flight guard and the 429 cooldown belong to the
+ *      AUTHORITATIVE request: a superseded request settling early must not
+ *      release the guard for a newer pending load (letting an unnecessary
+ *      auto-refresh C claim the newest sequence id), and a superseded 429
+ *      must not freeze auto-refresh after the newer request succeeded.
+ * 021: the auto-refresh interval reads the any-dialog flag on EVERY tick,
+ *      so opening a dialog pauses refresh and closing it resumes — without
+ *      waiting for an effect re-run; an interval created while a dialog was
+ *      open still recovers after it closes.
+ */
+describe('useRegistrarWorklistData — refresh lifecycle (REG-FE-007/020/021)', () => {
+  const hookDeps = (anyDialogOpenRef: { current: boolean } = { current: false }) => ({
+    searchParams: new URLSearchParams(),
+    activeTab: null,
+    showCalendar: false,
+    historyDate: '',
+    showWizard: false,
+    anyDialogOpenRef,
+    enrichAppointmentsWithPatientData: async (rows: Record<string, unknown>[]) => rows,
+    loadIntegratedData: () => undefined,
+    tI18n: (key: string) => key,
+  });
+
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  const rateLimited = () => Promise.reject({ response: { status: 429 } });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('REG-FE-007: a non-silent 429 primary load surfaces an explicit error state, not a silent spinner', async () => {
+    vi.mocked(api.get).mockImplementation(() => rateLimited() as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.dataSource).toBe('error');
+    expect(result.current.appointmentsLoading).toBe(false);
+  });
+
+  it('REG-FE-007: a 429 during a refresh keeps the loaded rows and marks them stale', async () => {
+    // Lazy factories: a rejected promise created before its consumer attaches
+    // a handler would surface as an unhandled rejection between act blocks.
+    const callQueue = [
+      () => Promise.resolve({ data: { queues: [{ entries: [{ id: 'row-1' }] }] } }),
+      () => rateLimited(),
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift()!() as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+
+    await act(async () => {
+      result.current.loadAppointments({ silent: false, source: 'reg_fe_007_refresh' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+    expect(result.current.stale).toBe(true);
+    expect(result.current.dataSource).toBe('api');
+  });
+
+  it('REG-FE-020: a superseded request settling early keeps the in-flight guard for the newer pending load', async () => {
+    const lateA = deferred<{ data: { queues: unknown[] } }>();
+    const freshB = deferred<{ data: { queues: unknown[] } }>();
+    const callQueue: Array<Promise<{ data: { queues: unknown[] } }>> = [
+      Promise.resolve({ data: { queues: [] } }),
+      lateA.promise,
+      freshB.promise,
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const baselineCalls = vi.mocked(api.get).mock.calls.length;
+
+    // A (old date) starts and hangs; B (new date) starts and stays pending.
+    let aPromise: Promise<unknown> | null = null;
+    await act(async () => {
+      aPromise = result.current.loadAppointments({ silent: false, source: 'race_a' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      void result.current.loadAppointments({ silent: false, source: 'race_b' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // A settles while B is still pending: the shared in-flight guard must
+    // stay held by B, so the next auto-refresh tick must NOT start request C.
+    await act(async () => {
+      lateA.resolve({ data: { queues: [{ entries: [{ id: 'old-row' }] }] } });
+      await aPromise;
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      result.current.loadAppointments({ silent: true, source: 'auto_refresh' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBe(baselineCalls + 2); // A and B only — no C
+
+    // B resolves and releases the guard: a later auto-refresh may run again.
+    await act(async () => {
+      freshB.resolve({ data: { queues: [{ entries: [{ id: 'new-row' }] }] } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['new-row']);
+    await act(async () => {
+      result.current.loadAppointments({ silent: true, source: 'auto_refresh' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBe(baselineCalls + 3);
+  });
+
+  it('REG-FE-020: a superseded 429 does not freeze auto-refresh after the newer request succeeds', async () => {
+    const lateA = deferred<{ data: { queues: unknown[] } }>();
+    const freshB = deferred<{ data: { queues: unknown[] } }>();
+    const callQueue: Array<Promise<{ data: { queues: unknown[] } }>> = [
+      Promise.resolve({ data: { queues: [] } }),
+      lateA.promise,
+      freshB.promise,
+      Promise.resolve({ data: { queues: [{ entries: [{ id: 'post-cooldown-row' }] }] } }),
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    let aPromise: Promise<unknown> | null = null;
+    await act(async () => {
+      aPromise = result.current.loadAppointments({ silent: false, source: 'race_a_429' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      void result.current.loadAppointments({ silent: false, source: 'race_b_ok' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // A (superseded) rejects with 429: must NOT install the 60s cooldown.
+    await act(async () => {
+      lateA.reject({ response: { status: 429 } });
+      await aPromise!.then(() => undefined, () => undefined);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // B succeeds.
+    await act(async () => {
+      freshB.resolve({ data: { queues: [{ entries: [{ id: 'b-row' }] }] } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['b-row']);
+
+    // An auto-refresh right after must NOT be blocked by A's stale cooldown.
+    await act(async () => {
+      result.current.loadAppointments({ silent: true, source: 'auto_refresh' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['post-cooldown-row']);
+  });
+
+  it('REG-FE-021: opening a dialog pauses the interval refresh and closing it resumes', async () => {
+    const anyDialogOpenRef = { current: false };
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: { queues: [] } }) as never);
+    renderHook(() => useRegistrarWorklistData(hookDeps(anyDialogOpenRef)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const baselineCalls = vi.mocked(api.get).mock.calls.length;
+
+    // A payment/cancel dialog opens — no effect re-run, only the ref flips.
+    anyDialogOpenRef.current = true;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBe(baselineCalls); // paused
+
+    // The dialog closes: the next ticks refresh again.
+    anyDialogOpenRef.current = false;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBeGreaterThan(baselineCalls); // resumed
+  });
+
+  it('REG-FE-021: an interval created while a dialog was open still refreshes after it closes', async () => {
+    const anyDialogOpenRef = { current: true };
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: { queues: [] } }) as never);
+    renderHook(() => useRegistrarWorklistData(hookDeps(anyDialogOpenRef)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const baselineCalls = vi.mocked(api.get).mock.calls.length;
+
+    // The dialog closes without any effect re-run (ref flip only).
+    anyDialogOpenRef.current = false;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBeGreaterThan(baselineCalls);
+  });
+});
+
+/**
+ * PR #3851 review (P2): loadedDate — the clinic day of the VERIFIED sample —
+ * must gate today-only instruments (the Welcome morning checklist via
+ * useRegistrarDoctorWorklistFacts.sampleIsToday). The SELECTED date flips
+ * instantly on a calendar switch; the sample must NOT be presented as the
+ * new day until that day's request actually succeeds.
+ */
+describe('useRegistrarWorklistData — PR #3851 review (P2): loadedDate binds to the verified sample', () => {
+  const HIST = '2026-09-24';
+  const TODAY = '2026-09-25';
+  const histRows = [{ id: 'hist-1' }];
+  const todayRows = [{ id: 'today-1' }];
+
+  // IMPORTANT: the deps object must keep STABLE member identities across
+  // re-renders (mirrors the panel, where every dep is useCallback-stable).
+  // Building it inline in the render callback would mint a fresh
+  // enrichAppointmentsWithPatientData/searchParams on every state update →
+  // new loadAppointments identity → calendar-date-change effect refires →
+  // new load → re-render → … an infinite reload loop. Only `historyDate`
+  // is swapped per rerender (the property under test).
+  const stableDeps = {
+    searchParams: new URLSearchParams(),
+    activeTab: null,
+    showCalendar: true,
+    showWizard: false,
+    anyDialogOpenRef: { current: false },
+    enrichAppointmentsWithPatientData: async (rows: Record<string, unknown>[]) => rows,
+    loadIntegratedData: () => undefined,
+    tI18n: (key: string) => key,
+  };
+  const depsFor = (historyDate: string) => ({ ...stableDeps, historyDate });
+
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  it('history → today with a DELAYED today-load: loadedDate stays the history day until the response lands', async () => {
+    const todayRequest = deferred<{ data: { queues: unknown[] } }>();
+    // Any HIST request resolves instantly; the TODAY request hangs until resolved.
+    vi.mocked(api.get).mockImplementation((_url: unknown, config: unknown) => {
+      const targetDate = (config as { params?: { target_date?: string } }).params?.target_date;
+      if (targetDate === TODAY) return todayRequest.promise;
+      return Promise.resolve({ data: { queues: [{ entries: histRows }] } });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ historyDate }: { historyDate: string }) => useRegistrarWorklistData(depsFor(historyDate)),
+      { initialProps: { historyDate: HIST } },
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // History day verified.
+    expect(result.current.loadedDate).toBe(HIST);
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['hist-1']);
+
+    // The calendar flips to today: the selection changes instantly, but the
+    // today-load hangs — the sample (and its verified day) must NOT flip.
+    rerender({ historyDate: TODAY });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['hist-1']);
+    expect(result.current.loadedDate).toBe(HIST); // ← the P2 regression pin
+
+    // The today response lands: the sample AND its day flip together.
+    await act(async () => {
+      todayRequest.resolve({ data: { queues: [{ entries: todayRows }] } } as never);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['today-1']);
+    expect(result.current.loadedDate).toBe(TODAY);
+  });
+
+  it('history → today with a FAILED today-load: rows stay, loadedDate stays the history day (stale sample, honest flag)', async () => {
+    const todayRequest = deferred<{ data: { queues: unknown[] } }>();
+    vi.mocked(api.get).mockImplementation((_url: unknown, config: unknown) => {
+      const targetDate = (config as { params?: { target_date?: string } }).params?.target_date;
+      if (targetDate === TODAY) return todayRequest.promise;
+      return Promise.resolve({ data: { queues: [{ entries: histRows }] } });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ historyDate }: { historyDate: string }) => useRegistrarWorklistData(depsFor(historyDate)),
+      { initialProps: { historyDate: HIST } },
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.loadedDate).toBe(HIST);
+
+    // The calendar flips to today and the today-load FAILS: RQ-22 keeps the
+    // history rows on screen with stale=true — the verified day must stay
+    // the HISTORY day, so sampleIsToday cannot present them as today's.
+    rerender({ historyDate: TODAY });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await act(async () => {
+      todayRequest.reject(new Error('network down'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['hist-1']);
+    expect(result.current.stale).toBe(true);
+    expect(result.current.loadedDate).toBe(HIST); // ← the P2 regression pin
+    expect(result.current.dataSource).toBe('api');
+  });
+
+  it('an authoritative EMPTY today verifies the today day (empty ≠ unverified)', async () => {
+    vi.mocked(api.get).mockImplementation((_url: unknown, config: unknown) => {
+      const targetDate = (config as { params?: { target_date?: string } }).params?.target_date;
+      return Promise.resolve({ data: { queues: targetDate === TODAY ? [] : [{ entries: histRows }] } });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ historyDate }: { historyDate: string }) => useRegistrarWorklistData(depsFor(historyDate)),
+      { initialProps: { historyDate: HIST } },
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.loadedDate).toBe(HIST);
+
+    rerender({ historyDate: TODAY });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments).toEqual([]);
+    expect(result.current.loadedDate).toBe(TODAY);
+    expect(result.current.stale).toBe(false);
   });
 });

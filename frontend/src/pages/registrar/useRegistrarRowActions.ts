@@ -65,9 +65,10 @@ export const useRegistrarRowActions = ({
 
   const openRecordEditor = useCallback((row: unknown) => {
     const appt = row as Appointment;
+    // REG-FE-013 (audit ledger 3803): в диагностику — только безопасные
+    // факты (счётчики записей), без ФИО пациента.
     if (isMultiRecordAggregateRow(appt as Record<string, unknown>)) {
       logger.info('[RegistrarPanel] Opening edit wizard for aggregate all-departments row', {
-        patient: appt?.patient_fio || appt?.patient_name,
         groupedRecords: appt?.grouped_records?.length || 0,
         recordRefs: appt?.grouped_record_refs?.length || 0,
         aggregatedIds: appt?.aggregated_ids?.length || 0
@@ -86,7 +87,8 @@ export const useRegistrarRowActions = ({
   const handleTableAction = useCallback(async (action: string, row: Record<string, unknown>, event?: unknown) => {
     switch (action) {
         case 'view':
-          logger.info('Просмотр записи:', row);
+          // REG-FE-013: безопасные факты вместо дампа строки (ФИО/телефон).
+          logger.info('[RegistrarPanel] Row action: view', { recordId: row.id });
           openRecordPreview(row as unknown as Appointment);
           break;
         case 'edit':
@@ -95,7 +97,7 @@ export const useRegistrarRowActions = ({
           openRecordEditor(row);
           break;
         case 'payment':
-          logger.info('Открытие модального окна оплаты для записи:', row);
+          logger.info('[RegistrarPanel] Row action: payment', { recordId: row.id });
           setPaymentDialog({ open: true, row: row as unknown as Appointment, paid: false, source: 'table' });
           break;
         case 'in_cabinet': {
@@ -111,12 +113,12 @@ export const useRegistrarRowActions = ({
             intent: 'primary',
           });
           if (!inCabinetOk) break;
-          logger.info('Отправка пациента в кабинет:', row);
+          logger.info('[RegistrarPanel] Row action: in_cabinet', { recordId: row.id });
           updateAppointmentStatus(row.id, 'in_cabinet', '', row as Record<string, unknown>);
           break;
         }
         case 'call':
-          logger.info('Вызов пациента:', row);
+          logger.info('[RegistrarPanel] Row action: call', { recordId: row.id });
           handleStartVisit(row as Record<string, unknown>);
           break;
         case 'complete': {
@@ -130,12 +132,12 @@ export const useRegistrarRowActions = ({
             intent: 'primary',
           });
           if (!completeOk) break;
-          logger.info('Завершение приёма:', row);
+          logger.info('[RegistrarPanel] Row action: complete', { recordId: row.id });
           updateAppointmentStatus(row.id, 'done', '', row as Record<string, unknown>);
           break;
         }
         case 'print':
-          logger.info('Печать талона:', row);
+          logger.info('[RegistrarPanel] Row action: print', { recordId: row.id });
           setPrintDialog({ open: true, type: 'ticket', data: row as Record<string, unknown> });
           break;
         // UX Audit Registrar #4: cancel и reschedule теперь доступны
@@ -174,7 +176,7 @@ export const useRegistrarRowActions = ({
         break;
       case 'edit':
         openRecordEditor(row);
-        logger.info('Редактирование записи:', row);
+        logger.info('[RegistrarPanel] Row action: edit (context)', { recordId: row.id });
         break;
       case 'in_cabinet': {
         // UX Audit R-1.2: добавлен confirm для критичных действий в context menu.
@@ -190,8 +192,11 @@ export const useRegistrarRowActions = ({
           intent: 'primary',
         });
         if (!inCabinetOk) break;
+        // REG-FE-014 (audit 3803): подтверждение принадлежит единственному
+        // владельцу — useRegistrarActions (тост только после фактического
+        // успеха команды). Меню больше не заявляет успех для отклонённой
+        // команды и не дублирует тост при реальном успехе.
         await updateAppointmentStatus(row.id, 'in_cabinet', '', row as Record<string, unknown>);
-        notify.success(tI18n('registrar.sent_to_cabinet'));
         break;
       }
       case 'call':
@@ -208,8 +213,9 @@ export const useRegistrarRowActions = ({
           intent: 'primary',
         });
         if (!completeOk) break;
+        // REG-FE-014 (audit 3803): см. in_cabinet выше — владелец тоста
+        // useRegistrarActions, не контекстное меню.
         await updateAppointmentStatus(row.id, 'done', '', row as Record<string, unknown>);
-        notify.success(tI18n('registrar.visit_completed'));
         break;
       }
       case 'payment':
@@ -243,14 +249,51 @@ export const useRegistrarRowActions = ({
           document.body.removeChild(link);
         }
         break;
-      case 'force_majeure':
-        // Открываем модальное окно форс-мажора для специалиста
-        setForceMajeureModal({
-          open: true,
-          specialistId: row.doctor_id || row.specialist_id || null,
-          specialistName: row.doctor_name || row.specialist_name || tI18n('registrarPanel.rp_all_specialists')
-        });
+      case 'force_majeure': {
+        // #3808 (CR-01 / REG-FE-025): цель форс-мажора — канонический
+        // владелец строки read-модели (queue_owner_kind/queue_owner_id),
+        // а НЕ legacy-поля врача. Ресурсная, смешанная или неизвестная
+        // очередь не может быть молча перенаправлена на «случайного»
+        // врача всей очередью: такое действие видно недоступно, пока у
+        // бэкенда нет безопасного ресурсного контракта.
+        // Review round 2 (P1 queue identity): daily_queue_id — такой же
+        // обязательный факт строки: без него бэкенд не может привязать
+        // операцию к конкретной очереди (резолюция специалиста способна
+        // выбрать общую ресурсную очередь) — действие тоже недоступно.
+        const ownerKind = row.queue_owner_kind ?? null;
+        const ownerId = row.queue_owner_id ?? null;
+        const dailyQueueId =
+          typeof row.daily_queue_id === 'number' && row.daily_queue_id > 0
+            ? row.daily_queue_id
+            : null;
+        const ownerIsUnambiguousDoctor =
+          ownerKind === 'doctor' && typeof ownerId === 'number' && ownerId > 0;
+
+        if (ownerIsUnambiguousDoctor && dailyQueueId) {
+          const targetDate =
+            (typeof row.record_date === 'string' && row.record_date) ||
+            (typeof row.date === 'string' && row.date) ||
+            null;
+          setForceMajeureModal({
+            open: true,
+            specialistId: ownerId,
+            specialistName:
+              row.doctor_name || row.specialist_name || row.queue_name || tI18n('registrarPanel.rp_all_specialists'),
+            targetDate,
+            dailyQueueId,
+          });
+        } else {
+          logger.info('[RegistrarPanel] Force majeure unavailable: row owner is not an unambiguous doctor or the canonical queue identity is missing', {
+            ownerKind,
+            ownerId,
+            dailyQueueId,
+          });
+          notify.warning(
+            tI18n(ownerIsUnambiguousDoctor ? 'misc.fm_queue_unbound' : 'misc.fm_owner_unsupported'),
+          );
+        }
         break;
+      }
       default:
         logger.info('Неизвестное действие:', action);
         break;

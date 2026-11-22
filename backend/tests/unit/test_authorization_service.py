@@ -74,14 +74,21 @@ class TestSelfAccess:
         assert result.actor_type == "self"
         assert result.reason == "self_access"
 
-    def test_self_access_denied_for_other_patient(self):
-        """Patient accessing another patient's PHI is denied."""
+    def test_self_access_denied_for_other_patient(self, db_session):
+        """Patient accessing another patient's PHI is denied.
+
+        AUTHZAMBIENTDB-BE-001: the relationship lookup runs against the
+        caller-owned test session (same schema the suite builds via
+        create_all), not the ambient settings-DATABASE_URL — with no
+        relationship row the canonical reason is patient_scope_mismatch.
+        """
         scope = _make_patient_scope(patient_id=42)
         result = authorization_service.can_access_phi(
             scope,
             subject_patient_id=99,
             resource_type="cabinet_summary",
             action="view",
+            db=db_session,
         )
         assert not result.allowed
         assert result.reason == "patient_scope_mismatch"
@@ -238,8 +245,15 @@ class TestRequirePhiAccess:
         )
         assert result is scope
 
-    def test_require_phi_access_raises_when_denied(self):
-        """Raises AuthorizationError when access is denied."""
+    def test_require_phi_access_raises_when_denied(self, db_session):
+        """Raises AuthorizationError when access is denied.
+
+        AUTHZAMBIENTDB-BE-001: same caller-owned-session contract as
+        test_self_access_denied_for_other_patient — the denial reason must
+        be patient_scope_mismatch, not the fail-closed
+        relationship_check_error the ambient path produced on a schemaless
+        ambient database.
+        """
         scope = _make_patient_scope(patient_id=42)
         with pytest.raises(AuthorizationError) as exc_info:
             authorization_service.require_phi_access(
@@ -247,6 +261,7 @@ class TestRequirePhiAccess:
                 subject_patient_id=99,
                 resource_type="cabinet_summary",
                 action="view",
+                db=db_session,
             )
         assert exc_info.value.reason == "patient_scope_mismatch"
 

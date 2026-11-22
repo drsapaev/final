@@ -8,6 +8,7 @@ the pipe releases the keeper even when the Windows parent is interrupted.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -18,7 +19,8 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
-from pathlib import Path, PureWindowsPath
+from datetime import UTC, datetime, timedelta
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import parse_qsl, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,12 +41,17 @@ PUBLIC_ORIGIN_KEYS = (
     "CORS_ORIGINS",
 )
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost"}
+LOOPBACK_BIND_IP = "127.0.0.1"
 INSPECT = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
     '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
+    '"lifecycle":{{json (index .Config.Labels "clinic.lifecycle")}},'
+    '"owner":{{json (index .Config.Labels "clinic.owner")}},'
+    '"expires_at":{{json (index .Config.Labels "clinic.expires_at")}},'
     '"root":{{json (index .Config.Labels "com.docker.compose.project.working_dir")}},'
     '"files":{{json (index .Config.Labels "com.docker.compose.project.config_files")}},'
     '"mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}},'
+    '"host_port_bindings":{{json .HostConfig.PortBindings}},'
     '"image":{{json .Image}},'
     '"status":{{json .State.Status}},'
     '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}}}'
@@ -71,14 +78,13 @@ def windows_distro_base_path(distribution: str) -> str:
                 ) as registered:
                     name = winreg.QueryValueEx(registered, "DistributionName")[0]
                     if not isinstance(name, str):
-                        raise ValueError
+                        raise TypeError
                     if name.casefold() == distribution.casefold():
                         matches.append(winreg.QueryValueEx(registered, "BasePath")[0])
         if len(matches) != 1 or not isinstance(matches[0], str):
             raise ValueError
         base_path = matches[0]
-        if base_path.startswith("\\\\?\\"):
-            base_path = base_path[4:]
+        base_path = base_path.removeprefix("\\\\?\\")
         path = PureWindowsPath(base_path)
         if (
             not path.is_absolute()
@@ -102,13 +108,55 @@ def native(argv: list[str], *, timeout: int = 30, operation: str = "native") -> 
         ) from None
     if result.returncode:
         # Native stderr can contain expanded secrets. Do not echo it or argv.
+        category = (
+            f"; category {_compose_failure_category(result.stderr)}"
+            if operation.startswith("compose-")
+            else ""
+        )
         raise GuardError(
-            f"NATIVE_FAILED ({operation}): exit {result.returncode}; no subsequent command continued"
+            f"NATIVE_FAILED ({operation}): exit {result.returncode}{category}; no subsequent command continued"
         )
     data = result.stdout
     return data.decode(
         "utf-16-le" if b"\0" in data else "utf-8", errors="replace"
     ).strip()
+
+
+def _compose_failure_category(stderr: bytes) -> str:
+    """Return one fixed category; never expose Compose stderr or arguments."""
+    text = stderr.decode("utf-8", errors="replace").casefold()
+    patterns = (
+        ("disk_exhausted", r"no space left on device|disk quota exceeded"),
+        (
+            "image_build",
+            r"failed to solve|failed to build|build failed|error: failed to",
+        ),
+        (
+            "image_unavailable",
+            r"pull access denied|manifest unknown|repository does not exist",
+        ),
+        (
+            "docker_daemon_unavailable",
+            r"cannot connect to the docker daemon|error during connect|is the docker daemon running",
+        ),
+        (
+            "platform_mismatch",
+            r"no matching manifest for|requested image(?:'s|’s) platform",
+        ),
+        (
+            "network_or_port_setup",
+            r"failed to create (?:the )?network|address already in use|port is already allocated",
+        ),
+        (
+            "container_startup",
+            r"failed to create shim|failed to create task|failed to start container|failed to mount",
+        ),
+        ("wsl_transport", r"wsl_e_[0-9a-f]+|wsl.*(?:failed|error)"),
+    )
+    for category, pattern in patterns:
+        if re.search(pattern, text):
+            return category
+    return "unclassified"
 
 
 def tcp_ready(port: int) -> bool:
@@ -160,6 +208,12 @@ def context_values(path: Path) -> dict[str, str]:
         )
     keys = {
         "COMPOSE_PROJECT_NAME",
+        "CLINIC_LIFECYCLE",
+        "CLINIC_OWNER",
+        "CLINIC_EXPIRES_AT",
+        "STAGING_FRONTEND_BUILD_TARGET",
+        "STAGING_FRONTEND_ARTIFACT_CONTEXT",
+        "VERCEL_GIT_COMMIT_SHA",
         *(v[0] for v in PORT_KEYS.values()),
         *PUBLIC_ORIGIN_KEYS,
     }
@@ -189,7 +243,183 @@ def context_values(path: Path) -> dict[str, str]:
         raise GuardError(
             "PROJECT_REQUIRED: set an explicit unique COMPOSE_PROJECT_NAME"
         )
+    frontend_target = (
+        values.get("STAGING_FRONTEND_BUILD_TARGET", "runtime").strip() or "runtime"
+    )
+    if frontend_target not in {"runtime", "artifact-runtime"}:
+        raise GuardError(
+            "FRONTEND_BUILD_TARGET_INVALID: unsupported staging frontend target"
+        )
     return values
+
+
+def _is_link_or_reparse_point(path: Path) -> bool:
+    """Reject symlinks and Windows junctions/reparse points in build contexts."""
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction) and is_junction():
+        return True
+    # pathlib.Path.is_junction is not available on every supported Python.
+    # Windows exposes junctions and other reparse points in st_file_attributes.
+    try:
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except FileNotFoundError:
+        return False
+    return bool(attributes & 0x400)  # FILE_ATTRIBUTE_REPARSE_POINT
+
+
+def validate_frontend_artifact_context(
+    root: Path, context_value: str, expected_source_sha: str
+) -> Path:
+    """Verify an exact frontend artifact rooted in this worktree's .scratch."""
+    if (
+        not context_value
+        or "\\" in context_value
+        or any(ord(char) < 32 or ord(char) == 127 for char in context_value)
+    ):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: use a relative artifact directory in this worktree"
+        )
+    relative = PurePosixPath(context_value)
+    if (
+        relative.is_absolute()
+        or PureWindowsPath(context_value).is_absolute()
+        or PureWindowsPath(context_value).drive
+    ):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: use a relative artifact directory in this worktree"
+        )
+    if not re.fullmatch(r"[0-9a-f]{40}", expected_source_sha):
+        raise GuardError(
+            "ARTIFACT_SOURCE_INVALID: provide the exact 40-character source commit"
+        )
+
+    worktree = root.resolve()
+    ops_path = worktree / "ops"
+    scratch_path = worktree / ".scratch"
+    if _is_link_or_reparse_point(ops_path) or _is_link_or_reparse_point(scratch_path):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: ops and .scratch must be real worktree directories"
+        )
+    try:
+        if ops_path.resolve(strict=True) != ops_path:
+            raise GuardError(
+                "ARTIFACT_CONTEXT_INVALID: ops must be a real worktree directory"
+            )
+        scratch = scratch_path.resolve(strict=True)
+        candidate = Path(os.path.abspath(ops_path / Path(*relative.parts)))
+    except (OSError, RuntimeError):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: artifact directory is missing or unresolved"
+        ) from None
+    if (
+        not scratch.is_dir()
+        or scratch == worktree
+        or not scratch.is_relative_to(worktree)
+        or scratch != scratch_path
+        or candidate == scratch_path
+        or not candidate.is_relative_to(scratch_path)
+    ):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_OUTSIDE_SCRATCH: artifact must be below this worktree's .scratch"
+        )
+
+    relative_to_scratch = candidate.relative_to(scratch_path)
+    current = scratch_path
+    for part in relative_to_scratch.parts:
+        current = current / part
+        if _is_link_or_reparse_point(current):
+            raise GuardError(
+                "ARTIFACT_SYMLINK: artifact paths must not contain symlinks"
+            )
+
+    try:
+        context = candidate.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: artifact directory is missing or unresolved"
+        ) from None
+    if context != candidate:
+        raise GuardError("ARTIFACT_SYMLINK: artifact paths must not contain symlinks")
+    if not context.is_dir():
+        raise GuardError(
+            "ARTIFACT_CONTEXT_INVALID: artifact directory is missing or unresolved"
+        )
+
+    files: dict[str, Path] = {}
+    try:
+        for item in context.rglob("*"):
+            if _is_link_or_reparse_point(item):
+                raise GuardError(
+                    "ARTIFACT_SYMLINK: artifact contents must not contain symlinks"
+                )
+            if item.is_file():
+                files["./" + item.relative_to(context).as_posix()] = item
+            elif not item.is_dir():
+                raise GuardError(
+                    "ARTIFACT_FILESET_INVALID: artifact contains a non-file entry"
+                )
+
+        manifest = context / "SHA256SUMS"
+        source_file = context / "source.sha"
+        if (
+            not manifest.is_file()
+            or _is_link_or_reparse_point(manifest)
+            or not source_file.is_file()
+            or _is_link_or_reparse_point(source_file)
+        ):
+            raise GuardError(
+                "ARTIFACT_MANIFEST_INVALID: source and checksum manifest are required"
+            )
+        if source_file.read_text(encoding="ascii").strip() != expected_source_sha:
+            raise GuardError(
+                "ARTIFACT_SOURCE_MISMATCH: artifact source differs from the requested commit"
+            )
+
+        expected: dict[str, str] = {}
+        for line in manifest.read_text(encoding="ascii").splitlines():
+            match = re.fullmatch(r"([0-9a-f]{64})  (\./[^\s\\]+)", line)
+            if not match:
+                raise GuardError(
+                    "ARTIFACT_MANIFEST_INVALID: checksum manifest contains an unsupported path"
+                )
+            digest, name = match.groups()
+            components = name[2:].split("/")
+            if (
+                name == "./SHA256SUMS"
+                or any(part in {"", ".", ".."} for part in components)
+                or name in expected
+            ):
+                raise GuardError(
+                    "ARTIFACT_MANIFEST_INVALID: checksum manifest paths must be unique and relative"
+                )
+            expected[name] = digest
+        actual = set(files) - {"./SHA256SUMS"}
+        if (
+            actual != set(expected)
+            or "./source.sha" not in expected
+            or "./index.html" not in expected
+        ):
+            raise GuardError(
+                "ARTIFACT_FILESET_MISMATCH: files must exactly match the checksum manifest"
+            )
+        for name, digest in expected.items():
+            hasher = hashlib.sha256()
+            with files[name].open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    hasher.update(chunk)
+            if hasher.hexdigest() != digest:
+                raise GuardError(
+                    "ARTIFACT_CHECKSUM_MISMATCH: artifact file does not match its manifest"
+                )
+    except GuardError:
+        raise
+    except (OSError, UnicodeError, ValueError):
+        raise GuardError(
+            "ARTIFACT_MANIFEST_INVALID: artifact files could not be verified"
+        ) from None
+    return context
 
 
 def validate_public_origins(values: dict[str, str], frontend_port: int) -> None:
@@ -255,11 +485,11 @@ def validate_public_origins(values: dict[str, str], frontend_port: int) -> None:
         or ws_host.path
         or ws_host.query
         or ws_host.fragment
-        or any(
-            char in values["STAGING_PUBLIC_WS_HOST"] for char in "\r\n\t/?#"
-        )
+        or any(char in values["STAGING_PUBLIC_WS_HOST"] for char in "\r\n\t/?#")
     ):
-        raise GuardError("PUBLIC_ORIGIN_INVALID: WebSocket host must be loopback host:port")
+        raise GuardError(
+            "PUBLIC_ORIGIN_INVALID: WebSocket host must be loopback host:port"
+        )
     if parsed_ws_host != public_host or ws_host_port != frontend_port:
         raise GuardError(
             "PUBLIC_ORIGIN_CONTEXT_MISMATCH: WebSocket host must match the frontend host and port"
@@ -282,7 +512,11 @@ def validate_public_origins(values: dict[str, str], frontend_port: int) -> None:
 
 
 def effective_ports(
-    config: dict, values: dict[str, str], linux_root: str
+    config: dict,
+    values: dict[str, str],
+    linux_root: str,
+    *,
+    stop_recovery: bool = False,
 ) -> dict[str, int]:
     ports = {}
     for service, (key, default, target) in PORT_KEYS.items():
@@ -307,8 +541,12 @@ def effective_ports(
             raise GuardError(
                 "PORT_CONTEXT_MISMATCH: resolved Compose ports differ from the selected env"
             )
-        if service == "postgres" and item.get("host_ip") != "127.0.0.1":
-            raise GuardError("POSTGRES_EXPOSED: PostgreSQL must bind to loopback")
+        if not stop_recovery and item.get("host_ip") != LOOPBACK_BIND_IP:
+            if service == "postgres":
+                raise GuardError("POSTGRES_EXPOSED: PostgreSQL must bind to loopback")
+            raise GuardError(
+                "STAGING_PORT_EXPOSED: published staging services must bind to loopback"
+            )
         ports[service] = port
     if len(set(ports.values())) != len(ports):
         raise GuardError("PORT_COLLISION: staging services must use distinct ports")
@@ -327,20 +565,57 @@ def effective_ports(
 
 
 def validate_ownership(
-    containers: list[dict], project: str, root: str, compose: str, ports: dict[str, int]
+    containers: list[dict],
+    project: str,
+    root: str,
+    compose: str | list[str],
+    ports: dict[str, int],
+    *,
+    enforce_port_bindings: bool = True,
+    alternative_compose_files: list[list[str]] | None = None,
 ) -> list[dict]:
     owned = []
+    expected_compose_files = compose if isinstance(compose, list) else [compose]
+    allowed_compose_file_sets = [
+        expected_compose_files,
+        *(alternative_compose_files or []),
+    ]
+    allowed_compose_file_labels = [
+        ",".join(files) for files in allowed_compose_file_sets
+    ]
+
+    def validate_bindings(mapping: dict | None, service: str) -> None:
+        expected_key = f"{PORT_KEYS[service][2]}/tcp"
+        if not isinstance(mapping, dict) or set(mapping) != {expected_key}:
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: expected the configured container TCP port"
+            )
+        bindings = mapping[expected_key]
+        if not isinstance(bindings, list) or len(bindings) != 1:
+            raise GuardError("PORT_CONTEXT_MISMATCH: expected one published binding")
+        try:
+            host_port = int(bindings[0]["HostPort"])
+        except (KeyError, TypeError, ValueError):
+            raise GuardError("PORT_CONTEXT_MISMATCH: invalid published port") from None
+        if host_port != ports[service]:
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: existing project uses different ports"
+            )
+        if bindings[0].get("HostIp") != LOOPBACK_BIND_IP:
+            raise GuardError(
+                "STAGING_PORT_EXPOSED: existing staging services must bind to loopback"
+            )
+
     for container in containers:
-        bindings = [
-            b
-            for group in (container.get("ports") or {}).values()
-            for b in (group or [])
-        ]
         if container.get("project") == project:
-            if (
-                container.get("root") != root + "/ops"
-                or container.get("files") != compose
-            ):
+            actual_compose_files = container.get("files")
+            if isinstance(actual_compose_files, str):
+                compose_files_match = (
+                    actual_compose_files in allowed_compose_file_labels
+                )
+            else:
+                compose_files_match = actual_compose_files in allowed_compose_file_sets
+            if container.get("root") != root + "/ops" or not compose_files_match:
                 raise GuardError(
                     "PROJECT_OWNERSHIP: project belongs to another worktree or Compose file"
                 )
@@ -352,19 +627,25 @@ def validate_ownership(
                     "SOURCE_MISMATCH: existing container mounts different source"
                 )
             service = container.get("service")
-            if service in ports and any(
-                int(b["HostPort"]) != ports[service] for b in bindings
-            ):
-                raise GuardError(
-                    "PORT_CONTEXT_MISMATCH: existing project uses different ports"
-                )
+            if enforce_port_bindings and service in ports:
+                # NetworkSettings.Ports reflects active publications and is empty
+                # on stopped containers. HostConfig.PortBindings preserves the
+                # configured binding in both states and is always authoritative
+                # for a container that may be started again.
+                validate_bindings(container.get("host_port_bindings"), service)
+                if container.get("status") == "running":
+                    validate_bindings(container.get("ports"), service)
             owned.append(container)
-        elif container.get("status") == "running" and any(
-            int(b["HostPort"]) in ports.values() for b in bindings
-        ):
-            raise GuardError(
-                "FOREIGN_PORT: a selected port belongs to another Docker project; preserve it"
-            )
+        elif enforce_port_bindings and container.get("status") == "running":
+            bindings = [
+                binding
+                for group in (container.get("ports") or {}).values()
+                for binding in (group or [])
+            ]
+            if any(int(binding["HostPort"]) in ports.values() for binding in bindings):
+                raise GuardError(
+                    "FOREIGN_PORT: a selected port belongs to another Docker project; preserve it"
+                )
     return owned
 
 
@@ -440,14 +721,60 @@ def validate_junit(path: Path) -> int:
     return len(cases)
 
 
+def lifecycle_context(values: dict[str, str]) -> tuple[str, str, datetime]:
+    """Require bounded ownership metadata before creating disposable resources."""
+    lifecycle = values.get("CLINIC_LIFECYCLE", "ephemeral").strip()
+    owner = values.get("CLINIC_OWNER", "").strip()
+    expires_raw = values.get("CLINIC_EXPIRES_AT", "").strip()
+    if lifecycle != "ephemeral":
+        raise GuardError("LIFECYCLE_INVALID: staging must be labeled ephemeral")
+    if (
+        not owner
+        or owner.casefold() in {"unknown", "none", "null"}
+        or len(owner) > 128
+        or any(ord(char) < 32 or ord(char) == 127 for char in owner)
+    ):
+        raise GuardError("LIFECYCLE_OWNER_REQUIRED: provide a specific staging owner")
+    try:
+        parsed = datetime.fromisoformat(
+            expires_raw[:-1] + "+00:00" if expires_raw.endswith("Z") else expires_raw
+        )
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError
+    except (TypeError, ValueError):
+        raise GuardError(
+            "LIFECYCLE_EXPIRY_REQUIRED: provide CLINIC_EXPIRES_AT as a timezone-aware ISO timestamp"
+        ) from None
+    expires_at = parsed.astimezone(UTC)
+    if expires_at > datetime.now(UTC) + timedelta(days=7):
+        raise GuardError(
+            "LIFECYCLE_EXPIRY_TOO_FAR: staging lease must expire within seven days"
+        )
+    return owner, expires_raw, expires_at
+
+
 class WslStaging:
     def __init__(self, root: Path, env_file: str, distribution: str):
         self.root = root.resolve()
         self.env_file = local_file(self.root, env_file)
         self.values = context_values(self.env_file)
         self.project = self.values["COMPOSE_PROJECT_NAME"]
+        self.frontend_build_target = (
+            self.values.get("STAGING_FRONTEND_BUILD_TARGET", "runtime").strip()
+            or "runtime"
+        )
+        self.frontend_artifact_context_value = self.values.get(
+            "STAGING_FRONTEND_ARTIFACT_CONTEXT", ""
+        )
+        self.frontend_artifact_context: Path | None = None
         self.distribution = distribution
         self.compose = self.root / "ops/compose.staging.yml"
+        self.compose_artifact = self.root / "ops/compose.staging.artifact.yml"
+        self.stop_recovery = False
+        self.ownership_verified = False
+        self.cleanup_policy = None
+        self.lifecycle_owner = None
+        self.lifecycle_expires_at = None
         self.summary = {
             "project": self.project,
             "worktree": str(self.root),
@@ -461,13 +788,29 @@ class WslStaging:
             operation=operation,
         )
 
-    def docker(self, *args: str, timeout: int = 30, operation: str = "docker") -> str:
+    def docker(
+        self,
+        *args: str,
+        timeout: int = 30,
+        operation: str = "docker",
+        extra_env: dict[str, str] | None = None,
+    ) -> str:
         # Clear ambient WSL env/Compose overrides and forbid a remote Docker context.
+        env_args = []
+        for key, value in (extra_env or {}).items():
+            if not re.fullmatch(r"[A-Z_][A-Z0-9_]*", key) or any(
+                ord(char) < 32 or ord(char) == 127 for char in value
+            ):
+                raise GuardError(
+                    "COMPOSE_ENV_INVALID: refusing an invalid Compose override"
+                )
+            env_args.append(f"{key}={value}")
         return self.wsl(
             "env",
             "-i",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "COMPOSE_PARALLEL_LIMIT=1",
+            *env_args,
             "docker",
             "--host",
             "unix:///var/run/docker.sock",
@@ -478,7 +821,7 @@ class WslStaging:
 
     def compose_command(self, *args: str, timeout: int = 30) -> str:
         # Compose relative paths are anchored at ops/, where the canonical YAML lives.
-        return self.docker(
+        compose_args = [
             "compose",
             "--project-directory",
             self.linux_root + "/ops",
@@ -488,10 +831,29 @@ class WslStaging:
             self.linux_env,
             "-f",
             self.linux_compose,
+        ]
+        extra_env = None
+        if self.frontend_build_target == "artifact-runtime":
+            compose_args.extend(["-f", self.linux_compose_artifact])
+            if self.stop_recovery:
+                # Teardown does not build. Keep it possible after an operator
+                # removes the ignored artifact directory, while preserving the
+                # exact Compose file labels used to validate project ownership.
+                extra_env = {"STAGING_FRONTEND_ARTIFACT_CONTEXT": "../frontend/docker"}
+        docker_options = {"timeout": timeout, "operation": "compose-" + args[0]}
+        if extra_env is not None:
+            docker_options["extra_env"] = extra_env
+        return self.docker(
+            *compose_args,
             *args,
-            timeout=timeout,
-            operation="compose-" + args[0],
+            **docker_options,
         )
+
+    def expected_compose_files(self) -> list[str]:
+        files = [self.linux_compose]
+        if self.frontend_build_target == "artifact-runtime":
+            files.append(self.linux_compose_artifact)
+        return files
 
     @contextmanager
     def keeper(self):
@@ -545,11 +907,167 @@ class WslStaging:
             for line in self.docker("inspect", "--format", INSPECT, *ids).splitlines()
         ]
 
+    def project_resource_ids(self, kind: str) -> list[str]:
+        selector = f"label=com.docker.compose.project={self.project}"
+        if kind == "container":
+            args = ("ps", "--all", "--quiet", "--filter", selector)
+        elif kind in {"volume", "network"}:
+            args = (kind, "ls", "--quiet", "--filter", selector)
+        else:
+            raise ValueError("unsupported Docker resource kind")
+        return self.docker(*args).split()
+
+    def resource_labels(self, kind: str, resource_id: str) -> dict:
+        if kind not in {"volume", "network"}:
+            raise ValueError("unsupported Docker resource kind")
+        raw = self.docker(
+            kind,
+            "inspect",
+            "--format",
+            "{{json .Labels}}",
+            resource_id,
+        )
+        try:
+            labels = json.loads(raw)
+        except (TypeError, ValueError):
+            labels = None
+        return labels if isinstance(labels, dict) else {}
+
+    def validate_disposable_labels(self, labels: dict) -> None:
+        if (
+            labels.get("com.docker.compose.project") != self.project
+            or labels.get("clinic.lifecycle") != "ephemeral"
+            or labels.get("clinic.owner") != self.lifecycle_owner
+            or labels.get("clinic.expires_at") != self.lifecycle_expires_at
+        ):
+            raise GuardError(
+                "RESOURCE_LIFECYCLE_MISMATCH: refusing cleanup without matching ephemeral owner and expiry labels"
+            )
+
+    def validate_project_lifecycle_labels(self) -> dict[str, int]:
+        owned = validate_ownership(
+            self.containers(),
+            self.project,
+            self.linux_root,
+            self.expected_compose_files(),
+            self.ports,
+            enforce_port_bindings=False,
+        )
+        for container in owned:
+            self.validate_disposable_labels(
+                {
+                    "com.docker.compose.project": container.get("project"),
+                    "clinic.lifecycle": container.get("lifecycle"),
+                    "clinic.owner": container.get("owner"),
+                    "clinic.expires_at": container.get("expires_at"),
+                }
+            )
+
+        counts = {"container": len(owned), "volume": 0, "network": 0}
+        for kind in ("volume", "network"):
+            ids = self.project_resource_ids(kind)
+            counts[kind] = len(ids)
+            for resource_id in ids:
+                self.validate_disposable_labels(self.resource_labels(kind, resource_id))
+        return counts
+
+    def teardown_project(self, *, allow_keep: bool) -> str:
+        """Remove and verify only this already-validated Compose project."""
+        if not self.ownership_verified:
+            raise GuardError("PROJECT_OWNERSHIP_UNVERIFIED: refusing staging teardown")
+        if allow_keep and os.environ.get("KEEP_STAGING") == "1":
+            self.summary["teardown"] = "SKIPPED_KEEP_STAGING"
+            return "SKIPPED_KEEP_STAGING"
+        if not self.lifecycle_owner or not self.lifecycle_expires_at:
+            raise GuardError(
+                "LIFECYCLE_UNVERIFIED: refusing staging teardown without owner and expiry"
+            )
+
+        before = self.validate_project_lifecycle_labels()
+
+        self.compose_command(
+            "down",
+            "--volumes",
+            "--remove-orphans",
+            "--rmi",
+            "local",
+            timeout=300,
+        )
+
+        remaining = {
+            kind: len(self.project_resource_ids(kind))
+            for kind in ("container", "volume", "network")
+        }
+        if any(remaining.values()):
+            raise GuardError(
+                "STAGING_TEARDOWN_INCOMPLETE: project-scoped containers, volumes or networks remain"
+            )
+        self.summary["teardown"] = {
+            "status": "PASS",
+            "removed": before,
+            "remaining": remaining,
+            "local_images": "compose --rmi local",
+        }
+        return "PASS"
+
+    def finish_after_failure(self, primary: BaseException, keeper, boot: str) -> None:
+        if os.environ.get("KEEP_STAGING") == "1":
+            self.summary["teardown"] = "SKIPPED_KEEP_STAGING"
+            if isinstance(primary, GuardError):
+                primary.args = (f"{primary}; STAGING_PRESERVED_KEEP_STAGING=1",)
+                return
+            raise GuardError(
+                f"STAGING_FAILED: {type(primary).__name__}; STAGING_PRESERVED_KEEP_STAGING=1"
+            ) from None
+        try:
+            self.assert_session(keeper, boot)
+        except GuardError:
+            self.summary["teardown"] = "NOT_RUN_WSL_SESSION_INTERRUPTED"
+            if isinstance(primary, GuardError):
+                primary.args = (
+                    f"{primary}; STAGING_TEARDOWN_NOT_RUN: WSL session continuity was lost",
+                )
+                return
+            raise GuardError(
+                f"STAGING_FAILED: {type(primary).__name__}; STAGING_TEARDOWN_NOT_RUN: WSL session continuity was lost"
+            ) from None
+        try:
+            outcome = self.teardown_project(allow_keep=True)
+            self.assert_session(keeper, boot)
+        except (
+            Exception
+        ) as cleanup_error:  # noqa: BLE001 - preserve the primary failure and redact unknown errors
+            self.summary["teardown"] = "FAIL"
+            safe_cleanup_error = (
+                str(cleanup_error)
+                if isinstance(cleanup_error, GuardError)
+                else f"STAGING_TEARDOWN_FAILED: {type(cleanup_error).__name__}"
+            )
+            if isinstance(primary, GuardError):
+                primary.args = (f"{primary}; {safe_cleanup_error}",)
+                return
+            raise GuardError(
+                f"STAGING_FAILED: {type(primary).__name__}; {safe_cleanup_error}"
+            ) from None
+        note = (
+            "STAGING_PRESERVED_KEEP_STAGING=1"
+            if outcome == "SKIPPED_KEEP_STAGING"
+            else "STAGING_TEARDOWN=PASS"
+        )
+        if isinstance(primary, GuardError):
+            primary.args = (f"{primary}; {note}",)
+        elif isinstance(primary, Exception):
+            raise GuardError(
+                f"STAGING_FAILED: {type(primary).__name__}; {note}"
+            ) from None
+
     def host_storage(self, *, build_possible: bool, recovery: bool = False) -> None:
         # The checkout and the sparse distro VHD can live on different volumes.
         # Non-Windows direct calls exist only for the mocked tooling tests.
         backing = (
-            windows_distro_base_path(self.distribution) if IS_WINDOWS else str(self.root)
+            windows_distro_base_path(self.distribution)
+            if IS_WINDOWS
+            else str(self.root)
         )
         self.summary["wsl_backing_path"] = backing
         self.storage_recovery = recovery
@@ -587,7 +1105,9 @@ class WslStaging:
         """Reject read-only/full virtual storage before Compose or the child."""
         reserve = BUILD_RESERVE_GIB if build_possible else RUN_RESERVE_GIB
         try:
-            root = json.loads(self.docker("info", "--format", "{{json .DockerRootDir}}"))
+            root = json.loads(
+                self.docker("info", "--format", "{{json .DockerRootDir}}")
+            )
         except (ValueError, TypeError):
             raise GuardError(
                 "WSL_STORAGE_UNKNOWN: local Docker storage path cannot be verified"
@@ -597,7 +1117,9 @@ class WslStaging:
             or not root.startswith("/")
             or any(char in root for char in ("\0", "\r", "\n"))
         ):
-            raise GuardError("WSL_STORAGE_UNKNOWN: local Docker storage path is invalid")
+            raise GuardError(
+                "WSL_STORAGE_UNKNOWN: local Docker storage path is invalid"
+            )
         self.summary["wsl_storage"] = {}
         prefix = (
             "env",
@@ -609,8 +1131,14 @@ class WslStaging:
             try:
                 mounts = json.loads(
                     self.wsl(
-                        *prefix, "findmnt", "--json", "--target", path,
-                        "--output", "TARGET,OPTIONS", operation="wsl-storage-mount",
+                        *prefix,
+                        "findmnt",
+                        "--json",
+                        "--target",
+                        path,
+                        "--output",
+                        "TARGET,OPTIONS",
+                        operation="wsl-storage-mount",
                     )
                 )["filesystems"]
                 if len(mounts) != 1:
@@ -626,7 +1154,12 @@ class WslStaging:
                 if "rw" not in options:
                     raise ValueError
                 available = self.wsl(
-                    *prefix, "df", "--block-size=1", "--output=avail", "--", path,
+                    *prefix,
+                    "df",
+                    "--block-size=1",
+                    "--output=avail",
+                    "--",
+                    path,
                     operation="wsl-storage-space",
                 ).splitlines()
                 if (
@@ -649,7 +1182,9 @@ class WslStaging:
                     f"WSL_DISK_LOW: root or Docker storage needs {reserve} GiB free; recover space before staging"
                 )
 
-    def preflight(self) -> list[dict]:
+    def preflight(self, *, stop_recovery: bool = False) -> list[dict]:
+        self.ownership_verified = False
+        self.stop_recovery = stop_recovery
         main = Path(
             native(
                 [
@@ -689,6 +1224,9 @@ class WslStaging:
         self.linux_root = self.wsl("wslpath", "-a", "-u", str(self.root))
         self.linux_env = self.wsl("wslpath", "-a", "-u", str(self.env_file))
         self.linux_compose = self.wsl("wslpath", "-a", "-u", str(self.compose))
+        self.linux_compose_artifact = self.wsl(
+            "wslpath", "-a", "-u", str(self.compose_artifact)
+        )
         self.summary["boot_id"] = self.boot_id()
         self.summary["docker"] = self.docker(
             "version", "--format", "{{.Server.Version}}"
@@ -699,28 +1237,41 @@ class WslStaging:
             raise GuardError(
                 "PROJECT_CONTEXT_MISMATCH: effective Compose project differs"
             )
-        self.ports = effective_ports(config, self.values, self.linux_root)
+        self.ports = effective_ports(
+            config,
+            self.values,
+            self.linux_root,
+            stop_recovery=stop_recovery,
+        )
         self.summary["ports"] = self.ports
-        validate_windows_listeners(self.ports)
+        if not stop_recovery:
+            validate_windows_listeners(self.ports)
         owned = validate_ownership(
             self.containers(),
             self.project,
             self.linux_root,
-            self.linux_compose,
+            self.expected_compose_files(),
             self.ports,
+            enforce_port_bindings=not stop_recovery,
+            alternative_compose_files=(
+                [[self.linux_compose]]
+                if stop_recovery and self.frontend_build_target == "artifact-runtime"
+                else None
+            ),
         )
-        owned_ports = {
-            int(b["HostPort"])
-            for c in owned
-            if c.get("status") == "running"
-            for group in (c.get("ports") or {}).values()
-            for b in group or []
-        }
-        for port in self.ports.values():
-            if tcp_ready(port) and port not in owned_ports:
-                raise GuardError(
-                    "HOST_PORT: selected Windows port is already in use outside this project"
-                )
+        if not stop_recovery:
+            owned_ports = {
+                int(b["HostPort"])
+                for c in owned
+                if c.get("status") == "running"
+                for group in (c.get("ports") or {}).values()
+                for b in group or []
+            }
+            for port in self.ports.values():
+                if tcp_ready(port) and port not in owned_ports:
+                    raise GuardError(
+                        "HOST_PORT: selected Windows port is already in use outside this project"
+                    )
         free = None
         if not getattr(self, "storage_recovery", False):
             free = self.summary.get("host_disk_free_gib")
@@ -740,6 +1291,7 @@ class WslStaging:
             self.summary["warnings"].append(
                 "Low WSL available memory; build concurrency is limited to one"
             )
+        self.ownership_verified = True
         return owned
 
     def ready(self) -> None:
@@ -748,7 +1300,7 @@ class WslStaging:
             self.containers(),
             self.project,
             self.linux_root,
-            self.linux_compose,
+            self.expected_compose_files(),
             self.ports,
         )
         by_service = {c["service"]: c for c in owned}
@@ -771,96 +1323,143 @@ class WslStaging:
             s: by_service[s].get("image") for s in ("backend", "frontend", "worker")
         }
 
+    def _execute_after_preflight(self, args, keeper) -> dict:
+        build_possible = args.action in {"start", "session"} and not args.no_build
+        if args.action in {"start", "session"}:
+            if not self.ownership_verified:
+                raise GuardError(
+                    "PROJECT_OWNERSHIP_UNVERIFIED: refusing staging execution"
+                )
+            owner, expires_raw, expires_at = lifecycle_context(self.values)
+            self.lifecycle_owner = owner
+            self.lifecycle_expires_at = expires_raw
+            self.validate_project_lifecycle_labels()
+            # Arm cleanup as soon as this exact project and its lifecycle
+            # labels are verified. Start must also clean when later safety
+            # checks (public origins, Linux storage or keeper continuity) fail.
+            self.cleanup_policy = "always" if args.action == "session" else "failure"
+            if args.action == "session":
+                # A Session owns teardown once its project and lifecycle labels
+                # have been verified, including readiness and child failures.
+                if expires_at <= datetime.now(UTC):
+                    raise GuardError(
+                        "LIFECYCLE_EXPIRED: staging lease expired; project will be torn down"
+                    )
+            elif expires_at <= datetime.now(UTC):
+                # A stale project name must not be reused. If it is still the
+                # exact project, remove it on this failed Start path.
+                raise GuardError(
+                    "LIFECYCLE_EXPIRED: staging lease expired; project will be torn down"
+                )
+
+        if args.action != "stop":
+            validate_public_origins(self.values, self.ports["frontend"])
+            self.linux_storage(build_possible=build_possible)
+        boot = self.summary["boot_id"]
+        self.assert_session(keeper, boot)
+        if args.action in {"start", "session"}:
+            command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
+            command.append("--no-build" if args.no_build else "--build")
+            self.compose_command(
+                *command, timeout=args.timeout + (1800 if not args.no_build else 30)
+            )
+        elif args.action == "stop":
+            # Preserve volumes and every foreign project. No distro shutdown/prune.
+            self.compose_command("down", timeout=args.timeout)
+        if args.action not in {"stop", "preflight"}:
+            self.ready()
+            self.summary["runtime_readiness"] = "PASS"
+        else:
+            self.summary["runtime_readiness"] = "NOT_RUN"
+        if args.action == "session":
+            if not args.command and not args.pg_admin_env:
+                raise GuardError(
+                    "SESSION_COMMAND_REQUIRED: wrap the complete validation script"
+                )
+            junit = local_file(self.root, args.junit) if args.junit else None
+            if junit and junit.exists():
+                raise GuardError(
+                    "STALE_REPORT: select a new JUnit path for this invocation"
+                )
+            if args.pg_admin_env:
+                # Other fixtures may have hardcoded fallback ports. Only this
+                # audited env-only scratch fixture belongs to the strict path.
+                if args.pg_admin_env != "RQ23A_PG_ADMIN_URL" or args.command:
+                    raise GuardError(
+                        "PG_SUITE_BOUNDARY: strict PG mode runs only the audited effective-settings suite; omit CommandArgs"
+                    )
+                if not junit:
+                    raise GuardError(
+                        "PG_REPORT_REQUIRED: PostgreSQL proof must reject skipped tests"
+                    )
+                validate_pg_env(self.root, args.pg_admin_env, self.ports["postgres"])
+                command = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-File",
+                    str(self.root / "scripts/run_backend_pytest.ps1"),
+                    "tests/integration/test_effective_queue_settings_report.py",
+                    "--junitxml=" + str(junit),
+                    "-q",
+                    "-rs",
+                ]
+            else:
+                command = args.command
+            child_env = (
+                pg_child_env(self.root, args.pg_admin_env)
+                if args.pg_admin_env
+                else None
+            )
+            try:
+                result = subprocess.run(
+                    command, cwd=self.root, env=child_env, check=False
+                )
+            except OSError:
+                raise GuardError(
+                    "SESSION_COMMAND_UNAVAILABLE: validation executable is missing"
+                ) from None
+            self.assert_session(keeper, boot)
+            if result.returncode:
+                raise GuardError(f"VALIDATION_FAILED: child exit {result.returncode}")
+            if junit:
+                self.summary["junit_passed_cases"] = validate_junit(junit)
+        self.assert_session(keeper, boot)
+        return self.summary
+
     def execute(self, args) -> dict:
         # Session commands are opaque and may build. NoBuild is the caller's
         # explicit promise to run without image builds, not an argv heuristic.
         build_possible = args.action in {"start", "session"} and not args.no_build
+        if self.frontend_build_target == "artifact-runtime" and args.action != "stop":
+            self.frontend_artifact_context = validate_frontend_artifact_context(
+                self.root,
+                self.frontend_artifact_context_value,
+                self.values.get("VERCEL_GIT_COMMIT_SHA", ""),
+            )
+            self.summary["frontend_artifact_validation"] = "PASS"
         self.host_storage(build_possible=build_possible, recovery=args.action == "stop")
         with self.keeper() as keeper:
-            self.preflight()
-            if args.action != "stop":
-                validate_public_origins(self.values, self.ports["frontend"])
-            if args.action != "stop":
-                self.linux_storage(build_possible=build_possible)
-            boot = self.summary["boot_id"]
-            self.assert_session(keeper, boot)
-            if args.action == "start":
-                command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
-                if not args.no_build:
-                    command.append("--build")
-                self.compose_command(
-                    *command, timeout=args.timeout + (1800 if not args.no_build else 30)
-                )
-            elif args.action == "stop":
-                # Preserve volumes and every foreign project. No distro shutdown/prune.
-                self.compose_command("down", timeout=args.timeout)
-            if args.action not in {"stop", "preflight"}:
-                self.ready()
-                self.summary["runtime_readiness"] = "PASS"
-            else:
-                self.summary["runtime_readiness"] = "NOT_RUN"
-            if args.action == "session":
-                if not args.command and not args.pg_admin_env:
-                    raise GuardError(
-                        "SESSION_COMMAND_REQUIRED: wrap the complete validation script"
-                    )
-                junit = local_file(self.root, args.junit) if args.junit else None
-                if junit and junit.exists():
-                    raise GuardError(
-                        "STALE_REPORT: select a new JUnit path for this invocation"
-                    )
-                if args.pg_admin_env:
-                    # Other fixtures may have hardcoded fallback ports. Only this
-                    # audited env-only scratch fixture belongs to the strict path.
-                    if args.pg_admin_env != "RQ23A_PG_ADMIN_URL" or args.command:
-                        raise GuardError(
-                            "PG_SUITE_BOUNDARY: strict PG mode runs only the audited effective-settings suite; omit CommandArgs"
-                        )
-                    if not junit:
-                        raise GuardError(
-                            "PG_REPORT_REQUIRED: PostgreSQL proof must reject skipped tests"
-                        )
-                    validate_pg_env(
-                        self.root, args.pg_admin_env, self.ports["postgres"]
-                    )
-                    command = [
-                        "powershell.exe",
-                        "-NoProfile",
-                        "-File",
-                        str(self.root / "scripts/run_backend_pytest.ps1"),
-                        "tests/integration/test_effective_queue_settings_report.py",
-                        "--junitxml=" + str(junit),
-                        "-q",
-                        "-rs",
-                    ]
-                else:
-                    command = args.command
-                child_env = (
-                    pg_child_env(self.root, args.pg_admin_env)
-                    if args.pg_admin_env
-                    else None
-                )
-                try:
-                    result = subprocess.run(
-                        command, cwd=self.root, env=child_env, check=False
-                    )
-                except OSError:
-                    raise GuardError(
-                        "SESSION_COMMAND_UNAVAILABLE: validation executable is missing"
-                    ) from None
-                self.assert_session(keeper, boot)
-                if result.returncode:
-                    raise GuardError(
-                        f"VALIDATION_FAILED: child exit {result.returncode}"
-                    )
-                if junit:
-                    self.summary["junit_passed_cases"] = validate_junit(junit)
-            self.assert_session(keeper, boot)
+            self.preflight(stop_recovery=args.action == "stop")
+            self.cleanup_policy = None
+            try:
+                self._execute_after_preflight(args, keeper)
+            except BaseException as primary:
+                if self.cleanup_policy in {"failure", "always"}:
+                    self.finish_after_failure(primary, keeper, self.summary["boot_id"])
+                raise
+            if self.cleanup_policy == "always":
+                # A passing validation is never retained, even if KEEP_STAGING
+                # was left in the process environment from an older failure.
+                self.assert_session(keeper, self.summary["boot_id"])
+                self.teardown_project(allow_keep=False)
+                self.assert_session(keeper, self.summary["boot_id"])
             self.summary.update(action=args.action, result="PASS")
             if args.action == "start":
                 self.summary["session_required"] = (
                     "Use Session for the full test/browser lifetime; Start alone releases the keeper"
                 )
+                if self.ownership_verified:
+                    self.summary["teardown"] = "PENDING_SESSION"
             return self.summary
 
 

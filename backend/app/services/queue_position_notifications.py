@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 class QueuePositionNotificationError(Exception):
     """Ошибка при отправке уведомлений о позиции"""
+
     pass
 
 
@@ -39,6 +40,14 @@ class QueuePositionNotificationService:
 
     # Пороги для уведомлений (человек перед вами)
     NOTIFICATION_THRESHOLDS = [5, 3, 1, 0]
+
+    # QPOSCALL-BE-001 (audit PR #3961): антидубль-окно для повторных
+    # ручных вызовов (сек). Реестр классовый — сервис инстанцируется
+    # на каждый запрос (get_queue_position_service). In-process only:
+    # кросс-воркерная дедупликация требует Redis/ACK-семантики и не
+    # заявляется.
+    MANUAL_CALL_COOLDOWN_SECONDS = 60
+    _manual_call_log: dict[int, datetime] = {}
 
     def __init__(self, db: Session):
         self.db = db
@@ -70,7 +79,9 @@ class QueuePositionNotificationService:
     async def notify_patient_called(
         self,
         entry: OnlineQueueEntry,
-        cabinet_number: str | None = None
+        cabinet_number: str | None = None,
+        *,
+        manual_resend: bool = False,
     ) -> dict[str, Any]:
         """
         Уведомление о вызове пациента
@@ -78,10 +89,65 @@ class QueuePositionNotificationService:
         Args:
             entry: Запись в очереди
             cabinet_number: Номер кабинета
+            manual_resend: True — намерение «ручной повтор»
+                (``POST /queue/position/notify/call``); только для него
+                действует антидубль-окно. Канонические переходы очереди
+                (QR call-next, nurse serving, GraphQL-мутация) вызывают
+                метод без флага и никогда не подавляются кулдауном.
 
         Returns:
             Результат отправки уведомления
         """
+        # QPOSCALL-BE-001 (audit PR #3961): статусный guard — высоко-
+        # приоритетное «Вас вызывают!» не отправляется билетам в статусе
+        # ожидания/терминальном. Канонические потоки (QR call-next, nurse
+        # serving, GraphQL-мутация) вызывают это ПОСЛЕ перехода
+        # waiting→called, поэтому проходят; защита и от будущих
+        # неканонических вызовов (fail-safe, honest result).
+        entry_status = getattr(entry, "status", None)
+        if entry_status != "called":
+            logger.warning(
+                "Вызов-уведомление подавлено для записи %s: статус=%s "
+                "(ложное сообщение о вызове не отправляется)",
+                getattr(entry, "id", "?"),
+                entry_status,
+            )
+            return {
+                "success": False,
+                "sent": False,
+                "reason": "invalid_entry_status",
+                "error": (
+                    f"Билет не в статусе «вызван» (текущий: {entry_status}); "
+                    "уведомление о вызове не отправлено"
+                ),
+            }
+
+        # QPOSCALL-BE-001 + пост-merge ревью PR #4013: антидубль-окно
+        # guardирует ТОЛЬКО намерение «ручной повтор» (manual_resend=True).
+        # Канонический вызов после перехода waiting→called реестр не
+        # проверяет и подавлен быть не может. Неудачная попытка (нет
+        # канала/пользователя, ошибка отправителя, raise) кулдаун не
+        # начинает — повтор обязан иметь возможность фактического повтора.
+        now = datetime.now(UTC)
+        entry_key = int(getattr(entry, "id", 0) or 0)
+        if manual_resend:
+            last_sent = self._manual_call_log.get(entry_key)
+            if last_sent is not None:
+                elapsed = (now - last_sent).total_seconds()
+                if elapsed < self.MANUAL_CALL_COOLDOWN_SECONDS:
+                    logger.info(
+                        "Повторное вызов-уведомление для записи %s подавлено "
+                        "(антидубль-окно %.0fс)",
+                        entry_key,
+                        self.MANUAL_CALL_COOLDOWN_SECONDS - elapsed,
+                    )
+                    return {
+                        "success": True,
+                        "sent": False,
+                        "reason": "duplicate_suppressed",
+                        "error": None,
+                    }
+
         patient_name = entry.patient_name or "Пациент"
         cabinet_info = f"\nКабинет: {cabinet_number}" if cabinet_number else ""
 
@@ -98,23 +164,45 @@ class QueuePositionNotificationService:
             "queue_number": str(entry.number),
             "cabinet": cabinet_number or "",
             "status": "called",
-            "timestamp": datetime.now(UTC).isoformat()
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
-        return await self._send_notification_to_patient(
+        result = await self._send_notification_to_patient(
             entry=entry,
             title=title,
             body=body,
             data=data,
             sound="call_notification",  # Специальный звонок
-            priority="high"
+            priority="high",
         )
+
+        # Кулдаун фиксируется только фактической доставкой (sent=True):
+        # no_user_found / ошибка отправителя не подавляют последующий
+        # легитимный повтор. Просроченные ключи вытесняются при записи
+        # (bounded, in-process only — кросс-воркерная дедупликация не
+        # заявляется).
+        if result.get("sent"):
+            self._prune_manual_call_log(now)
+            self._manual_call_log[entry_key] = now
+        return result
+
+    def _prune_manual_call_log(self, now: datetime) -> None:
+        """Вытеснить просроченные ключи антидубль-реестра — размер
+        реестра ограничен живым окном кулдауна (не растёт всё время
+        жизни воркера)."""
+        expired = [
+            key
+            for key, ts in self._manual_call_log.items()
+            if (now - ts).total_seconds() >= self.MANUAL_CALL_COOLDOWN_SECONDS
+        ]
+        for key in expired:
+            self._manual_call_log.pop(key, None)
 
     async def notify_position_update(
         self,
         entry: OnlineQueueEntry,
         people_ahead: int,
-        estimated_wait_minutes: int | None = None
+        estimated_wait_minutes: int | None = None,
     ) -> dict[str, Any]:
         """
         Уведомление об обновлении позиции в очереди
@@ -154,24 +242,18 @@ class QueuePositionNotificationService:
             "queue_number": str(entry.number),
             "people_ahead": str(people_ahead),
             "status": entry.status or "waiting",
-            "timestamp": datetime.now(UTC).isoformat()
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         if estimated_wait_minutes:
             data["estimated_wait_minutes"] = str(estimated_wait_minutes)
 
         return await self._send_notification_to_patient(
-            entry=entry,
-            title=title,
-            body=body,
-            data=data,
-            sound="position_update"
+            entry=entry, title=title, body=body, data=data, sound="position_update"
         )
 
     async def notify_queue_changes_batch(
-        self,
-        queue_id: int,
-        changed_after_number: int
+        self, queue_id: int, changed_after_number: int
     ) -> dict[str, Any]:
         """
         Массовое уведомление об изменении очереди
@@ -187,20 +269,22 @@ class QueuePositionNotificationService:
             Результат массовой отправки
         """
         # Получаем записи со статусом waiting после указанного номера
-        entries = self.db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.queue_id == queue_id,
-            OnlineQueueEntry.status == "waiting",
-            OnlineQueueEntry.number > changed_after_number
-        ).order_by(
-            OnlineQueueEntry.priority.desc(),
-            OnlineQueueEntry.queue_time
-        ).all()
+        entries = (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.queue_id == queue_id,
+                OnlineQueueEntry.status == "waiting",
+                OnlineQueueEntry.number > changed_after_number,
+            )
+            .order_by(OnlineQueueEntry.priority.desc(), OnlineQueueEntry.queue_time)
+            .all()
+        )
 
         if not entries:
             return {
                 "success": True,
                 "total_notified": 0,
-                "message": "Нет записей для уведомления"
+                "message": "Нет записей для уведомления",
             }
 
         results = []
@@ -214,22 +298,20 @@ class QueuePositionNotificationService:
             if people_ahead in self.NOTIFICATION_THRESHOLDS or people_ahead <= 5:
                 try:
                     result = await self.notify_position_update(
-                        entry=entry,
-                        people_ahead=people_ahead
+                        entry=entry, people_ahead=people_ahead
                     )
-                    results.append({
-                        "entry_id": entry.id,
-                        "number": entry.number,
-                        "people_ahead": people_ahead,
-                        "sent": result.get("sent", False),
-                        "success": result.get("success", False)
-                    })
+                    results.append(
+                        {
+                            "entry_id": entry.id,
+                            "number": entry.number,
+                            "people_ahead": people_ahead,
+                            "sent": result.get("sent", False),
+                            "success": result.get("success", False),
+                        }
+                    )
                 except Exception as e:
                     logger.error(f"Error notifying entry {entry.id}: {e}")
-                    results.append({
-                        "entry_id": entry.id,
-                        "error": str(e)
-                    })
+                    results.append({"entry_id": entry.id, "error": str(e)})
 
             position += 1
 
@@ -240,16 +322,9 @@ class QueuePositionNotificationService:
             f"after number {changed_after_number}"
         )
 
-        return {
-            "success": True,
-            "total_notified": sent_count,
-            "details": results
-        }
+        return {"success": True, "total_notified": sent_count, "details": results}
 
-    async def send_waiting_reminder(
-        self,
-        entry: OnlineQueueEntry
-    ) -> dict[str, Any]:
+    async def send_waiting_reminder(self, entry: OnlineQueueEntry) -> dict[str, Any]:
         """
         Напоминание о том, что пациент всё ещё в очереди
 
@@ -269,20 +344,15 @@ class QueuePositionNotificationService:
             "entry_id": str(entry.id),
             "queue_number": str(entry.number),
             "people_ahead": str(people_ahead),
-            "timestamp": datetime.now(UTC).isoformat()
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         return await self._send_notification_to_patient(
-            entry=entry,
-            title=title,
-            body=body,
-            data=data
+            entry=entry, title=title, body=body, data=data
         )
 
     async def notify_diagnostics_return_needed(
-        self,
-        entry: OnlineQueueEntry,
-        specialist_name: str
+        self, entry: OnlineQueueEntry, specialist_name: str
     ) -> dict[str, Any]:
         """
         Уведомление о необходимости вернуться после диагностики
@@ -301,7 +371,7 @@ class QueuePositionNotificationService:
             "type": "diagnostics_return",
             "entry_id": str(entry.id),
             "queue_number": str(entry.number),
-            "timestamp": datetime.now(UTC).isoformat()
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         return await self._send_notification_to_patient(
@@ -310,24 +380,28 @@ class QueuePositionNotificationService:
             body=body,
             data=data,
             sound="return_notification",
-            priority="high"
+            priority="high",
         )
 
     def _count_people_ahead(self, entry: OnlineQueueEntry) -> int:
         """Подсчитать количество людей впереди в очереди"""
-        count = self.db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.queue_id == entry.queue_id,
-            OnlineQueueEntry.status == "waiting",
-            OnlineQueueEntry.id != entry.id,
-            # Учитываем приоритет и время
-            (
-                (OnlineQueueEntry.priority > entry.priority) |
+        count = (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.queue_id == entry.queue_id,
+                OnlineQueueEntry.status == "waiting",
+                OnlineQueueEntry.id != entry.id,
+                # Учитываем приоритет и время
                 (
-                    (OnlineQueueEntry.priority == entry.priority) &
-                    (OnlineQueueEntry.queue_time < entry.queue_time)
-                )
+                    (OnlineQueueEntry.priority > entry.priority)
+                    | (
+                        (OnlineQueueEntry.priority == entry.priority)
+                        & (OnlineQueueEntry.queue_time < entry.queue_time)
+                    )
+                ),
             )
-        ).count()
+            .count()
+        )
 
         return count
 
@@ -338,7 +412,7 @@ class QueuePositionNotificationService:
         body: str,
         data: dict[str, Any],
         sound: str = "default",
-        priority: str = "normal"
+        priority: str = "normal",
     ) -> dict[str, Any]:
         """
         Отправить уведомление пациенту (WebSocket + Push)
@@ -352,13 +426,11 @@ class QueuePositionNotificationService:
         telegram_event_type = self._patient_telegram_event_type(data)
         if entry.patient_id and telegram_event_type:
             try:
-                telegram_sent = (
-                    await notification_sender_service.send_patient_telegram_event_notification(
-                        db=self.db,
-                        patient_id=entry.patient_id,
-                        event_type=telegram_event_type,
-                        metadata=self._patient_telegram_metadata(entry, data),
-                    )
+                telegram_sent = await notification_sender_service.send_patient_telegram_event_notification(
+                    db=self.db,
+                    patient_id=entry.patient_id,
+                    event_type=telegram_event_type,
+                    metadata=self._patient_telegram_metadata(entry, data),
                 )
             except Exception as exc:
                 logger.warning(
@@ -369,18 +441,20 @@ class QueuePositionNotificationService:
         # Определяем user_id
         # Способ 1: Через patient_id
         if entry.patient_id:
-            patient = self.db.query(Patient).filter(
-                Patient.id == entry.patient_id
-            ).first()
+            patient = (
+                self.db.query(Patient).filter(Patient.id == entry.patient_id).first()
+            )
 
             if patient and patient.user_id:
                 user_id = patient.user_id
 
         # Способ 2: Через telegram_id (если есть связь)
         if not user_id and entry.telegram_id:
-            user = self.db.query(User).filter(
-                User.telegram_id == entry.telegram_id
-            ).first()
+            user = (
+                self.db.query(User)
+                .filter(User.telegram_id == entry.telegram_id)
+                .first()
+            )
 
             if user:
                 user_id = user.id
@@ -389,18 +463,14 @@ class QueuePositionNotificationService:
             # Используем унифицированный сервис
             # Он сам отправит и в WS, и в Push (если есть токен)
             success = await notification_sender_service.send_push(
-                user_id=user_id,
-                title=title,
-                message=body,
-                data=data,
-                db=self.db
+                user_id=user_id, title=title, message=body, data=data, db=self.db
             )
 
             return {
-                "success": True, # Считаем успешным если сервис принял (он сам ошибки логирует)
+                "success": True,  # Считаем успешным если сервис принял (он сам ошибки логирует)
                 "sent": bool(success or telegram_sent),
                 "telegram_sent": telegram_sent,
-                "user_id": user_id
+                "user_id": user_id,
             }
 
         if telegram_sent:
@@ -410,11 +480,7 @@ class QueuePositionNotificationService:
                 "telegram_sent": True,
             }
 
-        return {
-            "success": True,
-            "sent": False,
-            "reason": "no_user_found"
-        }
+        return {"success": True, "sent": False, "reason": "no_user_found"}
 
     def get_queue_position_info(self, entry: OnlineQueueEntry) -> dict[str, Any]:
         """
@@ -425,9 +491,9 @@ class QueuePositionNotificationService:
         people_ahead = self._count_people_ahead(entry)
 
         # Получаем информацию об очереди
-        queue = self.db.query(DailyQueue).filter(
-            DailyQueue.id == entry.queue_id
-        ).first()
+        queue = (
+            self.db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+        )
 
         queue_info = {}
         if queue:
@@ -435,7 +501,7 @@ class QueuePositionNotificationService:
                 "queue_id": queue.id,
                 "queue_tag": queue.queue_tag,
                 "cabinet_number": queue.cabinet_number,
-                "is_open": queue.opened_at is not None
+                "is_open": queue.opened_at is not None,
             }
 
             # Получаем имя специалиста
@@ -448,9 +514,7 @@ class QueuePositionNotificationService:
             if queue.queue_resource_id is not None:
                 resource = queue.queue_resource
                 queue_info["specialist_name"] = (
-                    resource.display_name
-                    if resource is not None
-                    else "Ресурс очереди"
+                    resource.display_name if resource is not None else "Ресурс очереди"
                 )
                 if queue_info["cabinet_number"] is None and resource is not None:
                     queue_info["cabinet_number"] = resource.default_cabinet
@@ -469,7 +533,7 @@ class QueuePositionNotificationService:
             "people_ahead": people_ahead,
             "priority": entry.priority,
             "queue_time": entry.queue_time.isoformat() if entry.queue_time else None,
-            "queue_info": queue_info
+            "queue_info": queue_info,
         }
 
 
@@ -481,9 +545,7 @@ def get_queue_position_service(db: Session) -> QueuePositionNotificationService:
 
 # Вспомогательная функция для вызова из синхронного кода
 def notify_patient_called_sync(
-    db: Session,
-    entry: OnlineQueueEntry,
-    cabinet_number: str | None = None
+    db: Session, entry: OnlineQueueEntry, cabinet_number: str | None = None
 ) -> dict[str, Any]:
     """Синхронная обёртка для уведомления о вызове"""
     service = get_queue_position_service(db)
@@ -491,10 +553,10 @@ def notify_patient_called_sync(
 
 
 def notify_queue_changes_sync(
-    db: Session,
-    queue_id: int,
-    changed_after_number: int
+    db: Session, queue_id: int, changed_after_number: int
 ) -> dict[str, Any]:
     """Синхронная обёртка для массового уведомления"""
     service = get_queue_position_service(db)
-    return asyncio.run(service.notify_queue_changes_batch(queue_id, changed_after_number))
+    return asyncio.run(
+        service.notify_queue_changes_batch(queue_id, changed_after_number)
+    )

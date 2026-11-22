@@ -7,6 +7,7 @@ psycopg[binary]>=3.1,<4.0
 redis>=5.0,<8.0
 alembic>=1.13,<1.21
 PyJWT>=2.8,<3.0  # migrated from python-jose (archived, CVE-2024-33664)
+webauthn==2.8.0
 passlib[argon2]>=1.7,<1.8
 argon2-cffi>=21.3,<26.0
 cryptography>=50.0,<51.0  # F-009: AES encryption for encryption_service.py

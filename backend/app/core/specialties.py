@@ -23,8 +23,9 @@ Rules
   CRUD, services, provisioning and Alembic migrations alike.
 - ``general`` remains the INCOMPLETE-profile sentinel (decisions #5/#13):
   it is not a bookable specialty and every eligibility filter excludes it.
-- Non-dental specialties (``cardiology``, ``dermatology``, ``lab``, ...)
-  are passed through untouched — they are already consistent.
+- Other specialties (``cardiology``, ``dermatology``, ``lab``, ...) are
+  passed through untouched by the general read-side helpers. The queue
+  WebSocket room check has its own explicit family matcher below.
 """
 from __future__ import annotations
 
@@ -40,6 +41,30 @@ DENTAL_CANONICAL_SPECIALTY = "dentistry"
 DENTAL_FAMILY_SPELLINGS = frozenset(
     {"dentistry", "dental", "stomatology", "dentist"}
 )
+
+# Legacy account/profile spellings and canonical department names are both
+# stored in supported records. Keep these families explicit: queue-room
+# authorization may match aliases within a doctor's own specialty, but must
+# never broaden access to an unrelated department.
+CARDIOLOGY_FAMILY_SPELLINGS = frozenset(
+    {"cardio", "cardiology", "cardiologist"}
+)
+DERMATOLOGY_FAMILY_SPELLINGS = frozenset(
+    {"derma", "dermatology", "dermatologist"}
+)
+
+_DENTAL_FAMILY_BY_SPELLING = {
+    spelling: DENTAL_FAMILY_SPELLINGS for spelling in DENTAL_FAMILY_SPELLINGS
+}
+_QUEUE_ROOM_FAMILY_BY_SPELLING = {
+    spelling: family
+    for family in (
+        DENTAL_FAMILY_SPELLINGS,
+        CARDIOLOGY_FAMILY_SPELLINGS,
+        DERMATOLOGY_FAMILY_SPELLINGS,
+    )
+    for spelling in family
+}
 
 def canonical_specialty(value: str | None) -> str | None:
     """Normalize a specialty value for STORAGE (write boundary).
@@ -67,9 +92,8 @@ def specialty_variants(value: str | None) -> list[str]:
     Used by filters that historically compared ``Doctor.specialty``
     exactly: passing any dental spelling returns all four family
     spellings so a ``dentistry`` doctor is found when filtering by
-    ``dental`` and vice versa. Unknown specialties return only their
-    trimmed form (case preserved for the original input, lowercase
-    family spellings for known families) — SQL ``IN`` stays
+    ``dental`` and vice versa. Non-dental specialties return only their
+    trimmed form — SQL ``IN`` stays
     case-sensitive, so the original input is always included verbatim.
     """
     if value is None:
@@ -77,8 +101,27 @@ def specialty_variants(value: str | None) -> list[str]:
     trimmed = value.strip()
     if not trimmed:
         return [trimmed]
-    if trimmed.lower() in DENTAL_FAMILY_SPELLINGS:
-        return sorted(DENTAL_FAMILY_SPELLINGS)
+    family = _DENTAL_FAMILY_BY_SPELLING.get(trimmed.lower())
+    if family:
+        return sorted(family)
+    return [trimmed]
+
+
+def queue_room_specialty_variants(value: str | None) -> list[str]:
+    """Return spellings accepted for a queue WebSocket department room.
+
+    This narrowly applies the legacy cardio/derma aliases to the room
+    authorization boundary. General specialty filters and queue-profile
+    tag expansion intentionally keep their existing passthrough behavior.
+    """
+    if value is None:
+        return []
+    trimmed = value.strip()
+    if not trimmed:
+        return [trimmed]
+    family = _QUEUE_ROOM_FAMILY_BY_SPELLING.get(trimmed.lower())
+    if family:
+        return sorted(family)
     return [trimmed]
 
 

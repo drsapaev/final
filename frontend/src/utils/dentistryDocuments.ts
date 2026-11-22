@@ -1,4 +1,9 @@
 import { safeJsonParse } from '../utils/safeJsonParse';
+// DENTPHI-FE-001 (audit 3892): legacy storage key for dentist visit protocols.
+// It carried identifiable clinical data (patient ids/names, full visit
+// payloads) in unscoped, plaintext, shared-origin localStorage — nothing may
+// be written to it anymore, and the key is actively purged on bootstrap and
+// on every dentist-panel cache invalidation.
 export const DENTIST_DOCUMENTS_STORAGE_KEY = 'dentist_panel_documents_v1';
 
 export function getDefaultDentistDocuments() {

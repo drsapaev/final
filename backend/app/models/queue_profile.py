@@ -50,7 +50,7 @@ class QueueProfile(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # ⭐ NEW: Show this profile on QR join page for patient self-registration
-    show_on_qr_page: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    show_on_qr_page: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Optional UI configuration
     icon: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g., "Heart", "Activity"

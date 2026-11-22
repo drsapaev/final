@@ -15,6 +15,8 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useEMR } from '../../hooks/useEMR';
 import { useEMRAutosave } from '../../hooks/useEMRAutosave';
+import { useEMRLeaveGuard } from '../../hooks/useEMRLeaveGuard';
+import { isRejectedEMRWrite } from './emrWriteResult';
 import { useBeforeUnload } from '../../hooks/useNavigationGuard';
 import { useEMRKeyboard } from '../../hooks/useEMRKeyboard';
 import { useVisitLifecycle } from '../../hooks/useVisitLifecycle';
@@ -31,7 +33,8 @@ import { useAppData } from '../../contexts/AppDataContext';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
-import { readSavedEMRForCompletion } from './emrCompletion';
+import { readSavedEMRForCompletion, emrTextValue, emrTreatmentText } from './emrCompletion';
+import { assertMedicalAiSafety, hasMedicalAiSafety } from '../../utils/aiSafety';
 // Analytics is handled via handleTelemetry callback
 
 // Import modular sections
@@ -66,6 +69,7 @@ import { useConfirm } from '../common/ConfirmDialog';
 import notify from '../../services/notify';
 import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
+
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
 // (consistent with the rest of the app + screen-reader friendly via aria-label).
 import {
@@ -81,6 +85,14 @@ import {
     FilePenLine,
     Ban,
 } from 'lucide-react';
+
+/** Only reuse data together with the original verified server envelope. */
+export function readVerifiedMedicalAiCache(value: unknown): unknown[] | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const entry = value as { response?: unknown; suggestions?: unknown };
+    return hasMedicalAiSafety(entry.response) && Array.isArray(entry.suggestions)
+        ? entry.suggestions : null;
+}
 
 /**
  * EMRContainerV2 Component
@@ -103,6 +115,7 @@ interface EMRContainerV2Props {
     onCompletionBlocked?: () => void;
     ICD10Component?: React.ComponentType<Record<string, unknown>> | null;
     onPersisted?: () => void | Promise<void>;
+    onDirtyChange?: (dirty: boolean) => void;
 }
 
 interface EMRDataShape {
@@ -124,28 +137,15 @@ interface EMRDataShape {
     [key: string]: unknown;
 }
 
-/** Normalize legacy field values that may be a string OR an object with `.text`. */
-function fieldText(value: unknown): string {
-    if (typeof value === 'string') return value;
-    if (value && typeof value === 'object' && 'text' in value) {
-        const t = (value as { text?: unknown }).text;
-        return typeof t === 'string' ? t : '';
-    }
-    return '';
-}
-
+/**
+ * EMRPROGRESS-FE-001 / EMRAI-FE-001 (audit 3886, round 27): field values can
+ * be a plain string OR a structured object (the canonical new-record draft
+ * seeds `diagnosis: {main, icd10_code, secondary[]}`). Every consumer that
+ * needs the clinical TEXT of a field must go through the canonical
+ * `emrTextValue` selector (unit-tested in emrCompletion.test.ts) instead of
+ * raw truthiness or string methods on a union type.
+ */
 type PersistAndSignResult = 'cancelled' | 'save_failed' | 'sign_failed' | 'sign_attempted';
-
-function isRejectedEMRWrite(value: unknown): boolean {
-    if (!value || typeof value !== 'object') return true;
-    const result = value as Record<string, unknown>;
-    return result.accessDenied === true ||
-        result.conflict === true ||
-        result.signed === true ||
-        result.success === false ||
-        result.status === 'error' ||
-        (result.error !== undefined && result.error !== null);
-}
 
 function getSavedRowVersion(value: unknown): number | null {
     if (isRejectedEMRWrite(value)) return null;
@@ -250,6 +250,9 @@ interface EMRHookResult {
     isSigned: boolean;
     isAmended: boolean;
     accessDenied: boolean;
+    // RETRO-4007-01: the record was finalized on the server while the
+    // local editor held the stale in_progress draft.
+    serverFinalized: boolean;
     version: number | null;
     rowVersion: number;
     canUndo: boolean;
@@ -259,10 +262,10 @@ interface EMRHookResult {
     signEMR: (opts?: { rowVersion?: number }) => Promise<unknown>;
     amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
     setField: (field: string, value: unknown) => void;
+    setNestedField: (path: string, value: unknown) => void;
     undo: () => void;
     redo: () => void;
     reloadFromServer: () => Promise<unknown>;
-    forceOverwrite: () => Promise<unknown>;
 }
 
 export function EMRContainerV2({
@@ -275,6 +278,7 @@ export function EMRContainerV2({
     onCompletionBlocked,
     ICD10Component = null,
     onPersisted,
+    onDirtyChange,
 }: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
@@ -296,6 +300,7 @@ export function EMRContainerV2({
         isSigned,
         isAmended,
         accessDenied,
+        serverFinalized,
         version,
         rowVersion,
         canUndo,
@@ -305,14 +310,36 @@ export function EMRContainerV2({
         signEMR,
         amendEMR,
         setField,
+        setNestedField,
         undo,
         redo,
         reloadFromServer,
-        forceOverwrite,
     } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
     const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
     const completionScopeRef = useRef({ visitId, active: true });
-    const editingDisabled = isReadOnly || isSigned || isPreparingCompletion || completionBusy;
+    // EMRSIGN-FE-001 + EMRAMEND-FE-002 (audit 3886 round 17): `isSaving` now
+    // locks field editing for the whole save→sign transaction so the doctor
+    // cannot type text B while the save of text A is in flight — the signed
+    // revision must equal the latest explicitly approved clinical snapshot.
+    // `isAmended` joins `isSigned` because an amended record is a finalized
+    // state whose ordinary fields must never be editable through the plain
+    // save/sign UI (the reasoned amendment flow is the only sanctioned
+    // correction pathway — see `amendAllowed` below).
+    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSaving;
+    // EMRAMEND-FE-001 (audit 3886 round 17): the amendment workflow must be
+    // REACHABLE on the very records it exists for (signed, and — after round
+    // 16 — amended ones eligible for a repeat reasoned correction). The old
+    // `editingDisabled` (which includes isSigned) permanently disabled the
+    // «Внести поправку» button on every signed EMR, making the backend's
+    // reasoned amendment path dead UI. Amendment stays blocked only for
+    // read-only observers and while a completion transaction is running.
+    // RETRO-4007-01 (post-merge re-review of 4007): serverFinalized joins the
+    // reachability set — a FINALIZED_STATE 409 / legacy signed 400 arrives
+    // while the LOCAL isSigned/isAmended flags are still false, and the
+    // container must render the amendment branch for exactly that window
+    // (the stale-local draft is preserved; the reasoned amendment is the
+    // sanctioned pathway onto the server's signed record).
+    const amendAllowed = (isSigned || isAmended || serverFinalized) && !isReadOnly && !isPreparingCompletion && !completionBusy;
     const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
     const canSignReadOnly = isReadOnly
         && Boolean(emr?.id)
@@ -341,7 +368,7 @@ export function EMRContainerV2({
     const doctorId = currentUser?.id;
 
     // Autosave setup
-    const { lastAutosave, config: autosaveConfig } = useEMRAutosave({
+    const { lastAutosave, config: autosaveConfig, suppressOnDiscard } = useEMRAutosave({
         isDirty,
         isSaving,
         isSigned,
@@ -352,8 +379,40 @@ export function EMRContainerV2({
         enabled: !editingDisabled && !accessDenied,
     });
 
+    // RETRO-3971-04 residual (post-merge re-review of 4009): the unmount
+    // flush above is a best-effort safety net — a clinical draft must not
+    // depend on a fire-and-forget destructor. The container (the visit
+    // owner) registers its dirty draft in the SHARED App-level leave
+    // guard: SPA navigation / browser Back / logout pass through the
+    // explicit Stay / Retry / Discard dialog, and «Save and leave» is an
+    // AWAITED draft save that only proceeds on the server's acknowledged
+    // write of the current visit. Read-only observers and access-denied
+    // mounts register nothing — they own no draft.
+    useEMRLeaveGuard({
+        visitId,
+        isDirty,
+        isSaving,
+        saveEMR,
+        reloadFromServer,
+        // RETRO-3971-04 P1: route-level Discard синхронно подавляет
+        // PR-4009 unmount autosave ДО асинхронного reload — отброшенный
+        // врачом черновик не может уйти на сервер из деструктора.
+        onDiscard: suppressOnDiscard,
+        enabled: !isReadOnly && !accessDenied,
+    });
+
     // Navigation guard
     useBeforeUnload(isDirty);
+
+    // DERMAHOTKEY-FE-001 (audit 3892): expose the dirty flag so panel-level
+    // exits (e.g. the dermatologist Escape hotkey) can guard against
+    // silently discarding an unsaved draft. Optional and purely additive.
+    useEffect(() => {
+        onDirtyChange?.(isDirty);
+        return () => {
+            onDirtyChange?.(false);
+        };
+    }, [isDirty, onDirtyChange]);
 
     // Local UI state
     const [showHistory, setShowHistory] = useState(false);
@@ -367,6 +426,24 @@ export function EMRContainerV2({
     // AI Suggestions state — keyed by EMR field name (examination/diagnosis/treatment).
     const [aiSuggestions, setAiSuggestions] = useState<Record<string, unknown[]>>({});
     const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+    // A response belongs to the complete clinical input, not merely a visit.
+    // Replacing the scope during render invalidates in-flight responses even
+    // before effects run, including when the new input never starts a request.
+    const aiContextKey = JSON.stringify([
+        visitId, patientId, data?.specialty, emrTextValue(data?.complaints),
+        emrTextValue(data?.diagnosis), data?.patient_age, data?.patient_gender,
+    ]);
+    const aiScopeRef = useRef({ key: aiContextKey, active: true, versions: {} as Record<string, number> });
+    if (aiScopeRef.current.key !== aiContextKey) {
+        aiScopeRef.current = { key: aiContextKey, active: true, versions: {} };
+    }
+    useEffect(() => {
+        const scope = aiScopeRef.current;
+        scope.active = true;
+        setAiSuggestions({});
+        setAiLoading({});
+        return () => { scope.active = false; };
+    }, [aiContextKey]);
 
     // 🔄 Visit Lifecycle Management - критично для безопасности данных
     const visitLifecycle = useVisitLifecycle(visitId, patientId ?? 0, {
@@ -375,6 +452,14 @@ export function EMRContainerV2({
             // Очищаем AI-состояние при смене визита
             setAiSuggestions({});
             setAiLoading({});
+            // EMRHIST-FE-002 (audit 3886, round 19): инвариантные diff-виджеты
+            // сбрасываются вместе со сменой визита — выбранная версия и
+            // открытый overlay сравнения не переживают переход к другому
+            // пациенту/визиту (поздние ответы старого визита отбрасываются
+            // самими панелями, но контейнер не должен оставлять выбранный
+            // снапшот чужого визита в state).
+            setSelectedVersion(null);
+            setShowDiff(false);
             logger.info('[EMR] Visit changed', { prevVisitId, newVisitId });
         },
         onCleanup: () => {
@@ -406,12 +491,17 @@ export function EMRContainerV2({
 
     const buildAiCacheKey = useCallback((fieldName: string) => {
         const specialty = data?.specialty || 'general';
-        const complaints = (data?.complaints || '').trim().toLowerCase();
-        const diagnosis = (data?.diagnosis || '').trim().toLowerCase();
+        // EMRAI-FE-001 (audit 3886 round 27): complaints/diagnosis may be the
+        // structured diagnosis OBJECT — .trim() on it threw a TypeError before
+        // the request even started. Normalize through the canonical selector.
+        const complaints = emrTextValue(data?.complaints).trim().toLowerCase();
+        const diagnosis = emrTextValue(data?.diagnosis).trim().toLowerCase();
         const patientAge = typeof data?.patient_age === 'number' ? data?.patient_age : String(data?.patient_age ?? '');
         const patientGender = typeof data?.patient_gender === 'string' ? data?.patient_gender : String(data?.patient_gender ?? '');
         return cacheService.generateKey(
-            'ai',
+            'ai-safety-v1',
+            visitId,
+            patientId,
             fieldName,
             specialty,
             complaints,
@@ -419,7 +509,7 @@ export function EMRContainerV2({
             patientAge,
             patientGender
         );
-    }, [data?.specialty, data?.complaints, data?.diagnosis, data?.patient_age, data?.patient_gender]);
+    }, [visitId, patientId, data?.specialty, data?.complaints, data?.diagnosis, data?.patient_age, data?.patient_gender]);
 
     const buildAiTags = useCallback(() => {
         const tags = [CACHE_TAGS.aiAnalysis];
@@ -442,18 +532,22 @@ export function EMRContainerV2({
 
     // Handle AI Request - calls MCP API for suggestions
     const handleRequestAI = useCallback(async (fieldName: string) => {
-        logger.info('[EMR AI Request]', {
-            fieldName,
-            specialty: data?.specialty || 'general',
-            complaintsLength: data?.complaints?.length || 0,
-            complaintsPreview: data?.complaints?.substring(0, 50) || '(empty)'
-        });
+        const scope = aiScopeRef.current;
+        const version = (scope.versions[fieldName] ?? 0) + 1;
+        scope.versions[fieldName] = version;
+        const isCurrent = () => aiScopeRef.current === scope && scope.active
+            && scope.versions[fieldName] === version;
+        // EMRAI-FE-001: same normalization applies to the debug preview —
+        // `substring` on an object value would throw the same way.
+        const complaintsPreviewText = emrTextValue(data?.complaints);
+        logger.info('[EMR AI Request]', { fieldName, complaintsLength: complaintsPreviewText.length });
         handleTelemetry({ type: 'ai.requested', payload: { fieldName } });
 
         const cacheKey = buildAiCacheKey(fieldName);
-        const cachedSuggestions = cacheService.get(cacheKey);
+        setAiSuggestions(prev => ({ ...prev, [fieldName]: [] }));
+        const cachedSuggestions = readVerifiedMedicalAiCache(cacheService.get(cacheKey));
         if (cachedSuggestions) {
-            setAiSuggestions(prev => ({ ...prev, [fieldName]: cachedSuggestions }) as Record<string, unknown[]>);
+            setAiSuggestions(prev => ({ ...prev, [fieldName]: cachedSuggestions }));
             setAiLoading(prev => ({ ...prev, [fieldName]: false }));
             handleTelemetry({ type: 'ai.cache.hit', payload: { fieldName } });
             return;
@@ -494,19 +588,20 @@ export function EMRContainerV2({
 
             switch (fieldName) {
                 case 'diagnosis': {
+                    // EMRAI-FE-001 (audit 3886 round 27): send the normalized
+                    // diagnosis TEXT — the structured object must never reach
+                    // the request body, and an absent main must be ''.
+                    const diagnosisText = emrTextValue(data?.diagnosis);
+                    const complaintsText = emrTextValue(data?.complaints);
                     // Use ICD-10 suggestions
                     result = await mcpAPI.suggestICD10({
-                        symptoms: data?.complaints ? [data?.complaints] : [],
-                        diagnosis: data?.diagnosis || '',
+                        symptoms: complaintsText ? [complaintsText] : [],
+                        diagnosis: diagnosisText,
                         specialty,
                         maxSuggestions: 5
                     }, requestOptions) as AiResult;
-                    logger.info('[EMR AI] ICD10 result:', result);
-
-                    // Log debug_meta in dev mode for transparency
-                    if (process.env.NODE_ENV === 'development' && result?.debug_meta) {
-                        logger.info('[AI Debug]', result.debug_meta);
-                    }
+                    if (requestOptions.signal.aborted || !isCurrent()) return;
+                    assertMedicalAiSafety(result);
 
                     // Handle wrapped response: {status, data: {suggestions: [...]}}
                     const icd10Data: AiResult['data'] | AiResult | undefined = result?.data || result;
@@ -526,7 +621,7 @@ export function EMRContainerV2({
                             ...prev,
                             [fieldName]: formattedSuggestions
                         }));
-                        cacheService.set(cacheKey, formattedSuggestions, {
+                        cacheService.set(cacheKey, { response: result, suggestions: formattedSuggestions }, {
                             ttl: CACHE_CONFIG.aiTTL,
                             tags: buildAiTags(),
                         });
@@ -537,20 +632,19 @@ export function EMRContainerV2({
                 }
 
                 case 'examination':
-                case 'treatment':
+                case 'treatment': {
                     // Use complaint analysis for general suggestions
-                    if (data?.complaints) {
+                    // EMRAI-FE-001: normalize before the request — an object
+                    // complaints value would be sent as raw JSON otherwise.
+                    const complaintsText = emrTextValue(data?.complaints);
+                    if (complaintsText) {
                         result = await mcpAPI.analyzeComplaint({
-                            complaint: data?.complaints,
+                            complaint: complaintsText,
                             patientAge: data?.patient_age,
                             patientGender: data?.patient_gender
                         }, requestOptions) as AiResult;
-                        logger.info('[EMR AI] Complaint analysis result:', result);
-
-                        // Log debug_meta in dev mode for transparency
-                        if (process.env.NODE_ENV === 'development' && result?.debug_meta) {
-                            logger.info('[AI Debug]', result.debug_meta);
-                        }
+                        if (requestOptions.signal.aborted || !isCurrent()) return;
+                        assertMedicalAiSafety(result);
 
                         const analysisData: AiResult['data'] | AiResult | undefined = result?.data || result;
                         if (analysisData) {
@@ -584,7 +678,7 @@ export function EMRContainerV2({
                             }
                             if (fieldSuggestions.length > 0) {
                                 setAiSuggestions(prev => ({ ...prev, [fieldName]: fieldSuggestions }));
-                                cacheService.set(cacheKey, fieldSuggestions, {
+                                cacheService.set(cacheKey, { response: result, suggestions: fieldSuggestions }, {
                                     ttl: CACHE_CONFIG.aiTTL,
                                     tags: buildAiTags(),
                                 });
@@ -606,11 +700,13 @@ export function EMRContainerV2({
                         logger.info('[EMR AI] No complaints to analyze - showing info message');
                     }
                     break;
+                }
 
                 default:
                     logger.info('[EMR AI] No AI handler for field:', fieldName);
             }
         } catch (err) {
+            if (!isCurrent()) return;
             const errObj = err as { name?: string; code?: string; message?: string };
             if (errObj?.name === 'CanceledError' || errObj?.code === 'ERR_CANCELED') {
                 return;
@@ -618,7 +714,7 @@ export function EMRContainerV2({
             logger.error('[EMR AI Error]', err);
             handleTelemetry({ type: 'ai.error', payload: { fieldName, error: errObj?.message } });
         } finally {
-            setAiLoading(prev => ({ ...prev, [fieldName]: false }));
+            if (isCurrent()) setAiLoading(prev => ({ ...prev, [fieldName]: false }));
         }
     }, [
         data?.specialty,
@@ -656,6 +752,34 @@ export function EMRContainerV2({
     const handleFieldChange = useCallback((field: string) => (value: unknown) => {
         setField(field, value);
     }, [setField]);
+
+    const handleNestedFieldChange = useCallback((path: string) => (value: unknown) => {
+        setNestedField(path, value);
+    }, [setNestedField]);
+
+    // EMRDIAG-FE-001/002 (audit 3886 round 18): the visible ICD-10 field must
+    // read and write the CANONICAL nested diagnosis.icd10_code (the backend
+    // prefers it when materializing the searchable code), mirror to the legacy
+    // flat field so older consumers stay in agreement, and never clobber
+    // diagnosis.main / secondary[]. A legacy string diagnosis is migrated to
+    // the structured shape on first edit.
+    const structuredDiagnosis = data && typeof (data as Record<string, unknown>).diagnosis === 'object'
+        && (data as Record<string, unknown>).diagnosis !== null
+        ? (data as Record<string, unknown>).diagnosis as Record<string, unknown>
+        : null;
+    const canonicalIcd10Code = (structuredDiagnosis?.icd10_code as string | undefined)
+        || ((data as Record<string, unknown> | null)?.icd10_code as string | undefined)
+        || '';
+    const handleCanonicalIcd10Change = useCallback((value: string) => {
+        const currentDiagnosis = (data as Record<string, unknown> | null)?.diagnosis;
+        if (typeof currentDiagnosis === 'string') {
+            // Legacy flat diagnosis string — migrate to the structured shape,
+            // preserving the visible main text, before setting the code.
+            setNestedField('diagnosis', { main: currentDiagnosis });
+        }
+        setNestedField('diagnosis.icd10_code', value);
+        setField('icd10_code', value);
+    }, [data, setNestedField, setField]);
 
     const refreshParentStatus = useCallback(async () => {
         try {
@@ -815,12 +939,39 @@ export function EMRContainerV2({
     }
 
     const handleAmend = async () => {
-        if (editingDisabled) return;
+        // EMRAMEND-FE-001 (audit 3886 round 17): the guard must NOT use
+        // `editingDisabled` — that flag contains `isSigned`/`isAmended` by
+        // definition of the amendment workflow, so the old check made this
+        // handler unreachable dead code. Only true blockers apply.
+        if (isReadOnly || isPreparingCompletion || completionBusy) return;
         if (amendReason.trim().length >= 10) {
             await amendEMR(amendReason);
             setShowAmendForm(false);
             setAmendReason('');
         }
+    };
+
+    // EMRRELOAD-FE-001 (audit 3886 round 17): the toolbar Refresh used to
+    // call loadEMR() directly, which replaces the entire reducer state
+    // (data + undo/redo history) with the cached/server snapshot — silently
+    // discarding unsaved clinical edits with no warning. Now a dirty
+    // document must be explicitly discarded by the doctor; cancelling keeps
+    // the draft (text + Undo history) untouched, and a confirmed discard
+    // bypasses the cache (loadEMR(true)) so the doctor sees the truly
+    // authoritative server version, not a stale cached copy.
+    const handleToolbarRefresh = async () => {
+        if (isDirty && !isSigned && !isAmended && !isReadOnly) {
+            const confirmed = await confirm({
+                title: t('misc.emr_refresh_title'),
+                message: t('misc.emr_refresh_discard_message'),
+                description: t('misc.emr_refresh_discard_description'),
+                confirmLabel: t('misc.emr_refresh_discard_confirm'),
+                cancelLabel: t('misc.cancel'),
+                intent: 'danger',
+            });
+            if (!confirmed) return;
+        }
+        await loadEMR(true);
     };
 
     // Conflict handlers
@@ -917,7 +1068,7 @@ export function EMRContainerV2({
                     <Button variant="ghost" size="small" onClick={redo} disabled={!canRedo || editingDisabled} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
                         <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
                     </Button>
-                    <Button variant="ghost" size="small" onClick={() => { void loadEMR(); }} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
+                    <Button variant="ghost" size="small" onClick={() => { void handleToolbarRefresh(); }} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
                         <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
                     </Button>
                 </div>
@@ -927,13 +1078,20 @@ export function EMRContainerV2({
                     {/* UX Audit Doctor M-48: progress indicator for EMR sections. */}
                     {(() => {
                         const sections = [
-                            { name: t('misc.emr_sec_complaints'), filled: !!(data?.complaints || fieldText(data?.complaints)) },
-                            { name: t('misc.emr_sec_anamnesis'), filled: !!(data?.anamnesis_morbi || fieldText(data?.anamnesis_morbi)) },
-                            { name: t('misc.emr_sec_examination'), filled: !!(data?.examination || fieldText(data?.examination)) },
-                            { name: t('misc.emr_sec_diagnosis'), filled: !!(data?.diagnosis || fieldText(data?.diagnosis)) },
-                            { name: t('misc.emr_sec_treatment'), filled: !!(data?.treatment || fieldText(data?.treatment)) },
-                            { name: t('misc.emr_sec_recommendations'), filled: !!(data?.recommendations || fieldText(data?.recommendations)) },
-                            { name: t('misc.emr_sec_notes'), filled: !!(data?.notes || fieldText(data?.notes)) },
+                            { name: t('misc.emr_sec_complaints'), filled: emrTextValue(data?.complaints).trim() !== '' },
+                            { name: t('misc.emr_sec_anamnesis'), filled: emrTextValue(data?.anamnesis_morbi).trim() !== '' },
+                            { name: t('misc.emr_sec_examination'), filled: emrTextValue(data?.examination).trim() !== '' },
+                            { name: t('misc.emr_sec_diagnosis'), filled: emrTextValue(data?.diagnosis).trim() !== '' },
+                            // EMRTREAT-FE-001 (audit 3886): the treatment row counts
+                            // the CANONICAL treatment text (treatment →
+                            // medications.text → plan.treatment, mirroring the
+                            // backend's get_emr_text_field chain) — the visible
+                            // TreatmentSection editor is bound to
+                            // medications.text, so a genuine treatment plan typed
+                            // there must mark «Лечение» as filled.
+                            { name: t('misc.emr_sec_treatment'), filled: emrTreatmentText(data) !== '' },
+                            { name: t('misc.emr_sec_recommendations'), filled: emrTextValue(data?.recommendations).trim() !== '' },
+                            { name: t('misc.emr_sec_notes'), filled: emrTextValue(data?.notes).trim() !== '' },
                         ];
                         const filledCount = sections.filter(s => s.filled).length;
                         return (
@@ -998,9 +1156,9 @@ export function EMRContainerV2({
 
                     <DiagnosisSection
                         diagnosis={data?.diagnosis}
-                        icd10Code={data?.icd10_code}
-                        onDiagnosisChange={handleFieldChange('diagnosis')}
-                        onIcd10Change={handleFieldChange('icd10_code')}
+                        icd10Code={canonicalIcd10Code}
+                        onDiagnosisChange={handleNestedFieldChange('diagnosis.main')}
+                        onIcd10Change={handleCanonicalIcd10Change}
                         disabled={editingDisabled}
                         ICD10Component={ICD10Component}
                         doctorId={doctorId}
@@ -1033,6 +1191,7 @@ export function EMRContainerV2({
                         suggestions={aiSuggestions.treatment || []}
                         aiLoading={aiLoading.treatment || false}
                         defaultOpen={false}
+                        visitKey={visitId}
                     />
 
                     {/* Recommendations is reused in TreatmentSection above, or separate?
@@ -1118,6 +1277,8 @@ export function EMRContainerV2({
                                 [field]: value
                             })}
                             disabled={editingDisabled}
+                            visitId={visitId}
+                            patientId={patientId}
                         />
                     )}
 
@@ -1156,7 +1317,7 @@ export function EMRContainerV2({
                                 </button>
                             )}
                         </>
-                    ) : !isSigned ? (
+                    ) : !isSigned && !isAmended && !serverFinalized ? (
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
@@ -1191,7 +1352,7 @@ export function EMRContainerV2({
                                 <button
                                     className="emr-v2-btn emr-v2-btn--warning"
                                     onClick={() => setShowAmendForm(true)}
-                                    disabled={editingDisabled}
+                                    disabled={!amendAllowed || isSaving}
                                     aria-label={t('misc.emr_amend_aria')}
                                 >
                                     <FilePenLine size={14} aria-hidden="true" /> {t('misc.emr_amend')}
@@ -1203,20 +1364,20 @@ export function EMRContainerV2({
                                         value={amendReason}
                                         onChange={(e) => setAmendReason(e.target.value)}
                                         placeholder={t('misc.emr_amend_reason_ph')}
-                                        disabled={editingDisabled}
+                                        disabled={!amendAllowed}
                                     />
                                     <div className="emr-v2-amend-actions">
                                         <button
                                             className="emr-v2-btn emr-v2-btn--primary"
                                             onClick={handleAmend}
-                                            disabled={amendReason.trim().length < 10 || editingDisabled}
+                                            disabled={amendReason.trim().length < 10 || !amendAllowed || isSaving}
                                         >
                                             {t('misc.emr_save')}
                                         </button>
                                         <button
                                             className="emr-v2-btn"
                                             onClick={() => setShowAmendForm(false)}
-                                            disabled={editingDisabled}
+                                            disabled={!amendAllowed}
                                         >
                                             {t('misc.cancel')}
                                         </button>
@@ -1287,7 +1448,6 @@ export function EMRContainerV2({
                     onReload={reloadFromServer}
                     onCompare={handleCompareConflict}
                     onAmend={() => setShowAmendForm(true)}
-                    onForceOverwrite={forceOverwrite}
                     loading={isSaving}
                 />
             )}

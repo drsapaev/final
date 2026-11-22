@@ -98,20 +98,27 @@ function getBrowserOrigin(): string {
 
 function buildRuntimeSnapshot(): RuntimeSnapshot {
   const currentOrigin = getBrowserOrigin();
-  const configuredOrigin = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
-  // CONTRACT: an explicitly configured VITE_API_BASE_URL wins over the
-  // browser origin — ops/vps/frontend.env.sample documents it as an
-  // intentional separate-API-origin switch (Vercel frontend + API elsewhere).
-  // Without it the previous "browser origin preferred on non-localhost" rule
-  // silently overrode the operator's setting and sent API calls to the
-  // static host (405). When the env is NOT set, the same-origin behaviour is
-  // preserved (fallback DEFAULT covers local dev).
-  const hasExplicitApiOrigin = Boolean(import.meta.env.VITE_API_BASE_URL);
+  const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const useSameOriginApi = configuredApiBaseUrl === 'same-origin';
+  const configuredOrigin = trimTrailingSlash(
+    useSameOriginApi
+      ? currentOrigin || DEFAULT_API_BASE_URL
+      : configuredApiBaseUrl || DEFAULT_API_BASE_URL,
+  );
+  // CONTRACT: an explicit API origin wins over browser-origin inference —
+  // ops/vps/frontend.env.sample documents the separate-API-origin deployment.
+  // The reserved "same-origin" value is used by portable staging artifacts so
+  // local custom ports still route through their own Nginx proxy. With no value,
+  // same-origin behavior is preserved for non-local hosts and the Vite proxy.
+  const hasExplicitApiOrigin = Boolean(configuredApiBaseUrl) && !useSameOriginApi;
   const preferBrowserOrigin =
-    !hasExplicitApiOrigin &&
-    currentOrigin &&
-    (!isLocalOrigin(currentOrigin) || isViteDevProxyOrigin(currentOrigin));
-  const apiOrigin = preferBrowserOrigin ? currentOrigin : configuredOrigin;
+    useSameOriginApi ||
+    (!hasExplicitApiOrigin &&
+      Boolean(currentOrigin) &&
+      (!isLocalOrigin(currentOrigin) || isViteDevProxyOrigin(currentOrigin)));
+  const apiOrigin = preferBrowserOrigin
+    ? currentOrigin || DEFAULT_API_BASE_URL
+    : configuredOrigin;
   const apiBaseUrl = `${apiOrigin}/api/v1`;
   const parsedOrigin = parseOriginParts(apiOrigin) || parseOriginParts(configuredOrigin);
   const wsProtocol = parsedOrigin?.protocol === 'https:' ? 'wss:' : 'ws:';

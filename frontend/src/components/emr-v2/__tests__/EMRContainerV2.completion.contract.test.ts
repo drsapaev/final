@@ -58,7 +58,12 @@ describe('EMRContainerV2 visit completion contract', () => {
     expect(source).toContain('signSavedEMR({ confirm: confirmSigning, rowVersion, sign: signEMR })');
     expect(source).not.toContain('signSavedEMR({ confirm: confirmSigning, rowVersion: version, sign: signEMR })');
 
-    const readOnlyBranch = source.match(/\{isReadOnly \? \([\s\S]*?\) : !isSigned \?/);
+    // Round 17 (audit 3886): the editable branch now also excludes amended
+    // records (!isSigned && !isAmended) — keep the read-only branch matcher
+    // in sync with the new ternary structure.
+    // RETRO-4007-01 (post-merge re-review of 4007): the branch additionally
+    // excludes the server-finalized window (amendment routing).
+    const readOnlyBranch = source.match(/\{isReadOnly \? \([\s\S]*?\) : !isSigned && !isAmended && !serverFinalized \?/);
     expect(readOnlyBranch).not.toBeNull();
     expect(readOnlyBranch?.[0]).toContain('{canSignReadOnly && (');
     expect(readOnlyBranch?.[0]).not.toContain('saveEMR');

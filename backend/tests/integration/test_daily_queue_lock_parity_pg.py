@@ -169,6 +169,7 @@ def _seed_v1_token_admission(engine, *, cap: int, token_count: int):
     from app.crud.daily_queue_creation_policy import (
         ONLINE_ISSUANCES_V1_POLICY_VERSION,
     )
+    from app.models.department import Department
     from app.models.online_queue import DailyQueue, QueueToken
     from app.models.queue_profile import QueueProfile
 
@@ -178,6 +179,13 @@ def _seed_v1_token_admission(engine, *, cap: int, token_count: int):
     token_values = [f"t083-synthetic-{uuid.uuid4().hex}" for _ in range(token_count)]
 
     with Session(engine) as seed:
+        seed.add(
+            Department(
+                key="cardiology",
+                name_ru="SYNTHETIC-Кардиология",
+                active=True,
+            )
+        )
         seed.add(
             QueueProfile(
                 key="cardiology",
@@ -319,6 +327,89 @@ def _queue_api_legacy_creator(engine, day, doctor_id, barrier, errors, queue_ids
             queue_ids.append(int(queue.id))
     except Exception as exc:  # noqa: BLE001
         errors.append(("queue_api_legacy", exc))
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("has_archived_null_tag", [False, True])
+def test_batch_reuses_an_active_queue_with_a_legacy_empty_tag(
+    lock_parity_engine, has_archived_null_tag,
+):
+    from datetime import date
+
+    day = date(2026, 9, 29)
+    doctor_id = _seed_doctor(lock_parity_engine)
+    with Session(lock_parity_engine) as seed:
+        if has_archived_null_tag:
+            seed.add(DailyQueue(day=day, specialist_id=doctor_id, queue_tag=None, active=False))
+        queue = DailyQueue(day=day, specialist_id=doctor_id, queue_tag="", active=True)
+        seed.add(queue)
+        seed.flush()
+        queue_id = queue.id
+        seed.commit()
+
+    with Session(lock_parity_engine) as batch:
+        queue = crud_online_queue.get_or_create_daily_queue(batch, day, doctor_id, queue_tag=None)
+        assert queue.id == queue_id
+        assert queue.active and queue.queue_tag == ""
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("archived_tag", [None, ""])
+@pytest.mark.parametrize("use_v1", [False, True])
+def test_batch_never_reuses_an_archived_untagged_queue(
+    lock_parity_engine, monkeypatch, archived_tag, use_v1
+):
+    from datetime import date
+
+    from app.repositories.queue_batch_repository import QueueBatchRepository
+
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "1" if use_v1 else "0")
+    policy = "daily_online_issuances_v1" if use_v1 else "legacy"
+    issued_count = 7 if use_v1 else 0
+    day = date(2026, 9, 29)
+    doctor_id = _seed_doctor(lock_parity_engine)
+    with Session(lock_parity_engine) as seed:
+        archived = DailyQueue(
+            day=day,
+            specialist_id=doctor_id,
+            queue_tag=archived_tag,
+            active=False,
+            policy_version=policy,
+            start_number=41,
+            online_issued_count=issued_count,
+        )
+        seed.add(archived)
+        seed.flush()
+        archived_id = archived.id
+        seed.commit()
+
+    with Session(lock_parity_engine) as batch:
+        repository = QueueBatchRepository(batch)
+        if use_v1:
+            with pytest.raises(ValueError, match="replacement can be created"):
+                repository.get_or_create_daily_queue(day, doctor_id)
+            batch.rollback()
+        else:
+            new_queue = repository.get_or_create_daily_queue(day, doctor_id)
+            assert new_queue.active is True
+            assert new_queue.id != archived_id
+            assert new_queue.queue_tag is None
+            assert new_queue.policy_version == "legacy"
+
+    with Session(lock_parity_engine) as check:
+        archived = check.get(DailyQueue, archived_id)
+        assert archived is not None
+        assert archived.active is False
+        assert archived.queue_tag == archived_tag
+        assert archived.start_number == 41
+        assert archived.policy_version == policy
+        assert archived.online_issued_count == issued_count
+        assert (
+            check.query(DailyQueue)
+            .filter(DailyQueue.day == day, DailyQueue.specialist_id == doctor_id)
+            .count()
+            == (1 if use_v1 else 2)
+        )
 
 
 @pytest.mark.integration

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.core.roles import INTERNAL_ONLY_ROLE_SPELLINGS
 from app.crud import service as crud
 from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
+from app.models.user import User
 from app.models.visit import VisitService
 from app.services.service_audit_service import ServiceAuditService
 from app.services.service_mapping import normalize_service_code
@@ -30,10 +32,16 @@ class ServicesApiRepository:
         return query.order_by(ServiceCategory.name_ru).all()
 
     def get_service_category_by_code(self, code: str):
-        return self.db.query(ServiceCategory).filter(ServiceCategory.code == code).first()
+        return (
+            self.db.query(ServiceCategory).filter(ServiceCategory.code == code).first()
+        )
 
     def get_service_category(self, category_id: int):
-        return self.db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
+        return (
+            self.db.query(ServiceCategory)
+            .filter(ServiceCategory.id == category_id)
+            .first()
+        )
 
     def count_services_in_category(self, category_id: int) -> int:
         return self.db.query(Service).filter(Service.category_id == category_id).count()
@@ -96,7 +104,9 @@ class ServicesApiRepository:
             .first()
         )
 
-    def get_service_code_conflict(self, *, code: str, exclude_service_id: int | None = None):
+    def get_service_code_conflict(
+        self, *, code: str, exclude_service_id: int | None = None
+    ):
         query = self.db.query(Service).filter(
             or_(Service.code == code, Service.service_code == code)
         )
@@ -114,11 +124,36 @@ class ServicesApiRepository:
     def list_active_services(self):
         return self.db.query(Service).filter(Service.active.is_(True)).all()
 
-    def list_active_doctors(self):
-        return self.db.query(Doctor).filter(Doctor.active.is_(True)).all()
+    def list_active_doctors(self, *, limit: int, offset: int):
+        return (
+            self.db.query(
+                Doctor.id,
+                Doctor.specialty,
+                Doctor.cabinet,
+                Doctor.active,
+                User.full_name.label("display_name"),
+            )
+            .outerjoin(User, User.id == Doctor.user_id)
+            .filter(
+                Doctor.active.is_(True),
+                or_(
+                    Doctor.user_id.is_(None),
+                    User.role.is_(None),
+                    func.lower(User.role).notin_(INTERNAL_ONLY_ROLE_SPELLINGS),
+                ),
+            )
+            .order_by(Doctor.id.asc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
 
-    def list_services(self, *, q: str | None, active: bool | None, limit: int, offset: int):
-        return crud.list_services(self.db, q=q, active=active, limit=limit, offset=offset)
+    def list_services(
+        self, *, q: str | None, active: bool | None, limit: int, offset: int
+    ):
+        return crud.list_services(
+            self.db, q=q, active=active, limit=limit, offset=offset
+        )
 
     def resolve_service(self, *, service_id: int | None, code: str | None):
         service = None
@@ -153,10 +188,14 @@ class ServicesApiRepository:
         return {
             "service_id": service.id,
             "service_code": service.service_code or service.code,
-            "normalized_code": normalize_service_code(service.service_code or service.code or ""),
+            "normalized_code": normalize_service_code(
+                service.service_code or service.code or ""
+            ),
             "category": service.category_code or service.category,
             "subcategory": service.subcategory,
-            "departments": [service.department] if getattr(service, "department", None) else [],
+            "departments": (
+                [service.department] if getattr(service, "department", None) else []
+            ),
             "ui_type": None,
         }
 

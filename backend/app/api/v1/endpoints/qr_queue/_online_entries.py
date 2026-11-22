@@ -1,5 +1,5 @@
-"""Split from qr_queue.py.
-"""
+"""Split from qr_queue.py."""
+
 from __future__ import annotations
 
 from app.api.v1.endpoints.qr_queue._analytics import (
@@ -101,7 +101,6 @@ def update_online_entry(
     except HTTPException:
         raise
     except Exception as e:
-
         logger.error(
             "[update_online_entry] Ошибка: %s: %s",
             type(e).__name__,
@@ -125,7 +124,9 @@ class FullUpdateOnlineEntryRequest(BaseModel):
     discount_mode: str  # none/repeat/benefit
     services: list[dict]  # [{service_id, quantity}]
     all_free: bool = False
-    aggregated_ids: list[int] | None = None  # ⭐ FIX: IDs of all merged entries for dedup check
+    aggregated_ids: list[int] | None = (
+        None  # ⭐ FIX: IDs of all merged entries for dedup check
+    )
     # Codex R4 #3095 (P1): привязка подтверждённой full-update квоты к команде —
     # пересчёт цен на текущем каталоге (правила full_update) ДО мутаций.
     quote_token: str | None = None
@@ -139,9 +140,7 @@ def _full_update_find_and_validate_entry(
     """Find queue entry by ID and validate doctor access."""
     from app.models.online_queue import OnlineQueueEntry
 
-    entry = (
-        db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
-    )
+    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
 
     if not entry:
         raise HTTPException(
@@ -214,9 +213,9 @@ def _full_update_sync_patient_and_entries(
                 patient.id,
             )
 
-            if patient_data.get('patient_name'):
+            if patient_data.get("patient_name"):
                 # Разбираем ФИО на компоненты
-                name_parts = patient_data['patient_name'].split()
+                name_parts = patient_data["patient_name"].split()
                 if len(name_parts) >= 1:
                     patient.last_name = name_parts[0]
                 if len(name_parts) >= 2:
@@ -224,16 +223,18 @@ def _full_update_sync_patient_and_entries(
                 if len(name_parts) >= 3:
                     patient.middle_name = name_parts[2]
 
-            if patient_data.get('phone'):
-                patient.phone = patient_data['phone']
+            if patient_data.get("phone"):
+                patient.phone = patient_data["phone"]
 
-            if patient_data.get('birth_year'):
-                patient.birth_date = date(patient_data['birth_year'], 1, 1)
+            if patient_data.get("birth_year"):
+                patient.birth_date = date(patient_data["birth_year"], 1, 1)
 
-            if patient_data.get('address'):
-                patient.address = patient_data['address']
+            if patient_data.get("address"):
+                patient.address = patient_data["address"]
 
-            logger.info("[full_update_online_entry] Пациент обновлен: id=%d", patient.id)
+            logger.info(
+                "[full_update_online_entry] Пациент обновлен: id=%d", patient.id
+            )
 
             # Keep duplicate service entries in the same visit/session aligned.
             # Patient-wide sync can rewrite unrelated historical/future entries.
@@ -243,9 +244,7 @@ def _full_update_sync_patient_and_entries(
                 != entry.id,  # Исключаем текущую запись (уже обновлена)
             ]
             if entry.visit_id:
-                other_entry_filters.append(
-                    OnlineQueueEntry.visit_id == entry.visit_id
-                )
+                other_entry_filters.append(OnlineQueueEntry.visit_id == entry.visit_id)
             elif entry.session_id:
                 other_entry_filters.extend(
                     [
@@ -262,9 +261,7 @@ def _full_update_sync_patient_and_entries(
                 )
 
             other_entries = (
-                db.query(OnlineQueueEntry)
-                .filter(*other_entry_filters)
-                .all()
+                db.query(OnlineQueueEntry).filter(*other_entry_filters).all()
             )
 
             if other_entries:
@@ -280,14 +277,14 @@ def _full_update_sync_patient_and_entries(
                     original_number = other_entry.number
 
                     # Обновляем только те поля, которые были переданы
-                    if patient_data.get('patient_name'):
-                        other_entry.patient_name = patient_data['patient_name']
-                    if patient_data.get('phone'):
-                        other_entry.phone = patient_data['phone']
-                    if patient_data.get('birth_year') is not None:
-                        other_entry.birth_year = patient_data['birth_year']
-                    if patient_data.get('address'):
-                        other_entry.address = patient_data['address']
+                    if patient_data.get("patient_name"):
+                        other_entry.patient_name = patient_data["patient_name"]
+                    if patient_data.get("phone"):
+                        other_entry.phone = patient_data["phone"]
+                    if patient_data.get("birth_year") is not None:
+                        other_entry.birth_year = patient_data["birth_year"]
+                    if patient_data.get("address"):
+                        other_entry.address = patient_data["address"]
 
                     # ⭐ ВАЖНО: Восстанавливаем queue_time и number (не перезаписываем!)
                     if original_queue_time:
@@ -326,20 +323,20 @@ def _full_update_sync_patient_and_entries(
                                 visit_total += vs_price * vs_qty
 
                                 service_obj = {
-                                    'service_id': vs.service_id,
-                                    'name': vs.name,
-                                    'code': vs.code,
-                                    'quantity': vs_qty,
-                                    'price': int(vs_price),
-                                    'queue_time': (
+                                    "service_id": vs.service_id,
+                                    "name": vs.name,
+                                    "code": vs.code,
+                                    "quantity": vs_qty,
+                                    "price": int(vs_price),
+                                    "queue_time": (
                                         other_entry.queue_time.isoformat()
                                         if other_entry.queue_time
                                         else None
                                     ),
-                                    'cancelled': False,
-                                    'cancel_reason': None,
-                                    'cancelled_by': None,
-                                    'was_paid_before_cancel': False,
+                                    "cancelled": False,
+                                    "cancel_reason": None,
+                                    "cancelled_by": None,
+                                    "was_paid_before_cancel": False,
                                 }
                                 visit_services_list.append(service_obj)
 
@@ -359,8 +356,6 @@ def _full_update_sync_patient_and_entries(
                     "[full_update_online_entry] ✅ Синхронизировано %d записей",
                     len(other_entries),
                 )
-
-
 
 
 def _full_update_finalize_and_respond(
@@ -458,13 +453,11 @@ def _full_update_finalize_and_respond(
     except HTTPException:
         raise
     except Exception as e:
-
         logger.error("[full_update_online_entry] Ошибка: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
-
 
 
 def _full_update_resolve_visit_metadata(
@@ -489,16 +482,16 @@ def _full_update_resolve_visit_metadata(
     if queue and queue.queue_tag:
         # Маппинг queue_tag -> department
         queue_tag_to_dept = {
-            'cardiology': 'cardiology',
-            'cardio': 'cardiology',
-            'dermatology': 'dermatology',
-            'derma': 'dermatology',
-            'stomatology': 'stomatology',
-            'dentist': 'stomatology',
-            'lab': 'laboratory',
-            'laboratory': 'laboratory',
-            'ecg': 'cardiology',
-            'echokg': 'cardiology',
+            "cardiology": "cardiology",
+            "cardio": "cardiology",
+            "dermatology": "dermatology",
+            "derma": "dermatology",
+            "stomatology": "stomatology",
+            "dentist": "stomatology",
+            "lab": "laboratory",
+            "laboratory": "laboratory",
+            "ecg": "cardiology",
+            "echokg": "cardiology",
         }
         department = queue_tag_to_dept.get(queue.queue_tag.lower())
 
@@ -507,21 +500,19 @@ def _full_update_resolve_visit_metadata(
         for service_item in request.services:
             service = (
                 db.query(Service)
-                .filter(Service.id == service_item['service_id'])
+                .filter(Service.id == service_item["service_id"])
                 .first()
             )
             if service:
                 # Resolve department through the queue-group SSOT.
-                service_code = service.service_code or get_service_code(
-                    service.id, db
-                )
+                service_code = service.service_code or get_service_code(service.id, db)
                 queue_group = get_queue_group_for_service(service_code)
                 service_group_to_dept = {
-                    'cardiology': 'cardiology',
-                    'ecg': 'cardiology',
-                    'dermatology': 'dermatology',
-                    'dental': 'stomatology',
-                    'laboratory': 'laboratory',
+                    "cardiology": "cardiology",
+                    "ecg": "cardiology",
+                    "dermatology": "dermatology",
+                    "dental": "stomatology",
+                    "laboratory": "laboratory",
                 }
                 department = service_group_to_dept.get(queue_group)
                 if department:
@@ -529,20 +520,18 @@ def _full_update_resolve_visit_metadata(
 
     # Если department все еще не определен, используем значение по умолчанию
     if not department:
-        department = 'general'
+        department = "general"
 
     # Вычисляем оригинальную сумму (без скидки all_free)
-    original_total_amount = Decimal('0')
+    original_total_amount = Decimal("0")
     for service_item in request.services:
         service = (
-            db.query(Service)
-            .filter(Service.id == service_item['service_id'])
-            .first()
+            db.query(Service).filter(Service.id == service_item["service_id"]).first()
         )
         if service:
-            original_total_amount += (
-                service.price or Decimal('0')
-            ) * service_item.get('quantity', 1)
+            original_total_amount += (service.price or Decimal("0")) * service_item.get(
+                "quantity", 1
+            )
 
     return (visit_date, doctor_id, department, original_total_amount)
 
@@ -567,24 +556,24 @@ def _full_update_ensure_patient_for_visit(
         )
         from app.crud.patient import normalize_patient_name
 
-        patient_name = patient_data.get('patient_name', 'Неизвестный пациент')
+        patient_name = patient_data.get("patient_name", "Неизвестный пациент")
         name_parts = normalize_patient_name(full_name=patient_name)
 
         # Гарантируем, что поля не пустые
-        last_name = name_parts["last_name"] or 'Неизвестный'
-        first_name = name_parts["first_name"] or 'Пациент'
+        last_name = name_parts["last_name"] or "Неизвестный"
+        first_name = name_parts["first_name"] or "Пациент"
 
         temp_patient = Patient(
             last_name=last_name,
             first_name=first_name,
             middle_name=name_parts.get("middle_name"),
-            phone=patient_data.get('phone', ''),
+            phone=patient_data.get("phone", ""),
             birth_date=(
-                date(patient_data.get('birth_year', 1990), 1, 1)
-                if patient_data.get('birth_year')
+                date(patient_data.get("birth_year", 1990), 1, 1)
+                if patient_data.get("birth_year")
                 else None
             ),
-            address=patient_data.get('address', ''),
+            address=patient_data.get("address", ""),
         )
         db.add(temp_patient)
         db.flush()
@@ -639,8 +628,8 @@ def _full_update_find_existing_visit(
         visit = (
             db.query(Visit)
             .filter(
-            Visit.id == entry.visit_id,
-            Visit.patient_id == patient_id_for_visit,
+                Visit.id == entry.visit_id,
+                Visit.patient_id == patient_id_for_visit,
                 Visit.visit_date == visit_date,
             )
             .order_by(Visit.created_at.desc())
@@ -658,9 +647,9 @@ def _full_update_find_existing_visit(
         visit = (
             db.query(Visit)
             .filter(
-            Visit.id == entry.visit_id,
-            Visit.patient_id == patient_id_for_visit,
-            Visit.visit_date == visit_date,
+                Visit.id == entry.visit_id,
+                Visit.patient_id == patient_id_for_visit,
+                Visit.visit_date == visit_date,
                 Visit.discount_mode == "all_free",
             )
             .first()
@@ -688,21 +677,22 @@ def _full_update_add_services_to_visit(
 
     from app.models.service import Service
     from app.models.visit import VisitService
+    from app.services.appointment_duration_snapshot import (
+        duration_snapshot_for_service_id,
+    )
 
     # ✅ ИСПРАВЛЕНО: Добавляем услуги к Visit (после удаления старых ИЛИ к существующим)
     added_services = []
     for service_item in request.services:
         service = (
-            db.query(Service)
-            .filter(Service.id == service_item['service_id'])
-            .first()
+            db.query(Service).filter(Service.id == service_item["service_id"]).first()
         )
         if service:
             # ✅ Проверяем, нет ли уже такой услуги
             existing_service = (
                 db.query(VisitService)
                 .filter(
-                VisitService.visit_id == visit.id,
+                    VisitService.visit_id == visit.id,
                     VisitService.service_id == service.id,
                 )
                 .first()
@@ -711,16 +701,17 @@ def _full_update_add_services_to_visit(
             if not existing_service:
                 # ⭐ ИСПРАВЛЕНИЕ #2: Добавляем новую услугу (работает и для оплаченных, и для неоплаченных)
                 # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                service_code = service.service_code or get_service_code(
-                    service.id, db
-                )
+                service_code = service.service_code or get_service_code(service.id, db)
                 visit_service = VisitService(
                     visit_id=visit.id,
                     service_id=service.id,
+                    duration_minutes_snapshot=duration_snapshot_for_service_id(
+                        db, service.id, doctor_id=visit.doctor_id
+                    ),
                     code=service_code,
                     name=service.name,
-                    qty=service_item.get('quantity', 1),
-                    price=Decimal('0'),  # All Free - всё бесплатно
+                    qty=service_item.get("quantity", 1),
+                    price=Decimal("0"),  # All Free - всё бесплатно
                     currency="UZS",
                 )
                 db.add(visit_service)
@@ -732,7 +723,7 @@ def _full_update_add_services_to_visit(
                     )
             else:
                 # Обновляем количество если услуга уже есть
-                existing_service.qty = service_item.get('quantity', 1)
+                existing_service.qty = service_item.get("quantity", 1)
                 added_services.append(f"{service.name} (обновлено)")
 
     db.flush()  # Коммитим добавление услуг
@@ -777,7 +768,9 @@ def _full_update_handle_all_free_visit(
 
     # Section 4.6.2: Ensure patient exists for Visit
     patient_id_for_visit = _full_update_ensure_patient_for_visit(
-        db=db, entry=entry, patient_data=patient_data,
+        db=db,
+        entry=entry,
+        patient_data=patient_data,
     )
 
     # Section 4.6.3: Find existing Visit (3-priority lookup)
@@ -805,8 +798,8 @@ def _full_update_handle_all_free_visit(
             db.query(PaymentInvoiceVisit)
             .join(PaymentInvoice)
             .filter(
-            PaymentInvoiceVisit.visit_id == visit.id,
-                PaymentInvoice.status == 'paid',
+                PaymentInvoiceVisit.visit_id == visit.id,
+                PaymentInvoice.status == "paid",
             )
             .first()
         )
@@ -888,7 +881,6 @@ def _full_update_handle_all_free_visit(
             department,
         )
 
-
     # Section 4.6.4: Add services to Visit
     _full_update_add_services_to_visit(
         db=db,
@@ -898,8 +890,6 @@ def _full_update_handle_all_free_visit(
     )
 
     return visit
-
-
 
 
 def _full_update_parse_entry_services(services_json):
@@ -912,7 +902,11 @@ def _full_update_parse_entry_services(services_json):
     if not services_json:
         return []
     try:
-        parsed = json.loads(services_json) if isinstance(services_json, str) else services_json
+        parsed = (
+            json.loads(services_json)
+            if isinstance(services_json, str)
+            else services_json
+        )
         # Handle double-encoding
         if isinstance(parsed, str):
             parsed = json.loads(parsed)
@@ -933,7 +927,6 @@ def _full_update_parse_entry_services(services_json):
             parse_err,
         )
         return []
-
 
 
 def _full_update_compute_aggregated_ids(
@@ -965,20 +958,14 @@ def _full_update_compute_aggregated_ids(
             OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
         ]
         if entry.patient_id is not None:
-            visit_entry_filters.append(
-                OnlineQueueEntry.patient_id == entry.patient_id
-            )
+            visit_entry_filters.append(OnlineQueueEntry.patient_id == entry.patient_id)
         else:
             visit_entry_filters.append(OnlineQueueEntry.id == entry.id)
             logger.warning(
                 "[full_update_online_entry] visit-linked entry %d has no patient_id; using current entry only for aggregation",
                 entry.id,
             )
-        visit_entries = (
-            db.query(OnlineQueueEntry)
-            .filter(*visit_entry_filters)
-            .all()
-        )
+        visit_entries = db.query(OnlineQueueEntry).filter(*visit_entry_filters).all()
         computed_aggregated_ids = [e.id for e in visit_entries]
         logger.info(
             "[full_update_online_entry] computed %d aggregated ids by visit_id with same-patient guard",
@@ -1003,9 +990,7 @@ def _full_update_compute_aggregated_ids(
 
         if session_label:
             if entry.session_id:
-                session_filters.append(
-                    OnlineQueueEntry.session_id == entry.session_id
-                )
+                session_filters.append(OnlineQueueEntry.session_id == entry.session_id)
                 boundary_label = "session_id"
             else:
                 session_filters.append(OnlineQueueEntry.queue_id == entry.queue_id)
@@ -1068,7 +1053,6 @@ def _full_update_same_fallback_aggregation_scope(
     return False
 
 
-
 def _full_update_resolve_final_aggregated_ids(
     db: Session,
     entry,
@@ -1120,7 +1104,7 @@ def _full_update_resolve_final_aggregated_ids(
         final_aggregated_ids = safe_fallback_ids
         logger.warning(
             "[full_update_online_entry] ⚠️ Используем aggregated_ids из frontend (fallback): %s",
-            final_aggregated_ids
+            final_aggregated_ids,
         )
     else:
         final_aggregated_ids = []
@@ -1185,20 +1169,22 @@ def _full_update_scan_existing_services(
                 OnlineQueueEntry.visit_id == entry.visit_id
             )
         elif entry.session_id:
-            all_patient_entry_filters.extend([
-                OnlineQueueEntry.visit_id.is_(None),
-                OnlineQueueEntry.session_id == entry.session_id,
-            ])
+            all_patient_entry_filters.extend(
+                [
+                    OnlineQueueEntry.visit_id.is_(None),
+                    OnlineQueueEntry.session_id == entry.session_id,
+                ]
+            )
         else:
-            all_patient_entry_filters.extend([
-                OnlineQueueEntry.visit_id.is_(None),
-                OnlineQueueEntry.queue_id == entry.queue_id,
-            ])
+            all_patient_entry_filters.extend(
+                [
+                    OnlineQueueEntry.visit_id.is_(None),
+                    OnlineQueueEntry.queue_id == entry.queue_id,
+                ]
+            )
 
         all_patient_entries = (
-            db.query(OnlineQueueEntry)
-            .filter(*all_patient_entry_filters)
-            .all()
+            db.query(OnlineQueueEntry).filter(*all_patient_entry_filters).all()
         )
         logger.info(
             "[full_update_online_entry] ⭐ FIX: Найдено %d записей пациента в текущей сессии",
@@ -1242,7 +1228,8 @@ def _full_update_collect_existing_services(
     """
     # Section 4.1: Compute aggregated_ids
     computed_aggregated_ids = _full_update_compute_aggregated_ids(
-        db=db, entry=entry,
+        db=db,
+        entry=entry,
     )
 
     # Section 4.2: Resolve final_aggregated_ids
@@ -1269,8 +1256,6 @@ def _full_update_collect_existing_services(
     )
 
     return existing_service_ids, existing_service_queue_times, final_aggregated_ids
-
-
 
 
 def _full_update_resolve_target_queue_id(
@@ -1362,7 +1347,9 @@ def _full_update_resolve_target_queue_id(
     if candidate_queue:
         logger.info(
             "[full_update_online_entry] 🔀 Услуга %s → очередь %s (ID=%d)",
-            service.name, service.queue_tag, candidate_queue.id,
+            service.name,
+            service.queue_tag,
+            candidate_queue.id,
         )
         return candidate_queue.id
 
@@ -1387,7 +1374,8 @@ def _full_update_resolve_target_queue_id(
     )
     logger.info(
         "[full_update_online_entry] ✅ Created DailyQueue for %s (ID=%d)",
-        service.queue_tag, new_queue.id,
+        service.queue_tag,
+        new_queue.id,
     )
     return new_queue.id
 
@@ -1433,11 +1421,7 @@ def _full_update_create_single_independent_entry(
         db, entry.patient_id, target_queue_id, entry.queue.day
     )
 
-    service_code = (
-        service.service_code
-        or get_service_code(service.id, db)
-        or "UNKNOWN"
-    )
+    service_code = service.service_code or get_service_code(service.id, db) or "UNKNOWN"
 
     new_entry = OnlineQueueEntry(
         queue_id=target_queue_id,
@@ -1482,7 +1466,6 @@ def _full_update_create_single_independent_entry(
         current_queue_time,
     )
     return new_entry
-
 
 
 def _full_update_create_independent_entries(
@@ -1537,7 +1520,7 @@ def _full_update_create_independent_entries(
         additional_service_ids = []
 
         for service_item in request.services:
-            svc_id = service_item['service_id']
+            svc_id = service_item["service_id"]
             service = db.query(Service).filter(Service.id == svc_id).first()
 
             # ⭐ Консультация определяется ТОЛЬКО явным флагом is_consultation
@@ -1545,7 +1528,9 @@ def _full_update_create_independent_entries(
                 # Первая найденная консультация получает QR время
                 consultation_service_id = svc_id
                 existing_service_queue_times[svc_id] = (
-                    queue_time.isoformat() if hasattr(queue_time, 'isoformat') else str(queue_time)
+                    queue_time.isoformat()
+                    if hasattr(queue_time, "isoformat")
+                    else str(queue_time)
                 )
                 logger.info(
                     "[full_update_online_entry] ⭐ FIX 13: Консультация %s (ID=%d) получает QR время: %s",
@@ -1589,12 +1574,15 @@ def _full_update_create_independent_entries(
             )
 
             for new_service_id in new_service_ids:
-                new_service = db.query(Service).filter(Service.id == new_service_id).first()
+                new_service = (
+                    db.query(Service).filter(Service.id == new_service_id).first()
+                )
                 if not new_service:
                     continue
 
                 service_item_data = next(
-                    (s for s in request.services if s["service_id"] == new_service_id), None
+                    (s for s in request.services if s["service_id"] == new_service_id),
+                    None,
                 )
                 _full_update_create_single_independent_entry(
                     db=db,
@@ -1604,7 +1592,6 @@ def _full_update_create_independent_entries(
                     service_item_data=service_item_data,
                     current_queue_time=current_queue_time,
                 )
-
 
         # ⭐ FIX 2: Создаём Visit для QR-записи при первом заполнении
         if entry.patient_id and entry.visit_id is None and request.services:
@@ -1616,31 +1603,41 @@ def _full_update_create_independent_entries(
                 # Подготавливаем услуги для Visit
                 services_for_visit = []
                 for svc_item in request.services:
-                    svc = db.query(Service).filter(Service.id == svc_item['service_id']).first()
+                    svc = (
+                        db.query(Service)
+                        .filter(Service.id == svc_item["service_id"])
+                        .first()
+                    )
                     if svc:
-                        services_for_visit.append({
-                            'service_id': svc.id,
-                            'name': svc.name,
-                            'code': svc.code,
-                            'price': float(svc.price) if svc.price else 0,
-                            'quantity': svc_item.get('quantity', 1),
-                        })
+                        services_for_visit.append(
+                            {
+                                "service_id": svc.id,
+                                "name": svc.name,
+                                "code": svc.code,
+                                "price": float(svc.price) if svc.price else 0,
+                                "quantity": svc_item.get("quantity", 1),
+                            }
+                        )
 
                 if services_for_visit:
                     visit = qr_service._create_visit_for_qr(
                         patient_id=entry.patient_id,
+                        doctor_id=(
+                            entry.queue.specialist_id
+                            if consultation_service_id is not None
+                            else None
+                        ),
                         visit_date=date.today(),
                         services=services_for_visit,
                         visit_type=entry.visit_type or "paid",
                         discount_mode=request.discount_mode or "none",
                         notes=f"QR-регистрация: {entry.patient_name}",
                     )
-                    if consultation_service_id is not None:
-                        visit.doctor_id = entry.queue.specialist_id
                     entry.visit_id = visit.id
                     logger.info(
                         "[full_update_online_entry] ⭐ FIX 2: Создан Visit ID=%d для QR-записи ID=%d",
-                        visit.id, entry.id,
+                        visit.id,
+                        entry.id,
                     )
             except Exception as visit_err:
                 logger.warning(
@@ -1674,12 +1671,15 @@ def _full_update_create_independent_entries(
             current_queue_time = datetime.now(local_tz)
 
             for new_service_id in new_service_ids:
-                new_service = db.query(Service).filter(Service.id == new_service_id).first()
+                new_service = (
+                    db.query(Service).filter(Service.id == new_service_id).first()
+                )
                 if not new_service:
                     continue
 
                 service_item_data = next(
-                    (s for s in request.services if s["service_id"] == new_service_id), None
+                    (s for s in request.services if s["service_id"] == new_service_id),
+                    None,
                 )
                 _full_update_create_single_independent_entry(
                     db=db,
@@ -1692,10 +1692,7 @@ def _full_update_create_independent_entries(
 
             db.flush()  # Сохраняем новые entries
 
-
-
     return queue_time, new_service_ids
-
 
 
 def _full_update_update_current_entry_services(
@@ -1731,7 +1728,7 @@ def _full_update_update_current_entry_services(
     # При первичной регистрации - добавляем все услуги
     # При редактировании - добавляем только СУЩЕСТВУЮЩИЕ услуги (новые уже созданы как отдельные entries)
     for service_item in request.services:
-        service_id = service_item['service_id']
+        service_id = service_item["service_id"]
 
         # ⭐ FIX 13: Пропускаем услуги, которые уже созданы как Independent Queue Entries
         # Это включает:
@@ -1747,7 +1744,7 @@ def _full_update_update_current_entry_services(
         service = db.query(Service).filter(Service.id == service_id).first()
         if service:
             # Рассчитываем стоимость с учетом скидок
-            item_price = service.price * service_item.get('quantity', 1)
+            item_price = service.price * service_item.get("quantity", 1)
 
             logger.info(
                 "[full_update_online_entry] Услуга: %s, базовая цена: %s",
@@ -1757,8 +1754,8 @@ def _full_update_update_current_entry_services(
 
             # Применяем скидки
             if service.is_consultation and request.discount_mode in [
-                'repeat',
-                'benefit',
+                "repeat",
+                "benefit",
             ]:
                 logger.info(
                     "[full_update_online_entry] Применена скидка на консультацию (%s)",
@@ -1794,7 +1791,7 @@ def _full_update_update_current_entry_services(
                     "code": service.service_code
                     or get_service_code(service.id, db)
                     or "UNKNOWN",
-                    "quantity": service_item.get('quantity', 1),
+                    "quantity": service_item.get("quantity", 1),
                     "price": int(item_price),
                     "queue_time": service_queue_time,  # ⭐ FIX: Используем правильное время
                     "cancelled": False,
@@ -1814,7 +1811,7 @@ def _full_update_update_current_entry_services(
                     # Первичная регистрация или первое заполнение QR — время регистрации
                     service_queue_time = (
                         queue_time.isoformat()
-                        if hasattr(queue_time, 'isoformat')
+                        if hasattr(queue_time, "isoformat")
                         else str(queue_time)
                     )
                     # Добавляем в services_list ТОЛЬКО для First Fill
@@ -1824,7 +1821,7 @@ def _full_update_update_current_entry_services(
                         "code": service.service_code
                         or get_service_code(service.id, db)
                         or "UNKNOWN",
-                        "quantity": service_item.get('quantity', 1),
+                        "quantity": service_item.get("quantity", 1),
                         "price": int(item_price),
                         "queue_time": service_queue_time,  # ⭐ FIX: Используем правильное время
                         "cancelled": False,
@@ -1843,7 +1840,7 @@ def _full_update_update_current_entry_services(
                     # Новые услуги будут созданы как отдельные entries.
                     logger.info(
                         "[full_update_online_entry] ⭐ Пропуск новой услуги %d (уже создана отдельная queue_entry)",
-                        service_id
+                        service_id,
                     )
                     # НЕ добавляем в services_list
 
@@ -1851,9 +1848,7 @@ def _full_update_update_current_entry_services(
     entry.service_codes = json.dumps(
         service_codes_list, ensure_ascii=False
     )  # Обратная совместимость
-    entry.total_amount = int(
-        total_amount
-    )  # ✅ СОХРАНЯЕМ СУММУ (конвертируем в int)
+    entry.total_amount = int(total_amount)  # ✅ СОХРАНЯЕМ СУММУ (конвертируем в int)
 
     # ⭐ FIX: При первичной регистрации устанавливаем queue_time на entry
     # Это критически важно! Без этого entry.queue_time остается None,
@@ -1875,7 +1870,6 @@ def _full_update_update_current_entry_services(
     return services_list, service_codes_list, total_amount
 
 
-
 def _full_update_process_services(
     db: Session,
     entry,
@@ -1887,12 +1881,10 @@ def _full_update_process_services(
     """Section 4: Collect existing services, create new entries, calculate totals."""
     import json
 
-
     patient_data = request.patient_data
     # ✅ НОВЫЙ ФОРМАТ: Полные объекты услуг с метаданными
 
     # ⭐ FIX: Определяем существующие услуги из ВСЕХ записей пациента за день (не только текущей entry)
-
 
     existing_service_ids, existing_service_queue_times, final_aggregated_ids = (
         _full_update_collect_existing_services(db=db, entry=entry, request=request)
@@ -1901,8 +1893,8 @@ def _full_update_process_services(
     # Определяем новые услуги (которые не были в entry.services)
     new_service_ids = []
     for service_item in request.services:
-        if service_item['service_id'] not in existing_service_ids:
-            new_service_ids.append(service_item['service_id'])
+        if service_item["service_id"] not in existing_service_ids:
+            new_service_ids.append(service_item["service_id"])
 
     logger.info(
         "[full_update_online_entry] ⭐ DEBUG: Новые услуги для добавления: %s",
@@ -1910,7 +1902,7 @@ def _full_update_process_services(
     )
     logger.info(
         "[full_update_online_entry] ⭐ DEBUG: request.services содержит: %s",
-        [s['service_id'] for s in request.services],
+        [s["service_id"] for s in request.services],
     )
     logger.info(
         "[full_update_online_entry] ⭐ DEBUG: existing_service_ids: %s",
@@ -1933,7 +1925,11 @@ def _full_update_process_services(
     has_services = False
     if entry.services:
         try:
-            parsed = json.loads(entry.services) if isinstance(entry.services, str) else entry.services
+            parsed = (
+                json.loads(entry.services)
+                if isinstance(entry.services, str)
+                else entry.services
+            )
             has_services = len(parsed) > 0
         except (json.JSONDecodeError, TypeError):
             has_services = False
@@ -1945,7 +1941,8 @@ def _full_update_process_services(
         not has_services
         and entry.queue_time is not None
         and entry.source == "online"
-        and len(existing_service_ids) == 0  # ⭐ FIX: Только если вообще нет услуг у пациента
+        and len(existing_service_ids)
+        == 0  # ⭐ FIX: Только если вообще нет услуг у пациента
     )
     is_initial_registration = entry.queue_time is None
 
@@ -2121,8 +2118,6 @@ def full_update_online_entry(
     if not request.all_free and request.discount_mode == "all_free":
         request.all_free = True
     try:
-
-
         logger.info(
             "[full_update_online_entry] Обновление записи ID=%d, тип визита=%s, услуг=%d",
             entry_id,
@@ -2259,7 +2254,7 @@ def full_update_online_entry(
             db=db,
             entry=entry,
             request=request,
-            visit=locals().get('visit'),
+            visit=locals().get("visit"),
             total_amount=total_amount,
             services_list=services_list,
             service_codes_list=service_codes_list,
@@ -2277,6 +2272,7 @@ def full_update_online_entry(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
 
 @router.post(
     "/online-entry/{entry_id}/cancel-service", response_model=CancelServiceResponse
@@ -2347,24 +2343,24 @@ def cancel_service_in_entry(
 
         for service_obj in services_list:
             if service_obj.get(
-                'service_id'
-            ) == request.service_id and not service_obj.get('cancelled', False):
+                "service_id"
+            ) == request.service_id and not service_obj.get("cancelled", False):
                 # Отменяем услугу
-                service_obj['cancelled'] = True
-                service_obj['cancel_reason'] = request.cancel_reason
-                service_obj['cancelled_by'] = current_user.id
-                service_obj['was_paid_before_cancel'] = request.was_paid
+                service_obj["cancelled"] = True
+                service_obj["cancel_reason"] = request.cancel_reason
+                service_obj["cancelled_by"] = current_user.id
+                service_obj["was_paid_before_cancel"] = request.was_paid
                 service_found = True
                 cancelled_service_obj = service_obj.copy()
                 logger.info(
                     "[cancel_service] Услуга '%s' отменена",
-                    service_obj.get('name'),
+                    service_obj.get("name"),
                 )
 
             # Пересчитываем сумму (только не отмененные услуги)
-            if not service_obj.get('cancelled', False):
-                new_total += service_obj.get('price', 0) * service_obj.get(
-                    'quantity', 1
+            if not service_obj.get("cancelled", False):
+                new_total += service_obj.get("price", 0) * service_obj.get(
+                    "quantity", 1
                 )
 
         if not service_found:
@@ -2406,9 +2402,7 @@ def cancel_service_in_entry(
                 )
 
             other_entries = (
-                db.query(OnlineQueueEntry)
-                .filter(*other_entry_filters)
-                .all()
+                db.query(OnlineQueueEntry).filter(*other_entry_filters).all()
             )
 
             if other_entries:
@@ -2430,25 +2424,25 @@ def cancel_service_in_entry(
                         for other_service_obj in other_services:
                             # Отменяем ту же услугу
                             if other_service_obj.get(
-                                'service_id'
+                                "service_id"
                             ) == request.service_id and not other_service_obj.get(
-                                'cancelled', False
+                                "cancelled", False
                             ):
-                                other_service_obj['cancelled'] = True
-                                other_service_obj['cancel_reason'] = (
+                                other_service_obj["cancelled"] = True
+                                other_service_obj["cancel_reason"] = (
                                     request.cancel_reason
                                 )
-                                other_service_obj['cancelled_by'] = current_user.id
-                                other_service_obj['was_paid_before_cancel'] = (
+                                other_service_obj["cancelled_by"] = current_user.id
+                                other_service_obj["was_paid_before_cancel"] = (
                                     request.was_paid
                                 )
                                 updated = True
 
                             # Пересчитываем сумму
-                            if not other_service_obj.get('cancelled', False):
+                            if not other_service_obj.get("cancelled", False):
                                 other_total += other_service_obj.get(
-                                    'price', 0
-                                ) * other_service_obj.get('quantity', 1)
+                                    "price", 0
+                                ) * other_service_obj.get("quantity", 1)
 
                         if updated:
                             other_entry.services = json.dumps(

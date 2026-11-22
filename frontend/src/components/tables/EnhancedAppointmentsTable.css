@@ -166,8 +166,17 @@
   color: var(--mac-text-primary) !important;
 }
 
-/* Общие стили для всех div внутри таблицы */
-.enhanced-table div {
+/* REG-FE-079 (follow-up audit 2026-11-02): прежде — `.enhanced-table div`
+   красил ЛЮБОЙ div внутри таблицы с !important, затирая семантические
+   muted/warning/success цвета бейджей и статусов. Область сужена до
+   реальных текстовых контейнеров таблицы. */
+.enhanced-table tbody td div,
+.enhanced-table thead th div,
+.enhanced-table .eat-toolbar,
+.enhanced-table .eat-toolbar-inner,
+.enhanced-table .eat-pagination,
+.enhanced-table .eat-pagination-info,
+.enhanced-table .eat-table-scroll > div {
   color: var(--mac-text-primary) !important;
 }
 
@@ -667,18 +676,21 @@
 }
 
 /* Toolbar */
+/* REG-FE-078 (follow-up audit 2026-11-02): тулбар больше НЕ требует
+   min-width:600px — внутри clipped-предка (overflow:hidden корня) это
+   прятало правые фильтры/экспорт за границей экрана на узких вьюпортах.
+   Контролы переносятся на следующую строку (wrap) вместо обрезания. */
 .eat-toolbar {
   padding: var(--mac-spacing-4);
   border-bottom: 1px solid var(--mac-border);
   overflow-x: auto;
-  min-width: 600px;
 }
 
 .eat-toolbar-inner {
   display: flex;
   align-items: center;
   gap: var(--mac-spacing-3);
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   min-width: 0;
 }
 

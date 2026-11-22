@@ -417,19 +417,43 @@ class Mutation:
                         )
 
                 # Создаем запись (SSOT: crud create_appointment)
+                appointment_data = {
+                    "patient_id": input.patient_id,
+                    "doctor_id": input.doctor_id,
+                    "appointment_date": input.appointment_date,
+                    "appointment_time": input.appointment_time,
+                    "notes": input.notes,
+                    "services": input.services,
+                    "status": AppointmentStatus.PENDING.value,
+                    "payment_type": None,
+                    "payment_amount": None,
+                }
+                if input.service_ids is not None:
+                    from app.services.appointment_duration_snapshot import (
+                        InvalidServiceSelection,
+                        resolve_exact_service_selection,
+                    )
+
+                    try:
+                        selection = resolve_exact_service_selection(
+                            db,
+                            input.service_ids,
+                            doctor_id=input.doctor_id,
+                        )
+                    except InvalidServiceSelection:
+                        return AppointmentMutationResponse(
+                            success=False,
+                            message=t("error.validation"),
+                            errors=["SERVICES_INVALID"],
+                        )
+                    appointment_data["services"] = list(selection.names)
+                    appointment_data["duration_minutes_snapshot"] = (
+                        selection.duration_minutes_snapshot
+                    )
+
                 appointment = crud_create_appointment(
                     db,
-                    {
-                        "patient_id": input.patient_id,
-                        "doctor_id": input.doctor_id,
-                        "appointment_date": input.appointment_date,
-                        "appointment_time": input.appointment_time,
-                        "notes": input.notes,
-                        "services": input.services,
-                        "status": AppointmentStatus.PENDING.value,
-                        "payment_type": None,
-                        "payment_amount": None,
-                    },
+                    appointment_data,
                 )
 
                 # M4-P0-1: appointment_to_type включает patient (PHI) — read-trail

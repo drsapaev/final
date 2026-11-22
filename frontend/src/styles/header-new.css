@@ -1,9 +1,8 @@
 /* HDR-FX-1: header chrome styles.
  *
- * P2-6: every structural value the inline headerStyle in HeaderNew.tsx owns
- * (grid template, column gap, padding, height, overflow, radius) lives ONLY
- * there — this file keeps the non-conflicting shell (sticky positioning)
- * plus the responsive visibility utilities that inline styles cannot express.
+ * The base shell layout and responsive overrides live here so media queries
+ * can adapt them without specificity escapes. HeaderNew.tsx supplies only the
+ * theme-dependent paint values (background, border, shadow and image).
  * P2-5: the dead hdr-btn family, hdr-select, hdr-title and hdr-logo layers
  * (zero TSX usage since the ui/macos Button migration) were removed together
  * with the media-block remnants that inline styles had already overridden.
@@ -12,6 +11,15 @@
  * CSS rule (the .app-header sticky rule was being discarded that way). */
 
 .app-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+  overflow: visible;
+  border-radius: var(--mac-radius-md);
+  padding: 0 16px;
+  height: 54px;
+  font-family: var(--ui-font);
   position: sticky;
   top: 0;
   left: 0;
@@ -38,6 +46,9 @@
    inside this box — the GSB dropdown is portaled to document.body and the
    profile menu paints from hdr-right — so the scroll container clips nothing. */
 .hdr-center {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-4);
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -56,7 +67,13 @@
   flex-shrink: 0;
 }
 
-.hdr-controls { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.hdr-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
 
 /* P1-1: the search bar wrapper is the designated shrivable item of the
    center column — flex-basis equals GlobalSearchBar's own 400px maxWidth,
@@ -122,6 +139,52 @@ html {
     flex-shrink: 1;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  /* Admin pages need the full command/search surface at narrow widths, but
+     the intrinsic brand + controls columns can exceed the viewport even
+     after the center navigation starts panning. Stack the existing regions
+     inside the header so document scrolling stays within the page width. */
+  .app-header[data-role="admin"] {
+    display: flex;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    height: auto;
+    min-height: 54px;
+    padding: 8px 12px;
+  }
+
+  .app-header[data-role="admin"] > .hdr-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-header[data-role="admin"] > .hdr-center {
+    flex: 1 0 100%;
+    order: 2;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-header[data-role="admin"] > .hdr-right {
+    flex: 1 0 100%;
+    order: 3;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-end;
+  }
+
+  .app-header[data-role="admin"] .hdr-controls {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    white-space: normal;
+  }
+
+  .app-header[data-role="admin"] .hdr-controls > [aria-hidden="true"] {
+    display: none;
   }
 }
 

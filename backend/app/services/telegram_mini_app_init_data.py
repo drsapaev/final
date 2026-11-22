@@ -17,8 +17,12 @@ from app.models.patient import Patient
 from app.models.telegram_config import TelegramPatientFormSubmission, TelegramUser
 from app.models.user import User
 
-DEFAULT_MAX_AUTH_AGE_SECONDS = 5 * 60  # M4-P0-2: reduced from 24h to 5min (for /auth/exchange)
-LEGACY_MAX_AUTH_AGE_SECONDS = 24 * 60 * 60  # M4-P0-2: backward-compat for existing per-request initData callers
+DEFAULT_MAX_AUTH_AGE_SECONDS = (
+    5 * 60
+)  # M4-P0-2: reduced from 24h to 5min (for /auth/exchange)
+LEGACY_MAX_AUTH_AGE_SECONDS = (
+    24 * 60 * 60
+)  # M4-P0-2: backward-compat for existing per-request initData callers
 DEFAULT_MAX_FUTURE_SKEW_SECONDS = 60
 _HASH_FIELD = "hash"
 _AUTH_DATE_FIELD = "auth_date"
@@ -99,6 +103,7 @@ class TelegramMiniAppAppointmentBookingDraft:
     department: str | None = None
     notes: str | None = None
     services: tuple[str, ...] = ()
+    service_ids: tuple[int, ...] = ()
     status: str = "scheduled"
     visit_type: str = "paid"
     payment_type: str = "cash"
@@ -116,6 +121,7 @@ class TelegramMiniAppAppointmentBookingDraft:
             "visit_type": self.visit_type,
             "payment_type": self.payment_type,
             "services": list(self.services),
+            "service_ids": list(self.service_ids),
             "payment_amount": None,
             "payment_currency": self.payment_currency,
             "payment_provider": None,
@@ -209,7 +215,9 @@ class TelegramMiniAppPatientFormsPreview:
             form_payload = form.to_response_payload()
             submission = submissions_by_form_id.get(form.form_id)
             if submission is not None:
-                form_payload["submission"] = _patient_form_submission_payload(submission)
+                form_payload["submission"] = _patient_form_submission_payload(
+                    submission
+                )
             forms_payload.append(form_payload)
 
         return {
@@ -329,7 +337,9 @@ def _utc_now() -> datetime:
 
 
 def _parse_init_data(init_data: str) -> dict[str, str]:
-    pairs = parse_qsl(str(init_data or ""), keep_blank_values=True, strict_parsing=False)
+    pairs = parse_qsl(
+        str(init_data or ""), keep_blank_values=True, strict_parsing=False
+    )
     fields: dict[str, str] = {}
     for key, value in pairs:
         key_text = str(key)
@@ -408,6 +418,21 @@ def _normalize_services(values: list[str] | tuple[str, ...] | None) -> tuple[str
     return tuple(services)
 
 
+def _normalize_service_ids(
+    values: list[int] | tuple[int, ...] | None,
+) -> tuple[int, ...]:
+    if not values:
+        return ()
+    normalized: list[int] = []
+    for value in values:
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise TelegramMiniAppSessionScopeError("appointment_service_id_invalid")
+        normalized.append(value)
+    if len(set(normalized)) != len(normalized):
+        raise TelegramMiniAppSessionScopeError("appointment_service_id_invalid")
+    return tuple(normalized)
+
+
 def _normalize_appointment_time(value: str | None) -> str | None:
     text = _trim_optional_text(
         value,
@@ -460,7 +485,9 @@ def _normalize_patient_form_answers(
         field = fields_by_key[field_key]
         if field.field_type == "boolean":
             if not isinstance(value, bool):
-                raise TelegramMiniAppSessionScopeError("patient_form_answer_type_invalid")
+                raise TelegramMiniAppSessionScopeError(
+                    "patient_form_answer_type_invalid"
+                )
             normalized[field_key] = value
             continue
 
@@ -724,6 +751,7 @@ def build_telegram_mini_app_appointment_booking_draft(
     department: str | None = None,
     notes: str | None = None,
     services: list[str] | tuple[str, ...] | None = None,
+    service_ids: list[int] | tuple[int, ...] | None = None,
     patient_id: int | None = None,
     today: date | None = None,
 ) -> TelegramMiniAppAppointmentBookingDraft:
@@ -767,6 +795,7 @@ def build_telegram_mini_app_appointment_booking_draft(
             reason="notes_too_long",
         ),
         services=_normalize_services(services),
+        service_ids=_normalize_service_ids(service_ids),
     )
 
 
@@ -779,6 +808,7 @@ def build_telegram_mini_app_appointment_booking_preview(
     department: str | None = None,
     notes: str | None = None,
     services: list[str] | tuple[str, ...] | None = None,
+    service_ids: list[int] | tuple[int, ...] | None = None,
     patient_id: int | None = None,
     today: date | None = None,
 ) -> TelegramMiniAppAppointmentBookingPreview:
@@ -792,6 +822,7 @@ def build_telegram_mini_app_appointment_booking_preview(
         department=department,
         notes=notes,
         services=services,
+        service_ids=service_ids,
         patient_id=patient_id,
         today=today,
     )
@@ -830,8 +861,7 @@ def build_telegram_mini_app_patient_forms_preview(
         scope=scope,
         forms=TELEGRAM_MINI_APP_PATIENT_FORMS,
         submissions_by_form_id={
-            submission.form_id: submission
-            for submission in submissions
+            submission.form_id: submission for submission in submissions
         },
     )
 

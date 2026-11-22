@@ -18,6 +18,13 @@ const translationsSource = fs.readFileSync(
   'utf8'
 );
 
+// CARDIO-FE-001 (audit 3886 round 20): the manual ECG entry form owns the
+// ecg_added/ecg_save_failed toasts now.
+const manualEcgFormSource = fs.readFileSync(
+  path.join(ROOT, 'components/cardiology/ManualEcgForm.tsx'),
+  'utf8'
+);
+
 describe('CardiologistPanel STRAT#32 — i18n migration', () => {
   it('imports useTranslation from unified i18n', () => {
     expect(source).toContain("from '../i18n/useTranslation'");
@@ -41,7 +48,11 @@ describe('CardiologistPanel STRAT#32 — i18n migration', () => {
     expect(source).toContain("tI18n('cardio.appointment_cancelled')");
     expect(source).toContain("tI18n('cardio.visit_completed')");
     expect(source).toContain("tI18n('cardio.blood_test_saved')");
-    expect(source).toContain("tI18n('cardio.ecg_added')");
+    // CARDIO-FE-001 (audit 3886 round 20): the manual ECG entry moved into
+    // the dedicated ManualEcgForm, which owns the ecg_added/ecg_save_failed
+    // toasts now.
+    expect(manualEcgFormSource).toContain("t('cardio.ecg_added')");
+    expect(manualEcgFormSource).toContain("t('cardio.ecg_save_failed')");
     // Cardioplan slice 5: the floating settings menu (and its "settings
     // saved" toast) was removed with the unused ECG/Echo toggle; the key
     // stays in the locales for parity but the panel no longer uses it.

@@ -168,6 +168,15 @@ describe('HeaderNew chrome (HDR-FX-1)', () => {
     expect(banner.tagName).toBe('HEADER');
   });
 
+  it('marks the Admin header for the compact responsive layout without hiding its controls', () => {
+    renderHeader({ role: 'Admin', path: '/admin/setup-directions' });
+
+    expect(screen.getByRole('banner')).toHaveAttribute('data-role', 'admin');
+    expect(screen.getByTestId('global-search')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Выбрать тему' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Профиль пользователя' })).toBeInTheDocument();
+  });
+
   it('theme menu: ArrowDown opens, items are menuitemradio with aria-checked, Escape closes and restores focus (P1-3)', async () => {
     renderHeader({ role: 'Admin', path: '/admin' });
     const trigger = screen.getByRole('button', { name: 'Выбрать тему' });

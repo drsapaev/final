@@ -297,6 +297,39 @@ describe('createGroupedCashierPayment guards (PR-UI-14-1)', () => {
   });
 });
 
+describe('createGroupedCashierPayment — client_request_id (issue 3859)', () => {
+  // CSH-FE-008 remainder: the idempotency key must be part of the POST
+  // body so the backend can dedup a network-loss retry of the same
+  // grouped allocation intent.
+  it('posts the client_request_id when the payment data carries one', async () => {
+    getAccessToken.mockReturnValue('token');
+    apiPost.mockResolvedValue({ data: { ok: true } });
+    await createGroupedCashierPayment(
+      { patient_id: 7, visit_ids: [1, 2], can_create_grouped_payment: true } as never,
+      {
+        amount: 100,
+        method: 'card',
+        note: 'n',
+        client_request_id: '0f0e0d0c-1b2a-4567-890a-bcdef0123456',
+      },
+    );
+    expect(apiPost).toHaveBeenCalledWith('/cashier/payments/grouped', expect.objectContaining({
+      client_request_id: '0f0e0d0c-1b2a-4567-890a-bcdef0123456',
+    }));
+  });
+
+  it('omits the field when no key is provided (legacy body shape)', async () => {
+    getAccessToken.mockReturnValue('token');
+    apiPost.mockResolvedValue({ data: { ok: true } });
+    await createGroupedCashierPayment(
+      { patient_id: 7, visit_ids: [1, 2], can_create_grouped_payment: true } as never,
+      { amount: 100, method: 'card', note: 'n' },
+    );
+    const body = apiPost.mock.calls[0][1] as Record<string, unknown>;
+    expect(body).not.toHaveProperty('client_request_id');
+  });
+});
+
 describe('date helpers (PR-UI-14-1)', () => {
   it('getLocalDateString formats YYYY-MM-DD in local time', () => {
     expect(getLocalDateString(new Date(2026, 7, 5))).toBe('2026-08-05');

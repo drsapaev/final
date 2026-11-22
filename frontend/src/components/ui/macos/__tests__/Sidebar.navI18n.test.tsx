@@ -2,7 +2,7 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Brain, Users } from 'lucide-react';
+import { Brain, Building2, Compass, List, Users } from 'lucide-react';
 import i18n from '@/i18n';
 import Sidebar from '../Sidebar';
 
@@ -66,6 +66,31 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
     });
     render(<Sidebar items={[{ id: 'patients', labelKey: 'nav.patients', icon: Users }]} />);
     expect(screen.getByRole('button', { name: 'Bemorlar' })).toBeInTheDocument();
+  });
+
+  it('renders the queue navigation labels for setup, shared rules and today queues', async () => {
+    const items = [
+      { id: 'setup', labelKey: 'nav.setup_directions', icon: Compass },
+      { id: 'rules', labelKey: 'nav.queue_settings', icon: List },
+      { id: 'today', labelKey: 'nav.queue_today', icon: Building2 },
+    ];
+
+    await act(async () => {
+      await i18n.changeLanguage('ru');
+    });
+    const { unmount } = render(<Sidebar items={items} activeItem="setup" />);
+    expect(screen.getByRole('button', { name: 'Направления и очереди' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Общие правила очереди' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Очереди сегодня' })).toBeInTheDocument();
+    unmount();
+
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+    render(<Sidebar items={items} activeItem="setup" />);
+    expect(screen.getByRole('button', { name: 'Directions & Queues' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'General Queue Rules' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Queues Today' })).toBeInTheDocument();
   });
 
   it('falls back to the fallback label when the key is missing everywhere', async () => {

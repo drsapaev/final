@@ -1,7 +1,21 @@
+## D-T19-STAGING-RECOVERY — сохранять окружение при ошибке — 2026-11-19
+
+Явное решение пользователя: если проверка собственного синтетического staging остановилась из-за ошибки, сохранять проект и его данные для диагностики, исправлять причину и продолжать оставшиеся проверки в том же окружении. Перед `Start` и `Session` задавать `KEEP_STAGING=1` в окружении запускающего процесса и записывать проект, владельца, срок жизни и причину в checkpoint. Не сбрасывать и не засевать существующую базу повторно без проверки состояния. Успешная `Session` удаляет собственный проект; после неё проверить очистку и удалить его синтетический env. Проверки принадлежности, актуальности кода и изоляции не обходятся. Выбор не разрешает production, изменения реальных данных или бессрочное накопление забытых проектов.
+
+## T19 — единые вкладки — 2026-11-16
+
+D-T19 implemented: internal Registrar tabs have one explicit configuration in ClinicSettings registrar_tabs_v1 with typed profile/doctor IDs, order, visibility and optional custom label. QueueProfile/Doctor/queue records are not tab entities. First save explicitly fixes legacy snapshot; future targets do not auto-add. Empty saved list stays empty. profile_filters preserve old dept links; missing selected filter is visible and cleared only by the user.
+
 # Decisions and contract
 
 Plan version: 2.9
 Last updated: 2026-10-04T08:31:13+05:00
+
+## D6 — T18 Tier-2 disposition — 2026-10-29
+
+- **Decision source:** explicit user instruction: keep Tier-2 partial and continue under the existing plan.
+- **Meaning:** preserve T18 as `PARTIAL`; this does not accept a staging deferral, waive the T18 acceptance criteria, complete the plan, or establish production readiness. Existing individual PASS/NOT_RUN evidence remains unchanged.
+- **Execution boundary:** this checkpoint runs no new staging project and does not alter runtime, PR, merge, deployment, or the plan's acceptance criteria. The full `STAGING_VALIDATION.md` remains required before production deployment.
 
 ## Current execution instruction
 
@@ -146,3 +160,94 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - **User decision:** in response to the T10 scope clarification, the user explicitly approved adding OpenAPI and generated API types.
 - **Included artifacts:** `backend/openapi.json`, focused OpenAPI contract tests, and `frontend/src/types/generated/api.ts`; no frontend runtime UI or adapter behavior is included.
 - **Technical choice:** remove the hard-coded schema/path totals from `frontend/scripts/generate-api-types.sh`'s generated-file header. Those totals would become inaccurate as soon as this OpenAPI change adds schemas; the generic source label stays correct across future regeneration. This changes metadata only, not the generation command or API behavior.
+
+## T11 plan synchronization and reported profile 409 — 2026-10-14
+
+- **User instruction:** synchronize/update the existing plan and clarify its uncertainties. This is a documentation-only side action in the same T11 task, not authorization to modify runtime, accept a Tier-2 deferral, merge, deploy or change the v1 flag.
+- **Source-backed clarification:** `specialists` can be `profile_key` in the existing PUT/DELETE `/queues/profiles/{profile_key}` route. The console URL and HTTP 409 do not establish the request method or prove a missing specialists-list endpoint. Initial profile loading uses a different GET path. Live method/reason/deployed revision are unknown.
+- **Technical planning choice:** add T11.1 with explicit diagnostic branches and acceptance criteria. Preserve existing used-binding/delete/availability guards. A proven T11 regression is fixed in #3639; an older/deployment issue receives a separate owned follow-up under the PR-cycle rules. Missing evidence stays UNRESOLVED, never an implicit deferral or a PASS.
+- **Evidence interpretation:** frontend source provenance PASS on `35717fa` supersedes the older unresolved artifact finding only for that image/source. It does not complete legacy named specs, all Tier-2, T18, or the pre-deploy runbook. Existing D1–D5 product decisions are unchanged.
+
+## T11.1 user clarification and narrow renderer follow-up — 2026-10-14
+
+- **User clarification:** the 409 occurs when deleting the profile. This establishes the action/path mapping to DELETE with profile key `specialists`; it does not establish the production usage counts or precise refusal reason.
+- **Technical scope refinement under the user's continuation:** keep a tiny T11.1a renderer-only fix in the active #3639 rather than starting another PR cycle: reuse the existing error formatter in single-delete and add two regressions. This explicitly narrows the prior generic follow-up rule and does not advance T17 bulk/CSV work or authorize backend changes.
+- **Preserved contract:** used profiles are archived through the existing explicit action; deletion guards remain authoritative. No auto-archive, retry or request change is introduced. The UI defect is reproduced independently of the still-unknown production refusal reason.
+
+## T11 / PR #3639 — ограниченное закрытие и условный legacy-spec deferral — 2026-10-16
+
+- Источник: пользователь ответил «делай» на конкретную рекомендацию заморозить scope кроме подтверждённых blockers, один раз синхронизировать main, закрыть матрицу T11 и оформить ограниченный deferral общих legacy live-spec. Это delegated technical disposition; независимый human GitHub APPROVE и merge не имитируются.
+- Scope: один подтверждённый legacy Doctor token fallback P2 исправляется в existing PR с unit/PG regression. Никаких новых функций, схем, queue identity, auth или UI redesign.
+- Условно разрешённый deferral касается только полных admin-navigation.spec.ts, queue-system.spec.ts, panel-qa-admin-live.spec.ts. Он вступает в силу после PASS обязательной матрицы C01–C09 и закрытия source review/CI. Неисполненное поведение T11 не откладывается.
+- Original requirement: полностью выполнить три перечисленных backend-dependent live suite.
+- Reason: общая auth/origin/control несовместимость legacy harness и неразобранные общие UI assertions; полные suites ещё не адаптированы надёжно. Они не помечаются obsolete, fixed или PASS.
+- Evidence: final targeted T11 unit/PG/browser/environment evidence с точным source SHA плюс все прежние FAIL/NOT_RUN. r2/r4 passes сохраняют свои SHA и не сертифицируют автоматически новый source patch.
+- Owner/workstream: T18 synthetic Admin/Registrar QA.
+- Resume condition: до production rollout, v1 flag activation или закрытия T18, на совместимом нормальному2FA/configurable-origin/controlled-writes harness. Доказанный regression в изменённом коде становится текущим blocker, а не deferral.
+- Headline impact: 0% completed coverage credit; 0/3 полных deferred suite закрыто этим решением. T18 и полный pre-deploy runbook остаются незавершёнными.
+- Production diagnostic: точный live409 reason/revision остаётся неизвестным; T11.1/оператор собирает минимальные безопасные read-only факты после разрешённого deployment. C06 отдельно доказывает renderer и сохранение backend guard; production mutation не разрешена.
+- Не отменены: required CI на итоговом HEAD, реальная матрица доступности/locking, normal Admin2FA, source review, собственный teardown, полный STAGING_VALIDATION.md до production. Мержит пользователь.
+## T11 final deferral disposition — 2026-10-16T15:23:19.3429781+05:00
+- Status: EFFECTIVE LIMITED DEFERRAL for PR3639/codeacb509c36a9583f917bc86d601120bef95eddc1e after C01–C09 PASS and exact-headCI28PASS/12SKIPPED/0failure/0pending.
+- Authority: user explicitly approved the bounded closure recommendation and separately authorized final r8 after the reproduced harness correction. This is delegated technical acceptance; no human identity/independent GitHub APPROVE is asserted.
+- Original requirement: complete whole admin-navigation.spec.ts, queue-system.spec.ts and panel-qa-admin-live.spec.ts.
+- Reason: existing general live harness requires auth/origin/control adaptations and includes unresolved general workflow failures beyond the changed T11 acceptance. Unchanged generic suites are not declared obsolete/fixed. A dedicated real T11 harness plus PG contracts verifies the changed behavior.
+- Evidence: acb509c36, selected21PG+7unit+4browser PASS; normalAdmin2FA/Registrar, exactSW marker/0080/teardown PASS; r7 FAIL retained; three whole named suites NOT_RUN,0/3 completed.
+- Owner/workstream: T18 synthetic Admin/Registrar QA.
+- Resume condition: before production rollout, v1 activation or T18 closure; compatible ordinary2FA, verified synthetic users, configurable origin and controlled synthetic writes/cleanup. A proven regression in changed behavior immediately becomes current blocker, not deferred.
+- Headline impact:0% completion credit from deferred suites,0/3 complete. Do not report all Tier2/system/predeploy validation complete.
+- Full pre-production runbook and live409 method/reason/deployed revision diagnosis remain separate unmet obligations. No production, merge or deployment authorized by this disposition. User performs merge.
+
+## T12.1a generated API contract — 2026-10-16T17:09:33+05:00
+
+- **Technical finding:** T12.1 changed `QueueProfileCreate.show_on_qr_page` from visible-by-default to hidden-by-default. The committed OpenAPI snapshot and generated TypeScript still describe the old default.
+- **Scope decision:** refresh only `backend/openapi.json` and `frontend/src/types/generated/api.ts` after a separate canonical gate. Generator scripts remain read-only; no response schema redesign or runtime/test change is included.
+- **Validation boundary:** if generation requires a live DB, additional source/test files, or unrelated schema changes, stop. Backend PostgreSQL tests remain NOT_RUN until a safe disposable DB is available.
+
+## T11 merge and T12.1 create-time publication contract — 2026-10-16T16:50:51+05:00
+
+- User instruction: “Мержил. Продолжай.” GitHub merge for #3639 was already confirmed; verified merge commit is 7443b0e290b9143e877d5898a5589df52592d3b3. Continue the existing implementation plan in a fresh worktree from that main commit.
+- Plan/policy basis: T12 requires all new profiles hidden, publication through a separate explicit action, and explicitly allows a backward-compatible reject/defer behavior for old clients posting show_on_qr_page=true.
+- Technical choice for T12.1: defer such create-time publication. The new profile is persisted with show_on_qr_page=false; response/UI must state that publication was deferred. No existing profile is mass-hidden. No readiness/ambiguity decision is added to the create path here; that is T12.2.
+- Scope boundary: eight gate-approved source/test paths only. The discovered generated-file drift is handled as separately gated T12.1a; do not silently expand T12.1.
+
+## T13 canonical Admin directions read model — 2026-10-17
+
+- **Technical choice:** expose the read-only Admin contract from the existing `/queue` router at `/admin/directions`; the router is already mounted at `/api/v1/queue`, so no route-registry change is needed.
+- **Identity choice:** queue owners always carry `owner_type` with the numeric `owner_id`; a Doctor ID and QueueResource ID are never combined or inferred. Today's queue references are a separate collection from future/default targets.
+- **Eligibility choice:** current public availability is computed through the canonical public-catalog selector. A hidden profile's proposed publication readiness is evaluated through that same selector using an in-memory profile proxy; ORM state is not mutated and the publish command remains responsible for transactional revalidation.
+- **Precreate choice:** automatic morning precreate eligibility is returned separately from ordinary booking. It follows the active-resource or one-explicit-eligible-service-doctor rule; `Service.doctor_id` is not required for normal multi-doctor booking.
+- **Privacy/read-only choice:** the endpoint returns no patient data, public address code, or URL. For permanent addresses it reports only active-address existence. The read uses bulk catalog/owner/queue lookups and performs no provisioning or queue creation.
+
+## T13 #3697 review-fix contract clarifications — 2026-10-18
+
+- **Publication readiness:** assess each hidden profile as the sole hypothetical published candidate against the current catalog; other hidden profiles remain hidden. Reuse the snapshot's preloaded availability, owner scopes, and eligible specialties.
+- **Precreate owner matching:** detect existing queues by (owner_type, owner_id, queue_tag) for the selected target owner. A same-tag queue for another owner does not satisfy or block this target.
+- **Precreate field meaning:** can_precreate describes policy feasibility from the active service/resource-or-explicit-doctor owner. state and existing_daily_queue_ids describe whether that exact typed owner/tag queue exists for the selected day; therefore an eligible policy with an existing exact-day queue is can_precreate=true, state=already_exists.
+
+## T15 — URL and typed return-context contract — 2026-10-19
+
+- **Destination-specific validation:** each editor accepts only entity kinds it can safely interpret: queue profile/tag in queue-profile management, service/tag in the service catalog, and doctor/tag in user management. Queue resources remain within the existing setup resources section and are not forwarded to unrelated editors. Return targets are built only from the fixed setup path and validated page state.
+- **Duplicate query fields:** repeated setup state or return-context fields are malformed. The setup page clears repeated day/profile values and normalizes repeated section values to checklist; editor return links are hidden when their context contains duplicate fields.
+
+- **Setup-page query state:** `/admin/setup-directions` owns `profile`, `section`, and `day`. `profile` is an optional canonical `QueueProfile.key`; `section` is the closed set `checklist | resources` and defaults to `checklist`; `day` is an optional real ISO calendar date `YYYY-MM-DD`. An absent day means the T13 endpoint's clinic-local current day; the browser must not infer that date.
+- **Removed local workflow state:** the five-step executor/services/display/verify/QR wizard, its `step`, `axis`, and `tag`, and any local “complete” flags are not persisted or recreated. Completion remains derived from T13 facts and `allowed_next_actions`.
+- **Editor return context:** outgoing links may carry `setupReturn=queue-directions-v1`, `setupProfile`, `setupSection`, and optional `setupDay`; `setupEntityKind` is a closed enum (`queue_profile | queue_tag | service | doctor | queue_resource`) with a corresponding `setupEntityKey` for profile/tag keys or positive `setupEntityId` for numeric service/doctor/resource IDs. An entity is included only when the current server action identifies it unambiguously.
+- **Fixed internal destinations:** `service-catalog` maps only to `/admin/services?servicesTab=catalog`; `queue-profiles` maps only to `/admin/services?servicesTab=queue-profiles`; `user-management` maps only to `/admin/users`. These destinations are selected by code, never read as an arbitrary redirect URL. Return links always target the fixed `/admin/setup-directions` route and serialize only validated profile/section/day values.
+- **Reload and mutation behavior:** setup-page URL is the source of selected profile, section, and day. Re-entering through a typed return link or browser history restores that URL and re-reads T13 facts; saving or cancelling an editor never marks a step complete locally. Existing Admin guards and the existing UserModal doctor-onboarding flow remain unchanged.
+- **Unknown input:** invalid dates are ignored; unknown sections fall back to `checklist`; a profile key absent from fresh T13 facts does not select another profile; malformed or unknown return contexts render no return action. No auth/RBAC/API/backend/database behavior changes are authorized by T15.
+
+## T18 — Narrow QueueProfile parent-conflict repair — 2026-10-24
+
+- **Decision source:** the user explicitly approved the source-grounded narrow repair proposal and then said “GO”.
+- **Allowed repair:** only clear a conflicting explicit `QueueProfile.department_key` so the existing `QueueProfile.key` → same-key Department convention becomes authoritative. The existing availability resolver stays unchanged. The command does not accept an arbitrary target parent.
+- **Required flow:** Admin-only read-only preview, then explicit apply bound to a fresh preview fingerprint, fixed reason code, and target confirmation. A stale or mismatched preview returns 409. T10's ordinary PUT guard remains unchanged.
+- **Impact confirmation:** preview reports linked entity counts, services entering/leaving Department scope, and whether the canonical public selector would restore QR/permanent-address booking. Apply requires explicit confirmations for reported service-scope changes and restored public access.
+- **Preservation:** no service row, queue owner/tag/row, issued number, patient entry/status/time, public address, token, publication flag, or QueueProfile tags are changed. The profile field update and strict audit row are committed atomically.
+- **Out of scope:** no arbitrary parent selection, resolver precedence change, migration, new entity, queue ownership/routing change, provisioning/retirement of addresses, clinical record change, merge, or deployment.
+
+## T18 queue-profile deletion refusal localization — 2026-10-29T15:42+05:00
+
+- Technical implementation choice (not a new product decision): map only the existing delete refusal codes `profile_has_significant_links` and `profile_binding_changed` to localized messages in the single-delete and bulk-delete UI. Preserve the backend contract and deletion/archive behavior; unknown error codes continue to use the existing server-message/fallback behavior.
+- Languages covered: `ru`, `en`, `kk`, `uz-Cyrl`, and `uz-Latn`. The in-use refusal explicitly tells the administrator to archive the profile instead of deleting it.
+- Tier-2 remains `PARTIAL` by user direction. This UI follow-up is not a Tier-2 pass, deferral, waiver, or acceptance of the outstanding live specs.

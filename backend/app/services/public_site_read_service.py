@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from datetime import time
 from typing import TYPE_CHECKING
 
 from app.repositories.public_site_read_repository import PublicSiteReadRepository
@@ -10,12 +12,41 @@ from app.schemas.public_site import (
     PublicSiteClinicOut,
     PublicSiteDoctorOut,
     PublicSiteLocale,
+    PublicSiteRelatedDoctorOut,
+    PublicSiteServiceDetailOut,
     PublicSiteServiceOut,
+)
+from app.schemas.public_site_admin import WEBSITE_SLUG_PATTERN
+from app.services.registrar_doctor_eligibility import (
+    accepted_specialty_variants_for_department_key,
+    is_named_eligible_real_doctor,
+    service_has_explicit_doctor_assignment,
+    service_requires_doctor_selection,
 )
 
 if TYPE_CHECKING:
     from app.models.clinic import Doctor
     from app.models.service import Service
+
+
+_PROFESSIONAL_CATEGORY_LABELS = {
+    "third": {
+        "ru": "Третья квалификационная категория",
+        "uz-Latn": "Uchinchi malaka toifasi",
+    },
+    "second": {
+        "ru": "Вторая квалификационная категория",
+        "uz-Latn": "Ikkinchi malaka toifasi",
+    },
+    "first": {
+        "ru": "Первая квалификационная категория",
+        "uz-Latn": "Birinchi malaka toifasi",
+    },
+    "highest": {
+        "ru": "Высшая квалификационная категория",
+        "uz-Latn": "Oliy malaka toifasi",
+    },
+}
 
 
 def _clean_text(value: object) -> str | None:
@@ -44,12 +75,46 @@ class PublicSiteReadService:
         def value(key: str) -> str | None:
             return _clean_text(settings.get(key))
 
+        logo = self.repository.get_published_clinic_logo()
+        raw_start = settings.get("clinic_working_hours_start")
+        raw_end = settings.get("clinic_working_hours_end")
+        if raw_start is None and raw_end is None:
+            # Owner-approved clinic hours. Admin changes are read from the same
+            # ClinicSettings keys and take effect on the next uncached request.
+            working_hours_start, working_hours_end = time(9), time(17)
+        else:
+            working_hours_start = self._parse_working_time(raw_start)
+            working_hours_end = self._parse_working_time(raw_end)
+            if (
+                working_hours_start is None
+                or working_hours_end is None
+                or working_hours_start >= working_hours_end
+            ):
+                working_hours_start = working_hours_end = None
         return PublicSiteClinicOut(
             name=value("clinic_name"),
             address=value("clinic_address"),
             phone=value("clinic_phone"),
             email=value("clinic_email"),
+            logo_url=(self._media_url(logo.storage_key) if logo is not None else None),
+            working_hours_start=working_hours_start,
+            working_hours_end=working_hours_end,
         )
+
+    @staticmethod
+    def _parse_working_time(value: object) -> time | None:
+        if not isinstance(value, str) or not re.fullmatch(
+            r"(?:[01]\d|2[0-3]):[0-5]\d", value.strip()
+        ):
+            return None
+        try:
+            return time.fromisoformat(value.strip())
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _media_url(storage_key: str) -> str:
+        return f"/api/v1/public-site/media/{storage_key}"
 
     @staticmethod
     def _category_name(category, locale: PublicSiteLocale) -> str | None:
@@ -140,9 +205,53 @@ class PublicSiteReadService:
 
     def get_service(
         self, slug: str, locale: PublicSiteLocale
-    ) -> PublicSiteServiceOut | None:
+    ) -> PublicSiteServiceDetailOut | None:
         row = self.repository.get_public_service_by_slug(slug)
-        return self._service_out(row, locale) if row is not None else None
+        if row is None or (card := self._service_out(row, locale)) is None:
+            return None
+        return PublicSiteServiceDetailOut(
+            **card.model_dump(), related_doctors=self._related_doctors(row)
+        )
+
+    def _related_doctors(self, service: Service) -> list[PublicSiteRelatedDoctorOut]:
+        if not (
+            service_requires_doctor_selection(service)
+            or service_has_explicit_doctor_assignment(service)
+        ):
+            return []
+        queue_tag = _clean_text(service.queue_tag)
+        if (service.is_consultation and queue_tag is None) or (
+            self.repository.service_has_resource_queue(queue_tag)
+        ):
+            return []
+
+        specialties = accepted_specialty_variants_for_department_key(
+            service.department_key
+        )
+        result = []
+        for doctor in self.repository.list_public_service_doctor_candidates(service):
+            if not self._doctor_content_is_complete(doctor) or not (
+                is_named_eligible_real_doctor(doctor, doctor.user)
+            ):
+                continue
+            if specialties is not None:
+                if (doctor.specialty or "").strip().lower() not in specialties:
+                    continue
+                if doctor.department is not None:
+                    department_specialties = (
+                        accepted_specialty_variants_for_department_key(
+                            doctor.department.key
+                        )
+                    )
+                    if not department_specialties or specialties.isdisjoint(
+                        department_specialties
+                    ):
+                        continue
+            slug = doctor.slug
+            name = _clean_text(doctor.user.full_name) if doctor.user else None
+            if slug and name and re.fullmatch(WEBSITE_SLUG_PATTERN, slug):
+                result.append(PublicSiteRelatedDoctorOut(slug=slug, name=name))
+        return result
 
     @classmethod
     def _category_rows(
@@ -167,6 +276,7 @@ class PublicSiteReadService:
         doctor: Doctor,
         locale: PublicSiteLocale,
         specialties: dict[str, object],
+        portrait_url: str | None = None,
     ) -> PublicSiteDoctorOut | None:
         if not PublicSiteReadService._doctor_content_is_complete(doctor):
             return None
@@ -181,11 +291,21 @@ class PublicSiteReadService:
         if specialty is not None:
             specialty_title = _localized(specialty.title_ru, specialty.title_uz, locale)
 
+        category_labels = _PROFESSIONAL_CATEGORY_LABELS.get(
+            doctor.professional_category
+        )
+        professional_category = (
+            category_labels.get(locale) if category_labels is not None else None
+        )
+
         return PublicSiteDoctorOut(
             slug=doctor.slug,
             name=name,
             bio=bio,
             specialty=specialty_title,
+            experience_years=doctor.experience_years,
+            professional_category=professional_category,
+            portrait_url=portrait_url,
         )
 
     def list_doctors(self, locale: PublicSiteLocale) -> list[PublicSiteDoctorOut]:
@@ -193,9 +313,18 @@ class PublicSiteReadService:
         specialties = self.repository.list_specialties_by_code(
             {doctor.specialty for doctor in doctors if doctor.specialty}
         )
+        media_keys = self.repository.list_published_doctor_media_keys(
+            {doctor.id for doctor in doctors}
+        )
         result = []
         for doctor in doctors:
-            card = self._doctor_out(doctor, locale, specialties)
+            storage_key = media_keys.get(doctor.id)
+            card = self._doctor_out(
+                doctor,
+                locale,
+                specialties,
+                self._media_url(storage_key) if storage_key else None,
+            )
             if card is not None:
                 result.append(card)
         return result
@@ -209,4 +338,15 @@ class PublicSiteReadService:
         specialties = self.repository.list_specialties_by_code(
             {doctor.specialty} if doctor.specialty else set()
         )
-        return self._doctor_out(doctor, locale, specialties)
+        media_keys = self.repository.list_published_doctor_media_keys({doctor.id})
+        storage_key = media_keys.get(doctor.id)
+        return self._doctor_out(
+            doctor,
+            locale,
+            specialties,
+            self._media_url(storage_key) if storage_key else None,
+        )
+
+    def is_public_doctor_media_owner(self, doctor_id: int) -> bool:
+        doctor = self.repository.get_public_doctor_by_id(doctor_id)
+        return doctor is not None and self._doctor_content_is_complete(doctor)

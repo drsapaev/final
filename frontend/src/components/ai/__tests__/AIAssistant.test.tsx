@@ -70,6 +70,7 @@ describe('AIAssistant Component', () => {
     it('should analyze complaint on refresh button click', async () => {
       const mockResult = {
         status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
         data: {
           preliminary_diagnosis: ['Мигрень', 'Головная боль напряжения'],
           examinations: [
@@ -122,6 +123,7 @@ describe('AIAssistant Component', () => {
     it('should fetch ICD10 suggestions', async () => {
       const mockResult = {
         status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
         data: {
           suggestions: [
             { code: 'G43.9', name: 'Мигрень неуточненная', relevance: 'высокая' },
@@ -167,6 +169,7 @@ describe('AIAssistant Component', () => {
     it('should display clinical recommendations for ICD10', async () => {
       const mockResult = {
         status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
         data: {
           suggestions: [],
           clinical_recommendations: '### Клинические рекомендации\n\nДетальное описание...'
@@ -218,6 +221,7 @@ describe('AIAssistant Component', () => {
     it('should change provider on chip click', async () => {
       const mockResult = {
         status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
         data: {
           preliminary_diagnosis: ['Test'],
           examinations: [],
@@ -303,6 +307,7 @@ describe('AIAssistant Component', () => {
     it('should interpret lab results via MCP', async () => {
       const mockResult = {
         status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
         data: {
           summary: 'Результаты в пределах нормы',
           abnormal_values: [],
@@ -346,6 +351,7 @@ describe('AIAssistant Component', () => {
   describe('apply action visibility', () => {
     const icdResponse = {
       status: 'success',
+        ai_safety_meta: { requires_doctor_confirmation: true },
       data: {
         clinical_recommendations: 'Рекомендации',
         suggestions: [

@@ -15,19 +15,29 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn, Phone, ShieldCheck } from 'lucide-react';
 import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../../components/ui/macos';
 import { ensureCSRFToken } from '../../api/client';
-import { patientLogin, requestPatientOtp, verifyPatientOtp } from '../../api/patientAccess';
+import { patientLogin, requestPatientOtp, verifyPatientOtp, verifyPatientTwoFactor } from '../../api/patientAccess';
 import { replaceAccessOnlySession } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
+import {
+  getPendingPublicBookingLocale,
+  getPublicBookingPath,
+  getPublicBookingResubmitHandoffLocale,
+  hasPublicBookingResubmitHandoff,
+} from '../../api/publicBooking';
 import { isValidUzbekPhone, normalizeUzbekPhoneForApi } from '../../utils/phoneUtils';
+import { useWebAuthn } from '../../hooks/useWebAuthn';
+import { tokenManager } from '../../utils/tokenManager';
+import { isPatientPendingTwoFactor } from '../../types/domain/patientAccess';
+import type { PatientPendingTwoFactor } from '../../types/domain/patientAccess';
 import { useTranslation } from '../../i18n/useTranslation';
-import logger from '../../utils/logger';
 import type { HttpApiError } from '../../types/errors';
+import '../patient.css';
 
-type PatientLoginStep = 'phone' | 'code';
+type PatientLoginStep = 'phone' | 'code' | 'two-factor';
 
 const cardShellStyle: CSSProperties = {
   minHeight: '100vh',
@@ -50,7 +60,18 @@ const PatientLoginPage = () => {
   const { t: rawT, language } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
+  const location = useLocation();
 
+  const { isSupported: passkeySupported, isAuthenticating, authenticationStep, authenticate,
+    confirmAuthentication, cancelAuthentication, error: passkeyError } = useWebAuthn();
+  const [passkeyAttempted, setPasskeyAttempted] = useState(false);
+  const pendingAction = useRef(false);
+  const authVersion = useRef(0);
+  const pendingTwoFactor = useRef<{ challenge: PatientPendingTwoFactor; token: string | null; version: number } | null>(null);
+  const [factorKind, setFactorKind] = useState<'totp' | 'backup'>('totp');
+  const [factorCode, setFactorCode] = useState('');
+  const mounted = useRef(false);
+  const confirmationButton = useRef<HTMLButtonElement>(null);
   const [step, setStep] = useState<PatientLoginStep>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -60,7 +81,25 @@ const PatientLoginPage = () => {
   const resendTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (authenticationStep === 'confirm') confirmationButton.current?.focus();
+  }, [authenticationStep]);
+
+  useEffect(() => {
+    mounted.current = true;
+    const onAuthChange = () => {
+      authVersion.current += 1;
+      if (pendingTwoFactor.current) {
+        pendingTwoFactor.current = null;
+        setFactorCode('');
+        setStep('phone');
+        setError('');
+      }
+    };
+    window.addEventListener('authStateChanged', onAuthChange);
     return () => {
+      window.removeEventListener('authStateChanged', onAuthChange);
+      pendingTwoFactor.current = null;
+      mounted.current = false;
       if (resendTimerRef.current !== null) {
         window.clearInterval(resendTimerRef.current);
       }
@@ -102,8 +141,29 @@ const PatientLoginPage = () => {
     [t]
   );
 
+  const navigateAfterLogin = (user: Record<string, unknown>) => {
+    const hasResubmitHandoff = hasPublicBookingResubmitHandoff(location.state);
+    const handoffLocale = getPublicBookingResubmitHandoffLocale(location.state);
+    const pendingBookingLocale = getPendingPublicBookingLocale();
+    const fallbackLocale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl'
+      ? 'uz-Latn'
+      : 'ru';
+    const bookingLocale = handoffLocale ?? pendingBookingLocale
+      ?? (hasResubmitHandoff ? fallbackLocale : null);
+    const isPatient = String(user.role ?? '').toLowerCase() === 'patient';
+    const target = bookingLocale && isPatient
+      ? getPublicBookingPath(bookingLocale)
+      : getRouteForProfile(user);
+    navigate(target, {
+      replace: true,
+      ...(bookingLocale && isPatient && hasResubmitHandoff ? { state: location.state } : {}),
+    });
+  };
+
   const handleRequestOtp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (pendingAction.current) return;
+    setPasskeyAttempted(false);
     setError('');
 
     const normalized = normalizeUzbekPhoneForApi(phone);
@@ -112,23 +172,26 @@ const PatientLoginPage = () => {
       return;
     }
 
+    pendingAction.current = true;
     setLoading(true);
     try {
       const locale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl' ? 'uz' : 'ru';
       const response = await requestPatientOtp({ phone: normalized, locale });
+      if (!mounted.current) return;
       startResendCountdown(response.resend_after_seconds || 60);
       setPhone(normalized);
       setStep('code');
     } catch (err) {
-      logger.warn('[PatientLogin] request-otp failed:', err);
-      setError(normalizeError(err, 'patientPortal.pl_login_error'));
+      if (mounted.current) setError(normalizeError(err, 'patientPortal.pl_login_error'));
     } finally {
-      setLoading(false);
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
     }
   };
 
   const handleVerifyAndLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (pendingAction.current) return;
     setError('');
 
     const trimmedCode = code.trim();
@@ -137,12 +200,28 @@ const PatientLoginPage = () => {
       return;
     }
 
+    pendingAction.current = true;
+    const originalToken = tokenManager.getAccessToken();
+    let sessionChanged = false;
+    const onAuthChange = () => { sessionChanged = true; };
+    window.addEventListener('authStateChanged', onAuthChange);
+    const sessionIsCurrent = () => mounted.current && !sessionChanged && tokenManager.getAccessToken() === originalToken;
     setLoading(true);
     try {
       // Step 2+3: verify OTP → one-time grant → canonical patient session.
       const grantResponse = await verifyPatientOtp({ phone, code: trimmedCode });
+      if (!sessionIsCurrent()) return;
       const session = await patientLogin({ phone, verification_grant: grantResponse.verification_grant });
 
+      if (!sessionIsCurrent()) return;
+      if (isPatientPendingTwoFactor(session)) {
+        pendingTwoFactor.current = { challenge: session, token: originalToken, version: authVersion.current };
+        setCode('');
+        setFactorCode('');
+        setFactorKind('totp');
+        setStep('two-factor');
+        return;
+      }
       const accessToken = session.access_token.trim();
       // Phase 0 PR-B review P1: patient sessions are access-only (no refresh
       // token). REPLACE any previous staff principal in this tab — never merge
@@ -154,35 +233,109 @@ const PatientLoginPage = () => {
         // Non-fatal — the request interceptor fetches CSRF on demand.
       });
 
-      const target = getRouteForProfile(session.user as unknown as Record<string, unknown>);
-      navigate(target, { replace: true });
+      navigateAfterLogin(session.user as unknown as Record<string, unknown>);
     } catch (err) {
-      logger.warn('[PatientLogin] verify/login failed:', err);
-      setError(normalizeError(err, 'patientPortal.pl_login_error'));
+      if (mounted.current) setError(normalizeError(err, 'patientPortal.pl_login_error'));
     } finally {
-      setLoading(false);
+      window.removeEventListener('authStateChanged', onAuthChange);
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
     }
   };
 
   const handleResend = async () => {
-    if (resendAfter > 0 || loading) {
+    if (resendAfter > 0 || loading || pendingAction.current) {
       return;
     }
     setError('');
+    pendingAction.current = true;
     setLoading(true);
     try {
       const locale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl' ? 'uz' : 'ru';
       const response = await requestPatientOtp({ phone, locale });
+      if (!mounted.current) return;
       startResendCountdown(response.resend_after_seconds || 60);
     } catch (err) {
-      logger.warn('[PatientLogin] resend failed:', err);
-      setError(normalizeError(err, 'patientPortal.pl_login_error'));
+      if (mounted.current) setError(normalizeError(err, 'patientPortal.pl_login_error'));
     } finally {
-      setLoading(false);
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
+    }
+  };
+
+  const handlePasskey = async () => {
+    if (pendingAction.current) return;
+    pendingAction.current = true;
+    setPasskeyAttempted(true);
+    setError('');
+    setLoading(true);
+    const token = tokenManager.getAccessToken();
+    const version = authVersion.current;
+    try {
+      const session = await authenticate({ isCurrent: () => mounted.current });
+      if (session && mounted.current) {
+        if (isPatientPendingTwoFactor(session)) {
+          if (version !== authVersion.current || tokenManager.getAccessToken() !== token) return;
+          pendingTwoFactor.current = { challenge: session, token, version };
+          setFactorCode('');
+          setFactorKind('totp');
+          setStep('two-factor');
+        } else {
+          navigateAfterLogin(session.user as unknown as Record<string, unknown>);
+        }
+      }
+    } finally {
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
+    }
+  };
+
+  const handleVerifySecondFactor = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const pending = pendingTwoFactor.current;
+    if (pendingAction.current || !pending) return;
+    setError('');
+    if (factorKind === 'totp' ? !/^\d{6}$/.test(factorCode) : factorCode.length < 8 || factorCode.length > 10) {
+      setError(t('patientPortal.pl_second_factor_invalid'));
+      return;
+    }
+    const isCurrent = () => mounted.current && pendingTwoFactor.current === pending &&
+      authVersion.current === pending.version && tokenManager.getAccessToken() === pending.token;
+    if (!isCurrent()) { pendingTwoFactor.current = null; setFactorCode(''); setStep('phone'); return; }
+    pendingAction.current = true;
+    setLoading(true);
+    try {
+      const result = await verifyPatientTwoFactor({
+        pending_2fa_token: pending.challenge.pending_2fa_token,
+        ...(factorKind === 'totp' ? { totp_code: factorCode } : { backup_code: factorCode }),
+      });
+      if (!isCurrent()) return;
+      setFactorCode('');
+      if (!result.success) { setError(t('patientPortal.pl_second_factor_invalid')); return; }
+      const user = pending.challenge.user as unknown as Record<string, unknown>;
+      pendingTwoFactor.current = null;
+      replaceAccessOnlySession(result.access_token.trim(), user);
+      void ensureCSRFToken().catch(() => {});
+      navigateAfterLogin(user);
+    } catch (err) {
+      if (!isCurrent()) return;
+      setFactorCode('');
+      if ((err as HttpApiError)?.response?.status === 401) {
+        pendingTwoFactor.current = null;
+        setStep('phone');
+        setError(t('patientPortal.pl_second_factor_expired'));
+      } else {
+        setError(normalizeError(err, 'patientPortal.pl_second_factor_invalid'));
+      }
+    } finally {
+      pendingAction.current = false;
+      if (mounted.current) setLoading(false);
     }
   };
 
   const handleBackToPhone = () => {
+    pendingTwoFactor.current = null;
+    setFactorCode('');
     setStep('phone');
     setCode('');
     setError('');
@@ -212,6 +365,26 @@ const PatientLoginPage = () => {
             </Alert>
           ) : null}
 
+          {passkeyAttempted && !isAuthenticating && passkeyError && (
+            <Alert variant="danger" className="patient-login-passkey-alert" role="alert">
+              {t(passkeyError === 'authentication_unavailable' ? 'patientPortal.pl_unavailable' :
+                passkeyError === 'authentication_rate_limited' ? 'patientPortal.pl_rate_limited' :
+                passkeyError === 'authentication_cancelled' ? 'patient.pat_web_login_cancelled' : 'patient.pat_web_login_error')}
+            </Alert>
+          )}
+
+          {isAuthenticating && (authenticationStep === 'confirm' || authenticationStep === 'confirming') && (
+            <Alert severity="info" role="status">
+              {t('patient.pat_web_second_confirmation')}
+              {authenticationStep === 'confirm' && (
+                <div>
+                  <Button ref={confirmationButton} type="button" variant="primary" onClick={confirmAuthentication}>{t('patient.pat_web_continue_confirmation')}</Button>
+                  <Button type="button" variant="ghost" onClick={cancelAuthentication}>{t('patient.pat_web_cancel')}</Button>
+                </div>
+              )}
+            </Alert>
+          )}
+
           {step === 'phone' ? (
             <form onSubmit={handleRequestOtp} noValidate>
               <label htmlFor="patient-login-phone" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
@@ -234,7 +407,7 @@ const PatientLoginPage = () => {
                 {loading ? t('patientPortal.pl_sending') : t('patientPortal.pl_send_code')}
               </Button>
             </form>
-          ) : (
+          ) : step === 'code' ? (
             <form onSubmit={handleVerifyAndLogin} noValidate>
               <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--mac-text-secondary, #6e6e73)' }}>
                 {t('patientPortal.pl_code_sent_to', { phone })}
@@ -264,6 +437,7 @@ const PatientLoginPage = () => {
                 <button
                   type="button"
                   onClick={handleBackToPhone}
+                  disabled={loading}
                   style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', ...footerLinkStyle }}
                 >
                   {t('patientPortal.pl_back_to_phone')}
@@ -287,6 +461,28 @@ const PatientLoginPage = () => {
                 </button>
               </div>
             </form>
+          ) : null}
+
+          {step === 'two-factor' && (
+            <form onSubmit={handleVerifySecondFactor} noValidate>
+              <p>{t('patientPortal.pl_second_factor_hint')}</p>
+              <fieldset disabled={loading}>
+                <legend>{t('patientPortal.pl_second_factor_title')}</legend>
+                <label><input type="radio" name="factor" aria-label={t('patientPortal.pl_totp_option')} checked={factorKind === 'totp'} onChange={() => { setFactorKind('totp'); setFactorCode(''); }} /> {t('patientPortal.pl_totp_option')}</label>
+                <label><input type="radio" name="factor" aria-label={t('patientPortal.pl_backup_option')} checked={factorKind === 'backup'} onChange={() => { setFactorKind('backup'); setFactorCode(''); }} /> {t('patientPortal.pl_backup_option')}</label>
+              </fieldset>
+              <label htmlFor="patient-login-factor">{t(factorKind === 'totp' ? 'patientPortal.pl_totp_label' : 'patientPortal.pl_backup_label')}</label>
+              <Input id="patient-login-factor" value={factorCode} onChange={(event) => setFactorCode(event.target.value)}
+                inputMode={factorKind === 'totp' ? 'numeric' : 'text'} autoComplete="one-time-code" maxLength={factorKind === 'totp' ? 6 : 10} disabled={loading} autoFocus required />
+              <Button type="submit" disabled={loading}>{t('patientPortal.pl_second_factor_submit')}</Button>
+              <Button type="button" variant="ghost" disabled={loading} onClick={handleBackToPhone}>{t('patientPortal.pl_second_factor_cancel')}</Button>
+            </form>
+          )}
+
+          {step === 'phone' && passkeySupported && (
+            <Button type="button" variant="outline" disabled={loading || isAuthenticating} onClick={handlePasskey} className="patient-login-passkey-button">
+              {t('patient.pat_web_login')}
+            </Button>
           )}
 
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--mac-border, #d2d2d7)', fontSize: 13, color: 'var(--mac-text-secondary, #6e6e73)' }}>

@@ -86,6 +86,7 @@ describe('i18n adapter (STRAT#29 + STRAT#49)', () => {
           'misc.aw_discard_changes_title',
           'misc.aw_discard_changes_message',
           'misc.aw_discard_changes_confirm',
+          'admin2.sdx_retry',
         ]) {
           const value = i18n.getResource(language, 'translation', key);
           expect(value, `${language}:${key}`).toEqual(expect.any(String));

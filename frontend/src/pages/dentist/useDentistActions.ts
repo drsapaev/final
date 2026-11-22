@@ -104,8 +104,12 @@ export function useDentistActions({
       }
 
       // Создаем объект пациента для переключения на прием
+      // DENTWORK-FE-001 (audit 3892): carry the canonical patient_id from the
+      // queue row — `row.id` is the queue entry id and must never be used as
+      // the patient identity for history lookups or completion payloads.
       const patientData: SelectedPatient = {
         id: row.id,
+        patient_id: row.patient_id,
         appointment_id: (row.appointment_id as string | number | null | undefined) || null,
         visit_id: visitId,
         patient_name: row.patient_fio,
@@ -168,8 +172,12 @@ export function useDentistActions({
             break;
           }
 
+          // DENTWORK-FE-001 (audit 3892): same canonical patient_id fix as the
+          // row-click path — the completion payload must identify the patient,
+          // not the queue entry.
           const patient: SelectedPatient = {
             id: row.id,
+            patient_id: row.patient_id,
             appointment_id: (row.appointment_id as string | number | null | undefined) || null,
             visit_id: visitId,
             patient_name: row.patient_fio,
@@ -259,6 +267,55 @@ export function useDentistActions({
   // is present in the visit's icd10 field.
   const CRITICAL_ICD10_CODES = useRef(['K04', 'K10']).current;
 
+  // DENTICD-FE-001 (audit 3892): the backend extractor (emr_contract.py
+  // extract_icd10_code) prioritizes the structured diagnosis object's
+  // `icd10_code`/`icd_10_code` over the flat aliases, so the safety gate and
+  // the queue payload must read the SAME canonical source — a stale flat
+  // alias must never downgrade a critical nested code to a primary
+  // confirmation.
+  const extractCanonicalIcd10 = useCallback((draft: Record<string, unknown>): string => {
+    const diagnosis = draft?.diagnosis;
+    if (diagnosis && typeof diagnosis === 'object' && !Array.isArray(diagnosis)) {
+      const nestedCode = (diagnosis as Record<string, unknown>).icd10_code ?? (diagnosis as Record<string, unknown>).icd_10_code;
+      if (typeof nestedCode === 'string' && nestedCode.trim()) {
+        return nestedCode;
+      }
+    }
+    const flatCode = draft?.icd10_code ?? draft?.icd_10_code ?? draft?.icd10;
+    if (typeof flatCode === 'string' && flatCode.trim()) {
+      return flatCode;
+    }
+    return '';
+  }, []);
+
+  // DENTSYNC-FE-001 (audit 3892): the dental protocol editor persists its
+  // recommendations under specialty_data.visit_protocol.recommendations. The
+  // queue completion notes fall back to that canonical nested field when the
+  // top-level recommendation/notes are empty, so the clinically intended
+  // instruction is not silently dropped from the queue payload.
+  const extractCanonicalNotes = useCallback((draft: Record<string, unknown>): string => {
+    if (typeof draft?.recommendations === 'string' && draft.recommendations.trim()) {
+      return draft.recommendations;
+    }
+    if (typeof draft?.notes === 'string' && draft.notes.trim()) {
+      return draft.notes;
+    }
+    const specialtyData = (draft?.specialty_data ?? {}) as Record<string, unknown>;
+    const visitProtocol = (specialtyData.visit_protocol ?? {}) as Record<string, unknown>;
+    const nestedRecommendations = visitProtocol.recommendations;
+    if (typeof nestedRecommendations === 'string' && nestedRecommendations.trim()) {
+      return nestedRecommendations;
+    }
+    return '';
+  }, []);
+
+  // DOCFLOW-FE-002 (audit 3886): the LATEST selected patient must be
+  // reachable from a ref so a completion flow that started for patient A can
+  // re-verify the selection identity after every async boundary (confirm
+  // dialog, network) before the irreversible POST and the clinical UI reset.
+  const selectedPatientRef = useRef(selectedPatient);
+  selectedPatientRef.current = selectedPatient;
+
   const getCriticalDiagnosisWarning = useCallback(
     (icd10Code: unknown) => {
       if (!icd10Code || typeof icd10Code !== 'string') return null;
@@ -309,6 +366,14 @@ export function useDentistActions({
       return;
     }
 
+    // DOCFLOW-FE-002 (audit 3886): snapshot the queue-entry/patient identity
+    // BEFORE the async confirm boundary so the completion can be re-verified
+    // against the live selection after the dialog resolves.
+    const completionIdentity = {
+      queueEntryId,
+      patientId: resolvePatientId(selectedPatient),
+    };
+
     // C-1 + C-3 (UX audit): tiered confirmation before completing the visit.
     // C-3: if the ICD-10 code matches a critical dental diagnosis (K04 —
     // pulp/periapical diseases, K10 — jaw diseases including osteomyelitis
@@ -316,7 +381,9 @@ export function useDentistActions({
     // require explicit confirmation. This prevents accidental entry of a
     // diagnosis that could trigger unnecessary surgical intervention,
     // hospitalization, or IV antibiotics.
-    const icd10ForCheck = String(latestDraft.icd10_code || latestDraft.icd10 || latestDraft.icdCode || '');
+    // DENTICD-FE-001 (audit 3892): the check runs on the CANONICAL ICD code
+    // (structured diagnosis first, flat aliases as legacy fallback).
+    const icd10ForCheck = extractCanonicalIcd10(latestDraft as Record<string, unknown>);
     const criticalWarning = getCriticalDiagnosisWarning(icd10ForCheck);
 
     let confirmOptions;
@@ -342,31 +409,76 @@ export function useDentistActions({
 
     const ok = await confirm(confirmOptions);
     if (!ok) {
-      return;
+      // DENTVISIT-FE-002 (audit 3892): an explicit user abort is not a
+      // failure — report it as an abort so the visit screen shows no error.
+      return undefined;
+    }
+
+    // DOCFLOW-FE-002 (audit 3886): the confirm dialog is an async boundary —
+    // the selection may have changed while it was pending. Bind the
+    // completion to the snapshotted queue-entry/patient identity and abort
+    // (no POST, no UI reset) when the panel has moved to another patient;
+    // otherwise a stale handler could complete A and wipe B's state.
+    const currentSelection = selectedPatientRef.current;
+    if (
+      String(resolveDoctorQueueEntryId(currentSelection)) !== String(completionIdentity.queueEntryId) ||
+      String(resolvePatientId(currentSelection)) !== String(completionIdentity.patientId)
+    ) {
+      logger.warn('[Dentistry] Selection changed during completion confirmation — aborting stale completion');
+      return undefined;
     }
 
     try {
       setLoading(true);
       logger.info('[Dentistry] Completing queue visit');
 
-      const patientId =
-        selectedPatient?.patient?.id ||
-        selectedPatient?.patient_id ||
-        selectedPatient?.id ||
-        null;
+      const patientId = completionIdentity.patientId;
 
       // Минимальный payload: стоматолог использует EMR v2 для протокола визита,
       // а в queue completeVisit передаём только ключевые поля для закрытия очереди.
+      // DENTDIAG-FE-001 (audit 3892): the EMR draft may carry the canonical
+      // structured diagnosis {main, icd10_code, secondary}; the queue payload
+      // keeps a plain string — extract .main instead of shipping the object.
+      const draftDiagnosis = latestDraft.diagnosis as unknown;
+      const queueDiagnosisText =
+        typeof draftDiagnosis === 'string'
+          ? draftDiagnosis
+          : (draftDiagnosis && typeof draftDiagnosis === 'object' && typeof (draftDiagnosis as { main?: unknown }).main === 'string'
+              ? (draftDiagnosis as { main: string }).main
+              : '');
       const visitPayload = {
         patient_id: patientId,
         complaint: latestDraft.anamnesis_morbi || latestDraft.complaints || latestDraft.chiefComplaint || latestDraft.complaint || '',
-        diagnosis: latestDraft.diagnosis || '',
-        icd10: latestDraft.icd10_code || latestDraft.icd10 || latestDraft.icdCode || '',
+        diagnosis: queueDiagnosisText,
+        // DENTICD-FE-001 (audit 3892): the queue payload carries the canonical
+        // ICD code (structured diagnosis priority) — never a stale flat alias.
+        icd10: extractCanonicalIcd10(latestDraft as Record<string, unknown>),
         services: [],
-        notes: latestDraft.recommendations || latestDraft.notes || '',
+        // DENTSYNC-FE-001 (audit 3892): nested visit-protocol recommendations
+        // are the fallback when the top-level fields are empty.
+        notes: extractCanonicalNotes(latestDraft as Record<string, unknown>),
       };
 
-      await queueService.completeVisit(queueEntryId, visitPayload);
+      // DOCFLOW-FE-001 (audit 3886): only a confirmed `success: true` DTO
+      // completes the visit in the UI. An ambiguous (unreadable 2xx) or
+      // rejected response keeps the clinical state intact; the ambiguous
+      // branch additionally reconciles the visible queue with the canonical
+      // server snapshot instead of blindly retrying.
+      const completionAck = await queueService.completeVisit(queueEntryId, visitPayload);
+      if (completionAck?.success !== true) {
+        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
+        notify.error(
+          (typeof ackMessage === 'string' && ackMessage) || tI18n('dental.dental_panel_complete_failed')
+        );
+        logger.error('[Dentistry] Visit completion NOT confirmed by the server');
+        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
+          // Ambiguous outcome — refresh the visible queue from the server.
+          void loadDentistryAppointments(true);
+        }
+        // DENTVISIT-FE-002 (audit 3892): report the failure so the visit
+        // screen can surface its persistent completion-failed state.
+        return false;
+      }
       logger.info('[Dentistry] Queue visit completed');
       notify.success(tI18n('dental.visit_completed'));
 
@@ -386,11 +498,15 @@ export function useDentistActions({
         logger.warn('[Dentistry] Failed to call next queue entry');
         // Не блокируем UI: визит уже завершён, просто информируем
       }
+      // DENTVISIT-FE-002 (audit 3892): the queue completion itself succeeded —
+      // report completion even if the best-effort next-patient call failed.
+      return true;
     } catch (error: unknown) {
       logger.error('[Dentistry] Failed to complete queue visit');
       notify.error(
         getErrorMessage(error) || tI18n('dental.dental_panel_complete_failed')
       );
+      return false;
     } finally {
       setLoading(false);
     }
@@ -533,12 +649,24 @@ export function useDentistActions({
     setShowReports(true);
   };
 
-  const handleDentalChart = (patient: SelectedPatient | Record<string, unknown> | null) => {
+  const handleDentalChart = async (patient: SelectedPatient | Record<string, unknown> | null) => {
+    const patientRecord = (patient ?? {}) as Record<string, unknown>;
+    // DENTDIALOG-FE-001 (audit 3892): an editable dental chart writes tooth
+    // records into the visit's EMR — it requires the canonical visit, exactly
+    // like the treatment planner. A patient object without a visit fails
+    // closed instead of opening a chart that can only pretend to save.
+    const visitId = (patientRecord.visit_id as string | number | null | undefined) || await ensureCanonicalVisitId(patientRecord);
+    if (!visitId) {
+      notify.error(tI18n('dental.dental_chart_needs_visit_id'));
+      return;
+    }
+
     setSelectedPatient({
       ...(patient as Record<string, unknown>),
       patient_id: resolvePatientId(patient),
       patient_name: resolvePatientName(patient),
-      patient_fio: resolvePatientName(patient)
+      patient_fio: resolvePatientName(patient),
+      visit_id: visitId
     } as SelectedPatient);
     setDentalChartData((patient as Record<string, unknown>)?.dentalChart as Record<string, unknown> | null | undefined || null);
     setShowDentalChart(true);

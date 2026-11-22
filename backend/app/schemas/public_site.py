@@ -6,10 +6,13 @@ inherit from the broader operational service or doctor schemas.
 
 from __future__ import annotations
 
+from datetime import time
 from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.public_site_admin import WEBSITE_SLUG_PATTERN
 
 PublicSiteLocale = Literal["uz-Latn", "ru"]
 
@@ -21,6 +24,9 @@ class PublicSiteClinicOut(BaseModel):
     address: str | None = None
     phone: str | None = None
     email: str | None = None
+    logo_url: str | None = None
+    working_hours_start: time | None = None
+    working_hours_end: time | None = None
 
 
 class PublicSiteNotFoundDetail(BaseModel):
@@ -54,6 +60,17 @@ class PublicSiteServiceOut(BaseModel):
     category: str | None = None
 
 
+class PublicSiteRelatedDoctorOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slug: str = Field(max_length=160, pattern=WEBSITE_SLUG_PATTERN)
+    name: str
+
+
+class PublicSiteServiceDetailOut(PublicSiteServiceOut):
+    related_doctors: list[PublicSiteRelatedDoctorOut] = Field(default_factory=list)
+
+
 class PublicSiteDoctorOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -61,3 +78,8 @@ class PublicSiteDoctorOut(BaseModel):
     name: str
     bio: str
     specialty: str | None = None
+    experience_years: int | None = Field(None, ge=0)
+    professional_category: str | None = Field(
+        None, description="Localized professional qualification category."
+    )
+    portrait_url: str | None = None

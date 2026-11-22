@@ -15,12 +15,11 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
-
-import asyncio
 
 import pytest
 import sqlalchemy as sa
@@ -33,11 +32,11 @@ from app.core.specialties import (
 )
 from app.crud import clinic as crud_clinic
 from app.models.clinic import ClinicSettings, Doctor
+from app.models.department import Department
 from app.models.online_queue import QueueToken
 from app.models.queue_profile import QueueProfile
 from app.schemas.clinic import DoctorCreate, DoctorUpdate
 from app.services.queue_service import QueueBusinessService
-
 
 # ===================== A. Unit level =====================
 
@@ -83,6 +82,7 @@ def test_expand_queue_tags_family_and_dedupe() -> None:
     assert "dentistry" in expanded
     assert "dental" in expanded and "stomatology" in expanded
     assert "cardiology" in expanded
+    assert "cardio" not in expanded and "cardiologist" not in expanded
     assert len(expanded) == len(set(expanded))
     assert expanded[0] == "dental"  # original order preserved first
 
@@ -166,6 +166,13 @@ def test_clinic_wide_join_finds_canonical_dentistry_doctor(
     doctor = Doctor(user_id=test_doctor_user.id, specialty="dentistry", active=True)
     db_session.add(doctor)
     db_session.flush()
+    db_session.add(
+        Department(
+            key="stomatology",
+            name_ru="SYNTHETIC-Стоматология",
+            active=True,
+        )
+    )
     profile = QueueProfile(
         key="stomatology",
         title="Dental",
@@ -975,6 +982,13 @@ def test_department_integration_profile_tags_cover_family(db_session) -> None:
     assert profile is not None
     assert "dentistry" in (profile.queue_tags or [])
     assert "dental" in (profile.queue_tags or [])
+    assert profile.show_on_qr_page is False
+
+    # Keep this regression focused on specialty/tag matching by modeling the
+    # explicit publish step required before a newly provisioned profile is
+    # available to QR selection.
+    profile.show_on_qr_page = True
+    db_session.commit()
 
     # and the QR clinic-wide matcher now sees canonical dentistry doctors
     # (RQ-09: the public selection applies the canonical owner-eligibility
@@ -1148,7 +1162,10 @@ def test_queue_profile_update_expands_family_tags(db_session) -> None:
             queue_tags=["dental"],
             display_order=9,
             is_active=True,
-            show_on_qr_page=True,
+            # This regression covers tag canonicalization only. The profile
+            # has no configured owner, so keep it unpublished and out of the
+            # explicit-publish readiness contract.
+            show_on_qr_page=False,
         )
     )
     db_session.commit()
@@ -1182,7 +1199,7 @@ def test_queue_profile_update_expands_family_tags(db_session) -> None:
             queue_tags=["ortho"],
             display_order=10,
             is_active=True,
-            show_on_qr_page=True,
+            show_on_qr_page=False,
         )
     )
     db_session.commit()

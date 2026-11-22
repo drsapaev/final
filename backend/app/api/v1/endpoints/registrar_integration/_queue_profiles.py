@@ -2,42 +2,39 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from sqlalchemy import func
+from fastapi import Request
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_integration._helpers import (
     _raise_registrar_internal_error,
 )  # noqa: F401
 from app.core.specialties import (
-    DENTAL_FAMILY_SPELLINGS,
     canonical_specialty,
-    expand_queue_tags,
 )
+from app.crud.clinic import clinic_today
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
-from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
-
-
-def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[str]:
-    """D-1 (Codex round-6/7): the tags a QueueProfile write path persists.
-
-    - omitted/empty tags fall back to ``[profile_key]``;
-    - a dental-family key must always contribute to the expansion (unless
-      the submitted tags already contain a family spelling), so family
-      profiles stay canonical-covered even when the admin sets unrelated
-      tags;
-    - NON-dental profiles keep EXACTLY the tags the admin submitted — the
-      key is never silently re-added after an explicit removal.
-    """
-    tag_list = [t for t in (tags or []) if t]
-    if not tag_list:
-        return expand_queue_tags([profile_key])
-    key_is_family = (profile_key or "").strip().lower() in DENTAL_FAMILY_SPELLINGS
-    tags_are_family = any(
-        (t or "").strip().lower() in DENTAL_FAMILY_SPELLINGS for t in tag_list
-    )
-    if key_is_family and not tags_are_family:
-        tag_list.append(profile_key)
-    return expand_queue_tags(tag_list)
+from app.schemas.queue_profile_conflicts import (
+    QueueProfileBindingChangedResponse,
+    QueueProfilePublicationConflictResponse,
+)
+from app.schemas.queue_profile_parent_repair import (
+    QueueProfileParentRepairApplyRequest,
+    QueueProfileParentRepairErrorResponse,
+    QueueProfileParentRepairPreview,
+    QueueProfileParentRepairResult,
+)
+from app.services.queue_profile_parent_repair_service import (
+    QueueProfileParentRepairError,
+    apply_queue_profile_parent_repair,
+    preview_queue_profile_parent_repair,
+)
+from app.services.queue_profile_parent_repair_service import (
+    canonical_profile_tags as _canonical_profile_tags,
+)
+from app.services.queue_profile_parent_repair_service import (
+    queue_profile_link_counts as _profile_link_counts,
+)
+from app.services.queue_service import queue_service
 
 
 def _profile_binding_values_equal(
@@ -91,6 +88,11 @@ def get_queue_profiles(
             query = query.filter(QueueProfile.is_active == True)
 
         profiles = query.order_by(QueueProfile.display_order).all()
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        availability_by_profile = load_queue_profile_availability(db, profiles)
 
         return {
             "success": True,
@@ -105,6 +107,10 @@ def get_queue_profiles(
                     "color": p.color,
                     "order": p.display_order,  # API returns as 'order' for frontend compatibility
                     "is_active": p.is_active,
+                    # ``is_active`` is persisted manual intent. The nested
+                    # fact explains whether new QR/admission is currently
+                    # available after resolving the optional Department.
+                    "effective_availability": availability_by_profile[p].as_dict(),
                     "show_on_qr_page": getattr(
                         p, "show_on_qr_page", True
                     ),  # Handle missing column
@@ -132,21 +138,34 @@ def get_queue_profiles_public(
     ⭐ PUBLIC ENDPOINT: Получить список профилей для QR-страницы регистрации.
 
     Не требует авторизации - используется пациентами при самостоятельной регистрации.
-    Возвращает только профили с is_active=True И show_on_qr_page=True.
+    Возвращает только профили с ручным is_active=True, show_on_qr_page=True
+    и доступным однозначно разрешённым Department parent (если он назначен).
 
     Используется на странице /queue/join для выбора специальности.
     """
     try:
         from app.models.queue_profile import QueueProfile
 
-        # Получаем только активные профили, которые видны на QR странице
+        # Load every published profile once, including manually archived
+        # siblings. The shared-target guard must see those unavailable rows;
+        # the service filters them from the public result afterward.
         profiles = (
             db.query(QueueProfile)
-            .filter(
-                QueueProfile.is_active == True, QueueProfile.show_on_qr_page == True
-            )
+            .filter(QueueProfile.show_on_qr_page.is_(True))
             .order_by(QueueProfile.display_order)
             .all()
+        )
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        availability_by_profile = load_queue_profile_availability(db, profiles)
+        catalog_day = clinic_today(db)
+        profiles = queue_service.public_qr_catalog_bookable_profiles(
+            db,
+            profiles,
+            day=catalog_day,
+            availability_by_profile=availability_by_profile,
         )
 
         return {
@@ -182,113 +201,6 @@ def _get_emoji_for_key(key: str) -> str:
         "general": "👥",
     }
     return emoji_map.get(key, "👨‍⚕️")
-
-
-def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
-    """RQ-12.b (D-02, owner decision 2026-09-15): significant-link counts
-    for a QueueProfile, computed from live tables at call time.
-
-    This function is the single SSOT for BOTH the impact preview and the
-    hard-delete guard: the delete endpoint re-computes these numbers in
-    the same transaction that would commit the delete, so a previously
-    rendered preview can never authorize a destructive action (stale
-    preview protection, ACCEPTANCE S-10). Significant links are:
-
-    - services whose queue_tag is owned by this profile, and services
-      assigned through the profile's department_key;
-    - active doctors and QueueResources selected by the profile's tags;
-    - daily queues (ANY day — historical rows included) whose queue_tag
-      is owned by this profile: their entries are the profile's real
-      usage history and possibly still-waiting patients;
-    - waiting entries under those queues (must remain serviceable by
-      staff regardless of the profile's active state);
-    - active permanent public addresses linked to this profile.
-    """
-    from app.models.clinic import Doctor
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
-    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
-    from app.models.service import Service
-
-    # Runtime routing expands dental-family aliases even for legacy rows
-    # seeded before the canonical profile writer. Count links against that
-    # same effective tag set so a legacy alias is not mistaken for an
-    # unused binding.
-    tags = _canonical_profile_tags(profile.queue_tags, profile.key)
-    # Doctor-backed QR admission stores the profile key as its DailyQueue
-    # queue_tag (see join_queue_with_token), while the profile's queue_tags
-    # select eligible doctors. Include that canonical queue identity in the
-    # usage guard without rewriting the profile's persisted routing tags.
-    usage_tags = list(tags)
-    if profile.key and profile.key not in usage_tags:
-        usage_tags.append(profile.key)
-    services = 0
-    department_services = 0
-    active_doctors = 0
-    active_queue_resources = 0
-    daily_queues = 0
-    entries_waiting = 0
-    entries_total = 0
-    active_public_addresses = (
-        db.query(QueueDirectionPublicAddress)
-        .filter(
-            QueueDirectionPublicAddress.queue_profile_id == profile.id,
-            QueueDirectionPublicAddress.retired_at.is_(None),
-        )
-        .count()
-    )
-    if usage_tags:
-        services = db.query(Service).filter(Service.queue_tag.in_(usage_tags)).count()
-        daily_queues = (
-            db.query(DailyQueue).filter(DailyQueue.queue_tag.in_(usage_tags)).count()
-        )
-        if daily_queues:
-            queue_ids = [
-                row.id
-                for row in db.query(DailyQueue.id)
-                .filter(DailyQueue.queue_tag.in_(usage_tags))
-                .all()
-            ]
-            entries_q = db.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.queue_id.in_(queue_ids)
-            )
-            entries_total = entries_q.count()
-            entries_waiting = entries_q.filter(
-                OnlineQueueEntry.status == "waiting"
-            ).count()
-    if tags:
-        active_doctors = (
-            db.query(Doctor)
-            .filter(
-                Doctor.active.is_(True),
-                func.lower(func.trim(Doctor.specialty)).in_(
-                    {tag.strip().lower() for tag in tags}
-                ),
-            )
-            .count()
-        )
-        active_queue_resources = (
-            db.query(QueueResource)
-            .filter(
-                QueueResource.active.is_(True),
-                QueueResource.queue_tag.in_(tags),
-            )
-            .count()
-        )
-    department_key = _normalize_department_key(profile.department_key)
-    if department_key:
-        department_services = (
-            db.query(Service).filter(Service.department_key == department_key).count()
-        )
-    return {
-        "services": services,
-        "department_services": department_services,
-        "active_doctors": active_doctors,
-        "active_queue_resources": active_queue_resources,
-        "daily_queues": daily_queues,
-        "entries_waiting": entries_waiting,
-        "entries_total": entries_total,
-        "active_public_addresses": active_public_addresses,
-    }
 
 
 @router.get(
@@ -341,6 +253,115 @@ def get_queue_profile_impact_preview(
         _raise_registrar_internal_error("queue profile impact preview", e)
 
 
+@router.get(
+    "/queues/profiles/{profile_key}/parent-repair-preview",
+    response_model=QueueProfileParentRepairPreview,
+    responses={
+        404: {"model": QueueProfileParentRepairErrorResponse},
+        409: {"model": QueueProfileParentRepairErrorResponse},
+    },
+)
+def get_queue_profile_parent_repair_preview(
+    profile_key: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Read-only preview for the explicit own-key parent-conflict repair."""
+    request_id = getattr(request.state, "request_id", None)
+    try:
+        return preview_queue_profile_parent_repair(db, profile_key)
+    except QueueProfileParentRepairError as exc:
+        db.rollback()
+        status_code = 404 if exc.reason == "profile_not_found" else 409
+        logger.warning(
+            "queue_profile_parent_repair.preview_refused reason=%s profile_key=%s user_id=%s request_id=%s",
+            exc.reason,
+            profile_key,
+            current_user.id,
+            request_id,
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={"reason": exc.reason, "message": exc.message},
+        ) from exc
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "queue_profile_parent_repair.preview_failed profile_key=%s user_id=%s request_id=%s",
+            profile_key,
+            current_user.id,
+            request_id,
+        )
+        _raise_registrar_internal_error("queue profile parent repair preview")
+
+
+@router.post(
+    "/queues/profiles/{profile_key}/parent-repair",
+    response_model=QueueProfileParentRepairResult,
+    responses={
+        404: {"model": QueueProfileParentRepairErrorResponse},
+        409: {"model": QueueProfileParentRepairErrorResponse},
+    },
+)
+def apply_queue_profile_parent_repair_command(
+    profile_key: str,
+    command: QueueProfileParentRepairApplyRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Apply the confirmed parent repair and strict audit in one transaction."""
+    request_id = getattr(request.state, "request_id", None)
+    try:
+        result = apply_queue_profile_parent_repair(
+            db,
+            profile_key=profile_key,
+            target_department_key=command.target_department_key,
+            preview_token=command.preview_token,
+            confirm_target=command.confirm_target,
+            confirm_service_scope_change=command.confirm_service_scope_change,
+            confirm_public_access=command.confirm_public_access,
+            reason_code=command.reason_code,
+            actor_user_id=int(current_user.id),
+            actor_role=str(getattr(current_user, "role", "Admin")),
+            request_id=request_id,
+        )
+        # The profile update and strict AuditLog flush share this one commit.
+        db.commit()
+        logger.info(
+            "queue_profile_parent_repair.completed profile_id=%s actor_user_id=%s result=%s request_id=%s",
+            result["profile_id"],
+            current_user.id,
+            result["result"],
+            request_id,
+        )
+        return result
+    except QueueProfileParentRepairError as exc:
+        db.rollback()
+        status_code = 404 if exc.reason == "profile_not_found" else 409
+        logger.warning(
+            "queue_profile_parent_repair.refused reason=%s profile_key=%s user_id=%s request_id=%s",
+            exc.reason,
+            profile_key,
+            current_user.id,
+            request_id,
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={"reason": exc.reason, "message": exc.message},
+        ) from exc
+    except Exception as exc:
+        db.rollback()
+        logger.exception(
+            "queue_profile_parent_repair.failed profile_key=%s user_id=%s request_id=%s",
+            profile_key,
+            current_user.id,
+            request_id,
+        )
+        _raise_registrar_internal_error("queue profile parent repair", exc)
+
+
 # ===================== QUEUE PROFILE CRUD (ADMIN) =====================
 
 
@@ -363,7 +384,8 @@ class QueueProfileCreate(BaseModel):
     display_order: int = Field(default=0, ge=0)
     is_active: bool = Field(default=True)
     show_on_qr_page: bool = Field(
-        default=True, description="Show this profile on QR join page"
+        default=False,
+        description="New profiles stay hidden; true is deferred to a separate publish action",
     )
     icon: str | None = Field(
         None, max_length=50, description="Lucide icon name (e.g., 'Heart')"
@@ -562,7 +584,10 @@ def create_queue_profile(
                 detail=f"Profile with key '{profile_data.key}' already exists",
             )
 
-        # Create new profile
+        # Creating and publishing are separate actions (T12/D5). Older clients
+        # may still send show_on_qr_page=true; preserve that intent in the
+        # response but never expose a profile directly from this command.
+        publication_deferred = profile_data.show_on_qr_page
         new_profile = QueueProfile(
             key=profile_data.key,
             title=profile_data.title,
@@ -574,7 +599,7 @@ def create_queue_profile(
             department_key=profile_data.department_key,
             display_order=profile_data.display_order,
             is_active=profile_data.is_active,
-            show_on_qr_page=profile_data.show_on_qr_page,
+            show_on_qr_page=False,
             icon=profile_data.icon,
             color=profile_data.color,
         )
@@ -584,9 +609,15 @@ def create_queue_profile(
         db.refresh(new_profile)
 
         logger.info(f"Created QueueProfile: {new_profile.key}")
+        if publication_deferred:
+            logger.warning(
+                "QueueProfile publication deferred until explicit publish action: %s",
+                new_profile.key,
+            )
 
         return {
             "success": True,
+            "publication_deferred": publication_deferred,
             "profile": {
                 "id": new_profile.id,
                 "key": new_profile.key,
@@ -616,10 +647,12 @@ def create_queue_profile(
     responses={
         409: {
             "model": QueueProfileBindingConflictResponse
-            | QueueProfileBindingChangedResponse,
+            | QueueProfileBindingChangedResponse
+            | QueueProfilePublicationConflictResponse,
             "description": (
-                "Binding changes are blocked while the profile is in use, or "
-                "the submitted binding snapshot became stale."
+                "Binding changes are blocked while the profile is in use, the "
+                "submitted binding snapshot became stale, or the profile does "
+                "not resolve to one available QR booking target."
             ),
         }
     },
@@ -696,7 +729,10 @@ def update_queue_profile(
             ):
                 update_data.pop(field)
 
-        if changed_binding_fields:
+        availability_fields_requested = bool(
+            {"is_active", "show_on_qr_page"}.intersection(update_data)
+        )
+        if changed_binding_fields or availability_fields_requested:
             from app.crud.queue_owner_invariant import lock_profile_binding_scopes
 
             proposed_tags = update_data.get("queue_tags", candidate.queue_tags or [])
@@ -785,9 +821,63 @@ def update_queue_profile(
                     },
                 )
 
+        proposed_is_active = update_data.get("is_active", profile.is_active)
+        proposed_show_on_qr_page = update_data.get(
+            "show_on_qr_page", profile.show_on_qr_page
+        )
+        should_validate_publication = bool(
+            proposed_show_on_qr_page
+            and (
+                not profile.show_on_qr_page
+                or (proposed_is_active and not profile.is_active)
+                or bool(changed_binding_fields)
+            )
+        )
         for field, value in update_data.items():
             if hasattr(profile, field):
                 setattr(profile, field, value)
+
+        if should_validate_publication:
+            with db.no_autoflush:
+                publication_conflict = queue_service.qr_profile_publication_conflict(
+                    db,
+                    profile,
+                    day=clinic_today(db),
+                    lock_parent_rows=True,
+                )
+            if publication_conflict:
+                messages = {
+                    "profile_inactive": "Сначала включите направление в регистратуре.",
+                    "profile_unpublished": "Профиль должен быть опубликован отдельным действием.",
+                    "profile_unavailable": (
+                        "Профиль недоступен: проверьте состояние связанного отделения."
+                    ),
+                    "mixed_direction_targets": (
+                        "Разделите независимые направления или ресурсные очереди "
+                        "на отдельные профили."
+                    ),
+                    "ambiguous_profile_target": (
+                        "Для этого направления найден неоднозначный QR-маршрут. "
+                        "Сначала устраните конфликт профилей или владельцев."
+                    ),
+                    "no_bookable_owner": (
+                        "Не найден активный врач или ресурс очереди для записи."
+                    ),
+                }
+                db.rollback()
+                logger.warning(
+                    "QueueProfile publication blocked: key=%s reason=%s",
+                    profile_key,
+                    publication_conflict,
+                )
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "reason": "profile_publication_blocked",
+                        "code": publication_conflict,
+                        "message": messages[publication_conflict],
+                    },
+                )
 
         db.commit()
         db.refresh(profile)

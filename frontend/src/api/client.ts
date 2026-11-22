@@ -9,15 +9,15 @@
 //  - me() - GET /me
 //  - login(username, password) - POST /login (x-www-form-urlencoded)
 
-import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, CanceledError, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { buildApiUrl, buildWsUrl, getApiBaseUrl, getApiOrigin } from './runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import type { LoginResult } from '../types/domain/auth';
 import { parseLoginResponse, AuthInvariantViolationError } from '../types/auth-mapper';
 import type { LoginResponseRaw, UserDto } from '../types/api';
-import { safeJsonParse } from '../utils/safeJsonParse';
 import type { HttpApiError } from '../types/errors';
+import { decodeJwtClaims, numericClaim } from '../utils/jwt';
 
 const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
@@ -31,12 +31,70 @@ const CSRF_BOOTSTRAP_ENABLED = import.meta.env.VITE_CSRF_BOOTSTRAP !== '0';
 // backend is confirmed to serve the endpoint reliably.
 const CSRF_STRICT_MODE = import.meta.env.VITE_CSRF_STRICT === '1';
 const GLOBAL_RATE_LIMIT_COOLDOWN_MS = 60_000;
+// The legacy key mixed route-specific and shared 429s, so it is intentionally ignored.
+const GLOBAL_RATE_LIMIT_STORAGE_KEY = 'clinic_api_global_rate_limit_until';
 let globalRateLimitUntil = 0;
 let globalRateLimitLogAt = 0;
+const requestRateLimitUntil = new Map<string, number>();
+
+function getRateLimitRequestKey(config: Pick<AxiosRequestConfig, 'url' | 'baseURL' | 'method'>): string | null {
+  if (!config.url) return null;
+
+  try {
+    const baseURL = config.baseURL || API_BASE || window.location.origin;
+    const requestUrl = new URL(config.url, baseURL);
+    return `${requestUrl.origin}:${String(config.method || 'get').toUpperCase()}:${requestUrl.pathname}`;
+  } catch {
+    const path = config.url.split(/[?#]/, 1)[0];
+    return path ? `${String(config.method || 'get').toUpperCase()}:${path}` : null;
+  }
+}
+
+function isAuthenticationRateLimitedRequest(url?: string): boolean {
+  if (!url) return false;
+
+  try {
+    const requestUrl = new URL(url, API_BASE || window.location.origin);
+    return /\/(?:auth|authentication|2fa|webauthn\/login)(?:\/|$)/i.test(requestUrl.pathname);
+  } catch {
+    return /\/(?:auth|authentication|2fa|webauthn\/login)(?:\/|$)/i.test(url.split(/[?#]/, 1)[0]);
+  }
+}
+
+function getRetryAfterMs(error: AxiosError): number | null {
+  const headers = error.response?.headers;
+  const getHeader = (headers as { get?: (name: string) => unknown } | undefined)?.get;
+  const retryAfter = getHeader?.call(headers, 'Retry-After')
+    ?? headers?.['retry-after']
+    ?? headers?.['Retry-After'];
+  if (typeof retryAfter !== 'string' && typeof retryAfter !== 'number') return null;
+
+  const value = String(retryAfter).trim();
+  const seconds = Number(value);
+  if (value && Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+
+  const retryAt = Date.parse(value);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - Date.now()) : null;
+}
+
+function rememberRequestRateLimit(key: string, until: number): void {
+  const now = Date.now();
+  for (const [existingKey, existingUntil] of requestRateLimitUntil) {
+    if (existingUntil <= now) requestRateLimitUntil.delete(existingKey);
+  }
+
+  requestRateLimitUntil.delete(key);
+  requestRateLimitUntil.set(key, until);
+  while (requestRateLimitUntil.size > 128) {
+    const oldestKey = requestRateLimitUntil.keys().next().value;
+    if (oldestKey === undefined) break;
+    requestRateLimitUntil.delete(oldestKey);
+  }
+}
 
 function readPersistedRateLimitUntil() {
   try {
-    const raw = window.localStorage.getItem('clinic_api_rate_limit_until');
+    const raw = window.localStorage.getItem(GLOBAL_RATE_LIMIT_STORAGE_KEY);
     const parsed = Number(raw || 0);
     return Number.isFinite(parsed) ? parsed : 0;
   } catch {
@@ -46,7 +104,7 @@ function readPersistedRateLimitUntil() {
 
 function persistRateLimitUntil(until: number): void {
   try {
-    window.localStorage.setItem('clinic_api_rate_limit_until', String(until || 0));
+    window.localStorage.setItem(GLOBAL_RATE_LIMIT_STORAGE_KEY, String(until || 0));
   } catch {
     // ignore storage failures
   }
@@ -61,83 +119,239 @@ const api = axios.create({
 });
 
 // ✅ SECURITY: Check if token is expiring soon (within 5 minutes)
-function isTokenExpiringSoon(token: string | null | undefined): boolean {
+// AUTH-FE-001 (audit 3886): exported for fail-first tests (jwt.claims.test.ts).
+export function isTokenExpiringSoon(token: string | null | undefined): boolean {
   if (!token) return true;
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return false;
-    const payload: { exp?: number } = safeJsonParse(atob(parts[1])) as { exp?: number };
-    if (!payload.exp) return false;
-    const expiresAt = payload.exp * 1000;
-    const fiveMinutes = 5 * 60 * 1000;
-    return Date.now() > (expiresAt - fiveMinutes);
-  } catch {
-    return false;
-  }
+  // AUTH-FE-001 (audit 3886): толерантный Base64URL-декодер. Прежний
+  // «сырой» atob бросал InvalidCharacterError на легальных `-`/`_`
+  // в JWT payload — catch возвращал false, и проактивный refresh
+  // молча skip-ался (оставалась только реактивная 401-страховка).
+  // Битый/не-JWT токен по-прежнему false: не триггерим превентивный
+  // refresh — 401-реактивный путь остаётся авторитетом.
+  const claims = decodeJwtClaims(token);
+  if (claims === null) return false;
+  const exp = numericClaim(claims, 'exp');
+  if (exp === null) return false;
+  const expiresAt = exp * 1000;
+  const fiveMinutes = 5 * 60 * 1000;
+  return Date.now() > (expiresAt - fiveMinutes);
+}
+
+function isAccessTokenUnexpired(token: string | null): boolean {
+  if (!token) return false;
+  const exp = numericClaim(decodeJwtClaims(token), 'exp');
+  return exp !== null && exp * 1000 > Date.now();
 }
 
 // ✅ SECURITY: Single-flight pattern for token refresh
 // Prevents race conditions when multiple requests detect token expiring
-let refreshPromise: Promise<string | null> | null = null;
-let pendingRequestsQueue: Array<(value: string | null) => void> = [];
+interface AuthSessionSnapshot {
+  accessToken: string | null;
+  refreshToken: string | null;
+  generation: number;
+}
+
+type SessionBoundRequestConfig = InternalAxiosRequestConfig & {
+  _authSessionSnapshot?: AuthSessionSnapshot;
+  _retriedAfterRefresh?: boolean;
+};
+
+interface TokenRefreshResult {
+  accessToken: string | null;
+  attemptedAccessToken: string | null;
+  attemptedRefreshToken: string | null;
+  attemptedSessionGeneration: number;
+  resultingRefreshToken: string | null;
+  failureStatus?: number;
+  sessionChanged: boolean;
+}
+
+interface TokenRefreshFlight extends AuthSessionSnapshot {
+  promise: Promise<TokenRefreshResult> | null;
+}
+
+interface ProactiveRefreshCooldown extends AuthSessionSnapshot {
+  retryAfter: number;
+}
+
+const PROACTIVE_REFRESH_401_COOLDOWN_MS = 30_000;
+let refreshFlight: TokenRefreshFlight | null = null;
+let proactiveRefreshCooldown: ProactiveRefreshCooldown | null = null;
+let observedCredentials: Omit<AuthSessionSnapshot, 'generation'> | null = null;
+let authSessionGeneration = 0;
+
+function getCurrentAuthSession(): AuthSessionSnapshot {
+  const credentials = {
+    accessToken: tokenManager.getAccessToken(),
+    refreshToken: tokenManager.getRefreshToken()
+  };
+  if (!observedCredentials
+    || observedCredentials.accessToken !== credentials.accessToken
+    || observedCredentials.refreshToken !== credentials.refreshToken) {
+    // Token changes made outside this module indicate a new login/logout.
+    // Successful refreshes update observedCredentials explicitly below and
+    // keep the same generation.
+    observedCredentials = credentials;
+    authSessionGeneration += 1;
+  }
+  return { ...credentials, generation: authSessionGeneration };
+}
 
 /**
- * Core refresh call. Caller must hold the single-flight mutex
- * (refreshPromise) — see refreshTokenIfNeeded / forceRefreshToken.
- * @returns {Promise<string|null>} New access token or null on failure
+ * Identify a login lifecycle without exposing its credentials. Refresh keeps
+ * the same generation; replacement login or logout changes it. Callers can
+ * avoid clearing a newer session after an older mutation resolves.
  */
-async function performTokenRefresh(): Promise<string | null> {
-  const refreshToken = tokenManager.getRefreshToken();
-  if (!refreshToken) return null;
+export function getAuthSessionGeneration(): number {
+  return getCurrentAuthSession().generation;
+}
+
+function sameCredentials(left: AuthSessionSnapshot, right: AuthSessionSnapshot): boolean {
+  return left.accessToken === right.accessToken && left.refreshToken === right.refreshToken;
+}
+
+function sameAuthSession(left: AuthSessionSnapshot, right: AuthSessionSnapshot): boolean {
+  return left.generation === right.generation && sameCredentials(left, right);
+}
+
+function isCurrentAuthSession(session: AuthSessionSnapshot): boolean {
+  return session.generation === getCurrentAuthSession().generation;
+}
+
+function createSessionChangedError(): CanceledError<unknown> {
+  return new CanceledError('Request canceled because the authenticated session changed');
+}
+
+function createTokenRefreshResult(
+  attemptedSession: AuthSessionSnapshot,
+  accessToken: string | null,
+  options: {
+    resultingRefreshToken?: string | null;
+    failureStatus?: number;
+    sessionChanged?: boolean;
+  } = {}
+): TokenRefreshResult {
+  return {
+    accessToken,
+    attemptedAccessToken: attemptedSession.accessToken,
+    attemptedRefreshToken: attemptedSession.refreshToken,
+    attemptedSessionGeneration: attemptedSession.generation,
+    resultingRefreshToken: options.resultingRefreshToken ?? null,
+    ...(options.failureStatus === undefined ? {} : { failureStatus: options.failureStatus }),
+    sessionChanged: options.sessionChanged ?? false
+  };
+}
+
+/**
+ * Refresh only the session pair supplied by the caller. Recheck that pair
+ * after the network await before writing rotated credentials.
+ */
+async function performTokenRefresh(attemptedSession: AuthSessionSnapshot): Promise<TokenRefreshResult> {
+  const refreshToken = attemptedSession.refreshToken;
+  const result = (
+    accessToken: string | null,
+    options: Parameters<typeof createTokenRefreshResult>[2] = {}
+  ) => createTokenRefreshResult(attemptedSession, accessToken, options);
+
+  if (!isCurrentAuthSession(attemptedSession)) {
+    return result(null, { sessionChanged: true });
+  }
+  if (!refreshToken) return result(null);
 
   try {
     logger.log('🔄 Refreshing access token...');
+    const csrfToken = await ensureCSRFToken();
+    if (!isCurrentAuthSession(attemptedSession)) return result(null, { sessionChanged: true });
     const response = await axios.post(buildApiUrl('/authentication/refresh'), {
       refresh_token: refreshToken
+    }, {
+      withCredentials: true,
+      ...(csrfToken ? { headers: { 'X-CSRF-Token': csrfToken } } : {}),
     });
 
     if (response.data && response.data.access_token) {
-      // Session-replacement guard (Phase 0 PR-B review P1): if the stored
-      // refresh token changed while this refresh was in flight — e.g.
-      // replaceAccessOnlySession() cleared it during a patient login or
-      // activation — the rotated tokens below belong to the REPLACED
-      // principal. Persisting them would resurrect the old staff session
-      // on top of the freshly installed patient one. Drop them and let the
-      // pending request continue under the current (replacement) session;
-      // the 401-recovery path already refuses to clear a replaced session
-      // (failedToken !== currentToken guard), so null is safe there too.
-      if (tokenManager.getRefreshToken() !== refreshToken) {
-        logger.warn('🔄 Refresh token changed mid-flight — dropping rotated tokens of the replaced session');
-        pendingRequestsQueue.forEach(resolve => resolve(null));
-        pendingRequestsQueue = [];
-        return null;
+      const currentSession = getCurrentAuthSession();
+      if (!sameAuthSession(currentSession, attemptedSession)) {
+        logger.warn('🔄 Auth session changed during refresh; discarding its result');
+        return result(null, { sessionChanged: true });
       }
+      proactiveRefreshCooldown = null;
       const newToken = response.data.access_token;
+      const newRefreshToken = response.data.refresh_token || refreshToken;
       tokenManager.setAccessToken(newToken);
-      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       // AUTH-REAUDIT-28: backend rotates refresh tokens on each /refresh —
       // persist the new one so future refreshes work.
       if (response.data.refresh_token) {
-        tokenManager.setRefreshToken(response.data.refresh_token);
+        tokenManager.setRefreshToken(newRefreshToken);
       }
+      // This credential rotation belongs to the same login session; update
+      // the observed pair without advancing its generation.
+      observedCredentials = { accessToken: newToken, refreshToken: newRefreshToken };
       logger.log('✅ Token refreshed successfully');
 
-      // Notify all pending requests
-      pendingRequestsQueue.forEach(resolve => resolve(newToken));
-      pendingRequestsQueue = [];
-
-      return newToken;
+      return result(newToken, { resultingRefreshToken: newRefreshToken });
     }
-    pendingRequestsQueue.forEach(resolve => resolve(null));
-    pendingRequestsQueue = [];
-    return null;
+    const currentSession = getCurrentAuthSession();
+    return result(null, { sessionChanged: currentSession.generation !== attemptedSession.generation });
   } catch (err) {
-    logger.warn('❌ Token refresh failed:', err);
-    // Notify pending requests of failure
-    pendingRequestsQueue.forEach(resolve => resolve(null));
-    pendingRequestsQueue = [];
-    return null;
+    const status = (err as AxiosError | undefined)?.response?.status;
+    const currentSession = getCurrentAuthSession();
+    const sessionChanged = currentSession.generation !== attemptedSession.generation;
+    if (status === 401 && !sessionChanged) {
+      proactiveRefreshCooldown = {
+        ...attemptedSession,
+        retryAfter: Date.now() + PROACTIVE_REFRESH_401_COOLDOWN_MS
+      };
+    }
+    // Axios errors contain request config and payloads (including refresh
+    // credentials). Keep logs limited to the response status.
+    logger.warn('❌ Token refresh failed', {
+      status: typeof status === 'number' ? status : null
+    });
+    return result(null, {
+      failureStatus: sessionChanged || typeof status !== 'number' ? undefined : status,
+      sessionChanged
+    });
   }
+}
+
+function getOrStartTokenRefresh(session: AuthSessionSnapshot): Promise<TokenRefreshResult> {
+  const currentSession = getCurrentAuthSession();
+  if (currentSession.generation !== session.generation) {
+    return Promise.resolve(createTokenRefreshResult(session, null, { sessionChanged: true }));
+  }
+  if (refreshFlight && sameAuthSession(refreshFlight, currentSession) && refreshFlight.promise) {
+    return refreshFlight.promise;
+  }
+
+  const flight: TokenRefreshFlight = { ...currentSession, promise: null };
+  const promise = performTokenRefresh(currentSession).finally(() => {
+    // An older session's completion must not clear a newer session's flight.
+    if (refreshFlight === flight) refreshFlight = null;
+  });
+  flight.promise = promise;
+  refreshFlight = flight;
+  return promise;
+}
+
+function createRefreshUnauthorizedError(): AxiosError {
+  const response: Partial<AxiosResponse> = {
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: {},
+    data: { detail: 'Not authenticated' },
+    config: {} as InternalAxiosRequestConfig
+  };
+  // Do not retain the failed refresh request config: its body contains the
+  // refresh token. Without a business-request config the response interceptor
+  // also cannot start a second refresh attempt for this synthetic rejection.
+  return new AxiosError(
+    'Request failed with status code 401',
+    'ERR_BAD_REQUEST',
+    undefined,
+    undefined,
+    response as AxiosResponse
+  );
 }
 
 /**
@@ -146,28 +360,81 @@ async function performTokenRefresh(): Promise<string | null> {
  * Proactive: only refreshes when the access token is missing or expiring soon.
  * @returns {Promise<string|null>} New access token or null on failure
  */
-async function refreshTokenIfNeeded(): Promise<string | null> {
-  const token = tokenManager.getAccessToken();
-  const refreshToken = tokenManager.getRefreshToken();
+interface PreparedRequestSession {
+  accessToken: string | null;
+  session: AuthSessionSnapshot;
+}
 
-  // No tokens or not expiring - return immediately
+async function refreshTokenIfNeeded(requestSession: AuthSessionSnapshot): Promise<PreparedRequestSession> {
+  let session = getCurrentAuthSession();
+  if (session.generation !== requestSession.generation) throw createSessionChangedError();
+
+  const token = session.accessToken;
+  const refreshToken = session.refreshToken;
+
+  // No tokens or not expiring - return the credentials captured for this
+  // login session. Never substitute credentials from a later session.
   if (!token || !refreshToken || !isTokenExpiringSoon(token)) {
-    return token;
+    return { accessToken: token, session };
   }
 
-  // ✅ MUTEX: If refresh is already in progress, wait for it
-  if (refreshPromise !== null) {
+  // An access token remains usable until its own exp claim. Keep a valid
+  // near-expiry session alive for the warning/explicit-extension flow and
+  // avoid retrying a rejected refresh on every page request. Cooldown belongs
+  // to the exact credential pair, so a new login is never held by old backoff.
+  if (proactiveRefreshCooldown
+    && sameAuthSession(proactiveRefreshCooldown, session)
+    && proactiveRefreshCooldown.retryAfter > Date.now()
+    && isAccessTokenUnexpired(token)) {
+    return { accessToken: token, session };
+  }
+
+  if (refreshFlight && sameAuthSession(refreshFlight, session) && refreshFlight.promise) {
     logger.log('🔄 Refresh already in progress, waiting...');
-    return refreshPromise;
   }
 
-  // ✅ Start single refresh operation
-  refreshPromise = performTokenRefresh().finally(() => {
-    // ✅ Reset mutex after completion
-    refreshPromise = null;
-  });
+  const result = await getOrStartTokenRefresh(session);
+  session = getCurrentAuthSession();
+  if (session.generation !== requestSession.generation || result.sessionChanged) {
+    throw createSessionChangedError();
+  }
 
-  return refreshPromise;
+  if (result.accessToken) {
+    const expectedRefreshedSession: AuthSessionSnapshot = {
+      accessToken: result.accessToken,
+      refreshToken: result.resultingRefreshToken,
+      generation: result.attemptedSessionGeneration
+    };
+    if (!sameAuthSession(session, expectedRefreshedSession)) throw createSessionChangedError();
+    return { accessToken: result.accessToken, session };
+  }
+
+  if (result.failureStatus === 401) {
+    const isAttemptedCredentialsStillCurrent = sameAuthSession(session, {
+      accessToken: result.attemptedAccessToken,
+      refreshToken: result.attemptedRefreshToken,
+      generation: result.attemptedSessionGeneration
+    });
+
+    if (isAttemptedCredentialsStillCurrent) {
+      if (isAccessTokenUnexpired(session.accessToken)) {
+        return { accessToken: session.accessToken, session };
+      }
+      logger.warn('🔒 Refresh token rejected — ending the matching session');
+      invalidateDeadSession();
+      throw createRefreshUnauthorizedError();
+    }
+    // Another login replaced the credentials while this refresh was pending.
+    // Cancel the old business request; do not replay it as the new principal.
+    throw createSessionChangedError();
+  }
+
+  // A network or 5xx failure is transient. Continue only while the same
+  // access token is still valid; do not send a known-expired credential.
+  if (!isAccessTokenUnexpired(session.accessToken)) {
+    throw createRefreshUnauthorizedError();
+  }
+  return { accessToken: session.accessToken, session };
 }
 
 /**
@@ -175,15 +442,19 @@ async function refreshTokenIfNeeded(): Promise<string | null> {
  * local expiry heuristic. Shares the same mutex as refreshTokenIfNeeded so
  * a burst of 401s triggers exactly one /authentication/refresh call.
  */
-async function forceRefreshToken(): Promise<string | null> {
-  if (refreshPromise !== null) {
+async function forceRefreshTokenWithResult(session: AuthSessionSnapshot): Promise<TokenRefreshResult> {
+  if (refreshFlight !== null && sameAuthSession(refreshFlight, session)) {
     logger.log('🔄 Reactive refresh already in progress, waiting...');
-    return refreshPromise;
   }
-  refreshPromise = performTokenRefresh().finally(() => {
-    refreshPromise = null;
-  });
-  return refreshPromise;
+  return getOrStartTokenRefresh(session);
+}
+
+async function forceRefreshToken(): Promise<string | null> {
+  // An explicit operator retry should bypass the automatic 401 backoff.
+  const session = getCurrentAuthSession();
+  proactiveRefreshCooldown = null;
+  const refreshResult = await forceRefreshTokenWithResult(session);
+  return refreshResult.accessToken;
 }
 
 // Endpoints that bootstrap or replace the session themselves — a 401/403
@@ -196,6 +467,7 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/auth/csrf-token',
   '/auth/password-reset',
   '/authentication/password-reset',
+  '/authentication/email-verification/confirm',
   '/password-reset',
   '/password-reset/confirm',
   '/auth/logout',
@@ -208,13 +480,89 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/patient-access/request-otp',
   '/patient-access/verify-otp',
   '/patient-access/login',
+  '/webauthn/login/begin',
+  '/webauthn/login/finish',
+  '/webauthn/login/discoverable/begin',
+  '/webauthn/login/discoverable/finish',
   '/patient-access/activate/request-otp',
   '/patient-access/activate/confirm'
 ];
 
-function isAuthBootstrapEndpoint(url: string | undefined): boolean {
-  const raw = String(url || '');
-  return AUTH_BOOTSTRAP_SUFFIXES.some((suffix) => raw.endsWith(suffix));
+// Attach session credentials only to relative requests whose actual Axios URL
+// remains inside the configured API. Absolute URLs and caller base overrides
+// are intentionally left to the caller's own authentication policy.
+function isTrustedApiTarget(config: InternalAxiosRequestConfig): boolean {
+  if (config.baseURL !== API_BASE) return false;
+  const url = config.url;
+  if (!url || url.includes('\\') || Array.from(url).some((c) => c.charCodeAt(0) <= 32 || c.charCodeAt(0) === 127) ||
+      /^(?:\/\/|[a-z][a-z\d+.-]*:)/i.test(url)) return false;
+  const path = url.split(/[?#]/, 1)[0];
+  if (/%(?:2f|5c|0[0-9a-f]|1[0-9a-f]|20|7f)/i.test(path)) return false;
+  try {
+    const base = new URL(API_BASE);
+    const target = new URL(api.getUri({ baseURL: config.baseURL, url, allowAbsoluteUrls: config.allowAbsoluteUrls }));
+    const basePath = base.pathname.replace(/\/+$/, '');
+    return target.origin === base.origin && (target.pathname === basePath || target.pathname.startsWith(`${basePath}/`));
+  } catch {
+    return false;
+  }
+}
+
+function isTrustedApiMutation(config: InternalAxiosRequestConfig): boolean {
+  return isTrustedApiTarget(config) && ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() ?? '');
+}
+
+function isAuthBootstrapEndpoint(url: string | undefined, baseURL?: string, method?: string): boolean {
+  const path = String(url || '').split(/[?#]/, 1)[0];
+  if (/^\/(?:api\/v1\/)?webauthn\/login\/discoverable\/complete$/.test(path)) return baseURL === API_BASE && method?.toLowerCase() === 'post';
+  return AUTH_BOOTSTRAP_SUFFIXES.some((suffix) => path.endsWith(suffix));
+}
+
+function isPendingTwoFactorChallenge(url: string | undefined, data: unknown): boolean {
+  const path = String(url || '').split(/[?#]/, 1)[0];
+  if (!path.endsWith('/2fa/verify')) return false;
+
+  let body = data;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body) as unknown;
+    } catch {
+      return false;
+    }
+  }
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return false;
+  const pendingToken = (body as Record<string, unknown>).pending_2fa_token;
+  return typeof pendingToken === 'string' && pendingToken.trim().length > 0;
+}
+
+function isTwoFactorEnrollmentBootstrap(url: string | undefined, data: unknown, method: string | undefined): boolean {
+  const path = String(url || '').split(/[?#]/, 1)[0];
+  if (method?.toLowerCase() !== 'post' || !/^\/(?:api\/v1\/)?2fa\/(?:setup|verify-setup)$/.test(path)) return false;
+
+  let body = data;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body) as unknown;
+    } catch {
+      return false;
+    }
+  }
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return false;
+  const enrollmentToken = (body as Record<string, unknown>).enrollment_token;
+  return typeof enrollmentToken === 'string' && enrollmentToken.trim().length > 0;
+}
+
+function belongsToReplacedAuthSession(config: InternalAxiosRequestConfig | undefined): boolean {
+  if (!config
+    || !isTrustedApiTarget(config)
+    || isAuthBootstrapEndpoint(config.url, config.baseURL, config.method)
+    || isPendingTwoFactorChallenge(config.url, config.data)
+    || isTwoFactorEnrollmentBootstrap(config.url, config.data, config.method)) {
+    return false;
+  }
+
+  const requestSession = (config as SessionBoundRequestConfig)._authSessionSnapshot;
+  return requestSession !== undefined && !isCurrentAuthSession(requestSession);
 }
 
 // ✅ SECURITY: Get CSRF token from cookie
@@ -270,26 +618,59 @@ async function ensureCSRFToken(): Promise<string | null> {
 
 // Ensure Authorization header is attached for every request from localStorage
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  const boundConfig = config as SessionBoundRequestConfig;
   const now = Date.now();
   const requestUrl = String(config.url || '');
-  if (now < globalRateLimitUntil && !requestUrl.includes('/auth/')) {
+  const trustedTarget = isTrustedApiTarget(config);
+  const shouldBindSession = trustedTarget && !isAuthBootstrapEndpoint(requestUrl, config.baseURL, config.method)
+    && !isPendingTwoFactorChallenge(requestUrl, config.data)
+    && !isTwoFactorEnrollmentBootstrap(requestUrl, config.data, config.method);
+  let requestSession = boundConfig._authSessionSnapshot;
+  if (!requestSession) {
+    requestSession = getCurrentAuthSession();
+    boundConfig._authSessionSnapshot = requestSession;
+  } else if (shouldBindSession && !isCurrentAuthSession(requestSession)) {
+    return Promise.reject(createSessionChangedError());
+  }
+
+  const rateLimitKey = getRateLimitRequestKey(config);
+  const requestCooldownUntil = rateLimitKey ? requestRateLimitUntil.get(rateLimitKey) || 0 : 0;
+  if (now < requestCooldownUntil) {
+    logger.warn('[FIX:429] Request-specific cooldown active', {
+      cooldownUntil: new Date(requestCooldownUntil).toISOString(),
+      method: String(config.method || 'get').toUpperCase()
+    });
+    return Promise.reject(createLocalRateLimitError(config, requestCooldownUntil - now, 'request'));
+  }
+
+  if (now < globalRateLimitUntil && !isAuthenticationRateLimitedRequest(requestUrl)) {
     if (now - globalRateLimitLogAt > 10_000) {
       logger.warn('[API] Global 429 cooldown active', {
-        cooldownUntil: new Date(globalRateLimitUntil).toISOString(),
-        url: requestUrl
+        cooldownUntil: new Date(globalRateLimitUntil).toISOString()
       });
       globalRateLimitLogAt = now;
     }
     persistRateLimitUntil(globalRateLimitUntil);
-    return Promise.reject(createLocalRateLimitError(config));
+    return Promise.reject(createLocalRateLimitError(config, globalRateLimitUntil - now, 'global'));
   }
 
-  // Try to refresh token if expiring soon (except for auth endpoints)
-  if (!config.url?.includes('/auth/')) {
-    await refreshTokenIfNeeded();
+  // Don't preemptively refresh on authentication bootstrap or the pending
+  // 2FA challenge. A challenge uses its own one-time token, not this session.
+  let token: string | null;
+  if (shouldBindSession) {
+    const prepared = await refreshTokenIfNeeded(requestSession);
+    requestSession = prepared.session;
+    boundConfig._authSessionSnapshot = requestSession;
+    token = prepared.accessToken;
+  } else {
+    // Bootstrap requests can carry the existing principal only on our API.
+    const emailConfirmation = config.method?.toLowerCase() === 'post' && /^\/(?:api\/v1\/)?authentication\/email-verification\/confirm$/.test(requestUrl.split(/[?#]/, 1)[0]);
+    token = trustedTarget && !emailConfirmation ? tokenManager.getAccessToken() : null;
   }
 
-  const token = tokenManager.getAccessToken();
+  if (shouldBindSession && !isCurrentAuthSession(requestSession)) {
+    return Promise.reject(createSessionChangedError());
+  }
   // PR-39 / Medium-12: Removed tokenPreview logging — was leaking first 20 chars
   // of the JWT to the browser console (visible in production via devtools).
   // Now we only log whether a token exists (boolean), not its content.
@@ -303,9 +684,14 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     }
   }
 
-  // ✅ CSRF: Add X-CSRF-Token for state-changing requests
+  const trustedMutation = isTrustedApiMutation(config);
+  if (trustedMutation && config.withCredentials !== false) {
+    config.withCredentials = true;
+  }
+
+  // CSRF tokens are bound to the configured API and must not leak to other origins.
   const method = config.method?.toLowerCase() ?? '';
-  if (['post', 'put', 'patch', 'delete'].includes(method)) {
+  if (trustedMutation) {
     const csrfToken = await ensureCSRFToken();
     if (csrfToken) {
       config.headers.set('X-CSRF-Token', csrfToken);
@@ -333,6 +719,21 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     }
   }
 
+  if (shouldBindSession) {
+    const currentSession = getCurrentAuthSession();
+    if (currentSession.generation !== requestSession.generation) {
+      return Promise.reject(createSessionChangedError());
+    }
+    // A successful refresh in another request may have rotated credentials
+    // while CSRF was loading. Rebind within the same login session to the
+    // latest pair before dispatching.
+    requestSession = currentSession;
+    boundConfig._authSessionSnapshot = currentSession;
+    if (currentSession.accessToken) {
+      config.headers.set('Authorization', `Bearer ${currentSession.accessToken}`);
+    }
+  }
+
   return config;
 });
 
@@ -357,6 +758,7 @@ export function setSessionInvalidationListener(listener: SessionInvalidationList
 }
 
 function invalidateDeadSession(): void {
+  proactiveRefreshCooldown = null;
   const listener = sessionInvalidationListener;
   if (listener) {
     try {
@@ -369,6 +771,7 @@ function invalidateDeadSession(): void {
   // credentials so guards and the request interceptor see an anonymous
   // state (idempotent with the listener path).
   tokenManager.clearAll();
+  getCurrentAuthSession();
   delete api.defaults.headers.common['Authorization'];
 }
 
@@ -396,8 +799,20 @@ function isCSRFRejection(error: AxiosError): boolean {
 }
 
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
+  (response: AxiosResponse) => {
+    if (belongsToReplacedAuthSession(response.config)) {
+      return Promise.reject(createSessionChangedError());
+    }
+    return response;
+  },
   async (error: AxiosError) => {
+    // Discard every stale response before status-specific handling. Besides
+    // successful PHI responses, this prevents an old 403/500 from reaching
+    // a caller after another principal has replaced the request's session.
+    if (belongsToReplacedAuthSession(error.config ?? error.response?.config)) {
+      return Promise.reject(createSessionChangedError());
+    }
+
     // Reactive 401 recovery: one single-flight refresh + retry for requests
     // that went out WITH an Authorization header. Auth bootstrap endpoints
     // are exempt; anonymous requests stay untouched (route guards decide).
@@ -407,40 +822,58 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       error.config &&
-      !isAuthBootstrapEndpoint(error.config.url)
+      isTrustedApiTarget(error.config) &&
+      !isAuthBootstrapEndpoint(error.config.url, error.config.baseURL, error.config.method) &&
+      !isPendingTwoFactorChallenge(error.config.url, error.config.data) &&
+      !isTwoFactorEnrollmentBootstrap(error.config.url, error.config.data, error.config.method)
     ) {
-      const config = error.config as InternalAxiosRequestConfig & {
-        _retriedAfterRefresh?: boolean;
-      };
+      const config = error.config as SessionBoundRequestConfig;
       const hadAuthHeader = !!config.headers?.Authorization;
       const failedToken = String(config.headers?.Authorization || '')
         .replace(/^Bearer\s+/i, '');
-      const refreshToken = tokenManager.getRefreshToken();
+      const liveSession = getCurrentAuthSession();
+      const requestSession = config._authSessionSnapshot ?? {
+        accessToken: failedToken || liveSession.accessToken,
+        refreshToken: liveSession.refreshToken,
+        generation: liveSession.generation
+      };
+      const requestStillBelongsToCurrentSession = requestSession.generation === liveSession.generation;
+      const refreshToken = liveSession.refreshToken;
 
-      if (hadAuthHeader && refreshToken && !config._retriedAfterRefresh) {
+      if (hadAuthHeader && !requestStillBelongsToCurrentSession) {
+        return Promise.reject(createSessionChangedError());
+      }
+
+      if (hadAuthHeader && requestStillBelongsToCurrentSession && refreshToken && !config._retriedAfterRefresh) {
         config._retriedAfterRefresh = true;
         logger.warn('🔒 401 received — single-flight refresh + retry', {
           url: config.url
         });
-        const newToken = await forceRefreshToken();
-        if (newToken) {
-          config.headers.set('Authorization', `Bearer ${newToken}`);
+        const refreshResult = await forceRefreshTokenWithResult(liveSession);
+        const afterRefreshSession = getCurrentAuthSession();
+        if (refreshResult.sessionChanged || afterRefreshSession.generation !== requestSession.generation) {
+          // A login/logout won the race. Never replay the old operation using
+          // credentials installed by the replacement session.
+          return Promise.reject(createSessionChangedError());
+        }
+        if (refreshResult.accessToken) {
+          const refreshedSession: AuthSessionSnapshot = {
+            accessToken: refreshResult.accessToken,
+            refreshToken: refreshResult.resultingRefreshToken,
+            generation: refreshResult.attemptedSessionGeneration
+          };
+          if (!sameAuthSession(afterRefreshSession, refreshedSession)) {
+            return Promise.reject(error);
+          }
+          config._authSessionSnapshot = afterRefreshSession;
+          config.headers.set('Authorization', `Bearer ${refreshResult.accessToken}`);
           return api.request(config);
         }
-        // Session is dead only if no newer session took its place meanwhile.
-        // Phase 0 PR-B review round 2 (P1): the decision MUST be made on the
-        // LIVE access token re-read AFTER the await — not on a snapshot taken
-        // before it. Interleaving: 401 on a staff request → refresh starts →
-        // patient login replaces the session mid-flight (replaceAccessOnlySession)
-        // → the stale staff refresh is dropped by the performTokenRefresh
-        // guard → resolve null here. With the old pre-await snapshot
-        // (failedToken === snapshot) clearAll() wiped the freshly installed
-        // Patient session right after a successful login. liveToken now
-        // differs from failedToken (or the new session is access-only and
-        // still present), so the replacement survives; a genuinely dead
-        // session still fails the check and gets cleared.
-        const liveToken = tokenManager.getAccessToken();
-        if (!liveToken || failedToken === liveToken) {
+        const failedRefreshSessionIsStillCurrent = refreshResult.failureStatus === 401
+          && afterRefreshSession.generation === refreshResult.attemptedSessionGeneration
+          && afterRefreshSession.accessToken === refreshResult.attemptedAccessToken
+          && afterRefreshSession.refreshToken === refreshResult.attemptedRefreshToken;
+        if (failedRefreshSessionIsStillCurrent) {
           // N2-5 review round 3 (P1): a STAFF session whose refresh died is
           // terminated through the SAME machinery as the access-only path
           // below — invalidateDeadSession() (the auth-store listener:
@@ -453,7 +886,7 @@ api.interceptors.response.use(
           logger.warn('🔒 Token refresh failed — clearing dead session');
           invalidateDeadSession();
         }
-      } else if (hadAuthHeader && !refreshToken) {
+      } else if (hadAuthHeader && requestStillBelongsToCurrentSession && !refreshToken) {
         // Access-only session (Patient portal): no refresh token exists, so
         // the reactive refresh branch above never runs. Phase 0 follow-up
         // (owner P2): without this branch a dead 30-minute JWT used to leave
@@ -463,7 +896,7 @@ api.interceptors.response.use(
         // the LIVE access token re-read at rejection time. If a newer login
         // replaced the principal mid-flight, liveToken differs from
         // failedToken and the replacement survives untouched.
-        const liveToken = tokenManager.getAccessToken();
+        const liveToken = liveSession.accessToken;
         if (liveToken && failedToken === liveToken) {
           logger.warn('🔒 401 on access-only session (no refresh token) — clearing dead session', {
             url: config.url
@@ -480,20 +913,34 @@ api.interceptors.response.use(
       // NOTE: Token clearing removed to prevent race condition during login.
       // User will be redirected to login by RoleGuard or route protection instead.
     }
-    if (error.response?.status === 429) {
-      globalRateLimitUntil = Date.now() + GLOBAL_RATE_LIMIT_COOLDOWN_MS;
-      globalRateLimitLogAt = 0;
-      persistRateLimitUntil(globalRateLimitUntil);
-      logger.warn('[API] HTTP 429 received, enabling global cooldown', {
-        url: error.config?.url,
-        cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
-      });
+    if (error.response?.status === 429 && (error as AxiosError & { clientRateLimit?: boolean }).clientRateLimit !== true) {
+      const failedConfig = error.config || error.response.config;
+      const requestKey = getRateLimitRequestKey(failedConfig);
+      const retryAfterMs = getRetryAfterMs(error);
+      const requestScoped = retryAfterMs !== null || isAuthenticationRateLimitedRequest(failedConfig?.url);
+
+      if (requestScoped && requestKey) {
+        const cooldownMs = retryAfterMs ?? GLOBAL_RATE_LIMIT_COOLDOWN_MS;
+        const cooldownUntil = Date.now() + cooldownMs;
+        rememberRequestRateLimit(requestKey, cooldownUntil);
+        logger.warn('[FIX:429] HTTP 429 received, limiting cooldown to the request', {
+          method: String(failedConfig.method || 'get').toUpperCase(),
+          cooldownMs
+        });
+      } else {
+        globalRateLimitUntil = Date.now() + GLOBAL_RATE_LIMIT_COOLDOWN_MS;
+        globalRateLimitLogAt = 0;
+        persistRateLimitUntil(globalRateLimitUntil);
+        logger.warn('[FIX:429] HTTP 429 received, enabling shared API cooldown', {
+          cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
+        });
+      }
     }
 
     // #05 Tier 1: CSRF 403 recovery — refresh token and retry exactly once.
     // This handles CSRF cookie drift (8h expiry, multi-tab, subdomain mixup).
     // The backend provides "recovery": "GET /auth/csrf-token" hint.
-    if (isCSRFRejection(error) && error.config) {
+    if (isCSRFRejection(error) && error.config && isTrustedApiMutation(error.config)) {
       const config = error.config as InternalAxiosRequestConfig & { _csrfRetried?: boolean };
       if (!config._csrfRetried) {
         config._csrfRetried = true;
@@ -529,7 +976,6 @@ function setToken(token: string | null | undefined): void {
     const t = typeof token === 'string' ? token.trim() : token;
     if (t) {
       tokenManager.setAccessToken(t);
-      api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
     }
   } else {
     tokenManager.clearAll();
@@ -569,6 +1015,7 @@ interface LocalRateLimitError {
   message: string;
   config: InternalAxiosRequestConfig;
   isAxiosError: boolean;
+  clientRateLimit: true;
   response: {
     status: number;
     statusText: string;
@@ -577,17 +1024,25 @@ interface LocalRateLimitError {
   };
 }
 
-function createLocalRateLimitError(config: InternalAxiosRequestConfig): LocalRateLimitError {
+function createLocalRateLimitError(
+  config: InternalAxiosRequestConfig,
+  cooldownMs: number,
+  scope: 'global' | 'request',
+): LocalRateLimitError {
   const error = new Error('Client-side cooldown active after HTTP 429') as unknown as LocalRateLimitError;
   error.name = 'AxiosError';
   error.config = config;
   error.isAxiosError = true;
+  error.clientRateLimit = true;
   error.response = {
     status: 429,
     statusText: 'Too Many Requests',
     data: {
-      detail: 'Превышен лимит запросов. Клиент временно поставил запросы на паузу после 429.',
-      cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
+      detail: scope === 'global'
+        ? 'Превышен общий лимит запросов. Клиент временно приостановил API-запросы после 429.'
+        : 'Превышен лимит запросов к этому адресу. Клиент временно приостановил повтор.',
+      cooldownMs,
+      scope
     },
     config
   };
@@ -661,9 +1116,8 @@ async function me(): Promise<UserDto> {
  *                                no pending_2fa_token
  *
  * If the backend violates ЗАКОН 2, parseLoginResponse throws
- * AuthInvariantViolationError. The error is logged here and re-thrown so
- * callers can surface it to the user (and the team can surface it to the
- * backend owner).
+ * AuthInvariantViolationError. The stable invariant identifier is logged
+ * here without the response DTO or error message, then the error is re-thrown.
  *
  * Caller should call setToken(result.access_token) to persist tokens
  * (only valid in the `requires_2fa === false` branch).
@@ -682,8 +1136,9 @@ async function login(username: string, password: string): Promise<LoginResult> {
     return parseLoginResponse(dto);
   } catch (err) {
     if (err instanceof AuthInvariantViolationError) {
-      // Log the invariant violation loudly — backend bugs must be visible.
-      logger.error('[api/client] login() backend violated auth invariant:', err.invariant, err.message, err.dto);
+      // The DTO may contain access or pending-2FA credentials. Log only the
+      // stable invariant identifier so logger sanitization is not the boundary.
+      logger.error('[api/client] login() backend violated auth invariant:', err.invariant);
     }
     throw err;
   }
@@ -694,11 +1149,6 @@ async function login(username: string, password: string): Promise<LoginResult> {
 // were removed 2026-07-25 — zero importers across the codebase.
 const apiClient = api;
 
-// Инициализируем токен при загрузке модуля
-const existingToken = tokenManager.getAccessToken();
-if (existingToken) {
-  api.defaults.headers.common['Authorization'] = `Bearer ${existingToken}`;
-}
 
 export {
   api,

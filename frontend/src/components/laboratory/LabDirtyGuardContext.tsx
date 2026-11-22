@@ -156,6 +156,33 @@ export function isLabRoutePath(pathname: string): boolean {
   return findRouteByPath(pathname)?.component === 'LabPanel';
 }
 
+/**
+ * RETRO-3971-04 residual (post-merge re-review of 4009): маршруты,
+ * чьи панели живут под route-level leave guard-механикой sentinel'а.
+ *
+ * Лабораторная семантика «остаться на маршруте, рендерящем LabPanel»
+ * (in-lab replace-контракт записи истории) остаётся на isLabRoutePath.
+ * Но SENTINEL (browser Back) обязан охранять и doctor-маршруты, на которых
+ * живёт EMR-контейнер (CardiologistPanelUnified, DermatologistPanelUnified):
+ * fire-and-forget unmount-flush (4009) не сохраняет клинический черновик,
+ * и SPA-уход уже гвардится общим реестром источников — а browser Back без
+ * sentinel'а размонтировал бы панель молча. Механика twin/collapse идентична:
+ * смена ?tab/?visit внутри маршрута — replace/push поверх armed sentinel
+ * (перевзвешивание, round 4–5); подтверждённый Back — go(-2) на запись под
+ * twin-дубликатом; отсутствие предшественника — абсорбция без диалога.
+ */
+const ROUTE_LEVEL_GUARDED_COMPONENTS: ReadonlySet<string> = new Set([
+  'LabPanel',
+  'CardiologistPanelUnified',
+  'DermatologistPanelUnified',
+]);
+
+export function isGuardedRoutePath(pathname: string): boolean {
+  return ROUTE_LEVEL_GUARDED_COMPONENTS.has(
+    findRouteByPath(pathname)?.component ?? '',
+  );
+}
+
 // ─── Sentinel controller ─────────────────────────────────────────────────────
 
 const SENTINEL_STATE_KEY = '__labLeaveGuardSentinel';
@@ -226,15 +253,27 @@ const labLeaveSentinel = {
    * sentinel и replace-переход затёр бы РЕАЛЬНУЮ /lab-запись.
    */
   leaveIntent: false,
+  /**
+   * RETRO-3971-04 P1 hotfix: href, на котором intent был начат. Подтверждённый
+   * диалоговый переход может приземлиться на ДРУГОЙ guarded-маршрут (lab →
+   * doctor, doctor → lab) или на тот же маршрут с новым search (таб-переключение
+   * через guardRouteLeave) — в обоих случаях leave-flow фактически завершён,
+   * и intent обязан сняться, иначе layout-эффект остаётся пассивным и sentinel
+   * никогда не перевооружается на новом guarded-маршруте.
+   */
+  leaveIntentHref: null as string | null,
   isArmed: () => labLeaveSentinel.armed,
   getHref: () => labLeaveSentinel.sentinelHref,
   isCollapsing: () => labLeaveSentinel.collapsing,
   isLeaveIntent: () => labLeaveSentinel.leaveIntent,
-  beginLeaveIntent() {
+  getLeaveIntentHref: () => labLeaveSentinel.leaveIntentHref,
+  beginLeaveIntent(href?: string) {
     labLeaveSentinel.leaveIntent = true;
+    labLeaveSentinel.leaveIntentHref = href ?? null;
   },
   endLeaveIntent() {
     labLeaveSentinel.leaveIntent = false;
+    labLeaveSentinel.leaveIntentHref = null;
   },
   /**
    * Состояние записи = состояние роутера (usr/key/idx) + маркер: POP на
@@ -378,7 +417,7 @@ function installSentinelHistoryPatch() {
       : new URL(String(url), window.location.href).pathname;
     const isSentinelReplace = labLeaveSentinel.isArmed()
       && labLeaveSentinel.isSentinelEntry()
-      && isLabRoutePath(targetPathname);
+      && isGuardedRoutePath(targetPathname);
     if (isSentinelReplace && data != null && typeof data === 'object') {
       originalReplaceState(
         { ...(data as Record<string, unknown>), [SENTINEL_STATE_KEY]: true },
@@ -524,7 +563,7 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
     // (isDirtyRef workbench'а обновляется в useEffect позже layout-эффектов)
     // и успевали ре-армаить уже разоружённый sentinel лишней записью,
     // коллапс которой отменял сам подтверждённый переход.
-    labLeaveSentinel.beginLeaveIntent();
+    labLeaveSentinel.beginLeaveIntent(window.location.href);
     const decided = guard.guardTransition(
       () => {
         try {
@@ -534,8 +573,26 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
           labLeaveSentinel.endLeaveIntent();
         }
       },
-      { onCancel: () => { labLeaveSentinel.endLeaveIntent(); } },
+      {
+        onCancel: () => { labLeaveSentinel.endLeaveIntent(); },
+        // LABGUARD-FE-003 (audit 3886, round 13): уход с /lab —
+        // иммутабельный интент: пока диалог открыт, новый leave-переход
+        // не подменяет этот (см. useDirtyTransitionGuard).
+        intentPolicy: 'leave',
+      },
     );
+    // RETRO-3971-04 residual: guardRouteLeave обслуживает не только уход
+    // С /lab — любой SPA-переход на не-LabPanel цель (включая ВХОД на
+    // doctor-маршрут с EMR-контейнером) проходит здесь при чистом реестре.
+    // Немедленно выполненный переход (decided=true) обязан снимать
+    // leaveIntent: layout-эффект guarded-маршрута при висящем intent
+    // пассивен — sentinel никогда бы не вооружился на doctor-панели и
+    // browser Back молча размонтировал бы dirty EMR. Подтверждённый
+    // (диалоговый) уход держит intent до фактического приземления —
+    // прежняя защита от STALE-dirty ре-арма не меняется.
+    if (decided) {
+      labLeaveSentinel.endLeaveIntent();
+    }
     return decided;
     // guard.guardTransition стабилен (useCallback без deps внутри хука):
     // деп по нестабильному объекту guard пересоздавал бы коллбек на каждом
@@ -585,6 +642,7 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
         hasHistoryGuardPending={hasHistoryGuardPending}
         onEngagedChange={notifyHistoryGuardEngaged}
         guardRouteLeave={guardRouteLeave}
+        isDialogOpen={guard.isDialogOpen}
       />
       {guard.guardDialog}
     </LabDirtyGuardContext.Provider>
@@ -599,6 +657,7 @@ function LabLeaveRouteGuard({
   hasHistoryGuardPending,
   onEngagedChange,
   guardRouteLeave,
+  isDialogOpen,
 }: {
   hasDirtySources: () => boolean;
   /** ДОКУМЕНТ-уровень (beforeunload): dirty ИЛИ любая операция, включая report CREATE. */
@@ -608,6 +667,8 @@ function LabLeaveRouteGuard({
   /** PR 3351 (review round 8, P1): публикация armed||collapsing для WF-15 LabPanel. */
   onEngagedChange: (engaged: boolean) => void;
   guardRouteLeave: (leave: () => void) => boolean;
+  /** RETRO-3971-04 P1: диалог открыт — leave-flow владеет intent-ом полностью. */
+  isDialogOpen: boolean;
 }) {
   const navigate = useNavigate();
   // PR 3351 (review round 8, P1): публикация «sentinel занят» на каждой
@@ -644,6 +705,11 @@ function LabLeaveRouteGuard({
   hasHistoryPendingRef.current = hasHistoryGuardPending;
   const guardRouteLeaveRef = useRef(guardRouteLeave);
   guardRouteLeaveRef.current = guardRouteLeave;
+  // RETRO-3971-04 P1: render-time присваивание (тот же паттерн) — layout-эффект
+  // всегда видит актуальное состояние диалога leave-flow без перевешивания
+  // слушателей на его флипах.
+  const dialogOpenRef = useRef(isDialogOpen);
+  dialogOpenRef.current = isDialogOpen;
 
   // PR 3351 (review round 6, P1): beforeunload на уровне общего провайдера —
   // полная защита документа при dirty-черновиках ИЛИ незавершённых
@@ -674,7 +740,9 @@ function LabLeaveRouteGuard({
   // Присваивание в render (тот же паттерн, что hasDirtyRef): popstate-
   // listener и таймер fallback-а всегда видят актуальное значение.
   const lastNonLabLocationRef = useRef<{ pathname: string; search: string } | null>(null);
-  if (!isLabRoutePath(location.pathname)) {
+  // RETRO-3971-04 residual: fallback-цель подтверждённого ухода — последняя
+  // страница вне ВСЕХ guarded-маршрутов (не только вне /lab).
+  if (!isGuardedRoutePath(location.pathname)) {
     lastNonLabLocationRef.current = { pathname: location.pathname, search: location.search };
   }
 
@@ -685,7 +753,9 @@ function LabLeaveRouteGuard({
     if (typeof window === 'undefined') return;
     // PR 3351 (review round 3, P1): route identity — только точный маршрут
     // LabPanel сохраняет панель; '/lab/results' сюда не попадает.
-    if (!isLabRoutePath(window.location.pathname)) {
+    // RETRO-3971-04 residual: sentinel вооружается на ВСЕХ guarded-маршрутах
+    // (lab + doctor-панели с EMR-контейнером).
+    if (!isGuardedRoutePath(window.location.pathname)) {
       labLeaveSentinel.disarm();
       // PR 3351 (review round 3, P2): подтверждённый уход приземлился —
       // leave-flow закончился, sentinel возвращается обычному циклу.
@@ -705,7 +775,23 @@ function LabLeaveRouteGuard({
     // useEffect позже layout-эффектов) ре-армил уже разоружённый sentinel
     // лишней записью, а последующий clean-рендер коллапсировал её —
     // конкурирующий traversal отменял navigate(-2) подтверждённого ухода.
-    if (labLeaveSentinel.isLeaveIntent()) return;
+    if (labLeaveSentinel.isLeaveIntent()) {
+      // RETRO-3971-04 P1 hotfix: подтверждённый диалоговый переход может
+      // приземлиться на ДРУГОЙ guarded-маршрут (lab → doctor, doctor → lab,
+      // same-route таб-переключение). href изменился при закрытом диалоге =
+      // переход фактически приземлился: intent обязан сняться, иначе этот
+      // эффект остаётся пассивным навсегда (pathname не покидает guarded
+      // класс) и sentinel никогда не перевооружается — первый browser Back
+      // на новом маршруте молча размонтирует следующий dirty-черновик.
+      // Пока диалог открыт (или выполняется его save/discard), href не
+      // менялся и владение intent-ом НЕ передаётся (LABGUARD-FE-003).
+      if (dialogOpenRef.current) return;
+      const intentHref = labLeaveSentinel.getLeaveIntentHref();
+      if (intentHref === null || window.location.href === intentHref) return;
+      labLeaveSentinel.endLeaveIntent();
+      // НЕ return: проваливаемся в обычную логику arm/disarm ниже —
+      // dirty/pending состояние НОВОГО маршрута решает перевооружение.
+    }
     // PR 3351 (review round 3, P1): sentinel активен при dirty ИЛИ pending.
     // PR 3351 (review round 7, P1): pending здесь — history-guard сигнал
     // (контекстно-блокирующие операции). PR 3351 (review round 8, P1):
@@ -796,7 +882,8 @@ function LabLeaveRouteGuard({
         // Переход уже приземлился (layout-эффект снял leaveIntent) —
         // или документ выгружается (кросс-документный -2) — ничего не делаем.
         if (!labLeaveSentinel.isLeaveIntent()) return;
-        if (!isLabRoutePath(window.location.pathname)) return;
+        // RETRO-3971-04 residual: guarded-маршрут (lab ИЛИ doctor-панель).
+        if (!isGuardedRoutePath(window.location.pathname)) return;
         const fallback = lastNonLabLocationRef.current;
         navigate(
           fallback ? { pathname: fallback.pathname, search: fallback.search } : '/health',
@@ -824,10 +911,44 @@ function LabLeaveRouteGuard({
       // изменением ?instance владеет urlIntent-флоу самой панели.
       if (labLeaveSentinel.isSentinelEntry()) return;
       // PR 3351 (review round 3, P1): route identity — точный маршрут
-      // LabPanel, а не любой /lab/*.
-      if (!isLabRoutePath(window.location.pathname)) {
-        // Защитная ветка: при вооружённом sentinel недостижима (pop
-        // абсорбируется на /lab). Разоружаем и отдаём поп роутеру.
+      // LabPanel, а не любой /lab/*. RETRO-3971-04 residual: любой
+      // guarded-маршрут (lab ИЛИ doctor-панель с EMR-контейнером).
+      if (!isGuardedRoutePath(window.location.pathname)) {
+        // LABGUARD-FE-001 (audit 3886): multi-entry POP (history.go(-2)
+        // и дальше, жест-меню браузера, консоль) при вооружённом sentinel
+        // приземляется ЗА twin — прежняя «защитная ветка» молча
+        // разоружалась и отдавала поп роутеру: панель размонтировалась,
+        // несохранённый черновик терялся без вопроса. Незапрошенный
+        // прыжок при dirty/pending теперь ОТКАТЫВАЕТСЯ к sentinel
+        // (stateful rollback: go(+delta)) и открывает тот же guard-диалог;
+        // подтверждение уходит на страницу прыжка, отмена оставляет
+        // пользователя и черновик на /lab. Диалог открывается СИНХРОННО
+        // здесь (источники ещё живы в реестре), popstate отката
+        // глотается ниже (isSentinelEntry) — роутер возвращает /lab.
+        const landedState = window.history.state as Record<string, unknown> | null;
+        const landedIdx = typeof landedState?.idx === 'number' ? landedState.idx : null;
+        // sentinelIdx — idx двойника; sentinel-запись физически на одну
+        // выше, поэтому delta возврата = sentinelIdx - landedIdx + 1.
+        const restoreDelta = labLeaveSentinel.sentinelIdx !== null && landedIdx !== null
+          ? labLeaveSentinel.sentinelIdx - landedIdx + 1
+          : null;
+        const blocked = hasDirtyRef.current() || hasHistoryPendingRef.current;
+        if (blocked && restoreDelta !== null && restoreDelta >= 2) {
+          const jumpedTo = { pathname: window.location.pathname, search: window.location.search };
+          window.history.go(restoreDelta);
+          guardRouteLeaveRef.current(() => {
+            // Подтверждённый уход на страницу прыжка: мы уже на
+            // sentinel-записи (откат) — заменяем её (replace), Back с
+            // цели вернётся на /lab без второго дубля.
+            labLeaveSentinel.disarm();
+            labLeaveSentinel.endLeaveIntent();
+            navigate(jumpedTo, { replace: true });
+          });
+          syncHistoryGuardEngaged();
+          return;
+        }
+        // Fallback: landing без router-idx (внешняя запись) или чистое
+        // состояние — прежнее поведение: разоружаем и отдаём поп роутеру.
         labLeaveSentinel.disarm();
         syncHistoryGuardEngaged();
         return;
@@ -957,18 +1078,49 @@ export function useGuardedLabNavigate() {
   ) => {
     const { onLeave, ...navigateOptions } = options ?? {};
     if (typeof to === 'number') {
+      // LABGUARD-FE-001 (audit 3886): дельта ±1 остаётся на sentinel-
+      // механике (pop вытесняет sentinel и приземляется на twin — тот же
+      // /lab URL, диалог показывает popstate-обработчик; guardRouteLeave
+      // здесь был бы ошибочен — см. комментарий выше). Дельты |n| > 1
+      // перепрыгивают twin и приземляются сразу на не-lab запись:
+      // «защитная ветка» поп-обработчика отдаёт поп роутеру и панель
+      // размонтируется без решения. Публичный навигационный контракт не
+      // должен принимать произвольные прыжки без явного leave-контракта:
+      // чистое состояние — немедленный переход (прежняя семантика),
+      // dirty/pending — guard-диалог; подтверждение разоружает sentinel
+      // ДО traverse, чтобы поп от go(n) не откатился новым циклом.
+      if (Math.abs(to) > 1) {
+        guardRouteLeaveRef.current(() => {
+          labLeaveSentinel.disarm();
+          navigate(to);
+        });
+        return;
+      }
       // Числовая дельта: второй overload NavigateFunction — без options.
       navigate(to);
       return;
     }
     const targetPathname = typeof to === 'string'
-      ? new URL(to, window.location.origin).pathname
+      ? new URL(to, window.location.href).pathname
       : (to.pathname ?? window.location.pathname);
-    // PR 3351 (review round 3, P1): route identity — точный маршрут LabPanel.
-    // '/lab/results' не зарегистрирован (wildcard → /not-found размонтирует
-    // панель), поэтому это уход, а не внутренний переход.
+    // LABGUARD-FE-002 (audit 3886): относительные строковые цели
+    // (query-only '?tab=…', fragment '#results') резолвятся против
+    // ТЕКУЩЕГО href — как в resolveToHref. Прежний резолв против
+    // origin корня misклассифицировал '?tab=templates' на /lab как
+    // уход (pathname '/') и открывал destructive Save/Discard/Cancel
+    // диалог для внутрилабораторного переключения вкладки.
+    // Route identity — точный маршрут LabPanel: '/lab/results' не
+    // зарегистрирован (wildcard → /not-found размонтирует панель).
     const leavesLabRoute = !isLabRoutePath(targetPathname);
-    if (!leavesLabRoute) {
+    // RETRO-3971-04 P1 hotfix: цель /lab — не автоматическая «внутренняя»
+    // навигация. Dirty doctor EMR смонтирован на ДРУГОМ guarded-маршруте;
+    // вход на /lab обязан пройти через общее решение Stay/Save/Discard, как
+    // любой другой cross-panel переход. Короткое замыкание действует ТОЛЬКО
+    // когда источник — сам LabPanel (внутренняя перезапись URL / no-op).
+    const leavesDoctorEditorForLab = !leavesLabRoute
+      && isGuardedRoutePath(window.location.pathname)
+      && !isLabRoutePath(window.location.pathname);
+    if (!leavesLabRoute && !leavesDoctorEditorForLab) {
       // PR 3351 (review round 5, P1): переход УЖЕ с lab-маршрута на тот же
       // lab-маршрут (LabPanel смонтирован) — это внутренняя перезапись URL,
       // и она НЕ может пушить запись поверх sentinel'а. Штатные shell-

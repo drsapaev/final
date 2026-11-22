@@ -18,8 +18,16 @@
     border-bottom: none;
 }
 
+/* EMRREAD-FE-001 (audit 3886, round 21): a disabled (read-only) section must
+   still be expandable — the header toggle stays interactive. pointer-events
+   is scoped to the section BODY only, so clinical inputs keep their belt-and-
+   braces guard while the expansion button (a sibling, outside the body)
+   remains clickable by mouse/touch. */
 .emr-section--disabled {
     opacity: 0.6;
+}
+
+.emr-section--disabled .emr-section__body {
     pointer-events: none;
 }
 

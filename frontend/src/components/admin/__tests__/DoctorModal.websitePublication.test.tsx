@@ -69,6 +69,113 @@ afterEach(() => {
 });
 
 describe('DoctorModal website publication editor', () => {
+  it('saves confirmed experience years in the operational doctor profile', async () => {
+    const onSave = vi.fn();
+    render(
+      <ThemeProvider>
+        <DoctorModal
+          isOpen
+          onClose={vi.fn()}
+          doctor={{
+            id: 54,
+            user_id: 88,
+            specialty: 'dentistry',
+            active: true,
+            experience_years: null,
+            user: {
+              id: 88,
+              full_name: 'SYNTHETIC Website Doctor',
+              role: 'Doctor',
+              is_active: true,
+            },
+          }}
+          onSave={onSave}
+          availableUsers={[]}
+        />
+      </ThemeProvider>,
+    );
+
+    const experience = await screen.findByLabelText('Стаж, лет');
+    fireEvent.change(experience, { target: { value: '18' } });
+    fireEvent.submit(experience.closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ experienceYears: '18' }),
+    ));
+  });
+
+  it('rejects experience above 100 years before saving', async () => {
+    const onSave = vi.fn();
+    render(
+      <ThemeProvider>
+        <DoctorModal
+          isOpen
+          onClose={vi.fn()}
+          doctor={{
+            id: 54,
+            user_id: 88,
+            specialty: 'dentistry',
+            active: true,
+            experience_years: null,
+            user: {
+              id: 88,
+              full_name: 'SYNTHETIC Website Doctor',
+              role: 'Doctor',
+              is_active: true,
+            },
+          }}
+          onSave={onSave}
+          availableUsers={[]}
+        />
+      </ThemeProvider>,
+    );
+
+    const experience = await screen.findByLabelText('Стаж, лет');
+    expect(experience).toHaveAttribute('max', '100');
+    fireEvent.change(experience, { target: { value: '101' } });
+    fireEvent.submit(experience.closest('form') as HTMLFormElement);
+
+    expect(await screen.findByText('Введите целое число лет от 0 до 100.')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('saves the selected professional category in the working doctor profile', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <ThemeProvider>
+        <DoctorModal
+          isOpen
+          onClose={vi.fn()}
+          doctor={{
+            id: 54,
+            user_id: 88,
+            specialty: 'dentistry',
+            active: true,
+            professional_category: null,
+            user: {
+              id: 88,
+              full_name: 'SYNTHETIC Website Doctor',
+              role: 'Doctor',
+              is_active: true,
+            },
+          }}
+          onSave={onSave}
+          availableUsers={[]}
+        />
+      </ThemeProvider>,
+    );
+
+    const category = await screen.findByRole('button', { name: 'Квалификационная категория' });
+    await user.click(category);
+    await user.click(await screen.findByRole('option', { name: 'Высшая категория' }));
+    fireEvent.submit(category.closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ professional_category: 'highest' }),
+    ));
+  });
+
   it('keeps website publication actions separate and locks the slug after first publish', async () => {
     const user = userEvent.setup();
     render(

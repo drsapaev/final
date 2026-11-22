@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from './runtime';
 import tokenManager from '../utils/tokenManager';
+import { forceRefreshToken } from './client';
 
 const API_V1_BASE = getApiBaseUrl();
 
@@ -25,39 +26,75 @@ interface RequestOptions {
   method?: string;
 }
 
-async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
-  const token = tokenManager.getAccessToken();
-  const headers: Record<string, string> = {
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
-  };
+/** LABR-FE-001 (audit 3886): true for a rejected 401 from an expired access JWT. */
+function isAuthRejected(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    (error as { status?: unknown }).status === 401
+  );
+}
 
-  const fetchInit: RequestInit = {
-    ...(options as Record<string, unknown>),
-    headers,
-    // UX-AUDIT-FIX12: пробрасываем signal в fetch, если передан.
-    // Если signal уже отменён — fetch выбросит AbortError сразу.
-    ...(options.signal ? { signal: options.signal } : {})
-  };
-
-  const response = await fetch(`${API_V1_BASE}${path}`, fetchInit);
-
-  if (!response.ok) {
-    let detail = `${response.status} ${response.statusText}`;
-    try {
-      const payload = await response.json();
-      detail = payload.detail || detail;
-    } catch {
-      // Ignore JSON parsing failures and use the fallback detail.
+/**
+ * LABR-FE-001 (audit 3886): converge the lab transport on the canonical
+ * shared expired-JWT refresh. A rejected 401 (the server did NOT execute
+ * the command) is safely retried once after a single-flight refresh —
+ * including for mutations, which keep their Idempotency-Key and fail
+ * closed on any transport error (no automatic retry of ambiguous POSTs:
+ * network/timeout failures still surface as before).
+ */
+async function withAuthRetry<T>(perform: () => Promise<T>): Promise<T> {
+  try {
+    return await perform();
+  } catch (error) {
+    if (!isAuthRejected(error)) {
+      throw error;
     }
-    throw new Error(detail);
+    const refreshed = await forceRefreshToken();
+    if (!refreshed) {
+      throw error;
+    }
+    return perform();
   }
+}
 
-  if (response.status === 204) {
-    return null;
-  }
-  return response.json();
+async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
+  const run = async (): Promise<unknown> => {
+    const token = tokenManager.getAccessToken();
+    const headers: Record<string, string> = {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+
+    const fetchInit: RequestInit = {
+      ...(options as Record<string, unknown>),
+      headers,
+      // UX-AUDIT-FIX12: пробрасываем signal в fetch, если передан.
+      // Если signal уже отменён — fetch выбросит AbortError сразу.
+      ...(options.signal ? { signal: options.signal } : {})
+    };
+
+    const response = await fetch(`${API_V1_BASE}${path}`, fetchInit);
+
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`;
+      try {
+        const payload = await response.json();
+        detail = payload.detail || detail;
+      } catch {
+        // Ignore JSON parsing failures and use the fallback detail.
+      }
+      throw Object.assign(new Error(detail), { status: response.status });
+    }
+
+    if (response.status === 204) {
+      return null;
+    }
+    return response.json();
+  };
+
+  return withAuthRetry(run);
 }
 
 export const labReportingApi = {
@@ -274,14 +311,17 @@ export const labReportingApi = {
   },
 
   async downloadPdf(instanceId: string | number) {
-    const token = tokenManager.getAccessToken();
-    const response = await fetch(`${API_V1_BASE}/lab/report-instances/${instanceId}/pdf`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-    if (!response.ok) {
-      throw new Error(`Не удалось сформировать PDF: ${response.status}`);
-    }
-    return response.blob();
+    const run = async (): Promise<Blob> => {
+      const token = tokenManager.getAccessToken();
+      const response = await fetch(`${API_V1_BASE}/lab/report-instances/${instanceId}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!response.ok) {
+        throw Object.assign(new Error(`Не удалось сформировать PDF: ${response.status}`), { status: response.status });
+      }
+      return response.blob();
+    };
+    return withAuthRetry(run);
   },
 
   // PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же
@@ -289,26 +329,32 @@ export const labReportingApi = {
   // без mark-printed/уведомлений/финализации — просто blob для просмотра.
   // Рендерятся сохранённые значения (Save Draft до preview).
   async previewInstancePdf(instanceId: string | number) {
-    const token = tokenManager.getAccessToken();
-    const response = await fetch(`${API_V1_BASE}/lab/report-instances/${instanceId}/preview`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-    if (!response.ok) {
-      throw new Error(`Не удалось сформировать предпросмотр: ${response.status}`);
-    }
-    return response.blob();
+    const run = async (): Promise<Blob> => {
+      const token = tokenManager.getAccessToken();
+      const response = await fetch(`${API_V1_BASE}/lab/report-instances/${instanceId}/preview`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!response.ok) {
+        throw Object.assign(new Error(`Не удалось сформировать предпросмотр: ${response.status}`), { status: response.status });
+      }
+      return response.blob();
+    };
+    return withAuthRetry(run);
   },
 
   // PR8: template preview — рендер СОХРАНЁННОЙ версии шаблона со
   // синтетическими placeholder-значениями (без данных пациентов).
   async previewTemplateVersionPdf(versionId: string | number) {
-    const token = tokenManager.getAccessToken();
-    const response = await fetch(`${API_V1_BASE}/lab/template-versions/${versionId}/preview`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-    if (!response.ok) {
-      throw new Error(`Не удалось сформировать предпросмотр шаблона: ${response.status}`);
-    }
-    return response.blob();
+    const run = async (): Promise<Blob> => {
+      const token = tokenManager.getAccessToken();
+      const response = await fetch(`${API_V1_BASE}/lab/template-versions/${versionId}/preview`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!response.ok) {
+        throw Object.assign(new Error(`Не удалось сформировать предпросмотр шаблона: ${response.status}`), { status: response.status });
+      }
+      return response.blob();
+    };
+    return withAuthRetry(run);
   }
 };

@@ -174,6 +174,11 @@ async def get_csrf_token(response: Response) -> CSRFTokenResponse:
     """
     # PR-30: secure flag must follow production status. Previously secure=False
     # always — cookie was sent over plain HTTP, allowing MITM interception.
+    # AUTH-BE-005 (#4063): the claimed settings/process-env mismatch was
+    # refuted for supported startup paths. core/config.py loads backend/.env
+    # into os.environ before constructing the settings singleton; systemd and
+    # Compose also pass ENV as a process variable. The earlier probe mutated
+    # only the cached settings object, a state the runtime does not create.
     import os
 
     is_prod = os.getenv("ENV", "dev").lower() in ("prod", "production")

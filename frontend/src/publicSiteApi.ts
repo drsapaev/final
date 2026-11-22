@@ -3,6 +3,7 @@ import type { PublicSiteLocale } from './routing/publicSiteRouteEntries';
 
 export type PublicSiteClinic = components['schemas']['PublicSiteClinicOut'];
 export type PublicSiteService = components['schemas']['PublicSiteServiceOut'];
+export type PublicSiteServiceDetail = components['schemas']['PublicSiteServiceDetailOut'];
 export type PublicSiteDoctor = components['schemas']['PublicSiteDoctorOut'];
 
 export class PublicSiteApiError extends Error {
@@ -18,14 +19,15 @@ export type PublicSiteFetch = (
 ) => Promise<Response>;
 
 export interface PublicSiteApi {
-  getClinic(): Promise<PublicSiteClinic>;
+  getClinic(signal?: AbortSignal): Promise<PublicSiteClinic>;
   listServices(locale: PublicSiteLocale): Promise<PublicSiteService[]>;
-  getService(slug: string, locale: PublicSiteLocale): Promise<PublicSiteService | null>;
+  getService(slug: string, locale: PublicSiteLocale): Promise<PublicSiteServiceDetail | null>;
   listDoctors(locale: PublicSiteLocale): Promise<PublicSiteDoctor[]>;
   getDoctor(slug: string, locale: PublicSiteLocale): Promise<PublicSiteDoctor | null>;
 }
 
 const REQUEST_TIMEOUT_MS = 8_000;
+const PUBLIC_MEDIA_PATH = /^\/api\/v1\/public-site\/media\/[0-9a-f]{64}$/;
 
 function normalizeApiOrigin(value: string): string {
   const url = new URL(value);
@@ -43,7 +45,13 @@ export function createPublicSiteApi(
 ): PublicSiteApi {
   const origin = normalizeApiOrigin(apiOrigin);
 
-  async function request<T>(path: string, missingIsNull = false): Promise<T | null> {
+  async function request<T>(
+    path: string,
+    { missingIsNull = false, signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS) }: {
+      missingIsNull?: boolean;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<T | null> {
     let response: Response;
     try {
       response = await fetchImpl(new URL(`/api/v1/public-site/${path}`, origin), {
@@ -52,7 +60,7 @@ export function createPublicSiteApi(
         cache: 'no-store',
         credentials: 'omit',
         redirect: 'error',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal,
       });
     } catch {
       throw new PublicSiteApiError();
@@ -77,29 +85,45 @@ export function createPublicSiteApi(
   const localized = (path: string, locale: PublicSiteLocale) =>
     `${path}?locale=${encodeURIComponent(locale)}`;
 
+  function resolvePublicMediaUrl(value: string | null | undefined): string | null {
+    if (value == null) return null;
+    if (!PUBLIC_MEDIA_PATH.test(value)) throw new PublicSiteApiError();
+    return new URL(value, `${origin}/`).toString();
+  }
+
+  function withClinicMedia(clinic: PublicSiteClinic): PublicSiteClinic {
+    return { ...clinic, logo_url: resolvePublicMediaUrl(clinic.logo_url) };
+  }
+
+  function withDoctorMedia(doctor: PublicSiteDoctor): PublicSiteDoctor {
+    return { ...doctor, portrait_url: resolvePublicMediaUrl(doctor.portrait_url) };
+  }
+
   return {
-    async getClinic() {
-      const result = await request<PublicSiteClinic>('clinic');
+    async getClinic(signal) {
+      const result = await request<PublicSiteClinic>('clinic', { signal });
       if (!result || typeof result !== 'object') throw new PublicSiteApiError();
-      return result;
+      return withClinicMedia(result);
     },
     listServices(locale) {
       return requestList<PublicSiteService>(localized('services', locale));
     },
     async getService(slug, locale) {
-      return request<PublicSiteService>(
+      return request<PublicSiteServiceDetail>(
         localized(`services/${encodeURIComponent(slug)}`, locale),
-        true,
+        { missingIsNull: true },
       );
     },
     listDoctors(locale) {
-      return requestList<PublicSiteDoctor>(localized('doctors', locale));
+      return requestList<PublicSiteDoctor>(localized('doctors', locale))
+        .then((doctors) => doctors.map(withDoctorMedia));
     },
     async getDoctor(slug, locale) {
-      return request<PublicSiteDoctor>(
+      const doctor = await request<PublicSiteDoctor>(
         localized(`doctors/${encodeURIComponent(slug)}`, locale),
-        true,
+        { missingIsNull: true },
       );
+      return doctor ? withDoctorMedia(doctor) : null;
     },
   };
 }

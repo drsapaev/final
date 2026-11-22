@@ -125,7 +125,10 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
 
     // Must compute criticalWarning from the same latest draft saved by the screen.
     expect(completeBlock).toContain('getCriticalDiagnosisWarning(');
-    expect(completeBlock).toContain('latestDraft.icd10_code');
+    // Audit 3892 round 3 (DENTICD-FE-001): the gate reads the CANONICAL ICD
+    // code through the shared extractor (structured diagnosis.icd10_code
+    // first, flat aliases as legacy fallback) — never a bare flat alias.
+    expect(completeBlock).toContain('extractCanonicalIcd10(latestDraft');
 
     // Must branch into danger-intent confirm when criticalWarning is truthy.
     expect(completeBlock).toContain('if (criticalWarning) {');

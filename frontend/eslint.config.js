@@ -201,7 +201,8 @@ export default [
         // etc.) via lib.dom.d.ts. ESLint doesn't need these re-declared as
         // globals — that would duplicate what tsc already knows and create
         // a maintenance burden (the list drifts from lib.dom.d.ts).
-        project: './tsconfig.json',
+        // App and Playwright files are type-checked by separate projects.
+        project: ['./tsconfig.json', './e2e/tsconfig.json'],
       },
       globals: {
         ...globals.browser,

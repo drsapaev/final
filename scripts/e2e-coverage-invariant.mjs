@@ -46,6 +46,8 @@ const TARGET_E2E_FILES = [
   // (ci-cd-unified.yml "UX Audit e2e + Visual regression") — the
   // anti-skip invariant must cover it too.
   'e2e/a11y-axe-authenticated.spec.ts',
+  // PR #3725: public-site keyboard navigation and Axe checks run in the UX E2E CI step.
+  'e2e/public-site-accessibility.spec.ts',
 ];
 
 // Patterns that silently disable tests. Each is a RegExp source.

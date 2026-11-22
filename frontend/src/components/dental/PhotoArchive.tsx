@@ -12,6 +12,12 @@ import {
   type DentalMediaMetadata,
 } from '../../api/dentalMedia';
 
+// DENTPHOTO-FE-001/002 (audit 3892): the archive's editable surfaces (upload
+// form, open preview) belong to the bound patient/visit pair. A switch of that
+// identity drops the old patient's pending file and preview and invalidates
+// their in-flight requests.
+type ArchiveIdentity = { patientId: number | null; visitId: number | null };
+
 type MetadataDraft = {
   title: string;
   description: string;
@@ -87,6 +93,16 @@ const PhotoArchive = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewCloseRef = useRef<HTMLButtonElement>(null);
   const requestId = useRef(0);
+  // Stable per-context identity object: replaced ONLY when the patient/visit
+  // pair actually changes, so async guards compare object identity safely.
+  const identityRef = useRef<ArchiveIdentity>({ patientId: null, visitId: null });
+  if (
+    identityRef.current.patientId !== numericPatientId ||
+    identityRef.current.visitId !== numericVisitId
+  ) {
+    identityRef.current = { patientId: numericPatientId, visitId: numericVisitId };
+  }
+  const archiveContextKey = `${numericPatientId ?? ''}:${numericVisitId ?? ''}`;
 
   const reload = useCallback(async () => {
     if (!numericPatientId || !numericVisitId) return;
@@ -113,6 +129,27 @@ const PhotoArchive = ({
     void reload();
     return () => { requestId.current += 1; };
   }, [reload, retryKey]);
+
+  // DENTPHOTO-FE-001/002 (audit 3892): a patient/visit switch invalidates the
+  // previous patient's pending upload form and any open preview. Setting
+  // preview to null lets the existing url-cleanup effect revoke the blob URL.
+  // Review 3903 P2 (DENTPHOTO): the switch also clears A's in-flight upload
+  // spinner — the submit handler's identity guard deliberately leaves
+  // `uploading` untouched for B, so it must be reset here instead.
+  useEffect(() => {
+    setSelectedFile(null);
+    setUploadTitle('');
+    setUploadDescription('');
+    setUploadTooth('');
+    setUploadDate('');
+    setCategory('photo');
+    setActionError(null);
+    setSuccessMessage(null);
+    setPreview(null);
+    setPreviewingId(null);
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [archiveContextKey]);
 
   useEffect(() => () => {
     if (preview?.url) URL.revokeObjectURL(preview.url);
@@ -191,6 +228,7 @@ const PhotoArchive = ({
       setActionError(t('dental.dental_pa_pdf_xray_only'));
       return;
     }
+    const originIdentity = identityRef.current;
     setUploading(true);
     setActionError(null);
     setSuccessMessage(null);
@@ -201,6 +239,11 @@ const PhotoArchive = ({
         tooth: uploadTooth.trim() || null,
         capture_date: uploadDate || null,
       });
+      // Review 3903 P2 (DENTPHOTO): verify the origin identity BEFORE any
+      // form state mutation. When A's upload completes after the archive has
+      // switched to B, B may already be filling in a new file and metadata —
+      // a late A-context completion must not erase it.
+      if (identityRef.current !== originIdentity) return;
       setSelectedFile(null);
       setUploadTitle('');
       setUploadDescription('');
@@ -210,9 +253,9 @@ const PhotoArchive = ({
       setSuccessMessage(t('dental.dental_pa_upload_success'));
       await reload();
     } catch (error: unknown) {
-      showActionError(error);
+      if (identityRef.current === originIdentity) showActionError(error);
     } finally {
-      setUploading(false);
+      if (identityRef.current === originIdentity) setUploading(false);
     }
   };
 
@@ -263,16 +306,23 @@ const PhotoArchive = ({
 
   const openPreview = async (item: DentalMediaItem) => {
     if (!numericVisitId) return;
+    // DENTPHOTO-FE-002: bind the preview request to the patient/visit it was
+    // opened under; a late response must never reopen under a new patient.
+    const originIdentity = identityRef.current;
     setPreviewingId(item.id);
     setActionError(null);
     try {
       const blob = await loadDentalMediaContent(item.id, numericVisitId);
       const url = URL.createObjectURL(blob);
+      if (identityRef.current !== originIdentity) {
+        URL.revokeObjectURL(url);
+        return;
+      }
       setPreview({ item, url });
     } catch (error: unknown) {
-      showActionError(error);
+      if (identityRef.current === originIdentity) showActionError(error);
     } finally {
-      setPreviewingId(null);
+      if (identityRef.current === originIdentity) setPreviewingId(null);
     }
   };
 
