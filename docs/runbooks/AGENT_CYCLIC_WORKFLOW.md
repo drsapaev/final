@@ -107,21 +107,38 @@ unchanged blockers instead of preparing what can safely be prepared.
 1. Have a Codex agent review the current PR head against the task scope, the
    diff, and validation evidence. Fix blocking findings in the same PR and
    review the new head after any update.
-2. Record the reviewed commit SHA, the verdict, and a short review summary on
-   the PR. GitHub accepts a formal **Approve** from a different GitHub identity
-   with review permission. If Codex is acting as the PR author, write
-   `Codex review: approved` with the reviewed SHA in a PR comment once the review
-   passes. [GitHub review rules](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/reviewing-proposed-changes-in-a-pull-request).
+2. Use the authorized owner connection to dispatch `codex-pr-app.yml` with
+   `operation=approve`, the PR number, the reviewed SHA, and the review summary.
+   Confirm that GitHub records **Approved** from `drsapaev-final-codex-pr[bot]`
+   on that commit.
 3. Confirm the reviewed SHA is still the PR head and all required CI checks
    and applicable validations are green. For a PR marked
    `AI-authored by ChatGPT: yes`, verify the recorded launcher evidence under
    the [additional merge gate](../../AGENTS.md#additional-merge-gate-for-chatgpt-authored-prs-owner-instruction-2026-11-10).
-   Squash-merge with `gh pr merge <number> --squash --match-head-commit <reviewed-sha>`.
+   Dispatch the same workflow with `operation=merge` on that SHA. Confirm that
+   GitHub recorded the merge before cleaning up the branch.
+
+```powershell
+gh workflow run codex-pr-app.yml --repo drsapaev/final --ref main `
+  -f operation=approve -f pull_request=<number> -f head_sha=<reviewed-sha> `
+  -f "review_summary=<review findings and verification>"
+gh workflow run codex-pr-app.yml --repo drsapaev/final --ref main `
+  -f operation=merge -f pull_request=<number> -f head_sha=<reviewed-sha>
+```
+
+The private GitHub App is installed only on `drsapaev/final`. It has
+`Pull requests: write` and `Contents: write` at installation. The workflow
+requests the permissions needed for each operation. It runs from `main` under
+the owner connection and uses the dedicated `codex-pr-app` environment. Its
+`CODEX_PR_APP_CLIENT_ID` variable and `CODEX_PR_APP_PRIVATE_KEY` secret belong to
+that environment.
 
 For this workflow, keep the required GitHub approving-review count at zero on
 `main`, with required code-owner and last-push approvals off. Required CI checks
-remain part of branch protection. If GitHub blocks a merge, inspect the
-applicable branch protection and rulesets before acting.
+remain part of branch protection. The workflow requires the App's approval for
+the exact head before it sends a squash-merge request to GitHub. If a dispatch
+fails, inspect the workflow run and the applicable branch protection before
+retrying.
 
 ## Scope Gate
 

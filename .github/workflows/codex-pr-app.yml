@@ -1,0 +1,155 @@
+name: Codex PR App
+
+run-name: Codex PR ${{ inputs.operation }} for #${{ inputs.pull_request }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: GitHub App action
+        type: choice
+        required: true
+        options:
+          - approve
+          - merge
+      pull_request:
+        description: Pull request number
+        type: number
+        required: true
+      head_sha:
+        description: Full SHA of the reviewed PR head
+        type: string
+        required: true
+      review_summary:
+        description: Codex review findings and verification for an approval
+        type: string
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: codex-pr-app-${{ inputs.pull_request }}
+  cancel-in-progress: false
+
+jobs:
+  act-on-reviewed-head:
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: codex-pr-app
+
+    steps:
+      - name: Create a repository-scoped GitHub App token
+        id: app
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.CODEX_PR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CODEX_PR_APP_PRIVATE_KEY }}
+          permission-contents: ${{ inputs.operation == 'merge' && 'write' || '' }}
+          permission-pull-requests: ${{ inputs.operation == 'approve' && 'write' || 'read' }}
+
+      - name: Apply the Codex review decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          OPERATION: ${{ inputs.operation }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          REVIEW_SUMMARY: ${{ inputs.review_summary }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+
+          def api(endpoint, *, method="GET", body=None, paginate=False):
+              command = ["gh", "api", "--method", method, endpoint]
+              if paginate:
+                  command.extend(["--paginate", "--slurp"])
+              if body is not None:
+                  command.extend(["--input", "-"])
+              result = subprocess.run(
+                  command,
+                  input=json.dumps(body) if body is not None else None,
+                  stdout=subprocess.PIPE,
+                  encoding="utf-8",
+                  check=True,
+              )
+              return json.loads(result.stdout)
+
+
+          app_slug = os.environ["APP_SLUG"]
+          app_login = f"{app_slug}[bot]"
+          operation = os.environ["OPERATION"]
+          pr_number = os.environ["PR_NUMBER"]
+          head_sha = os.environ["HEAD_SHA"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+          summary = os.environ["REVIEW_SUMMARY"].strip()
+
+          if app_slug != "drsapaev-final-codex-pr" or not os.environ["GH_TOKEN"]:
+              raise SystemExit("Expected the dedicated Codex GitHub App identity.")
+          if operation not in {"approve", "merge"} or not re.fullmatch("[1-9][0-9]*", pr_number):
+              raise SystemExit("Expected an approval or merge operation and a PR number.")
+          if not re.fullmatch("[0-9a-f]{40}", head_sha):
+              raise SystemExit("Expected the full SHA of the reviewed PR head.")
+          if operation == "approve" and not summary:
+              raise SystemExit("An approval must include the Codex review summary.")
+
+          endpoint = f"repos/{repository}/pulls/{pr_number}"
+          pr = api(endpoint)
+          if pr["state"] != "open" or pr["draft"] or pr["base"]["ref"] != "main":
+              raise SystemExit("Expected an open, ready PR into main.")
+          if pr["head"]["sha"] != head_sha or pr["user"]["login"] == app_login:
+              raise SystemExit("Expected the current reviewed SHA and a separate PR author.")
+
+          app_decision = None
+          for page in api(f"{endpoint}/reviews", paginate=True):
+              for review in page:
+                  if (
+                      (review.get("user") or {}).get("login") == app_login
+                      and review["commit_id"] == head_sha
+                      and review["state"] in {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}
+                  ):
+                      app_decision = review["state"]
+
+          if operation == "approve":
+              if app_decision == "APPROVED":
+                  print(f"The Codex App already approved {head_sha}.")
+                  raise SystemExit(0)
+              review = api(
+                  f"{endpoint}/reviews",
+                  method="POST",
+                  body={
+                      "event": "APPROVE",
+                      "commit_id": head_sha,
+                      "body": f"Codex review of {head_sha}.\n\n{summary}",
+                  },
+              )
+              if (
+                  review["user"]["login"] != app_login
+                  or review["commit_id"] != head_sha
+                  or review["state"] != "APPROVED"
+              ):
+                  raise SystemExit("GitHub did not record the expected App approval.")
+              print(f"The Codex App approved {head_sha}.")
+              raise SystemExit(0)
+
+          if app_decision != "APPROVED":
+              raise SystemExit("The reviewed head needs a current approval from the Codex App.")
+
+          merge = api(
+              f"{endpoint}/merge",
+              method="PUT",
+              body={"sha": head_sha, "merge_method": "squash"},
+          )
+          if not merge["merged"]:
+              raise SystemExit("GitHub rejected the exact-head merge.")
+          print(f"The Codex App merged {head_sha}.")
+          PY
