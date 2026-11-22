@@ -49,6 +49,13 @@ function makeCacheStubs(): CacheStubs {
 function compileSW(
   fetchImpl: ReturnType<typeof vi.fn>,
   cachesStub: CacheStubs['caches'],
+  worker: {
+    registration?: {
+      sync?: { register: (tag: string) => Promise<void> };
+      periodicSync?: { register: (tag: string, options: { minInterval: number }) => Promise<void> };
+    };
+    clients?: { claim: () => Promise<void> };
+  } = {},
 ): SWInternals {
   const code = readFileSync(TEMPLATE_PATH, 'utf8');
   const factory = new Function(
@@ -62,7 +69,13 @@ function compileSW(
   );
   const handlers = new Map();
   const result = factory(
-    { addEventListener: (name: string, handler: unknown) => { if (!handlers.has(name)) handlers.set(name, handler); }, skipWaiting: vi.fn(), registration: {}, clients: { claim: vi.fn() } },
+    {
+      addEventListener: (name: string, handler: unknown) => { if (!handlers.has(name)) handlers.set(name, handler); },
+      skipWaiting: vi.fn(),
+      registration: {},
+      clients: { claim: vi.fn() },
+      ...worker,
+    },
     cachesStub,
     { origin: 'https://clinic.test' },
     {},
@@ -351,6 +364,32 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     const offline = await sw.handleRequest(request);
     expect(offline.status).toBe(503);
     expect(stubs.caches.match).not.toHaveBeenCalled();
+  });
+
+  it('claims clients even while optional sync registrations are pending', async () => {
+    const pendingRegistration = new Promise<void>(() => {});
+    const registerSync = vi.fn(() => pendingRegistration);
+    const registerPeriodicSync = vi.fn(() => pendingRegistration);
+    const claim = vi.fn(async () => {});
+    const { caches } = makeCacheStubs();
+    const sw = compileSW(vi.fn(), caches, {
+      registration: {
+        sync: { register: registerSync },
+        periodicSync: { register: registerPeriodicSync },
+      },
+      clients: { claim },
+    });
+
+    let activation: Promise<unknown> | undefined;
+    sw.handlers.get('activate')?.({ waitUntil: (promise) => { activation = promise; } });
+    expect(activation).toBeDefined();
+    await activation;
+
+    expect(claim).toHaveBeenCalledOnce();
+    expect(registerSync).toHaveBeenCalledWith('clinic-background-sync');
+    expect(registerPeriodicSync).toHaveBeenCalledWith('clinic-data-sync', {
+      minInterval: 24 * 60 * 60 * 1000,
+    });
   });
 
   it('finishes activation with fallback disabled if old cache cleanup fails', async () => {
