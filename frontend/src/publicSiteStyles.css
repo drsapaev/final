@@ -63,21 +63,25 @@ html.public-site-document body {
 
 .public-site__header {
   display: flex;
+  box-sizing: border-box;
   min-height: 82px;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 12px 24px;
+  padding-block: 6px;
   border-bottom: 1px solid var(--mac-border, rgb(184, 200, 218));
 }
 
 .public-site .public-site__brand {
   display: inline-flex;
-  min-width: max-content;
+  min-inline-size: 0;
   align-items: center;
   gap: 10px;
   color: var(--mac-text-primary, rgb(0, 0, 0));
   font-size: 1rem;
   font-weight: 700;
+  overflow-wrap: anywhere;
   text-decoration: none;
 }
 
@@ -105,9 +109,14 @@ html.public-site-document body {
 
 .public-site__nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: var(--public-site-nav-gap);
+  gap: 8px var(--public-site-nav-gap);
+}
+
+.public-site__nav a {
+  overflow-wrap: anywhere;
 }
 
 .public-site__mobile-menu {
@@ -518,15 +527,8 @@ html.public-site-document body {
 @media (max-width: 760px) {
   .public-site__header {
     min-height: auto;
-    flex-wrap: wrap;
-    justify-content: space-between;
     gap: 12px;
     padding-block: 16px;
-  }
-
-  .public-site .public-site__brand {
-    min-width: 0;
-    overflow-wrap: anywhere;
   }
 
   .public-site__nav {

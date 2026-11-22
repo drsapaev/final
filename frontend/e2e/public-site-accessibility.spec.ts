@@ -215,6 +215,57 @@ async function assertMobileServiceNavigation(page: Page, locale: Locale, skipLin
   }
 }
 
+async function assertEnlargedDesktopNavigation(page: Page, locale: Locale) {
+  const header = page.locator('.public-site__header');
+  const navigation = header.getByRole('navigation', { name: locale.navigation, exact: true });
+  const navLinks = navigation.getByRole('link');
+  const headerLinks = header.getByRole('link');
+  const skipLink = page.getByRole('link', { name: locale.skipLink, exact: true });
+  const brand = header.getByRole('link', { name: PUBLIC_SITE_BRAND, exact: true });
+  const language = header.getByRole('link', { name: locale.languageSwitch, exact: true });
+
+  await expect(navLinks).toHaveCount(5);
+  await expect(headerLinks).toHaveCount(7);
+  // Simulate enlarged header text while preserving the page's viewport, spacing and breakpoint.
+  const enlarged = await headerLinks.evaluateAll((elements) => {
+    const links = elements as HTMLAnchorElement[];
+    const sizes = links.map((link) => Number.parseFloat(getComputedStyle(link).fontSize));
+    links.forEach((link, index) => {
+      link.style.fontSize = `${sizes[index] * 2}px`;
+    });
+    return links.every((link, index) =>
+      Math.abs(Number.parseFloat(getComputedStyle(link).fontSize) - sizes[index] * 2) < 0.1);
+  });
+  expect(enlarged, 'the computed font size of each header link should double').toBe(true);
+
+  await expect.poll(() => page.evaluate(() => {
+    const { scrollWidth, clientWidth } = document.documentElement;
+    return scrollWidth - clientWidth;
+  }), { message: 'the enlarged header should not cause horizontal overflow' }).toBeLessThanOrEqual(1);
+
+  for (const target of [skipLink, brand, ...await navLinks.all(), language]) {
+    await page.keyboard.press('Tab');
+    await expect(target).toBeFocused();
+    await expect(target).toBeInViewport({ ratio: 1 });
+    // Overflow clipping can hide a label even when the document has no horizontal scrollbar.
+    await expect.poll(() => target.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const { clientWidth } = document.documentElement;
+      return {
+        focusVisible: element.matches(':focus-visible'),
+        centerExposed: element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)),
+        textFits: Array.from(range.getClientRects()).every((rect) => rect.left >= -1 && rect.right <= clientWidth + 1),
+      };
+    }), { message: 'the focused navigation target and its text should remain exposed' }).toEqual({
+      focusVisible: true,
+      centerExposed: true,
+      textFits: true,
+    });
+  }
+}
+
 async function assertSkipNavigation(page: Page, locale: Locale, checkMobileServiceNavigation = false) {
   const skipLink = page.getByRole('link', { name: locale.skipLink, exact: true });
   const navigation = page.getByRole('navigation', { name: locale.navigation, exact: true });
@@ -461,6 +512,24 @@ test.describe('public-site accessibility', () => {
     test.setTimeout(120_000);
     await assertLocalizedCatalog(page, request, 1440);
   });
+
+  for (const locale of LOCALES) {
+    test(`the desktop header fits doubled ${locale.lang} text at 960px in Vite and Nitro`, async ({ page, request }) => {
+      await page.setViewportSize({ width: 960, height: 900 });
+      await installSyntheticApi(page, request);
+
+      for (const runtime of PUBLIC_SITE_ORIGINS) {
+        await test.step(runtime.name, async () => {
+          await page.goto(runtime.origin + locale.prefix + '/services');
+          const main = page.getByRole('main');
+          await expect(main.getByRole('heading', { name: SERVICE_TITLES[locale.lang], level: 1, exact: true }))
+            .toBeVisible();
+          await expect(page.locator('html')).toHaveAttribute('lang', locale.lang);
+          await assertEnlargedDesktopNavigation(page, locale);
+        });
+      }
+    });
+  }
 
   for (const locale of LOCALES) {
     test(`the Vite skip link keeps focus when the ${locale.lang} catalog loads`, async ({ page, request }) => {
