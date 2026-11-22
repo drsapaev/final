@@ -4,6 +4,7 @@ import {
   PUBLIC_SITE_ROUTE_DEFINITIONS,
   resolvePublicSiteRoute,
   type PublicSiteLocale,
+  type PublicSitePageKind,
   type PublicSiteRouteMatch,
 } from './routing/publicSiteRouteEntries';
 import {
