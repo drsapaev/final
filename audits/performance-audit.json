@@ -387,5 +387,24 @@
       }
     ]
   },
+  "public_field_data_follow_up": {
+    "checked_on": "2026-11-22",
+    "measured_origin": "https://finalclinic.fyi",
+    "source": "https://cruxvis.withgoogle.com/",
+    "method": "Enter the public origin in Google's CrUX Vis and inspect the resulting CrUX History API responses for that origin.",
+    "response_by_form_factor": {
+      "all": { "http_status": 404, "code": "NOT_FOUND" },
+      "phone": { "http_status": 404, "code": "NOT_FOUND" },
+      "desktop": { "http_status": 404, "code": "NOT_FOUND" },
+      "tablet": { "http_status": 404, "code": "NOT_FOUND" }
+    },
+    "collection_period": null,
+    "p75": {
+      "lcp_ms": null,
+      "inp_ms": null,
+      "cls": null
+    },
+    "result": "No origin record was returned at the time of the lookup. Field Core Web Vitals remain unverified."
+  },
   "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. On 2026-10-22 the owner-authorized Cloudflare setting for finalclinic.fyi was changed to Disable and remained selected after reload. A later no-cache GET returned HTTP 200 without the beacon script or /cdn-cgi/rum marker; ordinary Chrome verification remains pending because navigation failed with ERR_CONNECTION_RESET. Vercel Speed Insights returned no p75 samples, Vercel Function duration required Observability Plus, and PageSpeed Insights returned HTTP 429 due to zero daily quota. No server-only timing or field p75 was obtained, and no external telemetry was enabled."
 }
