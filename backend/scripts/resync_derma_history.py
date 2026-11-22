@@ -16,9 +16,9 @@
   ждёт, а его INSERT после коммита пересчёта может нарушить
   uq_derma_history_entry_identity и уронить сохранение ЭМК. Запускать
   только в окне обслуживания с остановленной записью.
-- хирургический (--visit-ids 12,34): пересчёт строк только ЭМК указанных
-  визитов (resync_derma_history_for_visits), БЕЗ глобального DELETE —
-  блокируется лишь диапазон затронутых визитов, годится под трафиком.
+- scoped (--visit-ids 12,34): пересчёт строк ЭМК указанных визитов
+  (resync_derma_history_for_visits). Остановите запись для этих визитов
+  на время короткой транзакции. См. docs/runbooks/DERMA_HISTORY_RESYNC.md.
 
 Запуск (от корня репо):
     python backend/scripts/resync_derma_history.py --database-url <url>
@@ -169,12 +169,12 @@ def main(argv: list[str] | None = None) -> int:
     if visit_ids is None:
         print(
             "mode: FULL rebuild — требует остановленной записи "
-            "(runbook: окно обслуживания; под трафиком — --visit-ids)"
+            "(runbook: окно обслуживания; для выбранных визитов — --visit-ids)"
         )
     else:
         print(
             f"mode: scoped, visit_ids={visit_ids} "
-            "(без глобального DELETE, безопасно под трафиком)"
+            "(пауза записи нужна для выбранных визитов)"
         )
 
     engine = create_engine(database_url)
