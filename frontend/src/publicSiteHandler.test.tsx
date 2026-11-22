@@ -45,6 +45,13 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+const DETAIL_ENTITY_TYPE = /"@type"\s*:\s*"(?:ProfilePage|Service)"/;
+
+function readStructuredData(document: Document): Record<string, unknown>[] {
+  return Array.from(document.querySelectorAll('head script[type="application/ld+json"]'), (tag) =>
+    JSON.parse(tag.textContent ?? '') as Record<string, unknown>);
+}
+
 describe('public-site SSR request handler', () => {
   it('renders a localized service detail and request-time SEO metadata', async () => {
     const fetchImpl = createFetch((url) => {
@@ -139,7 +146,7 @@ describe('public-site SSR request handler', () => {
     expect(article?.textContent).not.toContain('UZS');
   });
 
-  it.each(PUBLIC_SITE_ROUTE_DEFINITIONS)('renders the published clinic logo on $path and falls back when absent', async ({ path: routePath, locale }) => {
+  it.each(PUBLIC_SITE_ROUTE_DEFINITIONS)('renders the published clinic logo on $path and falls back when absent', async ({ path: routePath, locale, kind }) => {
     const path = routePath.replace(':slug', 'synthetic');
     const home = locale === 'ru' ? '/ru' : '/';
     const apiOrigin = 'https://api.kosmed.test';
@@ -174,7 +181,8 @@ describe('public-site SSR request handler', () => {
         String(url) === apiOrigin + '/api/v1/public-site/clinic');
       expect(clinicReads).toHaveLength(1);
       const html = await response.text();
-      if (!path.endsWith('/contacts')) expect(html).not.toContain('MedicalClinic');
+      if (kind !== 'contacts') expect(html).not.toContain('MedicalClinic');
+      if (kind !== 'doctor' && kind !== 'service') expect(html).not.toMatch(DETAIL_ENTITY_TYPE);
       const document = new DOMParser().parseFromString(html, 'text/html');
       return document.querySelector('header a.public-site__brand');
     }
@@ -374,11 +382,6 @@ describe('public-site SSR request handler', () => {
       );
     }
 
-    function readStructuredData(document: Document): Record<string, unknown>[] {
-      return Array.from(document.querySelectorAll('head script[type="application/ld+json"]'), (tag) =>
-        JSON.parse(tag.textContent ?? '') as Record<string, unknown>);
-    }
-
     it.each([
       {
         path: '/contacts',
@@ -529,6 +532,8 @@ describe('public-site SSR request handler', () => {
       sectionLabel: 'Услуги',
       sectionPath: '/ru/services',
       pageName: 'Лазерная терапия',
+      pageDescription: 'SYNTHETIC описание опубликованной услуги.',
+      category: 'SYNTHETIC категория',
     },
     {
       path: '/services/laser-care',
@@ -540,6 +545,8 @@ describe('public-site SSR request handler', () => {
       sectionLabel: 'Xizmatlar',
       sectionPath: '/services',
       pageName: 'Lazer terapiyasi',
+      pageDescription: 'SYNTHETIC e’lon qilingan xizmat tavsifi.',
+      category: null,
     },
     {
       path: '/ru/doctors/dermatolog',
@@ -550,7 +557,8 @@ describe('public-site SSR request handler', () => {
       homePath: '/ru',
       sectionLabel: 'Врачи',
       sectionPath: '/ru/doctors',
-      pageName: 'Врач дерматолог',
+      pageName: 'SYNTHETIC Doctor',
+      pageDescription: 'SYNTHETIC биография врача.',
     },
     {
       path: '/doctors/dermatolog',
@@ -561,16 +569,33 @@ describe('public-site SSR request handler', () => {
       homePath: '/',
       sectionLabel: 'Shifokorlar',
       sectionPath: '/doctors',
-      pageName: 'Dermatolog shifokor',
+      pageName: 'SYNTHETIC Doctor',
+      pageDescription: 'SYNTHETIC shifokor tarjimai holi.',
     },
-  ])('renders matching localized breadcrumbs and JSON-LD for $path', async (scenario) => {
-    const { kind, locale, path, slug, pageName } = scenario;
+  ])('renders localized breadcrumbs and published detail structured data for $path', async (scenario) => {
+    const { kind, locale, path, slug, pageName, pageDescription, category } = scenario;
     const apiPath = kind === 'service'
       ? `/api/v1/public-site/services/${slug}`
       : `/api/v1/public-site/doctors/${slug}`;
     const apiRecord = kind === 'service'
-      ? { slug, name: pageName, description: 'Published service description.', price: null, currency: null }
-      : { slug, name: pageName, bio: 'Published doctor biography.' };
+      ? {
+        slug,
+        name: pageName,
+        description: pageDescription,
+        category,
+        price: '125000.00',
+        currency: 'UZS',
+        related_doctors: [{ slug: 'synthetic-doctor', name: 'SYNTHETIC Related Doctor' }],
+      }
+      : {
+        slug,
+        name: pageName,
+        bio: pageDescription,
+        specialty: locale === 'ru' ? 'Дерматология' : 'Dermatologiya',
+        experience_years: 10,
+        professional_category: 'SYNTHETIC Qualification',
+        portrait_url: `/api/v1/public-site/media/${'b'.repeat(64)}`,
+      };
     const fetchImpl = createFetch((url) => {
       if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
       expect(url.pathname).toBe(apiPath);
@@ -589,27 +614,22 @@ describe('public-site SSR request handler', () => {
     );
     const html = await response.text();
     const navigation = html.match(/<nav class="public-site__breadcrumbs"[\s\S]*?<\/nav>/);
-    const jsonLdTag = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    const document = new DOMParser().parseFromString(html, 'text/html');
+    const structuredData = readStructuredData(document);
+    const canonical = `https://www.kosmed.test${path}`;
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Language')).toBe(locale);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(canonical);
+    expect(document.querySelector('article h1')?.textContent).toContain(pageName);
+    expect(document.querySelector('article')?.textContent).toContain(pageDescription);
     expect(navigation).not.toBeNull();
     expect(navigation?.[0]).toContain(`<a href="${scenario.homePath}">${scenario.homeLabel}</a>`);
     expect(navigation?.[0]).toContain(`<a href="${scenario.sectionPath}">${scenario.sectionLabel}</a>`);
     expect(navigation?.[0]).toContain(`<span aria-current="page">${pageName}</span>`);
-    expect(jsonLdTag).not.toBeNull();
-    if (!jsonLdTag) throw new Error('BreadcrumbList JSON-LD was not rendered.');
-
-    const jsonLd = JSON.parse(jsonLdTag[1]) as {
-      '@context': string;
-      '@type': string;
-      itemListElement: Array<{
-        '@type': string;
-        position: number;
-        name: string;
-        item: string;
-      }>;
-    };
-    expect(jsonLd).toEqual({
+    expect(structuredData.find((record) => record['@type'] === 'BreadcrumbList')).toEqual({
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
       itemListElement: [
@@ -629,10 +649,31 @@ describe('public-site SSR request handler', () => {
           '@type': 'ListItem',
           position: 3,
           name: pageName,
-          item: new URL(path, 'https://www.kosmed.test').href,
+          item: canonical,
         },
       ],
     });
+    const expectedEntity = kind === 'service' ? {
+      '@context': 'https://schema.org',
+      '@type': 'Service',
+      '@id': `https://www.kosmed.test/services/${slug}#service`,
+      url: canonical,
+      name: pageName,
+      description: pageDescription,
+      ...(category ? { category } : {}),
+    } : {
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      url: canonical,
+      mainEntity: {
+        '@type': 'Person',
+        '@id': `https://www.kosmed.test/doctors/${slug}#doctor`,
+        name: pageName,
+        description: pageDescription,
+      },
+    };
+    expect(structuredData.filter((record) => record['@type'] !== 'BreadcrumbList')).toEqual([expectedEntity]);
+    if (category) expect(document.querySelector('article .public-site__eyebrow')?.textContent).toBe(category);
   });
 
   it('omits breadcrumbs from home, hidden details, and their JSON-LD', async () => {
@@ -660,10 +701,11 @@ describe('public-site SSR request handler', () => {
 
   it('escapes untrusted catalog text inside the JSON-LD script element', async () => {
     const unsafeName = '</script><script>alert(1)</script> &';
+    const unsafeDescription = 'SYNTHETIC description </script> &';
     const fetchImpl = createFetch(() => jsonResponse({
       slug: 'unsafe-name',
       name: unsafeName,
-      description: 'Published service description.',
+      description: unsafeDescription,
       price: null,
       currency: null,
     }));
@@ -686,9 +728,20 @@ describe('public-site SSR request handler', () => {
       itemListElement: Array<{ name: string }>;
     };
     expect(jsonLd.itemListElement[jsonLd.itemListElement.length - 1]?.name).toBe(unsafeName);
+
+    const document = new DOMParser().parseFromString(html, 'text/html');
+    const service = readStructuredData(document).find((record) => record['@type'] === 'Service');
+    expect(html).not.toContain(unsafeDescription);
+    expect(service).toMatchObject({ name: unsafeName, description: unsafeDescription });
+    expect(service).not.toHaveProperty('category');
   });
 
-  it.each(['/ru/services', '/ru/contacts'])('returns a generic 503 without published data when %s fails', async (path) => {
+  it.each([
+    '/ru/services',
+    '/ru/contacts',
+    '/ru/services/synthetic-service',
+    '/ru/doctors/synthetic-doctor',
+  ])('returns a generic 503 without published data when %s fails', async (path) => {
     const fetchImpl = createFetch(() => new Response('private upstream error', { status: 500 }));
     const response = await handlePublicSiteRequest(
       new Request(`https://preview.kosmed.test${path}`),
@@ -705,12 +758,16 @@ describe('public-site SSR request handler', () => {
     expect(html).not.toContain('private upstream error');
     expect(html).not.toContain('old published card');
     expect(html).not.toContain('MedicalClinic');
+    expect(html).not.toMatch(DETAIL_ENTITY_TYPE);
   });
 
-  it('returns a public 404 for a hidden or unknown detail slug', async () => {
+  it.each([
+    { path: '/ru/services/hidden-service', message: 'Услуга не найдена или больше не опубликована.' },
+    { path: '/ru/doctors/hidden-doctor', message: 'Врач не найден или профиль больше не опубликован.' },
+  ])('returns a public 404 without structured detail data for $path', async ({ path, message }) => {
     const fetchImpl = createFetch(() => jsonResponse({ detail: { code: 'public_content_not_found' } }, 404));
     const response = await handlePublicSiteRequest(
-      new Request('https://preview.kosmed.test/ru/services/hidden-service'),
+      new Request(`https://preview.kosmed.test${path}`),
       { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'preview' },
       assets,
       fetchImpl,
@@ -720,9 +777,10 @@ describe('public-site SSR request handler', () => {
     expect(response.status).toBe(404);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
-    expect(html).toContain('Услуга не найдена или больше не опубликована.');
+    expect(html).toContain(message);
     expect(html).not.toContain('public_content_not_found');
     expect(html).not.toContain('MedicalClinic');
+    expect(html).not.toMatch(DETAIL_ENTITY_TYPE);
   });
 
   it('generates a no-store sitemap from published services and doctors in both locales', async () => {
@@ -795,6 +853,7 @@ describe('public-site SSR request handler', () => {
       expect(html, pathname).toContain('/assets/clinic-app.js');
       expect(html, pathname).not.toContain('id="public-site-root"');
       expect(html, pathname).not.toContain('MedicalClinic');
+      expect(html, pathname).not.toMatch(DETAIL_ENTITY_TYPE);
     }
 
     expect(fetchImpl).not.toHaveBeenCalled();
