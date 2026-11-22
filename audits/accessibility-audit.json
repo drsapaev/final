@@ -106,5 +106,39 @@
       "Desktop text-only enlargement",
       "Full WCAG 2.2 AA audit and full staging validation"
     ]
+  },
+  "loading_focus_follow_up": {
+    "date": "2026-11-22",
+    "base_sha": "590d8461f7712ef54fbea556f9373df03891f2cf",
+    "runtime": "Isolated Vite using synthetic catalog responses",
+    "routes": [
+      "/services",
+      "/ru/services"
+    ],
+    "browsers": [
+      "Chrome",
+      "Firefox"
+    ],
+    "method": "Hold the required catalog response. Press Tab and Enter to focus main while loading, then release the response and read the active element and the original node identity.",
+    "baseline": {
+      "successful_load_cases_losing_focus": 4,
+      "http_503_cases_retaining_focus": 4,
+      "observation": "After success, the browser retained #main-content, focused the body and returned to the skip link on the next Tab."
+    },
+    "fix": "Keep the shared header, native skip link and main landmark mounted across request states for a single pathname.",
+    "result": {
+      "cases_passed": 8,
+      "ready_cases_retaining_main": 4,
+      "http_503_cases_retaining_main": 4,
+      "after_ready_next_tab": "Localized breadcrumb inside main",
+      "after_http_503_next_tab": "Localized retry link inside main",
+      "fixture_teardown": "PASS"
+    },
+    "regression": "Playwright holds a real synthetic catalog response in both Vite locales and checks the same focused main before and after success, including the next Tab stop.",
+    "remaining": [
+      "Actual screen-reader speech",
+      "Native Safari and physical devices",
+      "Full WCAG 2.2 AA and staging acceptance"
+    ]
   }
 }

@@ -33,9 +33,11 @@ const LOCALES = [
 ] as const;
 type Locale = (typeof LOCALES)[number];
 
+const SERVICE_TITLES = { 'uz-Latn': 'Xizmatlar', ru: 'Услуги' } as const;
+
 const PAGES = [
   { path: '', titles: { 'uz-Latn': 'SYNTHETIC QA CLINIC', ru: 'SYNTHETIC QA CLINIC' } },
-  { path: '/services', titles: { 'uz-Latn': 'Xizmatlar', ru: 'Услуги' } },
+  { path: '/services', titles: SERVICE_TITLES },
   {
     path: '/services/synthetic-service',
     titles: { 'uz-Latn': 'Sintetik sinov xizmati', ru: 'Синтетическая тестовая услуга' },
@@ -103,7 +105,13 @@ function jsonResponse(body: unknown, status = 200) {
 async function installSyntheticApi(
   page: Page,
   request: APIRequestContext,
-  beforePublicFailure?: () => Promise<void>,
+  {
+    beforeCatalogResponse,
+    beforePublicFailure,
+  }: {
+    beforeCatalogResponse?: () => Promise<void>;
+    beforePublicFailure?: () => Promise<void>;
+  } = {},
 ) {
   await page.routeWebSocket('**/*', (socket) => socket.close());
   await page.route('**/*', (route) => {
@@ -133,6 +141,9 @@ async function installSyntheticApi(
         await beforePublicFailure();
         await route.fulfill(jsonResponse({ detail: 'synthetic upstream unavailable' }, 503));
         return;
+      }
+      if (pathname === '/api/v1/public-site/services' && beforeCatalogResponse) {
+        await beforeCatalogResponse();
       }
 
       const fixtureUrl = new URL(FIXTURE_ORIGIN);
@@ -451,9 +462,46 @@ test.describe('public-site accessibility', () => {
     await assertLocalizedCatalog(page, request, 1440);
   });
 
+  for (const locale of LOCALES) {
+    test(`the Vite skip link keeps focus when the ${locale.lang} catalog loads`, async ({ page, request }) => {
+      let releaseCatalog!: () => void;
+      const holdCatalog = new Promise<void>((resolve) => { releaseCatalog = resolve; });
+      const path = VITE_ORIGIN + locale.prefix + '/services';
+      const main = page.getByRole('main');
+      const skipLink = page.getByRole('link', { name: locale.skipLink, exact: true });
+
+      try {
+        await installSyntheticApi(page, request, { beforeCatalogResponse: () => holdCatalog });
+        await Promise.all([
+          page.waitForRequest((candidate) => new URL(candidate.url()).pathname === '/api/v1/public-site/services'),
+          page.goto(path, { waitUntil: 'domcontentloaded' }),
+        ]);
+        await expect(main).toHaveAttribute('aria-busy', 'true');
+        await page.keyboard.press('Tab');
+        await expect(skipLink).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(path + '#main-content');
+        await expect(main).toBeFocused();
+        const loadingMain = await main.elementHandle();
+
+        releaseCatalog();
+        await expect(main.getByRole('heading', { level: 1, name: SERVICE_TITLES[locale.lang], exact: true })).toBeVisible();
+        await expect(main).not.toHaveAttribute('aria-busy', 'true');
+        await expect(page).toHaveURL(path + '#main-content');
+        await expect(main).toBeFocused();
+        expect(await loadingMain.evaluate((element) => element === document.activeElement)).toBe(true);
+
+        await page.keyboard.press('Tab');
+        await expect(main.locator('.public-site__breadcrumbs a').first()).toBeFocused();
+      } finally {
+        releaseCatalog();
+      }
+    });
+  }
+
   test('the Vite error state uses the public locale and restores the app language on exit', async ({ page, request }) => {
     let allowPublicFailure = Promise.resolve();
-    await installSyntheticApi(page, request, () => allowPublicFailure);
+    await installSyntheticApi(page, request, { beforePublicFailure: () => allowPublicFailure });
     await page.goto(VITE_ORIGIN + '/login');
     const login = page.locator('input[autocomplete="username"]');
     const body = page.locator('body');
