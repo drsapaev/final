@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { getApiOrigin } from './api/runtime';
 import { createPublicSiteApi } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
-import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_COPY } from './publicSiteMetadata';
+import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_TITLES } from './publicSiteMetadata';
 import {
   PublicSiteFallback,
   PublicSitePage,
@@ -22,7 +22,7 @@ export default function PublicSiteAppRoute() {
   const [pageState, setPageState] = useState<PageState>({ pathname, status: 'loading' });
   const state = pageState.pathname === pathname ? pageState : { pathname, status: 'loading' as const };
   const title = route && (state.status === 'error'
-    ? PUBLIC_SITE_ERROR_COPY[route.locale].title
+    ? PUBLIC_SITE_ERROR_TITLES[route.locale]
     : getPublicSitePageMetadata(route, state.status === 'ready' ? state.data : undefined).title);
 
   useLayoutEffect(() => {

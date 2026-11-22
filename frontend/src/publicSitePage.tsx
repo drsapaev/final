@@ -181,10 +181,6 @@ const COPY: Record<PublicSiteLocale, Copy> = {
   },
 };
 
-export function getPublicSiteSkipLinkLabel(locale: PublicSiteLocale): string {
-  return COPY[locale].skipToContent;
-}
-
 interface PublicSitePageProps {
   route: PublicSiteRouteMatch;
   data: PublicSitePageData;

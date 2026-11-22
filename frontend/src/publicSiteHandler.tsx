@@ -17,12 +17,12 @@ import {
   type PublicSiteService,
 } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
-import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_COPY } from './publicSiteMetadata';
+import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_TITLES } from './publicSiteMetadata';
 import {
   getPublicClinicContacts,
   getPublicSiteBreadcrumbs,
-  getPublicSiteSkipLinkLabel,
   PublicSitePage,
+  PublicSiteRequestState,
 } from './publicSitePage';
 
 export interface PublicSiteRuntimeConfig {
@@ -335,24 +335,8 @@ export async function handlePublicSiteRequest(
     return new Response(request.method === 'HEAD' ? null : robots, { status: 200, headers });
   }
 
-  if (!origin) {
-    if (resolvePublicSiteRoute(url.pathname) || url.pathname === '/sitemap.xml') {
-      const body = url.pathname === '/sitemap.xml'
-        ? 'Sitemap is temporarily unavailable'
-        : renderErrorDocument(localeHint, assets.pageStyles, assets.pageStyleText);
-      const contentType = url.pathname === '/sitemap.xml'
-        ? 'application/xml; charset=utf-8'
-        : 'text/html; charset=utf-8';
-      return new Response(request.method === 'HEAD' ? null : body, {
-        status: 503,
-        headers: responseHeaders(contentType, true),
-      });
-    }
-    return htmlResponse(renderAppShell(assets), 200, localeHint, true, request.method);
-  }
-
   if (url.pathname === '/sitemap.xml') {
-    if (!config.apiOrigin) {
+    if (!origin || !config.apiOrigin) {
       return new Response(request.method === 'HEAD' ? null : 'Sitemap is temporarily unavailable', {
         status: 503,
         headers: responseHeaders('application/xml; charset=utf-8', true),
@@ -375,6 +359,7 @@ export async function handlePublicSiteRequest(
   if (!route) {
     return htmlResponse(renderAppShell(assets), 200, localeHint, true, request.method);
   }
+  if (!origin) return renderErrorResponse(route, assets, request.method);
 
   try {
     if (!config.apiOrigin) throw new PublicSiteApiError();
@@ -387,7 +372,7 @@ export async function handlePublicSiteRequest(
     return htmlResponse(html, status, route.locale, noIndex || status === 404, request.method);
   } catch {
     // Error details can contain upstream response data; keep the public response generic.
-    return htmlResponse(renderErrorDocument(route.locale, assets.pageStyles, assets.pageStyleText), 503, route.locale, true, request.method);
+    return renderErrorResponse(route, assets, request.method);
   }
 }
 
@@ -424,13 +409,15 @@ function renderPageStyles(styles: string[], pageStyleText?: string): string {
   return pageStyleText || styles.map((href) => `<link rel="stylesheet" href="${escapeHtml(href)}">`).join('');
 }
 
-function renderErrorDocument(locale: PublicSiteLocale, styles: string[], pageStyleText?: string): string {
-  const error = PUBLIC_SITE_ERROR_COPY[locale];
-  const css = renderPageStyles(styles, pageStyleText);
-  return '<!doctype html><html lang="' + escapeHtml(locale) + '"><head>' +
+function renderErrorResponse(route: PublicSiteRouteMatch, assets: PublicSiteAssets, method: string): Response {
+  const { locale } = route;
+  const title = PUBLIC_SITE_ERROR_TITLES[locale];
+  const css = renderPageStyles(assets.pageStyles, assets.pageStyleText);
+  const body = renderToString(<PublicSiteRequestState route={route} status="error" />);
+  const html = `<!doctype html><html lang="${escapeHtml(locale)}"><head>` +
     '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<meta name="robots" content="noindex,nofollow">' +
-    `<title>${escapeHtml(error.title)}</title>${css}</head>` +
-    `<body><div class="public-site"><a class="public-site__skip-link" href="#main-content">${escapeHtml(getPublicSiteSkipLinkLabel(locale))}</a>` +
-    `<main id="main-content" tabindex="-1" class="public-site__error"><h1>${escapeHtml(error.title)}</h1><p>${escapeHtml(error.message)}</p></main></div></body></html>`;
+    `<title>${escapeHtml(title)}</title>${css}</head>` +
+    `<body>${body}</body></html>`;
+  return htmlResponse(html, 503, locale, true, method);
 }
