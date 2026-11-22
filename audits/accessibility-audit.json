@@ -246,5 +246,52 @@
       "Contrast samples cover default states and the visible skip-link focus outline. Hover, forced colors and Vite dark mode were outside this measurement.",
       "Exact screen-reader speech, physical devices, native Safari and complete WCAG conformance remain unverified."
     ]
+  },
+  "forced_colors_keyboard_follow_up": {
+    "date": "2026-11-22",
+    "origin": "https://finalclinic.fyi",
+    "deployment_id": "dpl_FatQQZaGA9nTMJ2JdfQjprktTzym",
+    "deployment_sha": "b32c990d9f7fd90199ff60038243269b0328896c",
+    "verified_deployment_before_and_after": true,
+    "browser": "Headless Chrome 157.0.8103.79 on Windows, using Playwright.",
+    "routes": [
+      "/services",
+      "/ru/services"
+    ],
+    "document_languages": [
+      "uz-Latn",
+      "ru"
+    ],
+    "viewport_widths_css_px": [1366, 390],
+    "forced_colors": {
+      "observed_at_utc": "2026-11-22T14:22:57.633Z",
+      "media_features": {
+        "forced-colors": "active",
+        "prefers-color-scheme": "light"
+      },
+      "cases_passed": 4,
+      "minimum_computed_outline_contrast": 15.134,
+      "outlines": "Computed 3 CSS px solid outlines on sampled links and filter controls and native auto outlines on main and the mobile disclosure."
+    },
+    "light_comparison": {
+      "observed_at_utc": "2026-11-22T14:23:44.888Z",
+      "cases_passed": 4,
+      "minimum_computed_outline_contrast": 4.269,
+      "navigation_hover_text_contrast": {
+        "desktop": 6.53,
+        "narrow": 6.056
+      }
+    },
+    "checks": [
+      "Loaded each route with HTTP 200 and the expected document language in a fresh browser context for each viewport and color mode.",
+      "First Tab revealed the skip link. Enter focused main and set the target fragment. Subsequent Tab reached the search, category selector and reset control.",
+      "Keyboard focus reached the desktop navigation. In the narrow layout Enter opened the native disclosure, Tab reached its first link, and Shift+Tab followed by Enter closed the menu.",
+      "Checked :focus-visible, viewport intersection and computed outline contrast against the adjacent solid surface. In the light comparison also measured the hovered navigation text."
+    ],
+    "limitations": [
+      "An initial forced-colors attempt encountered connection resets. The recorded complete sweeps used a fresh browser process with QUIC and HTTP/2 disabled.",
+      "Measurements cover the browser's emulated light forced-colors palette and these two routes. Dark palettes, physical devices, native Safari and actual screen-reader speech remain separate checks.",
+      "No new Axe scan or full WCAG 2.2 AA or staging acceptance was performed in these sweeps. Previous Axe results remain in their original audit section."
+    ]
   }
 }
