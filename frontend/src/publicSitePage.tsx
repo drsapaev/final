@@ -210,9 +210,9 @@ function formatDoctorHeading(doctor: PublicSiteDoctor): string {
 }
 
 function displayTime(value?: string | null): string | null {
-  if (!value) return null;
-  const match = value.match(/^(\d{2}:\d{2})/);
-  return match?.[1] ?? null;
+  return value && /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value)
+    ? value.slice(0, 5)
+    : null;
 }
 
 function formatPrice(service: PublicSiteService, locale: PublicSiteLocale, copy: Copy): string {
@@ -366,21 +366,29 @@ function SiteFooter({ clinicName, locale, copy }: {
   );
 }
 
-function ContactLinks({ clinic, copy }: { clinic?: PublicSiteClinic; copy: Copy }) {
-  const telHref = cleanTelHref(clinic?.phone);
-  const mailtoHref = cleanMailtoHref(clinic?.email);
+export function getPublicClinicContacts(clinic?: PublicSiteClinic) {
   const start = displayTime(clinic?.working_hours_start);
   const end = displayTime(clinic?.working_hours_end);
-  const hasHours = Boolean(start && end);
-  const hasContact = Boolean(telHref || mailtoHref || clinic?.address || hasHours);
-  if (!hasContact) return <p className="public-site__muted">{copy.contactMissing}</p>;
+  return {
+    address: clinic?.address?.trim() || undefined,
+    telHref: cleanTelHref(clinic?.phone),
+    mailtoHref: cleanMailtoHref(clinic?.email),
+    hours: start && end && start < end ? { start, end } : undefined,
+  };
+}
+
+function ContactLinks({ clinic, copy }: { clinic?: PublicSiteClinic; copy: Copy }) {
+  const { address, telHref, mailtoHref, hours } = getPublicClinicContacts(clinic);
+  if (!address && !telHref && !mailtoHref && !hours) {
+    return <p className="public-site__muted">{copy.contactMissing}</p>;
+  }
 
   return (
     <address className="public-site__contact-list">
-      {clinic?.address && <p><span>{copy.address}</span>{clinic.address}</p>}
+      {address && <p><span>{copy.address}</span>{address}</p>}
       {telHref && <p><span>{copy.callClinic}</span><a href={telHref}>{clinic?.phone}</a></p>}
       {mailtoHref && <p><span>{copy.emailClinic}</span><a href={mailtoHref}>{clinic?.email}</a></p>}
-      {hasHours && <p><span>{copy.workingHours}</span>{copy.workingDays}, {start}–{end}; {copy.sundayClosed}</p>}
+      {hours && <p><span>{copy.workingHours}</span>{copy.workingDays}, {hours.start}–{hours.end}; {copy.sundayClosed}</p>}
     </address>
   );
 }

@@ -11,12 +11,18 @@ import {
   createPublicSiteApi,
   PublicSiteApiError,
   type PublicSiteApi,
+  type PublicSiteClinic,
   type PublicSiteDoctor,
   type PublicSiteFetch,
   type PublicSiteService,
 } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
-import { getPublicSiteBreadcrumbs, getPublicSiteSkipLinkLabel, PublicSitePage } from './publicSitePage';
+import {
+  getPublicClinicContacts,
+  getPublicSiteBreadcrumbs,
+  getPublicSiteSkipLinkLabel,
+  PublicSitePage,
+} from './publicSitePage';
 
 export interface PublicSiteRuntimeConfig {
   apiOrigin?: string;
@@ -114,6 +120,34 @@ function serializeJsonLd(value: unknown): string {
     .replace(/\u2029/g, '\\u2029');
 }
 
+function renderMedicalClinicJsonLd(clinic: PublicSiteClinic | undefined, origin: string): string {
+  const name = clinic?.name?.trim();
+  if (!clinic || !name) return '';
+
+  const { address, telHref, mailtoHref, hours } = getPublicClinicContacts(clinic);
+  if (!address && !telHref && !mailtoHref && !hours) return '';
+
+  const openingHoursSpecification = hours && {
+    '@type': 'OpeningHoursSpecification',
+    dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      .map((day) => `https://schema.org/${day}`),
+    opens: `${hours.start}:00`,
+    closes: `${hours.end}:00`,
+  };
+
+  return `<script type="application/ld+json">${serializeJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'MedicalClinic',
+    '@id': `${origin}/#clinic`,
+    url: `${origin}/`,
+    name,
+    address,
+    telephone: telHref?.slice('tel:'.length),
+    email: mailtoHref ? clinic.email?.trim() : undefined,
+    openingHoursSpecification,
+  })}</script>`;
+}
+
 function pageMeta(route: PublicSiteRouteMatch, data: PublicSitePageData): PageMeta {
   const base = META_COPY[route.locale][route.kind];
   if (route.kind === 'service' && data.service) {
@@ -159,6 +193,7 @@ function renderPublicDocument(
       })),
     })}</script>`
     : '';
+  const clinicJsonLd = route.kind === 'contacts' ? renderMedicalClinicJsonLd(data.clinic, origin) : '';
   const body = renderToString(<PublicSitePage route={route} data={data} />);
   const css = renderPageStyles(styles, pageStyleText);
 
@@ -174,7 +209,7 @@ function renderPublicDocument(
     `<meta property="og:description" content="${escapeHtml(meta.description)}">` +
     `<meta property="og:type" content="website"><meta property="og:url" content="${escapeHtml(canonical)}">` +
     `<meta property="og:locale" content="${route.locale === 'ru' ? 'ru_RU' : 'uz_UZ'}">` +
-    `<meta name="twitter:card" content="summary">${breadcrumbJsonLd}${css}</head>` +
+    `<meta name="twitter:card" content="summary">${breadcrumbJsonLd}${clinicJsonLd}${css}</head>` +
     `<body><div id="public-site-root">${body}</div></body></html>`;
 }
 
