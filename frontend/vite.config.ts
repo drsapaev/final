@@ -75,6 +75,21 @@ function createPlugins(enableBundleVisualizer: boolean, enableNitro: boolean): P
     serviceWorkerCacheBustingPlugin(),
   ];
 
+  if (enableNitro && process.env.VERCEL === "1") {
+    // Nitro renders the indexable catalog separately from this Vite fallback.
+    plugins.push({
+      name: "clinic-vercel-spa-noindex",
+      apply: "build",
+      transformIndexHtml() {
+        return [{
+          tag: "meta",
+          attrs: { name: "robots", content: "noindex, nofollow" },
+          injectTo: "head",
+        }];
+      },
+    });
+  }
+
   if (enableBundleVisualizer) {
     plugins.push(
       // rollup-plugin-visualizer returns a rollup.Plugin. Runtime-compatible
