@@ -29,15 +29,9 @@ const META_COPY: Record<PublicSiteLocale, Record<PublicSitePageKind, PageMeta>> 
   },
 };
 
-export const PUBLIC_SITE_ERROR_COPY: Record<PublicSiteLocale, { title: string; message: string }> = {
-  ru: {
-    title: `Страница временно недоступна — ${BRAND}`,
-    message: 'Не удалось загрузить актуальную информацию клиники. Попробуйте открыть страницу позже.',
-  },
-  'uz-Latn': {
-    title: `Sahifa vaqtincha ochilmayapti — ${BRAND}`,
-    message: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi. Sahifani keyinroq ochib ko‘ring.',
-  },
+export const PUBLIC_SITE_ERROR_TITLES: Record<PublicSiteLocale, string> = {
+  ru: `Страница временно недоступна — ${BRAND}`,
+  'uz-Latn': `Sahifa vaqtincha ochilmayapti — ${BRAND}`,
 };
 
 function truncateDescription(value: string): string {

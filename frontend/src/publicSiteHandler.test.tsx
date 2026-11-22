@@ -52,6 +52,14 @@ function readStructuredData(document: Document): Record<string, unknown>[] {
     JSON.parse(tag.textContent ?? '') as Record<string, unknown>);
 }
 
+function expectUnavailablePage(response: Response, locale: string) {
+  expect(response.status).toBe(503);
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
+  expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+  expect(response.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
+  expect(response.headers.get('Content-Language')).toBe(locale);
+}
+
 describe('public-site SSR request handler', () => {
   it('renders a localized service detail and request-time SEO metadata', async () => {
     const fetchImpl = createFetch((url) => {
@@ -736,29 +744,130 @@ describe('public-site SSR request handler', () => {
     expect(service).not.toHaveProperty('category');
   });
 
+  const errorCopy = {
+    ru: {
+      title: 'Страница временно недоступна — Doktor KosMed Clinic',
+      message: 'Не удалось загрузить актуальную информацию клиники.',
+      navigation: 'Навигация сайта',
+      retry: 'Повторить',
+      skip: 'Перейти к основному содержимому',
+    },
+    'uz-Latn': {
+      title: 'Sahifa vaqtincha ochilmayapti — Doktor KosMed Clinic',
+      message: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.',
+      navigation: 'Sayt navigatsiyasi',
+      retry: 'Qayta urinish',
+      skip: 'Asosiy mazmunga o‘tish',
+    },
+  } as const;
+
   it.each([
-    '/ru/services',
-    '/ru/contacts',
-    '/ru/services/synthetic-service',
-    '/ru/doctors/synthetic-doctor',
-  ])('returns a generic 503 without published data when %s fails', async (path) => {
-    const fetchImpl = createFetch(() => new Response('private upstream error', { status: 500 }));
+    { path: '/services', locale: 'ru' },
+    { path: '/contacts', locale: 'ru' },
+    { path: '/services/synthetic-service', locale: 'ru' },
+    { path: '/doctors/synthetic-doctor', locale: 'ru' },
+    { path: '/doctors/synthetic-doctor', locale: 'uz-Latn' },
+  ] as const)('returns the localized recovery view for $locale $path failures', async ({ path, locale }) => {
+    const fetchImpl = createFetch(() => new Response('private upstream error: old published card', { status: 500 }));
+    const prefix = locale === 'ru' ? '/ru' : '';
+    const alternatePrefix = locale === 'ru' ? '' : '/ru';
+    const copy = errorCopy[locale];
     const response = await handlePublicSiteRequest(
-      new Request(`https://preview.kosmed.test${path}`),
-      { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'preview' },
+      new Request(`https://www.kosmed.test${prefix}${path}?ref=synthetic-incidental-query`),
+      { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'production' },
       assets,
       fetchImpl,
     );
     const html = await response.text();
+    const document = new DOMParser().parseFromString(html, 'text/html');
 
-    expect(response.status).toBe(503);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
-    expect(html).toContain('Не удалось загрузить актуальную информацию клиники.');
+    expectUnavailablePage(response, locale);
+    expect(document.documentElement.lang).toBe(locale);
+    expect(document.title).toBe(copy.title);
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex,nofollow');
+    expect(document.querySelector('link[rel="canonical"], script')).toBeNull();
+    const nav = document.querySelector('header > nav');
+    expect(nav?.getAttribute('aria-label')).toBe(copy.navigation);
+    expect(nav?.querySelector(`a[href="${prefix}/contacts"]`)).not.toBeNull();
+    expect(document.querySelector('header .public-site__language')?.getAttribute('href')).toBe(alternatePrefix + path);
+    expect(document.querySelector('a[href="#main-content"]')?.textContent).toBe(copy.skip);
+    const main = document.querySelector('main#main-content');
+    expect(main?.getAttribute('tabindex')).toBe('-1');
+    const error = main?.querySelector('[role="alert"]');
+    expect(error?.querySelector('h1')?.textContent).toBe(copy.message);
+    const retry = error?.querySelector('a');
+    expect(retry?.textContent).toBe(copy.retry);
+    expect(retry?.getAttribute('href')).toBe(prefix + path);
+    expect(html).not.toContain('synthetic-incidental-query');
     expect(html).not.toContain('private upstream error');
     expect(html).not.toContain('old published card');
-    expect(html).not.toContain('MedicalClinic');
-    expect(html).not.toMatch(DETAIL_ENTITY_TYPE);
+  });
+
+  it('returns the 503 headers and an empty body for HEAD', async () => {
+    const response = await handlePublicSiteRequest(
+      new Request('https://www.kosmed.test/ru/services/synthetic-service', { method: 'HEAD' }),
+      { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'production' },
+      assets,
+      createFetch(() => new Response(null, { status: 500 })),
+    );
+
+    expectUnavailablePage(response, 'ru');
+    expect(await response.text()).toBe('');
+  });
+
+  it('keeps the localized retry link when the configured canonical origin is invalid', async () => {
+    const fetchImpl = createFetch(() => jsonResponse({}));
+    const response = await handlePublicSiteRequest(
+      new Request('https://www.kosmed.test/doctors/synthetic-doctor?ref=synthetic-incidental-query'),
+      {
+        apiOrigin: 'https://api.kosmed.test',
+        siteOrigin: 'ftp://invalid-canonical-origin.test',
+        deploymentEnvironment: 'production',
+      },
+      assets,
+      fetchImpl,
+    );
+    const html = await response.text();
+    const document = new DOMParser().parseFromString(html, 'text/html');
+
+    expectUnavailablePage(response, 'uz-Latn');
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(document.title).toBe(errorCopy['uz-Latn'].title);
+    expect(document.querySelector('link[rel="canonical"], script')).toBeNull();
+    expect(document.querySelector('main [role="alert"] a')?.getAttribute('href')).toBe('/doctors/synthetic-doctor');
+    expect(html).not.toContain('invalid-canonical-origin.test');
+  });
+
+  it('retries the same localized detail after the synthetic API recovers', async () => {
+    const path = '/ru/services/synthetic-service';
+    const requestUrl = `https://www.kosmed.test${path}?ref=synthetic-incidental-query`;
+    const config = { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'production' };
+    const serviceName = 'Синтетическая услуга восстановлена';
+    let apiReady = false;
+    const fetchImpl = createFetch((url) => {
+      if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });
+      expect(url.pathname).toBe('/api/v1/public-site/services/synthetic-service');
+      expect(url.search).toBe('?locale=ru');
+      return apiReady
+        ? jsonResponse({ slug: 'synthetic-service', name: serviceName, description: 'SYNTHETIC service', price: null })
+        : new Response(null, { status: 500 });
+    });
+
+    const failed = await handlePublicSiteRequest(new Request(requestUrl), config, assets, fetchImpl);
+    expectUnavailablePage(failed, 'ru');
+    const errorDocument = new DOMParser().parseFromString(await failed.text(), 'text/html');
+    const retry = errorDocument.querySelector('main [role="alert"] a')?.getAttribute('href');
+    expect(retry).toBe(path);
+    if (!retry) throw new Error('The retry link is missing.');
+
+    apiReady = true;
+    const recovered = await handlePublicSiteRequest(new Request(new URL(retry, requestUrl)), config, assets, fetchImpl);
+    const document = new DOMParser().parseFromString(await recovered.text(), 'text/html');
+    expect(recovered.status).toBe(200);
+    expect(recovered.headers.get('Cache-Control')).toBe('no-store');
+    expect(recovered.headers.get('X-Robots-Tag')).toBeNull();
+    expect(document.querySelector('main h1')?.textContent).toBe(serviceName);
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(`https://www.kosmed.test${path}`);
   });
 
   it.each([
