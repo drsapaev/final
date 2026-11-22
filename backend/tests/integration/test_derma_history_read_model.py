@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
@@ -8,6 +9,7 @@ from app.models.derma_history import DermaHistoryEntry
 from app.models.derma_procedure import DermaProcedure
 from app.models.emr_v2 import EMRRecord
 from app.models.visit import Visit
+from app.services.derma_history_projection import resync_derma_history_for_visits
 
 READ_MODEL_ORDER = (
     DermaHistoryEntry.entry_date.desc(),
@@ -261,6 +263,93 @@ class TestDermaHistoryReadModelProjection:
         assert _entries(db_session, kind="examination")[
             0
         ].entry_date == date.today() + timedelta(days=30)
+
+    def test_scoped_resync_restores_historical_localization(
+        self, client, db_session, auth_headers, test_patient, test_doctor, admin_user
+    ):
+        target_visit = _add_visit(db_session, patient=test_patient, doctor=test_doctor)
+        other_visit = _add_visit(db_session, patient=test_patient, doctor=test_doctor)
+        emrs = []
+        for visit, description in (
+            (target_visit, "Участок осмотра A"),
+            (other_visit, "Участок осмотра B"),
+        ):
+            data = _derma_emr_data(procedures=1)
+            data["specialty_data"]["localization"] = {"description": description}
+            emrs.append(
+                _add_emr(db_session, visit=visit, data=data, created_by=admin_user.id)
+            )
+        target, other = emrs
+        target_key = f"emr-{target.id}"
+        other_key = f"emr-{other.id}"
+        original = (deepcopy(target.data), target.status, target.version, target.updated_at)
+        legacy = DermaExamination(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            examination_date=date.today() - timedelta(days=10),
+            skin_type="dry",
+        )
+        db_session.add(legacy)
+        db_session.commit()
+        legacy_id = legacy.id
+
+        def read_history():
+            response = client.get(
+                "/api/v1/derma/examinations",
+                params={"patient_id": test_patient.id, "page": 1, "size": 50},
+                headers=auth_headers,
+            )
+            assert response.status_code == 200
+            rows = response.json()["items"]
+            assert len(rows) == 3
+            return {row["id"]: row for row in rows}
+
+        fresh = read_history()
+        assert fresh[target_key]["localization"] == "Участок осмотра A"
+        assert fresh[other_key]["localization"] == "Участок осмотра B"
+        assert fresh[legacy_id]["source"] == "legacy"
+        assert fresh[legacy_id]["localization"] is None
+
+        # Simulate stored pre-upgrade payloads while keeping their source EMRs.
+        for record in emrs:
+            (entry,) = _entries(
+                db_session, kind="examination", source="emr", record_id=record.id
+            )
+            old_payload = dict(entry.payload)
+            del old_payload["localization"]
+            entry.payload = old_payload
+        db_session.commit()
+
+        stale = read_history()
+        assert stale[target_key]["localization"] is None
+        assert stale[other_key]["localization"] is None
+        counts = {"visits": 1, "emr_records": 1, "entries": 2}
+        assert resync_derma_history_for_visits(db_session, [target_visit.id]) == counts
+        db_session.rollback()
+        assert read_history() == stale
+
+        assert resync_derma_history_for_visits(db_session, [target_visit.id]) == counts
+        db_session.commit()
+        restored = read_history()
+        # SQLite can omit the UTC suffix when it reads the timestamp back.
+        before_created = datetime.fromisoformat(fresh[target_key]["created_at"])
+        after_created = datetime.fromisoformat(restored[target_key]["created_at"])
+        assert before_created.replace(tzinfo=before_created.tzinfo or UTC) == (
+            after_created.replace(tzinfo=after_created.tzinfo or UTC)
+        )
+        assert restored == {
+            **stale,
+            target_key: {
+                **fresh[target_key],
+                "created_at": restored[target_key]["created_at"],
+            },
+        }
+
+        assert resync_derma_history_for_visits(db_session, [target_visit.id]) == counts
+        db_session.commit()
+        assert read_history() == restored
+        db_session.refresh(target)
+        assert (target.data, target.status, target.version, target.updated_at) == original
 
     def test_read_model_order_matches_endpoint(
         self, client, db_session, auth_headers, test_patient, test_doctor, admin_user
