@@ -97,9 +97,34 @@ const pickQueueForDoctor = (
     }))
   });
 
-  // ✅ ИСПРАВЛЕНО: Проверяем только по specialist_id (точное совпадение)
-  // Это гарантирует, что для врача с ID=1,2,3 будет найдена именно его очередь
-  const foundQueue = payload.queues.find((queue) => {
+  for (const queue of payload.queues) {
+    if (queue.queue_resource_id == null && Array.isArray(queue.entries)) {
+      // The specialty bucket can hold rows from several doctors. Use the
+      // persisted ownership on each row when selecting within that bucket.
+      const doctorRows = queue.entries.filter(
+        (entry) => entry.queue_owner_kind === 'doctor' && (entry.queue_owner_id ?? 0) > 0,
+      );
+      const owners = new Set(doctorRows.map((entry) => entry.queue_owner_id));
+      if (owners.size > 1) {
+        const ownerId = owners.has(doctorId) ? doctorId : Number(doctor?.id);
+        const entries = doctorRows.filter((entry) => entry.queue_owner_id === ownerId);
+        if (!entries.length) continue;
+
+        const queueIds = new Set(entries
+          .map((entry) => entry.daily_queue_id)
+          .filter((id): id is number => id != null && id > 0));
+        if (!queueIds.size) continue;
+
+        return {
+          specialist_id: ownerId,
+          specialty: queue.specialty,
+          queue_id: queueIds.size === 1 ? queueIds.values().next().value : undefined,
+          entries,
+          stats: buildStatsFromEntries(entries),
+        };
+      }
+    }
+
     // Приоритет 1: Точное совпадение по specialist_id
     if (queue.specialist_id !== undefined && queue.specialist_id !== null) {
       const queueSpecialistId = Number(queue.specialist_id);
@@ -110,7 +135,7 @@ const pickQueueForDoctor = (
           doctorIdFromDoctor: doctor?.id,
           specialty: queue.specialty
         });
-        return true;
+        return queue;
       }
     }
     // QD-2C (Codex round-17 P1): ресурсная ось — чистая очередь реестра
@@ -131,31 +156,27 @@ const pickQueueForDoctor = (
           queueResourceId: queue.queue_resource_id,
           specialty: queue.specialty
         });
-        return true;
+        return queue;
       }
     }
-    return false;
-  });
-
-  if (!foundQueue) {
-    logger.warn('[useQueueManager] ❌ Очередь не найдена для врача:', {
-      specialistId,
-      doctorId,
-      doctorIdFromDoctor: doctor?.id,
-      availableQueues: payload.queues.map(q => ({
-        specialist_id: q.specialist_id,
-        specialty: q.specialty
-      }))
-    });
   }
 
-  return foundQueue || null;
+  logger.warn('[useQueueManager] ❌ Очередь не найдена для врача:', {
+    specialistId,
+    doctorId,
+    doctorIdFromDoctor: doctor?.id,
+    availableQueues: payload.queues.map(q => ({
+      specialist_id: q.specialist_id,
+      specialty: q.specialty
+    }))
+  });
+  return null;
 };
 
 const buildStatsFromEntries = (entries: QueueEntry[] = []): QueueStats => ({
   total_entries: entries.length,
   waiting: entries.filter((entry) => entry.status === 'waiting').length,
-  completed: entries.filter((entry) => entry.status === 'completed').length,
+  completed: entries.filter((entry) => entry.status === 'completed' || entry.status === 'served').length,
 });
 
 export const useQueueManager = (): UseQueueManagerReturn => {
