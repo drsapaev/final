@@ -1,0 +1,185 @@
+{
+  "status": "passed",
+  "scope": "Eligibility of supported Google rich result types on six live bilingual contact and detail routes.",
+  "method": "Google Rich Results Test URL mode with Google Inspection Tool smartphone, plus independent source HTML GETs.",
+  "origin": "https://finalclinic.fyi",
+  "vercel_production": {
+    "deployment_id": "dpl_8nuM5aaeQXS3an3H96JTdosfWuXp",
+    "commit_sha": "1987cbe830cd34fddd866aa78198bd0f0b327968",
+    "observed_state": "READY",
+    "alias": "finalclinic.fyi",
+    "ready_at_utc": "2026-11-22T05:44:48.106Z"
+  },
+  "checked_on": "2026-11-22",
+  "timezone": "Asia/Tashkent",
+  "summary": {
+    "routes": 6,
+    "valid_items": 12,
+    "critical_errors": 0
+  },
+  "checks": [
+    {
+      "path": "/contacts",
+      "locale": "uz-Latn",
+      "crawled_at": "2026-11-22T10:49:20+05:00",
+      "google_result": "https://search.google.com/test/rich-results/result?id=gTe1iVThVAe5noEMsbPmwg",
+      "valid_items": 3,
+      "detected_categories": [
+        "Breadcrumbs",
+        "Local businesses",
+        "Organization"
+      ],
+      "optional_warnings": true,
+      "source_html": {
+        "status": 200,
+        "cache_control": "no-store",
+        "canonical": "https://finalclinic.fyi/contacts",
+        "json_ld_types": [
+          "BreadcrumbList",
+          "MedicalClinic"
+        ]
+      }
+    },
+    {
+      "path": "/ru/contacts",
+      "locale": "ru",
+      "crawled_at": "2026-11-22T10:47:02+05:00",
+      "google_result": "https://search.google.com/test/rich-results/result?id=UY7vOy0uf1Q-aym91B_trA",
+      "valid_items": 3,
+      "detected_categories": [
+        "Breadcrumbs",
+        "Local businesses",
+        "Organization"
+      ],
+      "optional_warnings": true,
+      "source_html": {
+        "status": 200,
+        "cache_control": "no-store",
+        "canonical": "https://finalclinic.fyi/ru/contacts",
+        "json_ld_types": [
+          "BreadcrumbList",
+          "MedicalClinic"
+        ]
+      }
+    },
+    {
+      "path": "/doctors/cardio",
+      "locale": "uz-Latn",
+      "crawled_at": "2026-11-22T10:48:37+05:00",
+      "google_result": "https://search.google.com/test/rich-results/result?id=f5utEnGwGKb6nKt86b5CgQ",
+      "valid_items": 2,
+      "detected_categories": [
+        "Breadcrumbs",
+        "Profile page"
+      ],
+      "optional_warnings": false,
+      "source_html": {
+        "status": 200,
+        "cache_control": "no-store",
+        "canonical": "https://finalclinic.fyi/doctors/cardio",
+        "json_ld_types": [
+          "BreadcrumbList",
+          "ProfilePage"
+        ]
+      }
+    },
+    {
+      "path": "/ru/doctors/cardio",
+      "locale": "ru",
+      "crawled_at": "2026-11-22T10:49:07+05:00",
+      "google_result": "https://search.google.com/test/rich-results/result?id=94L3AAvj99ukfP_tLphDlA",
+      "valid_items": 2,
+      "detected_categories": [
+        "Breadcrumbs",
+        "Profile page"
+      ],
+      "optional_warnings": false,
+      "source_html": {
+        "status": 200,
+        "cache_control": "no-store",
+        "canonical": "https://finalclinic.fyi/ru/doctors/cardio",
+        "json_ld_types": [
+          "BreadcrumbList",
+          "ProfilePage"
+        ]
+      }
+    },
+    {
+      "path": "/services/cardiolog-kons",
+      "locale": "uz-Latn",
+      "crawled_at": "2026-11-22T10:49:48+05:00",
+      "google_result": "https://search.google.com/test/rich-results/result?id=iZuZFJvp_J1bkHdJG0Ybwg",
+      "valid_items": 1,
+      "detected_categories": [
+        "Breadcrumbs"
+      ],
+      "optional_warnings": false,
+      "source_html": {
+        "status": 200,
+        "cache_control": "no-store",
+        "canonical": "https://finalclinic.fyi/services/cardiolog-kons",
+        "json_ld_types": [
+          "BreadcrumbList",
+          "Service"
+        ]
+      }
+    },
+    {
+      "path": "/ru/services/cardiolog-kons",
+      "locale": "ru",
+      "crawled_at": "2026-11-22T10:49:35+05:00",
+      "google_result": "https://search.google.com/test/rich-results/result?id=AfPqLP7l5nd4NAGg4CGFjA",
+      "valid_items": 1,
+      "detected_categories": [
+        "Breadcrumbs"
+      ],
+      "optional_warnings": false,
+      "source_html": {
+        "status": 200,
+        "cache_control": "no-store",
+        "canonical": "https://finalclinic.fyi/ru/services/cardiolog-kons",
+        "json_ld_types": [
+          "BreadcrumbList",
+          "Service"
+        ]
+      }
+    }
+  ],
+  "issues": {
+    "critical": [],
+    "medium": [],
+    "minor": [
+      {
+        "path": "/ru/contacts",
+        "category": "Local businesses",
+        "missing_optional_fields": [
+          "priceRange",
+          "image"
+        ],
+        "resolution": "Keep price information in the prices section. Add a clinic image to metadata after its publication is approved."
+      },
+      {
+        "path": "/ru/contacts",
+        "category": "Organization",
+        "missing_optional_fields": [
+          "streetAddress",
+          "postalCode",
+          "addressCountry",
+          "addressLocality"
+        ],
+        "resolution": "Use approved structured address fields if supplied. Preserve the public address currently supplied by the catalog."
+      }
+    ]
+  },
+  "limits": {
+    "indexed_url_status": "not_checked",
+    "actual_search_appearance": "not_checked",
+    "other_routes": "not_checked_by_google_in_this_run",
+    "service_markup": "Service JSON-LD was present in source HTML. The two Google reports for service pages detected Breadcrumbs."
+  },
+  "references": [
+    "https://search.google.com/test/rich-results",
+    "https://developers.google.com/search/docs/appearance/structured-data/search-gallery",
+    "https://developers.google.com/search/docs/appearance/structured-data/local-business"
+  ]
+}
