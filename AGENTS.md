@@ -117,9 +117,19 @@ For local Python use `scripts/run_python.ps1`; for backend pytest use `scripts/r
 
 ## Codex PR review and merge
 
-- For an authorized PR, the owner delegates review, approval, and merge to Codex agents. Complete these steps through authorized GitHub access without requesting another participant or separate routine confirmation. Follow the [cyclic workflow](docs/runbooks/AGENT_CYCLIC_WORKFLOW.md#codex-review-and-merge).
-- Review the current PR head and record its commit SHA and verdict through the dedicated GitHub App workflow. Confirm that GitHub records `APPROVED` from `drsapaev-final-codex-pr[bot]` on the reviewed SHA.
-- After required CI, scope and gate checks, and applicable smoke validation pass, dispatch the workflow's squash merge for that same SHA. The workflow requires the App's approval on the current PR head. Explicit task limits and existing publication and production authorization apply.
+For authorized PRs in `drsapaev/final`, Codex agents carry out review, formal approval, and squash merge
+without a human reviewer or separate routine confirmation. Follow the [cyclic workflow](docs/runbooks/AGENT_CYCLIC_WORKFLOW.md#codex-review-and-merge).
+
+1. A Codex agent reviews the current PR head against the task scope, diff, and validation evidence.
+   Resolve blocking findings and record the review verdict and full commit SHA.
+2. Use authorized owner access to dispatch the [Codex PR App workflow](.github/workflows/codex-pr-app.yml)
+   from `main` with `operation=approve`, the PR number, the reviewed SHA, and the review summary.
+   Confirm the formal GitHub **Approve** is recorded as `APPROVED` from `drsapaev-final-codex-pr[bot]` on that SHA.
+3. Confirm that the reviewed SHA is still the PR head and all required CI, gate, and applicable smoke checks
+   have passed. Dispatch `operation=merge` through the same workflow for that SHA and verify that the App bot
+   performed the squash merge. If the PR head changes, repeat review, validation, and approval for the new SHA.
+
+GitHub branch rules, explicit task limits, and existing publication and production authorization still apply.
 
 ## Additional merge gate for ChatGPT-authored PRs (owner instruction, 2026-11-10)
 
