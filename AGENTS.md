@@ -118,8 +118,8 @@ For local Python use `scripts/run_python.ps1`; for backend pytest use `scripts/r
 ## Codex PR review and merge
 
 - For an authorized PR, the owner delegates review, approval, and merge to Codex agents. Complete these steps through authorized GitHub access without requesting another participant or separate routine confirmation. Follow the [cyclic workflow](docs/runbooks/AGENT_CYCLIC_WORKFLOW.md#codex-review-and-merge).
-- Review the current PR head and record its commit SHA and verdict on the PR. Submit GitHub `APPROVE` from a distinct authorized GitHub identity when available. If Codex and the PR author share a GitHub identity, record an approving Codex verdict in a PR comment after resolving blocking findings.
-- Merge the reviewed head after required CI, scope and gate checks, and applicable smoke validation pass. Explicit task limits and existing publication and production authorization apply.
+- Review the current PR head and record its commit SHA and verdict through the dedicated GitHub App workflow. Confirm that GitHub records `APPROVED` from `drsapaev-final-codex-pr[bot]` on the reviewed SHA.
+- After required CI, scope and gate checks, and applicable smoke validation pass, dispatch the workflow's squash merge for that same SHA. The workflow requires the App's approval on the current PR head. Explicit task limits and existing publication and production authorization apply.
 
 ## Additional merge gate for ChatGPT-authored PRs (owner instruction, 2026-11-10)
 
