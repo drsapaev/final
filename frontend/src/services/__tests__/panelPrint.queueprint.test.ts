@@ -82,6 +82,19 @@ describe('QUEUEPRINT-FE-004 — honest price under show_price=true', () => {
     expect(String(html)).not.toContain('>Цена:<');
   });
 
+  it('omits the ticket price when multiple services match the label', async () => {
+    const html = await buildPanelTicketsBatchPrintableHtml([
+      {
+        print_tickets: [{ queue_name: 'ЭКГ', queue_number: 4 }],
+        services: [
+          { code: 'ECG01', name: 'ЭКГ', price: 50000 },
+          { code: 'ECG02', name: 'ЭКГ', price: 75000 },
+        ],
+      },
+    ]);
+    expect(String(html)).not.toContain('>Цена:<');
+  });
+
   it('genuine 0 price IS rendered as 0 UZS (genuine 0 vs missing distinguished)', async () => {
     const html = await buildPanelTicketsBatchPrintableHtml([
       {

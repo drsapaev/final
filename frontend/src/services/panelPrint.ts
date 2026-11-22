@@ -423,9 +423,9 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
   }
 
   const services = Array.isArray(row?.services) ? row.services : [];
-  for (const service of services) {
+  const matchingServices = services.filter((service) => {
     if (!service || typeof service !== 'object') {
-      continue;
+      return false;
     }
 
     const serviceLabels = [
@@ -438,17 +438,20 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
       .filter(Boolean)
       .map((value: Record<string, unknown>) => String(value).trim().toLowerCase());
 
-    if (serviceLabels.some((label) => normalizedCandidates.includes(label))) {
-      return getFirstDefined(
-        service?.price,
-        service?.service_price,
-        service?.amount,
-        service?.cost
-      );
-    }
+    return serviceLabels.some((label) => normalizedCandidates.includes(label));
+  });
+
+  if (matchingServices.length !== 1) {
+    return null;
   }
 
-  return null;
+  const [matchedService] = matchingServices;
+  return getFirstDefined(
+    matchedService.price,
+    matchedService.service_price,
+    matchedService.amount,
+    matchedService.cost
+  );
 }
 
 function resolveTicketCabinet(row: Record<string, unknown>, source: Record<string, unknown> | null = null, overrides: Record<string, unknown> = {}): unknown {
