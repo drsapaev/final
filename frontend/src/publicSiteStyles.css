@@ -83,6 +83,7 @@ html.public-site-document body {
 
 .public-site__brand-mark {
   display: grid;
+  flex: none;
   width: 38px;
   height: 38px;
   place-items: center;
@@ -95,6 +96,11 @@ html.public-site-document body {
 .public-site__brand-logo {
   flex: none;
   object-fit: contain;
+}
+
+.public-site__brand-logo[data-public-site-image="unavailable"],
+.public-site__brand-logo:not([data-public-site-image="unavailable"]) + .public-site__brand-mark {
+  display: none;
 }
 
 .public-site__nav {
@@ -340,6 +346,10 @@ html.public-site-document body {
   flex: none;
   border-radius: 12px;
   object-fit: cover;
+}
+
+.public-site__doctor-portrait[data-public-site-image="unavailable"] {
+  visibility: hidden;
 }
 
 .public-site a.public-site__list-title {
