@@ -181,5 +181,43 @@
     "https://search.google.com/test/rich-results",
     "https://developers.google.com/search/docs/appearance/structured-data/search-gallery",
     "https://developers.google.com/search/docs/appearance/structured-data/local-business"
-  ]
+  ],
+  "hosted_shell_follow_up": {
+    "observed_at_utc": "2026-11-23T05:29:07.441Z",
+    "origin": "https://finalclinic.fyi",
+    "pull_request": "https://github.com/drsapaev/final/pull/4195",
+    "deployment_id": "dpl_3S1tk9z38Uw57Rvc8nrejrArgJgE",
+    "squash_sha": "0a406bc0f531fa8627aa85e3eb971e3a78d867ce",
+    "verified_deployment_before_and_after": true,
+    "utility_url_spellings_with_noindex_nofollow_html": 19,
+    "designated_urls_with_noindex_nofollow_header": 8,
+    "responses_with_noindex_nofollow_header": 9,
+    "followed_redirect": {
+      "from": "/queue/join//",
+      "to": "/queue/join/"
+    },
+    "public_sitemap_html": {
+      "documents_with_http_200_and_no_store": 14,
+      "document_languages": [
+        "ru",
+        "uz-Latn"
+      ],
+      "self_canonical_and_expected_hreflang_labels_present": true,
+      "blocking_robots_directive_observed": false
+    },
+    "robots_txt": {
+      "crawl_allowed_for": [
+        "*",
+        "Googlebot",
+        "Bingbot"
+      ],
+      "canonical_sitemap_declared": true,
+      "named_groups_with_disallow": 31
+    },
+    "service_worker": {
+      "build_sha_matches_before_and_after": true,
+      "cache_control_no_store": true
+    },
+    "remaining": "The check looked for the expected hreflang labels. Alternate-link target accuracy, search-engine index inclusion and actual search appearance remain unverified by this run."
+  }
 }

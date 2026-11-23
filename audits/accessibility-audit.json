@@ -293,5 +293,47 @@
       "Measurements cover the browser's emulated light forced-colors palette and these two routes. Dark palettes, physical devices, native Safari and actual screen-reader speech remain separate checks.",
       "No new Axe scan or full WCAG 2.2 AA or staging acceptance was performed in these sweeps. Previous Axe results remain in their original audit section."
     ]
+  },
+  "synthetic_dark_forced_colors_follow_up": {
+    "observed_at_utc": "2026-11-23T05:45:29.562Z",
+    "source_tree_matches_squash_sha": "0a406bc0f531fa8627aa85e3eb971e3a78d867ce",
+    "runtime": "Local synthetic Nitro over loopback",
+    "browser": "Playwright Chromium 153.0.8010.12 on Windows",
+    "locales_and_routes": {
+      "ru": "/ru/services",
+      "uz-Latn": "/services"
+    },
+    "viewports_css_px": [
+      [
+        1366,
+        800
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "emulated_media": {
+      "forced-colors": "active",
+      "prefers-color-scheme": "dark",
+      "prefers-reduced-motion": "reduce"
+    },
+    "cases_passed": 4,
+    "keyboard_focus_samples": 24,
+    "checks": "The first Tab revealed the localized skip link. Enter focused main and set the target fragment. Subsequent Tabs reached the breadcrumb and catalog controls. All samples matched focus-visible and intersected the viewport.",
+    "contrast": {
+      "solid_outlines_measured": 20,
+      "minimum_solid_outline_contrast": 14.371,
+      "automatic_main_outlines_observed": 4,
+      "text_samples_measured": 20,
+      "minimum_text_contrast": 19.556
+    },
+    "reduced_motion": {
+      "visible_elements_sampled_across_cases": 266,
+      "max_computed_transition_ms": 0.01,
+      "max_computed_animation_ms": 0.01,
+      "smooth_scroll_observed": false
+    },
+    "limits": "Contrast ratios use computed colors at sampled states. The automatic main outlines have computed visibility and style observations. Speech, native system high contrast, physical devices, native Safari and full WCAG conformance remain unverified."
   }
 }
