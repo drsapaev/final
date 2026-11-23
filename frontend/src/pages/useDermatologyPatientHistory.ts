@@ -20,6 +20,16 @@ export interface DermatologySkinExamination {
    * history read model (legacy rows stay null). */
   localization?: string | null;
   diagnosis?: string;
+  /** DERMAHIST-FE-004: detailed clinical findings the history union
+   * already sends — rendered behind the card's read-only disclosure,
+   * never persisted client-side (backend SSOT). */
+  lesions?: string | null;
+  distribution?: string | null;
+  symptoms?: string | null;
+  treatment_plan?: string | null;
+  /** History union markers: read-only source label + visit identity. */
+  source?: 'emr' | 'legacy';
+  visit_id?: number | null;
 }
 
 export interface DermatologyCosmeticProcedure {
@@ -28,6 +38,12 @@ export interface DermatologyCosmeticProcedure {
   total_cost?: number | string;
   procedure_type?: string;
   area_treated?: string;
+  /** DERMAHIST-FE-004: detailed procedure findings + union markers. */
+  products_used?: string | null;
+  results?: string | null;
+  follow_up?: string | null;
+  source?: 'emr' | 'legacy';
+  visit_id?: number | null;
 }
 
 /**
