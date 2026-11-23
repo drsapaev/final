@@ -587,7 +587,11 @@ def call_patient(
     try:
         # Получаем запись в очереди
         queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.id == entry_id)
+            .with_for_update(of=OnlineQueueEntry)
+            .populate_existing()
+            .first()
         )
 
         if not queue_entry:
