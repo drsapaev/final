@@ -18,15 +18,14 @@ from app.models.refund_deposit import DepositTransaction, RefundRequest
 from app.models.user import User
 from app.models.visit import Visit
 from app.repositories.online_queue_new_repository import OnlineQueueNewRepository
-from app.repositories.payment_invoice_repository import record_invoice_visit_release
+from app.services.context_facades.billing_facade import (
+    append_invoice_visit_release_audit,
+    require_visible_queue_cancellation_evidence,
+    require_visible_unpaid_draft_cancellation_evidence,
+)
 from app.services.encounter_benefit_net import require_no_existing_financial_adjustment
 from app.services.encounter_financial_fence import FinancialFenceError
 from app.services.money_input import MoneyInputError, parse_money
-from app.services.payment_refund_guard import (
-    require_visible_checkout_queue,
-    require_visible_unpaid_draft_evidence,
-    require_visible_visit_payments,
-)
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
 
@@ -182,7 +181,7 @@ class OnlineQueueNewService:
             return
 
         try:
-            require_visible_unpaid_draft_evidence(self.db)
+            require_visible_unpaid_draft_cancellation_evidence(self.db)
         except FinancialFenceError as exc:
             raise OnlineQueueNewDomainError(409, str(exc)) from exc
         used = self.db.query(or_(
@@ -225,8 +224,7 @@ class OnlineQueueNewService:
 
     def _check_cancellation_visibility(self) -> None:
         try:
-            require_visible_visit_payments(self.db)
-            require_visible_checkout_queue(self.db)
+            require_visible_queue_cancellation_evidence(self.db)
         except FinancialFenceError as exc:
             raise OnlineQueueNewDomainError(409, str(exc)) from exc
 
@@ -460,7 +458,7 @@ class OnlineQueueNewService:
             if len(amounts) == 1:
                 invoice.status = "cancelled"
             self.db.flush()
-            record_invoice_visit_release(
+            append_invoice_visit_release_audit(
                 self.db,
                 invoice,
                 visit_id=visit.id,
