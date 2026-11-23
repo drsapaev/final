@@ -1,27 +1,27 @@
 .public-site-analytics-report {
   min-inline-size: 0;
-  padding: var(--mac-spacing-4);
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-xl);
-  background: var(--mac-bg-primary);
-  color: var(--mac-text-primary);
+  padding: var(--mac-spacing-4, 16px);
+  border: 1px solid var(--mac-border, ButtonBorder);
+  border-radius: var(--mac-radius-xl, 12px);
+  background: var(--mac-bg-primary, Canvas);
+  color: var(--mac-text-primary, CanvasText);
 }
 
 .public-site-analytics-report summary {
   cursor: pointer;
-  font-weight: var(--mac-font-weight-semibold);
+  font-weight: var(--mac-font-weight-semibold, 600);
 }
 
 .public-site-analytics-report__body {
   display: grid;
-  gap: var(--mac-spacing-3);
+  gap: var(--mac-spacing-3, 12px);
   min-inline-size: 0;
-  margin-block-start: var(--mac-spacing-3);
+  margin-block-start: var(--mac-spacing-3, 12px);
 }
 
 .public-site-analytics-report__body p {
   margin: 0;
-  color: var(--mac-text-secondary);
+  color: var(--mac-text-secondary, CanvasText);
 }
 
 .public-site-analytics-report__toolbar {
@@ -29,15 +29,15 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--mac-spacing-3);
+  gap: var(--mac-spacing-3, 12px);
 }
 
 .public-site-analytics-report__scroll {
   overflow: auto;
   max-inline-size: 100%;
   max-block-size: min(28rem, 65vh);
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-md);
+  border: 1px solid var(--mac-border, ButtonBorder);
+  border-radius: var(--mac-radius-md, 8px);
 }
 
 .public-site-analytics-report__scroll table {
@@ -48,8 +48,8 @@
 
 .public-site-analytics-report__scroll th,
 .public-site-analytics-report__scroll td {
-  padding: var(--mac-spacing-2) var(--mac-spacing-3);
-  border-block-end: 1px solid var(--mac-border);
+  padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
+  border-block-end: 1px solid var(--mac-border, ButtonBorder);
   text-align: end;
 }
 
@@ -65,11 +65,11 @@
 .public-site-analytics-report__scroll thead th {
   position: sticky;
   inset-block-start: 0;
-  background: var(--mac-bg-secondary);
+  background: var(--mac-bg-secondary, Canvas);
 }
 
 .public-site-analytics-report summary:focus-visible,
 .public-site-analytics-report__scroll:focus-visible {
-  outline: 2px solid var(--mac-accent-blue);
+  outline: 2px solid var(--mac-accent-blue, Highlight);
   outline-offset: 2px;
 }
