@@ -68,6 +68,19 @@ build the frontend with `VITE_SENTRY_ENV=staging` and
 and `APP_VERSION=<full SHA>`. Pass both values through the supported build
 or runtime path.
 
+For a Compose build, set `APP_VERSION` to the verified checkout SHA before
+building the frontend. Compose passes it as `VITE_APP_VERSION` to the builder
+and as `APP_VERSION` to the backend and worker. Set
+`VERCEL_GIT_COMMIT_SHA` to the same SHA for the service worker and artifact
+source check.
+
+The GitHub staging frontend artifact workflow takes the dedicated frontend DSN
+from `staging-integrations`. It verifies the destination and checks the
+compiled release before publishing the artifact. Use an artifact from the
+exact release with these checks. Pulling an existing artifact into Compose
+keeps the Sentry release and destination that were compiled into it. The
+browser canary and Sentry project readback are still required.
+
 ### Mini App pre-merge preflight and live acceptance
 
 Use the manual **Mini App PR staging preflight** as a credential-free check
