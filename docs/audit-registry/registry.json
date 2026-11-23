@@ -3025,64 +3025,88 @@
       "date": "2026-11-16"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYPAYCLAIM-BE-001",
       "priority": "P1 conditional",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "mounted Admin/Doctor /notifications/send-payment-notification uses caller-supplied amount/currency and only checks Visit/Patient existence, then sends official paid-confirmation wording without verifying any canonical Payment/settlement",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "S",
+      "test_after": "S; registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "reviewer": "registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "date": "2026-11-23"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYPBROUTBATCHABORT-BE-001",
       "priority": "P2 conditional",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "process_due_batch reads db.get before per-item try, so one post-claim fetch exception aborts entire already-leased batch until lease expiry rather than isolating/releasing remaining items",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "R",
+      "test_after": "R; registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "reviewer": "registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "date": "2026-11-23"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYPBROUTFENCE-BE-001",
       "priority": "P1 conditional",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "10m outbox lease claim has no owner token/generation; stale worker completion/deferral writes by row ID alone, can clear/ACK lease re-claimed by second worker after lease expiry",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "S",
+      "test_after": "S; registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "reviewer": "registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "date": "2026-11-23"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYPBROUTRETRYMAX-BE-001",
       "priority": "P2",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "outbox never terminates permanent delivery failures; attempt_count unbounded, retry backoff capped at one hour but no dead-letter/manual disposition or failure-age alert; agree retention/replay policy before fixing",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "S",
+      "test_after": "S; registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "reviewer": "registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "date": "2026-11-23"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYPBROUTSTALE-BE-001",
       "priority": "P2 conditional",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "queued submitted/resubmitted notification is delivered without rechecking current PublicBookingRequest.status/version, so a stale v1 event can be emitted as actionable new booking after withdrawal or confirmation at v2; historical notification policy needs owner decision before source fix",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "S",
+      "test_after": "S; registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "reviewer": "registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "date": "2026-11-23"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYPBROUTWORKERFAIL-BE-001",
       "priority": "P2",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "cron ARQ worker swallows batch exceptions into warning and returns normally, masking batch failure from task-status-based monitoring",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "S",
+      "test_after": "S; registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "reviewer": "registry-agent cycle-30 triage 2026-11-23: direct source read on origin/main 63d06517b (outbox service L25-171, tasks/worker.py L823-846, notifications.py L419-460, registrar_notification_service.py L92-130)",
+      "date": "2026-11-23"
     },
     {
       "checked": false,
