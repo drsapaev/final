@@ -564,8 +564,11 @@ describe('queue setup editor return context', () => {
     expect(await screen.findByTestId('queue-setup-return-link')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Справочник услуг' }));
 
-    const afterCatalog = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
-    expect(afterCatalog.searchParams.get('servicesTab')).toBe('catalog');
+    const afterCatalog = await waitFor(() => {
+      const location = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+      expect(location.searchParams.get('servicesTab')).toBe('catalog');
+      return location;
+    });
     expect(afterCatalog.searchParams.get('setupReturn')).toBe('queue-directions-v1');
     expect(afterCatalog.searchParams.get('setupProfile')).toBe('lab-key');
     expect(afterCatalog.searchParams.get('setupSection')).toBe('checklist');
@@ -576,8 +579,11 @@ describe('queue setup editor return context', () => {
 
     await user.click(screen.getByRole('button', { name: 'Вкладки регистратуры' }));
 
-    const afterQueueProfiles = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
-    expect(afterQueueProfiles.searchParams.get('servicesTab')).toBe('queue-profiles');
+    const afterQueueProfiles = await waitFor(() => {
+      const location = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+      expect(location.searchParams.get('servicesTab')).toBe('queue-profiles');
+      return location;
+    });
     expect(afterQueueProfiles.searchParams.get('setupReturn')).toBe('queue-directions-v1');
     expect(afterQueueProfiles.searchParams.get('setupProfile')).toBe('lab-key');
     expect(afterQueueProfiles.searchParams.get('setupSection')).toBe('checklist');
