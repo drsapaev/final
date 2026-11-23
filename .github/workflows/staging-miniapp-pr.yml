@@ -53,6 +53,7 @@ jobs:
     # Manual runs use main; the scoped infra PR can also prove the token-free job.
     if: >-
       github.repository == 'drsapaev/final' &&
+      !inputs.native-arq &&
       ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
        (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == 'drsapaev/final' &&
@@ -707,11 +708,37 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ (inputs.native-live || inputs.native-arq) && 65 || 35 }}
     environment: staging-integrations
+    permissions:
+      pull-requests: read
     env:
       REVIEWED_SHA: ${{ !inputs.native-arq && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
       RUN_ARQ_ACCEPTANCE: ${{ inputs.native-arq }}
       WORKFLOW_SHA: ${{ github.workflow_sha }}
     steps:
+      - name: Verify the current PR 4195 metadata
+        if: env.RUN_ARQ_ACCEPTANCE == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh api --hostname github.com repos/drsapaev/final/pulls/4195 | python3 -c '
+          import json
+          import sys
+
+          pr = json.load(sys.stdin)
+          head, base = pr["head"], pr["base"]
+          sys.exit(not (
+              pr["number"] == 4195 and pr["state"] == "open"
+              and head["repo"]["full_name"] == base["repo"]["full_name"] == "drsapaev/final"
+              and head["ref"] == "codex/kosmed-shell-robots-20261122" and base["ref"] == "main"
+              and head["sha"] == sys.argv[1] and base["sha"] == sys.argv[2]
+          ))
+          ' "$REVIEWED_SHA" "$WORKFLOW_SHA" 2>/dev/null; then
+            echo '::error::Could not verify the current open same-repository PR #4195 head and main base.'
+            exit 1
+          fi
+
       - name: Prepare exact isolated backend, frontend and ingress
         shell: bash
         run: |
@@ -733,24 +760,6 @@ jobs:
                 exit 1
               fi
             done
-            if ! curl --disable --noproxy '*' --proto '=https' --max-time 20 --fail --silent --show-error \
-              -H 'Accept: application/vnd.github+json' 'https://api.github.com/repos/drsapaev/final/pulls/4195' |
-              python3 -c '
-          import json
-          import sys
-
-          pr = json.load(sys.stdin)
-          head, base = pr["head"], pr["base"]
-          sys.exit(not (
-              pr["number"] == 4195 and pr["state"] == "open"
-              and head["repo"]["full_name"] == base["repo"]["full_name"] == "drsapaev/final"
-              and head["ref"] == "codex/kosmed-shell-robots-20261122" and base["ref"] == "main"
-              and head["sha"] == sys.argv[1] and base["sha"] == sys.argv[2]
-          ))
-          ' "$sha" "$WORKFLOW_SHA" 2>/dev/null; then
-              echo '::error::Request must match the current open same-repository PR #4195 head and main base.'
-              exit 1
-            fi
             git -C "$source" fetch -q --no-tags --depth=64 "$origin" \
               refs/heads/main:refs/remotes/origin/main refs/pull/4195/head:refs/remotes/origin/pr-4195
             if [[ "$(git -C "$source" rev-parse refs/remotes/origin/main)" != "$WORKFLOW_SHA" ||

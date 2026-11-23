@@ -24,6 +24,8 @@ concurrency:
 jobs:
   native-acceptance:
     if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/main'
+    permissions:
+      pull-requests: read
     uses: ./.github/workflows/staging-miniapp-pr.yml
     with:
       source-sha: ${{ inputs.acceptance == 'pr-4118-sessions' && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
