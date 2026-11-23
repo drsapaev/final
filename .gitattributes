@@ -2,6 +2,9 @@
 /.gitattributes text eol=lf
 *.sh text eol=lf
 
+# Keep the repeat allocator migration's SHA-256 stable across checkouts.
+/backend/alembic/versions/0103_visit_consultation_completion.py text eol=lf
+
 # Phase 0.5: mark generated OpenAPI types as linguist-generated
 # so GitHub PRs don't show 75K lines of auto-generated code in diffs.
 frontend/src/types/generated/** linguist-generated=true

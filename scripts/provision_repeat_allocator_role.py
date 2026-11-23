@@ -18,7 +18,7 @@ from alembic.operations import Operations
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-MIGRATION_SHA256 = "6a852c5dc888b9e710278d951124e34017a5751b06dd016f4cd249f05f1faa6b"
+MIGRATION_SHA256 = "e5ffac186b1086a0b9ac94bfa5b542adbdd41bff1ad3c69e226e46d237a8cf29"
 MIGRATION_PATH = Path(__file__).resolve().parents[1] / "backend/alembic/versions/0103_visit_consultation_completion.py"
 
 

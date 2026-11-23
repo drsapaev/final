@@ -10,7 +10,9 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DBAPIError
 
-from tests.integration.test_repeat_allocator_security_pg import _revision, database  # noqa: F401
+from tests.integration import test_repeat_allocator_security_pg as allocator_security
+
+database = allocator_security.database
 
 _script_path = Path(__file__).resolve().parents[3] / "scripts/provision_repeat_allocator_role.py"
 _spec = importlib.util.spec_from_file_location("repeat_allocator_provisioner", _script_path)
@@ -41,7 +43,7 @@ def _drop_role(engine, role):
 def test_physical_runtime_needs_then_receives_only_usage(database):
     engine, schema = database
     with engine.begin() as db:
-        _revision(db, "upgrade", schema)
+        allocator_security._revision(db, "upgrade", schema)
         owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(nspowner) FROM pg_catalog.pg_namespace WHERE nspname=:schema"), {"schema": schema}).scalar_one()
         before = db.execute(text(f'SELECT last_value FROM "{schema}".repeat_evidence_generation_seq')).scalar_one()
     role = _runtime(engine, schema)
@@ -80,7 +82,7 @@ def test_physical_runtime_needs_then_receives_only_usage(database):
 def test_unexpected_grant_and_wrong_owner_leave_role_unmodified(database):
     engine, schema = database
     with engine.begin() as db:
-        _revision(db, "upgrade", schema)
+        allocator_security._revision(db, "upgrade", schema)
         owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(nspowner) FROM pg_catalog.pg_namespace WHERE nspname=:schema"), {"schema": schema}).scalar_one()
     first, second = _runtime(engine, schema), _runtime(engine, schema)
     q = engine.dialect.identifier_preparer.quote_identifier
@@ -102,7 +104,7 @@ def test_unexpected_grant_and_wrong_owner_leave_role_unmodified(database):
 def test_provisioned_allocator_survives_downgrade_reupgrade(database, monkeypatch):
     engine, schema = database
     with engine.begin() as db:
-        _revision(db, "upgrade", schema)
+        allocator_security._revision(db, "upgrade", schema)
         owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(nspowner) FROM pg_catalog.pg_namespace WHERE nspname=:schema"), {"schema": schema}).scalar_one()
     role = _runtime(engine, schema)
     try:
@@ -110,9 +112,9 @@ def test_provisioned_allocator_survives_downgrade_reupgrade(database, monkeypatc
         monkeypatch.setenv("REPEAT_ALLOCATOR_TRUSTED_SEQUENCE_USERS", json.dumps([role]))
         with engine.begin() as db:
             before = db.execute(text("SELECT last_value FROM repeat_evidence_generation_seq")).scalar_one()
-            _revision(db, "downgrade", schema)
+            allocator_security._revision(db, "downgrade", schema)
         with engine.begin() as db:
-            _revision(db, "upgrade", schema)
+            allocator_security._revision(db, "upgrade", schema)
             after = db.execute(text("SELECT last_value FROM repeat_evidence_generation_seq")).scalar_one()
             assert after > before
             assert db.execute(text("SELECT pg_catalog.has_sequence_privilege(:role,:seq,'USAGE')"),
@@ -121,6 +123,10 @@ def test_provisioned_allocator_survives_downgrade_reupgrade(database, monkeypatc
                                   {"role": role, "seq": f'"{schema}".repeat_evidence_generation_seq'}).scalar_one()
     finally:
         _drop_role(engine, role)
+
+
+def test_reviewed_migration_source_loads():
+    assert _script._migration().revision == "0103_visit_repeat_evidence"
 
 
 def test_changed_migration_source_fails_before_loading(monkeypatch):
