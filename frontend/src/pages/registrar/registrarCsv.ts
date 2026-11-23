@@ -10,6 +10,8 @@
  *   (=, +, -, @) are prefixed with single quote to prevent formula injection.
  */
 
+import { normalizeIssuedQueueTicket } from './registrarHelpers';
+
 /**
  * Mask phone number for CSV export (PHI protection).
  * Example: +998 90 123 45 67 → +998 ***-**-67
@@ -24,6 +26,19 @@ function maskPhoneForCSV(phone: unknown): string {
   const country = countryMatch ? countryMatch[0] : '+';
   return `${country} ***-**-${lastTwo}`;
 }
+
+const formatCsvQueueTickets = (row: Record<string, unknown>): string => {
+  const direct = normalizeIssuedQueueTicket(row.queue_number);
+  const tickets = Array.isArray(row.queue_numbers)
+    ? row.queue_numbers.flatMap((ticket) => {
+        if (!ticket || typeof ticket !== 'object') return [];
+        const number = normalizeIssuedQueueTicket(ticket.number);
+        return number ? [{ number, label: ticket.queue_name || ticket.queue_tag || '' }] : [];
+      })
+    : [];
+  if (tickets.length <= 1) return direct ?? tickets[0]?.number ?? '';
+  return tickets.map(({ number, label }) => label ? `${label}: ${number}` : number).join('; ');
+};
 
 /**
  * Generate CSV string from appointment rows.
@@ -61,10 +76,7 @@ export function generateCSV(data: Record<string, unknown>[], options: Record<str
   const rows = data.map((row, index) => {
     const baseRow = [
       index + 1,
-      ...(includeQueueNumber ? [(() => {
-        const value = String(row.queue_number ?? '').trim();
-        return /^[1-9]\d*$/.test(value) ? value : '';
-      })()] : []),
+      ...(includeQueueNumber ? [formatCsvQueueTickets(row)] : []),
       row.patient_fio || '',
       row.patient_birth_year || '',
       // R-05 fix: маскируем телефон в CSV-экспорте

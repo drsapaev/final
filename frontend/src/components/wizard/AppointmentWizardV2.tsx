@@ -1,3 +1,4 @@
+import { useWizardEditBirthDate } from './useWizardEditBirthDate';
 import { useTranslation } from '../../i18n/useTranslation';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -190,7 +191,6 @@ import {
   genderToPatientSexForApi,
   // Fix E: календарная валидация даты рождения (31.02, високосные, будущие)
   getBirthDateValidationError,
-  formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
   // Fix A: наследованные поля выбранной карточки не протекают в нового пациента
@@ -218,7 +218,6 @@ import {
   resolveEditRecordDate,
   isEditDeltaNewItem,
   resolveCartServiceReferences,
-  parseWizardBaseline,
   refreshBaselineAfterGenderHydration,
   refreshBaselineAfterServiceResolution,
   useWizardSearchUnmountCleanup,
@@ -357,8 +356,9 @@ const AppointmentWizardV2 = ({
   const [doctorsRequestStatus, setDoctorsRequestStatus] = useState<DoctorsRequestStatus>('idle');
   const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
   const [showAllServices, setShowAllServices] = useState(false);
-  const [formattedBirthDate, setFormattedBirthDate] = useState('');
-  const birthDateEditedRef = useRef(false);
+  const initialContentRef = useRef<string>('');
+  const { formattedBirthDate, setFormattedBirthDate, birthDateEditedRef, handleBirthDateChange: updateBirthDate } =
+    useWizardEditBirthDate({ isOpen: Boolean(isOpen), editMode: Boolean(editMode), initialData, getPatient, initialContentRef, setWizardData });
   const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({} as Record<string, unknown>);
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
 
@@ -457,32 +457,6 @@ const AppointmentWizardV2 = ({
       }
     }
   }, [isOpen, editMode, initialData, activeTab]);
-
-  useEffect(() => {
-    if (!isOpen || !editMode || initialData?.patient_birth_date) return;
-    const patientId = resolveInitialPatientId(initialData) as string | number | null;
-    if (!patientId) return;
-
-    let cancelled = false;
-    void getPatient(patientId).then((patient) => {
-      const birthDate = patient.birth_date;
-      if (cancelled || birthDateEditedRef.current || !birthDate || String(patient.id) !== String(patientId)) return;
-      const baseline = parseWizardBaseline(initialContentRef.current);
-      if (!baseline || String(baseline.patient.id) !== String(patientId)) return;
-      initialContentRef.current = wizardContentSignature({
-        patient: { ...baseline.patient, birth_date: birthDate },
-        cart: baseline.cart,
-      });
-      setWizardData((prev) => String(prev.patient.id) === String(patientId)
-        ? { ...prev, patient: { ...prev.patient, birth_date: birthDate } }
-        : prev);
-      setFormattedBirthDate(convertDateFromISO(birthDate));
-    }).catch(() => {
-      // An unavailable card does not turn the snapshot year into a date.
-    });
-
-    return () => { cancelled = true; };
-  }, [isOpen, editMode, initialData, getPatient]);
 
   useEffect(() => {
     if (!isOpen || !editMode || wizardData.patient.gender) return;
@@ -626,7 +600,6 @@ const AppointmentWizardV2 = ({
   // Fix F (Codex R1 PR 3097): снимок исходного содержимого мастера на момент
   // открытия (edit-mode данные или пустая форма). Служит базой для diff'а
   // «есть ли реально несохранённые правки» при закрытии.
-  const initialContentRef = useRef<string>('');
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -918,18 +891,7 @@ const AppointmentWizardV2 = ({
     setErrors((prev) => ({ ...prev, fio: null }));
   };
 
-  const handleBirthDateChange = (value: string) => {
-    birthDateEditedRef.current = true;
-    const formatted = formatBirthDateInput(value);
-    setFormattedBirthDate(formatted);
-
-    // Конвертируем в ISO формат для сохранения
-    const isoDate = convertDateToISO(formatted);
-    setWizardData((prev) => ({
-      ...prev,
-      patient: { ...prev.patient, birth_date: isoDate }
-    }));
-  };
+  const handleBirthDateChange = (value: string) => { updateBirthDate(value); };
 
   // ===================== ЗАГРУЗКА ДАННЫХ =====================
 

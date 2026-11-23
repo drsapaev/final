@@ -341,6 +341,7 @@ def test_registrar_wizard_characterization_same_specialist_different_queue_tags_
 
 @pytest.mark.integration
 @pytest.mark.queue
+@pytest.mark.parametrize("department", ["dermatology", "stomatology"])
 def test_registrar_wizard_characterization_different_specialists_create_separate_rows(
     client,
     db_session,
@@ -348,19 +349,22 @@ def test_registrar_wizard_characterization_different_specialists_create_separate
     test_patient,
     test_doctor,
     test_service,
+    department,
 ):
     second_doctor = _create_specialist(
         db_session,
         username="wizard_second_doctor",
         email="wizard_second_doctor@test.local",
         full_name="Wizard Second Doctor",
-        specialty="Dermatology",
+        specialty=department,
     )
+    test_doctor.cabinet = "6"
+    second_doctor.cabinet = "12"
     second_service = _create_service(
         db_session,
         code="WIZ-DERM-01",
         name="Wizard Dermatology",
-        queue_tag="dermatology",
+        queue_tag=department,
     )
 
     response = client.post(
@@ -371,7 +375,7 @@ def test_registrar_wizard_characterization_different_specialists_create_separate
             visits=[
                 {
                     "doctor_id": test_doctor.id,
-                    "visit_date": date.today().isoformat(),
+                    "visit_date": clinic_today(db_session).isoformat(),
                     "department": "cardiology",
                     "services": [
                         {
@@ -382,8 +386,8 @@ def test_registrar_wizard_characterization_different_specialists_create_separate
                 },
                 {
                     "doctor_id": second_doctor.id,
-                    "visit_date": date.today().isoformat(),
-                    "department": "dermatology",
+                    "visit_date": clinic_today(db_session).isoformat(),
+                    "department": department,
                     "services": [
                         {
                             "service_id": second_service.id,
@@ -410,6 +414,11 @@ def test_registrar_wizard_characterization_different_specialists_create_separate
 
     assert {entry.visit_id for entry in patient_entries} == set(payload["visit_ids"])
     assert len({entry.queue_id for entry in patient_entries}) == 2
+    assert {
+        assignment["queue_cabinet"]
+        for assignments in payload["queue_numbers"].values()
+        for assignment in assignments
+    } == {"6", "12"}
 
 
 @pytest.mark.integration
@@ -524,18 +533,26 @@ def test_registrar_wizard_rejects_duplicate_same_day_resource_queue_visits_befor
 
 @pytest.mark.integration
 @pytest.mark.queue
+@pytest.mark.parametrize(
+    ("queue_tag", "department"),
+    [("ecg", "echokg"), ("lab", "lab"), ("wizard_grouped_procedures", "procedures")],
+)
 def test_registrar_wizard_accepts_same_resource_queue_services_in_one_visit(
     client,
     db_session,
     registrar_auth_headers,
     test_patient,
+    queue_tag,
+    department,
 ):
-    queue_tag = "wizard_grouped_procedures"
+    test_patient.birth_date = date(1990, 4, 17)
+    test_patient.address = "SYNTHETIC-TEST address"
     db_session.add(
         QueueResource(
             code="wizard-grouped-procedures",
             queue_tag=queue_tag,
-            display_name="Процедуры",
+            display_name="SYNTHETIC resource",
+            default_cabinet="34",
             active=True,
         )
     )
@@ -563,8 +580,8 @@ def test_registrar_wizard_accepts_same_resource_queue_services_in_one_visit(
             visits=[
                 {
                     "doctor_id": None,
-                    "visit_date": date.today().isoformat(),
-                    "department": "procedures",
+                    "visit_date": clinic_today(db_session).isoformat(),
+                    "department": department,
                     "services": [
                         {"service_id": first_service.id, "quantity": 1},
                         {"service_id": second_service.id, "quantity": 1},
@@ -584,7 +601,25 @@ def test_registrar_wizard_accepts_same_resource_queue_services_in_one_visit(
         .all()
     )
     assert len(entries) == 1
-    assert payload["queue_numbers"][str(visit_id)][0]["number"] == entries[0].number
+    assignment = payload["queue_numbers"][str(visit_id)][0]
+    assert assignment["number"] == entries[0].number == 1
+    assert assignment["queue_cabinet"] == "34"
+    worklist = client.get(
+        "/api/v1/registrar/queues/today",
+        params={"target_date": clinic_today(db_session).isoformat()},
+        headers=registrar_auth_headers,
+    )
+    assert worklist.status_code == 200, worklist.text
+    [row] = [
+        row
+        for queue in worklist.json()["queues"]
+        for row in queue["entries"]
+        if row["record_kind"] == "online_queue" and row["id"] == entries[0].id
+    ]
+    assert row["number"] == 1
+    assert row["queue_cabinet"] == "34"
+    assert row["patient_birth_year"] == 1990
+    assert row["address"] == "SYNTHETIC-TEST address"
 
 
 @pytest.mark.integration

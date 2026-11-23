@@ -127,3 +127,17 @@ it('does not use the aggregate cabinet or ticket for a different child', () => {
   row.queue_numbers[1].number = 0;
   expect(resolvePanelTicketPayloads(row)[1].queue_number).toBe('В-22');
 });
+
+it('an unnumbered visit without a stable visit id cannot stop the other departments from printing', () => {
+  const payloads = resolvePanelTicketPayloads({
+    queue_numbers: [
+      { number: 0, queue_tag: 'procedures' },
+      { number: 0, queue_tag: 'ecg', visit_id: 21 },
+      { number: 1, queue_tag: 'ecg', visit_id: 21, queue_cabinet: '23' },
+      { number: 1, queue_tag: 'lab', queue_cabinet: '42' },
+    ],
+  });
+  expect(payloads.map(({ queue_number, cabinet }) => [queue_number, cabinet])).toEqual([
+    ['1', '23'], ['1', '42'],
+  ]);
+});

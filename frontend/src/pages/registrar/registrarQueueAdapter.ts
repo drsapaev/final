@@ -123,6 +123,7 @@ export const adaptQueueEntry = (
       // belong to different doctors/queues.
       queue_entry_id: queueEntryIdentity,
       daily_queue_id: dailyQueueId,
+      visit_id: fullEntry.visit_id ?? entry.visit_id ?? null,
       number: queueNum,
       queue_cabinet: queueCabinet,
       queue_tag: queueTag,

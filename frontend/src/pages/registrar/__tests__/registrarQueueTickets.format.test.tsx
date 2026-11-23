@@ -128,3 +128,8 @@ describe('RecordPreview — REG-FE-083 rendered queue field', () => {
     expect(screen.getByText('№9 — Кардиология')).toBeTruthy();
   });
 });
+
+it('does not describe the zero placeholder as issued ticket #0', () => {
+  expect(formatPreviewQueueTickets([{ number: 0, queue_name: 'ЭКГ' }], 'без номера'))
+    .toBe('ЭКГ (без номера)');
+});

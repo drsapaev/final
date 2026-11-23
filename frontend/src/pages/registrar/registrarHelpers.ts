@@ -329,6 +329,15 @@ export const formatPreviewList = (value: unknown) => {
   return value || '';
 };
 
+// Ticket IDs are display facts, not counters, cabinet labels or internal IDs.
+export const normalizeIssuedQueueTicket = (value: unknown): string | null => {
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  const normalized = String(value).trim();
+  const match = /^(?:[A-ZА-Я]{1,4}-?)?(\d+)$/iu.exec(normalized);
+  const ordinal = match ? Number(match[1]) : 0;
+  return Number.isSafeInteger(ordinal) && ordinal > 0 ? normalized : null;
+};
+
 // REG-FE-083 (follow-up audit 2026-11-02): выделенный форматер НОМЕРОВ
 // ТАЛОНОВ очереди. Прежде «Очередь» в предпросмотре записи печаталась
 // через formatPreviewList — он выбирает name/service_name/code/queue_name/
@@ -345,9 +354,8 @@ export const formatPreviewQueueTickets = (value: unknown, unallocatedLabel: stri
       if (typeof item === 'string') return item;
       if (!item || typeof item !== 'object') return '';
       const label = item.queue_name || item.queue_tag || item.name || item.service_name || item.code || '';
-      const number = item.number;
-      const hasNumber = number !== null && number !== undefined && number !== '';
-      if (!hasNumber) {
+      const number = normalizeIssuedQueueTicket(item.number);
+      if (!number) {
         // Без номера — только метка очереди + честный плейсхолдер:
         // никакого выдуманного «№индекс».
         return label ? `${label} (${unallocatedLabel})` : `(${unallocatedLabel})`;

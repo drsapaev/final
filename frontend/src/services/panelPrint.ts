@@ -20,6 +20,7 @@ import {
   parseRegistrarTimestamp,
 } from '../utils/dateUtils';
 import { finalizePrintableWindow, openPrintableWindow, type PrintableWindowResult } from '../utils/printWindow';
+import { normalizeIssuedQueueTicket } from '../pages/registrar/registrarHelpers';
 
 function normalizePrintableDateString(value: unknown): string | null {
   if (value === null || value === undefined || value === '') {
@@ -160,17 +161,9 @@ function formatTicketTimeWindow(row: Record<string, unknown>): TicketTimeWindow 
 
 const ticketNumberKeys = ['queue_number', 'number', 'ticket_number', 'queue_position', 'queue_no', 'display_number'] as const;
 
-function asIssuedTicketNumber(value: unknown): string | null {
-  if (typeof value !== 'number' && typeof value !== 'string') return null;
-  const normalized = String(value).trim();
-  const match = /^(?:[A-ZА-Я]{1,4}-?)?(\d+)$/iu.exec(normalized);
-  const ordinal = match ? Number(match[1]) : 0;
-  return Number.isSafeInteger(ordinal) && ordinal > 0 ? normalized : null;
-}
-
 function readTicketNumber(source: Record<string, unknown> | null | undefined): string | null {
   for (const key of ticketNumberKeys) {
-    const number = asIssuedTicketNumber(source?.[key]);
+    const number = normalizeIssuedQueueTicket(source?.[key]);
     if (number) return number;
   }
   return null;
@@ -514,16 +507,26 @@ export function resolvePanelTicketPayloads(row: Record<string, unknown>, overrid
 
   const seenKeys = new Set();
   const payloads: Record<string, unknown>[] = [];
+  const sources = ticketSources.filter((item): item is Record<string, unknown> =>
+    Boolean(item && typeof item === 'object')
+  );
+  const issuedVisitIds = new Set(sources
+    .filter((source) => source.visit_id && readTicketNumber(source))
+    .map((source) => String(source.visit_id)));
 
-  for (const source of ticketSources) {
-    const payload = buildPanelTicketPayloadForSource(row, source as Record<string, unknown>, overrides, ticketSources.length === 1);
+  for (const ticket of sources) {
+    // A visit-based slip cannot borrow a neighboring ticket. Skip a
+    // placeholder when its own visit already has an issued queue number.
+    if (ticketSources.length > 1 && !readTicketNumber(ticket) &&
+      (!ticket.visit_id || issuedVisitIds.has(String(ticket.visit_id)))) continue;
+    const payload = buildPanelTicketPayloadForSource(row, ticket, overrides, ticketSources.length === 1);
     const dedupeKey = [
       payload.queue_number,
       payload.specialty_name,
       payload.cabinet || '',
-      (source as Record<string, unknown>)?.visit_id || '',
-      (source as Record<string, unknown>)?.queue_id || '',
-      (source as Record<string, unknown>)?.queue_tag || '',
+      ticket.visit_id || '',
+      ticket.queue_id || '',
+      ticket.queue_tag || '',
     ].join('::');
 
     if (!seenKeys.has(dedupeKey)) {
