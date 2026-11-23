@@ -5,8 +5,10 @@ from decimal import Decimal
 from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.models.audit import AuditLog
 from app.models.payment import Payment
 from app.services.payment_providers.base import PaymentResult
 from app.services.payment_providers.click import ClickProvider
@@ -19,6 +21,14 @@ class _FakePaymentManager:
 
     def check_payment_status(self, provider_name: str, provider_payment_id: str) -> PaymentResult:
         return self.result
+
+
+def _provider_transitions(db_session, payment_id):
+    return db_session.scalars(
+        select(AuditLog).filter_by(
+            event_type="PAYMENT_PROVIDER_STATUS_CHANGED", entity_type="payment", entity_id=payment_id,
+        )
+    ).all()
 
 
 @pytest.mark.unit
@@ -63,6 +73,52 @@ class TestPaymentReadService:
         assert result["status"] == "paid"
         assert result["payment_id"] == payment.id
         assert result["provider_data"] == payment.provider_data
+        (transition,) = _provider_transitions(db_session, payment.id)
+        assert transition.action == "payment_provider_status_changed"
+        assert transition.actor_type == "system"
+        assert transition.actor_user_id is None
+        assert transition.resource_type == "payment"
+        assert transition.resource_id == str(payment.id)
+        assert transition.outcome == "success"
+        assert transition.payload == {
+            "previous_status": "pending",
+            "new_status": "paid",
+            "amount": "15000.00",
+            "currency": "UZS",
+            "provider": "click",
+        }
+
+    def test_provider_poll_rolls_back_if_audit_write_fails(self, db_session, test_visit, monkeypatch):
+        order_id = "SYNTHETIC-audit"
+        payment = Payment(
+            visit_id=test_visit.id, amount=Decimal("7350.25"), currency="UZS",
+            method="online", status="pending", provider="click", provider_payment_id=order_id,
+            provider_data={"recorded": True},
+        )
+        db_session.add(payment)
+        db_session.commit()
+        payment_id = payment.id
+        service = PaymentReadService(db_session, _FakePaymentManager(PaymentResult(
+            success=True, payment_id=order_id, status="paid",
+            provider_data={"merchant_trans_id": order_id, "amount": "7350.25"},
+        )))
+
+        def fail_audit(pending_payment, *, previous_status):
+            assert previous_status == "pending"
+            assert pending_payment.status == "paid" and pending_payment.paid_at is not None
+            raise SQLAlchemyError("SYNTHETIC-storage-error")
+
+        monkeypatch.setattr(service.repository, "record_provider_transition", fail_audit)
+
+        with pytest.raises(PaymentReadDomainError) as error:
+            service.get_payment_status(payment_id=payment_id)
+
+        assert error.value.status_code == 503
+        assert error.value.detail == "Обновление статуса платежа временно недоступно"
+        db_session.refresh(payment)
+        assert payment.status == "pending" and payment.paid_at is None
+        assert payment.provider_data == {"recorded": True}
+        assert _provider_transitions(db_session, payment_id) == []
 
     def test_provider_poll_preserves_payment_posted_during_lookup(self, db_session, test_visit):
         payment = Payment(
@@ -99,6 +155,7 @@ class TestPaymentReadService:
         assert payment.paid_at is not None
         assert payment.paid_at.replace(tzinfo=payment.paid_at.tzinfo or UTC) == posting_time
         assert payment.provider_data == {"source": "SYNTHETIC-settlement"}
+        assert _provider_transitions(db_session, payment_id) == []
 
     def test_provider_poll_reports_saved_status_for_disallowed_transition(self, db_session, test_visit):
         payment = Payment(
@@ -120,6 +177,7 @@ class TestPaymentReadService:
         assert result["status"] == payment.status == "pending"
         assert payment.paid_at is None
         assert payment.provider_data is None
+        assert _provider_transitions(db_session, payment.id) == []
 
     @pytest.mark.parametrize(
         ("provider_response", "expected_status"),
@@ -170,6 +228,14 @@ class TestPaymentReadService:
         else:
             assert observation.success
             assert payment.provider_data == provider_response
+        if expected_status == "processing":
+            assert service.get_payment_status(payment_id=payment.id)["status"] == "processing"
+        transitions = _provider_transitions(db_session, payment.id)
+        if expected_status == "pending":
+            assert transitions == []
+        else:
+            (transition,) = transitions
+            assert transition.payload["new_status"] == expected_status
 
     def test_get_visit_payments_returns_formatted_items(self, db_session, test_visit):
         payment_1 = Payment(

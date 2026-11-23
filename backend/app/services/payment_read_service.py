@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.models.enums import PaymentStatus
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.visit import Visit
 from app.repositories.payment_read_repository import PaymentReadRepository
 from app.services.billing_service import BillingService
 from app.services.payment_state_checks import is_valid_payment_transition
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -26,6 +32,7 @@ class PaymentReadService:
     """Provides payment status and visit payment listing queries."""
 
     def __init__(self, db, payment_manager=None):  # type: ignore[no-untyped-def]
+        self.db = db
         self.repository = PaymentReadRepository(db)
         self.billing_service = BillingService(db)
         self.payment_manager = payment_manager
@@ -173,6 +180,29 @@ class PaymentReadService:
 
         return "Helvetica", "Helvetica-Bold"
 
+    def _persist_provider_status(
+        self,
+        payment: Payment,
+        *,
+        new_status: str,
+        metadata: dict[str, Any],
+    ) -> Payment:
+        payment_id = payment.id
+        previous_status = payment.status
+        try:
+            payment = self.billing_service.update_payment_status(
+                payment_id=payment_id, new_status=new_status, meta=metadata, commit=False,
+            )
+            self.repository.record_provider_transition(payment, previous_status=previous_status)
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            logger.error("Could not save provider status transition for payment_id=%s", payment_id)
+            raise PaymentReadDomainError(
+                status_code=503, detail="Обновление статуса платежа временно недоступно",
+            ) from None
+        return payment
+
     def get_payment_status(self, *, payment_id: int) -> dict[str, Any]:
         payment = self.repository.get_payment(payment_id)
         if not payment:
@@ -211,8 +241,8 @@ class PaymentReadService:
                     and (payment.amount, payment.currency, payment.updated_at) == recorded_payment_terms
                 ):
                     meta = {**(payment.provider_data or {}), **(result.provider_data or {})}
-                    payment = self.billing_service.update_payment_status(
-                        payment_id=payment.id, new_status=reported_status, meta=meta
+                    payment = self._persist_provider_status(
+                        payment, new_status=reported_status, metadata=meta,
                     )
 
         return {
