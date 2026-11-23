@@ -30,6 +30,11 @@ html.public-site-document body {
   );
 }
 
+:where(html.public-site-document[data-theme="dark"]) .public-site a:hover {
+  color: var(--mac-link-ink, rgb(90, 200, 250));
+  text-decoration-line: underline;
+}
+
 .public-site a:focus-visible {
   border-radius: 4px;
   outline: 3px solid var(--mac-warning-strong, rgb(168, 98, 0));
@@ -463,6 +468,10 @@ html.public-site-document body {
 .public-site :is(button, input, select):focus-visible {
   outline: 3px solid var(--mac-warning-strong, rgb(168, 98, 0));
   outline-offset: 3px;
+}
+
+:where(html.public-site-document[data-theme="dark"]) .public-site :is(a, button, input, select):focus-visible {
+  outline-color: var(--mac-link-ink, rgb(90, 200, 250));
 }
 
 .public-site__contact-list {

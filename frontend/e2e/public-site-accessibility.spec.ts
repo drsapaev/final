@@ -501,7 +501,97 @@ async function navigateInApp(page: Page, path: string) {
   }, path);
 }
 
+async function solidContrastRatio(target: Locator, kind: 'text' | 'outline') {
+  return target.evaluate((element, kind) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Unable to sample the control colors');
+
+    const style = getComputedStyle(element);
+    if (kind === 'outline' && (style.outlineStyle === 'none' || parseFloat(style.outlineWidth) === 0)) return 0;
+    const backgrounds: string[] = [];
+    for (let node = kind === 'text' ? element : element.parentElement; node; node = node.parentElement) {
+      backgrounds.push(getComputedStyle(node).backgroundColor);
+      if (node.classList.contains('public-site')) break;
+    }
+    for (const color of backgrounds.reverse()) {
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+    }
+    const background = context.getImageData(0, 0, 1, 1).data;
+    if (background[3] !== 255) throw new Error('Expected a solid public-site background');
+
+    context.fillStyle = kind === 'text' ? style.color : style.outlineColor;
+    context.fillRect(0, 0, 1, 1);
+    const foreground = context.getImageData(0, 0, 1, 1).data;
+    const luminance = (pixel: Uint8ClampedArray) => {
+      const [r, g, b] = Array.from(pixel.slice(0, 3), (value) => {
+        const channel = value / 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const foregroundLight = luminance(foreground);
+    const backgroundLight = luminance(background);
+    return (Math.max(foregroundLight, backgroundLight) + 0.05) /
+      (Math.min(foregroundLight, backgroundLight) + 0.05);
+  }, kind);
+}
+
 test.describe('public-site accessibility', () => {
+  test('Vite dark public navigation preserves hover and keyboard focus contrast', async ({ page, request }) => {
+    test.setTimeout(60_000);
+    await page.emulateMedia({ colorScheme: 'dark', forcedColors: 'none' });
+    await page.addInitScript((origin) => {
+      if (location.origin === origin) localStorage.setItem('colorScheme', 'dark');
+    }, VITE_ORIGIN);
+    await installSyntheticApi(page, request);
+
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const locale of LOCALES) {
+        await test.step(`${locale.lang} at ${width}px`, async () => {
+          await page.goto(VITE_ORIGIN + locale.prefix + '/services');
+          const root = page.locator('html');
+          await expect(root).toHaveAttribute('data-theme', 'dark');
+          await expect(page.getByRole('heading', { level: 1, name: SERVICE_TITLES[locale.lang] })).toBeVisible();
+
+          const skip = page.getByRole('link', { name: locale.skipLink, exact: true });
+          const header = page.locator('.public-site__header');
+          await page.keyboard.press('Tab');
+          await expect(skip).toBeFocused();
+          await expect.poll(() => solidContrastRatio(skip, 'outline')).toBeGreaterThanOrEqual(3);
+          await page.keyboard.press('Tab');
+          await expect(header.getByRole('link', { name: PUBLIC_SITE_BRAND, exact: true })).toBeFocused();
+
+          if (width === 390) {
+            await page.keyboard.press('Tab');
+            await expect(header.getByRole('link', { name: locale.languageSwitch, exact: true })).toBeFocused();
+            await page.keyboard.press('Tab');
+            await expect(header.locator('.public-site__mobile-menu summary')).toBeFocused();
+            await page.keyboard.press('Enter');
+          }
+
+          const navigation = header.getByRole('navigation', { name: locale.navigation, exact: true });
+          const link = navigation.getByRole('link').first();
+          await page.keyboard.press('Tab');
+          await expect(link).toBeFocused();
+          await expect.poll(() => solidContrastRatio(link, 'outline')).toBeGreaterThanOrEqual(3);
+          await link.hover();
+          await expect.poll(() => solidContrastRatio(link, 'text')).toBeGreaterThanOrEqual(4.5);
+          await expect(link).toHaveCSS('text-decoration-line', 'underline');
+        });
+      }
+    }
+
+    await navigateInApp(page, '/login');
+    await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('html.public-site-document')).toHaveCount(0);
+  });
+
   test('the localized Vite and Nitro catalog passes keyboard and Axe checks at 320px', async ({ page, browser, request }) => {
     test.setTimeout(120_000);
     await assertLocalizedCatalog(page, request, 320);
