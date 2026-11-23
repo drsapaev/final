@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -22,6 +22,56 @@ from app.models.refund_deposit import (
     RefundRequest,
 )
 from app.models.visit import Visit
+
+
+def _record_refund_request_event(
+    db: Session,
+    request: RefundRequest,
+    *,
+    action: str,
+    actor_user_id: int | None,
+    actor_role: str | None,
+    created_at: datetime | None,
+    previous_status: str | None = None,
+) -> None:
+    payload = {
+        "payment_id": request.payment_id,
+        "new_status": request.status,
+        "refund_amount": format(request.refund_amount, "f"),
+        "currency": request.payment_currency_snapshot,
+    }
+    if previous_status is not None:
+        payload["previous_status"] = previous_status
+    db.execute(
+        insert(AuditLog.__table__).inline().values(
+            action=action,
+            event_type=action.upper(),
+            entity_type="refund_request",
+            entity_id=request.id,
+            resource_type="refund_request",
+            resource_id=str(request.id),
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            actor_type="staff" if actor_user_id is not None else "system",
+            outcome="success",
+            created_at=created_at,
+            payload=payload,
+        )
+    )
+
+
+def record_refund_request_creation(
+    db: Session, request: RefundRequest, *, actor_user_id: int | None,
+) -> None:
+    """Record a new request inside the caller's refund transaction."""
+    _record_refund_request_event(
+        db,
+        request,
+        action="refund_request_created",
+        actor_user_id=actor_user_id,
+        actor_role=None,
+        created_at=request.created_at,
+    )
 
 
 class ForceMajeureApiRepository:
@@ -166,27 +216,14 @@ class ForceMajeureApiRepository:
         actor_role: str | None,
     ) -> None:
         """Append the decision in the caller's transaction with INSERT-only access."""
-        self.db.execute(
-            insert(AuditLog.__table__).inline().values(
-                action="refund_request_status_changed",
-                event_type="REFUND_REQUEST_STATUS_CHANGED",
-                entity_type="refund_request",
-                entity_id=request.id,
-                resource_type="refund_request",
-                resource_id=str(request.id),
-                actor_user_id=request.processed_by,
-                actor_role=actor_role,
-                actor_type="staff",
-                outcome="success",
-                created_at=request.processed_at,
-                payload={
-                    "payment_id": request.payment_id,
-                    "previous_status": previous_status,
-                    "new_status": request.status,
-                    "refund_amount": format(request.refund_amount, "f"),
-                    "currency": request.payment_currency_snapshot,
-                },
-            )
+        _record_refund_request_event(
+            self.db,
+            request,
+            action="refund_request_status_changed",
+            actor_user_id=request.processed_by,
+            actor_role=actor_role,
+            created_at=request.processed_at,
+            previous_status=previous_status,
         )
 
     def list_deposits(

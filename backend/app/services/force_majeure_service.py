@@ -40,6 +40,7 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.models.visit import Visit
+from app.repositories.force_majeure_api_repository import record_refund_request_creation
 from app.repositories.queue_api_repository import QueueApiRepository
 from app.services.fcm_service import get_fcm_service
 from app.services.online_queue_new_service import (
@@ -427,6 +428,7 @@ class ForceMajeureService:
                             refund_info = self._create_refund_request(
                                 patient_id=entry.patient_id, payment_id=payment.id, visit_id=entry.visit_id,
                                 amount=payment.amount, reason=reason, refund_type=entry_refund_type, is_automatic=True,
+                                performed_by_id=performed_by_id,
                             )
 
                     elif payment is None and entry.visit_id:
@@ -1223,6 +1225,7 @@ class ForceMajeureService:
         reason: str,
         refund_type: RefundType,
         is_automatic: bool = False,
+        performed_by_id: int | None = None,
     ) -> dict[str, Any]:
         """Создать заявку на возврат
 
@@ -1334,6 +1337,8 @@ class ForceMajeureService:
             if claim_id is not None:
                 claim_row = self.db.get(PaymentRefundClaim, claim_id)
                 claim_row.refund_request_id = refund_request.id
+            if is_automatic:
+                record_refund_request_creation(self.db, refund_request, actor_user_id=performed_by_id)
 
         return {
             "type": "refund_request",

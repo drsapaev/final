@@ -16,11 +16,18 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 from tests.conftest import mint_access_token
 
+from app.models.audit import AuditLog
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.payment import Payment
-from app.models.refund_deposit import DepositTransaction, PatientDeposit
+from app.models.refund_deposit import (
+    DepositTransaction,
+    PatientDeposit,
+    PaymentRefundClaim,
+    RefundRequest,
+)
 from app.models.user import User
 from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
@@ -542,3 +549,55 @@ def test_active_refund_reader_respects_existing_roles(client, db_session, role, 
     response = client.get(f"{FINANCIAL_PREFIX}/refund-requests", headers=headers)
 
     assert response.status_code == status
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("audit_available", [True, False], ids=["audit-available", "audit-denied"])
+def test_bank_refund_creation_and_audit_share_the_queue_transaction(
+    client, db_session, test_doctor, test_patient, admin_user, admin_auth_headers,
+    monkeypatch, audit_available,
+):
+    queue, (entry,), (payment,) = _seed_bound_queue(db_session, test_doctor, test_patient, entries=1)
+    body = {
+        "specialist_id": test_doctor.id,
+        "entry_ids": [entry.id],
+        "target_date": str(queue.day),
+        "refund_type": "bank_transfer",
+        "reason": "SYNTHETIC PRIVATE REASON",
+        "send_notifications": False,
+    }
+    if not audit_available:
+        def unavailable(*args, **kwargs):
+            raise SQLAlchemyError("SYNTHETIC PRIVATE AUDIT FAILURE")
+
+        monkeypatch.setattr("app.services.force_majeure_service.record_refund_request_creation", unavailable)
+
+    response = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
+
+    assert response.status_code == 200
+    assert "SYNTHETIC PRIVATE AUDIT FAILURE" not in response.text
+    assert response.json()["cancelled"] == int(audit_available)
+    assert response.json()["failed"] == int(not audit_available)
+    db_session.expire_all()
+    assert entry.status == ("cancelled" if audit_available else "waiting")
+    assert payment.status == "paid" and payment.refunded_amount is None
+    requests = db_session.query(RefundRequest).filter_by(payment_id=payment.id).all()
+    claims = db_session.query(PaymentRefundClaim).filter_by(payment_id=payment.id).all()
+    events = db_session.query(AuditLog).filter_by(event_type="REFUND_REQUEST_CREATED")
+    assert len(requests) == len(claims) == events.count() == int(audit_available)
+    if audit_available:
+        [request] = requests
+        [claim] = claims
+        assert claim.refund_request_id == request.id
+        event = events.one()
+        assert event.entity_id == request.id and event.actor_user_id == admin_user.id
+        assert event.payload == {
+            "payment_id": payment.id,
+            "new_status": "pending",
+            "refund_amount": "101.00",
+            "currency": "UZS",
+        }
+
+        duplicate = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
+        assert duplicate.status_code == 200 and duplicate.json()["cancelled"] == 0
+        assert events.count() == 1
