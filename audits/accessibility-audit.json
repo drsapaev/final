@@ -411,6 +411,38 @@
       "states_with_horizontal_overflow": 0,
       "limits": "Counts include repeated observations across page states. The sampler compares DOM geometry. Effective pointer hit regions and painted clipping remain unverified."
     },
-    "limitations": "Evidence covers the listed synthetic pages and sampled states. Full WCAG 2.2 AA, screen-reader speech, native mobile browsers, physical devices and desktop text-spacing behavior remain open."
+    "desktop_text_spacing": {
+      "criterion": "WCAG 2.2 SC 1.4.12",
+      "report_written_at_utc": "2026-11-23T07:22:52.4441187Z",
+      "nitro_build_sha": "8564b7e4906f3dc4ea40981225f96612230175ad",
+      "color_scheme": "light",
+      "viewport_widths_css_px": [
+        761,
+        960,
+        1280
+      ],
+      "viewport_height_css_px": 800,
+      "browsers": {
+        "Chromium": "153.0.8010.12",
+        "Firefox": "155.0"
+      },
+      "browser_route_width_pairs": 84,
+      "method": "Compare baseline and four spacing overrides on the same 14 synthetic RU/UZ routes. Verify computed spacing, DOM text geometry and document scroll width. Test the first Tab and Enter to focus main, plus catalog filtering, empty state, reset and search focus.",
+      "snapshots": {
+        "total": 240,
+        "desktop": 168,
+        "catalog_empty": 72
+      },
+      "geometry_candidates": {
+        "baseline": 0,
+        "override": 0
+      },
+      "rendered_text_nodes_lost": 0,
+      "cases_with_horizontal_overflow": 0,
+      "skip_navigation_exercises_passed": 168,
+      "catalog_filter_empty_reset_and_focus_exercises_passed": 72,
+      "limits": "The sampler compares DOM geometry at three light-mode desktop widths. It does not inspect painted glyphs, the native select popup or spoken output."
+    },
+    "limitations": "Evidence covers the listed synthetic pages and sampled states. Full WCAG 2.2 AA, screen-reader speech, native mobile browsers, physical devices and other desktop configurations remain open."
   }
 }
