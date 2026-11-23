@@ -32,6 +32,7 @@ function maskPhoneForCSV(phone: unknown): string {
  * @param {boolean} options.maskPhone - mask phone numbers for PHI protection (default: true)
  * @param {boolean} options.includeAddress - include address column (default: false)
  * @param {boolean} options.includeTimestamps - include date/time/changed columns (default: false)
+ * @param {boolean} options.includeQueueNumber - label and export backend-issued tickets separately
  * @returns {string} CSV content with BOM-safe headers
  */
 export function generateCSV(data: Record<string, unknown>[], options: Record<string, unknown> = {}) {
@@ -39,7 +40,8 @@ export function generateCSV(data: Record<string, unknown>[], options: Record<str
     maskPhone = true,
     includeAddress = false,
     includeTimestamps = false,
-  } = options as { maskPhone?: boolean; includeAddress?: boolean; includeTimestamps?: boolean };
+    includeQueueNumber = false,
+  } = options as { maskPhone?: boolean; includeAddress?: boolean; includeTimestamps?: boolean; includeQueueNumber?: boolean };
 
   // UX Audit R-3.1: unified CSV generation with PHI masking.
   // Раньше: handleExport в EnhancedAppointmentsTable использовал formatPhoneNumber
@@ -48,7 +50,9 @@ export function generateCSV(data: Record<string, unknown>[], options: Record<str
     ? (p: unknown) => maskPhoneForCSV(p)
     : (p: unknown) => (p ? String(p) : '');
 
-  const headers = ['№', 'ФИО', 'Год рождения', 'Телефон'];
+  const headers = includeQueueNumber
+    ? ['№ строки', '№ талона', 'ФИО', 'Год рождения', 'Телефон']
+    : ['№', 'ФИО', 'Год рождения', 'Телефон'];
   if (includeAddress) headers.push('Адрес');
   headers.push('Услуги', 'Тип обращения', 'Вид оплаты');
   if (includeTimestamps) headers.push('Дата', 'Время', 'Изменено');
@@ -57,6 +61,10 @@ export function generateCSV(data: Record<string, unknown>[], options: Record<str
   const rows = data.map((row, index) => {
     const baseRow = [
       index + 1,
+      ...(includeQueueNumber ? [(() => {
+        const value = String(row.queue_number ?? '').trim();
+        return /^[1-9]\d*$/.test(value) ? value : '';
+      })()] : []),
       row.patient_fio || '',
       row.patient_birth_year || '',
       // R-05 fix: маскируем телефон в CSV-экспорте

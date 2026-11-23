@@ -179,3 +179,13 @@ describe('Fix A: wizard patient-selection contract', () => {
     expect(source).toContain('aw_phone_already_exists');
   });
 });
+
+it('does not invent or submit a full birth date from a worklist birth year', () => {
+  const source = readWizardSource();
+  expect(source).not.toContain('patient_birth_year}-01-01');
+  expect(source).toContain('String(patient.id) !== String(patientId)');
+  expect(source).toContain('cancelled || birthDateEditedRef.current || !birthDate');
+  const qrUpdate = extractSourceBlock(source, 'const patientData: Record<string, unknown> = {\n              patient_name:', '// Подготавливаем услуги из корзины');
+  expect(qrUpdate).toContain('birth_date: wizardData.patient.birth_date');
+  expect(qrUpdate).not.toContain('birth_year:');
+});

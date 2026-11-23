@@ -8,6 +8,7 @@ import type { Appointment } from '../../../types/domain/clinic';
 import type { AppointmentRow } from '../appointmentsTableContracts';
 import { useAppointmentsTableRenderers } from '../appointmentsTableColumns';
 import { getLocalDateString } from '../../../utils/dateUtils';
+import { generateCSV } from '../../../pages/registrar/registrarCsv';
 
 afterEach(() => cleanup());
 
@@ -226,4 +227,14 @@ describe('REG-FE-057: badge status resolves by queue identity, not by number alo
     const badge = document.querySelector('[data-queue-status]') as HTMLElement;
     expect(badge.getAttribute('data-queue-status')).toBe('waiting');
   });
+});
+
+it('labels CSV row order separately from the backend ticket and excludes unassigned values', () => {
+  const [headers, issued, unallocated] = generateCSV([
+    { queue_number: 17, cabinet: '6' },
+    { queue_number: 0, cabinet: '6' },
+  ], { includeQueueNumber: true }).split('\n');
+  expect(headers).toMatch(/^№ строки,№ талона,/);
+  expect(issued).toMatch(/^"1","17",/);
+  expect(unallocated).toMatch(/^"2","",/);
 });

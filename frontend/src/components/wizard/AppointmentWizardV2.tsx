@@ -218,6 +218,7 @@ import {
   resolveEditRecordDate,
   isEditDeltaNewItem,
   resolveCartServiceReferences,
+  parseWizardBaseline,
   refreshBaselineAfterGenderHydration,
   refreshBaselineAfterServiceResolution,
   useWizardSearchUnmountCleanup,
@@ -357,6 +358,7 @@ const AppointmentWizardV2 = ({
   const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
   const [showAllServices, setShowAllServices] = useState(false);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
+  const birthDateEditedRef = useRef(false);
   const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({} as Record<string, unknown>);
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
 
@@ -365,6 +367,7 @@ const AppointmentWizardV2 = ({
   // Эффект для инициализации данных при открытии
   useEffect(() => {
     if (isOpen) {
+      birthDateEditedRef.current = false;
 
       // ✅ ИСПРАВЛЕНО: Строгая проверка editMode перед загрузкой данных
       if (editMode === true && initialData !== null && initialData !== undefined) {
@@ -374,10 +377,8 @@ const AppointmentWizardV2 = ({
         // Парсим услуги из initialData (предполагаем, что они приходят в определенном формате)
         // В реальном приложении может потребоваться маппинг
 
-        // ✅ ИСПРАВЛЕНО: Правильная инициализация даты рождения
-        const birthDateRaw = initialData.patient_birth_date || (
-        initialData.patient_birth_year ? `${initialData.patient_birth_year}-01-01` : '');
-        const birthDate = String(birthDateRaw ?? '');
+        // A worklist birth year is not a date of birth.
+        const birthDate = String(initialData.patient_birth_date ?? '');
         const initialDataPatient = (initialData.patient as { fio?: string; phone?: string; address?: string } | null | undefined) ?? {};
         const initialCartItems = (() => {
           const items = normalizeServicesFromInitialData(initialData, []);
@@ -441,9 +442,7 @@ const AppointmentWizardV2 = ({
         });
 
         // ✅ ИСПРАВЛЕНО: Синхронизация formattedBirthDate
-        if (birthDate) {
-          setFormattedBirthDate(convertDateFromISO(birthDate));
-        }
+        setFormattedBirthDate(birthDate ? convertDateFromISO(birthDate) : '');
 
       } else {
         setActiveServiceCategory(activeTabToWizardCategory(activeTab));
@@ -458,6 +457,32 @@ const AppointmentWizardV2 = ({
       }
     }
   }, [isOpen, editMode, initialData, activeTab]);
+
+  useEffect(() => {
+    if (!isOpen || !editMode || initialData?.patient_birth_date) return;
+    const patientId = resolveInitialPatientId(initialData) as string | number | null;
+    if (!patientId) return;
+
+    let cancelled = false;
+    void getPatient(patientId).then((patient) => {
+      const birthDate = patient.birth_date;
+      if (cancelled || birthDateEditedRef.current || !birthDate || String(patient.id) !== String(patientId)) return;
+      const baseline = parseWizardBaseline(initialContentRef.current);
+      if (!baseline || String(baseline.patient.id) !== String(patientId)) return;
+      initialContentRef.current = wizardContentSignature({
+        patient: { ...baseline.patient, birth_date: birthDate },
+        cart: baseline.cart,
+      });
+      setWizardData((prev) => String(prev.patient.id) === String(patientId)
+        ? { ...prev, patient: { ...prev.patient, birth_date: birthDate } }
+        : prev);
+      setFormattedBirthDate(convertDateFromISO(birthDate));
+    }).catch(() => {
+      // An unavailable card does not turn the snapshot year into a date.
+    });
+
+    return () => { cancelled = true; };
+  }, [isOpen, editMode, initialData, getPatient]);
 
   useEffect(() => {
     if (!isOpen || !editMode || wizardData.patient.gender) return;
@@ -894,6 +919,7 @@ const AppointmentWizardV2 = ({
   };
 
   const handleBirthDateChange = (value: string) => {
+    birthDateEditedRef.current = true;
     const formatted = formatBirthDateInput(value);
     setFormattedBirthDate(formatted);
 
@@ -2262,9 +2288,9 @@ const AppointmentWizardV2 = ({
             const patientData: Record<string, unknown> = {
               patient_name: wizardData.patient.fio || wizardData.patient.name,
               phone: normalizedPhone,
-              birth_year: wizardData.patient.birth_date ?
-              parseInt(wizardData.patient.birth_date.split('-')[0]) :
-              null,
+              ...(birthDateEditedRef.current && wizardData.patient.birth_date
+                ? { birth_date: wizardData.patient.birth_date }
+                : {}),
               address: wizardData.patient.address || null
             };
 
@@ -2429,7 +2455,7 @@ const AppointmentWizardV2 = ({
           const patientDataForEditDelta: Record<string, unknown> = {
             full_name: wizardData.patient.fio || wizardData.patient.name,
             phone: normalizedPhone,
-            birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate || null,
+            birth_date: birthDateEditedRef.current ? wizardData.patient.birth_date || undefined : undefined,
             sex: selectedPatientSex,
             address: wizardData.patient.address || null
           };
@@ -2650,9 +2676,9 @@ const AppointmentWizardV2 = ({
         const patientUpdateData: Record<string, unknown> = {
           full_name: wizardData.patient.fio || wizardData.patient.name,
           phone: normalizedPhone,
-          birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate,
+          birth_date: birthDateEditedRef.current ? wizardData.patient.birth_date || undefined : undefined,
           sex: selectedPatientSex,
-          address: wizardData.patient.address
+          address: wizardData.patient.address || (initialData?.address ? '' : undefined)
         };
 
         // Удаляем undefined значения

@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.crud.clinic import clinic_today
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.payment_invoice import PaymentInvoice
@@ -135,6 +136,8 @@ def test_registrar_wizard_characterization_same_day_cart_creates_desk_queue_entr
     test_doctor,
     test_service,
 ):
+    test_doctor.cabinet = "6"
+    db_session.commit()
     response = client.post(
         "/api/v1/registrar/cart",
         headers=registrar_auth_headers,
@@ -143,7 +146,7 @@ def test_registrar_wizard_characterization_same_day_cart_creates_desk_queue_entr
             visits=[
                 {
                     "doctor_id": test_doctor.id,
-                    "visit_date": date.today().isoformat(),
+                    "visit_date": clinic_today(db_session).isoformat(),
                     "department": "cardiology",
                     "services": [
                         {
@@ -173,8 +176,9 @@ def test_registrar_wizard_characterization_same_day_cart_creates_desk_queue_entr
     assert entry.source == "desk"
     assert entry.status == "waiting"
     assert entry.queue_time is not None
-    assert entry.number > 0
+    assert entry.number == 1  # The cabinet is 6, but this queue is empty.
     assert payload["queue_numbers"][str(visit_id)][0]["number"] == entry.number
+    assert payload["queue_numbers"][str(visit_id)][0]["queue_cabinet"] == "6"
 
 
 @pytest.mark.integration

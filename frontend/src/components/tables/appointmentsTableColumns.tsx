@@ -973,7 +973,7 @@ export const buildAppointmentsTableColumns = ({
                   fontWeight: 'var(--mac-font-weight-semibold)',
                   whiteSpace: 'nowrap'
                 }}>
-                Manual
+                {t('terms.registrar')}
               </span>
             }
           </div>
@@ -1016,15 +1016,15 @@ export const buildAppointmentsTableColumns = ({
     )
   });
 
-  // Адрес (только registrar view, скрыт на mobile)
+  // Адрес доступен регистратору в прокручиваемой таблице и на узком экране.
   if (!isDoctorView) {
     columns.push({
       key: 'patient_address',
       sortable: false,
-      title: <div className="eat-th-content hide-on-mobile" style={{ minWidth: '140px' }}>{t('misc.eat_address')}</div>,
+      title: <div className="eat-th-content" style={{ minWidth: '140px' }}>{t('misc.eat_address')}</div>,
       render: (_value: unknown, row: AppointmentRow) => (
         <div
-          className="eat-cell eat-cell--primary hide-on-mobile"
+          className="eat-cell eat-cell--primary"
           style={{ minWidth: '140px', whiteSpace: 'normal', lineHeight: '1.4' }}
           title={String(row.address ?? '')}>
           {row.address ?

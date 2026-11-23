@@ -11277,7 +11277,7 @@ const uzCyrl = {
     rp_breadcrumb_new: 'Новая запись',
     rp_aria_worklist_summary: 'Сводка рабочего списка регистратуры',
     rp_worklist_root: 'Регистратура',
-    rp_worklist_title: 'Рабочий список: {label}',
+    rp_worklist_title: 'Иш рўйхати: {label}',
     rp_worklist_filter: 'Фильтр: {label}',
     rp_counter_records_one: 'ёзилган',
     rp_counter_records_few: 'ёзилган',
