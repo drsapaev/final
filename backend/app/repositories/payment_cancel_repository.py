@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from sqlalchemy import insert
 from sqlalchemy.orm import Session
 
+from app.models.audit import AuditLog
 from app.models.payment import Payment
 from app.models.payment_webhook import PaymentTransaction
+from app.models.user import User
 
 
 class PaymentCancelRepository:
@@ -16,6 +19,26 @@ class PaymentCancelRepository:
 
     def get_payment(self, payment_id: int) -> Payment | None:
         return self.db.query(Payment).filter(Payment.id == payment_id).first()
+
+    def record_cancellation(
+        self, payment: Payment, *, previous_status: str, actor: User | None,
+    ) -> None:
+        """Append the cancellation using the caller's transaction and INSERT grant."""
+        self.db.execute(
+            insert(AuditLog.__table__).inline().values(
+                action="payment_cancelled",
+                event_type="PAYMENT_CANCELLED",
+                entity_type="payment",
+                entity_id=payment.id,
+                resource_type="payment",
+                resource_id=str(payment.id),
+                actor_user_id=actor.id if actor is not None else None,
+                actor_role=actor.role if actor is not None else None,
+                actor_type="staff" if actor is not None else "system",
+                outcome="success",
+                payload={"previous_status": previous_status, "new_status": payment.status},
+            )
+        )
 
     def get_payment_for_update(self, payment_id: int) -> Payment | None:
         """Lock the payment row before the definitive status check."""

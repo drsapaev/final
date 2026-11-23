@@ -982,6 +982,13 @@ def pending_cashier_payment(payment_engines):
             f"CREATE POLICY cashier_transaction_lock ON {schema}.payment_transactions FOR UPDATE TO {role} "
             "USING (true) WITH CHECK (false)"
         )
+        conn.exec_driver_sql(f"GRANT INSERT ON {schema}.audit_logs TO {role}")
+        conn.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {schema}.audit_logs_id_seq TO {role}")
+        conn.exec_driver_sql(f"ALTER TABLE {schema}.audit_logs ENABLE ROW LEVEL SECURITY")
+        conn.exec_driver_sql(
+            f"CREATE POLICY cashier_cancellation_audit ON {schema}.audit_logs FOR INSERT TO {role} "
+            "WITH CHECK (action = 'payment_cancelled' AND event_type = 'PAYMENT_CANCELLED')"
+        )
     seed_session = sessionmaker(bind=admin, expire_on_commit=False)
     with seed_session.begin() as seed:
         visit = create_test_visit(seed, status="waiting")
@@ -1074,6 +1081,62 @@ def test_d6e_cashier_confirm_and_cancel_share_visit_first_lock_order(pending_cas
     with owner_session() as check:
         status = "paid" if confirmation[0] == "success" else "cancelled"
         assert check.get(Payment, payment_id).status == status
+
+
+@pytest.mark.parametrize("allow_audit", [True, False])
+def test_cashier_cancellation_requires_atomic_audit(pending_cashier_payment, allow_audit):
+    from sqlalchemy import select
+
+    from app.models.audit import AuditLog
+    from app.services.payment_cancel_service import (
+        PaymentCancelDomainError,
+        PaymentCancelService,
+    )
+
+    owner_session, runtime_session, _, payment_id = pending_cashier_payment
+    runtime_name = runtime_session.kw["bind"].url.username
+    with owner_session.begin() as seed:
+        actor = User(
+            username="SYNTHETIC-cancellation-auditor",
+            hashed_password="unused-synthetic",
+            role="Cashier",
+        )
+        seed.add(actor)
+        seed.flush()
+        if not allow_audit:
+            quote = seed.get_bind().dialect.identifier_preparer.quote_identifier
+            schema = quote(seed.get_bind().dialect.default_schema_name)
+            seed.connection().exec_driver_sql(
+                f"REVOKE INSERT ON {schema}.audit_logs FROM {quote(runtime_name)}"
+            )
+
+    with runtime_session() as db:
+        assert not db.scalar(text("SELECT has_table_privilege('audit_logs', 'SELECT')"))
+        assert not db.scalar(text("SELECT has_table_privilege('audit_logs', 'UPDATE,DELETE')"))
+        service = PaymentCancelService(db, payment_manager=None)
+        if allow_audit:
+            assert service.cancel_payment(payment_id=payment_id, actor=actor)["status"] == "cancelled"
+            with pytest.raises(PaymentCancelDomainError) as duplicate:
+                service.cancel_payment(payment_id=payment_id, actor=actor)
+            assert duplicate.value.status_code == 400
+        else:
+            with pytest.raises(PaymentCancelDomainError) as unavailable:
+                service.cancel_payment(payment_id=payment_id, actor=actor)
+            assert unavailable.value.status_code == 503
+
+    with owner_session() as check:
+        expected = "cancelled" if allow_audit else "pending"
+        assert check.get(Payment, payment_id).status == expected
+        receipts = check.scalars(select(AuditLog).filter_by(
+            event_type="PAYMENT_CANCELLED", entity_id=payment_id,
+        )).all()
+        if allow_audit:
+            receipt, = receipts
+            assert receipt.actor_user_id == actor.id
+            assert receipt.actor_role == "Cashier"
+            assert receipt.payload == {"previous_status": "pending", "new_status": "cancelled"}
+        else:
+            assert receipts == []
 
 
 # --- Codex R10 PR 3118: edit-delta decrease guard serialization -------

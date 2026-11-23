@@ -7,9 +7,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.transactions import transaction as transaction_ctx
 from app.models.enums import PaymentStatus
+from app.models.user import User
 from app.repositories.payment_cancel_repository import PaymentCancelRepository
 from app.services.billing_service import BillingService
 from app.services.context_facades.emr_facade import (
@@ -44,6 +46,7 @@ class PaymentCancelService:
         *,
         payment_id: int,
         reason: str | None = None,
+        actor: User | None = None,
     ) -> dict[str, Any]:
         payment = self.repository.get_payment(payment_id)
         if not payment:
@@ -67,6 +70,7 @@ class PaymentCancelService:
             expected_provider=payment.provider,
             expected_provider_payment_id=payment.provider_payment_id,
             reason=reason,
+            actor=actor,
         )
 
         payment = self.repository.get_payment(payment_id)
@@ -90,11 +94,12 @@ class PaymentCancelService:
         expected_provider: str | None,
         expected_provider_payment_id: str | None,
         reason: str | None = None,
+        actor: User | None = None,
     ) -> None:
         """Atomically cancel Payment and linked PaymentTransaction.
 
         The visit projection, Payment, linked PaymentTransaction, cancellation
-        reason, and linked invoices are updated inside one ``transaction_ctx``
+        reason, linked invoices and audit entry share one ``transaction_ctx``
         so that a failure rolls the complete local mutation back. For provider
         payments, the Payment and PaymentTransaction locks are deliberately held
         across the external cancellation call. This prevents a webhook or manual
@@ -186,6 +191,7 @@ class PaymentCancelService:
             #    billing_service.update_payment_status(commit=False)
             #    acquires SELECT Payment ... FOR UPDATE internally
             #    and flushes the UPDATE without committing.
+            previous_status = locked_payment.status
             try:
                 payment = self.billing_service.update_payment_status(
                     payment_id=payment_id,
@@ -241,6 +247,15 @@ class PaymentCancelService:
                     payment_method=payment.method,
                 )
             self.db.flush()
+            try:
+                self.repository.record_cancellation(
+                    payment, previous_status=previous_status, actor=actor,
+                )
+            except SQLAlchemyError:
+                logger.error("Could not record cancellation audit for payment_id=%s", payment_id)
+                raise PaymentCancelDomainError(
+                    status_code=503, detail="Отмена платежа временно недоступна",
+                ) from None
 
             # Make the provider call only after every local mutation and
             # reconciliation has flushed successfully. The changes remain

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
+from app.models.audit import AuditLog
 from app.models.payment import Payment
 from app.services.payment_cancel_service import (
     PaymentCancelDomainError,
@@ -74,14 +76,10 @@ class TestPaymentCancelService:
         assert result["success"] is True
         assert payment.status == "cancelled"
 
-    def test_cancel_online_payment_provider_failure_still_cancels(
+    def test_provider_rejection_rolls_back_payment_and_audit(
         self, db_session, test_visit
     ):
-        # PAY-REAUDIT-28 P0-6: при неудаче отмены у провайдера локальный статус
-        # НЕ должен меняться на cancelled. Тест переименован семантически:
-        # прежнее поведение (помечать cancelled при ошибке провайдера) было
-        # багом — рассинхрон локальных проводок и реального состояния платежа
-        # у провайдера. Теперь сервис поднимает PaymentCancelDomainError(502).
+        # PAY-REAUDIT-28 P0-6: отказ провайдера откатывает отмену и запись аудита.
         payment = Payment(
             visit_id=test_visit.id,
             amount=10_000.0,
@@ -113,3 +111,6 @@ class TestPaymentCancelService:
         assert exc_info.value.status_code == 502
         assert "provider unavailable" in exc_info.value.detail
         assert payment.provider_data["source"] == "unit"
+        assert db_session.scalar(select(AuditLog.id).filter_by(
+            event_type="PAYMENT_CANCELLED", entity_id=payment.id,
+        )) is None

@@ -472,7 +472,7 @@ def cancel_payment(
     """Отмена платежа"""
     service = PaymentCancelService(db, get_payment_manager())
     try:
-        return service.cancel_payment(payment_id=payment_id)
+        return service.cancel_payment(payment_id=payment_id, actor=current_user)
     except PaymentCancelDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 

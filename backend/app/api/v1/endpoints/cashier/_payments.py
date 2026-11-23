@@ -1213,6 +1213,7 @@ async def cancel_payment(
             PaymentCancelService(db, get_payment_manager()).cancel_payment(
                 payment_id=payment_id,
                 reason=cancel_data.reason,
+                actor=current_user,
             )
         except PaymentCancelDomainError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
