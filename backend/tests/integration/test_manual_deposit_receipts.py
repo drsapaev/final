@@ -291,8 +291,10 @@ def visit_deposit_pg(pg_cashier, request):
         conn.exec_driver_sql(f"ALTER TABLE {schema}.deposit_transactions FORCE ROW LEVEL SECURITY")
         conn.exec_driver_sql(f"CREATE POLICY synthetic_debit_read ON {schema}.deposit_transactions FOR SELECT TO {role} USING (true)")
         conn.exec_driver_sql(f"CREATE POLICY synthetic_debit_write ON {schema}.deposit_transactions FOR INSERT TO {role} WITH CHECK (true)")
-        for table in ("refund_requests", "payment_refund_claims"):
-            conn.exec_driver_sql(f"GRANT SELECT ON {schema}.{table} TO {role}")
+        conn.exec_driver_sql(
+            f"GRANT SELECT (refund_amount, is_automatic) ON {schema}.refund_requests TO {role}"
+        )
+        conn.exec_driver_sql(f"GRANT SELECT ON {schema}.payment_refund_claims TO {role}")
         for table in ("payments", "payment_refund_claims"):
             conn.exec_driver_sql(f"GRANT INSERT ON {schema}.{table} TO {role}")
             conn.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {schema}.{table}_id_seq TO {role}")
@@ -505,6 +507,13 @@ def test_postgres_batch_failure_rolls_back_only_its_refund_and_redacts_details(
 
         failed_payment_id = payments[0].id
         with Session(runtime) as refund_db:
+            assert not refund_db.scalar(text(
+                "SELECT pg_catalog.has_table_privilege(CURRENT_USER, 'refund_requests', 'SELECT')"
+            ))
+            assert not refund_db.scalar(text(
+                "SELECT pg_catalog.has_column_privilege("
+                "CURRENT_USER, 'refund_requests', 'bank_card_number', 'SELECT')"
+            ))
             runtime_entries = [refund_db.get(OnlineQueueEntry, entry.id) for entry in entries]
             service = ForceMajeureService(refund_db)
             add_credit = service._add_to_deposit

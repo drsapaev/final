@@ -18,6 +18,7 @@ from typing import Any, Final
 from sqlalchemy import false, func, insert, or_, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine import Row
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, lazyload, load_only
 
@@ -870,11 +871,15 @@ class ForceMajeureService:
             return False
         request = None
         if claim.refund_request_id is not None:
-            request = self.db.get(RefundRequest, claim.refund_request_id)
+            request = (
+                self.db.query(RefundRequest.status)
+                .filter(RefundRequest.id == claim.refund_request_id)
+                .first()
+            )
         if request is not None:
             return request.status in self.REFUND_REQUEST_FAILED_STATUSES
         automatic_requests = (
-            self.db.query(RefundRequest)
+            self.db.query(RefundRequest.status)
             .filter(
                 RefundRequest.payment_id == claim.payment_id,
                 RefundRequest.is_automatic.is_(True),
@@ -992,8 +997,12 @@ class ForceMajeureService:
                 raise ForceMajeureError("Платёж изменяется, повторите операцию") from None
             raise
 
-    def _find_prior_refund_request(self, payment_id: int, *, automatic_only: bool) -> RefundRequest | None:
-        query = self.db.query(RefundRequest).filter(
+    def _find_prior_refund_request(
+        self, payment_id: int, *, automatic_only: bool,
+    ) -> Row[tuple[int, str, Decimal]] | None:
+        query = self.db.query(
+            RefundRequest.id, RefundRequest.status, RefundRequest.refund_amount,
+        ).filter(
             RefundRequest.payment_id == payment_id,
             or_(RefundRequest.status.is_(None),
                 RefundRequest.status.not_in(self.REFUND_REQUEST_FAILED_STATUSES)),

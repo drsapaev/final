@@ -113,6 +113,9 @@ def require_visible_refund_history(db: Session) -> None:
         db,
         {
             **_EXTERNAL_REFUND_READS,
+            "refund_requests": (
+                *_EXTERNAL_REFUND_READS["refund_requests"], "refund_amount", "is_automatic",
+            ),
             "payment_refund_claims": ("id", "payment_id", "channel", "refund_request_id", "deposit_transaction_id"),
         },
         "История возвратов временно недоступна",
