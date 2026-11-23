@@ -327,14 +327,30 @@ async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind
   const copy = CATALOG_COPY[locale.lang];
   const search = controls.getByRole('searchbox', { name: copy[kind].search, exact: true });
   const group = controls.getByRole('combobox', { name: copy[kind].group, exact: true });
-  const status = catalog.locator('.public-site__catalog-status');
+  const status = catalog.getByRole('status');
   const reset = controls.getByRole('button', { name: copy.reset, exact: true });
   const paths = CATALOG_DETAILS[kind].map((path) => locale.prefix + path);
 
   await expect(search).toBeVisible();
   await expect(group.locator('option:checked')).toHaveText(copy.all);
   await assertVisibleCatalogLinks(catalog, paths);
-  await expect(status).toHaveText(`${copy.resultPrefix} 4`);
+  const initialStatus = await status.elementHandle();
+  const assertResultStatus = async (count: number) => {
+    const text = `${copy.resultPrefix} ${count}`;
+    await expect(status).toHaveAttribute('role', 'status');
+    await expect(status).toHaveAttribute('aria-atomic', 'true');
+    await expect(status).toHaveText(text);
+    expect(await status.evaluate((element, initial) => ({
+      sameRegion: element === initial,
+      content: Array.from(element.childNodes, (node) => ({
+        isText: node.nodeType === Node.TEXT_NODE,
+        text: node.textContent,
+      })),
+    }), initialStatus)).toEqual({
+      sameRegion: true,
+      content: [{ isText: true, text }],
+    });
+  };
 
   let sentQuery = false;
   let fetchedCatalog = false;
@@ -347,13 +363,15 @@ async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind
   const initialUrl = page.url();
   page.on('request', recordRequest);
   try {
+    await assertResultStatus(4);
+
     await group.selectOption({ label: copy[kind].firstGroup });
     await assertVisibleCatalogLinks(catalog, paths.slice(0, 2));
-    await expect(status).toHaveText(`${copy.resultPrefix} 2`);
+    await assertResultStatus(2);
 
     await search.fill(copy.query);
     await assertVisibleCatalogLinks(catalog, [paths[1]]);
-    await expect(status).toHaveText(`${copy.resultPrefix} 1`);
+    await assertResultStatus(1);
 
     await group.selectOption({ label: copy.all });
     await assertVisibleCatalogLinks(catalog, paths.slice(1, 3));
@@ -367,7 +385,7 @@ async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind
     await search.fill(PRIVATE_SEARCH_PROBE);
     await search.press('Enter');
     await assertVisibleCatalogLinks(catalog, []);
-    await expect(status).toHaveText(`${copy.resultPrefix} 0`);
+    await assertResultStatus(0);
     await expect(catalog.getByText(copy.noResults, { exact: true })).toBeVisible();
     await expect(catalog.locator(`a[href="${locale.prefix}/contacts"]`)).toBeVisible();
     await expect(page).toHaveURL(initialUrl);
@@ -384,13 +402,14 @@ async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind
     await expect(search).toHaveValue('');
     await expect(group.locator('option:checked')).toHaveText(copy.all);
     await assertVisibleCatalogLinks(catalog, paths);
-    await expect(status).toHaveText(`${copy.resultPrefix} 4`);
+    await assertResultStatus(4);
     await expect(catalog.getByText(copy.noResults, { exact: true })).toBeHidden();
     await expect(page).toHaveURL(initialUrl);
     expect(sentQuery, 'the synthetic search term must remain out of requests').toBe(false);
     expect(fetchedCatalog, 'filtering must use the catalog already on the page').toBe(false);
   } finally {
     page.off('request', recordRequest);
+    await initialStatus.dispose();
   }
 }
 

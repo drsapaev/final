@@ -503,7 +503,7 @@ function CatalogFilter({ groups, groupLabel, searchLabel, locale, copy, children
   const groupId = `${fieldId}-group`;
   return (
     <>
-      <script async src="/public-site-catalog-filter.js" />
+      <script async src="/public-site-catalog-filter.js?v=2" />
       {createElement('public-site-catalog-filter', { className: 'public-site__catalog' }, (
         <>
           <search
@@ -538,8 +538,9 @@ function CatalogFilter({ groups, groupLabel, searchLabel, locale, copy, children
             <button className="public-site__button" type="button" data-catalog-reset="">
               {copy.catalogReset}
             </button>
-            <p className="public-site__catalog-status" role="status">
-              {copy.catalogCount} <span data-catalog-count="">{groups.length}</span>
+            <p className="public-site__catalog-status" role="status" aria-atomic="true"
+              data-catalog-result-label={copy.catalogCount}>
+              {`${copy.catalogCount} ${groups.length}`}
             </p>
           </search>
           {children}
