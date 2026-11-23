@@ -336,6 +336,47 @@
     },
     "limits": "Contrast ratios use computed colors at sampled states. The automatic main outlines have computed visibility and style observations. Speech, native system high contrast, physical devices, native Safari and full WCAG conformance remain unverified."
   },
+  "native_text_zoom_follow_up": {
+    "criterion": "WCAG 2.2 SC 1.4.4 bounded text-resize verification",
+    "measured_at_utc": "2026-11-23T07:53:04.98Z",
+    "focus_recheck_at_utc": "2026-11-23T07:57:36.469Z",
+    "nitro_build_sha": "8564b7e4906f3dc4ea40981225f96612230175ad",
+    "browser": "Firefox 155.0",
+    "mode": "Browser-level text-only zoom, light scheme",
+    "desktop_widths_css_px": [
+      761,
+      960,
+      1280
+    ],
+    "viewport_height_css_px": 800,
+    "locales": [
+      "ru",
+      "uz-Latn"
+    ],
+    "routes_per_locale": 7,
+    "method": "Calibrate with HTML text and button text widths while fixed CSS width, viewport and DPR stay constant. Verify doubling again on each actual route. Compare DOM text geometry and exercise natural Tab through main/footer, the skip link and catalog filter/reset.",
+    "route_width_pairs": 42,
+    "route_runs_100_and_200": 84,
+    "geometry_snapshots": 120,
+    "rendered_text_nodes_lost": 0,
+    "new_geometry_candidates": 0,
+    "horizontal_overflow_snapshots": 0,
+    "catalog_filter_and_reset_checks": 36,
+    "initial_keyboard_observations": 912,
+    "initial_center_probe_candidates": 6,
+    "focus_follow_up": {
+      "route_width_pairs": 6,
+      "repeats_per_zoom_mode": 3,
+      "route_runs": 36,
+      "tab_steps_main_footer": 576,
+      "partially_visible_targets_with_center_below_viewport": 18,
+      "order_exposure_or_focus_selector_failures": 0,
+      "skip_link_checks_passed": 36,
+      "description": "The initial center-only probe flagged six scenarios. A diagnostic repeat confirmed that candidate centers could fall below the viewport even when parts of the same targets remained exposed, and stopped on an immediate first-Tab check. A separate repeat ensured initial document focus and sampled viewport intersections. The order, exposed target area, :focus-visible selector, and skip activation passed in its measured scenarios."
+    },
+    "teardown": "Temporary Firefox profiles and fixture listeners removed.",
+    "remaining": "Rendered focus outline, native select popup, other zoom modes and configurations, screen-reader output and the full WCAG audit."
+  },
   "synthetic_text_spacing_target_size_follow_up": {
     "date": "2026-11-23",
     "runtime": "Local synthetic Nitro over loopback",
