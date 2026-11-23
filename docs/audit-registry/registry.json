@@ -826,10 +826,14 @@
       "priority": "P2",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6698903715",
-      "status": "CONFIRMED_OPEN",
-      "fix_pr": null,
-      "merge_sha": null,
-      "root_cause": "CONFIRMED on current main 2026-11-15: DermaHistoryTab cards render only date/skin type/diagnosis (and date/type/area for procedures), no detail drilldown — backend sends lesions/distribution/symptoms/treatment_plan/products_used/results but the UI neither shows nor links them"
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4231",
+      "merge_sha": "63d06517b",
+      "root_cause": "CONFIRMED on current main 2026-11-15: DermaHistoryTab cards render only date/skin type/diagnosis (and date/type/area for procedures), no detail drilldown — backend sends lesions/distribution/symptoms/treatment_plan/products_used/results but the UI neither shows nor links them",
+      "test_before": "CONFIRMED on current main 2026-11-15: DermaHistoryTab cards render only date/skin type/diagnosis (date/type/area for procedures), no detail drilldown though the history union already sends the fields",
+      "test_after": "owner PR #4231 (merge 63d06517b) declares the API-sent fields (lesions/distribution/symptoms/treatment_plan; products_used/results/follow_up; source marker + visit identity) and renders per-card drilldown with i18n labels in 5 locales; dedicated regression suite DermaHistoryTab.details.test.tsx 4/4 GREEN on merged tree (registry branch = 63d06517b + registry docs), registry-agent verification 2026-11-23",
+      "reviewer": "registry-agent cycle-29: commit diff read + dedicated suite executed on exact merged tree",
+      "date": "2026-11-23"
     },
     {
       "checked": false,
