@@ -7,16 +7,26 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import false, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import OnlineQueueEntry
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.provider_attempt import ProviderActiveVisitReservation
+from app.models.refund_deposit import DepositTransaction, RefundRequest
+from app.models.user import User
 from app.models.visit import Visit
 from app.repositories.online_queue_new_repository import OnlineQueueNewRepository
+from app.repositories.payment_invoice_repository import record_invoice_visit_release
 from app.services.encounter_benefit_net import require_no_existing_financial_adjustment
 from app.services.encounter_financial_fence import FinancialFenceError
+from app.services.money_input import MoneyInputError, parse_money
+from app.services.payment_refund_guard import (
+    require_visible_checkout_queue,
+    require_visible_unpaid_draft_evidence,
+    require_visible_visit_payments,
+)
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
 
@@ -136,6 +146,90 @@ class OnlineQueueNewService:
         self.db.refresh(entry)
         return entry
 
+    def stage_unused_grouped_draft(
+        self, *, entry: OnlineQueueEntry, performed_by_id: int | None, reason: str,
+    ) -> None:
+        """Release a draft only while holding the visit and invoice locks."""
+        visit_id = entry.visit_id
+        if visit_id is None or self._lock_linked_visit(visit_id) is None:
+            return
+        self._check_cancellation_visibility()
+        self.check_pending_invoice_cancellation(visit_id)
+        if entry.status not in CANCELABLE_ENTRY_STATUSES:
+            return
+
+        drafts = (
+            self.db.query(PaymentInvoice)
+            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+            .filter(PaymentInvoiceVisit.visit_id == visit_id, PaymentInvoice.status == "pending")
+            .order_by(PaymentInvoice.id)
+            .with_for_update(of=PaymentInvoice)
+            .populate_existing()
+            .limit(2)
+            .all()
+        )
+        if not drafts:
+            return
+        if len(drafts) != 1:
+            raise OnlineQueueNewDomainError(409, "Распределение счёта по визиту требует сверки")
+        invoice = drafts[0]
+        visit_ids = self.db.scalars(
+            select(PaymentInvoiceVisit.visit_id).where(PaymentInvoiceVisit.invoice_id == invoice.id)
+        ).all()
+        if len(visit_ids) < 2 and invoice.registrar_encounter_id_snapshot is None:
+            return
+        if self._has_issued_checkout(invoice):
+            return
+
+        try:
+            require_visible_unpaid_draft_evidence(self.db)
+        except FinancialFenceError as exc:
+            raise OnlineQueueNewDomainError(409, str(exc)) from exc
+        used = self.db.query(or_(
+            select(Payment.id).where(or_(
+                Payment.visit_id.in_(visit_ids),
+                Payment.payment_visits.any(PaymentVisit.visit_id.in_(visit_ids)),
+            )).exists(),
+            select(ProviderActiveVisitReservation.visit_id)
+            .where(ProviderActiveVisitReservation.visit_id.in_(visit_ids)).exists(),
+            select(DepositTransaction.visit_id).where(DepositTransaction.visit_id.in_(visit_ids)).exists(),
+            select(RefundRequest.visit_id).where(RefundRequest.visit_id.in_(visit_ids)).exists(),
+            select(OnlineQueueEntry.visit_id).where(
+                OnlineQueueEntry.visit_id == visit_id,
+                or_(OnlineQueueEntry.diagnostics_started_at.is_not(None), OnlineQueueEntry.served_at.is_not(None)),
+            ).exists(),
+        )).scalar()
+        if used:
+            return
+
+        actor = self.db.get(User, performed_by_id) if performed_by_id is not None else None
+        if actor is None:
+            raise OnlineQueueNewDomainError(409, "Сотрудник для аудита счёта не подтверждён")
+        self._cascade_linked_visit_cancel(entry=entry, current_user=actor, reason=reason)
+
+    @staticmethod
+    def _has_issued_checkout(invoice: PaymentInvoice) -> bool:
+        return any((
+            invoice.provider, invoice.provider_payment_id, invoice.provider_transaction_id,
+            invoice.payment_url, invoice.provider_data, invoice.paid_at,
+        ))
+
+    def _lock_linked_visit(self, visit_id: int | None) -> Visit | None:
+        return (
+            self.db.query(Visit)
+            .filter(Visit.id == visit_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+
+    def _check_cancellation_visibility(self) -> None:
+        try:
+            require_visible_visit_payments(self.db)
+            require_visible_checkout_queue(self.db)
+        except FinancialFenceError as exc:
+            raise OnlineQueueNewDomainError(409, str(exc)) from exc
+
     def _cascade_linked_visit_cancel(
         self, *, entry: OnlineQueueEntry, current_user: Any, reason: str | None
     ) -> None:
@@ -163,13 +257,10 @@ class OnlineQueueNewService:
           визит» тоже сверяет долю счёта — отмена записи не оставляет
           пациента выставленным счётом.
         """
-        visit = (
-            self.db.query(Visit)
-            .filter(Visit.id == entry.visit_id)
-            .with_for_update()
-            .populate_existing()
-            .first()
-        )
+        self.db.flush()
+        if self.db.get_bind().dialect.name == "sqlite":
+            self.db.execute(update(OnlineQueueEntry).where(false()).values(id=OnlineQueueEntry.id))
+        visit = self._lock_linked_visit(entry.visit_id)
         if visit is None:
             return
         if visit.patient_id != entry.patient_id:
@@ -180,14 +271,22 @@ class OnlineQueueNewService:
                     "отмена недоступна, проверьте данные записи"
                 ),
             )
+        self._check_cancellation_visibility()
         self._assert_visit_has_no_payments(visit)
         self.check_pending_invoice_cancellation(visit.id)
-        canceled_now = self._stage_linked_visit_cancel(
-            visit, current_user=current_user
-        )
-        if canceled_now and reason:
-            visit.notes = (visit.notes or "") + f"\nCanceled: {reason}"
-        self._release_pending_invoice_for_visit(visit)
+        sibling = self.db.query(OnlineQueueEntry.id).filter(
+            OnlineQueueEntry.visit_id == visit.id,
+            OnlineQueueEntry.id != entry.id,
+            OnlineQueueEntry.status.not_in(TERMINAL_CANCELED_ENTRY_STATUSES),
+        ).first()
+        if sibling is not None:
+            return
+
+        with self.db.begin_nested():
+            self._release_pending_invoice_for_visit(visit, current_user=current_user)
+            canceled_now = self._stage_linked_visit_cancel(visit, current_user=current_user)
+            if canceled_now and reason:
+                visit.notes = (visit.notes or "") + f"\nCanceled: {reason}"
 
     def _stage_linked_visit_cancel(
         self, visit: Visit, *, current_user: Any
@@ -232,12 +331,13 @@ class OnlineQueueNewService:
         - Payment pending — инициализированный провайдерский платёж с
           фиксированной суммой и ссылкой (Click/PayMe/Kaspi).
         """
+        linked_payment = or_(
+            Payment.visit_id == visit.id,
+            Payment.payment_visits.any(PaymentVisit.visit_id == visit.id),
+        )
         payment_taken = (
-            self.db.query(Payment)
-            .filter(
-                Payment.visit_id == visit.id,
-                Payment.status.in_(("paid", "processing", "completed")),
-            )
+            self.db.query(Payment.id)
+            .filter(linked_payment, Payment.status.in_(("paid", "processing", "completed")))
             .first()
         )
         if payment_taken:
@@ -248,15 +348,9 @@ class OnlineQueueNewService:
                     "через возврат/корректировку оплаты"
                 ),
             )
-        pending_payment = (
-            self.db.query(Payment)
-            .filter(
-                Payment.visit_id == visit.id,
-                Payment.status == "pending",
-            )
-            .first()
-        )
-        if pending_payment:
+        pending_payment = self.db.query(Payment.id).filter(linked_payment, Payment.status == "pending").first()
+        reservation = self.db.query(ProviderActiveVisitReservation.visit_id).filter_by(visit_id=visit.id).first()
+        if pending_payment or reservation:
             raise OnlineQueueNewDomainError(
                 status_code=409,
                 detail=(
@@ -296,7 +390,9 @@ class OnlineQueueNewService:
                 except FinancialFenceError as exc:
                     raise OnlineQueueNewDomainError(409, str(exc)) from exc
 
-    def _release_pending_invoice_for_visit(self, visit: Visit) -> None:
+    def _release_pending_invoice_for_visit(
+        self, visit: Visit, *, current_user: Any,
+    ) -> None:
         """Финансовый хвост отмены: убрать долю визита из pending-счёта.
 
         - processing/paid счёт — явный отказ (зеркало W2-PR1);
@@ -340,24 +436,36 @@ class OnlineQueueNewService:
                 )
             if invoice.status != "pending":
                 continue
-            delta = Decimal(str(link.visit_amount or 0))
-            new_total = Decimal(str(invoice.total_amount or 0)) - delta
-            if new_total < 0:
-                raise OnlineQueueNewDomainError(
-                    status_code=409,
-                    detail=(
-                        "Нельзя уменьшить сумму счёта ниже выставленной. "
-                        "Обновите данные записи и повторите попытку"
-                    ),
-                )
-            remaining_links = (
-                self.db.query(PaymentInvoiceVisit)
+            if self._has_issued_checkout(invoice):
+                raise OnlineQueueNewDomainError(409, "Выставленная ссылка на оплату требует сверки")
+            allocations = (
+                self.db.query(PaymentInvoiceVisit.id, PaymentInvoiceVisit.visit_amount, Visit.patient_id)
+                .outerjoin(Visit, Visit.id == PaymentInvoiceVisit.visit_id)
                 .filter(PaymentInvoiceVisit.invoice_id == invoice.id)
-                .filter(PaymentInvoiceVisit.id != link.id)
-                .count()
+                .all()
             )
-            invoice.total_amount = new_total
+            if any(row.patient_id != invoice.patient_id for row in allocations):
+                raise OnlineQueueNewDomainError(409, "Распределение счёта по визиту требует сверки")
+            try:
+                previous_total = parse_money(invoice.total_amount)
+                amounts = {row.id: parse_money(row.visit_amount) for row in allocations}
+            except MoneyInputError as exc:
+                raise OnlineQueueNewDomainError(409, "Сумма счёта требует сверки") from exc
+            if link.id not in amounts or sum(amounts.values(), Decimal("0")) != previous_total:
+                raise OnlineQueueNewDomainError(409, "Распределение суммы счёта требует сверки")
+
+            delta = amounts[link.id]
+            invoice.total_amount = previous_total - delta
             self.db.delete(link)
-            self.db.flush()
-            if remaining_links == 0:
+            if len(amounts) == 1:
                 invoice.status = "cancelled"
+            self.db.flush()
+            record_invoice_visit_release(
+                self.db,
+                invoice,
+                visit_id=visit.id,
+                previous_total=previous_total,
+                released_amount=delta,
+                actor_user_id=getattr(current_user, "id", None),
+                actor_role=getattr(current_user, "role", None),
+            )

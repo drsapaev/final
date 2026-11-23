@@ -406,9 +406,8 @@ class ForceMajeureService:
             entry_id = entry.id
             try:
                 with self.db.begin_nested():
-                    # Re-read after selection. A concurrent cancellation is
-                    # skipped without producing another refund.
-                    self.db.refresh(entry)
+                    # Serialize with ordinary cancellation before checking payment evidence.
+                    self.db.refresh(entry, with_for_update=True)
                     if entry.status not in self._PENDING_STATUSES:
                         skipped.append({"entry_id": entry_id, "status": entry.status})
                         continue
@@ -432,7 +431,9 @@ class ForceMajeureService:
 
                     elif payment is None and entry.visit_id:
                         try:
-                            OnlineQueueNewService(self.db).check_pending_invoice_cancellation(entry.visit_id)
+                            OnlineQueueNewService(self.db).stage_unused_grouped_draft(
+                                entry=entry, performed_by_id=performed_by_id, reason=reason,
+                            )
                         except OnlineQueueNewDomainError as exc:
                             raise ForceMajeureError(exc.detail) from exc
 

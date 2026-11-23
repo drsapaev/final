@@ -57,6 +57,7 @@ def _require_visible_evidence(db: Session, schema: str, reads: dict[str, tuple[s
       )),false)
       FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname=:schema AND c.relname=ANY(:tables) AND c.relkind IN ('r','p')
+        AND pg_catalog.to_regclass(pg_catalog.quote_ident(c.relname)) = c.oid
     """), {"schema": db.get_bind().dialect.default_schema_name,
            "tables": list(reads), "expected": len(reads)}).scalar_one()
     if valid is not True:
@@ -65,6 +66,52 @@ def _require_visible_evidence(db: Session, schema: str, reads: dict[str, tuple[s
 
 def require_visible_external_refunds(db: Session, schema: str) -> None:
     _require_visible_evidence(db, schema, _EXTERNAL_REFUND_READS, "История возвратов временно недоступна")
+
+
+def _require_visible_current_schema(
+    db: Session, reads: dict[str, tuple[str, ...]], message: str,
+) -> None:
+    dialect = db.get_bind().dialect
+    if dialect.name != "postgresql":
+        return
+    schema = dialect.default_schema_name
+    isolation = db.execute(text("SELECT pg_catalog.current_setting('transaction_isolation')")).scalar_one()
+    if schema is None or isolation != "read committed":
+        raise FinancialFenceError(message)
+    _require_visible_evidence(db, dialect.identifier_preparer.quote_schema(schema), reads, message)
+
+
+def require_visible_visit_payments(db: Session) -> None:
+    _require_visible_current_schema(
+        db,
+        {
+            "payments": ("id", "visit_id", "status"),
+            "payment_visits": ("payment_id", "visit_id"),
+            "payment_invoices": ("id", "status"),
+            "payment_invoice_visits": ("invoice_id", "visit_id", "visit_amount"),
+            "provider_active_visit_reservations": ("visit_id",),
+        },
+        "История платежей визита требует сверки",
+    )
+
+
+def require_visible_checkout_queue(db: Session) -> None:
+    _require_visible_current_schema(
+        db, {"queue_entries": ("id", "visit_id", "status")},
+        "Состояние очереди визита требует сверки",
+    )
+
+
+def require_visible_unpaid_draft_evidence(db: Session) -> None:
+    _require_visible_current_schema(
+        db,
+        {
+            "deposit_transactions": ("visit_id",),
+            "refund_requests": ("visit_id",),
+            "queue_entries": ("visit_id", "diagnostics_started_at", "served_at"),
+        },
+        "История обслуживания или возвратов требует сверки",
+    )
 
 
 def _require_clear_debit_history(
