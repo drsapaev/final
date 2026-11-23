@@ -207,7 +207,11 @@ class PaymentReadService:
         return status_payload
 
     def get_payment_status(
-        self, *, payment_id: int, recheck_access: Callable[[Payment], None] | None = None,
+        self,
+        *,
+        payment_id: int,
+        recheck_access: Callable[[Payment], None] | None = None,
+        end_read_transaction: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         payment = self.repository.get_payment(payment_id)
         if not payment:
@@ -226,6 +230,8 @@ class PaymentReadService:
         ):
             visit_id = payment.visit_id
             recorded_payment_terms = (payment.amount, payment.currency, payment.updated_at)
+            if end_read_transaction is not None:
+                end_read_transaction()
             result = self.payment_manager.check_payment_status(provider, order_id)
             reported_status = result.status.lower() if isinstance(result.status, str) else ""
 

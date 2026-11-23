@@ -17,6 +17,7 @@ from app.db.session import get_db
 from app.models.clinic import Doctor
 from app.models.patient import Patient
 from app.models.payment import Payment
+from app.models.user import User
 from app.models.visit import Visit
 from app.services.money_input import MoneyInputError, parse_exact_json, parse_money
 from app.services.payment_cancel_service import (
@@ -96,7 +97,11 @@ def _ensure_visit_payment_access(db: Session, visit_id: int, current_user) -> Vi
         patient = getattr(current_user, "patient", None)
         if patient is None or visit.patient_id != patient.id:
             raise HTTPException(status_code=403, detail="Access denied")
-        patient_owner = db.query(Patient.user_id).filter(Patient.id == visit.patient_id).scalar()
+        patient_owner = (
+            db.query(Patient.user_id)
+            .filter(Patient.id == visit.patient_id, Patient.is_deleted.is_not(True))
+            .scalar()
+        )
         if patient_owner != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied")
     elif role == "doctor":
@@ -107,11 +112,11 @@ def _ensure_visit_payment_access(db: Session, visit_id: int, current_user) -> Vi
 
 def _ensure_payment_read_access(
     db: Session, payment_id: int, current_user, *, payment: Payment | None = None,
-) -> None:
+) -> Visit | None:
     # M5.2: centralized authorization — only Patient and Doctor need ownership check
     from app.services.authorization.staff import staff_authorization_service
     if staff_authorization_service.has_permission(current_user, "payments:manage"):
-        return  # Admin/Cashier — broad access, no ownership check
+        return None  # Admin/Cashier — broad access, no ownership check
 
     # Patient and Doctor: check ownership via visit
     if payment is None:
@@ -121,7 +126,7 @@ def _ensure_payment_read_access(
 
     if not payment.visit_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    _ensure_visit_payment_access(db, payment.visit_id, current_user)
+    return _ensure_visit_payment_access(db, payment.visit_id, current_user)
 
 
 class PaymentInvoicePatientReference(BaseModel):
@@ -404,18 +409,43 @@ def list_payments(
 def get_payment_status(
     payment_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient")),
+    current_user: User = Depends(
+        deps.require_active_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient"),
+    ),
 ) -> PaymentStatusResponse:
     """Получение статуса платежа"""
-    _ensure_payment_read_access(db, payment_id, current_user)
+    authorized_visit = _ensure_payment_read_access(db, payment_id, current_user)
+    actor_id = current_user.id
+    role = normalize_role_value(current_user.role)
+    is_superuser = current_user.is_superuser
+    auth_epoch = current_user.auth_epoch
+    patient_id = (
+        authorized_visit.patient_id if role == "patient" and authorized_visit is not None else None
+    )
     service = PaymentReadService(db, get_payment_manager())
 
     def recheck_access(payment: Payment) -> None:
-        _ensure_payment_read_access(db, payment_id, current_user, payment=payment)
+        actor = db.get(User, actor_id, populate_existing=True)
+        if (
+            actor is None
+            or not actor.is_active
+            or normalize_role_value(actor.role) != role
+            or actor.is_superuser != is_superuser
+            or actor.auth_epoch != auth_epoch
+        ):
+            raise HTTPException(status_code=403, detail="Access denied")
+        visit = _ensure_payment_read_access(db, payment_id, actor, payment=payment)
+        if patient_id is not None and (visit is None or visit.patient_id != patient_id):
+            raise HTTPException(status_code=403, detail="Access denied")
 
     try:
         return PaymentStatusResponse(
-            **service.get_payment_status(payment_id=payment_id, recheck_access=recheck_access)
+            **service.get_payment_status(
+                payment_id=payment_id,
+                recheck_access=recheck_access,
+                # The auth and payment reads share this request's read-only transaction.
+                end_read_transaction=db.rollback,
+            )
         )
     except PaymentReadDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)

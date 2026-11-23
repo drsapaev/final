@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import select, update
 
 from app.api.v1.endpoints import payments
-from app.core.security import get_password_hash
+from app.core.security import create_access_token, get_password_hash
 from app.models.audit import AuditLog
 from app.models.clinic import Doctor
 from app.models.patient import Patient
@@ -227,7 +227,16 @@ def test_doctor_payment_reads_are_limited_to_own_visits(client, db_session, role
 
 @pytest.mark.parametrize(
     ("scope_change", "provider_has_update"),
-    [(None, True), (None, False), ("reassigned", True), ("reassigned", False), ("deactivated", True)],
+    [
+        (None, True),
+        (None, False),
+        ("reassigned", True),
+        ("reassigned", False),
+        ("deactivated", True),
+        ("inactive_account", True),
+        ("changed_role", True),
+        ("new_auth_epoch", True),
+    ],
 )
 def test_doctor_payment_status_uses_current_scope_after_lookup(
     client, db_session, monkeypatch, scope_change, provider_has_update,
@@ -240,17 +249,20 @@ def test_doctor_payment_status_uses_current_scope_after_lookup(
     db_session.commit()
     payment_id, visit_id, order_id = payment.id, payment.visit_id, payment.provider_payment_id
     headers = _doctor_headers(client, user)
+    actor_filter = update(User).where(User.id == user.id)
+    changes = {
+        "reassigned": update(Visit).where(Visit.id == visit_id).values(doctor_id=other_doctor.id),
+        "deactivated": update(Doctor).where(Doctor.id == doctor.id).values(active=False),
+        "inactive_account": actor_filter.values(is_active=False),
+        "changed_role": actor_filter.values(role="Lab"),
+        "new_auth_epoch": actor_filter.values(auth_epoch=User.auth_epoch + 1),
+    }
 
     def check_payment_status(provider, order):
         assert (provider, order) == ("click", order_id)
-        if scope_change == "reassigned":
-            db_session.connection().execute(
-                update(Visit).where(Visit.id == visit_id).values(doctor_id=other_doctor.id)
-            )
-        elif scope_change == "deactivated":
-            db_session.connection().execute(
-                update(Doctor).where(Doctor.id == doctor.id).values(active=False)
-            )
+        assert not db_session.in_transaction()
+        if scope_change is not None:
+            db_session.execute(changes[scope_change])
         return PaymentResult(success=provider_has_update, status="processing")
 
     monkeypatch.setattr(payments, "get_payment_manager", lambda: SimpleNamespace(
@@ -273,29 +285,68 @@ def test_doctor_payment_status_uses_current_scope_after_lookup(
     assert len(events) == (1 if expected_status == "processing" else 0)
 
 
+@pytest.mark.parametrize("patient_change", [None, {"user_id": None}, {"is_deleted": True}])
 def test_patient_payment_status_requires_current_account_link_after_lookup(
-    client, db_session, monkeypatch,
+    client, db_session, monkeypatch, patient_change,
 ) -> None:
     user, patient = _create_patient_user(db_session, label="poll_account")
     payment = _create_payment(db_session, patient=patient)
     payment.status = "pending"
     db_session.commit()
     payment_id, patient_id = payment.id, patient.id
-    headers = _patient_headers(client, user)
+    token = create_access_token({
+        "sub": str(user.id),
+        "scope": "patient_portal",
+        "patient_id": patient_id,
+        "auth_epoch": user.auth_epoch,
+    })
 
     def check_payment_status(_provider, _order):
-        db_session.connection().execute(
-            update(Patient).where(Patient.id == patient_id).values(user_id=None)
-        )
+        assert not db_session.in_transaction()
+        if patient_change is not None:
+            db_session.execute(
+                update(Patient).where(Patient.id == patient_id).values(**patient_change)
+            )
         return PaymentResult(success=False)
+
+    monkeypatch.setattr(payments, "get_payment_manager", lambda: SimpleNamespace(
+        check_payment_status=check_payment_status,
+    ))
+    response = client.get(
+        f"/api/v1/payments/{payment_id}", headers={"Authorization": f"Bearer {token}"},
+    )
+
+    if patient_change is None:
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "pending"
+    else:
+        assert response.status_code == 403
+        assert response.json() == {"detail": "Access denied"}
+
+
+def test_inactive_account_is_denied_before_payment_status_lookup(
+    client, db_session, monkeypatch,
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="inactive_poll_owner")
+    _, patient = _create_patient_user(db_session, label="inactive_poll_patient")
+    payment = _create_payment(db_session, patient=patient, doctor=doctor)
+    payment.status = "pending"
+    db_session.commit()
+    headers = _doctor_headers(client, user)
+    user.is_active = False
+    db_session.commit()
+    payment_id = payment.id
+
+    def check_payment_status(_provider, _order):
+        pytest.fail("Inactive account reached the payment provider")
 
     monkeypatch.setattr(payments, "get_payment_manager", lambda: SimpleNamespace(
         check_payment_status=check_payment_status,
     ))
     response = client.get(f"/api/v1/payments/{payment_id}", headers=headers)
 
-    assert response.status_code == 403
-    assert response.json() == {"detail": "Access denied"}
+    assert response.status_code == 403, response.text
+    assert db_session.get(Payment, payment_id).status == "pending"
 
 
 def test_non_payment_staff_cannot_read_payment_receipts(client, db_session) -> None:
