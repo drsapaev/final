@@ -23,12 +23,12 @@
       -Deploy          sync main with origin/main (ff-only), apply pending
                        database migrations (alembic upgrade head), restart
                        runtime. -SkipMigrations skips the alembic step for
-                       a deliberate code-only deploy.
+                       a deliberate code-only deploy. -ExpectedRevision
+                       requires the fetched main to match a tested Git SHA.
       -RestartRuntime  restart the CURRENTLY DEPLOYED runtime only — no git
                        fetch/pull/mutation, no migrations. This is the only
                        mode a watchdog may call (it must never deploy).
-      -CheckOnly       run the guards only; nothing is fetched, migrated,
-                       or restarted.
+      -CheckOnly       fetch origin and run the checkout guards only.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy_restart.ps1 -CheckOnly
@@ -40,7 +40,9 @@ param(
     [switch]$CheckOnly,
     [switch]$RestartRuntime,
     [switch]$Deploy,
-    [switch]$SkipMigrations
+    [switch]$SkipMigrations,
+    [ValidatePattern('^[0-9a-fA-F]{40}$')]
+    [string]$ExpectedRevision
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,6 +58,13 @@ function Fail {
     exit 1
 }
 
+function Get-LoopbackListenerPid {
+    $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    if ($listeners.Count -eq 1 -and $listeners[0].LocalAddress -eq '127.0.0.1' -and $listeners[0].OwningProcess -gt 0) {
+        return $listeners[0].OwningProcess
+    }
+}
+
 # --- Mode resolution ----------------------------------------------------------
 $modeCount = @($CheckOnly, $RestartRuntime, $Deploy | Where-Object { $_ }).Count
 if ($modeCount -gt 1) {
@@ -63,6 +72,9 @@ if ($modeCount -gt 1) {
 }
 if (-not $CheckOnly -and -not $RestartRuntime -and -not $Deploy) {
     $Deploy = $true  # backward-compatible default
+}
+if ($ExpectedRevision -and -not $Deploy) {
+    Fail '-ExpectedRevision applies only to -Deploy.'
 }
 
 # --- Mutex: serialize deploy/restart/watchdog on this host --------------------
@@ -128,24 +140,29 @@ try {
     }
 
     # --- Git sync: Deploy only (RestartRuntime must not mutate git) ----------
+    $deployRevision = $null
     if ($Deploy) {
         & git fetch origin --quiet
         if ($LASTEXITCODE -ne 0) { Fail "git fetch origin failed (network?). Transient failures must be retried explicitly - this script never loops." }
 
-        $local = (& git rev-parse HEAD)
-        $remote = (& git rev-parse origin/main)
-        if ($local -ne $remote) {
+        $local = (& git rev-parse --verify HEAD)
+        if ($LASTEXITCODE -ne 0 -or $local -cnotmatch '^[0-9a-f]{40}$') { Fail 'Cannot resolve the local Git revision.' }
+        $deployRevision = (& git rev-parse --verify origin/main)
+        if ($LASTEXITCODE -ne 0 -or $deployRevision -cnotmatch '^[0-9a-f]{40}$') { Fail 'Cannot resolve the fetched main Git revision.' }
+        if ($ExpectedRevision -and $ExpectedRevision -ine $deployRevision) {
+            Fail "fetched main is $deployRevision, expected $ExpectedRevision. No fast-forward or restart performed."
+        }
+        if ($local -cne $deployRevision) {
             # EAP=Continue around native 2>&1: with EAP='Stop' the first
             # stderr line of git becomes a terminating NativeCommandError.
             $prevEap = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
-            & git merge --ff-only origin/main 2>&1 | Out-Null
+            & git merge --ff-only $deployRevision 2>&1 | Out-Null
             $ErrorActionPreference = $prevEap
             if ($LASTEXITCODE -ne 0) { Fail "fast-forward to origin/main failed - resolve (untracked collisions, divergence) manually. This script never loops." }
-            $local = (& git rev-parse HEAD)
-            $remote = (& git rev-parse origin/main)
-            if ($local -ne $remote) { Fail "fast-forward to origin/main did not stick." }
-            Write-Host "deploy_restart: main fast-forwarded to $remote."
+            $local = (& git rev-parse --verify HEAD)
+            if ($LASTEXITCODE -ne 0 -or $local -cne $deployRevision) { Fail 'fast-forward did not reach the selected revision.' }
+            Write-Host "deploy_restart: main fast-forwarded to $deployRevision."
         }
     }
     elseif ($CheckOnly) {
@@ -163,6 +180,8 @@ try {
     $backendDir = Join-Path $MainTree 'backend'
     $python = Join-Path $backendDir '.venv\Scripts\python.exe'
     if (-not (Test-Path $python)) { Fail "backend venv python not found at $python." }
+    $launcher = Join-Path $MainTree 'scripts\run_uvicorn_prod.ps1'
+    if (-not (Test-Path $launcher)) { Fail "launcher script not found at $launcher." }
 
     # --- Stop current uvicorn -------------------------------------------------
     # Remember the OLD listener pid: if the kill fails (e.g. an elevated
@@ -222,8 +241,6 @@ try {
     # Single launch point with persistent logging (tools\uvicorn_backend.log):
     # the same script the logon autostart uses, so the command line and the
     # log destination live in exactly one place.
-    $launcher = Join-Path $MainTree 'scripts\run_uvicorn_prod.ps1'
-    if (-not (Test-Path $launcher)) { Fail "launcher script not found at $launcher." }
     Start-Process -FilePath 'powershell.exe' `
         -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $launcher `
         -WorkingDirectory $MainTree `
@@ -231,26 +248,46 @@ try {
 
     # --- Health poll -----------------------------------------------------------
     $deadline = (Get-Date).AddSeconds($HealthTimeoutSec)
+    $healthFailure = 'no healthy HTTP response'
     do {
         Start-Sleep -Seconds 3
+        $listenerPid = Get-LoopbackListenerPid
+        if (-not $listenerPid) {
+            $healthFailure = 'could not verify a single IPv4 loopback listener'
+            continue
+        }
         try {
             $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/v1/health" -TimeoutSec 5
-            if ($health.ok) {
-                $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
-                    Select-Object -First 1
-                if ($oldPid -and $listener -and $listener.OwningProcess -eq $oldPid) {
-                    Fail "old process pid=$oldPid is still answering after the restart attempt - the new backend did not take over."
-                }
-                Write-Host "deploy_restart: healthy (db=$($health.db)) on port $Port (listener pid=$($listener.OwningProcess))."
-                exit 0
+        } catch {
+            $healthFailure = 'no healthy HTTP response'
+            continue
+        }
+        if (-not $health.ok) {
+            $healthFailure = 'no healthy HTTP response'
+            continue
+        }
+        if ($listenerPid -ne (Get-LoopbackListenerPid)) {
+            $healthFailure = 'loopback listener changed during the health check'
+            continue
+        }
+        if ($oldPid -and $listenerPid -eq $oldPid) {
+            Fail "old process pid=$oldPid is still answering after the restart attempt - the new backend did not take over."
+        }
+        if ($Deploy) {
+            if ($health.revision -cne $deployRevision) {
+                Fail "runtime response did not prove the selected Git revision $deployRevision."
             }
+            if ($health.db -cne 'ok') {
+                $healthFailure = 'database check did not report ok'
+                continue
+            }
+            Write-Host "deploy_restart: verified revision $deployRevision."
         }
-        catch {
-            # not up yet
-        }
+        Write-Host "deploy_restart: healthy (db=$($health.db)) on port $Port (listener pid=$listenerPid)."
+        exit 0
     } while ((Get-Date) -lt $deadline)
 
-    Fail "health check did not turn OK within ${HealthTimeoutSec}s - inspect tools\uvicorn_backend.log."
+    Fail "health check did not turn OK within ${HealthTimeoutSec}s ($healthFailure) - inspect tools\uvicorn_backend.log."
 }
 finally {
     Release-DeployMutex
