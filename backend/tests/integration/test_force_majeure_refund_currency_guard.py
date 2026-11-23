@@ -3,13 +3,16 @@ import logging
 from decimal import Decimal
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.models.audit import AuditLog
 from app.models.payment import Payment
 from app.models.refund_deposit import PaymentRefundClaim, RefundRequest
 from app.models.visit import Visit
+from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
 
 
-def _request(db, patient, status):
+def _request(db, patient, status, *, snapshot=None):
     visit = Visit(patient_id=patient.id, status="open")
     db.add(visit)
     db.flush()
@@ -19,12 +22,18 @@ def _request(db, patient, status):
     request = RefundRequest(patient_id=patient.id, payment_id=payment.id, visit_id=visit.id,
                             original_amount=Decimal("10.25"), refund_amount=Decimal("5.25"),
                             commission_amount=Decimal("0"), refund_type="bank_transfer", status=status,
-                            is_automatic=True)
+                            is_automatic=True, payment_currency_snapshot=snapshot)
     db.add(request)
     db.flush()
     db.add(PaymentRefundClaim(payment_id=payment.id, channel="refund_request", refund_request_id=request.id))
     db.commit()
     return request, payment
+
+
+def _audit_events(db, request_id):
+    return db.query(AuditLog).filter_by(
+        action="refund_request_status_changed", entity_type="refund_request", entity_id=request_id,
+    ).all()
 
 
 @pytest.mark.parametrize("status,action", [("pending", "approve"), ("approved", "complete"), ("approved", "reject")])
@@ -46,20 +55,69 @@ def test_unproven_bank_refund_transition_has_no_side_effects(
     assert details.status_code == 200, details.text
     assert details.json()["available_actions"] == (["reject"] if status == "pending" else [])
     assert not details.json()["can_approve"] and not details.json()["can_complete"]
+    assert _audit_events(db_session, request.id) == []
 
 
-def test_pending_reject_remains_available_and_releases_its_claim(client, db_session, test_patient, admin_auth_headers):
-    request, payment = _request(db_session, test_patient, "pending")
-    result = client.post(f"/api/v1/force-majeure/refund-requests/{request.id}/process", headers=admin_auth_headers,
-                         json={"action": "reject", "rejection_reason": "synthetic",
-                               "bank_card_number": "0" * 12 + "7654"})
+@pytest.mark.parametrize("snapshot", [None, "UZS"], ids=["legacy", "captured"])
+def test_pending_reject_releases_and_audits_one_claim(
+    client, db_session, test_patient, admin_user, admin_auth_headers, snapshot,
+):
+    request, payment = _request(db_session, test_patient, "pending", snapshot=snapshot)
+    path = f"/api/v1/force-majeure/refund-requests/{request.id}/process"
+    body = {
+        "action": "reject",
+        "rejection_reason": "SYNTHETIC PRIVATE REASON",
+        "manager_notes": "SYNTHETIC PRIVATE NOTES",
+        "bank_card_number": "0" * 12 + "7654",
+    }
+    result = client.post(path, headers=admin_auth_headers, json=body)
+
     assert result.status_code == 200, result.text
     assert result.json()["bank_card_number"] is None
     db_session.expire_all()
-    assert request.status == "rejected" and request.rejection_reason == "synthetic"
+    assert request.status == "rejected" and request.rejection_reason == body["rejection_reason"]
     assert request.bank_card_number is None
     assert db_session.query(PaymentRefundClaim).filter_by(payment_id=payment.id).count() == 0
     assert payment.refunded_amount is None and payment.status == "paid"
+    [event] = _audit_events(db_session, request.id)
+    assert event.event_type == "REFUND_REQUEST_STATUS_CHANGED"
+    assert event.actor_user_id == admin_user.id == request.processed_by
+    assert event.actor_role == admin_user.role and event.created_at == request.processed_at
+    assert event.payload == {
+        "payment_id": payment.id,
+        "previous_status": "pending",
+        "new_status": "rejected",
+        "refund_amount": "5.25",
+        "currency": snapshot,
+    }
+
+    assert client.post(path, headers=admin_auth_headers, json=body).status_code == 400
+    assert len(_audit_events(db_session, request.id)) == 1
+
+
+def test_refund_audit_failure_rolls_back_decision_and_claim(
+    client, db_session, test_patient, admin_auth_headers, monkeypatch,
+):
+    request, payment = _request(db_session, test_patient, "pending")
+    request_id, payment_id = request.id, payment.id
+
+    def unavailable(*args, **kwargs):
+        raise SQLAlchemyError("SYNTHETIC PRIVATE AUDIT FAILURE")
+
+    monkeypatch.setattr(ForceMajeureApiRepository, "record_refund_request_transition", unavailable)
+    response = client.post(
+        f"/api/v1/force-majeure/refund-requests/{request_id}/process",
+        headers=admin_auth_headers,
+        json={"action": "reject", "rejection_reason": "SYNTHETIC"},
+    )
+
+    assert response.status_code == 503
+    assert "SYNTHETIC PRIVATE AUDIT FAILURE" not in response.text
+    db_session.expire_all()
+    assert request.status == "pending"
+    assert request.processed_by is None and request.processed_at is None and request.rejection_reason is None
+    assert db_session.query(PaymentRefundClaim).filter_by(payment_id=payment_id).count() == 1
+    assert _audit_events(db_session, request_id) == []
 
 
 @pytest.mark.parametrize(

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import resolve_registry_tag_queue_for_specialist
+from app.models.audit import AuditLog
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.refund_deposit import (
     DepositTransaction,
@@ -156,6 +157,37 @@ class ForceMajeureApiRepository:
             return False
         self.db.delete(claim)
         return True
+
+    def record_refund_request_transition(
+        self,
+        request: RefundRequest,
+        *,
+        previous_status: str,
+        actor_role: str | None,
+    ) -> None:
+        """Append the decision in the caller's transaction with INSERT-only access."""
+        self.db.execute(
+            insert(AuditLog.__table__).inline().values(
+                action="refund_request_status_changed",
+                event_type="REFUND_REQUEST_STATUS_CHANGED",
+                entity_type="refund_request",
+                entity_id=request.id,
+                resource_type="refund_request",
+                resource_id=str(request.id),
+                actor_user_id=request.processed_by,
+                actor_role=actor_role,
+                actor_type="staff",
+                outcome="success",
+                created_at=request.processed_at,
+                payload={
+                    "payment_id": request.payment_id,
+                    "previous_status": previous_status,
+                    "new_status": request.status,
+                    "refund_amount": format(request.refund_amount, "f"),
+                    "currency": request.payment_currency_snapshot,
+                },
+            )
+        )
 
     def list_deposits(
         self,

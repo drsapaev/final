@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -11,7 +12,7 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.pii_masker import mask_card_number
@@ -37,6 +38,8 @@ from app.services.force_majeure_service import (
 )
 from app.services.money_input import MAX_MONEY, MoneyInputError, parse_money
 from app.services.payment_invariant_service import PaymentInvariantService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -419,6 +422,7 @@ class ForceMajeureApiService:
         if not req:
             raise ForceMajeureApiDomainError(404, "Заявка на возврат не найдена")
 
+        previous_status = req.status
         action = process_request.action.lower()
         if action == "approve":
             if req.status != RefundRequestStatus.PENDING.value:
@@ -449,15 +453,6 @@ class ForceMajeureApiService:
                 raise ForceMajeureApiDomainError(400, "Укажите причину отклонения")
             req.status = RefundRequestStatus.REJECTED.value
             req.rejection_reason = process_request.rejection_reason
-            # 3808 review round 5 (P1 claim lifecycle): reject — терминальный
-            # НЕ-платящий статус: деньги пациенту не ушли, поэтому единый
-            # claim платежа освобождается В ЭТОЙ ЖЕ транзакции (commit ниже),
-            # и повторный возврат — исправленная заявка или депозит —
-            # становится возможен. Удаляется только claim этой заявки;
-            # claim более поздней заявки не затрагивается. Ленивое
-            # самоисцеление в ForceMajeureService._claim_payment_refund
-            # покрывает пути отклонения в обход этого метода.
-            self.repository.release_refund_claim_for_request(req.id)
         elif action == "complete":
             if req.status != RefundRequestStatus.APPROVED.value:
                 raise ForceMajeureApiDomainError(
@@ -476,7 +471,23 @@ class ForceMajeureApiService:
         if process_request.manager_notes:
             req.manager_notes = process_request.manager_notes
 
-        self.repository.commit()
+        try:
+            if action == "reject":
+                self.repository.release_refund_claim_for_request(req.id)
+            self.repository.record_refund_request_transition(
+                req,
+                previous_status=previous_status,
+                actor_role=getattr(current_user, "role", None),
+            )
+            self.repository.commit()
+        except SQLAlchemyError as exc:
+            self.repository.rollback()
+            logger.warning(
+                "refund_request.transition_storage_failed",
+                extra={"refund_request_id": request_id, "error_type": type(exc).__name__},
+            )
+            raise ForceMajeureApiDomainError(503, "Обработка заявки на возврат временно недоступна") from None
+
         self.repository.refresh(req)
         payload = self._serialize_refund_request(req)
         payload["processed_by_name"] = current_user.full_name
