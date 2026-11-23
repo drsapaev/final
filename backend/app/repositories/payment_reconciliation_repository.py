@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, raiseload
 
 from app.models.payment import Payment
 from app.models.payment_webhook import PaymentTransaction
@@ -38,16 +38,20 @@ class PaymentReconciliationRepository:
         *,
         provider_name: str,
         cutoff_date: datetime,
+        end_at: datetime | None = None,
     ) -> list[Payment]:
-        return (
+        query = (
             self.db.query(Payment)
+            .options(raiseload(Payment.payment_visits))
             .filter(
                 Payment.provider == provider_name,
                 Payment.status.in_(["pending", "processing"]),
                 Payment.created_at >= cutoff_date,
             )
-            .all()
         )
+        if end_at is not None:
+            query = query.filter(Payment.created_at <= end_at)
+        return query.all()
 
     def get_completed_transaction_for_payment(
         self,

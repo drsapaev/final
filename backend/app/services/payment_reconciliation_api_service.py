@@ -2,18 +2,29 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from app.services.payment_reconciliation import PaymentReconciliationService
+from app.services.payment_reconciliation import (
+    RECONCILIATION_UNAVAILABLE,
+    PaymentReconciliationService,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class PaymentReconciliationApiDomainError(Exception):
     status_code: int
     detail: str
+
+
+def _reconciliation_failure(exc: Exception) -> PaymentReconciliationApiDomainError:
+    logger.error("Payment reconciliation request failed (%s)", type(exc).__name__)
+    return PaymentReconciliationApiDomainError(status_code=500, detail=RECONCILIATION_UNAVAILABLE)
 
 
 class PaymentReconciliationApiService:
@@ -37,10 +48,7 @@ class PaymentReconciliationApiService:
                 provider, start_date, end_date
             )
         except Exception as exc:
-            raise PaymentReconciliationApiDomainError(
-                status_code=500,
-                detail=f"Reconciliation error: {exc}",
-            ) from exc
+            raise _reconciliation_failure(exc) from None
 
     def reconcile_all_providers(
         self, *, start_date: date, end_date: date
@@ -50,10 +58,7 @@ class PaymentReconciliationApiService:
                 start_date, end_date
             )
         except Exception as exc:
-            raise PaymentReconciliationApiDomainError(
-                status_code=500,
-                detail=f"Reconciliation error: {exc}",
-            ) from exc
+            raise _reconciliation_failure(exc) from None
 
     def get_reconciliation_report(
         self,
@@ -72,10 +77,7 @@ class PaymentReconciliationApiService:
             report["alerts"] = self.reconciliation_service.alert_on_discrepancies(report)
             return report
         except Exception as exc:
-            raise PaymentReconciliationApiDomainError(
-                status_code=500,
-                detail=f"Report generation error: {exc}",
-            ) from exc
+            raise _reconciliation_failure(exc) from None
 
     def get_missing_payments(
         self, *, provider: str, days: int
@@ -91,10 +93,7 @@ class PaymentReconciliationApiService:
                 "missing_payments": missing,
             }
         except Exception as exc:
-            raise PaymentReconciliationApiDomainError(
-                status_code=500,
-                detail=f"Error: {exc}",
-            ) from exc
+            raise _reconciliation_failure(exc) from None
 
     def get_reconciliation_alerts(self, *, threshold: float) -> dict[str, Any]:
         start_date = date.today() - timedelta(days=7)
@@ -118,7 +117,4 @@ class PaymentReconciliationApiService:
                 "generated_at": datetime.now(UTC).isoformat(),
             }
         except Exception as exc:
-            raise PaymentReconciliationApiDomainError(
-                status_code=500,
-                detail=f"Error: {exc}",
-            ) from exc
+            raise _reconciliation_failure(exc) from None
