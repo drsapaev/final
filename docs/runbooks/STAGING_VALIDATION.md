@@ -49,7 +49,7 @@ separately.
 | Frontend Sentry | `STAGING_VITE_SENTRY_DSN` → build argument `VITE_SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
 | Backend Sentry | `STAGING_SENTRY_DSN` → backend runtime `SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
 | Telegram token | `STAGING_TELEGRAM_BOT_TOKEN`, a host-only network secret for `api.telegram.org`; use the authorized proxy injection, not a raw token | Same name as an Actions secret scoped to protected Environment `staging-integrations` |
-| Telegram destination | `STAGING_TELEGRAM_CHAT_ID` is provisioned as a Personal Vault environment variable scoped to `final` for the verified private staging chat. Start a fresh task in the published environment and check that the input is available. | Not provisioned in `staging-integrations`; do not assume the Cloud input carries over or guess a default. |
+| Telegram destination | `STAGING_TELEGRAM_CHAT_ID` is provisioned as a Personal Vault environment variable scoped to `final` for the verified private staging chat. Start a fresh task in the published environment and check that the input is available. | `STAGING_TELEGRAM_CHAT_ID` is a separate secret in `staging-integrations` for approved native acceptance. Verify the configured bot and private destination before use. |
 
 Verify settings are available in the selected executor before asking for
 anything. If a specific input is missing, report its **name and scope**, not
@@ -90,6 +90,34 @@ approved secret store. Do not start the worker: the base Compose file
 also maps `TELEGRAM_BOT_TOKEN` into that service. Use a fresh synthetic
 patient and record the exact tested SHA, native result and teardown.
 Do not reuse the reminder workflow or production credentials.
+
+For PR #4195 only, the reviewed **Mini App native staging acceptance**
+workflow can supplement an exact-SHA Cloud run that is otherwise complete.
+Dispatch from `main` with `acceptance=pr-4195-arq-reminder` and `source-sha`
+set to the full current PR #4195 head after it includes the current `main`.
+Before building, the job verifies the requested head and current base with
+GitHub, proves the app tree matches the SHA pinned by the reviewed workflow,
+and verifies the four workflow, helper and runbook files against trusted
+`main`. This keeps the app content fixed when the approved CI changes land
+on `main`, while the run attests the exact PR head. The existing protected
+environment, `miniapp-staging.finalclinic.fyi` hostname, and default
+`pr-4118-sessions` choice apply.
+
+When the run summary says native onboarding is ready, use the approved
+Telegram identity in the staging bot's Mini App. In Appointments submit the
+synthetic contact `SYNTHETIC staging`, phone `+998000000000` and tomorrow's
+date with the default `09:30` time. Leave the other optional fields empty.
+Once the review links the synthetic patient, return to Cabinet in the same
+Mini App and confirm it renders. Do not submit real patient information or
+paste Telegram authentication data.
+
+The test checks canonical linkage and a signed cabinet access audit, closes
+the HTTPS ingress, and processes one versioned synthetic reminder through
+ARQ. The worker can reach Telegram through the fixed TCP relay. Record the
+ARQ result, `reminder_sent_at`, a single receipt in the approved private
+chat, and teardown. Inspect any ambiguous delivery before a rerun. The
+Cloud evidence retains all its own checks and the native run only supplies
+the missing Telegram reminder evidence.
 
 ### Verify Sentry canaries without asking the owner
 
