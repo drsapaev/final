@@ -24,7 +24,11 @@ import os
 import re
 from typing import Any
 
-from app.core.pii_masker import is_sensitive_verification_path, mask_pii
+from app.core.pii_masker import (
+    is_public_site_analytics_ingest_path,
+    is_sensitive_verification_path,
+    mask_pii,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -967,12 +971,26 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         # so retain only safe diagnostic fields for these specific routes.
         safe = {
             key: event[key]
-            for key in ("event_id", "timestamp", "level", "platform", "environment", "release", "dist")
+            for key in (
+                "event_id",
+                "timestamp",
+                "level",
+                "platform",
+                "environment",
+                "release",
+                "dist",
+            )
             if key in event
         }
         safe["transaction"] = "[REDACTED VERIFICATION]"
         if isinstance(request, dict) and request.get("method") in {
-            "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS",
         }:
             safe["request"] = {"method": request["method"]}
         exception = event.get("exception")
@@ -981,7 +999,9 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
             types = []
             for value in values:
                 kind = value.get("type") if isinstance(value, dict) else None
-                if isinstance(kind, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,127}", kind):
+                if isinstance(kind, str) and re.fullmatch(
+                    r"[A-Za-z_][A-Za-z0-9_.]{0,127}", kind
+                ):
                     types.append({"type": kind})
             if types:
                 safe["exception"] = {"values": types}
@@ -1151,6 +1171,12 @@ def init_sentry() -> None:
         the cycle while still recording the failure in stdout logs.
         """
         try:
+            request = event.get("request")
+            request_url = request.get("url") if isinstance(request, dict) else None
+            if is_public_site_analytics_ingest_path(
+                request_url
+            ) or is_public_site_analytics_ingest_path(event.get("transaction")):
+                return None
             sanitize_event(event)
             _redact_unstructured_event_text(event)
             event.update(_redact_ai_content(event))

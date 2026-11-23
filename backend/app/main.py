@@ -355,6 +355,13 @@ log.info("Observability middleware registered")
 from app.middleware.idempotency_middleware import IdempotencyMiddleware  # noqa: E402
 
 app.add_middleware(IdempotencyMiddleware)
+
+# Check the collector's headers before idempotency or route instrumentation reads its body.
+from app.middleware.public_site_analytics_middleware import (  # noqa: E402
+    PublicSiteAnalyticsIntakeMiddleware,
+)
+
+app.add_middleware(PublicSiteAnalyticsIntakeMiddleware)
 log.info("Idempotency middleware registered")
 
 # -----------------------------------------------------------------------------
@@ -414,6 +421,7 @@ async def password_reset_no_store(request, call_next):
     if request.url.path.lower().rstrip("/").startswith(reset_path):
         response.headers["Cache-Control"] = "no-store"
     return response
+
 
 # -----------------------------------------------------------------------------
 # PR-30 / High-10: Real auth imports are mandatory in every environment.

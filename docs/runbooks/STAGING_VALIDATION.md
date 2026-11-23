@@ -34,20 +34,22 @@ executed the checks in this runbook AND they all passed. Hallucinating
 
 ## Cloud staging integrations
 
-Use the published Codex Cloud environment **`final`** for isolated cloud
-validation. Start a fresh Cloud task after the configuration is published;
-open a fresh checkout of the exact requested SHA. Use only
-synthetic fixtures and owned loopback services, and record teardown. Never
-copy a clinic database, access the production bot, or reuse production
-credentials. These settings have separate storage in the two execution paths;
-neither path inherits the other's settings automatically.
+Run full pre-release staging in a fresh Codex Cloud task in the published
+**`final`** environment. Verify that the checkout matches the exact release
+SHA before running checks. This keeps full validation off the clinic
+computer. Use local WSL for a full run only with explicit operator approval.
+
+Use only synthetic fixtures and owned loopback services, and record teardown.
+Never copy a clinic database, access the production bot, or reuse production
+credentials. Codex Cloud and GitHub Actions store integration settings
+separately.
 
 | Purpose | Codex Cloud `final` | GitHub Actions |
 |---|---|---|
 | Frontend Sentry | `STAGING_VITE_SENTRY_DSN` → build argument `VITE_SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
 | Backend Sentry | `STAGING_SENTRY_DSN` → backend runtime `SENTRY_DSN` | Same staging input name as a variable scoped to protected Environment `staging-integrations` |
 | Telegram token | `STAGING_TELEGRAM_BOT_TOKEN`, a host-only network secret for `api.telegram.org`; use the authorized proxy injection, not a raw token | Same name as an Actions secret scoped to protected Environment `staging-integrations` |
-| Telegram destination | `STAGING_TELEGRAM_CHAT_ID` is provisioned as a Personal Vault environment variable scoped to `final` for the verified private staging chat. Start a fresh task in the published environment and check that the input is available. | Not provisioned in `staging-integrations`; do not assume the Cloud input carries over or guess a default. |
+| Telegram destination | `STAGING_TELEGRAM_CHAT_ID` is provisioned as a Personal Vault environment variable scoped to `final` for the verified private staging chat. Start a fresh task in the published environment and check that the input is available. | `STAGING_TELEGRAM_CHAT_ID` is a separate secret in `staging-integrations` for approved native acceptance. Verify the configured bot and private destination before use. |
 
 Verify settings are available in the selected executor before asking for
 anything. If a specific input is missing, report its **name and scope**, not
@@ -65,6 +67,19 @@ build the frontend with `VITE_SENTRY_ENV=staging` and
 `VITE_APP_VERSION=<full SHA>`; run the backend with `SENTRY_ENV=staging`
 and `APP_VERSION=<full SHA>`. Pass both values through the supported build
 or runtime path.
+
+For a Compose build, set `APP_VERSION` to the verified checkout SHA before
+building the frontend. Compose passes it as `VITE_APP_VERSION` to the builder
+and as `APP_VERSION` to the backend and worker. Set
+`VERCEL_GIT_COMMIT_SHA` to the same SHA for the service worker and artifact
+source check.
+
+The GitHub staging frontend artifact workflow takes the dedicated frontend DSN
+from `staging-integrations`. It verifies the destination and checks the
+compiled release before publishing the artifact. Use an artifact from the
+exact release with these checks. Pulling an existing artifact into Compose
+keeps the Sentry release and destination that were compiled into it. The
+browser canary and Sentry project readback are still required.
 
 ### Mini App pre-merge preflight and live acceptance
 
@@ -88,6 +103,34 @@ approved secret store. Do not start the worker: the base Compose file
 also maps `TELEGRAM_BOT_TOKEN` into that service. Use a fresh synthetic
 patient and record the exact tested SHA, native result and teardown.
 Do not reuse the reminder workflow or production credentials.
+
+For PR #4195 only, the reviewed **Mini App native staging acceptance**
+workflow can supplement an exact-SHA Cloud run that is otherwise complete.
+Dispatch from `main` with `acceptance=pr-4195-arq-reminder` and `source-sha`
+set to the full current PR #4195 head after it includes the current `main`.
+Before building, the job verifies the requested head and current base with
+GitHub, proves the app tree matches the SHA pinned by the reviewed workflow,
+and verifies the four workflow, helper and runbook files against trusted
+`main`. This keeps the app content fixed when the approved CI changes land
+on `main`, while the run attests the exact PR head. The existing protected
+environment, `miniapp-staging.finalclinic.fyi` hostname, and default
+`pr-4118-sessions` choice apply.
+
+When the run summary says native onboarding is ready, use the approved
+Telegram identity in the staging bot's Mini App. In Appointments submit the
+synthetic contact `SYNTHETIC staging`, phone `+998000000000` and tomorrow's
+date with the default `09:30` time. Leave the other optional fields empty.
+Once the review links the synthetic patient, return to Cabinet in the same
+Mini App and confirm it renders. Do not submit real patient information or
+paste Telegram authentication data.
+
+The test checks canonical linkage and a signed cabinet access audit, closes
+the HTTPS ingress, and processes one versioned synthetic reminder through
+ARQ. The worker can reach Telegram through the fixed TCP relay. Record the
+ARQ result, `reminder_sent_at`, a single receipt in the approved private
+chat, and teardown. Inspect any ambiguous delivery before a rerun. The
+Cloud evidence retains all its own checks and the native run only supplies
+the missing Telegram reminder evidence.
 
 ### Verify Sentry canaries without asking the owner
 
@@ -156,19 +199,24 @@ that do not send.
 
 Before running any check below:
 
-1. **Own isolated staging is up** — on the Windows clinic host, use the
-   launcher from the worktree containing the commit under test:
+1. **Own isolated staging is up.** For a full pre-release run, follow the
+   [Cloud staging instructions](#cloud-staging-integrations) and start the
+   owned project using [`ops/compose.staging.yml`](../../ops/compose.staging.yml).
+   Use an ignored env file with an explicit unique `COMPOSE_PROJECT_NAME`,
+   synthetic credentials, and free non-production ports.
+
+   For an explicitly approved WSL fallback on the Windows clinic host, use
+   the launcher from the worktree containing the commit under test:
 
    ```powershell
    .\ops\scripts\wsl_staging.ps1 -Action Preflight -EnvFile ops/staging.env
    .\ops\scripts\wsl_staging.ps1 -Action Start -EnvFile ops/staging.env
    ```
 
-   Its ignored env file must use an explicit unique `COMPOSE_PROJECT_NAME`,
-   synthetic credentials, and free non-production ports. For long validation,
-   run the whole validation script through `-Action Session -CommandArgs
-   @(...)`; `Start` keeps WSL alive only during startup. See
-   [WSL_STAGING_SESSION.md](WSL_STAGING_SESSION.md) for the complete recipe.
+   For long WSL validation, run the whole validation script through
+   `-Action Session -CommandArgs @(...)`. `Start` keeps WSL alive only during
+   startup. See [WSL_STAGING_SESSION.md](WSL_STAGING_SESSION.md) for the
+   complete recipe.
 2. **Migrations applied to that staging database** — the canonical staging
    backend entrypoint runs Alembic when `RUN_ALEMBIC_ON_START=1`. Confirm its
    successful readiness; do not run a host migration command with an implicit
