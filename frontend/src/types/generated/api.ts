@@ -1245,6 +1245,40 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public-site/analytics/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Public Site Analytics Event */
+        post: operations["record_public_site_analytics_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-site/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Get Public Site Analytics */
+        get: operations["admin_get_public_site_analytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/public-booking-requests": {
         parameters: {
             query?: never;
@@ -37819,6 +37853,35 @@ export type components = {
                 [key: string]: unknown;
             };
         };
+        /** PublicSiteAnalyticsDayOut */
+        PublicSiteAnalyticsDayOut: {
+            /**
+             * Clinic Day
+             * Format: date
+             */
+            clinic_day: string;
+            /** Site Views */
+            site_views: number;
+            /** Phone Clicks */
+            phone_clicks: number;
+            /** Booking Form Opens */
+            booking_form_opens: number;
+            /** Booking Requests Submitted */
+            booking_requests_submitted: number;
+        };
+        /** PublicSiteAnalyticsReportOut */
+        PublicSiteAnalyticsReportOut: {
+            /**
+             * Enabled
+             * @description Whether new browser events are accepted.
+             */
+            enabled: boolean;
+            /**
+             * Days
+             * @description Daily totals for the latest 30 Tashkent calendar days, oldest first.
+             */
+            days: components["schemas"]["PublicSiteAnalyticsDayOut"][];
+        };
         /** PublicSiteCategoryOut */
         PublicSiteCategoryOut: {
             /** Name */
@@ -47697,6 +47760,111 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PublicBookingAvailabilityErrorOut"];
                 };
+            };
+        };
+    };
+    record_public_site_analytics_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/plain": "site_view" | "phone_click" | "booking_form_open";
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid event or unexpected request data. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or disallowed browser origin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Event token exceeds the fixed byte limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Expected an unencoded text/plain event token. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Collection is disabled or temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_get_public_site_analytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteAnalyticsReportOut"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Administrator role required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Report temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

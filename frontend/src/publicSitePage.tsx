@@ -7,6 +7,7 @@ import {
   type PublicSiteRouteMatch,
 } from './routing/publicSiteRouteEntries';
 import type { PublicSitePageData } from './publicSiteData';
+import { PublicSiteAnalytics } from './publicSiteAnalytics';
 import type {
   PublicSiteClinic,
   PublicSiteDoctor,
@@ -186,6 +187,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
 interface PublicSitePageProps {
   route: PublicSiteRouteMatch;
   data: PublicSitePageData;
+  analyticsEndpoint?: string;
 }
 
 interface PublicSiteRequestStateProps {
@@ -679,6 +681,11 @@ export function PublicSitePage(props: PublicSitePageProps | PublicSiteRequestSta
   const data = 'data' in props ? props.data : undefined;
   const isError = 'status' in props && props.status === 'error';
   const copy = COPY[route.locale];
+  const analyticsEndpoint = 'data' in props
+    && (route.kind !== 'service' || props.data.service)
+    && (route.kind !== 'doctor' || props.data.doctor)
+    ? props.analyticsEndpoint
+    : undefined;
   return (
     <div className="public-site">
       <a className="public-site__skip-link" href="#main-content">{copy.skipToContent}</a>
@@ -710,6 +717,7 @@ export function PublicSitePage(props: PublicSitePageProps | PublicSiteRequestSta
         )}
       </main>
       <SiteFooter clinicName={data?.clinic?.name} locale={route.locale} copy={copy} />
+      <PublicSiteAnalytics endpoint={analyticsEndpoint} event="site_view" trackPhone />
     </div>
   );
 }
