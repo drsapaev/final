@@ -94,12 +94,13 @@ const EnhancedAppointmentsTable = ({
   const handleExport = useCallback(() => {
     const csvContent = generateCSV(filteredData, {
       maskPhone: true, // R-05 fix: всегда маскируем телефон в CSV-экспорте
+      includeQueueNumber: preferCanonicalQueueNumber,
       includeAddress: !isDoctorView, // адрес только для registrar view
       includeTimestamps: true, // дата/время/изменено
     });
     const filename = `appointments_${getLocalDateString()}.csv`;
     downloadCSV(csvContent, filename);
-  }, [filteredData, isDoctorView]);
+  }, [filteredData, isDoctorView, preferCanonicalQueueNumber]);
 
   // Преждевременный возврат перенесён ниже, чтобы не нарушать порядок хуков
   // Инлайновый лоадер без раннего возврата

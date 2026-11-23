@@ -15,7 +15,7 @@ import { AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip,
   Checkbox } from '../ui/macos';
 import { normalizeCategoryCode, parseServiceCode } from '../../utils/serviceCodeUtils';
-import { MIXED_REPEAT_WARNING, collectDoctorAssignmentGaps, filterDoctorsForService, getWizardDoctorDisplayName, type DoctorsRequestStatus } from './wizardUtils';
+import { MIXED_REPEAT_WARNING, collectDoctorAssignmentGaps, filterDoctorsForService, getWizardDoctorDisplayName, queueTagToWizardCategory, type DoctorsRequestStatus } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -25,6 +25,8 @@ import React from "react";
 // CartStepV2 is step 2 of AppointmentWizardV2. The parent owns all state;
 // the child receives data + callbacks. Service / doctor / cart shapes are
 // dynamic (backend-driven), so they ride along via index signatures.
+
+const CATALOG_CATEGORIES = new Set(['specialists', 'laboratory', 'procedures', 'other']);
 
 export interface CartItem {
   id?: string | number;
@@ -50,6 +52,7 @@ export interface CartService {
   id?: string | number;
   name: string;
   category_code?: string;
+  queue_tag?: string;
   service_code?: string;
   code?: string;
   is_consultation?: boolean;
@@ -204,6 +207,8 @@ const CartStepV2 = ({
     // 2. Фильтрация по категории (если нет поиска)
     // Edit mode loads every service, but category tabs still filter what is displayed.
     return filtered.filter((service) => {
+      const routedCategory = queueTagToWizardCategory(service.queue_tag);
+      if (routedCategory && CATALOG_CATEGORIES.has(activeCategory)) return activeCategory === routedCategory;
       const normalizedCategory = service.category_code
         ? normalizeCategoryCode(service.category_code)
         : parseServiceCode(service.service_code).category;
@@ -310,7 +315,7 @@ const CartStepV2 = ({
   const doctorServices = displayedServices.filter(isDoctorPerformed);
   const regularServices = displayedServices.filter((service) => !isDoctorPerformed(service));
   const doctorQuery = searchQuery.trim().toLowerCase();
-  const showDoctorCards = doctorQuery || !['laboratory', 'procedures', 'other'].includes(activeCategory);
+  const showDoctorCards = Boolean(doctorQuery) || doctorServices.length > 0 || activeCategory === 'specialists';
   const doctorGroups = (showDoctorCards ? normalizedDoctorsData : [])
     .filter((doctor) => lockedDoctorId === undefined ||
       (lockedDoctorId !== null && String(doctor.id) === String(lockedDoctorId)))
@@ -345,6 +350,9 @@ const CartStepV2 = ({
     [servicesData, normalizedDoctorsData, doctorsRequestStatus],
   );
 
+  const displayedServiceIds = new Set(displayedServices.map((service) => String(service.id)));
+  const visibleAssignmentGaps = doctorAssignmentGaps.filter((gap) => displayedServiceIds.has(String(gap.serviceId)));
+
   const consultationRows = useMemo(() =>
   (cart?.items || []).
   map((item) => {
@@ -374,15 +382,15 @@ const CartStepV2 = ({
       <div className="cart-step-v2__services-area">
         {searchQuery &&
         <div className="cart-step-v2__search-info">
-            Результаты поиска: {regularServices.length + doctorGroups.reduce((count, group) => count + group.services.length, 0)}
+            {t('misc.aw_service_search_results', { count: new Set([...regularServices, ...doctorGroups.flatMap((group) => group.services)].map((service) => service.id)).size })}
           </div>
         }
 
-        {showDoctorCards && doctorAssignmentGaps.length > 0 &&
-        <div className="cart-step-v2__assignment-gaps" role="alert">
-          <strong>{t('misc.aw_doctor_assignment_gap_title')}</strong>
+        {visibleAssignmentGaps.length > 0 &&
+        <details className="cart-step-v2__assignment-gaps">
+          <summary>{t('misc.aw_doctor_assignment_gap_title')}</summary>
           <ul>
-            {doctorAssignmentGaps.map((gap) => (
+            {visibleAssignmentGaps.map((gap) => (
               <li key={`${String(gap.serviceId)}:${String(gap.pinnedDoctorId)}`}>
                 {gap.reason === 'doctor_missing'
                   ? t('misc.aw_doctor_assignment_gap_missing', {
@@ -398,7 +406,7 @@ const CartStepV2 = ({
           <span className="cart-step-v2__discount-hint">
             {t('misc.aw_doctor_assignment_gap_path')}
           </span>
-        </div>
+        </details>
         }
 
         {doctorGroups.length > 0 &&
@@ -416,7 +424,7 @@ const CartStepV2 = ({
                 {services.map((service) => {
                   const selectedItem = selectedItemForService(service, doctor.id ?? null);
                   const bookingUnavailable = service.doctor_booking_available === false;
-                  const unavailableHint = 'Очередь для этой консультации не настроена';
+                  const unavailableHint = t('misc.aw_service_queue_unavailable');
                   return <button
                     key={`${String(doctor.id)}:${String(service.id)}`}
                     type="button"
