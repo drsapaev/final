@@ -151,10 +151,17 @@ interface AuthSessionSnapshot {
   generation: number;
 }
 
-type SessionBoundRequestConfig = InternalAxiosRequestConfig & {
-  _authSessionSnapshot?: AuthSessionSnapshot;
-  _retriedAfterRefresh?: boolean;
+/** Bind an outgoing request to the login generation observed by its caller. */
+export type AuthSessionRequestConfig = AxiosRequestConfig & {
+  expectedAuthSessionGeneration: number;
 };
+
+type SessionBoundRequestConfig = InternalAxiosRequestConfig
+  & Partial<Pick<AuthSessionRequestConfig, 'expectedAuthSessionGeneration'>>
+  & {
+    _authSessionSnapshot?: AuthSessionSnapshot;
+    _retriedAfterRefresh?: boolean;
+  };
 
 interface TokenRefreshResult {
   accessToken: string | null;
@@ -628,10 +635,15 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   let requestSession = boundConfig._authSessionSnapshot;
   if (!requestSession) {
     requestSession = getCurrentAuthSession();
-    boundConfig._authSessionSnapshot = requestSession;
   } else if (shouldBindSession && !isCurrentAuthSession(requestSession)) {
     return Promise.reject(createSessionChangedError());
   }
+  const expectedGeneration = boundConfig.expectedAuthSessionGeneration;
+  if (expectedGeneration !== undefined
+    && (!shouldBindSession || requestSession.generation !== expectedGeneration)) {
+    return Promise.reject(createSessionChangedError());
+  }
+  boundConfig._authSessionSnapshot = requestSession;
 
   const rateLimitKey = getRateLimitRequestKey(config);
   const requestCooldownUntil = rateLimitKey ? requestRateLimitUntil.get(rateLimitKey) || 0 : 0;
