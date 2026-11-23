@@ -12,8 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.core.config import settings
+from app.core.roles import normalize_role_value
 from app.db.session import get_db
 from app.models.clinic import Doctor
+from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.services.money_input import MoneyInputError, parse_exact_json, parse_money
@@ -63,17 +65,17 @@ def _ensure_doctor_visit_payment_access(
     if not visit:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    doctor = (
-        db.query(Doctor)
+    doctor_id = (
+        db.query(Doctor.id)
         .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
-        .first()
+        .scalar()
     )
-    if not doctor:
+    if doctor_id is None:
         raise HTTPException(status_code=403, detail="Access denied")
-    if visit.doctor_id == doctor.id:
+    if visit.doctor_id == doctor_id:
         return
 
-    assigned_doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+    assigned_doctor = db.query(Doctor.user_id).filter(Doctor.id == visit.doctor_id).first()
     # Legacy writers sometimes stored User.id in visits.doctor_id. Preserve that
     # compatibility only when the value does not point to another Doctor row.
     if not assigned_doctor and visit.doctor_id == current_user.id:
@@ -85,31 +87,35 @@ def _ensure_doctor_visit_payment_access(
 
 
 def _ensure_visit_payment_access(db: Session, visit_id: int, current_user) -> Visit:
-    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    visit = db.query(Visit).filter(Visit.id == visit_id).populate_existing().first()
     if not visit:
         raise HTTPException(status_code=404, detail="Visit not found")
 
-    role = getattr(current_user, "role", None)
-    if role == "Patient":
-        if not getattr(current_user, "patient", None):
+    role = normalize_role_value(getattr(current_user, "role", None))
+    if role == "patient":
+        patient = getattr(current_user, "patient", None)
+        if patient is None or visit.patient_id != patient.id:
             raise HTTPException(status_code=403, detail="Access denied")
-        if visit.patient_id != current_user.patient.id:
+        patient_owner = db.query(Patient.user_id).filter(Patient.id == visit.patient_id).scalar()
+        if patient_owner != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied")
-    elif role == "Doctor":
+    elif role == "doctor":
         _ensure_doctor_visit_payment_access(db, visit, current_user)
 
     return visit
 
 
-def _ensure_payment_read_access(db: Session, payment_id: int, current_user) -> None:
+def _ensure_payment_read_access(
+    db: Session, payment_id: int, current_user, *, payment: Payment | None = None,
+) -> None:
     # M5.2: centralized authorization — only Patient and Doctor need ownership check
     from app.services.authorization.staff import staff_authorization_service
-    role = staff_authorization_service._get_permissions(current_user)
     if staff_authorization_service.has_permission(current_user, "payments:manage"):
         return  # Admin/Cashier — broad access, no ownership check
 
     # Patient and Doctor: check ownership via visit
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if payment is None:
+        payment = db.query(Payment).filter(Payment.id == payment_id).populate_existing().first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
@@ -378,7 +384,7 @@ def list_payments(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),
 ) -> PaymentListResponse:
     """Получение списка платежей с фильтрацией (использует SSOT)"""
-    if getattr(current_user, "role", None) == "Doctor":
+    if normalize_role_value(getattr(current_user, "role", None)) == "doctor":
         if visit_id is None:
             raise HTTPException(status_code=403, detail="Access denied")
         _ensure_visit_payment_access(db, visit_id, current_user)
@@ -403,8 +409,14 @@ def get_payment_status(
     """Получение статуса платежа"""
     _ensure_payment_read_access(db, payment_id, current_user)
     service = PaymentReadService(db, get_payment_manager())
+
+    def recheck_access(payment: Payment) -> None:
+        _ensure_payment_read_access(db, payment_id, current_user, payment=payment)
+
     try:
-        return PaymentStatusResponse(**service.get_payment_status(payment_id=payment_id))
+        return PaymentStatusResponse(
+            **service.get_payment_status(payment_id=payment_id, recheck_access=recheck_access)
+        )
     except PaymentReadDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 

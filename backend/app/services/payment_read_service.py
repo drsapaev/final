@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
@@ -186,7 +187,7 @@ class PaymentReadService:
         *,
         new_status: str,
         metadata: dict[str, Any],
-    ) -> Payment:
+    ) -> dict[str, Any]:
         payment_id = payment.id
         previous_status = payment.status
         try:
@@ -194,6 +195,8 @@ class PaymentReadService:
                 payment_id=payment_id, new_status=new_status, meta=metadata, commit=False,
             )
             self.repository.record_provider_transition(payment, previous_status=previous_status)
+            # Keep the response in the authorized snapshot before commit expires the ORM row.
+            status_payload = self._payment_status_payload(payment)
             self.db.commit()
         except SQLAlchemyError:
             self.db.rollback()
@@ -201,9 +204,11 @@ class PaymentReadService:
             raise PaymentReadDomainError(
                 status_code=503, detail="Обновление статуса платежа временно недоступно",
             ) from None
-        return payment
+        return status_payload
 
-    def get_payment_status(self, *, payment_id: int) -> dict[str, Any]:
+    def get_payment_status(
+        self, *, payment_id: int, recheck_access: Callable[[Payment], None] | None = None,
+    ) -> dict[str, Any]:
         payment = self.repository.get_payment(payment_id)
         if not payment:
             raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
@@ -224,27 +229,31 @@ class PaymentReadService:
             result = self.payment_manager.check_payment_status(provider, order_id)
             reported_status = result.status.lower() if isinstance(result.status, str) else ""
 
-            if (
+            can_transition = (
                 result.success
                 and reported_status != recorded_status
                 and is_valid_payment_transition(recorded_status, reported_status)
+            )
+            payment = self.repository.get_payment(payment_id, for_update=can_transition, refresh=True)
+            if payment is None or payment.visit_id != visit_id:
+                raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
+            if recheck_access is not None:
+                recheck_access(payment)
+
+            if (
+                can_transition
+                and payment.status == recorded_status
+                and payment.provider == provider
+                and payment.provider_payment_id == order_id
+                and (payment.amount, payment.currency, payment.updated_at) == recorded_payment_terms
             ):
-                # The provider call can outlive a concurrent settlement or order change.
-                payment = self.repository.get_payment(payment_id, for_update=True)
-                if payment is None or payment.visit_id != visit_id:
-                    raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
+                meta = {**(payment.provider_data or {}), **(result.provider_data or {})}
+                return self._persist_provider_status(payment, new_status=reported_status, metadata=meta)
 
-                if (
-                    payment.status == recorded_status
-                    and payment.provider == provider
-                    and payment.provider_payment_id == order_id
-                    and (payment.amount, payment.currency, payment.updated_at) == recorded_payment_terms
-                ):
-                    meta = {**(payment.provider_data or {}), **(result.provider_data or {})}
-                    payment = self._persist_provider_status(
-                        payment, new_status=reported_status, metadata=meta,
-                    )
+        return self._payment_status_payload(payment)
 
+    @staticmethod
+    def _payment_status_payload(payment: Payment) -> dict[str, Any]:
         return {
             "payment_id": payment.id,
             "status": payment.status,

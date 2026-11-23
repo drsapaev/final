@@ -2,27 +2,34 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
+from sqlalchemy import select, update
+
+from app.api.v1.endpoints import payments
 from app.core.security import get_password_hash
+from app.models.audit import AuditLog
 from app.models.clinic import Doctor
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
+from app.services.payment_providers.base import PaymentResult
 
 
 def _suffix() -> str:
     return uuid4().hex[:10]
 
 
-def _create_patient_user(db_session, *, label: str) -> tuple[User, Patient]:
+def _create_patient_user(db_session, *, label: str, role: str = "Patient") -> tuple[User, Patient]:
     suffix = _suffix()
     user = User(
         username=f"payment_patient_{label}_{suffix}",
         email=f"payment-patient-{label}-{suffix}@test.local",
         hashed_password=get_password_hash("patient123"),
-        role="Patient",
+        role=role,
         is_active=True,
         is_superuser=False,
     )
@@ -43,14 +50,14 @@ def _create_patient_user(db_session, *, label: str) -> tuple[User, Patient]:
     return user, patient
 
 
-def _create_doctor_user(db_session, *, label: str) -> tuple[User, Doctor]:
+def _create_doctor_user(db_session, *, label: str, role: str = "Doctor") -> tuple[User, Doctor]:
     suffix = _suffix()
     user = User(
         username=f"payment_doctor_{label}_{suffix}",
         email=f"payment-doctor-{label}-{suffix}@test.local",
         full_name=f"Payment Doctor {label}",
         hashed_password=get_password_hash("doctor123"),
-        role="Doctor",
+        role=role,
         is_active=True,
         is_superuser=False,
     )
@@ -140,8 +147,9 @@ def _staff_headers(client, db_session, *, role: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-def test_patient_payment_reads_are_limited_to_own_visit(client, db_session) -> None:
-    own_user, own_patient = _create_patient_user(db_session, label="own")
+@pytest.mark.parametrize("role", ["Patient", "patient"])
+def test_patient_payment_reads_are_limited_to_own_visit(client, db_session, role) -> None:
+    own_user, own_patient = _create_patient_user(db_session, label="own", role=role)
     _other_user, other_patient = _create_patient_user(db_session, label="other")
     own_payment = _create_payment(db_session, patient=own_patient)
     other_payment = _create_payment(db_session, patient=other_patient)
@@ -161,8 +169,9 @@ def test_patient_payment_reads_are_limited_to_own_visit(client, db_session) -> N
     assert receipt_response.status_code == 403
 
 
-def test_doctor_payment_reads_are_limited_to_own_visits(client, db_session) -> None:
-    own_user, own_doctor = _create_doctor_user(db_session, label="own")
+@pytest.mark.parametrize("role", ["Doctor", "doctor"])
+def test_doctor_payment_reads_are_limited_to_own_visits(client, db_session, role) -> None:
+    own_user, own_doctor = _create_doctor_user(db_session, label="own", role=role)
     _other_user, other_doctor = _create_doctor_user(db_session, label="other")
     own_patient = _create_patient_user(db_session, label="doc_own_patient")[1]
     other_patient = _create_patient_user(db_session, label="doc_other_patient")[1]
@@ -214,6 +223,79 @@ def test_doctor_payment_reads_are_limited_to_own_visits(client, db_session) -> N
 
     unscoped_list_response = client.get("/api/v1/payments/", headers=headers)
     assert unscoped_list_response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("scope_change", "provider_has_update"),
+    [(None, True), (None, False), ("reassigned", True), ("reassigned", False), ("deactivated", True)],
+)
+def test_doctor_payment_status_uses_current_scope_after_lookup(
+    client, db_session, monkeypatch, scope_change, provider_has_update,
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="poll_owner")
+    _, other_doctor = _create_doctor_user(db_session, label="poll_new_owner")
+    _, patient = _create_patient_user(db_session, label="poll_patient")
+    payment = _create_payment(db_session, patient=patient, doctor=doctor)
+    payment.status = "pending"
+    db_session.commit()
+    payment_id, visit_id, order_id = payment.id, payment.visit_id, payment.provider_payment_id
+    headers = _doctor_headers(client, user)
+
+    def check_payment_status(provider, order):
+        assert (provider, order) == ("click", order_id)
+        if scope_change == "reassigned":
+            db_session.connection().execute(
+                update(Visit).where(Visit.id == visit_id).values(doctor_id=other_doctor.id)
+            )
+        elif scope_change == "deactivated":
+            db_session.connection().execute(
+                update(Doctor).where(Doctor.id == doctor.id).values(active=False)
+            )
+        return PaymentResult(success=provider_has_update, status="processing")
+
+    monkeypatch.setattr(payments, "get_payment_manager", lambda: SimpleNamespace(
+        check_payment_status=check_payment_status,
+    ))
+    response = client.get(f"/api/v1/payments/{payment_id}", headers=headers)
+
+    expected_status = "processing" if scope_change is None and provider_has_update else "pending"
+    if scope_change is None:
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == expected_status
+    else:
+        assert response.status_code == 403
+        assert response.json() == {"detail": "Access denied"}
+    db_session.refresh(payment)
+    assert payment.status == expected_status
+    events = db_session.scalars(select(AuditLog.id).filter_by(
+        event_type="PAYMENT_PROVIDER_STATUS_CHANGED", entity_type="payment", entity_id=payment_id,
+    )).all()
+    assert len(events) == (1 if expected_status == "processing" else 0)
+
+
+def test_patient_payment_status_requires_current_account_link_after_lookup(
+    client, db_session, monkeypatch,
+) -> None:
+    user, patient = _create_patient_user(db_session, label="poll_account")
+    payment = _create_payment(db_session, patient=patient)
+    payment.status = "pending"
+    db_session.commit()
+    payment_id, patient_id = payment.id, patient.id
+    headers = _patient_headers(client, user)
+
+    def check_payment_status(_provider, _order):
+        db_session.connection().execute(
+            update(Patient).where(Patient.id == patient_id).values(user_id=None)
+        )
+        return PaymentResult(success=False)
+
+    monkeypatch.setattr(payments, "get_payment_manager", lambda: SimpleNamespace(
+        check_payment_status=check_payment_status,
+    ))
+    response = client.get(f"/api/v1/payments/{payment_id}", headers=headers)
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Access denied"}
 
 
 def test_non_payment_staff_cannot_read_payment_receipts(client, db_session) -> None:
