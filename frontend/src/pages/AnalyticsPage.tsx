@@ -7,6 +7,7 @@ import AdvancedCharts from '../components/analytics/AdvancedCharts';
 
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
 import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
+import PublicSiteAnalyticsReport from '../components/analytics/PublicSiteAnalyticsReport';
 import {
   Input, Button, Select, SegmentedControl,
 } from '../components/ui/macos';
@@ -1022,6 +1023,8 @@ export default function AnalyticsPage() {
       </section>
 
       <AdminRouteSwitcher current="admin-analytics" />
+
+      <PublicSiteAnalyticsReport />
 
       <section style={{
         background: analyticsSurface,

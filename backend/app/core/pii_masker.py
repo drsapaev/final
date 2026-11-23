@@ -358,6 +358,24 @@ SECRET_FIELD_PATTERNS = (
 )
 
 
+PUBLIC_SITE_ANALYTICS_INGEST_PATH = "/api/v1/public-site/analytics/events"
+PUBLIC_SITE_ANALYTICS_MAX_TOKEN_BYTES = 17
+
+
+def is_public_site_analytics_ingest_path(value: object) -> bool:
+    """Match the intake in an ASGI path, request URL or Sentry transaction."""
+    if not isinstance(value, str) or not value:
+        return False
+    method, separator, target = value.partition(" ")
+    if separator and re.fullmatch(r"[A-Z]+", method):
+        value = target
+    try:
+        path = unquote(urlsplit(value).path).removesuffix("/")
+    except ValueError:
+        return False
+    return path == PUBLIC_SITE_ANALYTICS_INGEST_PATH
+
+
 def is_sensitive_verification_path(value: object) -> bool:
     """Identify code-bearing authentication routes without masking ICD `code`.
 

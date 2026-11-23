@@ -219,5 +219,25 @@
       "cache_control_no_store": true
     },
     "remaining": "The check looked for the expected hreflang labels. Alternate-link target accuracy, search-engine index inclusion and actual search appearance remain unverified by this run."
+  },
+  "hosted_hreflang_target_follow_up": {
+    "origin": "https://finalclinic.fyi",
+    "observed_from_utc": "2026-11-23T10:37:49Z",
+    "observed_to_utc": "2026-11-23T10:38:07Z",
+    "deployment_id": "dpl_JE17GwbFdH5oCgP8jxrBGeRFsYsu",
+    "deployment_sha": "35b6cd9ddbff4d82eb9b05d081dcbd1722175f7a",
+    "service_worker_sha256": "23f51a225b6b491fa53e45b4f5c829e62fb072a68ec746ac383ef8816368401d",
+    "sitemap_sha256": "c771babacc8853d3e4097fe4e8b88dc219829633e825c1d7e0e2772fcec66e14",
+    "method": "Read the deployed sitemap and source HTML with anonymous no-cache GETs. Derive expected absolute alternate URLs from the bilingual route contract, compare hrefs in both directions and check the service-worker build marker before and after.",
+    "sitemap_pages_returning_http_200_without_redirect": 14,
+    "pages_with_one_self_canonical_and_expected_html_language": 14,
+    "reciprocal_locale_pairs": 7,
+    "alternate_link_targets_checked": 42,
+    "expected_destinations": {
+      "uz-Latn": "The original path without the /ru prefix.",
+      "ru": "The corresponding /ru path, with the home page at /ru.",
+      "x-default": "The corresponding uz-Latn URL."
+    },
+    "scope": "All pages listed in the sitemap during this run. Google index status and actual search appearance remain unverified."
   }
 }

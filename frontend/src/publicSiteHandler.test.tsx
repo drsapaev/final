@@ -97,6 +97,42 @@ it('marks already broken and newly failed public-site images as unavailable', ()
 });
 
 describe('public-site SSR request handler', () => {
+  it.each([
+    { path: '/', enabled: true, method: 'GET', upstreamStatus: 200, status: 200, collects: true },
+    { path: '/ru', enabled: 'true', method: 'GET', upstreamStatus: 200, status: 200, collects: true },
+    { path: '/', enabled: undefined, method: 'GET', upstreamStatus: 200, status: 200, collects: false },
+    { path: '/ru', enabled: 'false', method: 'GET', upstreamStatus: 200, status: 200, collects: false },
+    { path: '/ru', enabled: true, method: 'HEAD', upstreamStatus: 200, status: 200, collects: false },
+    { path: '/ru/services/synthetic-missing', enabled: true, method: 'GET', upstreamStatus: 404, status: 404, collects: false },
+    { path: '/ru', enabled: true, method: 'GET', upstreamStatus: 503, status: 503, collects: false },
+  ])('gates analytics for $method $path with status $status and flag $enabled', async ({
+    path, enabled, method, upstreamStatus, status, collects,
+  }) => {
+    const apiOrigin = 'https://api.kosmed.test';
+    const fetchImpl = createFetch((url) => jsonResponse(
+      url.pathname === '/api/v1/public-site/clinic' ? { name: 'SYNTHETIC Clinic' } : [],
+      upstreamStatus,
+    ));
+    const response = await handlePublicSiteRequest(
+      new Request('https://preview.kosmed.test' + path, { method }),
+      { apiOrigin, siteOrigin: 'https://www.kosmed.test', publicSiteAnalyticsEnabled: enabled },
+      assets,
+      fetchImpl,
+    );
+    expect(response.status).toBe(status);
+    const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const markers = page.querySelectorAll('kosmed-public-site-analytics');
+    const scripts = page.querySelectorAll('script[src="/public-site-analytics.js"]');
+    expect(markers).toHaveLength(collects ? 1 : 0);
+    expect(scripts).toHaveLength(collects ? 1 : 0);
+    if (collects) {
+      expect(markers[0].getAttribute('data-endpoint')).toBe(apiOrigin + '/api/v1/public-site/analytics/events');
+      expect(markers[0].getAttribute('data-event')).toBe('site_view');
+      expect(markers[0].hasAttribute('data-track-phone')).toBe(true);
+    }
+    expect(fetchImpl.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+  });
+
   it('renders a localized service detail and request-time SEO metadata', async () => {
     const fetchImpl = createFetch((url) => {
       if (url.pathname === '/api/v1/public-site/clinic') return jsonResponse({ logo_url: null });

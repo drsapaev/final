@@ -61,6 +61,8 @@ export type ServiceCreateDto = Schemas['ServiceCreate'];
 export type ServiceUpdateDto = Schemas['ServiceUpdate'];
 
 // Admin-managed public booking calendar (annual holiday dates).
+export type PublicSiteAnalyticsReportDto = Schemas['PublicSiteAnalyticsReportOut'];
+
 export type PublicBookingHolidayDto = Schemas['PublicBookingHoliday'];
 export type PublicBookingCalendarUpdateDto = Schemas['PublicBookingCalendarUpdate'];
 export type PublicBookingCalendarConfirmDto = Schemas['PublicBookingCalendarConfirm'];

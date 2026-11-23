@@ -291,6 +291,12 @@ class Settings(BaseSettings):
         default=30, ge=1, le=365, description="Number of days to retain backups"
     )
 
+    # --- Public website aggregate analytics ---
+    PUBLIC_SITE_ANALYTICS_ENABLED: bool = Field(
+        default=False,
+        description="Allow anonymous public-site daily counters to receive events.",
+    )
+
     # --- Public website media ---
     # Explicitly configured only. Leaving both roots unset keeps uploads
     # unavailable until deployment has provisioned the dedicated folders.
