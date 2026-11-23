@@ -6,6 +6,7 @@ on:
       - .github/workflows/staging-frontend-artifact.yml
       - frontend/Dockerfile.staging
       - frontend/src/api/runtime.ts
+      - frontend/src/services/sentry.ts
       - ops/compose.staging.yml
       - ops/compose.staging.artifact.yml
       - scripts/wsl_staging.py
@@ -31,24 +32,20 @@ jobs:
       - name: Build and verify both Compose frontend targets
         run: |
           set -euo pipefail
-          mkdir -p .scratch/frontend-artifact/assets
-          printf '%s\n' '<!doctype html><html><body>synthetic artifact</body></html>' > .scratch/frontend-artifact/index.html
-          printf '%s\n' 'console.log("synthetic frontend artifact");' > .scratch/frontend-artifact/assets/app.js
-          printf '%s\n' "$GITHUB_SHA" > .scratch/frontend-artifact/source.sha
-          (
-            cd .scratch/frontend-artifact
-            find . -type f ! -path './SHA256SUMS' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
-            sha256sum --check --status SHA256SUMS
-          )
-
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p .scratch/frontend-artifact .scratch/frontend-artifact-import
           ci_identity="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           ci_secret="${ci_identity}-ephemeral"
+          # Use a distinct value so the worker SHA cannot satisfy the Sentry assertion.
+          release_sha=00000000000000000000000000000000000abcde
+          test "$release_sha" != "$GITHUB_SHA"
+          sentry_dsn=https://1234567890abcdef1234567890abcdef@sentry.invalid/1
 
           write_compose_env() {
             local target="$1"
             local output="$2"
             cat > "$output" <<EOF
-          COMPOSE_PROJECT_NAME=clinic-artifact-ci
+          COMPOSE_PROJECT_NAME=$ci_identity
           STAGING_BACKEND_PORT=19001
           STAGING_FRONTEND_PORT=19080
           STAGING_POSTGRES_HOST_PORT=55441
@@ -65,6 +62,8 @@ jobs:
           ADMIN_PASSWORD=$ci_secret
           ADMIN_EMAIL=synthetic@example.invalid
           ADMIN_FULL_NAME=Synthetic CI
+          APP_VERSION=$release_sha
+          VITE_SENTRY_DSN=$sentry_dsn
           STAGING_FRONTEND_BUILD_TARGET=$target
           STAGING_FRONTEND_ARTIFACT_CONTEXT=../.scratch/frontend-artifact
           VERCEL_GIT_COMMIT_SHA=$GITHUB_SHA
@@ -73,29 +72,46 @@ jobs:
           write_compose_env runtime .scratch/compose-runtime.env
           write_compose_env artifact-runtime .scratch/compose-artifact.env
 
-          docker compose --project-directory "$GITHUB_WORKSPACE/ops" \
-            --env-file "$GITHUB_WORKSPACE/.scratch/compose-runtime.env" \
-            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml" config --quiet
-          docker compose --project-directory "$GITHUB_WORKSPACE/ops" \
-            --env-file "$GITHUB_WORKSPACE/.scratch/compose-runtime.env" \
-            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml" build frontend
+          compose=(docker compose --project-directory "$GITHUB_WORKSPACE/ops"
+            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml")
+          runtime=("${compose[@]}" --env-file "$GITHUB_WORKSPACE/.scratch/compose-runtime.env")
+          artifact_runtime=("${compose[@]}" -f "$GITHUB_WORKSPACE/ops/compose.staging.artifact.yml"
+            --env-file "$GITHUB_WORKSPACE/.scratch/compose-artifact.env")
+          containers=()
+          trap 'if ((${#containers[@]})); then docker rm "${containers[@]}" >/dev/null; fi' EXIT
 
-          docker compose --project-directory "$GITHUB_WORKSPACE/ops" \
-            --env-file "$GITHUB_WORKSPACE/.scratch/compose-artifact.env" \
-            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml" \
-            -f "$GITHUB_WORKSPACE/ops/compose.staging.artifact.yml" config --quiet
-          docker compose --project-directory "$GITHUB_WORKSPACE/ops" \
-            --env-file "$GITHUB_WORKSPACE/.scratch/compose-artifact.env" \
-            -f "$GITHUB_WORKSPACE/ops/compose.staging.yml" \
-            -f "$GITHUB_WORKSPACE/ops/compose.staging.artifact.yml" build frontend
+          "${runtime[@]}" config --quiet
+          "${runtime[@]}" build frontend
+          container_id="$(docker create "${ci_identity}-frontend")"
+          containers+=("$container_id")
+          docker cp "$container_id:/usr/share/nginx/html/." .scratch/frontend-artifact/
+          rm -f .scratch/frontend-artifact/50x.html
+          test -s .scratch/frontend-artifact/index.html
+          grep -rFq --include='*.js' -- "$sentry_dsn" .scratch/frontend-artifact/assets
+          grep -rEq --include='*.js' -- "release:[[:space:]]*(\"$release_sha\"|'$release_sha')" .scratch/frontend-artifact/assets
+          grep -Fxq -- "const BUILD_VERSION = '$GITHUB_SHA';" .scratch/frontend-artifact/sw.js
+          printf '%s\n' "$GITHUB_SHA" > .scratch/frontend-artifact/source.sha
+          (
+            cd .scratch/frontend-artifact
+            find . -type f ! -path './SHA256SUMS' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+            sha256sum --check --status SHA256SUMS
+          )
+
+          "${artifact_runtime[@]}" config --quiet
+          "${artifact_runtime[@]}" build frontend
+          container_id="$(docker create "${ci_identity}-frontend")"
+          containers+=("$container_id")
+          docker cp "$container_id:/usr/share/nginx/html/." .scratch/frontend-artifact-import/
+          test ! -e .scratch/frontend-artifact-import/source.sha
+          test ! -e .scratch/frontend-artifact-import/SHA256SUMS
+          diff -qr --exclude=source.sha --exclude=SHA256SUMS \
+            .scratch/frontend-artifact .scratch/frontend-artifact-import
 
   build:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # Public, send-only frontend DSN; events use the staging environment.
-      STAGING_FRONTEND_SENTRY_DSN: https://57fde20209e223ec5a4a96e3a5a59fa2@o4511673323749376.ingest.us.sentry.io/4511673366282240
+    environment: staging-integrations
     steps:
       - name: Check out the dispatched commit
         uses: actions/checkout@v7
@@ -110,28 +126,37 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test -z "$(git status --porcelain)"
 
-      - name: Build the checked-in staging image
+      - name: Build and export the checked-in staging image
+        env:
+          STAGING_FRONTEND_SENTRY_DSN: ${{ vars.STAGING_VITE_SENTRY_DSN }}
         run: |
           set -euo pipefail
+          # Accept only the dedicated frontend project from the staging runbook.
+          allowed_dsn='^https://[0-9a-fA-F]{32}@o4511673323749376\.ingest\.us\.sentry\.io/4512459389730816$'
+          if [[ ! "$STAGING_FRONTEND_SENTRY_DSN" =~ $allowed_dsn ]]; then
+            echo '::error::STAGING_VITE_SENTRY_DSN must target the dedicated frontend staging project.'
+            exit 1
+          fi
           docker build \
             --file frontend/Dockerfile.staging \
             --build-arg VITE_API_BASE=/api/v1 \
             --build-arg VITE_API_BASE_URL=same-origin \
             --build-arg "VITE_SENTRY_DSN=$STAGING_FRONTEND_SENTRY_DSN" \
             --build-arg VITE_SENTRY_ENV=staging \
+            --build-arg "VITE_APP_VERSION=$GITHUB_SHA" \
+            --build-arg "VERCEL_GIT_COMMIT_SHA=$GITHUB_SHA" \
             --tag "clinic-staging-frontend:$GITHUB_SHA" \
             frontend
 
-      - name: Export static files with source and checksums
-        run: |
-          set -euo pipefail
           container_id="$(docker create "clinic-staging-frontend:$GITHUB_SHA")"
           trap 'docker rm "$container_id" >/dev/null' EXIT
           mkdir -p artifact
           docker cp "$container_id:/usr/share/nginx/html/." artifact/
           rm -f artifact/50x.html  # stock nginx page, not part of Vite dist
           test -s artifact/index.html
-          grep -R -F -q "$STAGING_FRONTEND_SENTRY_DSN" artifact/assets
+          grep -rFq --include='*.js' -- "$STAGING_FRONTEND_SENTRY_DSN" artifact/assets
+          grep -rEq --include='*.js' -- "release:[[:space:]]*(\"$GITHUB_SHA\"|'$GITHUB_SHA')" artifact/assets
+          grep -Fxq -- "const BUILD_VERSION = '$GITHUB_SHA';" artifact/sw.js
           printf '%s\n' "$GITHUB_SHA" > artifact/source.sha
           (
             cd artifact
