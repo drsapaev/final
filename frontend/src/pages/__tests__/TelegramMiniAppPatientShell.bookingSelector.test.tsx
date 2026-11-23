@@ -15,7 +15,8 @@
  *
  * These tests render the real shell component at the real /book URL.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -44,6 +45,9 @@ function resolveLocaleValue(locale: Record<string, unknown>, key: string): strin
 }
 
 beforeAll(() => {
+  // The shell now explicitly loads its requested lazy locale. Keep this
+  // shared-store test isolated; browser QA exercises the actual lazy loader.
+  vi.spyOn(i18n, 'loadLanguages').mockResolvedValue(undefined);
   vi.spyOn(i18n, 'getFixedT').mockImplementation(((lng: string, ns?: string, opts?: Record<string, unknown>) => {
     if (lng === 'uz-Latn') {
       const uzT = (key: string, params?: Record<string, unknown>) =>
@@ -61,6 +65,10 @@ afterAll(() => {
 const { apiPost, apiGet } = vi.hoisted(() => ({ apiPost: vi.fn(), apiGet: vi.fn() }));
 
 vi.mock('../../api/client', () => ({ api: { post: apiPost, get: apiGet } }));
+vi.mock('../../api/telegramMiniAppSession', () => ({
+  telegramMiniAppApi: { post: apiPost },
+  telegramMiniAppSessions: { list: vi.fn().mockResolvedValue({ sessions: [], total: 0 }) },
+}));
 
 import TelegramMiniAppPatientShell from '../TelegramMiniAppPatientShell';
 
@@ -153,16 +161,17 @@ function rejectWithReason(status: number, reason: string) {
   });
 }
 
-function renderBookSurface(search: string) {
-  return render(
+function renderBookSurface(search: string, strict = false) {
+  const surface = (
     <ThemeProvider>
       <MemoryRouter initialEntries={[`/telegram/mini-app/patient${search}`]}>
         <Routes>
           <Route path="/telegram/mini-app/patient" element={<TelegramMiniAppPatientShell />} />
         </Routes>
       </MemoryRouter>
-    </ThemeProvider>,
+    </ThemeProvider>
   );
+  return render(strict ? <StrictMode>{surface}</StrictMode> : surface);
 }
 
 async function selectDepartmentByName(label: string, triggerLabel = 'Отделение') {
@@ -180,6 +189,123 @@ async function selectServiceByName(label: string) {
   fireEvent.click(trigger);
   fireEvent.click(await screen.findByRole('option', { name: label }));
 }
+
+describe('TelegramMiniAppPatientShell SDK bootstrap', () => {
+  const sdkSelector = 'script[data-telegram-web-app-sdk="true"]';
+
+  beforeEach(() => {
+    apiPost.mockReset();
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => routeApiPostByUrl(url, body));
+    apiGet.mockReset();
+    apiGet.mockResolvedValue({ data: serviceRows });
+    delete window.Telegram;
+  });
+
+  afterEach(() => {
+    document.querySelectorAll(sdkSelector).forEach((script) => script.remove());
+    delete window.Telegram;
+  });
+
+  it('waits for delayed SDK initialization before manifest and booking requests, including StrictMode replay', async () => {
+    renderBookSurface('?section=appointments', true);
+    const script = document.querySelector(sdkSelector)!;
+    expect(script).not.toBeNull();
+    expect(document.querySelectorAll(sdkSelector)).toHaveLength(1);
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(apiGet).not.toHaveBeenCalled();
+
+    const ready = vi.fn();
+    const expand = vi.fn();
+    await act(async () => {
+      (window as unknown as { Telegram?: unknown }).Telegram = {
+        WebApp: { initData: 'delayed-synthetic-init-data', ready, expand },
+      };
+      script.dispatchEvent(new Event('load'));
+    });
+
+    await screen.findByLabelText('Отделение');
+    expect(apiPost.mock.calls.filter(([url]) => url === MANIFEST_URL)).toHaveLength(1);
+    expect(apiPost).toHaveBeenCalledWith(
+      MANIFEST_URL,
+      { initData: 'delayed-synthetic-init-data', section: 'appointments' },
+      expect.anything(),
+    );
+    expect(apiPost).toHaveBeenCalledWith(DEPARTMENTS_URL, expect.anything(), expect.anything());
+    expect(ready).toHaveBeenCalledOnce();
+    expect(expand).toHaveBeenCalledOnce();
+  });
+
+  it('shows the safe unavailable state on SDK failure and retries without sending unauthenticated requests', async () => {
+    renderBookSurface('?section=appointments');
+    await act(async () => {
+      document.querySelector(sdkSelector)!.dispatchEvent(new Event('error'));
+    });
+    await screen.findByText('Сессия Telegram недоступна. Данные пациента не загружаются.');
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(apiGet).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить снова' }));
+    const retryScript = document.querySelector(sdkSelector)!;
+    expect(retryScript).not.toBeNull();
+    expect(apiPost).not.toHaveBeenCalled();
+    await act(async () => {
+      (window as unknown as { Telegram?: unknown }).Telegram = {
+        WebApp: { initData: 'retried-synthetic-init-data' },
+      };
+      retryScript.dispatchEvent(new Event('load'));
+    });
+    await screen.findByLabelText('Отделение');
+    expect(apiPost).toHaveBeenCalledWith(
+      MANIFEST_URL,
+      { initData: 'retried-synthetic-init-data', section: 'appointments' },
+      expect.anything(),
+    );
+  });
+
+  it('waits for a WebView launch even with an entry token and prefers signed initData', async () => {
+    renderBookSurface('?section=appointments&entryToken=tok_appointments_synthetic#tgWebAppData=synthetic-launch');
+    const script = document.querySelector(sdkSelector)!;
+    expect(script).not.toBeNull();
+    expect(apiPost).not.toHaveBeenCalled();
+    await act(async () => {
+      (window as unknown as { Telegram?: unknown }).Telegram = {
+        WebApp: { initData: 'webview-synthetic-init-data' },
+      };
+      script.dispatchEvent(new Event('load'));
+    });
+    await screen.findByLabelText('Отделение');
+    expect(apiPost).toHaveBeenCalledWith(
+      MANIFEST_URL,
+      { initData: 'webview-synthetic-init-data', section: 'appointments' },
+      expect.anything(),
+    );
+  });
+
+  it('does not start requests after unmount while the SDK is loading', async () => {
+    const view = renderBookSurface('?section=appointments');
+    const script = document.querySelector(sdkSelector)!;
+    view.unmount();
+    await act(async () => {
+      (window as unknown as { Telegram?: unknown }).Telegram = {
+        WebApp: { initData: 'unmounted-synthetic-init-data' },
+      };
+      script.dispatchEvent(new Event('load'));
+    });
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(apiGet).not.toHaveBeenCalled();
+  });
+
+  it('keeps plain scoped entry links available without loading the Telegram SDK', async () => {
+    renderBookSurface('?section=appointments&entryToken=tok_appointments_synthetic');
+    await screen.findByLabelText('Отделение');
+    expect(document.querySelector(sdkSelector)).toBeNull();
+    expect(apiPost).toHaveBeenCalledWith(
+      MANIFEST_URL,
+      { entryToken: 'tok_appointments_synthetic', section: 'appointments' },
+      expect.anything(),
+    );
+  });
+});
 
 describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)', () => {
   beforeEach(() => {
@@ -395,7 +521,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     // selector renders empty/placeholder now, so the payload must NOT
     // silently carry the previously selected key.
     fireEvent.click(screen.getByLabelText('Открытый раздел: Визиты'));
-    fireEvent.click(screen.getByLabelText('Открытый раздел: Запись'));
+    fireEvent.click(await screen.findByLabelText('Открытый раздел: Запись'));
     await waitFor(() => expect(departmentsCalls).toBe(2));
 
     await screen.findByText('Список отделений сейчас недоступен — можно отправить заявку без отделения.');
@@ -414,6 +540,10 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
       WebApp: { initData: 'test-init-data-payload' },
     };
     let departmentsCalls = 0;
+    let resolveDepartmentRefetch!: (value: { data: { departments: typeof departmentRows } }) => void;
+    const departmentRefetch = new Promise<{ data: { departments: typeof departmentRows } }>((resolve) => {
+      resolveDepartmentRefetch = resolve;
+    });
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
       if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
@@ -422,7 +552,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
         if (departmentsCalls >= 2) {
           // The refetch SUCCEEDS, but cardio was deactivated in the
           // meantime: the ACTIVE reference now lists only derma.
-          return Promise.resolve({ data: { departments: [departmentRows[1]] } });
+          return departmentRefetch;
         }
         return Promise.resolve({ data: { departments: departmentRows } });
       }
@@ -440,8 +570,15 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     // the UI LOOKS departmentless even while the form state still carries
     // the stale key — the divergence is only observable in the payload.
     fireEvent.click(screen.getByLabelText('Открытый раздел: Визиты'));
-    fireEvent.click(screen.getByLabelText('Открытый раздел: Запись'));
+    fireEvent.click(await screen.findByLabelText('Открытый раздел: Запись'));
     await waitFor(() => expect(departmentsCalls).toBe(2));
+    // A request count proves invocation, not that React applied its response.
+    // Settle the reference update before checking the resulting submit payload.
+    await act(async () => {
+      resolveDepartmentRefetch({ data: { departments: [departmentRows[1]] } });
+      await departmentRefetch;
+    });
+    expect(screen.getByLabelText('Отделение')).not.toHaveTextContent('Кардиология');
 
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
     await waitFor(() => {

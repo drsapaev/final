@@ -163,7 +163,7 @@ IIN_REGEX = re.compile(r"\b(\d{4})\d{6}(\d{4})\b")
 # non-backslash vs backslash), so the scan stays linear (no ReDoS).
 JSON_CREDENTIAL_REGEX = re.compile(
     r'("(?:token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
-    r"|web_push_subscription|vapid_private_key|verification[_-]?code"
+    r"|web_push_subscription|vapid_private_key|init_data|initData|verification[_-]?code"
     r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)"\s*:\s*")((?:[^"\\]|\\.)*)(")',
     re.IGNORECASE,
 )
@@ -174,7 +174,7 @@ JSON_CREDENTIAL_REGEX = re.compile(
 # cannot see them. Conservative: only credential-looking keys, never prose.
 FORM_CREDENTIAL_REGEX = re.compile(
     r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
-    r"|web_push_subscription|vapid_private_key|verification[_-]?code"
+    r"|web_push_subscription|vapid_private_key|init_data|initData|verification[_-]?code"
     r"|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=([^\s&]+)",
     re.IGNORECASE,
 )
@@ -234,6 +234,8 @@ _CREDENTIAL_KEYWORDS = (
     "backupcode",
     "otp",
     "totp",
+    "init_data",
+    "initdata",
 )
 _CREDENTIAL_FIELD_WINDOW = 130  # keyword→'=' distance cap (≈6× the longest key)
 
@@ -332,6 +334,8 @@ _PYREPR_DQ_CREDENTIAL_REGEX = re.compile(
 # key redaction, same style as full_redact_patterns in _mask_key_value.
 # ---------------------------------------------------------------------------
 SECRET_FIELD_PATTERNS = (
+    "init_data",
+    "initdata",
     # push device registry credentials (PR-6) — request bodies of
     # /api/v1/push/devices/* attach to Sentry events on unhandled 5xx
     "token",

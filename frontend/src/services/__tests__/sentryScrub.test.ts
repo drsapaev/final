@@ -10,6 +10,15 @@
 import { describe, expect, it } from 'vitest';
 import { redactCredentialQueryParams, scrubPIIFromObject } from '../sentry';
 
+describe('Telegram session credentials', () => {
+  it.each(['init_data', 'initData', 'entryToken', 'authorization'])('redacts %s in telemetry objects and URLs', (key) => {
+    const secret = 'SYNTHETIC-TELEGRAM-CREDENTIAL';
+    expect(JSON.stringify(scrubPIIFromObject({ [key]: secret }))).not.toContain(secret);
+    expect(redactCredentialQueryParams(`https://app.example.test/?${key}=${secret}&lang=ru`))
+      .not.toContain(secret);
+  });
+});
+
 describe('redactCredentialQueryParams (owner round-12 P1)', () => {
   it('redacts the legacy activation query token in a full URL, keeping unrelated params', () => {
     const out = redactCredentialQueryParams(

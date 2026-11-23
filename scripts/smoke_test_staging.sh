@@ -224,18 +224,18 @@ pii_check() {
         python -c "
 from app.core.pii_masker import mask_pii, mask_phone, mask_email, mask_name
 
-assert mask_phone('+998901234567') == '•••567'
-assert mask_email('john@example.com').startswith('j')
-assert mask_name('Иван Иванов') == 'И.И.'
+assert mask_phone('+000000000000') == '•••000'
+assert mask_email('synthetic@example.invalid').startswith('s')
+assert mask_name('SYNTHETIC CHECK') == 'S.C.'
 
 patient = {
-    'first_name': 'Akmal', 'last_name': 'Karimov',
-    'phone': '+998901234567', 'iin': '12345678901234',
-    'diagnosis': 'I10', 'id': 42,
+    'first_name': 'SYNTHETIC', 'last_name': 'CHECK',
+    'phone': '+000000000000', 'iin': '00000000000000',
+    'diagnosis': 'SYNTHETIC', 'id': 42,
 }
 masked = mask_pii(patient)
-assert masked['first_name'] == 'A.'
-assert masked['phone'] == '•••567'
+assert masked['first_name'] == 'S.'
+assert masked['phone'] == '•••000'
 assert masked['iin'] == '[REDACTED]'
 assert masked['id'] == 42
 

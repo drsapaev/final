@@ -255,3 +255,7 @@ export type NurseServingExecutionCreateRequestDto = Schemas['NurseServingExecuti
 export type NurseServingReasonRequestDto = Schemas['NurseServingExecutionIncompleteRequest'];
 export type NurseServingDrainingExecutionItemDto = Schemas['NurseServingDrainingExecutionItem'];
 export type NurseServingDrainingExecutionListDto = Schemas['NurseServingDrainingExecutionListResponse'];
+
+export type TelegramMiniAppTokenResponseDto = Schemas['TelegramMiniAppTokenResponse'];
+export type TelegramMiniAppSessionItemDto = Schemas['TelegramMiniAppSessionItem'];
+export type TelegramMiniAppSessionListResponseDto = Schemas['TelegramMiniAppSessionListResponse'];

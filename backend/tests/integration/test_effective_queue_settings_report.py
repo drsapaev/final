@@ -549,8 +549,8 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    # Head pin follows the notification template uniqueness migration.
-    assert revision == "0102_visit_confirm_context"
+    # Head extends confirmation/link fencing with patient sessions.
+    assert revision == "0103_telegram_mini_app_sessions"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

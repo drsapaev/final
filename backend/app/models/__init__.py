@@ -205,6 +205,7 @@ from .telegram_config import (
     TelegramTemplate,
     TelegramUser,
 )
+from .telegram_mini_app_session import TelegramMiniAppSession
 from .telegram_webhook_dedup import TelegramWebhookDedup  # noqa: F401
 from .two_factor_auth import (
     TwoFactorAuth,
@@ -393,4 +394,5 @@ __all__ = [
     "AIPromptTemplate",
     "AIProvider",
     "AIUsageLog",
+    "TelegramMiniAppSession",
 ]

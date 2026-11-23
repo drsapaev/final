@@ -1,12 +1,12 @@
 """
 Unit tests for Session Fixation Protection (M4-P0-3).
 
-Tests the _revoke_all_user_sessions() method in AuthenticationService
-and _revoke_previous_patient_sessions() in telegram_mini_app_jwt.
+Tests staff login revocation and the independent Telegram patient sessions.
 
 Covers:
 - Staff login revokes existing sessions
-- Patient JWT exchange revokes previous patient sessions
+- Patient exchange always issues a fresh, server-owned session id
+- Prior patient devices remain independent and staff sessions stay untouched
 - Revoke with no existing sessions (no-op)
 - Revoke failure is non-blocking (returns 0, doesn't raise)
 - REVOKE_SESSIONS_ON_NEW_LOGIN setting controls behavior
@@ -15,7 +15,7 @@ Covers:
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -139,61 +139,91 @@ class TestRevokeAllUserSessions:
         assert user.auth_epoch == 0
 
 
-class TestRevokePreviousPatientSessions:
-    """Tests for _revoke_previous_patient_sessions() in telegram_mini_app_jwt."""
+class TestPatientSessionFixationProtection:
+    """Fresh patient identities never adopt or revoke unrelated sessions."""
 
-    def test_revoke_previous_patient_sessions_revokes_active(self):
-        """Revokes previous patient sessions (negative user_id)."""
-        from app.services.telegram_mini_app_jwt import _revoke_previous_patient_sessions
+    @pytest.fixture
+    def patient_link(self, db_session, test_patient):
+        from tests.unit.test_telegram_mini_app_jwt import link_patient
 
-        db = MagicMock()
-        query = MagicMock()
-        query.filter.return_value.update.return_value = 1  # 1 session revoked
-        db.query.return_value = query
+        return link_patient(db_session, test_patient)
 
-        result = _revoke_previous_patient_sessions(db, patient_id=42)
+    def test_new_launch_cannot_choose_or_reuse_a_session_id(
+        self, db_session, patient_link
+    ):
+        from app.services.telegram_mini_app_jwt import exchange_init_data_for_jwt
+        from tests.unit.test_telegram_mini_app_jwt import (
+            BOT_TOKEN,
+            create_session,
+            signed_init_data,
+            verified_claims,
+        )
 
-        assert result == 1
-        assert db.commit.called
+        first = create_session(db_session)
+        first_claims = verified_claims(first["access_token"])
+        second = exchange_init_data_for_jwt(
+            db_session,
+            signed_init_data(nonce=first_claims["sid"]),
+            bot_token=BOT_TOKEN,
+        )
+        second_claims = verified_claims(second["access_token"])
+        assert second_claims["sid"] != first_claims["sid"]
+        assert second_claims["jti"] != first_claims["jti"]
+        assert second["refresh_token"] != first["refresh_token"]
 
-    def test_revoke_previous_patient_sessions_returns_zero_for_none(self):
-        """Returns 0 when patient_id is None."""
-        from app.services.telegram_mini_app_jwt import _revoke_previous_patient_sessions
+    def test_new_login_preserves_independent_existing_device(
+        self, db_session, patient_link
+    ):
+        from app.services.telegram_mini_app_jwt import (
+            list_patient_sessions,
+            verify_patient_jwt,
+        )
+        from tests.unit.test_telegram_mini_app_jwt import create_session
 
-        db = MagicMock()
-        result = _revoke_previous_patient_sessions(db, patient_id=None)
+        first = create_session(db_session)
+        second = create_session(db_session)
+        _, listed = list_patient_sessions(db_session, second["access_token"])
+        assert listed["total"] == 2
+        assert sum(session["is_current"] for session in listed["sessions"]) == 1
+        assert verify_patient_jwt(first["access_token"], db_session)
 
-        assert result == 0
-        assert not db.query.called  # Should not query DB
+    def test_exchange_does_not_return_credentials_when_persistence_fails(
+        self, db_session, patient_link
+    ):
+        from app.models.telegram_mini_app_session import TelegramMiniAppSession
+        from tests.unit.test_telegram_mini_app_jwt import create_session
 
-    def test_revoke_previous_patient_sessions_non_blocking_on_failure(self):
-        """Returns 0 and rolls back on db failure."""
-        from app.services.telegram_mini_app_jwt import _revoke_previous_patient_sessions
+        with patch.object(
+            db_session, "commit", side_effect=RuntimeError("SYNTHETIC failure")
+        ):
+            with pytest.raises(RuntimeError, match="SYNTHETIC failure"):
+                create_session(db_session)
+        db_session.rollback()
+        assert db_session.query(TelegramMiniAppSession).count() == 0
 
-        db = MagicMock()
-        db.query.side_effect = Exception("DB error")
+    def test_patient_login_and_revoke_never_modify_staff_sessions(
+        self, db_session, patient_link, admin_user
+    ):
+        from app.models.authentication import UserSession
+        from app.services.telegram_mini_app_jwt import revoke_patient_sessions
+        from tests.unit.test_telegram_mini_app_jwt import create_session
 
-        result = _revoke_previous_patient_sessions(db, patient_id=42)
-
-        assert result == 0
-        assert db.rollback.called
-
-    def test_revoke_previous_patient_sessions_uses_negative_user_id(self):
-        """Patient sessions use negative user_id (e.g. -42 for patient 42)."""
-        from app.services.telegram_mini_app_jwt import _revoke_previous_patient_sessions
-
-        db = MagicMock()
-        query = MagicMock()
-        query.filter.return_value.update.return_value = 0
-        db.query.return_value = query
-
-        _revoke_previous_patient_sessions(db, patient_id=99)
-
-        # Verify db.query was called with UserSession
-        # The filter should use user_id=-99
-        db.query.assert_called_once()
-        # We can't easily inspect the filter arguments without deeper mocking,
-        # but the fact that it was called confirms the function executed.
+        staff_session = UserSession(
+            user_id=admin_user.id,
+            refresh_token="SYNTHETIC-staff-refresh",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            revoked=False,
+        )
+        db_session.add(staff_session)
+        db_session.commit()
+        create_session(db_session)
+        current = create_session(db_session)
+        revoke_patient_sessions(db_session, current["access_token"])
+        revoke_patient_sessions(db_session, current["access_token"], logout=True)
+        db_session.refresh(staff_session)
+        assert staff_session.revoked is False
+        assert staff_session.refresh_token == "SYNTHETIC-staff-refresh"
+        assert db_session.query(UserSession).count() == 1
 
 
 class TestLoginSessionFixationProtection:

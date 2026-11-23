@@ -13,6 +13,7 @@ Integration tests for security scenarios that span multiple components:
 These are contract-style tests that verify the security properties
 without requiring a running server.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -24,7 +25,9 @@ import pytest
 class TestReplayProtection:
     """M4-P0-2: Same initData cannot be used twice."""
 
-    @pytest.mark.skip(reason="Replay protection tested in test_telegram_mini_app_init_data.py — this integration test has initData signing issues")
+    @pytest.mark.skip(
+        reason="Replay protection tested in test_telegram_mini_app_init_data.py — this integration test has initData signing issues"
+    )
     def test_replay_protection_rejects_second_use(self):
         """Same initData hash rejected on second validation."""
         pass
@@ -126,12 +129,18 @@ class TestSessionFixation:
         from app.services.auth_svc import AuthenticationService
 
         user = User(
-            username=f"SYNTHETIC-{uuid.uuid4().hex}", hashed_password="x",
-            role="Doctor", is_active=True, auth_epoch=0,
+            username=f"SYNTHETIC-{uuid.uuid4().hex}",
+            hashed_password="x",
+            role="Doctor",
+            is_active=True,
+            auth_epoch=0,
         )
         other = User(
-            username=f"SYNTHETIC-{uuid.uuid4().hex}", hashed_password="x",
-            role="Doctor", is_active=True, auth_epoch=0,
+            username=f"SYNTHETIC-{uuid.uuid4().hex}",
+            hashed_password="x",
+            role="Doctor",
+            is_active=True,
+            auth_epoch=0,
         )
         db_session.add_all([user, other])
         db_session.flush()
@@ -140,58 +149,89 @@ class TestSessionFixation:
         refreshes = []
         for owner in (user, user, other):
             jti = str(uuid.uuid4())
-            refreshes.append(RefreshToken(
-                user_id=owner.id, token=auth.create_refresh_token(owner.id, jti),
-                jti=jti, expires_at=expires, revoked=False,
-            ))
+            refreshes.append(
+                RefreshToken(
+                    user_id=owner.id,
+                    token=auth.create_refresh_token(owner.id, jti),
+                    jti=jti,
+                    expires_at=expires,
+                    revoked=False,
+                )
+            )
         active = UserSession(
-            user_id=user.id, refresh_token=refreshes[0].token,
-            expires_at=expires, revoked=False,
+            user_id=user.id,
+            refresh_token=refreshes[0].token,
+            expires_at=expires,
+            revoked=False,
         )
         already_revoked = UserSession(
-            user_id=user.id, refresh_token="SYNTHETIC-revoked",
-            expires_at=expires, revoked=True,
+            user_id=user.id,
+            refresh_token="SYNTHETIC-revoked",
+            expires_at=expires,
+            revoked=True,
         )
         other_session = UserSession(
-            user_id=other.id, refresh_token=refreshes[2].token,
-            expires_at=expires, revoked=False,
+            user_id=other.id,
+            refresh_token=refreshes[2].token,
+            expires_at=expires,
+            revoked=False,
         )
         db_session.add_all([*refreshes, active, already_revoked, other_session])
         db_session.commit()
 
-        assert auth._revoke_all_user_sessions(db_session, user.id, reason="new_login") == 1
+        assert (
+            auth._revoke_all_user_sessions(db_session, user.id, reason="new_login") == 1
+        )
         db_session.expire_all()
         assert user.auth_epoch == 1 and other.auth_epoch == 0
         assert active.revoked and already_revoked.revoked and not other_session.revoked
-        assert refreshes[0].revoked and refreshes[1].revoked and not refreshes[2].revoked
-        assert auth.refresh_access_token(db_session, refreshes[0].token)["success"] is False
-        assert auth.refresh_access_token(db_session, refreshes[2].token)["success"] is True
+        assert (
+            refreshes[0].revoked and refreshes[1].revoked and not refreshes[2].revoked
+        )
+        assert (
+            auth.refresh_access_token(db_session, refreshes[0].token)["success"]
+            is False
+        )
+        assert (
+            auth.refresh_access_token(db_session, refreshes[2].token)["success"] is True
+        )
 
 
 class TestJWTExpiry:
     """M4-P0-2: Expired JWT returns None."""
 
-    def test_verify_patient_jwt_rejects_expired(self):
+    def test_verify_patient_jwt_rejects_expired(self, db_session, test_patient):
         """verify_patient_jwt returns None for expired token."""
-        import uuid
-
+        from app.services.telegram_mini_app_jwt import (
+            PATIENT_JWT_AUDIENCE,
+            PATIENT_JWT_ISSUER,
+            verify_patient_jwt,
+        )
+        from tests.unit.test_telegram_mini_app_jwt import (
+            create_session,
+            link_patient,
+            verified_claims,
+        )
         import jwt as jwt_lib
+        from app.core.config import settings
 
-        from app.services.telegram_mini_app_jwt import verify_patient_jwt
+        link_patient(db_session, test_patient)
+        pair = create_session(db_session)
+        assert verify_patient_jwt(pair["access_token"], db_session)
+        payload = verified_claims(pair["access_token"])
+        payload["iat"] = datetime.now(UTC) - timedelta(minutes=30)
+        payload["exp"] = datetime.now(UTC) - timedelta(minutes=15)
+        token = jwt_lib.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
-        payload = {
-            "sub": "42",
-            "scope": "patient",
-            "type": "access",
-            "jti": str(uuid.uuid4()),
-            "iat": datetime.now(UTC) - timedelta(minutes=30),
-            "exp": datetime.now(UTC) - timedelta(minutes=15),
-        }
-        token = jwt_lib.encode(payload, "test-secret", algorithm="HS256")
-
-        with patch("app.services.telegram_mini_app_jwt.settings") as mock_settings:
-            mock_settings.SECRET_KEY = "test-secret"
-            result = verify_patient_jwt(token)
+        with pytest.raises(jwt_lib.ExpiredSignatureError):
+            jwt_lib.decode(
+                token,
+                settings.SECRET_KEY,
+                algorithms=["HS256"],
+                audience=PATIENT_JWT_AUDIENCE,
+                issuer=PATIENT_JWT_ISSUER,
+            )
+        result = verify_patient_jwt(token, db_session)
 
         assert result is None
 
@@ -208,7 +248,9 @@ class TestEmergencyTokenOneTimeUse:
         db = MagicMock()
 
         # Issue token
-        with patch("app.services.emergency_access_service.EmergencyAccessToken") as mock_model:
+        with patch(
+            "app.services.emergency_access_service.EmergencyAccessToken"
+        ) as mock_model:
             mock_token = MagicMock()
             mock_token.id = 1
             mock_token.token_hash = "test_hash"
@@ -223,7 +265,9 @@ class TestEmergencyTokenOneTimeUse:
             # First consume — returns data
             mock_model.return_value = mock_token
             with patch.object(db, "query") as mock_query:
-                mock_query.return_value.filter.return_value.first.return_value = mock_token
+                mock_query.return_value.filter.return_value.first.return_value = (
+                    mock_token
+                )
                 result1 = consume_emergency_token(db, token="test_token")
                 assert result1 is not None
                 assert mock_token.used is True
