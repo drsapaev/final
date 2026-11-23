@@ -864,15 +864,15 @@ def test_namespace_is_stable_per_canonical_user_and_hashed():
 
 
 def test_login_and_refresh_token_shapes_share_one_namespace(two_workers, monkeypatch):
-    """Codex R11 #3092 (P1): a mobile login token carries sub=username,
-    /mobile/auth/refresh re-issues sub=user.id (+username claim) — the SAME
-    key sent before and after the refresh must land in ONE namespace: the
-    retry after the refresh REPLAYS the stored outcome instead of
-    re-executing the write (duplicate appointment)."""
+    """Login and refresh tokens bind to the same immutable user ID.
+
+    A retry after refresh must replay the original operation even when the
+    optional display username is present in only one of the two tokens.
+    """
     client1, client2, counters, fake_redis = two_workers
     key = "refresh-storm-key"
 
-    # Attempt 1: login-shape token (sub=username, no username claim)
+    # Attempt 1: login-shape token (numeric sub, no username claim).
     from datetime import UTC, datetime, timedelta
 
     import jwt as pyjwt
@@ -880,25 +880,19 @@ def test_login_and_refresh_token_shapes_share_one_namespace(two_workers, monkeyp
     from app.core.config import settings
 
     login_payload = {
-        "sub": "alice.smith",  # username shape — the harness stub must map it
+        "sub": "1",
         "exp": datetime.now(UTC) + timedelta(minutes=5),
     }
     login_token = pyjwt.encode(login_payload, settings.SECRET_KEY, algorithm="HS256")
-
-    # The canonical resolution maps the username to user id 1 (stub seam)
-    monkeypatch.setattr(
-        idem_module,
-        "_resolve_principal_id_sync",
-        lambda request, user_id, username: 1 if username == "alice.smith" else user_id,
-    )
 
     first = client1.post("/echo", headers={**{"Authorization": f"Bearer {login_token}"}, "Idempotency-Key": key})
     assert first.status_code == 200
     assert counters["w1"]["calls"] == 1
 
-    # Attempt 2 (retry after refresh): refresh-shape token — sub="1",
-    # username claim present. SAME key, same (empty) payload.
-    second = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+    # Attempt 2: refreshed token carries the same numeric sub and an
+    # optional username; it must address the same idempotency namespace.
+    refreshed = create_canonical_token(sub="1", username="alice.smith")
+    second = client2.post("/echo", headers={"Authorization": f"Bearer {refreshed}", "Idempotency-Key": key})
     assert second.status_code == 200
     assert counters["w2"]["calls"] == 0, (
         "the post-refresh retry must REPLAY the stored outcome (one namespace), not re-execute"
@@ -1327,12 +1321,8 @@ def test_expired_token_bypasses_replay_zero_leeway(two_workers):
 # ===================== Codex R9 #3092 (P1): canonical subject =====================
 
 
-def test_replay_authorizes_by_username_claim_like_get_current_user(two_workers, monkeypatch):
-    """Canonical 2FA tokens carry BOTH numeric sub and a username claim;
-    get_current_user resolves the account through _subject_from_payload,
-    which PREFERS the username claim. The middleware must select the same
-    subject: captured authorization args must contain the USERNAME, not the
-    numeric id from sub."""
+def test_replay_authorizes_by_numeric_subject_not_username(two_workers, monkeypatch):
+    """The signed numeric user ID remains authoritative even with a username."""
     client1, client2, counters, fake_redis = two_workers
 
     captured: dict[str, Any] = {}
@@ -1349,38 +1339,34 @@ def test_replay_authorizes_by_username_claim_like_get_current_user(two_workers, 
         "/echo", headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "subj-key"}
     )
     assert first.status_code == 200
-    assert captured["username"] == "registrar_1", (
-        "the username claim must be the primary subject, exactly like deps.py"
-    )
-    assert captured["user_id"] is None
+    assert captured["user_id"] == 42
+    assert captured["username"] is None
 
 
-def test_replay_refused_when_username_claim_no_longer_resolves(two_workers, monkeypatch):
-    """After an admin RENAMES a registrar, the old token's username no longer
-    exists: the endpoint's get_current_user refuses (401), so the middleware
-    must refuse the replay too — previously it resolved the numeric sub and
-    replayed the cached PHI-bearing cart response under a token the endpoint
-    itself would reject."""
+def test_replay_refused_after_owner_revocation_even_when_name_is_reused(two_workers, monkeypatch):
+    """A cached response for user A must never be replayed as renamed user B."""
     client1, client2, counters, fake_redis = two_workers
 
-    from app.core.security import create_access_token as _cat  # noqa: F401
-
     token = create_canonical_token(sub="42", username="registrar_1")
+    observed: list[int | None] = []
+    accounts = {42: {"username": "registrar_1", "revoked": False}}
 
-    # First request: user 'registrar_1' exists → authorized + stored.
-    idem_module._check_principal_authorized_sync = _make_username_checker(
-        existing={"registrar_1"}, renamed_to="registrar_2"
-    )
+    def check(request, user_id, username, jti, require_active_doctor_profile=False):
+        observed.append(user_id)
+        assert username is None
+        account = accounts.get(user_id)
+        return (bool(account and not account["revoked"]), "Registrar", False)
+
+    monkeypatch.setattr(idem_module, "_check_principal_authorized_sync", check)
     first = client1.post(
         "/echo", headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "rename-key"}
     )
     assert first.status_code == 200
 
-    # Admin renames the user; the SAME token now fails the endpoint's
-    # username lookup (user_id=None, username='registrar_1' → not found).
-    idem_module._check_principal_authorized_sync = _make_username_checker(
-        existing={"registrar_2"}, renamed_to="registrar_2"
-    )
+    # A is renamed and its session revoked; B may now use the old name.
+    # The old token must still be checked against A's id, not B's username.
+    accounts[42].update(username="renamed_registrar", revoked=True)
+    accounts[99] = {"username": "registrar_1", "revoked": False}
     replay = client2.post(
         "/echo", headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "rename-key"}
     )
@@ -1388,6 +1374,7 @@ def test_replay_refused_when_username_claim_no_longer_resolves(two_workers, monk
         "a stored response must not replay for a principal the endpoint would refuse"
     )
     assert counters["w2"]["calls"] == 0
+    assert observed == [42, 42]
 
 
 # ── helpers for the canonical-subject tests ──
@@ -1398,25 +1385,6 @@ def create_canonical_token(sub: str, username: str) -> str:
     from app.core.security import create_access_token
 
     return create_access_token({"sub": sub, "username": username})
-
-
-def _make_username_checker(existing: set[str], renamed_to: str):
-    """Stub of the DB authorization query with get_current_user's subject
-    semantics: numeric subject → by id; text subject → by username."""
-
-    def _checker(request, user_id, username, jti, require_active_doctor_profile=False):
-        if user_id is not None:
-            # Numeric subjects resolve by id in get_current_user's primary
-            # lookup — but a canonical token with a username claim NEVER
-            # reaches this branch (the middleware mirrors deps.py).
-            return (True, "Registrar", False) if str(user_id) == "42" else (False, None, False)
-        if username is None:
-            return False, None, False
-        if username.isdigit():
-            return (True, "Registrar", False) if username == "42" else (False, None, False)
-        return (True, "Registrar", False) if username in existing else (False, None, False)
-
-    return _checker
 
 
 # ===================== Codex R7 #3092 (P1×2): fail-closed coordination =====================

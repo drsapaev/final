@@ -549,8 +549,8 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    # Head pin follows the latest migration (0093 — display board devices).
-    assert revision == "0093_display_board_devices"
+    # The fixture must reach the current repository head.
+    assert revision == "0103_public_site_daily_counts"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

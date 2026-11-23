@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
-from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
+from app.api.v1.endpoints.websocket_auth import (
+    authenticate_websocket_token,
+    resolve_websocket_token_user,
+)
 from app.api.v1.endpoints.ws_token import extract_ws_token
 from app.db.session import SessionLocal
 from app.services.notification_platform_service import get_notification_platform_service
@@ -14,6 +18,17 @@ from app.services.notification_websocket import get_notification_ws_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# NOTIFYLIVEAUTH-BE-001 (audit round 40, P1 conditional): a personal
+# notification socket was authorized exactly once at handshake, so a
+# principal revoked/expired/disabled AFTER acceptance kept receiving
+# user-scoped broadcasts until physical disconnect. The receive loop below
+# therefore re-runs the canonical WebSocket resolver every
+# NOTIFICATION_WS_AUTH_RECHECK_SECONDS. The re-check reuses the handshake's
+# own DB session (no additional checkout per idle socket) and closes the
+# socket with WS 1008 when any revocation source fires — mirroring the
+# queue-plane session-lifetime contract (QUEUEWSSESSION-BE-001).
+NOTIFICATION_WS_AUTH_RECHECK_SECONDS = 15
 
 
 @router.websocket("/ws/notifications/connect")
@@ -61,8 +76,55 @@ async def websocket_notifications(
             }
         )
 
+        loop = asyncio.get_running_loop()
+        last_auth_check = [loop.time()]
+
+        def refresh_notification_auth() -> bool:
+            """NOTIFYLIVEAUTH-BE-001: re-run the canonical resolver on the
+            handshake session — JWT exp, per-JTI revocation, the
+            ``all_user_tokens`` sentinel and ``User.is_active`` all fire
+            here; an updated principal row replaces the stale one so
+            role-scoped handlers see current state."""
+            nonlocal authenticated_user
+            # The synchronous resolver form — same contract the queue plane
+            # uses for its periodic re-check: the handshake's DB session is
+            # reused directly, no new checkout per idle socket.
+            current_user = resolve_websocket_token_user(token, db)
+            if current_user is None:
+                return False
+            authenticated_user = current_user
+            last_auth_check[0] = loop.time()
+            return True
+
         while True:
-            data = await websocket.receive_text()
+            elapsed = loop.time() - last_auth_check[0]
+            try:
+                data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=max(
+                        0.01, NOTIFICATION_WS_AUTH_RECHECK_SECONDS - elapsed
+                    ),
+                )
+            except TimeoutError:
+                data = None
+
+            if (
+                loop.time() - last_auth_check[0]
+                >= NOTIFICATION_WS_AUTH_RECHECK_SECONDS
+            ):
+                if not refresh_notification_auth():
+                    logger.info(
+                        "[NotificationWS] live authorization revoked; closing socket",
+                        extra={"user_id": registered_user_id},
+                    )
+                    await websocket.close(
+                        code=status.WS_1008_POLICY_VIOLATION,
+                        reason="Notification authorization expired or revoked",
+                    )
+                    break
+
+            if data is None:
+                continue
             try:
                 payload = json.loads(data)
             except json.JSONDecodeError:

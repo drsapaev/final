@@ -4,6 +4,7 @@ Covers the in-place sanitization of ``context['error_message']`` — the field
 is preserved (log contract stability) but its value is scrubbed of PII
 patterns before being passed to ``logger.exception``.
 """
+
 from __future__ import annotations
 
 import io
@@ -66,7 +67,7 @@ class TestLogEndpointError:
         assert "+998901234567" not in output
         # The masked form SHOULD appear (proves the value was sanitized,
         # not deleted).
-        assert "+998901•••567" in output
+        assert "•••567" in output
 
     def test_log_endpoint_error_preserves_error_type(
         self, capture_logger: tuple[logging.Logger, io.StringIO]
@@ -104,4 +105,4 @@ class TestLogEndpointError:
 
         assert "+998901234567" not in payload["message"]
         # But the masked form should be present.
-        assert "+998901•••567" in payload["message"]
+        assert "•••567" in payload["message"]

@@ -1,0 +1,36 @@
+# Group114 — DOCFLOW-FE-004 full CI GREEN and safe Draft rebase onto latest main
+
+**Review date:** 2026-11-16. **Current source main pinned:** [`eb8fff18d01729da3f719c9219148c646d41d7c0`](https://github.com/drsapaev/final/commit/eb8fff18d01729da3f719c9219148c646d41d7c0). **Owner:** [#4063](https://github.com/drsapaev/final/issues/4063), **cumulative audit:** [Draft PR #4059](https://github.com/drsapaev/final/pull/4059). **Implementation:** [Draft #4106](https://github.com/drsapaev/final/pull/4106), new head [`4d814af8325d665cf5f0442a956818fa85afe81a`](https://github.com/drsapaev/final/commit/4d814af8325d665cf5f0442a956818fa85afe81a). **No merge of source PR into main, no local tests, no mandatory agent-gate execution, no deployment.**
+
+## 1. Head-specific completed GitHub CI for clinical completion fix
+
+On earlier [PR #4106 head `c1532ed35e9766b9b298258d1ba20fa2b6464123`](https://github.com/drsapaev/final/commit/c1532ed35e9766b9b298258d1ba20fa2b6464123), [Unified CI run 43862149204](https://github.com/drsapaev/final/actions/runs/43862149204) **COMPLETED SUCCESS**: frontend unit tests **520/520 test files, 4,361/4,361 tests passed**, including [`CardiologistPanel.deferredCompletion.test.tsx`](https://github.com/drsapaev/final/blob/c1532ed35e9766b9b298258d1ba20fa2b6464123/frontend/src/pages/__tests__/CardiologistPanel.deferredCompletion.test.tsx), **five/five tests**; Frontend build, lint, E2E and PR Required Gate all **success**. Independent fetch of [Frontend unit job 133281617715](https://github.com/drsapaev/final/actions/runs/43862149204/job/133281617715) confirmed `✓ ...deferredCompletion.test.tsx (5 tests)`, `Test Files 520 passed (520)`, `Tests 4361 passed (4361)` in the actual CI log.
+
+Previously, real CI [run 43857614308](https://github.com/drsapaev/final/actions/runs/43857614308) on an older head failed **one of 4,351** positive completion tests because `setActiveTab('queue')` left the route at `?tab=visit`; this led to a bounded source correction and a stronger route-probe regression. **Thus CI contains a real observed RED failure followed by an observed GREEN source/test head.** It is *not* a local fail-first checkout exercise, and no claim of personally running local Vitest or the mandatory PowerShell gate is made.
+
+**Source intent verified against [current clinical panel](https://github.com/drsapaev/final/blob/c1532ed35e9766b9b298258d1ba20fa2b6464123/frontend/src/pages/CardiologistPanelUnified.tsx):**
+- A completed A POST is checked against captured patient ID plus doctor-queue entry **before** classifying a success/decline/ambiguous ACK; stale A may not toast, clear or auto-call over B.
+- Transport rejection (A network failure) checks the same live identity before error toast; shared `loading` flag is always released, preventing B from remaining stuck busy.
+- Confirmed current A success resets selection and queue tab, updates route `tab=queue`, removes obsolete `patientId`, `visitId`, `visit_id` deep-link anchors. Prevents route-sync and URL-hydration from reopening the completed visit.
+- Five synthetic React component scenarios: stale success / rejected / ambiguous / network-rejection after B selection, plus positive current A completion from actual deep-link query; source-contract tests remain intact. No backend queue fairness, EMR signing, auth, payment, migrations, production or patient data touched.
+
+## 2. Sync the existing Draft #4106 branch — no competing source changes
+
+Between original branch base [`main@d7eb9729248f949af5c74b45f1fdf26b914835fe`](https://github.com/drsapaev/final/commit/d7eb9729248f949af5c74b45f1fdf26b914835fe) and current [`main@eb8fff18`](https://github.com/drsapaev/final/commit/eb8fff18d01729da3f719c9219148c646d41d7c0), GitHub compare found **3 commits**, 9 changed files, **zero changes** in the two owned #4106 files: `frontend/src/pages/CardiologistPanelUnified.tsx` and `frontend/src/pages/__tests__/CardiologistPanel.deferredCompletion.test.tsx`. Some other changed files include shared dermatology completion tests, `DoctorVisitCompletionAck.contract.test.ts` and package metadata; therefore final-head CI should be rerun.
+
+Rather than overwriting or recreating #4106, made a **true two-parent merge commit** [`4d814af8325d665cf5f0442a956818fa85afe81a`](https://github.com/drsapaev/final/commit/4d814af8325d665cf5f0442a956818fa85afe81a) **only on the existing Draft branch** `codex/docflow-deferred-ack-regression-g111-20261116`. New tree based on GitHub `main` tree `5ea606821989d145e3cbafd0ad6f6c2a72e08aa8` plus the **exact pre-sync content blobs** for the two owned files. Commit parents were `c1532ed35e9766b9b298258d1ba20fa2b6464123` and `eb8fff18d01729da3f719c9219148c646d41d7c0`. GitHub `update_ref` with `expected_sha=c1532ed35` and `force=false` succeeded. **No force push and no main change.**
+
+Verified after sync:
+- PR #4106 remains `open`, **Draft**, unmerged, latest head `4d814af8325d665cf5f0442a956818fa85afe81a` and base current main `eb8fff18`.
+- GitHub compare `main...branch`: **status `ahead`, `ahead_by=13`, `behind_by=0`**, PR diff still **exactly the two scoped files**. The other main changes are inherited without being clobbered.
+- On sync head [Unified CI run 43880149784](https://github.com/drsapaev/final/actions/runs/43880149784) was **IN PROGRESS** at inspection. PR Review Quality, Agent Workflow Guards, Regression Audit, i18n, Gitleaks successful; security scan and full Unified CI were still running at last check. **Do not claim final synced-head CI GREEN until it has actually completed.**
+
+## 3. Non-negotiable remaining acceptance and registry scope
+
+The clinical completion lifecycle is a **mandatory `gate_known_root_cause` task** under root `AGENTS.md`; the verified root-cause file and test scope are the two files above. Required launcher is **`ai/langgraph/scripts/run_agent_gate.ps1` from `ai/langgraph`**, not bare Python. It **has not been executed by this reviewer** in the verified project worktree, and exact command, head SHA, timestamp, exit result and sanitized handoff are still missing. **Do not merge/deploy or change owner checkbox** merely because GitHub CI is green. A gate after merge would not retroactively fulfill a before-merge obligation. Clinical route/draft-guard behavior also merits independent functional review before merge.
+
+Another actor has already merged [dermatology #4105](https://github.com/drsapaev/final/pull/4105) on main and checked `DERMAAI-FE-002`; do not duplicate credit. Earlier Groups110–113 flagged the governance discrepancy where a ChatGPT-authored PR's body says the PowerShell gate was never run, but the registry substitutes `agent_gate.py` due to unavailable `pwsh`. This is independent of successful functional tests.
+
+At Group114 start live checklist had **536 unique IDs / 146 checked / 390 pending**, while issue title still read `145/391`; **no new checkbox is credited by Group114**. The historical pending set is a list of review candidates, not a count of current confirmed clinical bugs.
+
+**Next action:** ensure sync-head CI [43880149784](https://github.com/drsapaev/final/actions/runs/43880149784) passes; require a verified PowerShell gate run and independent clinical code review; then, after actual merge by the authorized operator, re-read main and only then credit `DOCFLOW-FE-004`. No source merge by Group114.

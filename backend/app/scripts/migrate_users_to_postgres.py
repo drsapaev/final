@@ -5,7 +5,7 @@ import logging
 import os
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -127,8 +127,8 @@ def _parse_datetime(value: Any) -> datetime | None:
         raise TypeError(f"Unsupported datetime type: {type(value)!r}")
 
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def load_legacy_users(source_sqlite_path: Path) -> list[LegacyUserRow]:
@@ -211,6 +211,43 @@ def _load_target_maps(connection) -> tuple[dict[str, dict[str, Any]], dict[str, 
     return by_username, by_email, by_id
 
 
+def _protect_existing_user(connection, target_id: int, user: LegacyUserRow) -> None:
+    """Lock and revoke current credentials before changing imported security fields.
+
+    A target predating auth_epoch or the credential tables fails closed: without
+    the current schema this migration cannot safely update existing accounts.
+    """
+    lock = " FOR NO KEY UPDATE" if connection.dialect.name == "postgresql" else ""
+    row = connection.execute(text(
+        "SELECT id, username, email, hashed_password, role, is_active, "
+        "is_superuser, must_change_password, auth_epoch FROM users WHERE id = :id" + lock
+    ), {"id": target_id}).mappings().one()
+    if not (str(row["username"]).lower() == user.username.lower() or
+            (row["email"] and user.email and str(row["email"]).lower() == user.email.lower())):
+        raise RuntimeError("Target identity changed during migration; retry the operation")
+    changed = any(row[field] != getattr(user, field) for field in (
+        "username", "email", "hashed_password", "role", "is_active", "is_superuser", "must_change_password"
+    ))
+    if not changed:
+        return
+    epoch = row["auth_epoch"]
+    if type(epoch) is not int or not 0 <= epoch < (1 << 63) - 1:
+        raise ValueError("Invalid or exhausted authentication generation")
+    row_lock = " FOR UPDATE" if connection.dialect.name == "postgresql" else ""
+    if row["email"] != user.email:
+        connection.execute(text("SELECT id FROM user_profiles WHERE user_id = :id" + row_lock), {"id": target_id}).all()
+        connection.execute(text("UPDATE user_profiles SET email_verified = false WHERE user_id = :id"), {"id": target_id})
+    now = datetime.now(UTC)
+    for table, marker, extra in (
+        ("user_sessions", "revoked", ""),
+        ("refresh_tokens", "revoked", ", revoked_at = :now"),
+        ("password_reset_tokens", "used", ", used_at = :now"),
+    ):
+        connection.execute(text(f"SELECT id FROM {table} WHERE user_id = :id AND {marker} IS NOT true ORDER BY id" + row_lock), {"id": target_id}).all()
+        connection.execute(text(f"UPDATE {table} SET {marker} = true{extra} WHERE user_id = :id AND {marker} IS NOT true"), {"id": target_id, "now": now})
+    connection.execute(text("UPDATE users SET auth_epoch = :epoch WHERE id = :id"), {"epoch": epoch + 1, "id": target_id})
+
+
 def migrate_users(*, source_sqlite_path: Path, target_engine: Engine, dry_run: bool = False) -> MigrationSummary:
     legacy_users = load_legacy_users(source_sqlite_path)
     inserted_count = 0
@@ -272,6 +309,7 @@ def migrate_users(*, source_sqlite_path: Path, target_engine: Engine, dry_run: b
                     user.username,
                 )
                 if not dry_run:
+                    _protect_existing_user(connection, target_id, user)
                     connection.execute(
                         text(
                             """

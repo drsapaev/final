@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from datetime import UTC, datetime
 from typing import Any
@@ -61,6 +62,50 @@ class JsonLogFormatter(logging.Formatter):
         return _mask_string_inplace(tb)
 
 
+def _trusted_idempotency_fingerprint(
+    record: logging.LogRecord,
+) -> tuple[int, str] | None:
+    """Identify the HMAC argument from the canonical idempotency logger only.
+
+    The dispatch method computes this field with _idempotency_key_log_fingerprint;
+    arbitrary log records or unrecognized format strings must stay fully masked.
+    """
+    if (
+        record.name != "app.middleware.idempotency_middleware"
+        or record.funcName != "dispatch"
+        or not isinstance(record.pathname, str)
+        or not record.pathname.replace("\\", "/").endswith(
+            "/app/middleware/idempotency_middleware.py"
+        )
+        or not isinstance(record.msg, str)
+        or not isinstance(record.args, tuple)
+    ):
+        return None
+
+    marker = "key_fingerprint=%s"
+    if record.msg.count(marker) != 1:
+        return None
+    prefix = record.msg.split(marker, 1)[0]
+    index = 0
+    offset = 0
+    while offset < len(prefix):
+        if prefix[offset] != "%":
+            offset += 1
+            continue
+        if offset + 1 >= len(prefix) or prefix[offset + 1] not in ("%", "s"):
+            return None
+        if prefix[offset + 1] == "s":
+            index += 1
+        offset += 2
+
+    if index >= len(record.args):
+        return None
+    value = record.args[index]
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{16}", value) is None:
+        return None
+    return index, value
+
+
 class PIIMaskingFilter(logging.Filter):
     """Logging filter that masks PII in record args + message.
 
@@ -79,9 +124,17 @@ class PIIMaskingFilter(logging.Filter):
         try:
             # Mask args (dict/list only — strings handled via message regex)
             if record.args:
-                if isinstance(record.args, (dict, list, tuple)):
-                    record.args = mask_pii(list(record.args) if isinstance(record.args, tuple) else record.args)
+                if isinstance(record.args, dict | list | tuple):
+                    fingerprint = _trusted_idempotency_fingerprint(record)
+                    record.args = mask_pii(
+                        list(record.args)
+                        if isinstance(record.args, tuple)
+                        else record.args
+                    )
                     if isinstance(record.args, list):
+                        if fingerprint is not None:
+                            index, value = fingerprint
+                            record.args[index] = value
                         record.args = tuple(record.args)
                 elif isinstance(record.args, str):
                     record.args = mask_pii(record.args)
@@ -89,8 +142,13 @@ class PIIMaskingFilter(logging.Filter):
             # Mask the formatted message too (catches f-strings + %-strings)
             # We can't reformat safely, so we scrub the msg field if it's a string.
             if isinstance(record.msg, str):
-                # Only scrub if there's likely PII — quick check via presence of digits/+998
-                if "+998" in record.msg or "@" in record.msg or "patient" in record.msg.lower():
+                # Local/formatted numbers may lack the country prefix or any
+                # patient-related words, so digits must also trigger masking.
+                if (
+                    any(char.isdigit() for char in record.msg)
+                    or "@" in record.msg
+                    or "patient" in record.msg.lower()
+                ):
                     record.msg = _mask_string_inplace(record.msg)
         except Exception:
             # Never let masking break logging

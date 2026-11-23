@@ -1,0 +1,37 @@
+name: Mini App native staging acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      acceptance:
+        description: Reviewed staging acceptance to run
+        type: choice
+        options:
+          - pr-4118-sessions
+          - pr-4195-arq-reminder
+        default: pr-4118-sessions
+      source-sha:
+        description: Full current PR 4195 HEAD SHA for the ARQ acceptance only
+        type: string
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: miniapp-named-staging-tls
+  cancel-in-progress: false
+
+jobs:
+  native-acceptance:
+    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/main'
+    permissions:
+      pull-requests: read
+    uses: ./.github/workflows/staging-miniapp-pr.yml
+    with:
+      source-sha: ${{ inputs.acceptance == 'pr-4118-sessions' && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
+      native-live: ${{ inputs.acceptance == 'pr-4118-sessions' }}
+      native-arq: ${{ inputs.acceptance == 'pr-4195-arq-reminder' }}
+    secrets:
+      STAGING_TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
+      STAGING_TELEGRAM_CHAT_ID: ${{ secrets.STAGING_TELEGRAM_CHAT_ID }}
+      STAGING_MINIAPP_TUNNEL_TOKEN: ${{ secrets.STAGING_MINIAPP_TUNNEL_TOKEN }}

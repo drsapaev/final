@@ -1130,7 +1130,12 @@ def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
                     deadline = time_module.monotonic() + 5
                     observed_wait = False
                     activity_summary = []
-                    with engine.connect() as observer:
+                    # PostgreSQL keeps the first activity snapshot for the
+                    # transaction. Each poll needs its own snapshot.
+                    observer_engine = engine.execution_options(
+                        isolation_level="AUTOCOMMIT"
+                    )
+                    with observer_engine.connect() as observer:
                         while time_module.monotonic() < deadline:
                             if second_future.done():
                                 break

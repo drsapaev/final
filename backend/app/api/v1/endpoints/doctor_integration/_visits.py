@@ -119,6 +119,7 @@ def _find_recent_identical_schedule_next(
     cutoff = datetime.now(UTC) - timedelta(seconds=_SCHEDULE_NEXT_DEDUP_WINDOW_SECONDS)
     query = (
         db.query(Visit)
+        .populate_existing()
         .filter(
             Visit.patient_id == patient_id,
             Visit.visit_date == visit_date,
@@ -447,9 +448,9 @@ async def schedule_next_visit(
             discount_mode=normalized_discount_mode,
             department="mixed",  # Будет определен по услугам
             notes=request.notes,
-            confirmation_token=confirmation_token,
+            confirmation_token=None,
             confirmation_channel=request.confirmation_channel,
-            confirmation_expires_at=expires_at,
+            confirmation_expires_at=None,
             source="desk",  # ✅ SSOT: Врач назначает = desk
         )
         db.add(visit)
@@ -476,8 +477,31 @@ async def schedule_next_visit(
 
             total_amount += service_price * quantity
 
-        db.commit()
+        # Child triggers fence prior credentials. Issue only after all initial
+        # service rows have been flushed, in the same atomic visit transaction.
+        db.flush()
+        visit.confirmation_token = confirmation_token
+        visit.confirmation_expires_at = expires_at
+        db.flush()
+        # Refresh while the transaction still owns the row, then freeze the
+        # authorized response and issuer context. A refresh after commit could
+        # fetch another patient's newly issued bearer after a visit transfer.
         db.refresh(visit)
+        visit_id = visit.id
+        expected_context = {
+            "patient_id": visit.patient_id,
+            "confirmation_context_epoch": visit.confirmation_context_epoch,
+            "confirmation_token": visit.confirmation_token,
+        }
+        confirmation_data = _schedule_next_confirmation_data(
+            visit=visit,
+            patient=patient,
+            channel=request.confirmation_channel,
+            total_amount=total_amount,
+            services_count=len(request.services),
+            notification_sent=False,
+        )
+        db.commit()
 
         # Отправляем приглашение на подтверждение
         notification_service = NotificationService(db)
@@ -488,39 +512,34 @@ async def schedule_next_visit(
             # was swallowed below — invitations never reached patients.
             notification_result = (
                 await notification_service.send_visit_confirmation_invitation(
-                    db, visit.id, request.confirmation_channel
+                    db, visit_id, request.confirmation_channel,
+                    expected_context=expected_context,
                 )
             )
             # PII/security (Codex P1): the pwa channel returns a URL with
             # the RAW confirmation token — never log the full result dict.
             logger.info(
                 "Приглашение отправлено для визита %s: channel=%s success=%s",
-                visit.id,
+                visit_id,
                 notification_result.get("channel"),
                 notification_result.get("success"),
             )
         except Exception as e:
-            logger.error(f"Ошибка отправки приглашения для визита {visit.id}: {e}")
+            logger.error(f"Ошибка отправки приглашения для визита {visit_id}: {e}")
             # Не прерываем выполнение, визит уже создан
 
-        # Формируем ответ
-        confirmation_data = _schedule_next_confirmation_data(
-            visit=visit,
-            patient=patient,
-            channel=request.confirmation_channel,
-            total_amount=total_amount,
-            services_count=len(request.services),
-            notification_sent=(
-                notification_result.get("success", False)
-                if "notification_result" in locals()
-                else False
-            ),
+        # Only the delivery outcome is filled in after commit; the response
+        # retains the credential frozen with the authorized visit snapshot.
+        confirmation_data["notification_sent"] = (
+            notification_result.get("success", False)
+            if "notification_result" in locals()
+            else False
         )
 
         return ScheduleNextVisitResponse(
             success=True,
             message=f"Визит назначен на {request.visit_date}. Ожидает подтверждения пациентом.",
-            visit_id=visit.id,
+            visit_id=visit_id,
             status="pending_confirmation",
             confirmation=confirmation_data,
             idempotent_replay=False,

@@ -24,6 +24,7 @@ from uuid import uuid4
 import jwt
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from app.db import session as session_module
 
@@ -89,7 +90,7 @@ def test_ws_notifications_accepts_subprotocol_token(client, db_session):
     db_session.commit()
     db_session.refresh(user)
 
-    token = _make_jwt(sub=user.username)
+    token = _make_jwt(sub=str(user.id))
     with client.websocket_connect(
         "/api/v1/ws/notifications/connect",
         subprotocols=[f"bearer.{token}"],
@@ -123,7 +124,7 @@ def test_ws_notifications_accepts_query_param_with_warning(client, db_session, c
     db_session.commit()
     db_session.refresh(user)
 
-    token = _make_jwt(sub=user.username)
+    token = _make_jwt(sub=str(user.id))
     with client.websocket_connect(
         f"/api/v1/ws/notifications/connect?token={token}",
     ) as ws:
@@ -155,23 +156,20 @@ def test_ws_ai_chat_accepts_subprotocol_token(client, db_session):
     db_session.commit()
     db_session.refresh(user)
 
-    token = _make_jwt(sub=user.username)
+    token = _make_jwt(sub=str(user.id))
     with client.websocket_connect(
         "/api/v1/ai/chat/ws",
         subprotocols=[f"bearer.{token}"],
     ) as ws:
-        # The endpoint either sends an error message OR closes immediately.
-        # The point of this test: the connection was accepted (no 4401/403
-        # before accept). If it closes immediately with code 4001, the test
-        # passes because that means auth went through but the user lacks
-        # AIPermission.CHAT. If we get any JSON, also pass.
+        # A successful chat connection waits for input; ping it so this test
+        # cannot hang waiting for an unsolicited message. Permission denial
+        # is also valid, but an authentication rejection is not.
         try:
-            msg = ws.receive_json()
-            assert isinstance(msg, dict)
-        except Exception:
-            # WebSocketDisconnect with code 4001 or 4003 means auth was
-            # evaluated (which is what we want — token was extracted).
-            pass
+            ws.send_json({"type": "ping"})
+            assert ws.receive_json()["type"] == "pong"
+        except WebSocketDisconnect as exc:
+            assert exc.code == 4003
+
 
 
 def test_ws_ai_chat_rejects_missing_token(client):

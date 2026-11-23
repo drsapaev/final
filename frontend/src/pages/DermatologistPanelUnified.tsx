@@ -1470,35 +1470,19 @@ const DermatologistPanelUnified = () => {
   const canCompleteCurrentVisitRef = useRef(canCompleteCurrentVisit);
   canCompleteCurrentVisitRef.current = canCompleteCurrentVisit;
 
-  // Унифицированная обработка сохранения визита
-  const handleSaveVisit = async () => {
-    if (!canCompleteCurrentVisitRef.current) return;
-    const completionContext = currentVisitContext;
-    const entryId =
-      resolveDoctorQueueEntryId(currentAppointment as unknown as Record<string, unknown>) ??
-      resolveDoctorQueueEntryId(selectedPatient as unknown as Record<string, unknown>);
-    if (!entryId || String(entryId) !== String(completionContext.queueEntryId)) {
-      notify.error(t('derma.no_patient_for_complete'));
-      return;
-    }
-
-    // QW-5 (UX audit): confirm before completing the visit
-    const ok = await confirm({
-      title: t('derma.complete_visit_title'),
-      message: t('derma.complete_visit_message'),
-      description: t('derma.derma_panel_complete_description'),
-      confirmLabel: t('derma.complete_visit_confirm'),
-      cancelLabel: t('derma.cancel'),
-      intent: 'primary',
-    });
-    if (!ok) {
-      return;
-    }
-    if (
-      !isSameDermatologyVisit(completionContext, currentVisitContextRef.current) ||
-      !canCompleteCurrentVisitRef.current
-    ) return;
-
+  // Унифицированная обработка сохранения визита.
+  // DERMACOMPLETE-FE-001 (audit 3892): the completion body runs through the
+  // shared app-level dirty-source registry. A clean editor completes
+  // immediately; when the visit's EMR source (`emr-visit-<id>`, registered
+  // by useEMRLeaveGuard) reports unsaved changes, the canonical
+  // Save/Discard guard dialog owns the completion — the completion POST can
+  // no longer bypass a registered dirty draft (the old flow unmounted the
+  // editor and the useEMRAutosave cleanup cancelled the pending autosave,
+  // silently losing edits within the debounce window).
+  const runCompletionFlow = async (
+    completionContext: typeof currentVisitContext,
+    entryId: string | number,
+  ) => {
     try {
       setLoading(true);
       // DOCFLOW-FE-001 (audit 3886): only a confirmed `success: true` DTO
@@ -1562,6 +1546,48 @@ const DermatologistPanelUnified = () => {
       notify.error(t('derma.derma_panel_complete_failed'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveVisit = async () => {
+    if (!canCompleteCurrentVisitRef.current) return;
+    const completionContext = currentVisitContext;
+    const entryId =
+      resolveDoctorQueueEntryId(currentAppointment as unknown as Record<string, unknown>) ??
+      resolveDoctorQueueEntryId(selectedPatient as unknown as Record<string, unknown>);
+    if (!entryId || String(entryId) !== String(completionContext.queueEntryId)) {
+      notify.error(t('derma.no_patient_for_complete'));
+      return;
+    }
+
+    // QW-5 (UX audit): confirm before completing the visit
+    const ok = await confirm({
+      title: t('derma.complete_visit_title'),
+      message: t('derma.complete_visit_message'),
+      description: t('derma.derma_panel_complete_description'),
+      confirmLabel: t('derma.complete_visit_confirm'),
+      cancelLabel: t('derma.cancel'),
+      intent: 'primary',
+    });
+    if (!ok) {
+      return;
+    }
+    if (
+      !isSameDermatologyVisit(completionContext, currentVisitContextRef.current) ||
+      !canCompleteCurrentVisitRef.current
+    ) return;
+
+    // DERMACOMPLETE-FE-001: same sourceId convention as the Escape
+    // clearSelection handler — scope the guard to THIS visit's EMR draft.
+    const emrSourceIds = completionContext.visitId === null || completionContext.visitId === undefined || completionContext.visitId === ''
+      ? []
+      : [`emr-visit-${completionContext.visitId}`];
+    const started = guardTransition(() => {
+      void runCompletionFlow(completionContext, entryId);
+    }, { sourceIds: emrSourceIds, intentPolicy: 'leave' });
+    if (!started) {
+      // Dirty EMR: the shared Save/Discard dialog now owns the completion.
+      logger.info('[Dermatology] Completion deferred to the EMR dirty guard dialog');
     }
   };
 
@@ -1695,7 +1721,17 @@ const DermatologistPanelUnified = () => {
                   visitId={(currentAppointment?.visit_id ?? undefined) as string | number}
                   patientId={(currentAppointment?.patient_id ?? undefined) as string | number | null | undefined}
                   specialty="dermatology"
-                  onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)} />
+                  onPersisted={async () => {
+                    // DERMAHIST-FE-003: a persisted EMR must also refresh the
+                    // same-patient history — returning to Patients/History
+                    // without re-selecting the patient must show the new
+                    // examination/procedure, not the stale snapshot. The
+                    // hook's request-generation guard makes the refetch safe;
+                    // EMRContainerV2 fires onPersisted only on successful
+                    // writes, so a failed save retains the prior snapshot.
+                    await refreshCanonicalStatus(currentVisitContext, true);
+                    patientHistory.reload();
+                  }} />
 
                 </div>
 

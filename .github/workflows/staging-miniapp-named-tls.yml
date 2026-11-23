@@ -1,0 +1,166 @@
+name: Mini App named staging TLS proof
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: miniapp-named-staging-tls
+  cancel-in-progress: false
+
+jobs:
+  static-proof:
+    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: staging-integrations
+    steps:
+      - name: Verify fixed Cloudflare connector binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$RUNNER_TEMP/miniapp-named-tls-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir "$d"
+          curl --fail --silent --show-error --location --max-time 40 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 \
+            --output "$d/cloudflared"
+          (cd "$d"; printf '%s  cloudflared\n' 1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872 | sha256sum --check -)
+          chmod 700 "$d/cloudflared"
+
+      - name: Serve one synthetic page and verify named HTTPS
+        shell: bash
+        env:
+          TUNNEL_TOKEN: ${{ secrets.STAGING_MINIAPP_TUNNEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          token=${TUNNEL_TOKEN:?Dedicated staging tunnel secret is missing}
+          unset TUNNEL_TOKEN
+          d="$RUNNER_TEMP/miniapp-named-tls-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          host=miniapp-staging.finalclinic.fyi
+          path=/__miniapp_tls_proof
+          local_origin=http://127.0.0.1:18086
+          public_origin="https://$host"
+          origin_pid=
+          tunnel_pid=
+          stop_child() {
+            local pid="$1"
+            [[ -n "$pid" ]] || return 0
+            kill -TERM "$pid" 2>/dev/null || true
+            for _ in {1..10}; do
+              kill -0 "$pid" 2>/dev/null || break
+              sleep 0.2
+            done
+            if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || return 1; fi
+            wait "$pid" 2>/dev/null || true
+            ! kill -0 "$pid" 2>/dev/null
+          }
+          cleanup() {
+            local exit_code=$? cleanup_status=PASS
+            trap - EXIT
+            stop_child "$tunnel_pid" || cleanup_status=FAIL
+            stop_child "$origin_pid" || cleanup_status=FAIL
+            if [[ -n "$tunnel_pid" ]]; then
+              local stopped_code=
+              for _ in {1..8}; do
+                stopped_code="$(curl --noproxy '*' --silent --max-time 4 --output /dev/null \
+                    --write-out '%{http_code}' "$public_origin$path" || true)"
+                [[ "$stopped_code" =~ ^(404|502|503|530)$ ]] && break
+                sleep 1
+              done
+              [[ "$stopped_code" =~ ^(404|502|503|530)$ ]] || cleanup_status=FAIL
+            fi
+            printf 'Runner shutdown and public page no longer served: %s.\n' "$cleanup_status" >> "$GITHUB_STEP_SUMMARY"
+            if [[ "$cleanup_status" != PASS ]]; then exit 1; fi
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          marker="synthetic-miniapp-tls-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf '<!doctype html><title>Staging TLS proof</title><p>%s</p>\n' "$marker" > "$d/expected.html"
+          cat > "$d/origin.py" <<'PY'
+          from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+          from pathlib import Path
+          import sys
+
+          host = "miniapp-staging.finalclinic.fyi"
+          body = Path(sys.argv[1]).read_bytes()
+
+          class StaticProof(BaseHTTPRequestHandler):
+              protocol_version = "HTTP/1.0"
+
+              def log_message(self, *_args):
+                  pass
+
+              def do_GET(self):
+                  if self.path != "/__miniapp_tls_proof" or self.headers.get_all("Host", []) != [host]:
+                      self.send_response(404)
+                      self.send_header("Content-Length", "0")
+                      self.end_headers()
+                      return
+                  self.send_response(200)
+                  self.send_header("Content-Type", "text/html; charset=utf-8")
+                  self.send_header("Cache-Control", "no-store, private, max-age=0")
+                  self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+                  self.send_header("X-Content-Type-Options", "nosniff")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+
+          ThreadingHTTPServer(("127.0.0.1", 18086), StaticProof).serve_forever()
+          PY
+          python3 "$d/origin.py" "$d/expected.html" &
+          origin_pid=$!
+          for _ in {1..15}; do
+            if curl --noproxy '*' --fail --silent --max-time 2 -H "Host: $host" \
+                --output "$d/local.html" "$local_origin$path" && cmp -s "$d/local.html" "$d/expected.html"; then break; fi
+            sleep 0.2
+          done
+          cmp -s "$d/local.html" "$d/expected.html"
+          for denied in / /api/v1/health /assets/unrelated.js "$path?query=denied"; do
+            test "$(curl --noproxy '*' --silent --max-time 4 -H "Host: $host" --output /dev/null \
+              --write-out '%{http_code}' "$local_origin$denied")" = 404
+          done
+          test "$(curl --noproxy '*' --silent --max-time 4 -X POST -H "Host: $host" --output /dev/null \
+            --write-out '%{http_code}' "$local_origin$path")" = 501
+          # Never pass the credential as an argument or print connector output.
+          mkdir "$d/home"
+          HOME="$d/home" TUNNEL_TOKEN="$token" "$d/cloudflared" tunnel --no-autoupdate \
+            --protocol http2 --metrics 127.0.0.1:20246 run >"$d/connector.log" 2>&1 &
+          tunnel_pid=$!
+          unset token
+          ready=false
+          for _ in {1..45}; do
+            kill -0 "$tunnel_pid" 2>/dev/null || { echo '::error::Cloudflare connector stopped before readiness.'; exit 1; }
+            if curl --noproxy '*' --fail --silent --max-time 2 http://127.0.0.1:20246/ready > /dev/null; then ready=true; break; fi
+            sleep 1
+          done
+          [[ "$ready" == true ]] || { echo '::error::Cloudflare connector readiness timed out.'; exit 1; }
+          proved=false
+          for _ in {1..20}; do
+            if curl --noproxy '*' --fail --silent --max-time 4 --proto '=https' \
+                --output "$d/public.html" --dump-header "$d/public.headers" "$public_origin$path" &&
+                cmp -s "$d/public.html" "$d/expected.html"; then proved=true; break; fi
+            sleep 1
+          done
+          [[ "$proved" == true ]] || { echo '::error::Strict public HTTPS and exact body did not verify.'; exit 1; }
+          grep -iE '^cache-control:.*no-store' "$d/public.headers" >/dev/null
+          for denied in / /api/v1/health /assets/unrelated.js "$path?query=denied"; do
+            test "$(curl --noproxy '*' --silent --max-time 6 --proto '=https' --output /dev/null \
+              --write-out '%{http_code}' "$public_origin$denied")" = 404
+          done
+          test "$(curl --noproxy '*' --silent --max-time 6 --proto '=https' -X POST --output /dev/null \
+            --write-out '%{http_code}' "$public_origin$path")" = 501
+          printf 'Named HTTPS static proof: PASS. Exact synthetic body; API, unrelated paths and writes denied.\n' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove ephemeral runner files
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-named-tls-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          rm -rf -- "$d"
+          test ! -e "$d"

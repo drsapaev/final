@@ -1,7 +1,9 @@
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, desc, func
+from sqlalchemy import and_, desc, func, text
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
@@ -19,11 +21,101 @@ from app.schemas.notification import (
 )
 
 
+class TemplateConcurrentUpdate(RuntimeError):
+    """A template changed pair repeatedly while acquiring locks."""
+
+
 class CRUDNotificationTemplate(
     CRUDBase[
         NotificationTemplate, NotificationTemplateCreate, NotificationTemplateUpdate
     ]
 ):
+    @staticmethod
+    def _lock_pairs(db: Session, pairs: set[tuple[str, str]]) -> None:
+        """Serialize a template key before taking any row locks on PostgreSQL."""
+        if db.get_bind().dialect.name != "postgresql":
+            return
+        for pair in sorted(pairs):
+            raw = json.dumps(["notification-template", *pair], ensure_ascii=True).encode()
+            key = int.from_bytes(hashlib.sha256(raw).digest()[:8], "big", signed=True)
+            db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+
+    @staticmethod
+    def _deactivate_siblings(db: Session, pair: tuple[str, str], exclude_id: int | None = None) -> None:
+        query = db.query(NotificationTemplate).filter(
+            NotificationTemplate.type == pair[0],
+            NotificationTemplate.channel == pair[1],
+            NotificationTemplate.is_active.is_(True),
+        )
+        if exclude_id is not None:
+            query = query.filter(NotificationTemplate.id != exclude_id)
+        query.update(
+            {NotificationTemplate.is_active: False, NotificationTemplate.updated_at: datetime.now(UTC)},
+            synchronize_session=False,
+        )
+        # The partial index is immediate, so deactivate before inserting or
+        # changing the target. Both flushes remain inside the same transaction.
+        db.flush()
+
+    def create_atomic(self, db: Session, *, obj_in: NotificationTemplateCreate) -> NotificationTemplate:
+        data = obj_in.model_dump()
+        pair = (data["type"], data["channel"])
+        try:
+            self._lock_pairs(db, {pair})
+            if data["is_active"]:
+                self._deactivate_siblings(db, pair)
+            result = NotificationTemplate(**data)
+            db.add(result)
+            db.flush()
+            db.commit()
+            db.refresh(result)
+            return result
+        except Exception:
+            db.rollback()
+            raise
+
+    def update_atomic(
+        self, db: Session, *, template_id: int, obj_in: NotificationTemplateUpdate
+    ) -> NotificationTemplate | None:
+        data = obj_in.model_dump(exclude_unset=True)
+        if any(data.get(field, object()) is None for field in ("name", "type", "channel", "template", "is_active")):
+            raise ValueError("Required template fields cannot be null")
+        # An old pair can change before its lock is acquired. Roll back and
+        # retry with a fresh snapshot instead of taking a row-first lock.
+        for _ in range(4):
+            try:
+                old = db.query(NotificationTemplate.type, NotificationTemplate.channel).filter(
+                    NotificationTemplate.id == template_id
+                ).first()
+                if old is None:
+                    db.rollback()
+                    return None
+                old_pair = (old[0], old[1])
+                new_pair = (data.get("type", old_pair[0]), data.get("channel", old_pair[1]))
+                self._lock_pairs(db, {old_pair, new_pair})
+                target = db.query(NotificationTemplate).filter(
+                    NotificationTemplate.id == template_id
+                ).with_for_update().populate_existing().first()
+                if target is None:
+                    db.rollback()
+                    return None
+                if (target.type, target.channel) != old_pair:
+                    db.rollback()
+                    continue
+                active = data.get("is_active", target.is_active)
+                if active:
+                    self._deactivate_siblings(db, new_pair, exclude_id=template_id)
+                for key, value in data.items():
+                    setattr(target, key, value)
+                db.flush()
+                db.commit()
+                db.refresh(target)
+                return target
+            except Exception:
+                db.rollback()
+                raise
+        raise TemplateConcurrentUpdate("Concurrent template update; retry")
+
     def get_by_type_and_channel(
         self, db: Session, *, type: str, channel: str
     ) -> NotificationTemplate | None:
@@ -36,6 +128,7 @@ class CRUDNotificationTemplate(
                     NotificationTemplate.is_active,
                 )
             )
+            .order_by(NotificationTemplate.updated_at.desc(), NotificationTemplate.id.desc())
             .first()
         )
 

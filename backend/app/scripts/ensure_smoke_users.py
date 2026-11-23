@@ -26,14 +26,17 @@ import os
 import sys
 
 from sqlalchemy import select
+from sqlalchemy.orm import object_session
 
 HERE = os.path.dirname(__file__)
 BACKEND_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 if BACKEND_ROOT not in sys.path:
     sys.path.insert(0, BACKEND_ROOT)
 
+from app.core.security import verify_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.models.user import User  # type: ignore[attr-defined]  # noqa: E402
+from app.services.token_blacklist_service import revoke_account_sessions_locked  # noqa: E402
 
 SMOKE_USERS = [
     # (username, role, email) — roles must NOT be in CRITICAL_2FA_ROLES
@@ -59,7 +62,7 @@ def _load_smoke_password() -> str:
     # Fall back to backend/.env so Task Scheduler does not need env setup.
     env_path = os.path.join(BACKEND_ROOT, ".env")
     if os.path.exists(env_path):
-        with open(env_path, "r", encoding="utf-8-sig") as fh:
+        with open(env_path, encoding="utf-8-sig") as fh:
             for line in fh:
                 line = line.strip()
                 if line.startswith("SMOKE_USER_PASSWORD="):
@@ -88,14 +91,17 @@ def ensure_smoke_users() -> list[dict]:
     with SessionLocal() as db:  # type: ignore # type: Session
         for username, role, email in SMOKE_USERS:
             row = (
-                db.execute(select(User).where(User.username == username))
+                db.execute(select(User).where(User.username == username).with_for_update(key_share=True).execution_options(populate_existing=True))
                 .scalars()
                 .first()
             )
             if row:
                 changed = False
+                password_changed = not verify_password(password, row.hashed_password)
+                if password_changed or row.role != role or not row.is_active:
+                    revoke_account_sessions_locked(object_session(row), row, revoke_password_resets=True)
                 # Always re-pin password/role so the smoke can always log in.
-                if row.hashed_password != hashed:
+                if password_changed:
                     row.hashed_password = hashed
                     changed = True
                 if row.role != role:

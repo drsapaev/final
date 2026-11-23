@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from sqlalchemy.orm import joinedload
 
@@ -103,7 +104,7 @@ class CoreMixin(UserManagementServiceMixinBase):
         )
 
     def ensure_user_support_records(
-        self, db: Session, user_or_id: User | int
+        self, db: Session, user_or_id: User | int, *, commit: bool = True
     ) -> tuple[UserProfile, UserPreferences, UserNotificationSettings]:
         """Создает профиль и настройки пользователя, если они отсутствуют."""
         user = user_or_id
@@ -171,16 +172,24 @@ class CoreMixin(UserManagementServiceMixinBase):
             changed = True
 
         if changed:
-            db.commit()
-            db.refresh(user)
-            profile = user.profile
-            preferences = user.preferences
-            notification_settings = user.notification_settings
+            if commit:
+                db.commit()
+                db.refresh(user)
+                profile = user.profile
+                preferences = user.preferences
+                notification_settings = user.notification_settings
+            else:
+                db.flush()
 
         return profile, preferences, notification_settings
 
     def create_user(
-        self, db: Session, user_data: UserCreateRequest, created_by: int
+        self,
+        db: Session,
+        user_data: UserCreateRequest,
+        created_by: int,
+        *,
+        before_commit: Callable[[], None] | None = None,
     ) -> tuple[bool, str, User | None]:
         """Создает нового пользователя с профилем"""
         try:
@@ -347,6 +356,8 @@ class CoreMixin(UserManagementServiceMixinBase):
                             f"Auto-created Doctor row for user {user.id} (role={user_data.role})"
                         )
 
+            if before_commit is not None:
+                before_commit()
             db.commit()
             # Обновляем объекты, чтобы получить все поля (id, created_at, updated_at)
             db.refresh(user)
@@ -365,7 +376,13 @@ class CoreMixin(UserManagementServiceMixinBase):
             return False, "Внутренняя ошибка", None
 
     def update_user(
-        self, db: Session, user_id: int, user_data: UserUpdateRequest, updated_by: int
+        self,
+        db: Session,
+        user_id: int,
+        user_data: UserUpdateRequest,
+        updated_by: int,
+        *,
+        before_commit: Callable[[], None] | None = None,
     ) -> tuple[bool, str]:
         """Обновляет пользователя"""
         try:
@@ -386,6 +403,9 @@ class CoreMixin(UserManagementServiceMixinBase):
             user, profile = lock_user_candidate_state(db, user_id)
             if not user:
                 return False, "Пользователь не найден"
+            # The request session may already contain this identity. Refresh
+            # under its existing row lock before deciding whether to revoke.
+            db.refresh(user)
 
             # QD-1.1 (queue resource role cleanup, Codex round-2): sentinel
             # rows are queue machinery, not manageable accounts — an admin
@@ -475,6 +495,8 @@ class CoreMixin(UserManagementServiceMixinBase):
             # could recreate the two-candidates fail-closed login lockout
             # (reactivation / role->Patient / verified-phone change).
             # `profile` is the row locked above (identity-map object).
+            phone_changed = False
+            email_changed = "email" in update_data and update_data["email"] != user.email
             if profile is not None:
                 # NOTE: PatientPhoneScopeConflict is NOT imported here — the
                 # module-level import above provides it for the `except`
@@ -504,8 +526,10 @@ class CoreMixin(UserManagementServiceMixinBase):
                     # while silently dropping the record out of the
                     # resolver predicate (generic login 401).
                     update_data["phone"] = new_normalized
-                phone_changed = (
-                    "phone" in update_data and new_normalized != old_normalized
+                phone_changed = "phone" in update_data and (
+                    new_normalized != old_normalized
+                    if new_normalized is not None and old_normalized is not None
+                    else raw_new_phone != profile.phone
                 )
                 if phone_changed:
                     if target_role == Roles.PATIENT:
@@ -532,6 +556,29 @@ class CoreMixin(UserManagementServiceMixinBase):
                     # the login-resolver predicate — the phone scope must
                     # still be free of ANOTHER active candidate.
                     ensure_phone_scope_free(db, profile.phone, exclude_user_id=user.id)
+
+                if email_changed:
+                    profile.email_verified = False
+
+            requires_session_revoke = (
+                ("is_active" in update_data and target_is_active is False)
+                or ("role" in update_data and target_role != old_role)
+                or ("username" in update_data and update_data["username"] != user.username)
+                or email_changed or phone_changed
+                or (
+                    "is_superuser" in update_data
+                    and target_is_superuser != user.is_superuser
+                )
+            )
+            if requires_session_revoke:
+                from app.services.token_blacklist_service import (
+                    revoke_account_sessions_locked,
+                )
+
+                # Explicit deactivation revokes even an already-inactive
+                # account. A privilege change invalidates stale bearer and
+                # pending credentials before they can inherit new authority.
+                revoke_account_sessions_locked(db, user, revoke_password_resets=True)
 
             for field, value in update_data.items():
                 if hasattr(user, field):
@@ -606,6 +653,8 @@ class CoreMixin(UserManagementServiceMixinBase):
                 db, user_id, "update", "Пользователь обновлен", updated_by
             )
 
+            if before_commit is not None:
+                before_commit()
             db.commit()
             return True, "Пользователь успешно обновлен"
 
@@ -648,10 +697,17 @@ class CoreMixin(UserManagementServiceMixinBase):
         user_id: int,
         deleted_by: int,
         transfer_to: int | None = None,
+        *,
+        before_commit: Callable[[], None] | None = None,
     ) -> tuple[bool, str]:
         """Удаляет пользователя"""
         try:
-            user = db.query(User).filter(User.id == user_id).first()
+            # Delete cascades to Patient and credentials; serialize first on
+            # User, matching login and WebAuthn's User -> Patient order.
+            user = (
+                db.query(User).filter(User.id == user_id)
+                .with_for_update().populate_existing().first()
+            )
             if not user:
                 return False, "Пользователь не найден"
 
@@ -714,6 +770,8 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Удаляем пользователя (каскадное удаление)
             db.delete(user)
+            if before_commit is not None:
+                before_commit()
             db.commit()
 
             return True, "Пользователь успешно удален"

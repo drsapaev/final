@@ -719,3 +719,23 @@
   align-items: center;
   justify-content: space-between;
 }
+
+/* Passkey management and patient login */
+.passkey-step-up {
+  display: grid;
+  gap: 8px;
+}
+
+.passkey-step-up-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.patient-login-passkey-alert {
+  margin-bottom: 16px;
+}
+
+.patient-login-passkey-button {
+  width: 100%;
+  margin-top: 12px;
+}
