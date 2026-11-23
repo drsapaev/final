@@ -846,12 +846,16 @@ Before enabling collection behind an Nginx config from this repo, run
 checkout. Use an isolated Linux or WSL Docker environment with the
 `nginx:1.27-alpine` image already available.
 
-The probe uses synthetic requests and checks that the collector is absent
-from both configured access logs. It also checks that nearby paths remain
-logged and that the proxy forwards the same request to the backend.
-Validate error logs and any external ingress separately. The clinic's
-Windows production API uses Cloudflare Tunnel, so its HTTP logging and
-monitoring settings require their own evidence.
+The probe checks successful forwarding and a controlled upstream failure
+using synthetic requests. The collector's normal, trailing slash, and
+encoded paths stay out of inherited access and error logs. The proxy
+preserves the 502 response. Nearby API routes still produce their ordinary
+access and upstream error entries.
+
+The Nginx error-log exclusion applies after the collector location is
+matched. Validate request parsing errors and external ingress separately.
+The clinic's Windows production API uses Cloudflare Tunnel, so its HTTP
+logging and monitoring settings require their own evidence.
 
 ---
 
