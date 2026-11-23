@@ -95,6 +95,30 @@ def require_visible_visit_payments(db: Session) -> None:
     )
 
 
+def require_visible_refund_payments(db: Session) -> None:
+    """Prove visibility of receipts and allocations before selecting a refund."""
+    _require_visible_current_schema(
+        db,
+        {
+            "payments": ("id", "visit_id", "status", "amount", "method"),
+            "payment_visits": ("payment_id", "visit_id", "amount"),
+        },
+        "История платежей визита требует сверки",
+    )
+
+
+def require_visible_refund_history(db: Session) -> None:
+    """Prove visibility of both channels and their shared refund reservations."""
+    _require_visible_current_schema(
+        db,
+        {
+            **_EXTERNAL_REFUND_READS,
+            "payment_refund_claims": ("id", "payment_id", "channel", "refund_request_id", "deposit_transaction_id"),
+        },
+        "История возвратов временно недоступна",
+    )
+
+
 def require_visible_checkout_queue(db: Session) -> None:
     _require_visible_current_schema(
         db, {"queue_entries": ("id", "visit_id", "status")},

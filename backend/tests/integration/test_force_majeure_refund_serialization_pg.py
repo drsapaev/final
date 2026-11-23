@@ -143,19 +143,22 @@ def db_engine():
     _refuse_nondisposable_target(db_url)
 
     schema = _one_off_schema()
+    # Establish the disposable schema before the dialect caches current_schema().
+    schema_admin = create_engine(db_url)
+    try:
+        with schema_admin.begin() as setup:
+            setup.execute(text(f'CREATE SCHEMA "{schema}"'))
+    finally:
+        schema_admin.dispose()
+
     engine = create_engine(
         db_url,
         echo=False,
         pool_pre_ping=True,
         connect_args={"options": f"-csearch_path={schema}"},
     )
-    # Собственная одноразовая схема: не public, не то, что поднял alembic,
-    # ничего общего ни с чем. Полный реестр моделей (app.db.base) — схема
-    # самодостаточна по FK, как и в юнит-мире (conftest).
-    with engine.begin() as setup:
-        setup.execute(text(f'CREATE SCHEMA "{schema}"'))
-    Base.metadata.create_all(engine)
     try:
+        Base.metadata.create_all(engine)
         from tests.integration.test_deposit_refund_evidence_pg import (
             install_deposit_guards,
         )

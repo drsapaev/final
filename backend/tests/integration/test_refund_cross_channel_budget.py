@@ -108,7 +108,7 @@ def test_protected_staff_refund_checks_the_same_external_evidence(
         )
     assert payment.refunded_amount is None
     assert db_session.query(PaymentRefundClaim.id).filter_by(payment_id=payment.id).count() == 1
-    audit = db_session.query(AuditLog).filter_by(entity_id=payment.id).one()
+    audit = db_session.query(AuditLog).filter_by(entity_type="payment", entity_id=payment.id).one()
     assert audit.action == "staff_action_failed"
     assert audit.payload["domain_mutation"] is False
 
@@ -149,7 +149,7 @@ def test_protected_staff_refund_refuses_hidden_postgresql_evidence(
     with Session(owner) as db:
         assert db.get(Payment, payment_id).refunded_amount is None
         assert db.query(PaymentRefundClaim.id).filter_by(payment_id=payment_id).count() == 1
-        audits = db.query(AuditLog).filter_by(entity_id=payment_id).all()
+        audits = db.query(AuditLog).filter_by(entity_type="payment", entity_id=payment_id).all()
         assert len(audits) == 2
         assert all(row.action == "staff_action_failed" and not row.payload["domain_mutation"] for row in audits)
 

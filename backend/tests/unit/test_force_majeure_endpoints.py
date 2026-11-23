@@ -601,3 +601,45 @@ def test_bank_refund_creation_and_audit_share_the_queue_transaction(
         duplicate = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
         assert duplicate.status_code == 200 and duplicate.json()["cancelled"] == 0
         assert events.count() == 1
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("channel", ["deposit", "bank_transfer"])
+@pytest.mark.parametrize("evidence", ["split", "manual_refund"])
+def test_force_refund_preserves_ambiguous_or_already_reserved_funds(
+    client, db_session, test_doctor, test_patient, admin_auth_headers, channel, evidence,
+):
+    queue, (entry,), (payment,) = _seed_bound_queue(db_session, test_doctor, test_patient, entries=1)
+    if evidence == "split":
+        db_session.add(Payment(
+            visit_id=payment.visit_id, amount=Decimal("20.00"), currency="UZS",
+            method="card", status="paid",
+        ))
+    else:
+        db_session.add(RefundRequest(
+            patient_id=test_patient.id, payment_id=payment.id, visit_id=payment.visit_id,
+            original_amount=payment.amount, refund_amount=Decimal("15.00"),
+            status="pending", refund_type="bank_transfer", is_automatic=False,
+        ))
+    db_session.commit()
+
+    response = client.post(CANCEL_PATH, headers=admin_auth_headers, json={
+        "specialist_id": test_doctor.id, "entry_ids": [entry.id], "target_date": str(queue.day),
+        "refund_type": channel, "reason": "SYNTHETIC", "send_notifications": False,
+    })
+
+    assert response.status_code == 200
+    body = response.json()
+    is_split = evidence == "split"
+    assert body["cancelled"] == int(not is_split)
+    assert body["failed"] == int(is_split)
+    if is_split:
+        assert body["errors"] == [{"entry_id": entry.id, "error": "Платежи визита требуют сверки"}]
+    else:
+        assert body["refund_requests_existing"] == 1
+    db_session.expire_all()
+    assert entry.status == ("waiting" if is_split else "cancelled")
+    assert payment.status == "paid" and payment.refunded_amount is None
+    assert db_session.query(PaymentRefundClaim).filter_by(payment_id=payment.id).count() == 0
+    assert db_session.query(DepositTransaction).filter_by(payment_id=payment.id).count() == 0
+    assert db_session.query(RefundRequest).filter_by(payment_id=payment.id).count() == int(not is_split)

@@ -42,10 +42,16 @@ from app.models.refund_deposit import (
 from app.models.visit import Visit
 from app.repositories.force_majeure_api_repository import record_refund_request_creation
 from app.repositories.queue_api_repository import QueueApiRepository
+from app.services.encounter_financial_fence import FinancialFenceError
 from app.services.fcm_service import get_fcm_service
+from app.services.money_input import MoneyInputError, parse_money
 from app.services.online_queue_new_service import (
     OnlineQueueNewDomainError,
     OnlineQueueNewService,
+)
+from app.services.payment_refund_guard import (
+    require_visible_refund_history,
+    require_visible_refund_payments,
 )
 from app.services.queue_service import queue_service
 
@@ -775,17 +781,26 @@ class ForceMajeureService:
         return self._get_or_create_queue(specialist_id, target_date)
 
     def _get_payment_for_entry(self, entry: OnlineQueueEntry) -> Payment | None:
-        """Получить платёж для записи"""
-        if not entry.visit_id:
+        """Select a single settled receipt after serializing with collection."""
+        if entry.visit_id is None:
             return None
 
-        visit = self.db.query(Visit).filter(Visit.id == entry.visit_id).first()
-        if not visit:
-            return None
+        if self.db.get_bind().dialect.name == "postgresql":
+            self.db.execute(text("SET LOCAL lock_timeout='2s'"))
+        try:
+            require_visible_refund_payments(self.db)
+        except FinancialFenceError as exc:
+            raise ForceMajeureError(str(exc)) from exc
+        visit = (
+            self.db.query(Visit.patient_id)
+            .filter(Visit.id == entry.visit_id)
+            .with_for_update(of=Visit, key_share=True)
+            .first()
+        )
+        if visit is None:
+            raise ForceMajeureError("Визит записи требует сверки")
         if visit.patient_id != entry.patient_id:
-            raise ForceMajeureError(
-                "Queue entry visit does not belong to the queue patient"
-            )
+            raise ForceMajeureError("Queue entry visit does not belong to the queue patient")
 
         payments = (
             self.db.query(Payment)
@@ -795,17 +810,30 @@ class ForceMajeureService:
                 or_(Payment.visit_id == entry.visit_id,
                     Payment.payment_visits.any(PaymentVisit.visit_id == entry.visit_id)),
                 Payment.status.in_(("paid", "completed")),
-                Payment.amount > 0,
+                Payment.amount != 0,
             )
             .order_by(Payment.id)
+            .limit(2)
             .all()
         )
-        if any(payment.method == "deposit" for payment in payments) and (
-            len(payments) != 1 or payments[0].visit_id != entry.visit_id or payments[0].status != "paid"
-        ):
-            raise ForceMajeureError("Распределение оплаты с депозита требует сверки")
-        return next((payment for payment in payments
-                     if payment.visit_id == entry.visit_id and payment.status == "paid"), None)
+        if not payments:
+            return None
+        payment = payments[0]
+        if len(payments) != 1 or payment.visit_id != entry.visit_id or payment.status != "paid":
+            raise ForceMajeureError("Платежи визита требуют сверки")
+        try:
+            amount = parse_money(payment.amount)
+        except MoneyInputError:
+            raise ForceMajeureError("Сумма платежа требует сверки") from None
+        links = (
+            self.db.query(PaymentVisit.visit_id, PaymentVisit.amount)
+            .filter(PaymentVisit.payment_id == payment.id)
+            .limit(2)
+            .all()
+        )
+        if links and links != [(entry.visit_id, amount)]:
+            raise ForceMajeureError("Распределение оплаты визита требует сверки")
+        return payment
 
     @staticmethod
     def _already_refunded_by_claim(
@@ -955,6 +983,36 @@ class ForceMajeureService:
             }
         return int(result.inserted_primary_key[0])
 
+    def _require_refund_history(self) -> None:
+        if self.db.get_bind().dialect.name != "postgresql":
+            return
+        try:
+            with self.db.connection().begin_nested():
+                self.db.execute(text("SET LOCAL lock_timeout='2s'"))
+                require_visible_refund_history(self.db)
+        except FinancialFenceError as exc:
+            raise ForceMajeureError(str(exc)) from exc
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate == "42501":
+                raise ForceMajeureError("История возвратов временно недоступна") from None
+            if sqlstate in {"55P03", "40001"}:
+                raise ForceMajeureError("Платёж изменяется, повторите операцию") from None
+            raise
+
+    def _find_prior_refund_request(self, payment_id: int, *, automatic_only: bool) -> RefundRequest | None:
+        query = self.db.query(RefundRequest).filter(
+            RefundRequest.payment_id == payment_id,
+            or_(RefundRequest.status.is_(None),
+                RefundRequest.status.not_in(self.REFUND_REQUEST_FAILED_STATUSES)),
+        )
+        if automatic_only:
+            query = query.filter(RefundRequest.is_automatic.is_(True))
+        prior = query.order_by(RefundRequest.id).first()
+        if prior is not None and prior.status not in self.REFUND_REQUEST_ACTIVE_STATUSES:
+            raise ForceMajeureError("Состояние возврата требует сверки")
+        return prior
+
     def _lock_payment_refund_budget(self, payment_id: int, visit_id: int | None, amount: Decimal) -> Payment:
         # Use the same row lock as the cashier. NO KEY UPDATE is compatible
         # with the refund claim's foreign-key lock. Keep it until commit.
@@ -1039,6 +1097,7 @@ class ForceMajeureService:
         """
         amount_decimal = Decimal(str(amount))
         postgres = self.db.get_bind().dialect.name == "postgresql"
+        self._require_refund_history()
         if not postgres:
             # Keep the visit's subject and the currency check in one SQLite
             # write transaction, including metadata-only test schemas.
@@ -1068,15 +1127,7 @@ class ForceMajeureService:
         # создана до 0088 или напрямую, как в тестах). 3808 round 5:
         # учитываются только ЖИВЫЕ заявки — отклонённая/отменённая заявка
         # денег не вернула и повторному возврату не мешает.
-        prior_request = (
-            self.db.query(RefundRequest)
-            .filter(
-                RefundRequest.payment_id == payment_id,
-                RefundRequest.is_automatic.is_(True),
-                RefundRequest.status.in_(self.REFUND_REQUEST_ACTIVE_STATUSES),
-            )
-            .first()
-        )
+        prior_request = self._find_prior_refund_request(payment_id, automatic_only=False)
         if prior_request is not None:
             return {
                 "type": "deposit",
@@ -1253,15 +1304,9 @@ class ForceMajeureService:
         """
         amount_decimal = Decimal(str(amount))
 
-        existing_request = (
-            self.db.query(RefundRequest)
-            .filter(
-                RefundRequest.payment_id == payment_id,
-                RefundRequest.is_automatic.is_(True),
-                RefundRequest.status.in_(self.REFUND_REQUEST_ACTIVE_STATUSES),
-            )
-            .first()
-        )
+        if is_automatic:
+            self._require_refund_history()
+        existing_request = self._find_prior_refund_request(payment_id, automatic_only=not is_automatic)
         if existing_request is not None:
             return {
                 "type": "refund_request",

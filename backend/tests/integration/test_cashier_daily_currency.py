@@ -281,6 +281,11 @@ def _daily_pg_app(guarded_pg, monkeypatch):
         for table in ("refund_requests", "deposit_transactions"):
             conn.execute(text(f'ALTER TABLE {qs}."{table}" ENABLE ROW LEVEL SECURITY'))
             conn.execute(text(f'ALTER TABLE {qs}."{table}" FORCE ROW LEVEL SECURITY'))
+            # Seeding through the refund service requires an explicit visibility policy.
+            conn.exec_driver_sql(
+                f'CREATE POLICY synthetic_refund_setup_read ON {qs}."{table}" '
+                f'FOR SELECT TO {quote(owner)} USING (true)'
+            )
     script = Path(__file__).resolve().parents[3] / "scripts/provision_encounter_financial_role.py"
     spec = importlib.util.spec_from_file_location("daily_finance_provision", script)
     provisioner = importlib.util.module_from_spec(spec)
