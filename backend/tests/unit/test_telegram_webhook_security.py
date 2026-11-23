@@ -276,6 +276,28 @@ def _create_lab_report_instance(
     return instance
 
 
+def _assert_staff_link_rejection_audit(
+    audit_log: AuditLog | None, *, chat_id: int, update_id: int, reason: str
+) -> None:
+    assert audit_log is not None
+    payload = audit_log.payload
+    timestamp = payload["timestamp"]
+    assert datetime.fromisoformat(timestamp).utcoffset() == timedelta(0)
+    digest = hashlib.sha256(f"staff-telegram-chat:{chat_id}".encode()).hexdigest()
+    chat_reference = f"telegram_chat:{digest[:24]}"
+    assert payload == {
+        "actor_role": None,
+        "telegram_user_id_hash": chat_reference,
+        "action_key": "staff_link_token_rejected",
+        "target_type": "telegram_user",
+        "target_reference_hash": chat_reference,
+        "result": "rejected",
+        "timestamp": timestamp,
+        "request_id": f"telegram-update:{update_id}",
+        "reason": reason,
+    }
+
+
 @pytest.mark.unit
 class TestTelegramWebhookSecurity:
     def test_admin_webhook_info_response_hides_raw_telegram_payload(
@@ -2959,9 +2981,9 @@ class TestMiniAppClinicCalendarDateValidation:
             .order_by(AuditLog.id.desc())
             .first()
         )
-        assert rejection_audit is not None
-        assert rejection_audit.payload["reason"] == "already_used"
-        assert "7011" not in str(rejection_audit.payload)
+        _assert_staff_link_rejection_audit(
+            rejection_audit, chat_id=7011, update_id=108, reason="already_used"
+        )
 
     @pytest.mark.asyncio
     async def test_invalid_staff_start_token_does_not_create_telegram_user(
@@ -2998,9 +3020,9 @@ class TestMiniAppClinicCalendarDateValidation:
             .order_by(AuditLog.id.desc())
             .first()
         )
-        assert rejection_audit is not None
-        assert rejection_audit.payload["reason"] == "signature_invalid"
-        assert "7013" not in str(rejection_audit.payload)
+        _assert_staff_link_rejection_audit(
+            rejection_audit, chat_id=7013, update_id=109, reason="signature_invalid"
+        )
 
     @pytest.mark.asyncio
     async def test_patient_dispatch_routes_staff_start_before_generic_start(
