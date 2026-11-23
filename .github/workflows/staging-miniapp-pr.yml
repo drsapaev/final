@@ -35,6 +35,9 @@ on:
       native-live:
         type: boolean
         required: true
+      native-arq:
+        type: boolean
+        default: false
     secrets:
       STAGING_TELEGRAM_BOT_TOKEN:
         required: true
@@ -694,27 +697,114 @@ jobs:
       github.repository == 'drsapaev/final' &&
       github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main' &&
-      (inputs.native-protected || inputs.native-live) &&
+      (inputs.native-protected || inputs.native-live || inputs.native-arq) &&
       !inputs.native-rehearsal &&
-      (!inputs.native-live || github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/main')
+      (!(inputs.native-live || inputs.native-arq) ||
+       (github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/main' &&
+        !inputs.native-protected &&
+        ((inputs.native-live && !inputs.native-arq && inputs.source-sha == '33f35996a1f86726b17f8caa819d1ed99aa1729a') ||
+         (inputs.native-arq && !inputs.native-live))))
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ inputs.native-live && 65 || 35 }}
+    timeout-minutes: ${{ (inputs.native-live || inputs.native-arq) && 65 || 35 }}
     environment: staging-integrations
+    env:
+      REVIEWED_SHA: ${{ !inputs.native-arq && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
+      RUN_ARQ_ACCEPTANCE: ${{ inputs.native-arq }}
+      WORKFLOW_SHA: ${{ github.workflow_sha }}
     steps:
       - name: Prepare exact isolated backend, frontend and ingress
         shell: bash
         run: |
           set -euo pipefail
           umask 077
-          sha=33f35996a1f86726b17f8caa819d1ed99aa1729a
+          sha=$REVIEWED_SHA
           host=miniapp-staging.finalclinic.fyi
           d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           mkdir "$d"
-          git init -q "$d/source"
-          git -C "$d/source" fetch -q --no-tags --depth=1 https://github.com/drsapaev/final.git "$sha"
-          git -C "$d/source" checkout -q --detach FETCH_HEAD
-          test "$(git -C "$d/source" rev-parse HEAD)" = "$sha"
+          source="$d/source"
+          origin=https://github.com/drsapaev/final.git
+          git init -q "$source"
+          if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+            approved=10a8cac30b21b9885ef320257d7add032c6ef5ac
+            for revision in "$sha" "$WORKFLOW_SHA" "$approved"; do
+              if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then
+                echo '::error::A full approved source, current workflow and requested PR commit SHA are required.'
+                exit 1
+              fi
+            done
+            if ! curl --disable --noproxy '*' --proto '=https' --max-time 20 --fail --silent --show-error \
+              -H 'Accept: application/vnd.github+json' 'https://api.github.com/repos/drsapaev/final/pulls/4195' |
+              python3 -c '
+          import json
+          import sys
+
+          pr = json.load(sys.stdin)
+          head, base = pr["head"], pr["base"]
+          sys.exit(not (
+              pr["number"] == 4195 and pr["state"] == "open"
+              and head["repo"]["full_name"] == base["repo"]["full_name"] == "drsapaev/final"
+              and head["ref"] == "codex/kosmed-shell-robots-20261122" and base["ref"] == "main"
+              and head["sha"] == sys.argv[1] and base["sha"] == sys.argv[2]
+          ))
+          ' "$sha" "$WORKFLOW_SHA" 2>/dev/null; then
+              echo '::error::Request must match the current open same-repository PR #4195 head and main base.'
+              exit 1
+            fi
+            git -C "$source" fetch -q --no-tags --depth=64 "$origin" \
+              refs/heads/main:refs/remotes/origin/main refs/pull/4195/head:refs/remotes/origin/pr-4195
+            if [[ "$(git -C "$source" rev-parse refs/remotes/origin/main)" != "$WORKFLOW_SHA" ||
+                  "$(git -C "$source" rev-parse refs/remotes/origin/pr-4195)" != "$sha" ]] ||
+              ! git -C "$source" merge-base --is-ancestor "$WORKFLOW_SHA" "$sha"; then
+              echo '::error::PR or main changed, or the requested commit does not include the current workflow commit.'
+              exit 1
+            fi
+            if ! git -C "$source" cat-file -e "$approved^{commit}" 2>/dev/null; then
+              git -C "$source" fetch -q --no-tags --depth=1 "$origin" "$approved"
+              test "$(git -C "$source" rev-parse FETCH_HEAD)" = "$approved"
+            fi
+
+            # These four paths are supplied by the trusted workflow commit.
+            # The rest of the candidate tree must equal the reviewed app commit.
+            helper_paths=(
+              '.github/workflows/staging-miniapp-pr.yml'
+              '.github/workflows/staging-miniapp-native-live.yml'
+              'ops/scripts/staging_miniapp_arq_check.py'
+              'docs/runbooks/STAGING_VALIDATION.md'
+            )
+            included=()
+            excluded=()
+            for path in "${helper_paths[@]}"; do
+              git -C "$source" cat-file -e "$WORKFLOW_SHA:$path"
+              included+=(":(top,literal)$path")
+              excluded+=(":(top,exclude,literal)$path")
+            done
+            if ! git -C "$source" diff --quiet --no-ext-diff --no-textconv "$approved" "$sha" -- . "${excluded[@]}" ||
+              ! git -C "$source" diff --quiet --no-ext-diff --no-textconv "$WORKFLOW_SHA" "$sha" -- "${included[@]}"; then
+              echo '::error::PR #4195 tree differs from the reviewed app source or trusted workflow files.'
+              exit 1
+            fi
+            git -C "$source" show "$WORKFLOW_SHA:ops/scripts/staging_miniapp_arq_check.py" > "$d/arq-check.py"
+            test -s "$d/arq-check.py"
+            printf 'PR #4195 source verification: PASS at `%s` (reviewed app `%s`, current workflow `%s`).\n' \
+              "$sha" "$approved" "$WORKFLOW_SHA" >> "$GITHUB_STEP_SUMMARY"
+          else
+            git -C "$source" fetch -q --no-tags --depth=1 "$origin" "$sha"
+            test "$(git -C "$source" rev-parse FETCH_HEAD)" = "$sha"
+          fi
+          git -C "$source" checkout -q --detach "$sha"
+          test "$(git -C "$source" rev-parse HEAD)" = "$sha"
+          if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+            # A native HTTPS button has no entry token. Verify the candidate
+            # can load the platform SDK before building or injecting secrets.
+            sdk=https://telegram.org/js/telegram-web-app.js
+            if ! git -C "$d/source" grep -Fq "$sdk" -- frontend/index.html frontend/src ||
+              ! git -C "$d/source" grep -Fq "$sdk" -- frontend/docker/nginx.staging.conf; then
+              echo '::error::Exact candidate lacks the native Mini App SDK loader or staging CSP permission.'
+              printf 'Native HTTPS and ARQ: BLOCKED before credentials. Candidate `%s` must load the Telegram SDK under staging CSP.\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          fi
           cat > "$d/runtime.env" <<ENV
           APP_VERSION=$sha
           VERCEL_GIT_COMMIT_SHA=$sha
@@ -746,6 +836,8 @@ jobs:
             backend:
               ports: !reset []
               dns: [127.0.0.1]
+              environment:
+                CSRF_ENABLED: ${CSRF_ENABLED:?missing native staging CSRF setting}
               volumes: !override
                 - staging_backend_data:/data
             frontend:
@@ -816,7 +908,7 @@ jobs:
           "$d/compose" pull postgres redis
           "$d/compose" build backend frontend
       - name: Start protected synthetic stack with token only in sealed backend
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.native-protected || inputs.native-live)
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.native-protected || inputs.native-live || inputs.native-arq)
         shell: bash
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
@@ -835,7 +927,7 @@ jobs:
         run: |
           set -euo pipefail
           d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          sha=33f35996a1f86726b17f8caa819d1ed99aa1729a
+          sha=$REVIEWED_SHA
           host=miniapp-staging.finalclinic.fyi
           patient=/telegram/mini-app/patient
           cabinet="$patient?section=cabinet"
@@ -844,7 +936,7 @@ jobs:
           "$d/compose" exec -T backend python -c "import urllib.request,json; assert json.load(urllib.request.urlopen('http://127.0.0.1:18000/', timeout=10))['version'] == '$sha'"
           "$d/compose" exec -T frontend grep -Fq "const BUILD_VERSION = '$sha';" /usr/share/nginx/html/sw.js
           "$d/compose" exec -T frontend find /usr/share/nginx/html/assets -type f > "$d/asset-list"
-          python3 - "$d" <<'PY'
+          python3 - "$d" "$RUN_ARQ_ACCEPTANCE" <<'PY'
           from pathlib import Path
           import re
           import sys
@@ -857,6 +949,8 @@ jobs:
           prefix = "/api/v1/telegram/mini-app/"
           exact_api = ("auth/exchange", "auth/refresh", "auth/logout", "sessions/list",
                        "sessions/revoke-all", "patient/manifest", "cabinet/summary")
+          if sys.argv[2] == "true":
+              exact_api = ("auth/exchange", "patient/manifest", "cabinet/summary", "onboarding/requests")
           routes = [
               '    "GET:/telegram/mini-app/patient" static;',
               '    "GET:/telegram/mini-app/patient?section=cabinet" static;',
@@ -864,8 +958,11 @@ jobs:
               '    "GET:/api/v1/auth/csrf-token" api;',
               *[f'    "GET:{path}" static;' for path in assets],
               *[f'    "POST:{prefix}{path}" api;' for path in exact_api],
-              '    ~^POST:/api/v1/telegram/mini-app/sessions/[a-f0-9-][a-f0-9-]*/revoke$ api;',
           ]
+          if sys.argv[2] == "true":
+              routes.append('    "GET:/telegram/mini-app/patient?section=appointments" static;')
+          else:
+              routes.append('    ~^POST:/api/v1/telegram/mini-app/sessions/[a-f0-9-][a-f0-9-]*/revoke$ api;')
           conf = r"""
           map_hash_bucket_size 256;
           map_hash_max_size 4096;
@@ -936,16 +1033,56 @@ jobs:
           test "$("$d/compose" ps --services --status running | sort)" = $'backend\nfrontend\ngateway\npostgres\nredis'
           printf 'Loopback Mini App ingress and CSRF: PASS at `%s`. This step checks loopback only.\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
       - name: Seed one approved synthetic Mini App identity
-        if: inputs.native-live
+        if: inputs.native-live || inputs.native-arq
         shell: bash
         env:
           STAGING_TELEGRAM_CHAT_ID: ${{ secrets.STAGING_TELEGRAM_CHAT_ID }}
+          STAGING_TELEGRAM_BOT_TOKEN: ${{ inputs.native-arq && secrets.STAGING_TELEGRAM_BOT_TOKEN || '' }}
         run: |
           set -euo pipefail
           d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           if [[ ! "$STAGING_TELEGRAM_CHAT_ID" =~ ^[1-9][0-9]{0,15}$ ]]; then
             echo '::error::A verified private STAGING_TELEGRAM_CHAT_ID is required in staging-integrations.'
             exit 1
+          fi
+          if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+            python3 - <<'PY'
+          import http.client
+          import json
+          import os
+          from urllib.parse import urlencode
+
+          try:
+              token = os.environ["STAGING_TELEGRAM_BOT_TOKEN"]
+              chat_id = int(os.environ["STAGING_TELEGRAM_CHAT_ID"])
+              assert token and 0 < chat_id < 2**52
+              for method, data in (("getMe", {}), ("getChat", {"chat_id": chat_id})):
+                  conn = http.client.HTTPSConnection("api.telegram.org", timeout=8)
+                  try:
+                      conn.request("POST", f"/bot{token}/{method}", urlencode(data),
+                                   {"Content-Type": "application/x-www-form-urlencoded"})
+                      response = conn.getresponse()
+                      assert response.status == 200
+                      payload = json.loads(response.read(65536))
+                      assert payload["ok"] is True
+                      result = payload["result"]
+                      if method == "getMe":
+                          assert result["is_bot"] is True and result["username"].lower() == "kosmed_staging_bot"
+                      else:
+                          assert result["type"] == "private" and result["id"] == chat_id
+                  finally:
+                      conn.close()
+          except Exception:
+              raise SystemExit("Protected staging bot or approved private chat verification failed.") from None
+          print("PASS: verified staging bot and private test chat; no message sent.")
+          PY
+            unset STAGING_TELEGRAM_BOT_TOKEN
+            if ! printf '%s\n' "$STAGING_TELEGRAM_CHAT_ID" | "$d/compose" exec -T backend \
+              python -c "$(cat "$d/arq-check.py")" seed "$REVIEWED_SHA" >/dev/null 2>&1; then
+              echo '::error::The reviewed synthetic reminder fixture could not be seeded.'
+              exit 1
+            fi
+            exit 0
           fi
           seed=$(cat <<'PY'
           import os
@@ -989,7 +1126,7 @@ jobs:
           fi
 
       - name: Expose only the verified Mini App gateway and await session evidence
-        if: inputs.native-live
+        if: inputs.native-live || inputs.native-arq
         shell: bash
         env:
           TUNNEL_TOKEN: ${{ secrets.STAGING_MINIAPP_TUNNEL_TOKEN }}
@@ -1069,6 +1206,32 @@ jobs:
           grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/public.headers" >/dev/null
           grep -qiE '^cross-origin-embedder-policy: require-corp' "$d/public.headers"
           grep -qiE '^cache-control:.*no-store' "$d/public.headers"
+          if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+            for staff_route in /api/v1/telegram/onboarding/requests /api/v1/telegram/onboarding/requests/1/link-existing; do
+              test "$(http_status "$staff_route")" = 404
+              test "$(curl --noproxy '*' --silent --max-time 5 --proto '=https' -X POST --output /dev/null --write-out '%{http_code}' "$origin$staff_route")" = 404
+            done
+            printf '### Native onboarding ready\n\nOpen the approved staging bot Mini App in Telegram. In Appointments submit the synthetic contact SYNTHETIC staging with phone +998000000000, tomorrow’s date and the default 09:30 time. Return to Cabinet after the request is linked. Window: 25 minutes.\n' >> "$GITHUB_STEP_SUMMARY"
+            printf 'Native onboarding ready. Operator instructions are in the run summary.\n'
+            deadline=$((SECONDS + 1500))
+            for check in link ready; do
+              while :; do
+                kill -0 "$connector" 2>/dev/null || exit 1
+                if "$d/compose" exec -T backend python -c "$(cat "$d/arq-check.py")" "$check" "$REVIEWED_SHA" >/dev/null 2>&1; then
+                  break
+                else
+                  result=$?
+                fi
+                if [[ "$result" != 3 ]] || (( SECONDS >= deadline )); then
+                  echo "::error::Native onboarding phase '$check' did not pass."
+                  exit 1
+                fi
+                sleep 5
+              done
+            done
+            printf 'Native signed onboarding, canonical linkage and cabinet access: PASS on `%s`.\n' "$REVIEWED_SHA" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           printf 'Staging ready at https://%s%s?section=cabinet. Open the verified staging-bot Mini App under the same allowed Telegram account on both devices. Open the session list on A, wait 15 minutes after login without closing A, then refresh the session list on A, revoke B, verify B loses access, and log out on A. The window is 25 minutes.\n' "$host" "$patient"
 
           # Only a boolean leaves the database, with no patient, session or request data.
@@ -1116,6 +1279,140 @@ jobs:
           printf 'Native acceptance incomplete. Expected session evidence was missing at timeout.\n' >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
+      - name: Process one versioned visit reminder through ARQ and Telegram
+        if: env.RUN_ARQ_ACCEPTANCE == 'true'
+        shell: bash
+        env:
+          ARQ_STAGING_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test -n "$ARQ_STAGING_BOT_TOKEN"
+          token=$ARQ_STAGING_BOT_TOKEN
+          unset ARQ_STAGING_BOT_TOKEN
+
+          # The preceding step verified the public connector shut down. Stop
+          # the local ingress too before granting the isolated worker egress.
+          "$d/compose" stop gateway >/dev/null
+          test "$("$d/compose" ps --services --status running | sort)" = $'backend\nfrontend\npostgres\nredis'
+          test "$(docker image inspect --format '{{.Id}}' "$project-backend")" = \
+            "$(docker inspect --format '{{.Image}}' "$("$d/compose" ps -q backend)")"
+          upstream=$(getent ahostsv4 api.telegram.org | awk '$2 == "STREAM" && !seen++ {print $1}')
+          python3 -c 'import ipaddress, sys; assert ipaddress.IPv4Address(sys.argv[1]).is_global' "$upstream"
+
+          cat > "$d/telegram-relay.py" <<'PY'
+          import selectors
+          import socket
+          import socketserver
+          import sys
+
+          bind, upstream = sys.argv[1:]
+
+          class Relay(socketserver.BaseRequestHandler):
+              def handle(self):
+                  try:
+                      with socket.create_connection((upstream, 443), timeout=8) as telegram, selectors.DefaultSelector() as watch:
+                          self.request.settimeout(10)
+                          watch.register(self.request, selectors.EVENT_READ, telegram)
+                          watch.register(telegram, selectors.EVENT_READ, self.request)
+                          while events := watch.select(timeout=12):
+                              for key, _ in events:
+                                  chunk = key.fileobj.recv(65536)
+                                  if not chunk:
+                                      return
+                                  key.data.sendall(chunk)
+                  except OSError:
+                      return
+
+          with socketserver.ThreadingTCPServer((bind, 443), Relay) as server:
+              server.daemon_threads = True
+              server.serve_forever()
+          PY
+          chmod 444 "$d/telegram-relay.py"
+          cat > "$d/arq.yml" <<YAML
+          services:
+            worker:
+              image: $project-backend
+              build: !reset null
+              cap_drop: [ALL]
+              volumes: !reset []
+              dns: [127.0.0.1]
+              networks: [default, reminder]
+              extra_hosts:
+                api.telegram.org: 172.30.242.2
+              environment:
+                TELEGRAM_BOT_TOKEN: \${ARQ_STAGING_BOT_TOKEN:-}
+            telegram-relay:
+              image: $project-backend
+              entrypoint: [python, /relay.py, 172.30.242.2, "$upstream"]
+              user: "65534:65534"
+              volumes:
+                - $d/telegram-relay.py:/relay.py:ro
+              cap_drop: [ALL]
+              sysctls:
+                net.ipv4.ip_unprivileged_port_start: 443
+              networks:
+                reminder:
+                  ipv4_address: 172.30.242.2
+                ingress: {}
+          networks:
+            reminder:
+              internal: true
+              ipam:
+                config:
+                  - subnet: 172.30.242.0/28
+          YAML
+          ARQ_STAGING_BOT_TOKEN=arq-synthetic-marker "$d/compose" -f "$d/arq.yml" config --format json | python3 -c '
+          import json, sys
+          c = json.load(sys.stdin)
+          s = c["services"]
+          worker, relay = s["worker"], s["telegram-relay"]
+          assert not any(n.get("external") for n in c["networks"].values())
+          assert all(c["networks"][n]["internal"] is True for n in ("default", "reminder"))
+          assert set(worker["networks"]) == {"default", "reminder"}
+          assert set(relay["networks"]) == {"reminder", "ingress"}
+          assert all(not s[n].get("ports") and not s[n].get("privileged") for n in ("worker", "telegram-relay"))
+          assert not worker.get("build") and not worker.get("volumes") and worker["dns"] == ["127.0.0.1"]
+          assert relay["volumes"][0]["read_only"] is True
+          assert worker["environment"]["TELEGRAM_BOT_TOKEN"] == "arq-synthetic-marker"
+          assert all("arq-synthetic-marker" not in json.dumps(v) for k, v in s.items() if k != "worker")
+          '
+
+          "$d/compose" -f "$d/arq.yml" up -d --no-deps --no-build --pull never telegram-relay
+          run_worker=("$d/compose" -f "$d/arq.yml" run --rm --no-deps --pull never -T --entrypoint python worker)
+          "${run_worker[@]}" -c '
+          import os, socket, ssl, time
+          assert not os.environ.get("TELEGRAM_BOT_TOKEN")
+          assert socket.gethostbyname("api.telegram.org") == "172.30.242.2"
+          for attempt in range(8):
+              try:
+                  with socket.create_connection(("api.telegram.org", 443), timeout=5) as tcp:
+                      with ssl.create_default_context().wrap_socket(tcp, server_hostname="api.telegram.org"):
+                          break
+              except OSError:
+                  if attempt == 7:
+                      raise
+                  time.sleep(1)
+          '
+
+          helper=$(cat "$d/arq-check.py")
+          if ! "$d/compose" exec -T backend python -c "$helper" enqueue "$REVIEWED_SHA" >/dev/null 2>&1; then
+            echo '::error::Could not enqueue the single versioned synthetic reminder.'
+            exit 1
+          fi
+          if ! ARQ_STAGING_BOT_TOKEN="$token" "${run_worker[@]}" -c "$helper" worker "$REVIEWED_SHA" >/dev/null 2>&1; then
+            echo '::error::ARQ worker failed or delivery is uncertain; investigate before another attempt.'
+            exit 1
+          fi
+          unset token
+          if ! "$d/compose" exec -T backend python -c "$helper" verify "$REVIEWED_SHA" >/dev/null 2>&1; then
+            echo '::error::ARQ result or PostgreSQL delivery stamp is missing; investigate before retrying.'
+            exit 1
+          fi
+          printf 'ARQ schedule-versioned Telegram reminder and PostgreSQL delivery stamp: PASS on `%s`. Confirm the single synthetic reminder in the approved test chat.\n' "$REVIEWED_SHA" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Remove exactly this isolated stack
         if: always()
         shell: bash
@@ -1125,7 +1422,9 @@ jobs:
           project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           result=PASS
           if [[ -x "$d/compose" ]]; then
-            "$d/compose" down --volumes --remove-orphans --rmi local || result=FAIL
+            overrides=()
+            if [[ -f "$d/arq.yml" ]]; then overrides=(-f "$d/arq.yml"); fi
+            "$d/compose" "${overrides[@]}" down --volumes --remove-orphans --rmi local || result=FAIL
           fi
           # The frontend has an explicit project-owned tag; Compose can keep it.
           if docker image inspect "$project-frontend" >/dev/null 2>&1; then
