@@ -333,7 +333,11 @@ async def send_visit_reminder(
         if token_expires is not None and token_expires.tzinfo is None:
             token_expires = token_expires.replace(tzinfo=UTC)
         changes = {}
-        if pinned_token is None or token_expires is None or token_expires <= datetime.now(UTC):
+        if (
+            pinned_token is None
+            or token_expires is None
+            or token_expires <= datetime.now(UTC)
+        ):
             import uuid
 
             pinned_token = str(uuid.uuid4())
@@ -371,7 +375,10 @@ async def send_visit_reminder(
                     .values(reminder_claimed_at=None)
                 )
                 db.commit()
-                logger.info("job.send_visit_reminder: visit %s context changed before issuance", visit_id)
+                logger.info(
+                    "job.send_visit_reminder: visit %s context changed before issuance",
+                    visit_id,
+                )
                 return
 
         expected_context = {
@@ -382,7 +389,12 @@ async def send_visit_reminder(
             "confirmation_token": pinned_token,
         }
         service = NotificationService(db)
-        patient = db.query(Patient).populate_existing().filter(Patient.id == pinned_patient).first()
+        patient = (
+            db.query(Patient)
+            .populate_existing()
+            .filter(Patient.id == pinned_patient)
+            .first()
+        )
 
         if allowed_channel == "auto":
             best_channel = (
@@ -775,6 +787,26 @@ async def run_data_retention(ctx) -> None:
         db.close()
 
 
+def _purge_public_site_analytics() -> int:
+    from app.db.session import SessionLocal
+    from app.repositories.public_site_analytics_repository import (
+        PublicSiteAnalyticsRepository,
+    )
+
+    with SessionLocal() as db:
+        removed = PublicSiteAnalyticsRepository(db).delete_older_than_retention(
+            as_of=datetime.now(UTC)
+        )
+        db.commit()
+        return removed
+
+
+async def run_public_site_analytics_retention(_ctx) -> int:
+    removed = await asyncio.to_thread(_purge_public_site_analytics)
+    logger.info("job.run_public_site_analytics_retention removed=%d", removed)
+    return removed
+
+
 def _process_public_booking_request_notification_outbox_batch(
     database_url: str,
 ) -> dict[str, int]:
@@ -917,6 +949,7 @@ class WorkerSettings:
     functions = [
         send_visit_reminder,
         run_data_retention,
+        run_public_site_analytics_retention,
         run_public_booking_request_notification_outbox,
         generate_scheduled_report,
         run_lab_follow_up_reminders,
@@ -941,6 +974,8 @@ class WorkerSettings:
     # path ever called enqueue_reminder and patients never got reminders.
     cron_jobs = [
         cron(run_data_retention, hour=3, minute=0),  # Daily 03:00 UTC
+        # Hourly, so the purge follows the Tashkent day rollover independently of worker TZ.
+        cron(run_public_site_analytics_retention, minute=0),
         cron(
             run_public_booking_request_notification_outbox,
             minute=set(range(60)),  # every minute, lease-safe across workers
@@ -959,6 +994,7 @@ __all__ = [
     "REMINDER_HOURS_BEFORE",
     "send_visit_reminder",
     "run_data_retention",
+    "run_public_site_analytics_retention",
     "run_public_booking_request_notification_outbox",
     "generate_scheduled_report",
     "run_lab_follow_up_reminders",

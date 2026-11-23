@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getApiOrigin } from './api/runtime';
+import { getVitePublicSiteAnalyticsEndpoint } from './publicSiteAnalytics';
 import { createPublicSiteApi } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
 import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_TITLES } from './publicSiteMetadata';
@@ -77,6 +78,6 @@ export default function PublicSiteAppRoute() {
   if (!route) return <PublicSiteFallback />;
   // Keep the native skip link's target mounted as this pathname's content loads.
   return state.status === 'ready'
-    ? <PublicSitePage key={pathname} route={route} data={state.data} />
+    ? <PublicSitePage key={pathname} route={route} data={state.data} analyticsEndpoint={getVitePublicSiteAnalyticsEndpoint()} />
     : <PublicSitePage key={pathname} route={route} status={state.status} />;
 }
