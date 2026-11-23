@@ -387,5 +387,68 @@
       }
     ]
   },
+  "public_field_data_follow_up": {
+    "checked_on": "2026-11-22",
+    "measured_origin": "https://finalclinic.fyi",
+    "source": "https://cruxvis.withgoogle.com/",
+    "method": "Enter the public origin in Google's CrUX Vis and inspect the resulting CrUX History API responses for that origin.",
+    "response_by_form_factor": {
+      "all": { "http_status": 404, "code": "NOT_FOUND" },
+      "phone": { "http_status": 404, "code": "NOT_FOUND" },
+      "desktop": { "http_status": 404, "code": "NOT_FOUND" },
+      "tablet": { "http_status": 404, "code": "NOT_FOUND" }
+    },
+    "collection_period": null,
+    "p75": {
+      "lcp_ms": null,
+      "inp_ms": null,
+      "cls": null
+    },
+    "result": "No origin record was returned at the time of the lookup. Field Core Web Vitals remain unverified."
+  },
+  "local_ssr_workload_follow_up": {
+    "checked_on": "2026-11-22",
+    "build_source_sha": "c4fd0bdfab37d3ae2462397765668c56a5fed6a8",
+    "render_request_origin": "http://127.0.0.1",
+    "method": "Build Nitro with the Vercel preset and Preview environment on the reviewed SHA. Invoke the built function locally against the repository synthetic HTTP fixture through a counting loopback proxy. Elapsed times include reading the response body.",
+    "route_checks": {
+      "get": 20,
+      "head": 4,
+      "localized_missing_details_returning_404": 4,
+      "cache_control": "no-store",
+      "robots_header": "noindex, nofollow",
+      "upstream_gets_per_render_get": {
+        "home": 3,
+        "contacts": 1,
+        "catalog_prices_and_details_including_missing_details": 2,
+        "sitemap": 4,
+        "robots": 0
+      },
+      "upstream_gets_per_render_head": {
+        "services_each_locale": 2,
+        "sitemap": 4,
+        "robots": 0
+      }
+    },
+    "bounded_concurrency": {
+      "route": "/sitemap.xml",
+      "parallel_render_requests": 4,
+      "artificial_upstream_delay_ms": 50,
+      "upstream_requests": 16,
+      "peak_in_flight_upstream_requests": 16,
+      "elapsed_ms": [82, 88, 88, 89]
+    },
+    "optional_clinic_read": {
+      "route": "/services",
+      "catalog_responded_without_artificial_delay": true,
+      "cases": [
+        { "clinic_delay_ms": 0, "elapsed_ms": 4, "status": 200, "header": "published_logo" },
+        { "clinic_delay_ms": 300, "elapsed_ms": 306, "status": 200, "header": "published_logo" },
+        { "clinic_delay_ms": 2300, "elapsed_ms": 1526, "status": 200, "header": "fallback_mark", "cancelled_clinic_reads": 1 }
+      ]
+    },
+    "teardown": "The owned loopback proxy and synthetic fixture stopped.",
+    "remaining": "No hosted Preview was listed for the checked SHA. Hosted capacity, runtime duration and cost remain unverified."
+  },
   "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. On 2026-10-22 the owner-authorized Cloudflare setting for finalclinic.fyi was changed to Disable and remained selected after reload. A later no-cache GET returned HTTP 200 without the beacon script or /cdn-cgi/rum marker; ordinary Chrome verification remains pending because navigation failed with ERR_CONNECTION_RESET. Vercel Speed Insights returned no p75 samples, Vercel Function duration required Observability Plus, and PageSpeed Insights returned HTTP 429 due to zero daily quota. No server-only timing or field p75 was obtained, and no external telemetry was enabled."
 }

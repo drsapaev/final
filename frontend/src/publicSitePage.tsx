@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createElement, useId, type ReactNode } from 'react';
 import './publicSiteStyles.css';
 import {
   getPublicSitePath,
@@ -13,6 +13,8 @@ import type {
   PublicSiteService,
 } from './publicSiteApi';
 
+const PUBLIC_SITE_MEDIA_FALLBACK = '/public-site-media-fallback.js';
+
 interface Copy {
   services: string;
   doctors: string;
@@ -20,7 +22,7 @@ interface Copy {
   prices: string;
   contacts: string;
   staffLogin: string;
-  language: string;
+  switchLanguage: string;
   navigation: string;
   breadcrumbs: string;
   home: string;
@@ -30,6 +32,7 @@ interface Copy {
   loadError: string;
   retry: string;
   serviceDetails: string;
+  serviceDoctors: string;
   doctorDetails: string;
   homeIntro: string;
   homeServices: string;
@@ -40,6 +43,13 @@ interface Copy {
   emailClinic: string;
   address: string;
   specialty: string;
+  catalogSearchServices: string;
+  catalogSearchDoctors: string;
+  catalogCategory: string;
+  catalogAll: string;
+  catalogReset: string;
+  catalogCount: string;
+  catalogNoMatches: string;
   experience: (years: number) => string;
   workingHours: string;
   workingDays: string;
@@ -65,7 +75,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     prices: 'Цены',
     contacts: 'Контакты',
     staffLogin: 'Вход для персонала',
-    language: 'Язык',
+    switchLanguage: 'Перейти на узбекский',
     navigation: 'Навигация сайта',
     breadcrumbs: 'Навигационная цепочка',
     home: 'Главная',
@@ -75,6 +85,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     loadError: 'Не удалось загрузить актуальную информацию клиники.',
     retry: 'Повторить',
     serviceDetails: 'Информация об услуге',
+    serviceDoctors: 'Врачи, оказывающие услугу',
     doctorDetails: 'Информация о враче',
     homeIntro: 'Информация об услугах клиники и специалистах.',
     homeServices: 'Популярные услуги',
@@ -85,6 +96,13 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     emailClinic: 'Написать по электронной почте',
     address: 'Адрес',
     specialty: 'Специализация',
+    catalogSearchServices: 'Поиск услуг',
+    catalogSearchDoctors: 'Поиск врачей',
+    catalogCategory: 'Категория',
+    catalogAll: 'Все',
+    catalogReset: 'Сбросить фильтры',
+    catalogCount: 'Найдено',
+    catalogNoMatches: 'Ничего не найдено.',
     experience: (years) => {
       const mod100 = years % 100;
       const mod10 = years % 10;
@@ -119,7 +137,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     prices: 'Narxlar',
     contacts: 'Kontaktlar',
     staffLogin: 'Xodimlar uchun kirish',
-    language: 'Til',
+    switchLanguage: 'Rus tiliga o‘tish',
     navigation: 'Sayt navigatsiyasi',
     breadcrumbs: 'Sahifa yo‘nalishi',
     home: 'Bosh sahifa',
@@ -129,6 +147,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     loadError: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.',
     retry: 'Qayta urinish',
     serviceDetails: 'Xizmat haqida',
+    serviceDoctors: 'Ushbu xizmat bo‘yicha shifokorlar',
     doctorDetails: 'Shifokor haqida',
     homeIntro: 'Klinika xizmatlari va mutaxassislari haqida ma’lumot.',
     homeServices: 'Xizmatlar',
@@ -139,6 +158,13 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     emailClinic: 'Elektron pochta yuborish',
     address: 'Manzil',
     specialty: 'Mutaxassisligi',
+    catalogSearchServices: 'Xizmatlarni qidirish',
+    catalogSearchDoctors: 'Shifokorlarni qidirish',
+    catalogCategory: 'Toifa',
+    catalogAll: 'Barchasi',
+    catalogReset: 'Filtrlarni tozalash',
+    catalogCount: 'Natijalar',
+    catalogNoMatches: 'Hech narsa topilmadi.',
     experience: (years) => `Ish tajribasi: ${years} yil`,
     workingHours: 'Ish vaqti',
     workingDays: 'Dushanba–shanba',
@@ -157,13 +183,14 @@ const COPY: Record<PublicSiteLocale, Copy> = {
   },
 };
 
-export function getPublicSiteSkipLinkLabel(locale: PublicSiteLocale): string {
-  return COPY[locale].skipToContent;
-}
-
 interface PublicSitePageProps {
   route: PublicSiteRouteMatch;
   data: PublicSitePageData;
+}
+
+interface PublicSiteRequestStateProps {
+  route: PublicSiteRouteMatch;
+  status: 'loading' | 'error';
 }
 
 function cleanTelHref(phone?: string | null): string | undefined {
@@ -186,9 +213,9 @@ function formatDoctorHeading(doctor: PublicSiteDoctor): string {
 }
 
 function displayTime(value?: string | null): string | null {
-  if (!value) return null;
-  const match = value.match(/^(\d{2}:\d{2})/);
-  return match?.[1] ?? null;
+  return value && /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value)
+    ? value.slice(0, 5)
+    : null;
 }
 
 function formatPrice(service: PublicSiteService, locale: PublicSiteLocale, copy: Copy): string {
@@ -279,28 +306,44 @@ function BreadcrumbNavigation({ items, label }: {
   );
 }
 
-function SiteHeader({ locale, route, copy }: {
+function SiteHeader({ locale, route, copy, logoUrl }: {
   locale: PublicSiteLocale;
   route: PublicSiteRouteMatch;
   copy: Copy;
+  logoUrl?: PublicSiteClinic['logo_url'];
 }) {
   const otherLocale = locale === 'ru' ? 'uz-Latn' : 'ru';
   const homePath = localizePath('home', locale);
   const switchPath = localizePath(route.kind, otherLocale, route.slug);
+  const languageCode = otherLocale === 'ru' ? 'RU' : 'O‘Z';
   return (
     <header className="public-site__header">
       <a className="public-site__brand" href={homePath}>
+        {logoUrl && (
+          <>
+            <script async src={PUBLIC_SITE_MEDIA_FALLBACK} />
+            <img
+              key={logoUrl}
+              className="public-site__brand-logo"
+              data-public-site-image=""
+              src={logoUrl}
+              alt=""
+              width={38}
+              height={38}
+            />
+          </>
+        )}
         <span className="public-site__brand-mark" aria-hidden="true">K</span>
         <span>{copy.clinicName}</span>
       </a>
       <PublicSiteLinks className="public-site__nav" locale={locale} copy={copy} />
+      <a className="public-site__language" href={switchPath} aria-label={`${languageCode} — ${copy.switchLanguage}`}>
+        {languageCode}
+      </a>
       <details className="public-site__mobile-menu">
         <summary>{copy.mobileMenu}</summary>
         <PublicSiteLinks className="public-site__mobile-nav" locale={locale} copy={copy} />
       </details>
-      <a className="public-site__language" href={switchPath} aria-label={copy.language}>
-        {otherLocale === 'ru' ? 'RU' : 'O‘Z'}
-      </a>
     </header>
   );
 }
@@ -337,21 +380,29 @@ function SiteFooter({ clinicName, locale, copy }: {
   );
 }
 
-function ContactLinks({ clinic, copy }: { clinic?: PublicSiteClinic; copy: Copy }) {
-  const telHref = cleanTelHref(clinic?.phone);
-  const mailtoHref = cleanMailtoHref(clinic?.email);
+export function getPublicClinicContacts(clinic?: PublicSiteClinic) {
   const start = displayTime(clinic?.working_hours_start);
   const end = displayTime(clinic?.working_hours_end);
-  const hasHours = Boolean(start && end);
-  const hasContact = Boolean(telHref || mailtoHref || clinic?.address || hasHours);
-  if (!hasContact) return <p className="public-site__muted">{copy.contactMissing}</p>;
+  return {
+    address: clinic?.address?.trim() || undefined,
+    telHref: cleanTelHref(clinic?.phone),
+    mailtoHref: cleanMailtoHref(clinic?.email),
+    hours: start && end && start < end ? { start, end } : undefined,
+  };
+}
+
+function ContactLinks({ clinic, copy }: { clinic?: PublicSiteClinic; copy: Copy }) {
+  const { address, telHref, mailtoHref, hours } = getPublicClinicContacts(clinic);
+  if (!address && !telHref && !mailtoHref && !hours) {
+    return <p className="public-site__muted">{copy.contactMissing}</p>;
+  }
 
   return (
     <address className="public-site__contact-list">
-      {clinic?.address && <p><span>{copy.address}</span>{clinic.address}</p>}
+      {address && <p><span>{copy.address}</span>{address}</p>}
       {telHref && <p><span>{copy.callClinic}</span><a href={telHref}>{clinic?.phone}</a></p>}
       {mailtoHref && <p><span>{copy.emailClinic}</span><a href={mailtoHref}>{clinic?.email}</a></p>}
-      {hasHours && <p><span>{copy.workingHours}</span>{copy.workingDays}, {start}–{end}; {copy.sundayClosed}</p>}
+      {hours && <p><span>{copy.workingHours}</span>{copy.workingDays}, {hours.start}–{hours.end}; {copy.sundayClosed}</p>}
     </address>
   );
 }
@@ -366,7 +417,7 @@ function ServiceList({ services, locale, copy, showPrices = false }: {
   return (
     <ul className="public-site__list">
       {services.map((service) => (
-        <li className="public-site__list-item" key={service.slug}>
+        <li className="public-site__list-item" key={service.slug} data-catalog-item="" data-catalog-group={service.category}>
           <div>
             <a className="public-site__list-title" href={localizePath('service', locale, service.slug)}>{service.name}</a>
             {service.category && <p className="public-site__muted">{service.category}</p>}
@@ -389,16 +440,21 @@ function DoctorPortrait({ src, isProfile = false }: {
   if (!src) return null;
   const size = isProfile ? 160 : 80;
   return (
-    <img
-      className="public-site__doctor-portrait"
-      src={src}
-      alt=""
-      width={size}
-      height={size}
-      loading={isProfile ? undefined : 'lazy'}
-      fetchPriority={isProfile ? 'high' : undefined}
-      decoding="async"
-    />
+    <>
+      <script async src={PUBLIC_SITE_MEDIA_FALLBACK} />
+      <img
+        key={src}
+        className="public-site__doctor-portrait"
+        data-public-site-image=""
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        loading={isProfile ? undefined : 'lazy'}
+        fetchPriority={isProfile ? 'high' : undefined}
+        decoding="async"
+      />
+    </>
   );
 }
 
@@ -412,7 +468,7 @@ function DoctorList({ doctors, locale, copy, showPortraits = false }: {
   return (
     <ul className="public-site__list public-site__list--doctors">
       {doctors.map((doctor) => (
-        <li className="public-site__list-item" key={doctor.slug}>
+        <li className="public-site__list-item" key={doctor.slug} data-catalog-item="" data-catalog-group={doctor.specialty}>
           <div className="public-site__doctor-summary">
             {showPortraits && <DoctorPortrait src={doctor.portrait_url} />}
             <div>
@@ -426,6 +482,72 @@ function DoctorList({ doctors, locale, copy, showPortraits = false }: {
         </li>
       ))}
     </ul>
+  );
+}
+
+function CatalogFilter({ groups, groupLabel, searchLabel, locale, copy, children }: {
+  groups: (string | null | undefined)[];
+  groupLabel: string;
+  searchLabel: string;
+  locale: PublicSiteLocale;
+  copy: Copy;
+  children: ReactNode;
+}) {
+  const fieldId = useId();
+  if (groups.length === 0) return children;
+
+  const options = [...new Set(groups.filter((label): label is string => Boolean(label)))];
+  const queryId = `${fieldId}-query`;
+  const groupId = `${fieldId}-group`;
+  return (
+    <>
+      <script async src="/public-site-catalog-filter.js" />
+      {createElement('public-site-catalog-filter', { className: 'public-site__catalog' }, (
+        <>
+          <search
+            role="search"
+            aria-label={searchLabel}
+            className="public-site__catalog-controls"
+            data-catalog-controls=""
+            hidden
+          >
+            <div className="public-site__catalog-field">
+              <label id={`${queryId}-label`} htmlFor={queryId}>{searchLabel}</label>
+              <input
+                id={queryId}
+                aria-labelledby={`${queryId}-label`}
+                className="public-site__catalog-control"
+                type="search"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </div>
+            {options.length > 0 && (
+              <div className="public-site__catalog-field">
+                <label htmlFor={groupId}>{groupLabel}</label>
+                <select id={groupId} className="public-site__catalog-control" defaultValue="">
+                  <option value="">{copy.catalogAll}</option>
+                  {options.map((label) => <option key={label} value={label}>{label}</option>)}
+                </select>
+              </div>
+            )}
+            <button className="public-site__button" type="button" data-catalog-reset="">
+              {copy.catalogReset}
+            </button>
+            <p className="public-site__catalog-status" role="status">
+              {copy.catalogCount} <span data-catalog-count="">{groups.length}</span>
+            </p>
+          </search>
+          {children}
+          <div className="public-site__empty" data-catalog-empty="" hidden>
+            <p>{copy.catalogNoMatches}</p>
+            <a href={localizePath('contacts', locale)}>{copy.contactClinic}</a>
+          </div>
+        </>
+      ))}
+    </>
   );
 }
 
@@ -467,23 +589,69 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
       );
     }
     case 'services':
-      return <section className="public-site__section"><h1>{copy.services}</h1><ServiceList services={data.services ?? []} locale={locale} copy={copy} /></section>;
-    case 'prices':
-      return <section className="public-site__section"><h1>{copy.prices}</h1><ServiceList services={data.services ?? []} locale={locale} copy={copy} showPrices /></section>;
-    case 'doctors':
-      return <section className="public-site__section"><h1>{copy.doctors}</h1><DoctorList doctors={data.doctors ?? []} locale={locale} copy={copy} showPortraits /></section>;
+    case 'prices': {
+      const services = data.services ?? [];
+      const showPrices = route.kind === 'prices';
+      return (
+        <section className="public-site__section">
+          <h1>{showPrices ? copy.prices : copy.services}</h1>
+          <CatalogFilter
+            groups={services.map(({ category }) => category)}
+            searchLabel={copy.catalogSearchServices}
+            groupLabel={copy.catalogCategory}
+            locale={locale}
+            copy={copy}
+          >
+            <ServiceList services={services} locale={locale} copy={copy} showPrices={showPrices} />
+          </CatalogFilter>
+        </section>
+      );
+    }
+    case 'doctors': {
+      const doctors = data.doctors ?? [];
+      return (
+        <section className="public-site__section">
+          <h1>{copy.doctors}</h1>
+          <CatalogFilter
+            groups={doctors.map(({ specialty }) => specialty)}
+            searchLabel={copy.catalogSearchDoctors}
+            groupLabel={copy.specialty}
+            locale={locale}
+            copy={copy}
+          >
+            <DoctorList doctors={doctors} locale={locale} copy={copy} showPortraits />
+          </CatalogFilter>
+        </section>
+      );
+    }
     case 'contacts':
       return <section className="public-site__section"><h1>{copy.contacts}</h1><ContactLinks clinic={data.clinic} copy={copy} /></section>;
-    case 'service':
-      if (!data.service) return <section className="public-site__section"><h1>{copy.serviceDetails}</h1><p className="public-site__empty">{copy.serviceMissing}</p></section>;
+    case 'service': {
+      const { service } = data;
+      if (!service) return <section className="public-site__section"><h1>{copy.serviceDetails}</h1><p className="public-site__empty">{copy.serviceMissing}</p></section>;
+
+      const relatedDoctors = service.related_doctors ?? [];
       return (
         <article className="public-site__section public-site__detail">
-          {data.service.category && <p className="public-site__eyebrow">{data.service.category}</p>}
-          <h1>{data.service.name}</h1>
-          <p className="public-site__lead">{data.service.description}</p>
+          {service.category && <p className="public-site__eyebrow">{service.category}</p>}
+          <h1>{service.name}</h1>
+          <p className="public-site__lead">{service.description}</p>
+          {relatedDoctors.length > 0 && (
+            <section>
+              <h2>{copy.serviceDoctors}</h2>
+              <ul>
+                {relatedDoctors.map((doctor) => (
+                  <li key={doctor.slug}>
+                    <a href={localizePath('doctor', locale, doctor.slug)}>{doctor.name}</a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <a className="public-site__button public-site__button--primary" href={localizePath('contacts', locale)}>{copy.contactClinic}</a>
         </article>
       );
+    }
     case 'doctor':
       if (!data.doctor) return <section className="public-site__section"><h1>{copy.doctorDetails}</h1><p className="public-site__empty">{copy.doctorMissing}</p></section>;
       return (
@@ -506,46 +674,48 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
   }
 }
 
-export function PublicSitePage({ route, data }: PublicSitePageProps) {
+export function PublicSitePage(props: PublicSitePageProps | PublicSiteRequestStateProps) {
+  const { route } = props;
+  const data = 'data' in props ? props.data : undefined;
+  const isError = 'status' in props && props.status === 'error';
   const copy = COPY[route.locale];
   return (
     <div className="public-site">
       <a className="public-site__skip-link" href="#main-content">{copy.skipToContent}</a>
-      <SiteHeader locale={route.locale} route={route} copy={copy} />
-      <main className="public-site__main" id="main-content" tabIndex={-1}>
-        <BreadcrumbNavigation
-          items={getPublicSiteBreadcrumbs(route, data)}
-          label={copy.breadcrumbs}
-        />
-        <PageContent route={route} data={data} copy={copy} />
+      <SiteHeader
+        locale={route.locale}
+        route={route}
+        copy={copy}
+        logoUrl={data?.clinic?.logo_url ?? data?.logoUrl}
+      />
+      <main
+        className="public-site__main"
+        id="main-content"
+        tabIndex={-1}
+        aria-busy={data ? undefined : !isError}
+      >
+        {data ? (
+          <>
+            <BreadcrumbNavigation
+              items={getPublicSiteBreadcrumbs(route, data)}
+              label={copy.breadcrumbs}
+            />
+            <PageContent route={route} data={data} copy={copy} />
+          </>
+        ) : (
+          <section className="public-site__error" role={isError ? 'alert' : 'status'}>
+            <h1>{isError ? copy.loadError : copy.loading}</h1>
+            {isError && <a href={getPublicSitePath(route.kind, route.locale, route.slug)}>{copy.retry}</a>}
+          </section>
+        )}
       </main>
-      <SiteFooter clinicName={data.clinic?.name} locale={route.locale} copy={copy} />
+      <SiteFooter clinicName={data?.clinic?.name} locale={route.locale} copy={copy} />
     </div>
   );
 }
 
-export function PublicSiteRequestState({
-  route,
-  status,
-}: {
-  route: PublicSiteRouteMatch;
-  status: 'loading' | 'error';
-}) {
-  const copy = COPY[route.locale];
-  const isError = status === 'error';
-  return (
-    <div className="public-site">
-      <a className="public-site__skip-link" href="#main-content">{copy.skipToContent}</a>
-      <SiteHeader locale={route.locale} route={route} copy={copy} />
-      <main className="public-site__main" id="main-content" tabIndex={-1} aria-busy={!isError}>
-        <section className="public-site__error" role={isError ? 'alert' : 'status'}>
-          <h1>{isError ? copy.loadError : copy.loading}</h1>
-          {isError && <a href={getPublicSitePath(route.kind, route.locale, route.slug)}>{copy.retry}</a>}
-        </section>
-      </main>
-      <SiteFooter locale={route.locale} copy={copy} />
-    </div>
-  );
+export function PublicSiteRequestState(props: PublicSiteRequestStateProps) {
+  return <PublicSitePage {...props} />;
 }
 
 export function PublicSiteFallback() {

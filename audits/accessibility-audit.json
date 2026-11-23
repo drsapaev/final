@@ -52,5 +52,246 @@
     "Only selected public catalog/error states were audited; this is not a complete WCAG 2.2 AA audit.",
     "Local Firefox and WebKit Playwright binaries are absent; the dedicated CI spec runs only in Chromium, so cross-browser behavior remains unverified.",
     "Mobile Chrome used an emulated viewport, not a physical device."
-  ]
+  ],
+  "mobile_reflow_follow_up": {
+    "date": "2026-11-22",
+    "base_sha": "a2f9fad7907a0fbcd2f7f50a10a4a3dda3f9b0b5",
+    "scope": "Targeted mobile public header, catalog filters and keyboard bypass, after catalog data is ready.",
+    "live_baseline": {
+      "deployment_id": "dpl_9zQfuyXCjvzzhpuQme1ps9hncjqb",
+      "width_css_px": 320,
+      "chrome": "On /ru/services, Tab reached the menu before the language switch despite the opposite visual order. The open menu covered the center of a focused service link.",
+      "firefox_text_only_200_percent": "Brand text extended to 403 CSS px and the open menu extended its link text left of the viewport on the measured public catalog pages."
+    },
+    "fix": "Align mobile DOM and visual order, let the expanded native disclosure occupy normal flow, and wrap brand and menu text at narrow widths.",
+    "isolated_vite": {
+      "locales": [
+        "ru",
+        "uz-Latn"
+      ],
+      "routes": [
+        "services",
+        "prices",
+        "doctors",
+        "contacts"
+      ],
+      "viewport_css_px": 320,
+      "reduced_motion": "reduce",
+      "chrome_default_cases_passed": 8,
+      "firefox_default_cases_passed": 8,
+      "firefox_text_only_200_percent_cases_passed": 8,
+      "probe_errors": 0,
+      "findings_after_fix": 0,
+      "calibration": {
+        "viewport_width_unchanged": true,
+        "device_pixel_ratio_unchanged": true,
+        "fixed_box_width_unchanged": true,
+        "text_width_ratio": 2,
+        "button_text_width_ratio": 2
+      },
+      "checks": [
+        "Actual Tab order and visible focus",
+        "Menu opens and leaves subsequent focused controls exposed",
+        "Brand and menu text fits viewport",
+        "Skip link transfers focus to main",
+        "Catalog query and keyboard reset restore results and focus",
+        "Sampled reduced-motion scroll and animation settings"
+      ],
+      "teardown": "Owned browser profiles and loopback services stopped."
+    },
+    "regression": "The existing Playwright accessibility spec now exercises real forward and reverse Tab through the mobile services header and catalog for both locales and Vite/Nitro. It tests that the open menu does not cover the focused search control or service link.",
+    "remaining": [
+      "Live Narrator announcements and native Safari",
+      "Physical devices",
+      "Desktop text-only enlargement is tracked in desktop_reflow_follow_up.",
+      "Full WCAG 2.2 AA audit and full staging validation"
+    ]
+  },
+  "loading_focus_follow_up": {
+    "date": "2026-11-22",
+    "base_sha": "590d8461f7712ef54fbea556f9373df03891f2cf",
+    "runtime": "Isolated Vite using synthetic catalog responses",
+    "routes": [
+      "/services",
+      "/ru/services"
+    ],
+    "browsers": [
+      "Chrome",
+      "Firefox"
+    ],
+    "method": "Hold the required catalog response. Press Tab and Enter to focus main while loading, then release the response and read the active element and the original node identity.",
+    "baseline": {
+      "successful_load_cases_losing_focus": 4,
+      "http_503_cases_retaining_focus": 4,
+      "observation": "After success, the browser retained #main-content, focused the body and returned to the skip link on the next Tab."
+    },
+    "fix": "Keep the shared header, native skip link and main landmark mounted across request states for a single pathname.",
+    "result": {
+      "cases_passed": 8,
+      "ready_cases_retaining_main": 4,
+      "http_503_cases_retaining_main": 4,
+      "after_ready_next_tab": "Localized breadcrumb inside main",
+      "after_http_503_next_tab": "Localized retry link inside main",
+      "fixture_teardown": "PASS"
+    },
+    "regression": "Playwright holds a real synthetic catalog response in both Vite locales and checks the same focused main before and after success, including the next Tab stop.",
+    "remaining": [
+      "Actual screen-reader speech",
+      "Native Safari and physical devices",
+      "Full WCAG 2.2 AA and staging acceptance"
+    ]
+  },
+  "desktop_reflow_follow_up": {
+    "date": "2026-11-22",
+    "base_sha": "e0a617c1ba3a114ffbf80b601d1a46a45245ecb6",
+    "scope": "Desktop public header on the Russian and Uzbek services routes.",
+    "live_baseline": {
+      "deployment_id": "dpl_GVLAziLa16fs1QvFximiUpwxRmHn",
+      "served_sha": "590d8461f7712ef54fbea556f9373df03891f2cf",
+      "same_stylesheet_as_base": true,
+      "widths_css_px": [960, 1280],
+      "firefox_default_cases_passed": 4,
+      "firefox_text_only_200_percent_cases_with_findings": 3,
+      "observed_right_overflow_css_px": {
+        "960_uz-Latn": 276,
+        "960_ru": 206,
+        "1280_uz-Latn": 20
+      },
+      "observation": "Navigation or language links and their focused targets extended beyond the visible viewport."
+    },
+    "fix": "Let the header groups and desktop links wrap in DOM order. Allow long text to break and leave room for focus outlines.",
+    "isolated_vite": {
+      "fixture": "Repository synthetic public-site API",
+      "routes": ["/services", "/ru/services"],
+      "widths_css_px": [761, 960, 1280],
+      "firefox_default_cases_passed": 6,
+      "firefox_text_only_200_percent_cases_passed": 6,
+      "findings_after_fix": 0,
+      "checks": [
+        "Native Firefox text-only enlargement doubled calibration text, button text and route brand text while viewport, fixed box width and DPR stayed constant.",
+        "The whole header fit with no horizontal overflow, clipped controls or clipped text fragments.",
+        "Actual Tab reached the skip link, brand, five navigation links and language switch with visible, exposed focus."
+      ],
+      "teardown": "Owned browser profile, synthetic API and Vite listeners were removed."
+    },
+    "regression": "The Playwright spec doubles computed header-link font sizes at 960 CSS px in Vite and Nitro for each locale and checks actual Tab, visible labels and target bounds. Existing mobile keyboard checks cover the native menu.",
+    "production_follow_up": {
+      "date": "2026-11-22",
+      "measured_origin": "https://finalclinic.fyi",
+      "deployment_id": "dpl_GgKYE3hvN1aSwaH3rgVNt7AXgGZu",
+      "served_sha": "1c9ab7a97b50ed7ed8430bbb6581b9aa2c0da89a",
+      "verified_deployment_before_and_after": true,
+      "routes": ["/services", "/ru/services"],
+      "widths_css_px": [761, 960, 1280],
+      "firefox_default_cases_passed": 6,
+      "firefox_text_only_200_percent_cases_passed": 6,
+      "findings": 0,
+      "checks": "Calibrated native Firefox zoom doubled text widths with stable viewport, device pixel ratio and fixed box. At both zoom levels, the header had zero horizontal overflow and actual Tab reached the skip link, brand, five menu links and language switch with exposed focus.",
+      "teardown": "The disposable Firefox profile was deleted."
+    },
+    "remaining": [
+      "Actual screen-reader speech, native Safari and physical devices",
+      "Full WCAG 2.2 AA and staging acceptance"
+    ]
+  },
+  "published_catalog_follow_up": {
+    "date": "2026-11-22",
+    "origin": "https://finalclinic.fyi",
+    "deployment_id": "dpl_852SPhftSnWzczjabJXM8L4YCVTy",
+    "deployment_sha": "718bd9529556b922c27cd1af8eace73e0e04b2e4",
+    "deployment_identity_check": "Vercel resolved the Production alias to this READY deployment before and after the sweep.",
+    "engine": {
+      "browser": "Chrome 157.0.8103.79",
+      "axe_core": "4.14.0",
+      "axe_tags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
+    },
+    "scope": {
+      "source": "All 14 URLs in the public sitemap, seven in each of ru and uz-Latn.",
+      "desktop_viewport_css_px": [1440, 900],
+      "narrow_viewport_css_px": [390, 844],
+      "narrow_profile": "Chrome with its default user agent, emulated touch input and device scale factor 2."
+    },
+    "results": {
+      "successful_page_loads": 28,
+      "correct_document_languages": 28,
+      "skip_link_first_tab_and_enter_moved_focus_to_main": 28,
+      "additional_scans_with_narrow_menu_open": 2,
+      "axe_scans": 30,
+      "axe_violations": 0,
+      "axe_incomplete": 0
+    },
+    "computed_contrast": {
+      "method": "Calculate WCAG relative luminance from effective browser colors and their composited solid backgrounds. Compare the unrounded ratios to the thresholds.",
+      "desktop_header_nav_text_min": 4.87,
+      "language_link_text_min": 4.87,
+      "narrow_menu_label_text_min": 19.54,
+      "open_narrow_menu_link_text_min": 5.05,
+      "focused_skip_link_text_min": 18.84,
+      "focused_skip_link_outline_against_page_background_min": 4.27,
+      "primary_action_text_min": 5.43,
+      "current_breadcrumb_text_min": 18.84,
+      "text_threshold": 4.5,
+      "focus_outline_threshold": 3.0
+    },
+    "reduced_motion": {
+      "preference": "prefers-reduced-motion: reduce",
+      "max_computed_transition_ms": 0.01,
+      "max_computed_animation_ms": 0.01,
+      "computed_smooth_scroll_observed": false,
+      "scope": "Visible public-site content and generated pseudo-elements in the scanned states."
+    },
+    "procedure": "Read the sitemap, open each URL in a fresh Chrome page at each viewport with reduced motion enabled, check HTTP 200 and document language, run the listed Axe tags, then press Tab and Enter to verify focus. Open the menu with Enter on both narrow home pages and run Axe again. Keep browser requests on the site's own frontend and public API.",
+    "limitations": [
+      "A separate Pixel 7 Chrome emulation profile received connection resets for all 14 document requests and yielded no scans.",
+      "Contrast samples cover default states and the visible skip-link focus outline. Hover, forced colors and Vite dark mode were outside this measurement.",
+      "Exact screen-reader speech, physical devices, native Safari and complete WCAG conformance remain unverified."
+    ]
+  },
+  "forced_colors_keyboard_follow_up": {
+    "date": "2026-11-22",
+    "origin": "https://finalclinic.fyi",
+    "deployment_id": "dpl_FatQQZaGA9nTMJ2JdfQjprktTzym",
+    "deployment_sha": "b32c990d9f7fd90199ff60038243269b0328896c",
+    "verified_deployment_before_and_after": true,
+    "browser": "Headless Chrome 157.0.8103.79 on Windows, using Playwright.",
+    "routes": [
+      "/services",
+      "/ru/services"
+    ],
+    "document_languages": [
+      "uz-Latn",
+      "ru"
+    ],
+    "viewport_widths_css_px": [1366, 390],
+    "forced_colors": {
+      "observed_at_utc": "2026-11-22T14:22:57.633Z",
+      "media_features": {
+        "forced-colors": "active",
+        "prefers-color-scheme": "light"
+      },
+      "cases_passed": 4,
+      "minimum_computed_outline_contrast": 15.134,
+      "outlines": "Computed 3 CSS px solid outlines on sampled links and filter controls and native auto outlines on main and the mobile disclosure."
+    },
+    "light_comparison": {
+      "observed_at_utc": "2026-11-22T14:23:44.888Z",
+      "cases_passed": 4,
+      "minimum_computed_outline_contrast": 4.269,
+      "navigation_hover_text_contrast": {
+        "desktop": 6.53,
+        "narrow": 6.056
+      }
+    },
+    "checks": [
+      "Loaded each route with HTTP 200 and the expected document language in a fresh browser context for each viewport and color mode.",
+      "First Tab revealed the skip link. Enter focused main and set the target fragment. Subsequent Tab reached the search, category selector and reset control.",
+      "Keyboard focus reached the desktop navigation. In the narrow layout Enter opened the native disclosure, Tab reached its first link, and Shift+Tab followed by Enter closed the menu.",
+      "Checked :focus-visible, viewport intersection and computed outline contrast against the adjacent solid surface. In the light comparison also measured the hovered navigation text."
+    ],
+    "limitations": [
+      "An initial forced-colors attempt encountered connection resets. The recorded complete sweeps used a fresh browser process with QUIC and HTTP/2 disabled.",
+      "Measurements cover the browser's emulated light forced-colors palette and these two routes. Dark palettes, physical devices, native Safari and actual screen-reader speech remain separate checks.",
+      "No new Axe scan or full WCAG 2.2 AA or staging acceptance was performed in these sweeps. Previous Axe results remain in their original audit section."
+    ]
+  }
 }
