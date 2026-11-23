@@ -577,5 +577,71 @@
       "min_changed_pixels_with_reference_contrast_at_least_3_to_1": 6744
     },
     "limits": "Measures the sampled keyboard controls and representative synthetic routes in one Chromium configuration. Raster focus samples do not establish WCAG conformance. Native select popup, rendered glyph clipping across the full document, physical hardware and other native browsers remain open."
+  },
+  "orca_catalog_result_status": {
+    "baseline_sha": "d17976144d554ac5ddcccdd52812b43b33d34b2a",
+    "candidate_sha": "2f0176c24c98601cc296b462bf466275053cafae",
+    "browser": "Google Chrome for Testing 153.0.8010.12 (Playwright Chromium revision 1243)",
+    "assistive_technology": "Orca 46.1 (46.1-1ubuntu1), AT-SPI 2.52.0-1build1",
+    "synthesis": "Speech Dispatcher 0.12.0~rc2-2build3, speech-dispatcher-espeak-ng 0.12.0~rc2-2build3, eSpeak NG 1.51+dfsg-12build1",
+    "runtime": "Exact compiled Nitro with the repository's synthetic catalogue in an Ubuntu 24.04 container with loopback-only networking. The served service worker and versioned filter script matched the candidate hashes.",
+    "method": "Open and commit the native category popup using X11 keys. Search for a synthetic term with zero matches, then reset by keyboard. Check visible rows, focus, and the Speech Dispatcher start and end for the corresponding message ID.",
+    "native_keyboard": "Both popups opened. Enter committed the category, search kept focus while showing zero results, and reset restored four rows and returned focus to search.",
+    "baseline": {
+      "observed_from_utc": "2026-11-23T20:19:18.357Z",
+      "observed_to_utc": "2026-11-23T20:19:37.839521Z",
+      "ru_status_messages": [
+        "Найдено2",
+        "Найдено0",
+        "Найдено4"
+      ],
+      "uz_latn_status_messages": [
+        "Natijalar2",
+        "Natijalar0",
+        "Natijalar4"
+      ],
+      "finding": "All six announcements joined the label and number without a word boundary."
+    },
+    "candidate_routes": [
+      {
+        "path": "/ru/services",
+        "language": "ru",
+        "observed_from_utc": "2026-11-23T20:29:54.628Z",
+        "observed_to_utc": "2026-11-23T20:30:12.221732Z",
+        "announced_messages": [
+          "Найдено 2",
+          "Найдено 0",
+          "Найдено 4"
+        ],
+        "dispatcher_completed_message_ids": [
+          50,
+          55,
+          63
+        ]
+      },
+      {
+        "path": "/services",
+        "language": "uz-Latn",
+        "observed_from_utc": "2026-11-23T20:33:56.854Z",
+        "observed_to_utc": "2026-11-23T20:34:13.811737Z",
+        "announced_messages": [
+          "Natijalar 2",
+          "Natijalar 0",
+          "Natijalar 4"
+        ],
+        "dispatcher_completed_message_ids": [
+          42,
+          47,
+          58
+        ]
+      }
+    ],
+    "candidate_dom": "The same status region contained one complete text node with aria-atomic=true in all six observed updates.",
+    "windows_checks": "On the baseline exact build, headless Windows Chrome 157 verified keyboard interaction and passed eight scoped Axe scans for four states in both languages. The candidate passed both dedicated Vite and Nitro catalogue Playwright tests at 320 and 1440 CSS px, including the unenhanced-catalogue fallback.",
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html"
+    ],
+    "limits": "Candidate locales used separate Chromium and Orca sessions. The protocol confirms the phrases progressed through synthesis. Physical listening, pronunciation, popup clipping, other assistive technologies, native Safari, physical devices and full WCAG conformance remain open."
   }
 }

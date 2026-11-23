@@ -55,7 +55,7 @@ const PAGES = [
 ] as const;
 
 const AXE_WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
-const CATALOG_FILTER_ASSET = '/public-site-catalog-filter.js';
+const CATALOG_FILTER_ASSET = '/public-site-catalog-filter.js?v=2';
 const PRIVATE_SEARCH_PROBE = 'synthetic-private-qa-741e';
 const CATALOG_COPY = {
   'uz-Latn': {
