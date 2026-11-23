@@ -42,6 +42,10 @@ from app.models.refund_deposit import (
 from app.models.visit import Visit
 from app.repositories.queue_api_repository import QueueApiRepository
 from app.services.fcm_service import get_fcm_service
+from app.services.online_queue_new_service import (
+    OnlineQueueNewDomainError,
+    OnlineQueueNewService,
+)
 from app.services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
@@ -425,6 +429,12 @@ class ForceMajeureService:
                                 patient_id=entry.patient_id, payment_id=payment.id, visit_id=entry.visit_id,
                                 amount=payment.amount, reason=reason, refund_type=entry_refund_type, is_automatic=True,
                             )
+
+                    elif payment is None and entry.visit_id:
+                        try:
+                            OnlineQueueNewService(self.db).check_pending_invoice_cancellation(entry.visit_id)
+                        except OnlineQueueNewDomainError as exc:
+                            raise ForceMajeureError(exc.detail) from exc
 
                     # The refund evidence and queue transition share this
                     # savepoint, including errors after staging a refund.

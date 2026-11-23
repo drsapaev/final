@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from threading import Barrier
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -16,8 +17,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
+from starlette.requests import Request
+from tests.conftest import mint_access_token
 
 from app.api.deps import get_db
+from app.api.v1.endpoints.registrar_wizard import _cart
 from app.api.v1.endpoints.registrar_wizard._cart import (
     CartRequest,
     create_cart_appointments,
@@ -25,22 +29,30 @@ from app.api.v1.endpoints.registrar_wizard._cart import (
 from app.core.config import settings
 from app.db.capability_namespace import capability_schema_name
 from app.main import app
+from app.models.all_free_request import AllFreeRequest, AllFreeRequestEvent
+from app.models.audit import AuditLog
+from app.models.clinic import ClinicSettings, Doctor
 from app.models.discount_benefits import (
     Benefit,
     BenefitApplication,
     BenefitType,
     PatientBenefit,
 )
+from app.models.encounter import Encounter
 from app.models.encounter_benefit_ledger import (
     EncounterBenefitAllocation,
     EncounterBenefitApplication,
     EncounterBenefitVisitSnapshot,
 )
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.refund_deposit import RefundType
 from app.models.service import Service
 from app.models.user import User
+from app.models.visit import Visit, VisitService
+from app.services.all_free_request_service import AllFreeRequestService
 from app.services.encounter_benefit_allocation import (
     BenefitLine,
     allocate_encounter_benefit,
@@ -49,7 +61,12 @@ from app.services.encounter_benefit_authority import (
     BenefitUsageEvidence,
     calculate_quota_usage,
 )
-from tests.conftest import mint_access_token
+from app.services.force_majeure_service import ForceMajeureService
+from app.services.online_queue_new_service import (
+    OnlineQueueNewDomainError,
+    OnlineQueueNewService,
+)
+from app.services.profile_contact_security import capture_profile_bearer
 
 pytestmark = pytest.mark.integration
 ROUTE = "/api/v1/discount-benefits/benefits/encounter/apply"
@@ -301,3 +318,177 @@ def test_caller_amount_is_not_part_of_the_approval_contract(client, admin_auth_h
     response = client.post(ROUTE, headers=admin_auth_headers,
                            json={"invoice_id": 1, "patient_benefit_id": 1, "amount": "0.01"})
     assert response.status_code == 422, response.text
+
+
+def test_approved_all_free_group_preserves_decisions_on_queue_cancellation(
+    configured_benefit_db, benefit_client, monkeypatch,
+):
+    admin, runtime = configured_benefit_db
+    monkeypatch.setattr(
+        _cart.notification_sender_service, "send_all_free_decision_notification",
+        AsyncMock(return_value=True),
+    )
+    grants = {
+        "audit_logs": "INSERT",
+        "clinic_settings": "SELECT",
+        "encounters": "SELECT, UPDATE",
+        "queue_entries": "SELECT, UPDATE",
+        "visits": "SELECT, UPDATE",
+        "payments": "SELECT",
+        "payment_visits": "SELECT",
+        "payment_invoices": "SELECT, UPDATE",
+        "payment_invoice_visits": "SELECT, UPDATE, DELETE",
+        "visit_services": "SELECT, UPDATE",
+        "deposit_transactions": "SELECT",
+        "refund_requests": "SELECT",
+    }
+    with admin.begin() as conn:
+        for table, privileges in grants.items():
+            conn.exec_driver_sql(f"GRANT {privileges} ON public.{table} TO {RUNTIME}")
+            if conn.scalar(text("SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass(:table)"), {"table": table}):
+                for privilege in privileges.split(", "):
+                    condition = "WITH CHECK (true)" if privilege == "INSERT" else "USING (true)"
+                    conn.exec_driver_sql(
+                        f"CREATE POLICY synthetic_all_free_cancel_{privilege.lower()} "
+                        f"ON public.{table} FOR {privilege} TO {RUNTIME} {condition}"
+                    )
+        conn.exec_driver_sql(f"GRANT USAGE ON SEQUENCE public.audit_logs_id_seq TO {RUNTIME}")
+        conn.exec_driver_sql(f"GRANT SELECT (id) ON public.audit_logs TO {RUNTIME}")
+        if conn.scalar(text("SELECT relrowsecurity FROM pg_class WHERE oid='public.audit_logs'::regclass")):
+            conn.exec_driver_sql(
+                f"CREATE POLICY synthetic_all_free_return_id ON public.audit_logs FOR SELECT TO {RUNTIME} USING (true)"
+            )
+
+    with runtime.connect() as conn:
+        assert conn.scalar(text("""
+            SELECT NOT rolsuper AND NOT rolbypassrls
+            FROM pg_catalog.pg_roles WHERE rolname=CURRENT_USER
+        """))
+        assert conn.scalar(text("""
+            SELECT NOT has_any_column_privilege('public.emr_records', 'SELECT')
+        """))
+        assert conn.scalar(text("""
+            SELECT has_table_privilege('public.audit_logs', 'INSERT')
+               AND has_column_privilege('public.audit_logs', 'id', 'SELECT')
+               AND NOT has_column_privilege('public.audit_logs', 'payload', 'SELECT')
+               AND NOT has_table_privilege('public.audit_logs', 'UPDATE,DELETE')
+        """))
+
+    amounts = Decimal("25.00"), Decimal("15.00")
+    visit_day = date.today() + timedelta(days=2)
+    with Session(admin) as db, db.begin():
+        setting = db.query(ClinicSettings).filter_by(key="all_free_auto_approve").one_or_none()
+        if setting is None:
+            db.add(ClinicSettings(key="all_free_auto_approve", value=False, category="benefits"))
+        else:
+            setting.value = False
+        actor = User(username="synthetic-all-free-cancel", hashed_password="!", role="Admin", is_active=True)
+        patient = Patient(first_name="SYNTHETIC", last_name="All Free Cancellation", is_deleted=False)
+        db.add_all([actor, patient])
+        db.flush()
+        actor_id, patient_id = actor.id, patient.id
+        headers = {"Authorization": "Bearer " + mint_access_token(actor)}
+        encounter = Encounter(patient_id=patient_id, provenance="new")
+        db.add(encounter)
+        db.flush()
+        encounter_id = encounter.id
+        visit_ids = []
+        for sequence, amount in enumerate(amounts):
+            service = Service(code=f"all-free-cancel-{sequence}", name="Synthetic service", price=amount,
+                              currency="UZS", active=True, requires_doctor=False, is_consultation=False)
+            visit = Visit(
+                patient_id=patient_id, encounter_id=encounter_id,
+                status="pending_confirmation", visit_date=visit_day,
+                discount_mode="all_free", approval_status="pending",
+            )
+            db.add_all([service, visit])
+            db.flush()
+            db.add(VisitService(visit_id=visit.id, service_id=service.id, name=service.name,
+                                price=amount, qty=1, currency="UZS"))
+            visit_ids.append(visit.id)
+
+    with Session(runtime) as db, db.begin():
+        actor = db.get(User, actor_id)
+        request = Request({"type": "http", "headers": [(b"authorization", headers["Authorization"].encode())]})
+        bearer = capture_profile_bearer(request, actor)
+        requests = []
+        for visit_id, amount in zip(visit_ids, amounts, strict=True):
+            visit = db.get(Visit, visit_id)
+            staged = AllFreeRequestService(db).stage_request(
+                visit_id=visit.id, expected_epoch=visit.confirmation_context_epoch,
+                bearer=bearer, require_financial_group=True,
+            )
+            assert (staged.baseline_total, staged.status) == (amount, "pending")
+            requests.append(staged.id)
+
+    with Session(admin) as db, db.begin():
+        encounter = db.get(Encounter, encounter_id)
+        invoice = PaymentInvoice(
+            patient_id=patient_id, registrar_encounter_id_snapshot=encounter.id,
+            registrar_encounter_generation_snapshot=encounter.generation,
+            total_amount=sum(amounts), currency="UZS", status="pending",
+        )
+        db.add(invoice)
+        db.flush()
+        invoice_id = invoice.id
+        db.add_all([
+            PaymentInvoiceVisit(invoice_id=invoice_id, visit_id=visit_id, visit_amount=amount)
+            for visit_id, amount in zip(visit_ids, amounts, strict=True)
+        ])
+
+    response = benefit_client.post(
+        "/api/v1/admin/all-free-approve", headers=headers,
+        json={"visit_id": visit_ids[0], "action": "approve"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["new_status"] == "approved"
+
+    with Session(admin) as db, db.begin():
+        doctor = Doctor(specialty="cardiology_common")
+        db.add(doctor)
+        db.flush()
+        queue = DailyQueue(day=visit_day, specialist_id=doctor.id, active=True)
+        db.add(queue)
+        db.flush()
+        entry = OnlineQueueEntry(queue_id=queue.id, patient_id=patient_id, visit_id=visit_ids[0],
+                                 number=1, source="desk", status="waiting", services=[], service_codes=[])
+        db.add(entry)
+        db.flush()
+        entry_id = entry.id
+        first = db.get(AllFreeRequest, requests[0])
+        assert (first.status, first.baseline_total, first.decided_by_user_id_snapshot) == ("approved", amounts[0], actor_id)
+        assert db.get(AllFreeRequest, requests[1]).status == "pending"
+        original_visit_state = [(db.get(Visit, visit_id).status, db.get(Visit, visit_id).approval_status)
+                                for visit_id in visit_ids]
+        assert db.get(PaymentInvoice, invoice_id).total_amount == amounts[1]
+
+    with Session(runtime) as db:
+        with pytest.raises(OnlineQueueNewDomainError) as failure:
+            OnlineQueueNewService(db).cancel_entry(
+                entry_id=entry_id, current_user=db.get(User, actor_id), reason="Synthetic cancellation",
+            )
+        assert failure.value.status_code == 409
+        assert "льгот" in failure.value.detail.lower()
+
+    with Session(runtime) as db:
+        outcome = ForceMajeureService(db).cancel_entries_with_refund(
+            [db.get(OnlineQueueEntry, entry_id)], reason="Synthetic force majeure",
+            refund_type=RefundType.DEPOSIT, performed_by_id=actor_id, send_notifications=False,
+        )
+        assert (outcome["cancelled"], outcome["failed"]) == (0, 1)
+        assert "льгот" in outcome["errors"][0]["error"].lower()
+
+    with Session(admin) as db:
+        assert db.get(OnlineQueueEntry, entry_id).status == "waiting"
+        assert [(db.get(Visit, visit_id).status, db.get(Visit, visit_id).approval_status)
+                for visit_id in visit_ids] == original_visit_state
+        invoice = db.get(PaymentInvoice, invoice_id)
+        assert (invoice.status, invoice.total_amount) == ("pending", amounts[1])
+        assert dict(db.query(PaymentInvoiceVisit.visit_id, PaymentInvoiceVisit.visit_amount)
+                    .filter_by(invoice_id=invoice_id).all()) == {visit_ids[0]: Decimal("0.00"), visit_ids[1]: amounts[1]}
+        assert db.get(AllFreeRequest, requests[0]).decided_by_user_id_snapshot == actor_id
+        assert db.query(AllFreeRequestEvent).filter_by(
+            request_id=requests[0], event_type="approved", actor_user_id_snapshot=actor_id,
+        ).count() == 1
+        assert db.get(AllFreeRequest, requests[1]).status == "pending"
+        assert db.query(AuditLog).filter_by(action="invoice.cancel_visit", entity_id=invoice_id).count() == 0

@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import OnlineQueueEntry
@@ -14,6 +15,8 @@ from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit
 from app.repositories.online_queue_new_repository import OnlineQueueNewRepository
+from app.services.encounter_benefit_net import require_no_existing_financial_adjustment
+from app.services.encounter_financial_fence import FinancialFenceError
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
 
@@ -178,6 +181,7 @@ class OnlineQueueNewService:
                 ),
             )
         self._assert_visit_has_no_payments(visit)
+        self.check_pending_invoice_cancellation(visit.id)
         canceled_now = self._stage_linked_visit_cancel(
             visit, current_user=current_user
         )
@@ -261,6 +265,37 @@ class OnlineQueueNewService:
                 ),
             )
 
+    def check_pending_invoice_cancellation(self, visit_id: int) -> None:
+        """Hold the draft lock while checking approvals before cancellation."""
+        drafts = (
+            self.db.query(PaymentInvoice.id, PaymentInvoice.registrar_encounter_id_snapshot)
+            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+            .filter(PaymentInvoiceVisit.visit_id == visit_id, PaymentInvoice.status == "pending")
+            .order_by(PaymentInvoice.id)
+            .with_for_update(of=PaymentInvoice)
+            .all()
+        )
+        for invoice_id, encounter_id in drafts:
+            approved_visit = (
+                self.db.query(Visit.id)
+                .join(PaymentInvoiceVisit, PaymentInvoiceVisit.visit_id == Visit.id)
+                .filter(
+                    PaymentInvoiceVisit.invoice_id == invoice_id,
+                    func.lower(Visit.approval_status) == "approved",
+                    func.lower(Visit.discount_mode).in_(("all_free", "benefit")),
+                )
+                .first()
+            )
+            if approved_visit is not None:
+                raise OnlineQueueNewDomainError(
+                    409, "Требуется повторное решение администратора по льготе или бесплатным услугам",
+                )
+            if encounter_id is not None:
+                try:
+                    require_no_existing_financial_adjustment(self.db, visit_id)
+                except FinancialFenceError as exc:
+                    raise OnlineQueueNewDomainError(409, str(exc)) from exc
+
     def _release_pending_invoice_for_visit(self, visit: Visit) -> None:
         """Финансовый хвост отмены: убрать долю визита из pending-счёта.
 
@@ -282,6 +317,7 @@ class OnlineQueueNewService:
                 self.db.query(PaymentInvoice)
                 .filter(PaymentInvoice.id == link.invoice_id)
                 .with_for_update()
+                .populate_existing()
                 .first()
             )
             if invoice is None:
