@@ -27,7 +27,10 @@ from app.models.refund_deposit import (
     RefundRequestStatus,
     RefundType,
 )
-from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
+from app.repositories.force_majeure_api_repository import (
+    ForceMajeureApiRepository,
+    RefundClaimEvidenceError,
+)
 from app.services.all_free_approval import (
     ALL_FREE_DECISION_REQUIRED,
     awaits_all_free_decision,
@@ -473,13 +476,16 @@ class ForceMajeureApiService:
 
         try:
             if action == "reject":
-                self.repository.release_refund_claim_for_request(req.id)
+                self.repository.release_refund_claim_for_request(req.id, payment_id=req.payment_id)
             self.repository.record_refund_request_transition(
                 req,
                 previous_status=previous_status,
                 actor_role=getattr(current_user, "role", None),
             )
             self.repository.commit()
+        except RefundClaimEvidenceError:
+            self.repository.rollback()
+            raise ForceMajeureApiDomainError(409, "Резерв возврата требует сверки") from None
         except SQLAlchemyError as exc:
             self.repository.rollback()
             logger.warning(

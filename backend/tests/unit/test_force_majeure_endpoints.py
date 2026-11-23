@@ -648,6 +648,59 @@ def test_force_refund_preserves_ambiguous_or_already_reserved_funds(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("action", ["deposit", "bank_transfer", "reject"])
+def test_refund_claim_requires_evidence_from_the_same_payment(
+    client, db_session, test_doctor, test_patient, admin_auth_headers, action,
+):
+    queue, (entry, _), (payment, other_payment) = _seed_bound_queue(db_session, test_doctor, test_patient)
+    request_status = "pending" if action == "reject" else "rejected"
+    request = RefundRequest(
+        patient_id=test_patient.id, payment_id=other_payment.id, visit_id=other_payment.visit_id,
+        original_amount=other_payment.amount, refund_amount=other_payment.amount,
+        status=request_status, refund_type="bank_transfer", is_automatic=True,
+    )
+    db_session.add(request)
+    db_session.flush()
+    claim = PaymentRefundClaim(
+        payment_id=payment.id, channel="refund_request", refund_request_id=request.id,
+    )
+    db_session.add(claim)
+    db_session.commit()
+    claim_id = claim.id
+
+    if action == "reject":
+        response = client.post(
+            f"{FINANCIAL_PREFIX}/refund-requests/{request.id}/process",
+            headers=admin_auth_headers,
+            json={"action": action, "rejection_reason": "SYNTHETIC"},
+        )
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Резерв возврата требует сверки"
+    else:
+        response = client.post(CANCEL_PATH, headers=admin_auth_headers, json={
+            "specialist_id": test_doctor.id, "entry_ids": [entry.id], "target_date": str(queue.day),
+            "refund_type": action, "reason": "SYNTHETIC", "send_notifications": False,
+        })
+        assert response.status_code == 200
+        result = response.json()
+        assert result["cancelled"] == 0 and result["failed"] == 1
+        assert result["errors"] == [{"entry_id": entry.id, "error": "Резерв возврата требует сверки"}]
+
+    db_session.expire_all()
+    assert entry.status == "waiting"
+    assert payment.status == "paid" and payment.refunded_amount is None
+    assert request.status == request_status and request.processed_by is None
+    assert request.payment_id == other_payment.id
+    [stored_claim] = db_session.query(PaymentRefundClaim).all()
+    assert (stored_claim.id, stored_claim.payment_id, stored_claim.refund_request_id) == (
+        claim_id, payment.id, request.id,
+    )
+    assert db_session.query(RefundRequest).count() == 1
+    assert db_session.query(DepositTransaction).count() == 0
+    assert db_session.query(AuditLog).filter_by(entity_type="refund_request").count() == 0
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("channel", ["deposit", "bank_transfer"])
 def test_refund_claim_write_failure_keeps_queue_entry_retryable(
     client, db_session, test_doctor, test_patient, admin_auth_headers, channel,

@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import insert
+from sqlalchemy import delete, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,29 @@ from app.models.refund_deposit import (
     RefundRequest,
 )
 from app.models.visit import Visit
+
+
+class RefundClaimEvidenceError(Exception):
+    """A stored refund reservation cannot be matched to the current request."""
+
+
+def delete_bank_refund_claim(
+    db: Session, *, claim_id: int, payment_id: int, refund_request_id: int | None,
+) -> bool:
+    """Delete only the reservation whose payment and evidence were checked."""
+    statement = (
+        delete(PaymentRefundClaim)
+        .where(
+            PaymentRefundClaim.id == claim_id,
+            PaymentRefundClaim.payment_id == payment_id,
+            PaymentRefundClaim.refund_request_id == refund_request_id,
+            PaymentRefundClaim.channel == "refund_request",
+            PaymentRefundClaim.deposit_transaction_id.is_(None),
+        )
+        .returning(PaymentRefundClaim.id)
+        .execution_options(synchronize_session="fetch")
+    )
+    return db.execute(statement).scalar_one_or_none() is not None
 
 
 def _record_refund_request_event(
@@ -182,30 +205,23 @@ class ForceMajeureApiRepository:
             .first()
         )
 
-    def release_refund_claim_for_request(self, refund_request_id: int) -> bool:
-        """3808 review round 5 (P1 claim lifecycle): кассирский ``reject``
-        — терминальный НЕ-платящий статус: деньги пациенту не ушли, и
-        единый claim платежа (``payment_refund_claims``, миграция 0088)
-        должен освободиться в ТОЙ ЖЕ транзакции, что и смена статуса,
-        чтобы повторный возврат (исправленная заявка или депозит) стал
-        возможен.
-
-        Удаляется ТОЛЬКО claim, связанный с ЭТОЙ заявкой; свежий claim
-        более поздней заявки (созданной после отклонения этой) не
-        затрагивается. True — claim найден и удалён, False — заявка
-        claim-а не держала (ручная заявка или строка до 0088).
-
-        Lives in the repository so the API service keeps the
-        no-direct-session-calls boundary (test_service_repository_boundary).
-        """
-        claim = (
-            self.db.query(PaymentRefundClaim)
+    def release_refund_claim_for_request(
+        self, refund_request_id: int, *, payment_id: int,
+    ) -> bool:
+        """Release the locked request's reservation in the rejection transaction."""
+        claims = (
+            self.db.query(PaymentRefundClaim.id)
             .filter(PaymentRefundClaim.refund_request_id == refund_request_id)
-            .first()
+            .limit(2)
+            .all()
         )
-        if claim is None:
+        if not claims:
             return False
-        self.db.delete(claim)
+        if len(claims) != 1 or not delete_bank_refund_claim(
+            self.db, claim_id=claims[0].id, payment_id=payment_id,
+            refund_request_id=refund_request_id,
+        ):
+            raise RefundClaimEvidenceError
         return True
 
     def record_refund_request_transition(

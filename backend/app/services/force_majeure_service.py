@@ -43,7 +43,10 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.models.visit import Visit
-from app.repositories.force_majeure_api_repository import record_refund_request_creation
+from app.repositories.force_majeure_api_repository import (
+    delete_bank_refund_claim,
+    record_refund_request_creation,
+)
 from app.repositories.queue_api_repository import QueueApiRepository
 from app.services.encounter_financial_fence import FinancialFenceError
 from app.services.fcm_service import get_fcm_service
@@ -853,31 +856,27 @@ class ForceMajeureService:
         }
 
     def _claim_is_stale(self, claim: PaymentRefundClaim) -> bool:
-        """3808 round 5 (P1 claim lifecycle): claim мёртв, если его
-        банковская заявка закончилась БЕЗ выплаты денег.
-
-        * ``deposit``-канал мёртвым быть не может: зачисление на депозит —
-          уже свершшееся движение денег, обратных статусов у него нет;
-        * ``refund_request``-канал мёртв, когда связанная заявка в
-          терминальном не-платящем статусе (rejected/cancelled) — деньги
-          пациенту НЕ ушли;
-        * если связанная заявка не найдена (строку удалили — FK SET NULL
-          обнулил ссылку), ищем любую ЖИВУЮ автоматическую заявку этого
-          платежа: есть — claim жив (fail-closed к деньгам); живых нет, но
-          есть отклонённые — мёртв; нет вообще — консервативно жив
-          (orphan-claim, разбирается вручную, логируем предупреждение).
-        """
-        if claim.channel == self.REFUND_CHANNEL_DEPOSIT:
+        """Return whether a bank reservation ended without a payout."""
+        if claim.channel == self.REFUND_CHANNEL_DEPOSIT and claim.refund_request_id is None:
             return False
-        request = None
+        if claim.channel != self.REFUND_CHANNEL_REFUND_REQUEST or claim.deposit_transaction_id is not None:
+            raise ForceMajeureError("Резерв возврата требует сверки")
+
         if claim.refund_request_id is not None:
             request = (
                 self.db.query(RefundRequest.status)
-                .filter(RefundRequest.id == claim.refund_request_id)
+                .filter(
+                    RefundRequest.id == claim.refund_request_id,
+                    RefundRequest.payment_id == claim.payment_id,
+                )
                 .first()
             )
-        if request is not None:
+            if request is None:
+                raise ForceMajeureError("Резерв возврата требует сверки")
             return request.status in self.REFUND_REQUEST_FAILED_STATUSES
+
+        # A deleted legacy request clears the foreign key. Release its
+        # reservation only with terminal evidence for this payment.
         automatic_requests = (
             self.db.query(RefundRequest.status)
             .filter(
@@ -886,13 +885,8 @@ class ForceMajeureService:
             )
             .all()
         )
-        if any(
-            req.status in self.REFUND_REQUEST_ACTIVE_STATUSES
-            for req in automatic_requests
-        ):
-            return False
         if automatic_requests:
-            return True
+            return all(req.status in self.REFUND_REQUEST_FAILED_STATUSES for req in automatic_requests)
         logger.warning(
             "PaymentRefundClaim %s (payment %s, channel %s) has no bound "
             "refund request and no automatic requests — treating as live "
@@ -939,17 +933,17 @@ class ForceMajeureService:
         )
         if existing is not None:
             if self._claim_is_stale(existing):
-                # 3808 round 5: терминальный не-платящий статус заявки —
-                # деньги не вернулись, платёж снова доступен для возврата.
+                if not delete_bank_refund_claim(
+                    self.db, claim_id=existing.id, payment_id=payment_id,
+                    refund_request_id=existing.refund_request_id,
+                ):
+                    raise ForceMajeureError("Резерв возврата требует сверки")
                 logger.info(
-                    "Releasing stale PaymentRefundClaim %s (payment %s, "
-                    "channel %s): bound refund request ended without a payout",
+                    "Released stale PaymentRefundClaim %s (payment %s): "
+                    "refund request ended without a payout",
                     existing.id,
                     payment_id,
-                    existing.channel,
                 )
-                self.db.delete(existing)
-                self.db.flush()
             else:
                 return self._already_refunded_by_claim(payment_id, existing)
 
@@ -976,7 +970,7 @@ class ForceMajeureService:
             .filter(PaymentRefundClaim.payment_id == payment_id)
             .first()
         )
-        if winner is None:
+        if winner is None or self._claim_is_stale(winner):
             raise ForceMajeureError("Резерв возврата требует сверки")
         return self._already_refunded_by_claim(payment_id, winner)
 
