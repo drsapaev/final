@@ -19,7 +19,6 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 import jwt as pyjwt
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import AfterValidator, BaseModel, Field
 from sqlalchemy.orm import Session
@@ -52,14 +51,12 @@ def _user_throttle_key(request: Request) -> str:
                 settings.SECRET_KEY,
                 algorithms=[getattr(settings, "ALGORITHM", "HS256")],
             )
-            sub = payload.get("sub")
-            # Round 14 (codex P2): the two mint sites disagree on `sub` —
-            # mobile initial login uses user.username, auth_svc refresh
-            # uses str(user.id) + a `username` claim. Normalize BOTH to the
-            # username so one user holds ONE bucket across token forms.
-            identity = payload.get("username") or sub
-            if identity:
-                return f"push-user:{identity}"
+            from app.core.user_token_claims import is_user_access_claims
+
+            if is_user_access_claims(payload):
+                # Normalize leading zeroes as well: different spellings of
+                # the same signed user ID must share one throttle bucket.
+                return f"push-user:{int(payload['sub'])}"
         except Exception:
             # Expired/garbled token: it cannot survive get_current_user, but
             # the fallback key keeps a bounded per-credential bucket.

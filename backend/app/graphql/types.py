@@ -202,6 +202,7 @@ class AppointmentInput:
     appointment_time: str | None = None
     notes: str | None = None
     services: list[str] | None = None
+    service_ids: list[int] | None = None
 
 
 @strawberry.input

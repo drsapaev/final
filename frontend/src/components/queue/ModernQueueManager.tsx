@@ -1,5 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
@@ -72,14 +72,28 @@ export interface ModernQueueManagerProps {
   [key: string]: unknown;
 }
 
+// PR-3856 review follow-up: stable default for the optional `doctors` prop.
+// A fresh `[]` literal per render changed the prop identity, which flowed
+// into the loadQueue useCallback deps and re-triggered the snapshot-load
+// effect on every render for consumers that omit the prop.
+const EMPTY_DOCTORS: ModernQueueManagerDoctor[] = [];
+
 const ModernQueueManager = ({
   mode,
   selectedDate = getLocalDateString(),
-  selectedDoctor = '',
+  // PR-3856 review follow-up: NO default for selectedDoctor — `undefined` now
+  // strictly means "uncontrolled mode" (internal UI state drives the
+  // selection), while any passed value (INCLUDING the empty string) means
+  // "controlled mode" where the prop is authoritative.
+  selectedDoctor,
   onQueueUpdate,
   onStartVisit,
   language = 'ru',
-  doctors = [],
+  // PR-3856 review follow-up: a stable module-level default — a fresh `[]`
+  // per render changed the `doctors` identity, which (through the
+  // loadQueue → effect chain) could re-trigger snapshot loads on every
+  // render for consumers that omit the prop.
+  doctors = EMPTY_DOCTORS,
   onDoctorChange,
   onDateChange
 }: ModernQueueManagerProps) => {
@@ -101,19 +115,61 @@ const ModernQueueManager = ({
 
   const [internalDoctor, setInternalDoctor] = useState('');
   const [internalDate, setInternalDate] = useState(getLocalDateString());
-  const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== '' ? selectedDoctor : internalDoctor;
+  // PR-3856 review follow-up (controlled vs uncontrolled): when the parent
+  // passes `selectedDoctor`, the prop is authoritative INCLUDING the empty
+  // string — a parent-driven reset (7 → '') must clear the selection
+  // instead of falling back to the last internal UI choice. `undefined`
+  // (prop not passed) keeps the uncontrolled internal-state mode.
+  const effectiveDoctor = selectedDoctor !== undefined ? String(selectedDoctor) : internalDoctor;
   const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [calledPatients, setCalledPatients] = useState<NonNullable<QueueActionResponse['patient']>[]>([]);
   const [startingQueueEntryId, setStartingQueueEntryId] = useState<string | number | null>(null);
+  // QMAN-FE-001 (audit 3886): a failed load of the CURRENT selection must be
+  // visible and recoverable — the previous selection's queue is no longer
+  // presented as current (the hook clears it fail-closed).
+  const [queueLoadError, setQueueLoadError] = useState<string | null>(null);
+  // QMAN-FE-002 (audit 3886): the live doctor/date selection must be
+  // reachable from a ref so a pending call-next response for a superseded
+  // selection can be dropped before it appends to the new selection's
+  // called list.
+  const selectionIdentityRef = useRef({ specialistId: effectiveDoctor, targetDate: effectiveDate });
+  selectionIdentityRef.current = { specialistId: effectiveDoctor, targetDate: effectiveDate };
+
+  // QMAN-FE-002 (audit 3886): called entries belong to ONE doctor/date
+  // selection. A selection transition invalidates the local called list —
+  // entries called under the previous selection must not expose Start
+  // Visit actions under the new one (backend authorization stays the
+  // SSOT; this only stops presenting stale local state as actionable).
+  useEffect(() => {
+    setCalledPatients([]);
+  }, [effectiveDoctor, effectiveDate]);
 
   // RQ-11 (F-10): классификация срока из серверного expires_at (valid/expired/
   // unspecified). Пересчитывается при открытии диалога, чтобы истекший код
   // показывался честно, а не как «действует до: —».
+  // QR-FE-004 (follow-up audit 2026-11-02): пересчёт больше НЕ заморожен
+  // мемо-зависимостями — диалог, открытый ЗА минуту до истечения, доживает
+  // тик до самого горизонта и честно перекрашивается в «истек» (и подпись
+  // скачиваемого постера тоже). Ограниченный таймер до expires_at, без
+  // интервальной нагрузки.
+  const [qrExpiryNow, setQrExpiryNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!showQrDialog || !qrData?.expires_at) return;
+    const horizon = Date.parse(qrData.expires_at);
+    if (Number.isNaN(horizon)) return;
+    const delay = horizon - Date.now();
+    if (delay <= 0) {
+      setQrExpiryNow(Date.now());
+      return;
+    }
+    const timer = setTimeout(() => setQrExpiryNow(Date.now()), delay + 100);
+    return () => clearTimeout(timer);
+  }, [showQrDialog, qrData?.expires_at]);
   const qrExpiryView = useMemo(
-    () => resolveQrExpiryView(qrData?.expires_at, showQrDialog ? new Date() : undefined),
-    [qrData?.expires_at, showQrDialog]
+    () => resolveQrExpiryView(qrData?.expires_at, showQrDialog ? new Date(qrExpiryNow) : undefined),
+    [qrData?.expires_at, showQrDialog, qrExpiryNow]
   );
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
@@ -142,10 +198,10 @@ const ModernQueueManager = ({
 
   // Загрузка данных очереди
   const loadQueue = useCallback(async () => {
-    if (!effectiveDoctor) {
-      return;
-    }
-
+    // REG-FE-068: пустой выбор — валидный переход жизненного цикла: хук
+    // очистит снапшот и сместит эпоху (запоздалый ответ предыдущего врача
+    // не сможет воскресить его очередь). Раньше здесь был ранний return —
+    // очередь отменённого врача оставалась на экране.
     const doctor = doctors.find(
       (candidate) => String(candidate.id) === String(effectiveDoctor)
     );
@@ -156,17 +212,34 @@ const ModernQueueManager = ({
         targetDate: effectiveDate,
         doctor
       });
+      setQueueLoadError(null);
     } catch (error) {
-      // Не показываем тост при автообновлении, чтобы не спамить
+      // QMAN-FE-001 (audit 3886): a failed load of the CURRENT selection is
+      // surfaced as a recoverable error with a retry — the hook has already
+      // cleared the previous selection's data, so nothing stale is
+      // presented as current. (No toast: the polling fallback would spam.)
       logger.error('Ошибка загрузки очереди:', error);
+      // Localized headline always; the raw failure detail rides along in
+      // parentheses so the doctor sees both the meaning and the cause.
+      const loadFailureDetail = getErrorMessage(error);
+      setQueueLoadError(
+        loadFailureDetail
+          ? `${t('misc.mqm_queue_load_failed')} (${loadFailureDetail})`
+          : t('misc.mqm_queue_load_failed')
+      );
     }
+    // `t` is intentionally NOT a dependency: useTranslation returns a fresh
+    // function identity on every render, and adding it here would re-create
+    // `loadQueue` on every render and re-trigger the auto-load effect in an
+    // endless snapshot loop (surfaced by the PR-UI-12-4 e2e geometry check).
+    // The translation is locale-pure for a fixed key — a stale closure only
+    // means the previous locale's text for one error message.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot]);
 
   // Автоматическая загрузка при изменении врача или даты
   useEffect(() => {
-    if (effectiveDoctor) {
-      loadQueue();
-    }
+    loadQueue();
   }, [effectiveDoctor, effectiveDate, loadQueue]);
 
   // Polling для автообновления (fallback для WebSocket)
@@ -347,17 +420,32 @@ const ModernQueueManager = ({
       return;
     }
 
+    // QMAN-FE-002 (audit 3886): snapshot the selection identity this call
+    // belongs to; a response that resolves after the selection moved to
+    // another doctor/date must not append to the new selection's list.
+    const callIdentity = { specialistId: effectiveDoctor, targetDate: effectiveDate };
+
     try {
       const result = await callNextPatientInQueue({
         specialistId: effectiveDoctor,
         targetDate: effectiveDate
       });
 
+      const selectionMoved =
+        String(selectionIdentityRef.current.specialistId) !== String(callIdentity.specialistId) ||
+        String(selectionIdentityRef.current.targetDate) !== String(callIdentity.targetDate);
+
       if (result?.success && result?.patient) {
         if (onStartVisit && result.patient.id !== null && result.patient.id !== undefined) {
-          setCalledPatients((current) => current.some((patient) => String(patient.id) === String(result.patient?.id))
-            ? current
-            : [...current, result.patient!]);
+          if (selectionMoved) {
+            // The call succeeded for the PREVIOUS selection — report it but
+            // never expose its Start Visit action under the new selection.
+            logger.warn('[ModernQueueManager] call-next resolved for a superseded selection — dropping the local called entry');
+          } else {
+            setCalledPatients((current) => current.some((patient) => String(patient.id) === String(result.patient?.id))
+              ? current
+              : [...current, result.patient!]);
+          }
         } else if (onStartVisit) {
           toast.error(t('dental.dental_panel_start_visit_failed'));
         }
@@ -578,7 +666,7 @@ const ModernQueueManager = ({
                 id="modern-queue-doctor"
                 aria-label={t('misc.mqm_select_doctor')}
                 value={effectiveDoctor === '' ? '' : String(effectiveDoctor)}
-                onChange={(newDoctor: unknown) => {
+                onValueChange={(newDoctor) => {
                   const v = String(newDoctor);
                   setInternalDoctor(v);
                   if (onDoctorChange) {
@@ -795,6 +883,22 @@ const ModernQueueManager = ({
             }
           </div>
 
+          {/* QMAN-FE-001 (audit 3886): a failed load of the CURRENT selection
+              is visible and recoverable — the previous selection's queue has
+              been cleared by the hook and must not be presented as current. */}
+          {queueLoadError && (
+            <div className="mqm-queue-load-error" role="alert">
+              <span>{queueLoadError}</span>
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => { void loadQueue(); }}
+              >
+                {t('misc.mqm_retry_load')}
+              </Button>
+            </div>
+          )}
+
           <QueueTable
             queueData={queueData as unknown as QueueTableData | null}
             effectiveDoctor={String(effectiveDoctor ?? '')}
@@ -869,13 +973,23 @@ const ModernQueueManager = ({
               alt="QR Code"
               className="mqm-qr-image" /> :
 
-            qrData?.token ?
+            /* QR-FE-003: SVG-fallback кодирует ТОЛЬКО серверный qr_url —
+               канонический origin этого развёртывания. Хардкод
+               med-queue.uz удалён: клиника на другом домене больше не
+               отправляет пациентов на чужой сайт. */
+            qrData?.qr_url ?
             <QRCodeSVG
-              value={`https://med-queue.uz/queue/join?token=${qrData.token}`}
+              value={qrData.qr_url}
               size={240}
               level="H"
               includeMargin={true}
               className="mqm-qr-svg" /> :
+
+            qrData?.token ?
+            <div className="mqm-qr-loading" data-testid="mqm-qr-url-missing">
+                <div className="mqm-spinner"></div>
+                <span>{t('misc.mqm_qr_unavailable')}</span>
+              </div> :
 
 
             <div className="mqm-qr-loading">

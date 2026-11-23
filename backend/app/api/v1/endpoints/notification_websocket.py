@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
-from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
+from app.api.v1.endpoints.websocket_auth import (
+    authenticate_websocket_token,
+    resolve_websocket_token_user,
+)
 from app.api.v1.endpoints.ws_token import extract_ws_token
 from app.db.session import SessionLocal
 from app.services.notification_platform_service import get_notification_platform_service
@@ -14,6 +18,17 @@ from app.services.notification_websocket import get_notification_ws_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# NOTIFYLIVEAUTH-BE-001 (audit round 40, P1 conditional): a personal
+# notification socket was authorized exactly once at handshake, so a
+# principal revoked/expired/disabled AFTER acceptance kept receiving
+# user-scoped broadcasts until physical disconnect. The receive loop below
+# therefore re-runs the canonical WebSocket resolver every
+# NOTIFICATION_WS_AUTH_RECHECK_SECONDS. The re-check reuses the handshake's
+# own DB session (no additional checkout per idle socket) and closes the
+# socket with WS 1008 when any revocation source fires — mirroring the
+# queue-plane session-lifetime contract (QUEUEWSSESSION-BE-001).
+NOTIFICATION_WS_AUTH_RECHECK_SECONDS = 15
 
 
 @router.websocket("/ws/notifications/connect")
@@ -30,6 +45,7 @@ async def websocket_notifications(
     db = SessionLocal()
     manager = get_notification_ws_manager()
     authenticated_user = None
+    registered_user_id = None
 
     try:
         token = extract_ws_token(websocket)
@@ -40,7 +56,10 @@ async def websocket_notifications(
             )
             return
 
-        await manager.connect(websocket, authenticated_user.id)
+        # Set before connecting so a partially registered socket is also
+        # cleaned up if manager.connect() raises after its registration step.
+        registered_user_id = authenticated_user.id
+        await manager.connect(websocket, registered_user_id)
 
         platform_service = get_notification_platform_service(db)
         unread_counts = platform_service.get_unread_counts(current_user=authenticated_user)
@@ -57,8 +76,55 @@ async def websocket_notifications(
             }
         )
 
+        loop = asyncio.get_running_loop()
+        last_auth_check = [loop.time()]
+
+        def refresh_notification_auth() -> bool:
+            """NOTIFYLIVEAUTH-BE-001: re-run the canonical resolver on the
+            handshake session — JWT exp, per-JTI revocation, the
+            ``all_user_tokens`` sentinel and ``User.is_active`` all fire
+            here; an updated principal row replaces the stale one so
+            role-scoped handlers see current state."""
+            nonlocal authenticated_user
+            # The synchronous resolver form — same contract the queue plane
+            # uses for its periodic re-check: the handshake's DB session is
+            # reused directly, no new checkout per idle socket.
+            current_user = resolve_websocket_token_user(token, db)
+            if current_user is None:
+                return False
+            authenticated_user = current_user
+            last_auth_check[0] = loop.time()
+            return True
+
         while True:
-            data = await websocket.receive_text()
+            elapsed = loop.time() - last_auth_check[0]
+            try:
+                data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=max(
+                        0.01, NOTIFICATION_WS_AUTH_RECHECK_SECONDS - elapsed
+                    ),
+                )
+            except TimeoutError:
+                data = None
+
+            if (
+                loop.time() - last_auth_check[0]
+                >= NOTIFICATION_WS_AUTH_RECHECK_SECONDS
+            ):
+                if not refresh_notification_auth():
+                    logger.info(
+                        "[NotificationWS] live authorization revoked; closing socket",
+                        extra={"user_id": registered_user_id},
+                    )
+                    await websocket.close(
+                        code=status.WS_1008_POLICY_VIOLATION,
+                        reason="Notification authorization expired or revoked",
+                    )
+                    break
+
+            if data is None:
+                continue
             try:
                 payload = json.loads(data)
             except json.JSONDecodeError:
@@ -173,6 +239,31 @@ async def websocket_notifications(
                     cursor_value = int(cursor_value) if cursor_value is not None else None
                 except (TypeError, ValueError):
                     cursor_value = None
+
+                # Match the canonical REST inbox/sync page size (1..200).
+                # Never let untrusted WebSocket frames request unbounded
+                # joined queries, and keep the connection usable on errors.
+                raw_limit = payload.get("limit", 50)
+                if raw_limit is None:
+                    raw_limit = 50
+                try:
+                    if isinstance(raw_limit, bool) or not isinstance(
+                        raw_limit, (int, str)
+                    ):
+                        raise ValueError("invalid limit type")
+                    sync_limit = int(raw_limit)
+                    if not 1 <= sync_limit <= 200:
+                        raise ValueError("limit outside allowed range")
+                except (ValueError, TypeError, OverflowError):
+                    await websocket.send_json(
+                        {
+                            "type": "notification_error",
+                            "field": "limit",
+                            "message": "Параметр limit должен быть целым числом от 1 до 200",
+                        }
+                    )
+                    continue
+
                 sync_payload = platform_service.get_inbox(
                     current_user=authenticated_user,
                     role=payload.get("role"),
@@ -182,7 +273,7 @@ async def websocket_notifications(
                     department_key=payload.get("department_key"),
                     search=payload.get("search"),
                     cursor=cursor_value,
-                    limit=int(payload.get("limit") or 50),
+                    limit=sync_limit,
                 )
                 await websocket.send_json(
                     {
@@ -193,8 +284,7 @@ async def websocket_notifications(
                 continue
 
     except WebSocketDisconnect:
-        if authenticated_user:
-            manager.disconnect(websocket, authenticated_user.id)
+        pass
     except Exception as exc:
         logger.error("WebSocket notification error: %s", exc)
         try:
@@ -202,4 +292,11 @@ async def websocket_notifications(
         except Exception:
             pass
     finally:
-        db.close()
+        # Normal disconnects, unexpected exceptions and cancellation must all
+        # release the manager's socket/home-loop and Redis subscription state.
+        # Close the DB even if the manager's disconnect path raises.
+        try:
+            if registered_user_id is not None:
+                manager.disconnect(websocket, registered_user_id)
+        finally:
+            db.close()

@@ -18,7 +18,10 @@ import {
 import PanelEmptyState from '../components/patient/PanelEmptyState';
 import PatientBookingPanel from '../components/patient/PatientBookingPanel';
 import PatientCabinetSummary from '../components/patient/PatientCabinetSummary';
+import WebAuthnRegistration from '../components/patient/WebAuthnRegistration';
+import { subscribe as subscribeAuth } from '../stores/auth';
 import PatientFormsPreview from '../components/patient/PatientFormsPreview';
+import PublicBookingRequestsPanel from '../components/patient/PublicBookingRequestsPanel';
 import './patient.css';
 import { useTranslation } from '../i18n/useTranslation';
 import { AlertTriangle, Calendar, FileText, Heart, Home, RotateCw, type LucideIcon } from 'lucide-react';
@@ -58,7 +61,8 @@ interface FormsPreview {
  * L-H-8 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3).
  *
  * Доступ: /patient (hideSidebar:true, homeForRoles:['patient']).
- * Защищённые данные требуют Telegram Mini App identity (initData).
+ * Статусы заявок читаются через JWT-scoped patient API; предпросмотр форм
+ * отдельно продолжает использовать Telegram Mini App identity (initData).
  */
 const PatientPanel = () => {
   const { t: rawT } = useTranslation();
@@ -66,6 +70,10 @@ const PatientPanel = () => {
   useBreakpoint();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const [isPatient, setIsPatient] = useState(false);
+  useEffect(() => subscribeAuth(({ token, profile }) => {
+    setIsPatient(Boolean(token) && String(profile?.role ?? '').toLowerCase() === 'patient');
+  }), []);
 
   // L-H-6 fix: activeSection вычисляется из URL (path или ?tab=).
   const activeSection = (() => {
@@ -291,7 +299,10 @@ const PatientPanel = () => {
                 ) : activeSection === 'booking' ? (
                   <PatientBookingPanel />
                 ) : activeSection === 'cabinet' ? (
-                  <PatientCabinetSummary />
+                  <>
+                    <PatientCabinetSummary />
+                    {isPatient && <WebAuthnRegistration />}
+                  </>
                 ) : activeSection === 'payments' ? (
                   <PatientCabinetSummary mode="payments" />
                 ) : activeSection === 'documents' ? (
@@ -363,6 +374,8 @@ const PatientPanel = () => {
                   )}
                 </div>
               </Card>
+
+              <PublicBookingRequestsPanel />
             </div>
           )}
         </div>

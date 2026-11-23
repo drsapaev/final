@@ -49,7 +49,13 @@ def lock_doctor_for_slot_reservation(
     """
     if doctor_id is None:
         return None
-    return db.query(Doctor).filter(Doctor.id == doctor_id).with_for_update().first()
+    return (
+        db.query(Doctor)
+        .filter(Doctor.id == doctor_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
 
 
 def lock_department_for_booking(

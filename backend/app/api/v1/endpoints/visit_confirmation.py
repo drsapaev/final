@@ -86,27 +86,64 @@ def _raise_http_error(exc: VisitConfirmationDomainError) -> None:
     raise HTTPException(status_code=exc.status_code, detail=exc.detail, headers=exc.headers)
 
 
-@router.post("/telegram/visits/confirm", response_model=ConfirmationResponse)
+class TelegramVisitActionDenied(BaseModel):
+    detail: str
+
+
+_TELEGRAM_DENIED_RESPONSE = {
+    403: {
+        "model": TelegramVisitActionDenied,
+        "description": "Telegram actions require an authenticated bot update.",
+        "headers": {"Cache-Control": {"schema": {"type": "string"}}},
+    }
+}
+
+
+@router.post(
+    "/telegram/visits/confirm", status_code=403, response_model=TelegramVisitActionDenied,
+    responses=_TELEGRAM_DENIED_RESPONSE, deprecated=True,
+)
 def confirm_visit_by_telegram(
     request_body: TelegramConfirmRequest,
-    request: Request,
-    db: Session = Depends(get_db),
 ):
-    """Подтверждение визита через Telegram бот по токену."""
-    service = VisitConfirmationService(db)
-    source_ip = request.client.host if request.client else None
-    user_agent = request.headers.get("user-agent")
+    """A claimed Telegram user ID in an unauthenticated request is untrusted.
 
-    try:
-        result = service.confirm_by_telegram(
-            token=request_body.token,
-            telegram_user_id=request_body.telegram_user_id,
-            source_ip=source_ip,
-            user_agent=user_agent,
-        )
-        return ConfirmationResponse(**result)
-    except VisitConfirmationDomainError as exc:
-        _raise_http_error(exc)
+    Telegram updates are handled by the authenticated webhook or polling
+    transport and invoke the service directly with the verified actor.
+    """
+    raise HTTPException(
+        status_code=403,
+        detail="Подтверждение доступно только из привязанного чата Telegram",
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+class TelegramCancelRequest(BaseModel):
+    token: str = Field(..., min_length=10)
+    telegram_user_id: str | None = None
+
+
+class CancelVisitResponse(BaseModel):
+    success: bool
+    message: str
+    visit_id: int
+    status: str
+    patient_name: str
+
+
+@router.post(
+    "/telegram/visits/cancel", status_code=403, response_model=TelegramVisitActionDenied,
+    responses=_TELEGRAM_DENIED_RESPONSE, deprecated=True,
+)
+def cancel_visit_by_telegram(
+    request_body: TelegramCancelRequest,
+):
+    """Reject caller-asserted Telegram identities on the public API."""
+    raise HTTPException(
+        status_code=403,
+        detail="Отмена доступна только из привязанного чата Telegram",
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 @router.post("/patient/visits/confirm", response_model=ConfirmationResponse)

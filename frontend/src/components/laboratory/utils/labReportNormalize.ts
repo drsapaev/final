@@ -207,98 +207,11 @@ export function flattenLabResults(sections: LabSectionInput[] = []): Array<{
   );
 }
 
-interface LabPrintInstance {
-  id?: string | number | null;
-  visit_id?: string | number | null;
-  patient_id?: string | number | null;
-  template_id?: string | number | null;
-  template_name?: string | null;
-  status?: string | null;
-  created_at?: string | null;
-  finalized_at?: string | null;
-  printed_at?: string | null;
-  updated_at?: string | null;
-  sections?: LabSectionInput[];
-  patient_snapshot?: Record<string, unknown>;
-  clinic?: Record<string, unknown>;
-  template?: { name?: string; subtitle?: string; footer_notes?: string; layout_mode?: string } | null;
-  signer_snapshot?: Record<string, unknown>;
-  footer_notes?: string;
-  critical_findings?: unknown[];
-  [key: string]: unknown;
-}
+/**
+ * LABPRINT-FE-001 (audit 3886, round 14): клиентский сбор печатного
+ * бланка удалён. Печать отправляет ТОЛЬКО report_instance_id — сервер
+ * материализует значения из БД тем же пайплайном, что канонический PDF
+ * (backend/app/api/v1/endpoints/print_api.py). Клиентские значения
+ * больше не собираются и не отправляются.
+ */
 
-interface LabPrintAppointment {
-  visit_id?: string | number | null;
-  patient_id?: string | number | null;
-  patient_fio?: string;
-  patient_name?: string;
-  patient_birth_year?: string;
-  patient_phone?: string;
-  address?: string;
-  sex?: string;
-  clinic?: Record<string, unknown>;
-  [key: string]: unknown;
-}
-
-export function buildLabPrintPayload(instance: LabPrintInstance | null | undefined, appointment: LabPrintAppointment | null | undefined) {
-  const sections = normalizeLabSections(instance?.sections || []);
-  const patientSnapshot = (instance?.patient_snapshot || {}) as Record<string, unknown>;
-  const appointmentSnapshot = appointment || {};
-  const clinic = (instance?.clinic || (appointmentSnapshot?.clinic as Record<string, unknown> | undefined) || {}) as Record<string, unknown>;
-  const templateName = instance?.template?.name || instance?.template_name || 'Лабораторный бланк';
-  const reportDate =
-    instance?.printed_at
-    || instance?.finalized_at
-    || instance?.updated_at
-    || instance?.created_at
-    || new Date().toISOString();
-
-  return {
-    lab_order: {
-      id: instance?.id || null,
-      visit_id: instance?.visit_id || appointmentSnapshot?.visit_id || null,
-      patient_id: instance?.patient_id || appointmentSnapshot?.patient_id || null,
-      template_id: instance?.template_id || null,
-      template_name: templateName,
-      status: instance?.status || null,
-      created_at: instance?.created_at || null,
-      finalized_at: instance?.finalized_at || null,
-      printed_at: instance?.printed_at || null
-    },
-    lab_results: flattenLabResults(sections),
-    patient: {
-      full_name:
-        patientSnapshot.full_name
-        || appointmentSnapshot.patient_fio
-        || appointmentSnapshot.patient_name
-        || `Пациент #${instance?.patient_id || appointmentSnapshot.patient_id || ''}`,
-      birth_date: patientSnapshot.birth_date || appointmentSnapshot.patient_birth_year || '',
-      address: patientSnapshot.address || appointmentSnapshot.address || '',
-      phone: patientSnapshot.phone || appointmentSnapshot.patient_phone || '',
-      sex: patientSnapshot.sex || appointmentSnapshot.sex || ''
-    },
-    clinic: {
-      name: clinic.name || clinic.clinic_name || 'МЕДИЦИНСКАЯ КЛИНИКА',
-      address: clinic.address || '',
-      phone: clinic.phone || '',
-      website: clinic.website || ''
-    },
-    branding: {
-      clinic_name: clinic.name || clinic.clinic_name || 'МЕДИЦИНСКАЯ КЛИНИКА',
-      address: clinic.address || '',
-      phone: clinic.phone || '',
-      document_title: templateName,
-      document_subtitle: instance?.template?.subtitle || ''
-    },
-    signers: instance?.signer_snapshot || {},
-    sections,
-    template_name: templateName,
-    report_date: typeof reportDate === 'string' ? reportDate : new Date(reportDate).toISOString(),
-    footer_notes: instance?.footer_notes || instance?.template?.footer_notes || '',
-    critical_findings: instance?.critical_findings || [],
-    smear_matrix_mode: Boolean(instance?.template?.layout_mode === 'smear_matrix'),
-    oam_docx_mode: Boolean(instance?.template?.layout_mode === 'oam'),
-    docx_three_column_mode: Boolean(instance?.template?.layout_mode === 'docx_three_column')
-  };
-}

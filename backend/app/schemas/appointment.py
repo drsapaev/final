@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any
+from datetime import date, datetime, time
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -20,9 +20,7 @@ class AppointmentBase(ORMModel):
     )  # scheduled, confirmed, cancelled, completed
 
     # Дополнительные поля для регистратуры
-    visit_type: str | None = Field(
-        default="paid", max_length=16
-    )  # paid, repeat, free
+    visit_type: str | None = Field(default="paid", max_length=16)  # paid, repeat, free
     payment_type: str | None = Field(
         default="cash", max_length=16
     )  # cash, card, online
@@ -38,7 +36,9 @@ class AppointmentBase(ORMModel):
 
 
 class AppointmentCreate(AppointmentBase):
-    pass
+    # Exact catalog identity is optional for older clients. When supplied,
+    # the server resolves service names and captures duration at write time.
+    service_ids: list[int] | None = None
 
 
 class PatientPortalAppointmentCreate(AppointmentCreate):
@@ -60,6 +60,16 @@ class PatientPortalAppointmentCreate(AppointmentCreate):
     department_id: int | None = None
 
 
+class PatientConfirmedPublicBookingOut(ORMModel):
+    """Minimal result for an immediately-created public booking appointment."""
+
+    id: int
+    appointment_date: date
+    appointment_time: time
+    status: Literal["scheduled"]
+    timezone: Literal["Asia/Tashkent"] = "Asia/Tashkent"
+
+
 class AppointmentUpdate(ORMModel):
     doctor_id: int | None = None
     department: str | None = Field(None, max_length=64)
@@ -72,6 +82,7 @@ class AppointmentUpdate(ORMModel):
     visit_type: str | None = Field(None, max_length=16)  # paid, repeat, free
     payment_type: str | None = Field(None, max_length=16)  # cash, card, online
     services: list[str] | None = None  # Список услуг
+    service_ids: list[int] | None = None
 
     # Поля для интеграции с платежами
     payment_amount: float | None = None
@@ -98,6 +109,8 @@ class Appointment(AppointmentBase):
     id: int
     created_at: datetime
     updated_at: datetime | None = None
+    # Patient RSVP is a read-only fact, separate from payment and visit status.
+    patient_confirmed_at: datetime | None = None
     patient_name: str | None = None  # Имя пациента (обогащается на бэкенде)
     # Round-3 (owner P2): the persisted routing FK stays on the READ model —
     # it was moved out of AppointmentBase so the public CREATE contract

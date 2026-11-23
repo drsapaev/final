@@ -138,6 +138,18 @@ class Settings(BaseSettings):
     # Установите через переменную окружения: FRONTEND_URL=https://your-domain.com
     FRONTEND_URL: str = Field(default="http://192.168.1.9:5173")
 
+    # TGCONFIRM-BE-001 (audit #3892, group 20): the patient Telegram confirm
+    # callback calls THIS backend's confirmation API over HTTP. The code
+    # referenced a nonexistent Settings.API_BASE_URL — with extra="ignore"
+    # no environment variable could ever create it, so EVERY callback failed
+    # with AttributeError and the visit stayed pending. Declare the field as
+    # an explicitly supported configuration: the PUBLIC origin of this
+    # backend (no trailing slash, no /api/v1 suffix — the bot appends the
+    # full /api/v1/... path itself). When unset, the callback fails honestly
+    # with a configuration error instead of AttributeError, and no internal/
+    # localhost URL is silently assumed in a public deployment.
+    API_BASE_URL: str | None = Field(default=None)
+
     # --- Queue / Time ---
     TIMEZONE: str = "Asia/Tashkent"
     QUEUE_START_HOUR: int = 7  # локальное время, начало утреннего окна
@@ -413,6 +425,14 @@ class Settings(BaseSettings):
     # PlayMobile SMS (Узбекистан)
     PLAYMOBILE_API_KEY: str | None = None
     PLAYMOBILE_API_SECRET: str | None = None
+
+    # TextBee is an isolated staging-only OTP transport. Its key is never
+    # sent to frontend builds or enabled by the production provider factory.
+    TEXTBEE_API_KEY: str | None = None
+    TEXTBEE_DEVICE_ID: str | None = None
+    TEXTBEE_ALLOWED_RECIPIENT: str | None = None
+    # Only "textbee" is supported here, and only when ENV=staging.
+    PATIENT_OTP_SMS_PROVIDER: str | None = None
 
     # SMS общие настройки
     SMS_SENDER: str = "Clinic"

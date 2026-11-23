@@ -10,7 +10,9 @@
  * - loadIntegratedData: loads doctors, services, departments in parallel
  *   from /registrar/* endpoints.
  * - fetchPatientData: fetches single patient by ID from /api/v1/patients/:id.
- *   Returns null for demo patients (ID >= 1000) or on error.
+ *   Returns null on 404 or fetch error (REG-FE-036: no ID-based demo
+ *   shortcut — backend Patient.id is an unbounded Integer PK, so any patient
+ *   ID is legal and is always fetched from the backend).
  * - enrichAppointmentsWithPatientData: enriches appointment records with
  *   patient display fields (FIO, phone, birth year, gender, address) if
  *   missing from backend response. Also applies local overrides.
@@ -220,11 +222,11 @@ export const useRegistrarData = () => {
   // ───────────────────────────────────────────────────────────
   const fetchPatientData = useCallback(async (patientId: number | string) => {
     const pid = Number(patientId);
-    // Проверяем, является ли это демо-пациентом (ID >= 1000)
-    if (pid >= 1000) {
-      // Возвращаем null для демо-пациентов, так как их данные уже есть в записи
-      return null;
-    }
+    // REG-FE-036 (#3819): the patient ID alone is NOT a demo marker — the
+    // backend Patient.id is a regular Integer PK without an upper bound, and
+    // legal real patients routinely have large IDs. Demo/synthetic rows carry
+    // explicit backend markers instead; this hook always asks the backend
+    // and returns null only on 404/network errors (never by an ID threshold).
 
     try {
       // UX Audit Registrar #1: raw fetch() с ручным Authorization-хедером

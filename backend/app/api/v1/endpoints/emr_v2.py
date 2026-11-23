@@ -36,6 +36,7 @@ from app.schemas.emr_v2 import (
     EMRSaveRequest,
     EMRSignRequest,
 )
+from app.services.emr_contract import extract_icd10_code, get_emr_text_field
 from app.services.emr_doctor_history_service import (
     EMRDoctorHistoryDomainError,
     EMRDoctorHistoryService,
@@ -398,9 +399,14 @@ async def save_emr(
     Creates new EMR if none exists, otherwise updates with new version.
     Uses optimistic locking via row_version to detect concurrent edits.
 
-    **Conflict Resolution:**
-    - If row_version mismatch and different user: returns 409 Conflict
-    - If row_version mismatch but same user/session: allows (autosave)
+    **Conflict Resolution (EMRLOCK-FE-001, audit 3886 round 16):**
+    - If row_version mismatch: returns 409 Conflict (fail closed) — even
+      for the same user/session, because a stale write must never
+      overwrite a newer committed revision.
+    - Only a byte-identical duplicate retry from the same session is
+      accepted as an idempotent no-op (no new revision, no version bump).
+    - Finalized records (signed/amended) are rejected with 409 — use the
+      reasoned amend endpoint instead.
     """
     ensure_emr_visit_access(db, visit_id, current_user)
 
@@ -445,6 +451,18 @@ async def save_emr(
                 "last_edited_at": e.last_edited_at.isoformat(),
             },
         )
+    except EMRSignedError:
+        # EMRAMEND-FE-002 (audit 3886 round 16): ordinary save on a
+        # finalized (signed/amended) record is a state conflict, not a
+        # server error — structured 409 so the client can route the doctor
+        # to the amendment workflow instead of a generic failure.
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "FINALIZED_STATE",
+                "message": "Cannot edit signed or amended EMR. Use amend endpoint instead.",
+            },
+        )
     except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
 
@@ -478,19 +496,32 @@ async def sign_emr(
         # 🧠 Learn from signed EMR - create section templates
         try:
             template_service = DoctorSectionTemplatesService(db)
-            icd10_code = payload.data.get('icd10_code') or payload.data.get('icd_10_code')
+            # RETRO-3971-01 (post-merge review of the 3969–3996 window): the
+            # canonical EMR places the code at diagnosis.icd10_code and the
+            # treatment text at plan.treatment — the service-level path
+            # already resolves both through the emr_contract SSOT
+            # (emr_v2_service.py). The flat-only reads here learned
+            # unkeyed templates for nested payloads (and keyed them under
+            # a STALE flat code when both shapes coexisted), while
+            # `.get('medications', {}).get('text')` raised AttributeError
+            # on the canonical LIST-shaped medications and silently
+            # skipped ALL section learning for that sign.
+            icd10_code = extract_icd10_code(payload.data)
 
             # Learn from each section with content
             sections_to_learn = [
                 ('anamnesis', payload.data.get('anamnesis_morbi')),
                 ('examination', payload.data.get('examination')),
-                ('treatment', payload.data.get('treatment') or payload.data.get('medications', {}).get('text')),
+                ('treatment', get_emr_text_field(payload.data, 'treatment')),
                 ('recommendations', payload.data.get('recommendations')),
             ]
 
             for section_type, text in sections_to_learn:
                 if text and text.strip():
-                    await template_service.learn_from_signed_emr(
+                    # EMRTMPL-API-001: the service is synchronous (repo-wide
+                    # sync Session); awaiting it raised TypeError on every
+                    # sign and silently skipped template learning.
+                    template_service.learn_from_signed_emr(
                         doctor_id=current_user.id,
                         section_type=section_type,
                         text=text,
@@ -574,6 +605,10 @@ async def restore_emr(
 
     Creates a new version with data from the target version.
     The restore is recorded in the revision history.
+
+    EMRRESTORE-FE-001/002 (audit 3886 round 16): restore is rejected for
+    finalized (signed/amended) records, requires an explicit reason and
+    honors optimistic locking via the caller's current row_version.
     """
     ensure_emr_visit_access(db, visit_id, current_user)
 
@@ -583,13 +618,32 @@ async def restore_emr(
             visit_id=visit_id,
             target_version=payload.target_version,
             user_id=current_user.id,
+            row_version=payload.row_version,
             reason=payload.reason,
         )
         return emr
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
+    except EMRSignedError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "FINALIZED_STATE",
+                "message": "Cannot restore a signed or amended EMR",
+            },
+        )
     except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
+    except ConcurrencyError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "CONFLICT",
+                "message": str(e),
+                "current_version": e.current_version,
+                "your_version": e.your_version,
+            },
+        )
 
 
 

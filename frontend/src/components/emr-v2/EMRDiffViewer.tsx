@@ -15,7 +15,7 @@
  * - Side-by-side editor
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
 import './EMRDiffViewer.css';
@@ -131,28 +131,47 @@ export function EMRDiffViewer({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // EMRHIST-FE-002 (audit 3886, round 19): diff responses are bound to the
+    // request identity (visitId + version pair) they were requested for.
+    // A context/version switch immediately clears the previous snapshot and
+    // bumps the epoch, so (a) the previous visit's field differences are not
+    // shown under the new context while the new request is pending, and (b)
+    // a late response — or a late FAILURE — of the old request can never
+    // overwrite the new one's result.
+    const fetchEpochRef = useRef(0);
+
     // Load diff when versions change
     useEffect(() => {
         if (!visitId || !versionFrom || !versionTo) return;
 
-        const loadDiff = async () => {
-            setLoading(true);
-            setError(null);
+        const epoch = fetchEpochRef.current + 1;
+        fetchEpochRef.current = epoch;
+        // Immediately drop the previous diff while the new request is in
+        // flight — a stale diff must not stay visible under the new context.
+        setDiff(null);
+        setError(null);
+        setLoading(true);
 
+        const loadDiff = async () => {
             try {
                 const response = await apiClient.get(
                     `/v2/emr/${visitId}/diff?v1=${versionFrom}&v2=${versionTo}`
                 );
+                if (epoch !== fetchEpochRef.current) return;
                 setDiff(response.data);
             } catch (err) {
+                if (epoch !== fetchEpochRef.current) return;
                 logger.error('Failed to load diff:', err);
                 setError((err instanceof Error ? err.message : String(err)) || t('misc.edv_ne_udalos_zagruzit_sravnenie'));
             } finally {
-                setLoading(false);
+                if (epoch === fetchEpochRef.current) setLoading(false);
             }
         };
 
-        loadDiff();
+        void loadDiff();
+        return () => {
+            fetchEpochRef.current += 1;
+        };
     }, [visitId, versionFrom, versionTo]);
 
     /**

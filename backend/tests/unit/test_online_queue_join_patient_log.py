@@ -23,7 +23,7 @@ from app.models.online_queue import OnlineQueueEntry, QueueToken
 
 
 PHONE = "+998901234567"
-MASKED = "+998901•••567"  # mask_phone: (\+\d{6})\d{3}(\d{3}) -> \1•••\2
+MASKED = "•••567"  # Only the last three digits are visible.
 
 
 @pytest.fixture
@@ -171,8 +171,8 @@ def test_new_patient_log_failclosed_for_noncanonical_formats(
     db_session, join_setup, queue_admission_open, caplog
 ):
     """P2-1 (Codex): приклад допускает и хранит неканонические форматы
-    телефона; mask_phone их не распознаёт — лог обязан быть fail-closed
-    (никакого сырого номера, только хвост/скрытие)."""
+    телефона; лог обязан быть fail-closed (никакого сырого номера,
+    только хвост/скрытие)."""
     doctor, token = join_setup
     for phone in ("998901234567", "+998 90 123 45 67", "+998-90-123-45-67"):
         with caplog.at_level(logging.INFO, logger="app.crud.online_queue"):

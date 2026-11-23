@@ -33,6 +33,51 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
     const legacy = adaptQueueEntry({ id: 34 }, { ...baseQueue, specialist_id: 8 }, baseData, '2026-08-29', FALLBACK);
     expect(legacy).toMatchObject({ queue_owner_kind: null, queue_owner_id: null, daily_queue_id: null });
   });
+
+  it('REG-FE-063 (#3803): queue_numbers element carries the ticket identity (entry id + owning daily queue)', () => {
+    const onlineRow = adaptQueueEntry(
+      {
+        data: {
+          id: 33,
+          record_kind: 'online_queue',
+          queue_position: 7,
+          queue_tag: 'cardio',
+          daily_queue_id: 91,
+        },
+      },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    // An online_queue row IS the queue entry: its id is the entry id.
+    expect(onlineRow.queue_entry_id).toBe(33);
+    expect(onlineRow.queue_numbers).toMatchObject([
+      { queue_entry_id: 33, daily_queue_id: 91, number: 7, queue_tag: 'cardio' },
+    ]);
+
+    const appointmentRow = adaptQueueEntry(
+      {
+        data: {
+          id: 50,
+          record_kind: 'appointment',
+          number: 4,
+          queue_tag: 'cardio',
+          daily_queue_id: 92,
+        },
+      },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    // An appointment row is NOT a queue entry: no fabricated identity —
+    // only the real per-row owner daily queue is carried.
+    expect(appointmentRow.queue_entry_id).toBeNull();
+    expect(appointmentRow.queue_numbers).toMatchObject([
+      { queue_entry_id: null, daily_queue_id: 92, number: 4, queue_tag: 'cardio' },
+    ]);
+  });
   it('skips entries without an id (null result)', () => {
     expect(adaptQueueEntry({ patient_fio: 'X' }, baseQueue, baseData, '2026-08-29', FALLBACK)).toBeNull();
     expect(adaptQueueEntry({ data: { patient_fio: 'Y' } }, baseQueue, baseData, '2026-08-29', FALLBACK)).toBeNull();
@@ -292,6 +337,25 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
   it('queue_number falls back to entry.number when queue_position missing', () => {
     const row = adaptQueueEntry({ id: 15, number: 42 }, baseQueue, baseData, '2026-08-29', FALLBACK) as Record<string, unknown>;
     expect(row.queue_number).toBe(42);
+  });
+
+  it('REG-FE-022: null number/queue_position (no allocated ticket) maps to the 0 no-ticket sentinel', () => {
+    // The backend today read model (issue 3822) now returns null number and
+    // queue_position for rows without a proven queue allocation instead of
+    // fabricating a list ordinal. The adapter must map that to the
+    // established 0 sentinel — the registrar EAT opt-in (PR #3821) renders
+    // 0/blank as «—», never as a fake ticket.
+    const row = adaptQueueEntry(
+      { id: 17, queue_position: null, number: null },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    expect(row.queue_number).toBe(0);
+    expect(row.queue_numbers).toEqual([
+      expect.objectContaining({ number: 0, queue_tag: 'cardio' }),
+    ]);
   });
 
   it('date fields fall back to data.date then dateParam', () => {

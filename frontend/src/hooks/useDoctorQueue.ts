@@ -42,33 +42,30 @@ const ZERO_STATS: QueueStats = {
   total: 0,
 };
 
-const hasBackendQueueAction = (
-  entry: QueueEntry | null | undefined,
-  action: string,
-  flagName: string,
-): boolean => {
-  if (!entry) return false;
-  const availableActions = entry.available_actions as string[] | undefined;
-  if (Array.isArray(availableActions)) {
-    return availableActions.includes(action);
-  }
-  if (flagName && Object.prototype.hasOwnProperty.call(entry, flagName)) {
-    return Boolean((entry as Record<string, unknown>)[flagName]);
-  }
-  return false;
-};
-
 const selectNextCallEntryId = (
   queuePayload: DoctorQueuePayload | null | undefined,
-): string | number | null => {
-  const backendEntryId = queuePayload?.next_call_entry_id;
-  if (backendEntryId !== undefined && backendEntryId !== null) {
-    return backendEntryId;
+): { id: string | number | null; contractError: boolean } => {
+  // QAPI-FE-001 (audit 3886): the backend `_queue_ops` SSOT ALWAYS returns
+  // next_call_entry_id (explicit null = «nothing callable"). A response
+  // WITHOUT the field is a contract failure — fail closed instead of
+  // guessing the first can_call entry; an explicit null must never be
+  // second-guessed with a local candidate.
+  if (
+    !queuePayload ||
+    !Object.prototype.hasOwnProperty.call(queuePayload, 'next_call_entry_id')
+  ) {
+    logger.warn(
+      '[useDoctorQueue] queue response missing next_call_entry_id — refusing to guess a caller (backend SSOT)',
+    );
+    return { id: null, contractError: true };
   }
 
-  const entries = Array.isArray(queuePayload?.entries) ? queuePayload?.entries ?? [] : [];
-  const callableEntry = entries.find((entry) => hasBackendQueueAction(entry, 'call', 'can_call'));
-  return callableEntry?.id ?? null;
+  const backendEntryId = queuePayload.next_call_entry_id;
+  if (backendEntryId === null || backendEntryId === undefined) {
+    // Canonical server said «none» — no local fallback.
+    return { id: null, contractError: false };
+  }
+  return { id: backendEntryId, contractError: false };
 };
 
 export interface UseDoctorQueueReturn {
@@ -118,11 +115,12 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
       const data = response.data as DoctorQueuePayload;
       const entries = Array.isArray(data?.entries) ? data.entries : [];
       const apiStats: QueueStats = (data?.stats as QueueStats) || {};
-      const nextCallEntryId = selectNextCallEntryId(data);
+      const { id: nextCallEntryId, contractError } = selectNextCallEntryId(data);
 
       setQueue(entries);
       setQueueControls({
-        canCallNext: data?.can_call_next === true,
+        // QAPI-FE-001: a broken contract never enables the next-call action.
+        canCallNext: data?.can_call_next === true && !contractError && nextCallEntryId !== null,
         nextCallEntryId,
       });
       setStats({
@@ -157,7 +155,17 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
     try {
       const currentQueue = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
       const queueData = currentQueue.data as DoctorQueuePayload;
-      const nextCallEntryId = selectNextCallEntryId(queueData);
+      // QAPI-FE-001 (audit 3886): the canonical next_call_entry_id is the
+      // ONLY call target — explicit null stops the call; a missing field
+      // fails closed as a contract error instead of guessing a caller.
+      const { id: nextCallEntryId, contractError } = selectNextCallEntryId(queueData);
+      if (contractError) {
+        return {
+          success: false,
+          message:
+            'Контракт очереди нарушен: ответ сервера не содержит next_call_entry_id — вызов не выполнен (SSOT сервера не подтверждает кандидата). / Queue contract failure: next_call_entry_id missing — refusing to guess a caller.',
+        };
+      }
       if (!nextCallEntryId) {
         return { success: false, message: 'Нет ожидающих пациентов' };
       }

@@ -76,6 +76,55 @@ successful starts. Check Windows connectivity as well as container health:
 the returned checks distinguish a healthy Linux service from a port that
 Windows cannot reach.
 
+### Low-memory host: verified hosted frontend artifact
+
+The normal `runtime` target remains the default and builds the frontend in the
+staging Docker build. For a T18 session on a memory-constrained host, use the
+existing `Build isolated staging frontend artifact` workflow on the exact
+`main` commit being tested. Its artifact contains `source.sha`, static files,
+and `SHA256SUMS`; download and unpack it under the current worktree's ignored
+`.scratch/` directory. Do not put it in another worktree or in the production
+checkout.
+
+Verify `source.sha` equals the selected application commit and verify every
+file with `sha256sum --check SHA256SUMS` from the artifact directory. In the
+private, worktree-local staging env file, set:
+
+```dotenv
+STAGING_FRONTEND_BUILD_TARGET=artifact-runtime
+STAGING_FRONTEND_ARTIFACT_CONTEXT=../.scratch/<session>/frontend-artifact
+VERCEL_GIT_COMMIT_SHA=<same application commit>
+```
+
+The artifact is built with `VITE_API_BASE_URL=same-origin`. The browser uses
+the exact origin and port where the selected staging frontend is served;
+Nginx forwards API and WebSocket requests to that Compose project's backend.
+Configure public origins for the selected frontend port and let canonical
+Preflight confirm them. The `artifact-runtime` target checks the embedded
+source SHA, every manifest checksum, and the exact copied file inventory
+before removing provenance files from the Nginx document root. The launcher
+also verifies the artifact before WSL starts and accepts it only from a real
+directory below the current worktree's `.scratch/`; symlinks and unlisted
+files are rejected. The default Compose file does not use named build
+contexts. Only the optional artifact target loads
+`compose.staging.artifact.yml` and requires Docker Compose 2.17.0 or newer.
+The artifact path is relative to `ops/`, for example
+`../.scratch/<session>/frontend-artifact`. The target copies the prebuilt
+bundle into a small Nginx image and skips `npm ci` and `npm run build` inside
+WSL. Backend/worker image builds still occur, so use normal build-reserve
+Preflight and do not pass `-NoBuild` to `Start` or `Session`.
+
+This opt-in path requires a Docker Compose / BuildKit version that supports
+named build contexts. The canonical `docker compose config` check must pass
+before `Start`; if it does not, keep the staging scenarios `NOT_RUN` and do not
+fall back to another checkout or a foreign daemon.
+
+After the session, compare the actual browser response bytes for its JS/CSS
+assets with the verified artifact manifest. Record the artifact workflow run,
+application SHA, manifest result, served-response result, and teardown result
+in the T18 evidence. A source file or image ID alone is not served-revision
+proof. Unset the artifact variables for the ordinary full frontend build.
+
 The launcher rejects protected host ports `18000`, `5173`, and `5432`, foreign
 project conflicts, source mounts from a different worktree, and foreign or
 ambiguous Windows listeners even when Docker also publishes that port.
@@ -110,8 +159,8 @@ JSON result includes `teardown.status=PASS` only after those checks. An
 inherited `KEEP_STAGING=1` does not preserve a successful run.
 
 A failed `Start` or `Session` also attempts the same cleanup while its WSL
-session is still continuous. Cleanup eligibility begins immediately after
-the exact project and its owner/expiry labels are verified, so later failures
+session is still continuous, unless `KEEP_STAGING=1` is set. Cleanup eligibility
+begins immediately after the exact project and its owner/expiry labels are verified, so later failures
 in public-origin, Linux-storage or keeper-continuity checks do not leave that
 owned project behind. Before ownership and lifecycle verification succeeds,
 the helper does not delete resources. A changed owner/lifecycle label blocks
@@ -119,14 +168,40 @@ deletion. A lost WSL keeper or boot identity reports teardown `NOT_RUN`; the
 helper does not reboot WSL to retry or delete resources after continuity is
 lost. To preserve a failed environment for
 diagnosis, set `KEEP_STAGING=1` explicitly and record the project, expiry and
-reason in the task checkpoint. Inspect the recorded failure once, resolve
-the cause, and clean only that project. A process forcibly killed by the OS
+reason in the task checkpoint. A process forcibly killed by the OS
 cannot run its cleanup handler, so the expiry label and checkpoint remain
 necessary.
 
+### Recover a failed synthetic staging session
+
+For agent-run synthetic staging, set `$env:KEEP_STAGING='1'` in the launcher
+process before both `Start` and `Session`. Record that choice and the owned
+project, worktree, ports, lease expiry and safe failure reason in the task
+checkpoint. The launcher reads this flag from its process environment; merely
+putting it in the Compose env file is insufficient. Select a lease long enough
+for investigation within the existing seven-day limit.
+
+On failure, retain the same verified project, its private synthetic env and
+volumes while diagnosing and fixing the cause. Recheck ownership, ports, lease
+and source revision before resuming. Continue with targeted remaining checks in
+the same project; do not blindly reseed or reset a partially populated database.
+Use `Session -NoBuild` only if its existing images still match the intended
+source and no rebuild is needed. If a source fix requires a rebuild, verify the
+new revision and preserve the owned data only when the change is compatible.
+Previously passed checks remain evidence for their tested revision. Keep unrun
+checks marked `NOT_RUN`. If a required check is still incomplete, the validation
+command must exit nonzero so the launcher preserves the project for recovery.
+
+A successful `Session` still performs the normal owned-project teardown even
+with `KEEP_STAGING=1`. Verify containers, volumes, networks and ports, then
+remove that project's private synthetic env. Do not leave preserved projects
+untracked: monitor their lease and disk use until the failure is resolved or
+the owner explicitly ends the investigation. Never change existing ownership
+or expiry labels to bypass the launcher's checks.
+
 A successful `Start` returns `teardown=PENDING_SESSION`; it is not a completed
-validation run. Continue with one `Session`, rather than leaving a stack
-between tasks. An expired lease cannot be started or used for validation;
+validation run. Continue with `Session`; after a failure, use the recovery
+procedure above. An expired lease cannot be started or used for validation;
 an exactly matching owned project is cleaned on that failed invocation unless
 the explicit failure-preservation exception is set.
 

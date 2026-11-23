@@ -179,6 +179,43 @@ describe('useCashierActions (PR-UI-14-4)', () => {
     expect(deps.paymentModal.closeModal).not.toHaveBeenCalled();
   });
 
+  // CSH-FE-008: the payment POST is not idempotent server-side, so the action
+  // handler itself must be single-flight even when two callers race (the
+  // modal button guard is defense layer 1; this hook is layer 2).
+  it('processPayment is single-flight: a duplicate in-flight call does not re-POST (CSH-FE-008)', async () => {
+    const deps = makeDeps();
+    let resolveApi: (v: unknown) => void = () => {};
+    deps.paymentsApi.createPayment.mockImplementation(
+      () => new Promise((res) => { resolveApi = res; }),
+    );
+    const { result } = renderActions(deps);
+
+    const first = result.current.processPayment(
+      { visit_id: 77, can_create_direct_payment: true },
+      { amount: 150, method: 'cash', note: '' },
+    );
+    // Second call while the first POST is still in flight.
+    await result.current.processPayment(
+      { visit_id: 77, can_create_direct_payment: true },
+      { amount: 150, method: 'cash', note: '' },
+    );
+
+    expect(deps.paymentsApi.createPayment).toHaveBeenCalledTimes(1);
+    expect(deps.dialogs.setPaymentError).not.toHaveBeenCalled();
+    expect(notify.error).not.toHaveBeenCalled();
+
+    resolveApi({ success: true });
+    await first;
+
+    // Guard released after settle: a new call goes through again.
+    deps.paymentsApi.createPayment.mockResolvedValueOnce({ success: true });
+    await result.current.processPayment(
+      { visit_id: 77, can_create_direct_payment: true },
+      { amount: 150, method: 'cash', note: '' },
+    );
+    expect(deps.paymentsApi.createPayment).toHaveBeenCalledTimes(2);
+  });
+
   it('confirmPayment: missing id → error notify, no confirm dialog, no API call', async () => {
     const deps = makeDeps();
     const { result } = renderActions(deps);
@@ -237,13 +274,45 @@ describe('useCashierActions (PR-UI-14-4)', () => {
     expect(deps.worklist.triggerDataReload).toHaveBeenCalled();
   });
 
-  it('handlePrintReceipt: row with successful browser print → success notify, no receipt API call', async () => {
+  it('handlePrintReceipt: row with successful browser print (invoked/deferred) → success notify, no receipt API call', async () => {
     const deps = makeDeps();
-    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    // CSH-FE-044: новый типизированный контракт PrintableWindowResult.
+    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue({ opened: true, printInvoked: true, deferred: false });
     const { result } = renderActions(deps);
     await result.current.handlePrintReceipt({ id: 5, amount: 10 } as CashierPaymentRow);
     expect(notify.success).toHaveBeenCalled();
     expect(deps.paymentsApi.getReceipt).not.toHaveBeenCalled();
+  });
+
+  it('handlePrintReceipt: deferred print (window opened, not yet confirmed) → still a success, no PDF fallback', async () => {
+    const deps = makeDeps();
+    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue({ opened: true, printInvoked: false, deferred: true });
+    const { result } = renderActions(deps);
+    await result.current.handlePrintReceipt({ id: 6, amount: 10 } as CashierPaymentRow);
+    expect(notify.success).toHaveBeenCalled();
+    expect(deps.paymentsApi.getReceipt).not.toHaveBeenCalled();
+  });
+
+  it('CSH-FE-044: print() throws → honest PDF fallback (getReceipt + warning toast), not a fake success', async () => {
+    const deps = makeDeps();
+    // Прежде обёртка возвращала true всегда: print() бросал, а кассир видел
+    // «диалог печати открыт» и PDF-fallback пропускался.
+    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue({ opened: true, printInvoked: false, deferred: false });
+    const { result } = renderActions(deps);
+    await result.current.handlePrintReceipt({ id: 7, amount: 10 } as CashierPaymentRow);
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(deps.paymentsApi.getReceipt).toHaveBeenCalledWith(7);
+    expect(notify.warning).toHaveBeenCalled();
+  });
+
+  it('CSH-FE-044: popup blocked → PDF fallback with the blocked-warning path', async () => {
+    const deps = makeDeps();
+    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue({ opened: false, printInvoked: false, deferred: false });
+    const { result } = renderActions(deps);
+    await result.current.handlePrintReceipt({ id: 8, amount: 10 } as CashierPaymentRow);
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(deps.paymentsApi.getReceipt).toHaveBeenCalledWith(8);
+    expect(notify.warning).toHaveBeenCalled();
   });
 
   it('handlePrintReceipt: no resolvable id → error notify', async () => {
@@ -296,5 +365,51 @@ describe('useCashierActions (PR-UI-14-4)', () => {
     resolveApi({ success: true });
     await promise;
     await waitFor(() => expect(result.current.processingAction).toBeNull());
+  });
+});
+
+describe('useCashierActions — client_request_id forwarding (issue 3859)', () => {
+  // CSH-FE-008 remainder: the server-side idempotency key generated by
+  // CashPaymentModal (one UUID per modal session) must reach BOTH payment
+  // POST bodies. Losing it here re-opens the network-loss double-charge
+  // window the backend dedup anchor is built to close.
+  it('forwards client_request_id into the single-visit createPayment body', async () => {
+    const deps = makeDeps();
+    const { result } = renderActions(deps);
+    await result.current.processPayment(
+      { visit_id: 77, can_create_direct_payment: true },
+      { amount: 150, method: 'cash', note: '', client_request_id: '0f0e0d0c-1b2a-4567-890a-bcdef0123456' },
+    );
+    expect(deps.paymentsApi.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      visit_id: 77,
+      client_request_id: '0f0e0d0c-1b2a-4567-890a-bcdef0123456',
+    }));
+  });
+
+  it('forwards client_request_id into the grouped allocation payload', async () => {
+    const deps = makeDeps();
+    (createGroupedCashierPayment as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    const { result } = renderActions(deps);
+    await result.current.processPayment(
+      { can_create_grouped_payment: true, payment_visit_ids: [1, 2], patient_id: 5 },
+      { amount: 200, method: 'card', client_request_id: '0f0e0d0c-1b2a-4567-890a-bcdef0123457' },
+    );
+    expect(createGroupedCashierPayment).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        client_request_id: '0f0e0d0c-1b2a-4567-890a-bcdef0123457',
+      }),
+    );
+  });
+
+  it('omits the field when the caller has no key (legacy callers stay compatible)', async () => {
+    const deps = makeDeps();
+    const { result } = renderActions(deps);
+    await result.current.processPayment(
+      { visit_id: 77, can_create_direct_payment: true },
+      { amount: 150, method: 'cash', note: '' },
+    );
+    const body = (deps.paymentsApi.createPayment as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(body).not.toHaveProperty('client_request_id');
   });
 });

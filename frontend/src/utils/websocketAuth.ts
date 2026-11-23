@@ -87,6 +87,14 @@ export function createAuthenticatedWebSocket(baseUrl: string, params: Record<str
       const data = safeJsonParse(event.data);
       logger.log('📨 Получено сообщение WebSocket:', data);
 
+      // WSHELPER-FE-002: answer server heartbeat pings automatically. The
+      // legacy queue endpoints track pong freshness server-side; without a
+      // caller-level pong the connection dies after the idle timeout even
+      // though it is healthy.
+      if (data && data.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong', timestamp: data.timestamp }));
+      }
+
       // Обрабатываем ошибки аутентификации в сообщениях
       if (data.type === 'error' && data.message && data.message.includes('аутентификация')) {
         if (onAuthError) {
@@ -94,7 +102,13 @@ export function createAuthenticatedWebSocket(baseUrl: string, params: Record<str
         }
       }
 
-      if (onMessage) onMessage(data);
+      // WSHELPER-FE-002: deliver the RAW MessageEvent — the declared
+      // contract is ``onMessage?: (event: MessageEvent) => void``. Passing
+      // the parsed object instead made wrapper-level
+      // ``JSON.parse(event.data)`` fail on "[object Object]", swallowing
+      // ping/pong and breaking heartbeat/reconnect wrappers. Callers that
+      // need the payload read ``event.data`` (safeJsonParse is available).
+      if (onMessage) onMessage(event);
     } catch (error) {
       logger.warn('⚠️ Ошибка парсинга WebSocket сообщения:', error);
     }

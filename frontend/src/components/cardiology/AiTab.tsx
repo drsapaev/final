@@ -9,6 +9,11 @@
  * here only mutated detached panel-local state. Applying suggestions stays
  * inside the EMR editor (AISuggestionPopover → setField), where the doctor
  * sees and confirms the resulting values (save/sign).
+ *
+ * CARDAI-FE-001 (audit 3886): this mount passes no patient/clinical
+ * `data`, so the assistant renders its explicit no-context state (no
+ * provider controls, no refresh action) instead of an inert false
+ * affordance. Contextual AI analysis lives in the EMR editor.
  */
 
 import AIAssistant from '../ai/AIAssistant';

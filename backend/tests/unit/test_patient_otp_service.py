@@ -14,6 +14,11 @@ Covers owner-approved identity contract v3:
 
 from __future__ import annotations
 
+import asyncio
+import json
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import pytest
 
 from app.core.security import get_password_hash
@@ -24,8 +29,74 @@ from app.services.patient_otp_service import (
     ERR_OTP_INVALID,
     PatientOtpError,
     PatientOtpService,
+    _hash_code,
     normalize_phone,
 )
+
+
+def _configure_textbee_staging(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.PATIENT_OTP_SMS_PROVIDER",
+        "textbee",
+    )
+    monkeypatch.setattr("app.services.patient_otp_service.settings.ENV", "staging")
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_API_KEY", "staging-test-key"
+    )
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_ALLOWED_RECIPIENT",
+        "+998901112233",
+    )
+
+
+def test_memory_staging_reservation_is_atomic_and_token_scoped(svc):
+    backend = svc.get_backend()
+    key = "patotp:textbee-staging-cap:+998901112233"
+
+    assert backend.reserve_once(key, "attempt-one", 60) is True
+    assert backend.reserve_once(key, "attempt-two", 60) is False
+    assert backend.release_if_value(key, "attempt-two") is False
+    assert backend.get(key) == "attempt-one"
+    assert backend.release_if_value(key, "attempt-one") is True
+    assert backend.reserve_once(key, "attempt-two", 60) is True
+    assert backend.get(key) == "attempt-two"
+
+
+def test_redis_staging_reservation_uses_nx_and_compare_delete():
+    from app.services.patient_otp_service import _RedisBackend
+
+    class FakeRedis:
+        def __init__(self):
+            self.values = {}
+
+        def set(self, key, value, *, ex, nx):
+            assert ex == 60
+            assert nx is True
+            if key in self.values:
+                return None
+            self.values[key] = value
+            return True
+
+        def eval(self, script, key_count, key, value):
+            assert key_count == 1
+            assert "redis.call('GET'" in script
+            if self.values.get(key) == value:
+                del self.values[key]
+                return 1
+            return 0
+
+    backend = _RedisBackend.__new__(_RedisBackend)
+    backend._client = FakeRedis()
+    backend._run = lambda operation, *args, **kwargs: operation(*args, **kwargs)
+    key = "patotp:textbee-staging-cap:+998901112233"
+
+    assert backend.reserve_once(key, "attempt-one", 60) is True
+    assert backend.reserve_once(key, "attempt-two", 60) is False
+    assert backend.release_if_value(key, "attempt-two") is False
+    assert backend._client.values[key] == "attempt-one"
+    assert backend.release_if_value(key, "attempt-one") is True
+    assert backend.reserve_once(key, "attempt-two", 60) is True
+    assert backend._client.values[key] == "attempt-two"
 
 
 # ---------------------------------------------------------------- helpers
@@ -78,6 +149,284 @@ def sms_ok(monkeypatch):
     return sent
 
 
+@pytest.mark.asyncio
+async def test_staging_textbee_override_is_used_only_for_patient_otp(
+    svc, sms_ok, monkeypatch
+):
+    from app.services import patient_otp_service as mod
+
+    sent = []
+
+    class FakeTextBee:
+        def __init__(self, *, api_key, device_id=None):
+            assert api_key == "staging-test-key"
+            assert device_id is None
+
+        async def send_sms(self, message):
+            sent.append(message)
+            return type(
+                "Result",
+                (),
+                {"success": True, "message_id": "batch-1", "provider": "textbee"},
+            )()
+
+    monkeypatch.setattr(mod, "TextBeeSMSProvider", FakeTextBee)
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.PATIENT_OTP_SMS_PROVIDER",
+        "textbee",
+    )
+    monkeypatch.setattr("app.services.patient_otp_service.settings.ENV", "staging")
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_API_KEY",
+        "staging-test-key",
+    )
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_ALLOWED_RECIPIENT",
+        "+998901112233",
+    )
+
+    await svc.send_login_otp("+998901112233", "ru")
+
+    assert len(sent) == 1
+    assert sent[0].phone == "+998901112233"
+    assert sent[0].text.startswith("Код подтверждения: ")
+    assert sms_ok == []
+
+    # Even if the normal resend cooldown is cleared, this acceptance key can
+    # queue at most one OTP during its 24-hour staging lease.
+    svc.get_backend().delete("patotp:cd:+998901112233")
+    with pytest.raises(PatientOtpError) as err:
+        await svc.send_login_otp("+998901112233", "ru")
+    assert err.value.status_code == 429
+    assert len(sent) == 1
+
+    # The single-send acceptance limit is shared by login and activation OTPs.
+    svc.get_backend().delete("patact:cd:+998901112233")
+    with pytest.raises(PatientOtpError) as activation_err:
+        await svc.send_activation_otp("+998901112233", "ru")
+    assert activation_err.value.status_code == 429
+    assert len(sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_textbee_patient_otp_override_fails_closed_outside_staging(
+    svc, sms_ok, monkeypatch
+):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.PATIENT_OTP_SMS_PROVIDER",
+        "textbee",
+    )
+    monkeypatch.setattr("app.services.patient_otp_service.settings.ENV", "production")
+
+    with pytest.raises(PatientOtpError) as err:
+        await svc.send_login_otp("+998901112233", "ru")
+
+    assert err.value.status_code == 503
+    assert sms_ok == []
+
+
+@pytest.mark.asyncio
+async def test_textbee_patient_otp_override_fails_closed_without_key(
+    svc, sms_ok, monkeypatch
+):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.PATIENT_OTP_SMS_PROVIDER",
+        "textbee",
+    )
+    monkeypatch.setattr("app.services.patient_otp_service.settings.ENV", "staging")
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_API_KEY", None
+    )
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_ALLOWED_RECIPIENT",
+        "+998901112233",
+    )
+
+    with pytest.raises(PatientOtpError) as err:
+        await svc.send_login_otp("+998901112233", "ru")
+
+    assert err.value.status_code == 503
+    assert sms_ok == []
+
+
+@pytest.mark.asyncio
+async def test_textbee_patient_otp_override_rejects_other_recipient(
+    svc, sms_ok, monkeypatch
+):
+    from app.services import patient_otp_service as mod
+
+    sends = []
+
+    class FakeTextBee:
+        def __init__(self, **kwargs):
+            pass
+
+        async def send_sms(self, message):
+            sends.append(message)
+            return type("Result", (), {"success": True, "provider": "textbee"})()
+
+    monkeypatch.setattr(mod, "TextBeeSMSProvider", FakeTextBee)
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.PATIENT_OTP_SMS_PROVIDER",
+        "textbee",
+    )
+    monkeypatch.setattr("app.services.patient_otp_service.settings.ENV", "staging")
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_API_KEY", "staging-test-key"
+    )
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_ALLOWED_RECIPIENT",
+        "+998901112233",
+    )
+
+    with pytest.raises(PatientOtpError) as err:
+        await svc.send_login_otp("+998901112244", "ru")
+
+    assert err.value.status_code == 503
+    assert sends == []
+    assert sms_ok == []
+
+
+@pytest.mark.asyncio
+async def test_textbee_definite_rejection_releases_staging_send_reservation(
+    svc, monkeypatch
+):
+    from app.services import patient_otp_service as mod
+
+    _configure_textbee_staging(monkeypatch)
+    sends = 0
+
+    class FakeTextBee:
+        def __init__(self, **kwargs):
+            pass
+
+        async def send_sms(self, message):
+            nonlocal sends
+            sends += 1
+            if sends == 1:
+                return type(
+                    "Result",
+                    (),
+                    {
+                        "success": False,
+                        "provider": "textbee",
+                        "definitely_not_accepted": True,
+                    },
+                )()
+            return type(
+                "Result",
+                (),
+                {"success": True, "provider": "textbee"},
+            )()
+
+    monkeypatch.setattr(mod, "TextBeeSMSProvider", FakeTextBee)
+
+    with pytest.raises(PatientOtpError) as err:
+        await svc.send_login_otp("+998901112233", "ru")
+    assert err.value.status_code == 503
+    assert svc.get_backend().get("patotp:code:+998901112233") is None
+    assert svc.get_backend().get("patotp:textbee-staging-cap:+998901112233") is None
+
+    await svc.send_activation_otp("+998901112233", "ru")
+    assert sends == 2
+    assert svc.get_backend().get("patact:code:+998901112233") is not None
+    assert svc.get_backend().get("patotp:textbee-staging-cap:+998901112233") is not None
+
+
+@pytest.mark.asyncio
+async def test_textbee_ambiguous_failure_keeps_staging_send_reservation(
+    svc, monkeypatch
+):
+    from app.services import patient_otp_service as mod
+
+    _configure_textbee_staging(monkeypatch)
+    sends = 0
+
+    class FakeTextBee:
+        def __init__(self, **kwargs):
+            pass
+
+        async def send_sms(self, message):
+            nonlocal sends
+            sends += 1
+            return type(
+                "Result",
+                (),
+                {"success": False, "provider": "textbee"},
+            )()
+
+    monkeypatch.setattr(mod, "TextBeeSMSProvider", FakeTextBee)
+
+    with pytest.raises(PatientOtpError) as first_err:
+        await svc.send_login_otp("+998901112233", "ru")
+    assert first_err.value.status_code == 503
+
+    with pytest.raises(PatientOtpError) as retry_err:
+        await svc.send_activation_otp("+998901112233", "ru")
+    assert retry_err.value.status_code == 429
+    assert sends == 1
+    assert svc.get_backend().get("patotp:code:+998901112233") is None
+    assert svc.get_backend().get("patact:code:+998901112233") is None
+
+
+@pytest.mark.asyncio
+async def test_textbee_concurrent_login_and_activation_share_reservation(
+    svc, monkeypatch
+):
+    from app.services import patient_otp_service as mod
+
+    _configure_textbee_staging(monkeypatch)
+    started = asyncio.Event()
+    finish_first = asyncio.Event()
+    sends = 0
+
+    class FakeTextBee:
+        def __init__(self, **kwargs):
+            pass
+
+        async def send_sms(self, message):
+            nonlocal sends
+            sends += 1
+            if sends == 1:
+                started.set()
+                await finish_first.wait()
+                return type(
+                    "Result",
+                    (),
+                    {
+                        "success": False,
+                        "provider": "textbee",
+                        "definitely_not_accepted": True,
+                    },
+                )()
+            return type(
+                "Result",
+                (),
+                {"success": True, "provider": "textbee"},
+            )()
+
+    monkeypatch.setattr(mod, "TextBeeSMSProvider", FakeTextBee)
+
+    first_attempt = asyncio.create_task(svc.send_login_otp("+998901112233", "ru"))
+    await started.wait()
+    with pytest.raises(PatientOtpError) as concurrent_err:
+        await svc.send_activation_otp("+998901112233", "ru")
+    assert concurrent_err.value.status_code == 429
+    assert sends == 1
+
+    finish_first.set()
+    with pytest.raises(PatientOtpError) as first_err:
+        await first_attempt
+    assert first_err.value.status_code == 503
+
+    await svc.send_activation_otp("+998901112233", "ru")
+    assert sends == 2
+    assert svc.get_backend().get("patact:code:+998901112233") is not None
+
+
 # ------------------------------------------------------------ normalization
 @pytest.mark.parametrize(
     ("raw", "expected"),
@@ -97,19 +446,25 @@ def test_normalize_phone_canonical(raw, expected):
 
 # ------------------------------------------------------------------ send
 @pytest.mark.asyncio
-async def test_send_login_otp_stores_hash_only_and_sends(svc, sms_ok, monkeypatch):
+@pytest.mark.parametrize(
+    ("locale", "message_label"),
+    [("ru", "Код подтверждения:"), ("uz", "Tasdiqlash kodi:")],
+)
+async def test_send_login_otp_stores_hash_only_and_sends(
+    svc, sms_ok, monkeypatch, locale, message_label
+):
     monkeypatch.setattr(
         "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
     )
-    await svc.send_login_otp("+998 90 111 22 33", "ru")
+    await svc.send_login_otp("+998 90 111 22 33", locale)
 
     backend = svc._get_backend()
     stored = backend.get("patotp:code:+998901112233")
     assert stored is not None
-    assert len(stored) == 64  # sha256 hex — plaintext code is never stored
+    assert len(json.loads(stored)["code_hash"]) == 64
     assert len(sms_ok) == 1
     assert sms_ok[0]["phone"] == "+998901112233"
-    assert "Код входа:" in sms_ok[0]["message"]
+    assert message_label in sms_ok[0]["message"]
     # TEST HOOK exposes the code only under TESTING
     code = backend.last_sent_code["+998901112233"]
     assert len(code) == 6
@@ -162,7 +517,8 @@ async def test_verify_grant_single_use(svc, sms_ok, monkeypatch):
 
     result = svc.verify_login_otp(phone, code)
     grant = result["verification_grant"]
-    assert svc.consume_grant(grant) == phone
+    proof = svc.consume_grant(grant)
+    assert proof.phone == phone and proof.binding is None
     assert svc.consume_grant(grant) is None  # single-use
 
 
@@ -203,6 +559,115 @@ async def test_verify_attempts_exhaustion(svc, sms_ok, monkeypatch):
     # even the CORRECT code is dead after exhaustion (code deleted)
     with pytest.raises(PatientOtpError):
         svc.verify_login_otp(phone, code)
+
+
+@pytest.mark.parametrize("namespace", ["patotp", "patact"])
+def test_concurrent_correct_codes_are_consumed_once(svc, namespace):
+    phone, code = "+998901112233", "123456"
+    backend = svc.get_backend()
+    stored = _hash_code(code)
+    if namespace == "patotp":
+        stored = json.dumps({"version": 1, "code_hash": stored})
+    backend.set(f"{namespace}:code:{phone}", stored, 60)
+    barrier = Barrier(16)
+
+    def verify():
+        barrier.wait()
+        try:
+            if namespace == "patotp":
+                return svc.verify_login_otp(phone, code)["verification_grant"]
+            return svc.verify_activation_otp(phone, code)
+        except PatientOtpError as exc:
+            assert (exc.status_code, exc.detail) == (400, ERR_OTP_INVALID)
+            return None
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        results = list(pool.map(lambda _: verify(), range(16)))
+    assert len([result for result in results if result is not None]) == 1
+
+
+def test_concurrent_wrong_codes_exhaust_attempts(svc):
+    phone = "+998901112233"
+    backend = svc.get_backend()
+    backend.set(
+        f"patotp:code:{phone}",
+        json.dumps({"version": 1, "code_hash": _hash_code("123456")}),
+        60,
+    )
+    barrier = Barrier(16)
+
+    def verify_wrong():
+        barrier.wait()
+        with pytest.raises(PatientOtpError):
+            svc.verify_login_otp(phone, "999999")
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        list(pool.map(lambda _: verify_wrong(), range(16)))
+    with pytest.raises(PatientOtpError):
+        svc.verify_login_otp(phone, "123456")
+
+
+def test_memory_grant_concurrent_consume_is_single_use(svc):
+    grant = "test-grant-" + "x" * 24
+    svc.get_backend().set(
+        f"patotp:grant:{grant}",
+        json.dumps({"version": 1, "phone": "+998901112233"}),
+        60,
+    )
+    barrier = Barrier(16)
+
+    def consume():
+        barrier.wait()
+        return svc.consume_grant(grant)
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        results = list(pool.map(lambda _: consume(), range(16)))
+    assert (
+        len(
+            [
+                result
+                for result in results
+                if result is not None and result.phone == "+998901112233"
+            ]
+        )
+        == 1
+    )
+    assert results.count(None) == 15
+
+
+def test_reissue_preserves_attempts_and_corrupt_metadata_fails_closed(svc):
+    backend = svc.get_backend()
+    key = "patotp:code:+998901112233"
+    backend.set(key, _hash_code("123456"), 60)
+    assert not backend.consume_otp(key, _hash_code("999999"), 3)
+    assert not backend.consume_otp(key, _hash_code("999999"), 3)
+    backend.set(key, _hash_code("654321"), 60)
+    assert not backend.consume_otp(key, _hash_code("999999"), 3)
+    assert not backend.consume_otp(key, _hash_code("654321"), 3)
+    backend.set(key, _hash_code("654321"), 60)
+    assert backend.consume_otp(key, _hash_code("654321"), 3)
+
+    backend.set(key, _hash_code("123456"), 60)
+    backend.set(f"meta:{key}", "corrupt", 60)
+    assert not backend.consume_otp(key, _hash_code("999999"), 3)
+    assert backend.get(key) is None
+
+
+def test_redis_failure_during_verification_fails_closed(svc):
+    import redis
+
+    from app.services.patient_otp_service import ERR_SMS_UNAVAILABLE, _RedisBackend
+
+    class UnavailableRedis:
+        def eval(self, *args):
+            raise redis.ConnectionError("unavailable")
+
+    backend = _RedisBackend.__new__(_RedisBackend)
+    backend._client = UnavailableRedis()
+    svc._backend = backend
+    with pytest.raises(PatientOtpError) as error:
+        svc.verify_login_otp("+998901112233", "123456")
+    assert (error.value.status_code, error.value.detail) == (503, ERR_SMS_UNAVAILABLE)
 
 
 # ----------------------------------------------------------------- resolver
@@ -264,9 +729,11 @@ async def test_login_with_grant_happy_path(svc, sms_ok, monkeypatch, db_session)
     )
     user = _patient_user(db_session, username="login_ok", phone="+998901112233")
     phone = "+998901112233"
-    await svc.send_login_otp(phone, "ru")
+    await svc.send_login_otp(
+        phone, "ru", binding=svc.binding_for_phone(db_session, phone)
+    )
     code = svc._get_backend().last_sent_code[phone]
-    grant = svc.verify_login_otp(phone, code)["verification_grant"]
+    grant = svc.verify_login_otp(phone, code, db=db_session)["verification_grant"]
 
     payload = svc.login_with_grant(db_session, phone, grant)
     assert payload["token_type"] == "bearer"

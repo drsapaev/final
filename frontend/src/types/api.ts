@@ -60,6 +60,34 @@ export type ServiceDto = Schemas['ServiceOut'];
 export type ServiceCreateDto = Schemas['ServiceCreate'];
 export type ServiceUpdateDto = Schemas['ServiceUpdate'];
 
+// Admin-managed public booking calendar (annual holiday dates).
+export type PublicBookingHolidayDto = Schemas['PublicBookingHoliday'];
+export type PublicBookingCalendarUpdateDto = Schemas['PublicBookingCalendarUpdate'];
+export type PublicBookingCalendarConfirmDto = Schemas['PublicBookingCalendarConfirm'];
+export type PublicBookingCalendarYearDto = Schemas['PublicBookingCalendarYearOut'];
+export type PublicBookingCalendarErrorDto = Schemas['PublicBookingCalendarErrorOut'];
+
+// Admin-managed clinic-wide public booking configuration.
+export type PublicBookingModeDto = Schemas['PublicBookingMode'];
+export type PublicBookingOptionOutDto = Schemas['PublicBookingOptionOut'];
+export type PublicBookingSettingsUpdateDto = Schemas['PublicBookingSettingsUpdate'];
+export type PublicBookingSettingsOutDto = Schemas['PublicBookingSettingsOut'];
+
+// Public patient booking selection and non-reserving request contracts.
+export type PublicBookingCatalogOptionDto = Schemas['PublicBookingCatalogOptionOut'];
+export type PublicBookingCompatiblePairDto = Schemas['PublicBookingCompatiblePairOut'];
+export type PublicBookingOptionsDto = Schemas['PublicBookingOptionsOut'];
+export type PublicBookingAvailabilityDto = Schemas['PublicBookingAvailabilityOut'];
+export type PublicBookingRequestCreateDto = Schemas['PublicBookingRequestCreate'];
+export type PublicBookingRequestOutDto = Schemas['PublicBookingRequestOut'];
+export type PublicBookingRequestListOutDto = Schemas['PublicBookingRequestListOut'];
+
+// Staff worklist for non-reserving public booking requests.
+export type PublicBookingRequestStatusDto = Schemas['PublicBookingRequestStatus'];
+export type PublicBookingRequestActionDto = Schemas['PublicBookingRequestAction'];
+export type PublicBookingRequestPatientOutDto = Schemas['PublicBookingRequestPatientOut'];
+export type PublicBookingRequestStaffListOutDto = Schemas['PublicBookingRequestStaffListOut'];
+
 export type DepartmentDto = Schemas['DepartmentInfoResponse'];
 export type DepartmentListResponseDto = Schemas['DepartmentListResponse'];
 export type DepartmentUpdateDto = Schemas['DepartmentUpdate'];
@@ -146,6 +174,7 @@ export type AdminQueueDirectionsResponseDto = Schemas['AdminQueueDirectionsRespo
 export type AdminQueueDirectionDto = Schemas['AdminQueueDirection'];
 export type AdminDirectionActionDto = Schemas['AdminDirectionAction'];
 export type AdminDirectionReasonDto = Schemas['AdminDirectionReason'];
+export type QueueProfileParentRepairPreviewDto = Schemas['QueueProfileParentRepairPreview'];
 export type QueueEntryResponse = Schemas['QueueEntryResponse'];
 export type QueueGroupInfo = Schemas['QueueGroupInfo'];
 export type QueueGroupsResponse = Schemas['QueueGroupsResponse'];

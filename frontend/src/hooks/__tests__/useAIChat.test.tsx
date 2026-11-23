@@ -140,6 +140,7 @@ describe('useAIChat', () => {
           id: 22,
           role: 'assistant',
           content: 'Ответ для второй сессии',
+          ai_safety_meta: { requires_doctor_confirmation: true },
           created_at: '2026-03-29T10:02:10Z',
         },
       ],

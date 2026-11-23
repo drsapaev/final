@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
 import {
-  DENTIST_DOCUMENTS_STORAGE_KEY,
   upsertDentistVisitProtocol,
 } from '../../utils/dentistryDocuments';
 import {
@@ -20,11 +19,12 @@ import { dentistCache, loadStoredDentistDocuments, type SelectedPatient } from '
  * pages/DentistPanelUnified.tsx (registrar/cashier decomposition precedent).
  *
  * Owns:
- *  - savedVisitProtocols state + the localStorage documents sync effect
+ *  - savedVisitProtocols state + the legacy localStorage documents purge
+ *    (DENTPHI-FE-001: identifiable clinical data never persist at rest)
  *  - loadDentistVisitProtocolsForPatient — GET /v2/emr/patient/{id} + per-visit
  *    GET /v2/emr/{visitId} hydration (module-cached, BS-42 invalidated)
  *  - loadDentistVisitProtocolByVisitId — GET /v2/emr/{visitId} (404-tolerant)
- *  - persistVisitProtocol — POST /v2/emr/{visitId} with local-cache fallback
+ *  - persistVisitProtocol — POST /v2/emr/{visitId} with in-memory fallback
  *  - reopenVisitProtocol — rehydrate a saved protocol into the visit screen
  *  - the hydrate-from-EMR effect on selectedPatient change
  *
@@ -42,24 +42,13 @@ export function useDentistVisitProtocols({
   setSelectedPatient: React.Dispatch<React.SetStateAction<SelectedPatient | null>>;
   setShowVisitProtocol: (open: boolean) => void;
 }) {
+  // DENTPHI-FE-001 (audit 3892): the protocol list is session-scoped memory.
+  // loadStoredDentistDocuments() purges the legacy shared-origin localStorage
+  // key instead of hydrating from it, so another clinician's identifiable
+  // clinical data can never resurface without a fresh authorized EMR read.
   const [savedVisitProtocols, setSavedVisitProtocols] = useState<Record<string, unknown>[]>(
     () => loadStoredDentistDocuments().visitProtocols
   );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(
-        DENTIST_DOCUMENTS_STORAGE_KEY,
-        JSON.stringify({ visitProtocols: savedVisitProtocols })
-      );
-    } catch {
-      logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита');
-    }
-  }, [savedVisitProtocols]);
 
   const loadDentistVisitProtocolsForPatient = useCallback(async (patient: SelectedPatient | Record<string, unknown> | null) => {
     const patientRecord = (patient ?? {}) as Record<string, unknown>;

@@ -17,6 +17,8 @@ from app.api.v1.endpoints import (
     admin_doctors,
     admin_finance,
     admin_providers,
+    admin_public_booking_calendar,
+    admin_public_booking_settings,
     admin_public_site_media,
     admin_stats,
     admin_telegram,
@@ -95,6 +97,7 @@ from app.api.v1.endpoints import (
     phrase_suggest,
     print_api,
     print_templates,
+    public_booking_requests,
     public_site,
     push_devices,
     qr_queue,
@@ -188,6 +191,11 @@ api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")
 api_router.include_router(
     public_site.router, prefix="/public-site", tags=["public-site"]
+)
+api_router.include_router(
+    public_booking_requests.router,
+    prefix="/admin/public-booking-requests",
+    tags=["public-booking-requests"],
 )
 api_router.include_router(
     departments.router, prefix="/departments", tags=["departments"]
@@ -338,6 +346,16 @@ api_router.include_router(
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_appointments.router, tags=["admin-appointments"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
+api_router.include_router(
+    admin_public_booking_calendar.router,
+    prefix="/admin",
+    tags=["admin-booking-calendar"],
+)
+api_router.include_router(
+    admin_public_booking_settings.router,
+    prefix="/admin",
+    tags=["admin-booking-settings"],
+)
 api_router.include_router(
     clinic_management.router, prefix="/clinic", tags=["clinic-management"]
 )

@@ -15,7 +15,7 @@ import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { api } from '../../api/client';
 import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
-import { printPanelTicketInBrowser } from '../../services/panelPrint';
+import { printPanelTicketInBrowserAsync, openPanelTicketBatchWindow, printPanelTicketsBatchInExistingWindow } from '../../services/panelPrint';
 import notify from '../../services/notify';
 
 interface PaymentTicket {
@@ -249,23 +249,45 @@ const PaymentProviderDialog = ({
 
   // ===================== ПЕЧАТЬ ТАЛОНОВ =====================
 
-  const printTicket = (ticket: PaymentTicket) => {
-    const opened = printPanelTicketInBrowser({
+  // CSH-FE-043 (follow-up audit 2026-11-02): прежняя «синхронная» обёртка
+  // printPanelTicketInBrowser запускала промис через void и возвращала true
+  // БЕЗУСЛОВНО — ветка `if (!opened)` была недостижима, и заблокированный
+  // popup молчал. Теперь ждем типизированный результат: opened честно
+  // отражает блокировку, success — провал рендера/печати.
+  const printTicket = async (ticket: PaymentTicket): Promise<boolean> => {
+    const result = await printPanelTicketInBrowserAsync({
       ...ticket,
       specialty_name: ticket.department || ticket.specialty || ticket.queue_name || t('payment.pay_dlg_queue'),
       source: 'payment',
     });
 
-    if (!opened) {
+    if (!result?.opened) {
       logger.warn('Browser popup blocked for payment ticket print', ticket);
+    } else if (!result?.success) {
+      logger.warn('Browser payment ticket print failed (render/print invocation)', ticket);
     }
-    return opened;
+    return Boolean(result?.opened);
   };
 
-  const printAllTickets = () => {
-    printTickets.forEach((ticket: PaymentTicket) => {
-      setTimeout(() => printTicket(ticket), 500); // Небольшая задержка между печатью
-    });
+  // CSH-FE-045 (follow-up audit 2026-11-02): «Печать всех» открывает ОДНО
+  // окно синхронно в прямом жесте клика и наполняет его единым документом
+  // (по .ticket-page на талон). Прежде каждый popup открывался на 500мс
+  // ПОСЛЕ клика — вне окна доверенной активации.
+  const printAllTickets = async () => {
+    const batchWindow = openPanelTicketBatchWindow();
+    if (!batchWindow) {
+      logger.warn('Browser popup blocked for batch ticket print');
+      return;
+    }
+    const rows = printTickets.map((ticket: PaymentTicket) => ({
+      ...ticket,
+      specialty_name: ticket.department || ticket.specialty || ticket.queue_name || t('payment.pay_dlg_queue'),
+      source: 'payment',
+    }));
+    const result = await printPanelTicketsBatchInExistingWindow(batchWindow, rows);
+    if (!result.success) {
+      logger.warn('Browser batch ticket print failed', result.error);
+    }
   };
 
   // ===================== РУЧНАЯ ПРОВЕРКА =====================

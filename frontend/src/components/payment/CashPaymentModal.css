@@ -59,6 +59,19 @@
     font-weight: var(--mac-font-weight-semibold);
 }
 
+/* CSH-FE-007: deliberate overpay (advance) warning (amber).
+   Distinct from the blue amount hint and the green change-due box.
+   Ratchet-neutral: every var() carries a non-hex fallback. */
+.cpm-advance-notice-box {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-1, 4px);
+    background-color: color-mix(in srgb, var(--mac-warning, transparent), transparent 88%);
+    border-radius: var(--mac-radius-sm, 6px);
+    color: var(--mac-warning-strong, var(--mac-warning, inherit));
+    font-weight: var(--mac-font-weight-semibold, 600);
+}
+
 /* Submit button icon */
 .cpm-submit-icon {
     margin-right: var(--mac-spacing-2);

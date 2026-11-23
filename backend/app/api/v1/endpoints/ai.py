@@ -4,6 +4,7 @@ AI API endpoints
 
 import json
 import logging
+from collections.abc import Awaitable
 from typing import Any, NoReturn
 
 from fastapi import (
@@ -21,7 +22,9 @@ from pydantic import BaseModel
 from ....api.deps import get_current_user
 from ....core.rbac import AIPermission, require_any_ai_permission
 from ....models.user import User
+from ....schemas.medical_ai_safety import MedicalAIListResponse, MedicalAIResultResponse
 from ....services.ai import AIProviderType, ai_manager
+from ....services.ai.medical_safety import with_medical_ai_safety
 from ....services.ai_feature_gating import RequireAiFeature
 from ....services.mcp import get_mcp_manager
 
@@ -80,6 +83,15 @@ def _raise_ai_internal_error(exc: Exception) -> NoReturn:
     ) from exc
 
 
+async def _call_ai_provider(call: Awaitable[Any]) -> Any:
+    """Do not expose HTTP errors raised by an upstream provider as ours."""
+    try:
+        return await call
+    except HTTPException as exc:
+        # The provider is untrusted and may embed patient data in its detail.
+        raise RuntimeError("AI provider request failed") from exc
+
+
 class ComplaintAnalysisRequest(BaseModel):
     """Запрос на анализ жалоб"""
 
@@ -131,7 +143,7 @@ current_user: User = Depends(get_current_user),
     }
 
 
-@router.post("/complaint-to-plan", response_model=dict[str, Any])
+@router.post("/complaint-to-plan", response_model=MedicalAIResultResponse)
 async def analyze_complaint(
     request: ComplaintAnalysisRequest, current_user: User = Depends(get_current_user)
 ) -> dict[str, Any]:
@@ -166,7 +178,7 @@ async def analyze_complaint(
                 )
 
                 if result.get("status") == "success":
-                    return result.get("data", {})
+                    return with_medical_ai_safety(result.get("data", {}))
                 elif result.get("fallback"):
                     # Fallback to direct AI manager
                     logger.warning("MCP failed, falling back to direct AI manager")
@@ -175,27 +187,30 @@ async def analyze_complaint(
                         status_code=500, detail=result.get("error", "MCP error")
                     )
             except Exception as mcp_error:
-                logger.error(f"MCP error: {str(mcp_error)}")
+                logger.error(
+                    "AI operation failed operation=%s error_type=%s",
+                    "complaint_mcp", type(mcp_error).__name__,
+                )
                 # Fallback to direct AI manager if MCP fails
 
         # Direct AI manager call (fallback or if MCP disabled)
-        result = await ai_manager.analyze_complaint(
+        result = await _call_ai_provider(ai_manager.analyze_complaint(
             complaint=request.complaint,
             patient_info=patient_info if patient_info else None,
             provider_type=request.provider,
-        )
+        ))
 
-        return result
+        return with_medical_ai_safety(result)
 
     except Exception as e:
-        logger.error(f"Error analyzing complaint: {str(e)}")
+        logger.error("AI operation failed operation=%s error_type=%s", "complaint", type(e).__name__)
         _raise_ai_internal_error(e)
 
 
-@router.post("/icd-suggest", response_model=list[dict[str, str]])
+@router.post("/icd-suggest", response_model=MedicalAIListResponse)
 async def suggest_icd10_codes(
     request: ICD10SuggestRequest, current_user: User = Depends(get_current_user)
-) -> list[dict[str, str]]:
+) -> dict[str, Any]:
     """Получить подсказки кодов МКБ-10"""
     try:
         # Проверяем права доступа
@@ -203,20 +218,20 @@ async def suggest_icd10_codes(
         if not staff_authorization_service.can_access_ai(current_user):
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
-        result = await ai_manager.suggest_icd10(
+        result = await _call_ai_provider(ai_manager.suggest_icd10(
             symptoms=request.symptoms,
             diagnosis=request.diagnosis,
             provider_type=request.provider,
-        )
+        ))
 
-        return result
+        return with_medical_ai_safety({"data": result})
 
     except Exception as e:
-        logger.error(f"Error suggesting ICD-10: {str(e)}")
+        logger.error("AI operation failed operation=%s error_type=%s", "icd10", type(e).__name__)
         _raise_ai_internal_error(e)
 
 
-@router.post("/lab-interpret", response_model=dict[str, Any])
+@router.post("/lab-interpret", response_model=MedicalAIResultResponse)
 async def interpret_lab_results(
     request: LabInterpretRequest, current_user: User = Depends(get_current_user)
 ) -> dict[str, Any]:
@@ -233,20 +248,20 @@ async def interpret_lab_results(
         if request.patient_gender:
             patient_info["gender"] = request.patient_gender
 
-        result = await ai_manager.interpret_lab_results(
+        result = await _call_ai_provider(ai_manager.interpret_lab_results(
             results=request.results,
             patient_info=patient_info if patient_info else None,
             provider_type=request.provider,
-        )
+        ))
 
-        return result
+        return with_medical_ai_safety(result)
 
     except Exception as e:
-        logger.error(f"Error interpreting lab results: {str(e)}")
+        logger.error("AI operation failed operation=%s error_type=%s", "lab", type(e).__name__)
         _raise_ai_internal_error(e)
 
 
-@router.post("/skin-analyze", response_model=dict[str, Any])
+@router.post("/skin-analyze", response_model=MedicalAIResultResponse)
 async def analyze_skin(
     image: UploadFile = File(...),
     metadata: str | None = Form(None),
@@ -275,18 +290,18 @@ async def analyze_skin(
             except Exception:
                 metadata_dict = {"description": metadata}
 
-        result = await ai_manager.analyze_skin(
+        result = await _call_ai_provider(ai_manager.analyze_skin(
             image_data=image_data, metadata=metadata_dict, provider_type=provider
-        )
+        ))
 
-        return result
+        return with_medical_ai_safety(result)
 
     except Exception as e:
-        logger.error(f"Error analyzing skin: {str(e)}")
+        logger.error("AI operation failed operation=%s error_type=%s", "skin", type(e).__name__)
         _raise_ai_internal_error(e)
 
 
-@router.post("/ecg-interpret", response_model=dict[str, Any])
+@router.post("/ecg-interpret", response_model=MedicalAIResultResponse)
 async def interpret_ecg(
     request: ECGInterpretRequest, current_user: User = Depends(get_current_user)
 ) -> dict[str, Any]:
@@ -308,16 +323,16 @@ async def interpret_ecg(
             "auto_interpretation": request.auto_interpretation,
         }
 
-        result = await ai_manager.interpret_ecg(
+        result = await _call_ai_provider(ai_manager.interpret_ecg(
             ecg_data=ecg_data,
             patient_info=patient_info if patient_info else None,
             provider_type=request.provider,
-        )
+        ))
 
-        return result
+        return with_medical_ai_safety(result)
 
     except Exception as e:
-        logger.error(f"Error interpreting ECG: {str(e)}")
+        logger.error("AI operation failed operation=%s error_type=%s", "ecg", type(e).__name__)
         _raise_ai_internal_error(e)
 
 

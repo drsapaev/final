@@ -3,7 +3,19 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -16,6 +28,12 @@ if TYPE_CHECKING:
 
 class Appointment(Base):
     __tablename__ = "appointments"
+    __table_args__ = (
+        CheckConstraint(
+            "duration_minutes_snapshot IS NULL OR duration_minutes_snapshot > 0",
+            name="ck_appointments_duration_snapshot_positive",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     patient_id: Mapped[int] = mapped_column(
@@ -40,8 +58,24 @@ class Appointment(Base):
     appointment_time: Mapped[str | None] = mapped_column(
         String(8), nullable=True
     )  # HH:MM
+    duration_minutes_snapshot: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="scheduled")
+
+    # Patient RSVP is independent of the financial/lifecycle status.  A DB
+    # trigger advances the occurrence revision when the booked encounter is
+    # materially changed, including changes made by old or bulk writers.
+    occurrence_revision: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default=text("0")
+    )
+    patient_rsvp_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    patient_rsvp_revision: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True
+    )
 
     # Дополнительные поля для регистратуры
     visit_type: Mapped[str | None] = mapped_column(
@@ -100,6 +134,13 @@ class Appointment(Base):
     def department_key(self) -> str | None:
         """Canonical `Department.key` of the booked department (None when unset)."""
         return getattr(self.department, "key", None)
+
+    @property
+    def patient_confirmed_at(self) -> datetime | None:
+        """Expose an RSVP only for the current occurrence, never an old slot."""
+        if self.patient_rsvp_revision != self.occurrence_revision:
+            return None
+        return self.patient_rsvp_at
 
     @property
     def department_name(self) -> str | None:

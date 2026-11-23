@@ -9,7 +9,7 @@
 
 import { CheckCircle } from 'lucide-react';
 
-import { Badge, Button, Skeleton } from '../../../components/ui/macos';
+import { AppError, Badge, Button, Skeleton } from '../../../components/ui/macos';
 import { formatUZS } from '../../../utils/formatCurrency';
 import { formatRegistrarDate, formatRegistrarTime } from '../../../utils/dateUtils';
 import type { Appointment } from '../../../types/domain/clinic';
@@ -24,6 +24,12 @@ import CashierServiceBadges from './CashierServiceBadges';
 interface CashierPendingTableProps {
   appointments: Appointment[];
   pendingLoading: boolean;
+  /** CSH-FE-001: last pending-read failure (null = last load succeeded).
+   * A failed read must never render as a server-confirmed empty queue. */
+  pendingError?: string | null;
+  /** CSH-FE-001: retry action for the error/stale banners (panel passes
+   * triggerDataReload). */
+  onRetryLoad?: () => void;
   pendingPage: number;
   onPendingPageChange: (updater: (p: number) => number) => void;
   pendingTotalPages: number;
@@ -39,6 +45,8 @@ interface CashierPendingTableProps {
 const CashierPendingTable = ({
   appointments,
   pendingLoading,
+  pendingError,
+  onRetryLoad,
   pendingPage,
   onPendingPageChange,
   pendingTotalPages,
@@ -49,6 +57,17 @@ const CashierPendingTable = ({
   tI18n,
 }: CashierPendingTableProps) => {
   const format = formatUZS;
+
+  // CSH-FE-001: a failed read is not a confirmed empty. With rows kept from
+  // the last successful load the banner is a stale-data warning above them;
+  // with no rows at all it replaces the «genuine empty» state entirely.
+  const loadFailed = pendingError !== null && pendingError !== undefined;
+  const hasRows = appointments.length > 0;
+  const retryAction = onRetryLoad ? (
+    <Button size="small" variant="outline" onClick={onRetryLoad}>
+      {tI18n('cashier.retry_load_btn')}
+    </Button>
+  ) : undefined;
 
   return (
     <div className="cashier-section-gap">
@@ -78,7 +97,28 @@ const CashierPendingTable = ({
         </table>
       </div>
       ) :
-      appointments.length > 0 ?
+      (loadFailed && !hasRows) ?
+      (/* CSH-FE-001: failed initial load — error + retry, never the
+          «no pending payments» empty state over a dead request. */
+      <AppError
+        title={tI18n('cashier.load_error_title')}
+        description={pendingError || tI18n('cashier.load_error_text')}
+        action={retryAction}
+      />
+      ) :
+      <>
+      {loadFailed && hasRows &&
+      (/* CSH-FE-001: failed refresh — kept rows stay visible under a
+          stale-data warning with retry. */
+      <AppError
+        severity="warning"
+        title={tI18n('cashier.load_error_title')}
+        description={[pendingError, tI18n('cashier.stale_data_note')].filter(Boolean).join(' ')}
+        action={retryAction}
+        className="cashier-mb-4"
+      />
+      )}
+      {appointments.length > 0 ?
       <div className="cashier-table-scroll">
             <table className="cashier-table">
               <thead>
@@ -132,7 +172,11 @@ const CashierPendingTable = ({
                     <CashierServiceBadges serviceCodes={appointment.services} serviceNames={appointment.services_names} tI18n={tI18n} />
                   </td>
                   <td className="cashier-text-sm cashier-text-accent">
-                    {format(Number(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0))}
+                    {/* CSH-FE-007: показываем канонический остаток долга, а не
+                        исходную сумму — после частичной оплаты строка не должна
+                        выглядеть как полная цена. `??` не даёт легитимному
+                        remaining_amount = 0 провалиться на total_amount. */}
+                    {format(Number(appointment.remaining_amount ?? appointment.total_amount ?? appointment.payment_amount ?? 0))}
                   </td>
                   <td className="cashier-cell-padded">
                     <Badge
@@ -212,6 +256,8 @@ const CashierPendingTable = ({
         </Button>
       </div>
       )}
+      </>
+      }
       </div>
   );
 };

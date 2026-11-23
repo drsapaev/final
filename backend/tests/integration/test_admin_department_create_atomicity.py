@@ -138,7 +138,9 @@ def pg_engine():
 
         engine = create_engine(sa_url, future=True)
         with engine.connect() as conn:
-            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
         assert version, "alembic_version must be present after upgrade"
         yield engine
     finally:
@@ -175,19 +177,14 @@ def _counts(db, key: str) -> dict:
             ("services", "services"),
         ):
             out[label] = db.execute(
-                text(
-                    f"select count(*) from {table} where department_id = :d"
-                ),
+                text(f"select count(*) from {table} where department_id = :d"),
                 {"d": dept_id},
             ).scalar()
         out["queue_profiles"] = db.execute(
             text("select count(*) from queue_profiles where key = :k"), {"k": key}
         ).scalar()
         out["clinic_settings"] = db.execute(
-            text(
-                "select count(*) from clinic_settings where key in "
-                "(:s, :m)"
-            ),
+            text("select count(*) from clinic_settings where key in (:s, :m)"),
             {"s": f"start_number_{key}", "m": f"max_per_day_{key}"},
         ).scalar()
         out["service_categories"] = db.execute(
@@ -210,9 +207,7 @@ def _cleanup(db, key: str) -> None:
             text("delete from services where department_id = :d"), {"d": dept_id}
         )
         db.execute(
-            text(
-                "delete from department_queue_settings where department_id = :d"
-            ),
+            text("delete from department_queue_settings where department_id = :d"),
             {"d": dept_id},
         )
         db.execute(
@@ -221,18 +216,12 @@ def _cleanup(db, key: str) -> None:
             ),
             {"d": dept_id},
         )
+    db.execute(text("delete from queue_profiles where key = :k"), {"k": key})
     db.execute(
-        text("delete from queue_profiles where key = :k"), {"k": key}
-    )
-    db.execute(
-        text(
-            "delete from clinic_settings where key = :s or key = :m"
-        ),
+        text("delete from clinic_settings where key = :s or key = :m"),
         {"s": f"start_number_{key}", "m": f"max_per_day_{key}"},
     )
-    db.execute(
-        text("delete from service_categories where specialty = :k"), {"k": key}
-    )
+    db.execute(text("delete from service_categories where specialty = :k"), {"k": key})
     db.execute(text("delete from departments where key = :k"), {"k": key})
     db.commit()
 
@@ -269,18 +258,16 @@ class _Boom:
         raise RuntimeError("RQ-04 injected failure")
 
 
-def _create(db, key: str, current_user, service_code: str = "RQ04A"):
-    """service_code обязателен и коротким: services.service_code —
-    String(10) unique; длинные department-ключи дают код > 10 (это
-    отдельный латентный дефект хелпера, вне среза RQ-04)."""
+def _create(db, key: str, current_user, service_code: str | None = "RQ04A"):
     from app.api.v1.endpoints.admin_departments._crud import create_department
     from app.api.v1.endpoints.admin_departments._helpers import DepartmentCreate
 
+    integration = {} if service_code is None else {"service_code": service_code}
     payload = DepartmentCreate(
         key=key,
         name_ru=f"RQ-04 {key}",
         active=True,
-        integration={"service_code": service_code},
+        integration=integration,
     )
     return create_department(payload, db=db, current_user=object())
 
@@ -288,7 +275,12 @@ def _create(db, key: str, current_user, service_code: str = "RQ04A"):
 def test_create_builds_exactly_one_settings_row(db_session):
     from types import SimpleNamespace
 
-    result = _create(db_session, "rq04a_ok", SimpleNamespace(id=999, role="Admin"), service_code="RQ04A")
+    result = _create(
+        db_session,
+        "rq04a_ok",
+        SimpleNamespace(id=999, role="Admin"),
+        service_code="RQ04A",
+    )
     assert result["success"] is True
 
     counts = _counts(db_session, "rq04a_ok")
@@ -304,10 +296,63 @@ def test_create_builds_exactly_one_settings_row(db_session):
     _cleanup(db_session, "rq04a_ok")
 
 
+def test_auto_default_service_code_preserves_short_key_format(db_session):
+    from types import SimpleNamespace
+
+    key = "a1"
+    result = _create(
+        db_session, key, SimpleNamespace(id=999, role="Admin"), service_code=None
+    )
+    assert result["success"] is True
+    service_id = result["integration"].get("default_service_id")
+    code = db_session.execute(
+        text("select service_code from services where id = :i"), {"i": service_id}
+    ).scalar_one()
+    assert code == "A1_CONSULT"
+    assert len(code) <= 10
+    _cleanup(db_session, key)
+
+
+def test_auto_default_service_code_is_bounded_and_unique_for_max_department_keys(
+    db_session,
+):
+    from types import SimpleNamespace
+
+    admin = SimpleNamespace(id=999, role="Admin")
+    keys = ["f05_" + "x" * 46, "f05_" + "x" * 45 + "y"]
+    for key in keys:
+        assert len(key) == 50
+        result = _create(db_session, key, admin, service_code=None)
+        assert result["success"] is True
+
+    codes = (
+        db_session.execute(
+            text(
+                "select service_code from services "
+                "where department_key in (:first, :second)"
+            ),
+            {"first": keys[0], "second": keys[1]},
+        )
+        .scalars()
+        .all()
+    )
+    assert len(codes) == 2
+    assert len(set(codes)) == 2
+    assert all(1 <= len(code) <= 10 for code in codes)
+
+    for key in keys:
+        _cleanup(db_session, key)
+
+
 def test_default_service_contract(db_session):
     from types import SimpleNamespace
 
-    result = _create(db_session, "rq04a_ok", SimpleNamespace(id=999, role="Admin"), service_code="RQ04A")
+    result = _create(
+        db_session,
+        "rq04a_ok",
+        SimpleNamespace(id=999, role="Admin"),
+        service_code="RQ04A",
+    )
     assert result["success"] is True
     service_id = result["integration"].get("default_service_id")
     assert service_id, result["integration"]
@@ -330,9 +375,7 @@ def test_default_service_contract(db_session):
     _cleanup(db_session, "rq04a_ok")
 
 
-def test_injected_failure_in_settings_rolls_back_everything(
-    db_session, monkeypatch
-):
+def test_injected_failure_in_settings_rolls_back_everything(db_session, monkeypatch):
     """The settings constructor must be invoked exactly ONCE (inside the
     guarded helper). Pre-fix, _crud.py constructed DepartmentQueueSettings
     AGAIN after the intermediate commit; injecting a raising stub there
@@ -348,7 +391,12 @@ def test_injected_failure_in_settings_rolls_back_everything(
 
     monkeypatch.setattr(_crud, "DepartmentQueueSettings", _Boom)
 
-    result = _create(db_session, "rq04a_boom", SimpleNamespace(id=999, role="Admin"), service_code="RQ04B")
+    result = _create(
+        db_session,
+        "rq04a_boom",
+        SimpleNamespace(id=999, role="Admin"),
+        service_code="RQ04B",
+    )
     assert result["success"] is True
 
     counts = _counts(db_session, "rq04a_boom")
@@ -371,7 +419,12 @@ def test_failure_at_late_staging_rolls_back_everything(db_session, monkeypatch):
     monkeypatch.setattr(_helpers, "expand_queue_tags", _boom_tags)
 
     with pytest.raises(RuntimeError):
-        _create(db_session, "rq04a_late", SimpleNamespace(id=999, role="Admin"), service_code="RQ04C")
+        _create(
+            db_session,
+            "rq04a_late",
+            SimpleNamespace(id=999, role="Admin"),
+            service_code="RQ04C",
+        )
 
     # teardown-level rollback: nothing staged may survive
     db_session.rollback()
@@ -394,12 +447,22 @@ def test_retry_after_failure_succeeds(db_session, monkeypatch):
     monkeypatch.setattr(_helpers, "expand_queue_tags", _boom_tags)
 
     with pytest.raises(RuntimeError):
-        _create(db_session, "rq04a_retry", SimpleNamespace(id=999, role="Admin"), service_code="RQ04D")
+        _create(
+            db_session,
+            "rq04a_retry",
+            SimpleNamespace(id=999, role="Admin"),
+            service_code="RQ04D",
+        )
 
     db_session.rollback()  # the failed attempt must leave nothing behind
     monkeypatch.undo()
 
-    result = _create(db_session, "rq04a_retry", SimpleNamespace(id=999, role="Admin"), service_code="RQ04D2")
+    result = _create(
+        db_session,
+        "rq04a_retry",
+        SimpleNamespace(id=999, role="Admin"),
+        service_code="RQ04D2",
+    )
     assert result["success"] is True
 
     counts = _counts(db_session, "rq04a_retry")
@@ -414,11 +477,21 @@ def test_duplicate_key_conflict_is_consistent(db_session):
 
     from fastapi import HTTPException
 
-    first = _create(db_session, "rq04a_dup", SimpleNamespace(id=999, role="Admin"), service_code="RQ04E")
+    first = _create(
+        db_session,
+        "rq04a_dup",
+        SimpleNamespace(id=999, role="Admin"),
+        service_code="RQ04E",
+    )
     assert first["success"] is True
 
     with pytest.raises(HTTPException) as exc:
-        _create(db_session, "rq04a_dup", SimpleNamespace(id=999, role="Admin"), service_code="RQ04E")
+        _create(
+            db_session,
+            "rq04a_dup",
+            SimpleNamespace(id=999, role="Admin"),
+            service_code="RQ04E",
+        )
     assert exc.value.status_code == 400
     assert "already exists" in exc.value.detail
 
@@ -445,11 +518,11 @@ def test_bulk_binding_conflict_rolls_back_only_the_conflicting_row(
     def _conflict_first_row(db, *, queue_tags=(), department_keys=()):
         if "r1" in department_keys:
             raise queue_owner_invariant.QueueProfileBindingChanged()
-        return original_lock(
-            db, queue_tags=queue_tags, department_keys=department_keys
-        )
+        return original_lock(db, queue_tags=queue_tags, department_keys=department_keys)
 
-    monkeypatch.setattr(queue_owner_invariant, "lock_profile_link_scopes", _conflict_first_row)
+    monkeypatch.setattr(
+        queue_owner_invariant, "lock_profile_link_scopes", _conflict_first_row
+    )
     payload = BulkCreateDepartmentsRequest(
         departments=[
             DepartmentCreate(key="r1", name_ru="Stale binding"),

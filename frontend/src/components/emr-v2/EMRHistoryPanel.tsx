@@ -13,7 +13,7 @@
  * - Restore from here
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ReactNode, ReactElement } from 'react';
 import React from 'react';
 import { FileText, Pencil, CheckCircle2, FilePenLine, RefreshCw, GitBranch } from 'lucide-react';
@@ -47,6 +47,12 @@ interface HistoryRevision {
     change_type?: ChangeType;
     change_summary?: string;
     reason?: string;
+    // EMRHIST-FE-001 (audit 3886, round 19): the backend history contract
+    // (EMRRevisionSummary in backend/app/schemas/emr_v2.py) publishes
+    // created_at/created_by. The legacy edited_at/edited_by keys are kept
+    // only as a read fallback for older payloads.
+    created_at?: string | number;
+    created_by?: number;
     edited_at?: string | number;
     edited_by?: number;
 }
@@ -117,26 +123,51 @@ export function EMRHistoryPanel({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // EMRHIST-FE-002 (audit 3886, round 19): fetch results are bound to the
+    // visit they were requested for. Every request takes an epoch; a
+    // context switch (visitId/isOpen change) immediately clears the previous
+    // snapshot and bumps the epoch, so a late response — or a late FAILURE —
+    // of visit A can never render A's audit trail (or hide B's) while the
+    // panel shows visit B.
+    const fetchEpochRef = useRef(0);
+
     // Load history on mount or visitId change
     useEffect(() => {
-        if (!visitId || !isOpen) return;
+        if (!isOpen) return;
+        if (!visitId) {
+            // Cleared context — nothing to show, no stale rows may survive.
+            setHistory([]);
+            setError(null);
+            setLoading(false);
+            return;
+        }
+
+        const epoch = fetchEpochRef.current + 1;
+        fetchEpochRef.current = epoch;
+        // Immediately drop the previous visit's rows while the new request
+        // is in flight (they must not stay visible under the new context).
+        setHistory([]);
+        setError(null);
+        setLoading(true);
 
         const loadHistory = async () => {
-            setLoading(true);
-            setError(null);
-
             try {
                 const response = await apiClient.get(`/v2/emr/${visitId}/history`);
+                if (epoch !== fetchEpochRef.current) return;
                 setHistory(response.data.revisions || []);
             } catch (err) {
+                if (epoch !== fetchEpochRef.current) return;
                 logger.error('Failed to load history:', err);
                 setError((err instanceof Error ? err.message : String(err)) || t('misc.ehp_ne_udalos_zagruzit_istoriyu'));
             } finally {
-                setLoading(false);
+                if (epoch === fetchEpochRef.current) setLoading(false);
             }
         };
 
-        loadHistory();
+        void loadHistory();
+        return () => {
+            fetchEpochRef.current += 1;
+        };
     }, [visitId, isOpen]);
 
     if (!isOpen) return null;
@@ -234,16 +265,23 @@ export function EMRHistoryPanel({
                                         </div>
                                     )}
 
-                                    {/* Footer: date and author */}
+                                    {/* Footer: date and author — EMRHIST-FE-001 (audit
+                                        3886, round 19): canonical DTO keys
+                                        created_at/created_by (with the legacy
+                                        edited_at/edited_by as read-only
+                                        fallback); no invented names. */}
                                     <div className="emr-history-panel__footer">
                                         <span className="emr-history-panel__date">
-                                            {formatDate(revision.edited_at)}
+                                            {formatDate(revision.created_at ?? revision.edited_at)}
                                         </span>
-                                        {revision.edited_by != null && revision.edited_by > 0 && (
-                                            <span className="emr-history-panel__author">
-                                                👤 #{revision.edited_by}
-                                            </span>
-                                        )}
+                                        {(() => {
+                                            const author = revision.created_by ?? revision.edited_by;
+                                            return author != null && author > 0 ? (
+                                                <span className="emr-history-panel__author">
+                                                    👤 #{author}
+                                                </span>
+                                            ) : null;
+                                        })()}
                                     </div>
                                 </li>
                             );

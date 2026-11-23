@@ -25,11 +25,12 @@ import { getLocalDateString } from '@/utils/dateUtils';
 import logger from '@/utils/logger';
 // i18n-unification: use unified useTranslation instead of getRegistrarTranslator
 import { useTranslation } from '@/i18n/useTranslation';
+import type { RegistrarWorklistLoadOutcome } from '../useRegistrarWorklistData';
 
 interface QueueViewProps {
   searchParams: URLSearchParams;
   setSearchParams: (params: URLSearchParams) => void;
-  loadAppointments: () => void | Promise<void>;
+  loadAppointments: () => void | Promise<RegistrarWorklistLoadOutcome | void>;
   getSpacing: (key: string) => string;
   getFontSize: (key: string) => string;
   getColor: (key: string) => string;
@@ -90,7 +91,7 @@ const QueueView = React.memo(({
             selectedDate={searchParams.get('date') || getLocalDateString()}
             selectedDoctor={searchParams.get('doctor') || ''}
             searchQuery={searchParams.get('q') || ''}
-            onQueueUpdate={loadAppointments}
+            onQueueUpdate={() => { void loadAppointments(); }}
             onDateChange={(newDate: string) => {
               logger.info('RegistrarPanel received date change:', newDate);
               const newParams = new URLSearchParams(searchParams);

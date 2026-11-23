@@ -165,6 +165,18 @@
     font-size: 12px;
 }
 
+.doctor-templates-empty small.doctor-templates-error-detail {
+    margin-top: var(--mac-spacing-2, 8px);
+    opacity: 0.7;
+}
+
+.doctor-templates-retry {
+    margin-top: var(--mac-spacing-2, 8px);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
 /* ============================================
    Template List
    ============================================ */

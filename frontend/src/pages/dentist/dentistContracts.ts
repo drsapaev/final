@@ -13,7 +13,7 @@ import type { Appointment } from '../../types/domain/clinic';
 import { normalizeNumericId } from '../../utils/doctorPanelShared';
 import {
   DENTIST_DOCUMENTS_STORAGE_KEY,
-  parseDentistDocuments,
+  getDefaultDentistDocuments,
 } from '../../utils/dentistryDocuments';
 
 /**
@@ -70,6 +70,13 @@ const dentistVisitProtocolsCache = new Map<string, Record<string, unknown>[]>();
 const dentistVisitProtocolsLoadPromises = new Map<string, Promise<Record<string, unknown>[]>>();
 const dentistFallbackLoggedKeys = new Set<string>();
 
+// DENTCACHE-FE-001 (audit 3892): ownership epoch for the module-level
+// worklist cache. Every invalidation advances the epoch, revoking the
+// ownership of any still-in-flight worklist load — a slow older response
+// can then never repopulate the cache or the panel state after a context
+// switch, unmount or principal change.
+let dentistAppointmentsEpoch = 0;
+
 // audit/phase-1, BS-42: invalidation helper for the 7 module-level caches.
 // Previously these caches were never invalidated on patient switch, so on
 // rapid visit-to-visit navigation the panel showed the previous patient's
@@ -84,6 +91,13 @@ export function invalidateDentistPanelCaches() {
   dentistServicesLoadPromise = null;
   dentistVisitProtocolsCache.clear();
   dentistVisitProtocolsLoadPromises.clear();
+  // DENTCACHE-FE-001 (audit 3892): revoke the in-flight worklist loader's
+  // cache/state ownership, not just its promise reference.
+  dentistAppointmentsEpoch += 1;
+  // DENTPHI-FE-001 (audit 3892): defensively purge the legacy protocol
+  // storage key too — no code path may keep identifiable clinical data in
+  // shared-origin localStorage.
+  purgeLegacyDentistDocumentsStorage();
   // Note: dentistFallbackLoggedKeys intentionally retained — it only guards
   // against duplicate log noise, holds no PHI, and clearing it would resurface
   // log spam on the next visit to the same patient.
@@ -104,6 +118,12 @@ export const dentistCache = {
   },
   set appointmentsLoadPromise(value: Promise<Appointment[]> | null) {
     dentistAppointmentsLoadPromise = value;
+  },
+  // DENTCACHE-FE-001 (audit 3892): the current ownership epoch of the
+  // worklist cache. A loader may only commit when its captured epoch still
+  // matches this value.
+  get appointmentsEpoch(): number {
+    return dentistAppointmentsEpoch;
   },
   get services(): Record<string, unknown> | null {
     return dentistServicesCache;
@@ -173,9 +193,25 @@ export function buildPatientsFromAppointments(
 }
 
 export function loadStoredDentistDocuments() {
-  if (typeof window === 'undefined') {
-    return parseDentistDocuments(null);
-  }
+  // DENTPHI-FE-001 (audit 3892): visit protocols carry identifiable clinical
+  // data (patient ids, names, full visit payloads). They must not persist in
+  // unscoped, plaintext, shared-origin localStorage across sessions. The
+  // legacy key is purged instead of read; the in-session list lives in
+  // memory and the EMR remains the source of truth.
+  purgeLegacyDentistDocumentsStorage();
+  return getDefaultDentistDocuments();
+}
 
-  return parseDentistDocuments(window.localStorage.getItem(DENTIST_DOCUMENTS_STORAGE_KEY));
+// DENTPHI-FE-001 (audit 3892): removes the legacy dentist documents key from
+// the shared browser storage. Exported for the invalidation helper and for
+// any future bootstrap that wants to guarantee the at-rest purge.
+export function purgeLegacyDentistDocumentsStorage() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(DENTIST_DOCUMENTS_STORAGE_KEY);
+  } catch {
+    // Storage may be unavailable (private mode / permissions) — nothing to do.
+  }
 }

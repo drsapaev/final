@@ -77,7 +77,87 @@ export interface CashierPaymentData {
   amount: number | string;
   method: string;
   note?: string;
+  /**
+   * CSH-FE-040 (follow-up audit 2026-11-02): кассовое подтверждение
+   * «внесено/сдача» для наличных. CashPaymentModal считает сдачу локально
+   * (HIGH #9), но прежний контракт сужал payload до amount/method/note —
+   * подтверждение терялось до записи. Бэкенд валидирует инвариант
+   * «внесено = сумма + сдача» (422 при расхождении) и сохраняет оба
+   * значения в provider_data строки платежа (только для method='cash').
+   */
+  received_amount?: number;
+  change_due?: number;
+  /**
+   * Ключ идемпотентности (issue 3859): UUID, генерируется ОДИН раз на
+   * жизненный цикл модального окна оплаты (см. generateCashierClientRequestId).
+   * Сервер дедуплицирует повторные запросы с тем же ключом и реплеит
+   * сохранённый ответ исходной операции вместо второго списания.
+   */
+  client_request_id?: string;
 }
+
+/**
+ * CSH-FE-040: канонический body для POST /cashier/payments. Единственная
+ * точка, где modal-данные превращаются в API-пейлоад: «внесено/сдача»
+ * (только cash) и ключ идемпотентности проходят без потерь. Выделен из
+ * useCashierActions, чтобы контракт был проверяем тестом напрямую.
+ */
+export const buildCashierPaymentPayload = (
+  visitId: number,
+  paymentData: CashierPaymentData,
+  fallbackNote: string,
+): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {
+    visit_id: visitId,
+    amount: paymentData.amount,
+    method: paymentData.method,
+    note: paymentData.note || fallbackNote,
+  };
+  if (paymentData.method === 'cash'
+    && typeof paymentData.received_amount === 'number'
+    && typeof paymentData.change_due === 'number') {
+    payload.received_amount = paymentData.received_amount;
+    payload.change_due = paymentData.change_due;
+  }
+  if (paymentData.client_request_id) {
+    payload.client_request_id = paymentData.client_request_id;
+  }
+  return payload;
+};
+
+/**
+ * Issue 3859 (CSH-FE-008 remainder): generate a payment idempotency key.
+ *
+ * ONE key per payment intent — the caller (CashPaymentModal) invokes this
+ * once per modal session (per mount) and reuses the value for every submit
+ * inside that session, including retries after a lost response. A
+ * deliberate new attempt (modal closed and reopened = remount) gets a
+ * fresh key. NEVER regenerate per automatic retry — that would defeat the
+ * server-side dedup anchor.
+ *
+ * crypto.randomUUID requires a secure context (HTTPS / localhost) which
+ * holds for the clinic deployment; the getRandomValues fallback keeps the
+ * contract intact on exotic embedded webviews.
+ */
+export const generateCashierClientRequestId = (): string => {
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj?.randomUUID) {
+    return cryptoObj.randomUUID();
+  }
+  // RFC4122 v4 fallback for non-secure contexts.
+  const bytes = new Uint8Array(16);
+  if (cryptoObj?.getRandomValues) {
+    cryptoObj.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
 
 // UX Audit #1.4: Quick date presets for typical financial reporting ranges.
 // Replaces single "Сегодня" button with a 4-option segmented control.
@@ -338,7 +418,20 @@ export const createGroupedCashierPayment = async (appointment: Appointment, paym
     visit_ids: visitIds,
     amount: paymentData.amount,
     method: paymentData.method,
-    note: paymentData.note || 'Grouped cashier payment'
+    note: paymentData.note || 'Grouped cashier payment',
+    // CSH-FE-040: «внесено/сдача» проходят и через групповую аллокацию
+    // (валидация та же: только cash, внесено = сумма + сдача).
+    ...(paymentData.method === 'cash'
+      && typeof paymentData.received_amount === 'number'
+      && typeof paymentData.change_due === 'number'
+      ? {
+        received_amount: paymentData.received_amount,
+        change_due: paymentData.change_due,
+      }
+      : {}),
+    ...(paymentData.client_request_id
+      ? { client_request_id: paymentData.client_request_id }
+      : {}),
   }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
   return response.data;

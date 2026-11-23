@@ -14,7 +14,7 @@ Endpoints:
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.models.section_templates import (
@@ -48,7 +48,7 @@ async def get_section_templates(
     icd10_code: str | None = Query(None, description="ICD-10 code for filtering"),
     limit: int = Query(10, ge=1, le=50),
     current_user: User = Depends(deps.get_current_user),
-    db: AsyncSession = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Получить персональные шаблоны врача для секции EMR.
@@ -72,7 +72,7 @@ async def get_section_templates(
         )
 
     service = DoctorSectionTemplatesService(db)
-    return await service.get_templates(
+    return service.get_templates(
         doctor_id=current_user.id,
         section_type=section_type,
         icd10_code=icd10_code,
@@ -89,7 +89,7 @@ async def pin_template(
     section_type: str,
     template_id: str,
     current_user: User = Depends(deps.get_current_user),
-    db: AsyncSession = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Закрепить шаблон (📌 Часто использую).
@@ -98,7 +98,7 @@ async def pin_template(
     При превышении — автоматически открепляется самый старый.
     """
     service = DoctorSectionTemplatesService(db)
-    success, message = await service.pin_template(
+    success, message = service.pin_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )
@@ -118,11 +118,11 @@ async def unpin_template(
     section_type: str,
     template_id: str,
     current_user: User = Depends(deps.get_current_user),
-    db: AsyncSession = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db),
 ):
     """Открепить шаблон."""
     service = DoctorSectionTemplatesService(db)
-    success, message = await service.unpin_template(
+    success, message = service.unpin_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )
@@ -143,7 +143,7 @@ async def update_template(
     template_id: str,
     body: DoctorSectionTemplateUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: AsyncSession = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Обновить шаблон.
@@ -153,7 +153,7 @@ async def update_template(
     - `save_as_new`: создать новый шаблон с изменённым текстом
     """
     service = DoctorSectionTemplatesService(db)
-    template, message = await service.update_template(
+    template, message = service.update_template(
         doctor_id=current_user.id,
         template_id=template_id,
         new_text=body.new_text,
@@ -184,11 +184,11 @@ async def delete_template(
     section_type: str,
     template_id: str,
     current_user: User = Depends(deps.get_current_user),
-    db: AsyncSession = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db),
 ):
     """Удалить шаблон."""
     service = DoctorSectionTemplatesService(db)
-    success, message = await service.delete_template(
+    success, message = service.delete_template(
         doctor_id=current_user.id,
         template_id=template_id,
     )

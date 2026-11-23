@@ -39,6 +39,15 @@ export interface EmrState {
   history: Record<string, unknown>[];
   future: Record<string, unknown>[];
   error: unknown;
+  /**
+   * EMRSAVE-FE-001 (audit 3886 round 17): monotonically increasing counter
+   * bumped by every local edit (SET_FIELD / SET_NESTED_FIELD / UNDO / REDO).
+   * A save ACK may only clear `isDirty` when no edit happened after the
+   * save started (editEpoch === saveEpoch).
+   */
+  editEpoch: number;
+  /** editEpoch snapshot captured at SAVE_START. */
+  saveEpoch: number;
 }
 
 /**
@@ -65,10 +74,29 @@ export type EmrAction =
   | { type: 'SAVE_SUCCESS'; payload: { emr: EmrRecord } }
   | { type: 'SAVE_ERROR'; payload: { error: unknown } }
   | { type: 'CONFLICT_DETECTED'; payload: EmrConflictDetectedPayload }
-  | { type: 'CONFLICT_RESOLVED'; payload: { data?: Record<string, unknown> | null; rowVersion?: number | null } }
+  | { type: 'CONFLICT_RESOLVED'; payload: {
+      data?: Record<string, unknown> | null;
+      rowVersion?: number | null;
+      /**
+       * EMRCONFLICT-FE-001 (audit 3886 round 17): how the user resolved the
+       * conflict. 'discard' = local edits were deliberately dropped and the
+       * canonical server snapshot was loaded (must NOT be dirty, must NOT
+       * schedule a new save). 'merge' = a local document was re-applied on
+       * top of the fresh server version (stays dirty, needs a save).
+       */
+      resolution?: 'discard' | 'merge';
+    } }
   | { type: 'UNDO' }
   | { type: 'REDO' }
-  | { type: 'RESET_DIRTY' };
+  | { type: 'RESET_DIRTY' }
+  /**
+   * EMRCTX-FE-001 (audit 3886 round 18): hard context reset when the
+   * canonical visit identity changes on a still-mounted hook — the whole
+   * reducer state (data, dirty flag, history, conflict, error) returns to
+   * the initial shape so no clinical state of the previous visit can leak
+   * into the new one while its authoritative load is in flight.
+   */
+  | { type: 'CONTEXT_RESET' };
 
 /**
  * Vital signs sub-record — used inside EMR data.

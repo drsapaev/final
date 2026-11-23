@@ -3,7 +3,8 @@
 Поддержка массовых рассылок, планировщика и аналитики
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from html import escape
 from typing import Any
 
 from fastapi import (
@@ -15,6 +16,7 @@ from fastapi import (
     Request,
     status,
 )
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -22,41 +24,47 @@ from app.api.v1.endpoints.admin_telegram import PATIENT_PAYMENT_ENTRY_ROUTE
 from app.core.config import settings
 from app.core.i18n import t  # noqa: F401
 from app.core.rate_limiter import limiter
-from app.crud import (
-    appointment as crud_appointment,
-)
-from app.crud import (
-    lab_result as crud_lab,
-)
-from app.crud import (
-    patient as crud_patient,
-)
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES
 from app.crud import (
     telegram_config as crud_telegram,
 )
-from app.models.clinic import Doctor
-from app.models.lab import LabOrder
+from app.models.lab import LabOrder, LabReportInstance
 from app.models.payment import Payment
+from app.models.telegram_config import TelegramConfig
 from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.notifications import PaymentData
+from app.services.appointment_rsvp import make_appointment_callback
+from app.services.lab_notification_scope import resolve_lab_notification
+from app.services.notifications_pkg._helpers import _patient_telegram_event_message
 from app.services.telegram_bot import get_telegram_bot_service
+from app.services.telegram_delivery_authorization import (
+    TelegramDeliveryError,
+    _current_actor,
+    _doctor_id,
+    _link,
+    _patient,
+    _required_id,
+    authorize_appointment,
+)
 from app.services.telegram_templates import get_telegram_templates_service
 
 router = APIRouter()
 
-PROTECTED_LAB_RESULTS_URL = (
-    "/patient/lab-results"  # P3 fix: relative URL, not example.com
-)
-PROTECTED_DOCTOR_CONTACT_REFERENCE = "assigned"
 PROTECTED_PAYMENT_HISTORY_PATH = PATIENT_PAYMENT_ENTRY_ROUTE
 PROTECTED_PAYMENT_REFERENCE = "available-in-protected-account"
 
-
-def _telegram_notification_allowed(telegram_user: Any, *preference_fields: str) -> bool:
-    if not bool(getattr(telegram_user, "notifications_enabled", True)):
-        return False
-    return all(bool(getattr(telegram_user, field, True)) for field in preference_fields)
+# Documentation of the existing patient-bound delivery error contract.
+# The response model does not change the runtime status or delivery outcome.
+_TELEGRAM_PATIENT_DELIVERY_ERRORS = {
+    400: {"model": TelegramDeliveryError, "description": "Missing or ambiguous resource identifier"},
+    403: {"model": TelegramDeliveryError, "description": "Staff role is not authorized"},
+    404: {"model": TelegramDeliveryError, "description": "Recipient or resource is unavailable"},
+    409: {"model": TelegramDeliveryError, "description": "The resource or recipient changed or is not eligible"},
+    500: {"model": TelegramDeliveryError, "description": "Notification processing or report delivery failed"},
+    502: {"model": TelegramDeliveryError, "description": "Telegram did not confirm delivery"},
+    503: {"model": TelegramDeliveryError, "description": "Telegram is unavailable"},
+}
 
 
 def _telegram_notifications_disabled_response() -> dict[str, Any]:
@@ -64,6 +72,69 @@ def _telegram_notifications_disabled_response() -> dict[str, Any]:
         "success": False,
         "message": "Telegram notifications disabled by patient preference",
     }
+
+
+def _linked_patient_chat(db: Session, patient_id: int, event_type: str):
+    """An absent, revoked, opted-out, or non-private link is not deliverable."""
+    try:
+        return _link(db, patient_id, event_type)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return None
+        raise
+
+
+async def _fresh_bot(db: Session):
+    from app.api.v1.endpoints.telegram_webhook._helpers import _ensure_bot_service_fresh
+
+    service = await get_telegram_bot_service()
+    await _ensure_bot_service_fresh(db, service)
+    return service
+
+
+def _require_active_bot(db: Session, service: Any) -> None:
+    # The cached service can remain active after a different worker disables it.
+    config = db.query(TelegramConfig).populate_existing().first()
+    if not service.active or (config is not None and not config.active):
+        raise HTTPException(status_code=503, detail="Telegram bot is unavailable")
+
+
+def _report_access(db: Session, user: User, patient_id: int, instance: Any) -> None:
+    """Check the report's own visit, not an unrelated visit of the patient."""
+    actor = _current_actor(db, user, {"doctor", "lab"})
+    _patient(db, patient_id)
+    if instance.patient_id != patient_id:
+        raise HTTPException(status_code=409, detail="Отчёт не принадлежит указанному пациенту")
+    if instance.status not in LAB_REPORT_INSTANCE_NOTIFY_ALLOWED_STATUSES:
+        raise HTTPException(status_code=409, detail="Only finalized reports can be sent to the patient")
+    order = db.query(LabOrder).filter(LabOrder.id == instance.order_id).populate_existing().first() if instance.order_id else None
+    if instance.order_id and (not order or (order.patient_id is not None and order.patient_id != patient_id)):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if order and order.visit_id and instance.visit_id and order.visit_id != instance.visit_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    visit_id = instance.visit_id or (order.visit_id if order else None)
+    visit = db.query(Visit).filter(Visit.id == visit_id).populate_existing().first() if visit_id else None
+    if visit_id and (not visit or visit.patient_id != patient_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    doctor_id = _doctor_id(db, actor)
+    if doctor_id is not None and (not visit or visit.doctor_id != doctor_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _verified_payment(db: Session, user: User, patient_id: int, data: dict[str, Any]) -> Payment:
+    _current_actor(db, user, {"cashier"})
+    _patient(db, patient_id)
+    payment_id = _required_id(data, ("payment_id", "id"))
+    payment = db.query(Payment).filter(Payment.id == payment_id).populate_existing().first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    visit = db.query(Visit).filter(Visit.id == payment.visit_id).populate_existing().first()
+    if not visit or visit.patient_id != patient_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if (str(payment.status or "").lower() not in {"paid", "completed"}
+            or (payment.refunded_amount is not None and payment.refunded_amount > 0)):
+        raise HTTPException(status_code=409, detail="Payment is not eligible for confirmation")
+    return payment
 
 
 def _protected_frontend_url(path: str) -> str:
@@ -79,31 +150,6 @@ def _protected_payment_history_url() -> str:
     return _protected_frontend_url(PROTECTED_PAYMENT_HISTORY_PATH)
 
 
-def _safe_lab_template_data(
-    patient: Any,
-    lab_results: list[Any],
-    templates_service: Any,
-    language: str,
-) -> dict[str, Any]:
-    test_types = [result.test_code for result in lab_results]
-    has_abnormalities = any(
-        result.is_abnormal for result in lab_results if hasattr(result, "is_abnormal")
-    )
-    return {
-        "patient_name": patient.full_name,
-        "test_type": ", ".join(test_types),
-        "collection_date": lab_results[0].created_at.strftime("%d.%m.%Y"),
-        "ready_date": datetime.now().strftime("%d.%m.%Y"),
-        "has_abnormalities": has_abnormalities,
-        "abnormalities_text": templates_service.get_abnormalities_text(
-            has_abnormalities, language
-        ),
-        "download_link": PROTECTED_LAB_RESULTS_URL,
-        "doctor_id": PROTECTED_DOCTOR_CONTACT_REFERENCE,
-        "clinic_address": "г. Ташкент, ул. Медицинская, 15",
-    }
-
-
 def _safe_payment_template_data(payment_data: dict[str, Any]) -> dict[str, Any]:
     return {
         "amount": payment_data.get("amount", 0),
@@ -115,330 +161,214 @@ def _safe_payment_template_data(payment_data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _doctor_allowed_doctor_ids(db: Session, current_user: User) -> set[int]:
-    doctor = (
-        db.query(Doctor)
-        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
-        .first()
-    )
-    if not doctor:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
-    allowed_doctor_ids = {doctor.id}
-    assigned_doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
-    # Some legacy visit writers stored User.id in doctor_id. Allow that only
-    # when the value does not target another real Doctor row.
-    if not assigned_doctor:
-        allowed_doctor_ids.add(current_user.id)
-    return allowed_doctor_ids
-
-
-def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
-    allowed_doctor_ids = _doctor_allowed_doctor_ids(db, current_user)
-    rows = (
-        db.query(Visit.patient_id)
-        .filter(
-            Visit.doctor_id.in_(allowed_doctor_ids),
-            Visit.patient_id.isnot(None),
-        )
-        .all()
-    )
-    return {row[0] for row in rows if row[0] is not None}
-
-
-def _ensure_doctor_can_send_appointment_reminder(
-    db: Session,
-    appointment: Any,
-    current_user: User,
-) -> None:
-    if current_user.role != "Doctor":
-        return
-    if current_user.is_superuser:
-        return
-    if getattr(appointment, "doctor_id", None) not in _doctor_allowed_doctor_ids(
-        db, current_user
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
-
-def _ensure_doctor_can_send_patient_lab_results(
-    db: Session,
-    patient_id: int,
-    current_user: User,
-) -> None:
-    if current_user.role != "Doctor":
-        return
-    if current_user.is_superuser:
-        return
-    if patient_id not in _doctor_allowed_patient_ids(db, current_user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
-
-def _lab_result_patient_id(db: Session, result: Any) -> int | None:
-    direct_patient_id = getattr(result, "patient_id", None)
-    if direct_patient_id is not None:
-        return int(direct_patient_id)
-
-    order = getattr(result, "order", None)
-    order_patient_id = getattr(order, "patient_id", None)
-    if order_patient_id is not None:
-        return int(order_patient_id)
-
-    order_id = getattr(result, "order_id", None)
-    if order_id is None:
-        return None
-    return db.query(LabOrder.patient_id).filter(LabOrder.id == order_id).scalar()
-
-
-def _ensure_lab_results_belong_to_patient(
-    db: Session,
-    *,
-    patient_id: int,
-    lab_results: list[Any],
-) -> None:
-    for result in lab_results:
-        result_patient_id = _lab_result_patient_id(db, result)
-        if result_patient_id is not None and result_patient_id != patient_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied",
-            )
-
-
-def _payment_id_from_payload(payment_data: dict[str, Any]) -> int | None:
-    for key in ("payment_id", "id"):
-        value = payment_data.get(key)
-        if value is None:
-            continue
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid payment_id",
-            )
-    return None
-
-
-def _ensure_payment_confirmation_belongs_to_patient(
-    db: Session,
-    *,
-    patient_id: int,
-    payment_data: dict[str, Any],
-) -> None:
-    payment_id = _payment_id_from_payload(payment_data)
-    if payment_id is None:
-        return
-
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Payment not found",
-        )
-
-    visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-    if not visit or visit.patient_id != patient_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
-
-@router.post("/send-appointment-reminder", response_model=dict[str, Any])
+@router.post("/send-appointment-reminder", response_model=dict[str, Any], responses=_TELEGRAM_PATIENT_DELIVERY_ERRORS)
 async def send_appointment_reminder(
     appointment_id: int,
     reminder_type: str = Query("24h", description="Тип напоминания: 24h, 2h, 30m"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
+    current_user: User = Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
-    """Отправить напоминание о записи на прием"""
+    """Send only to the current consenting, patient-linked private chat."""
+    del reminder_type, background_tasks
     try:
-        # Получаем данные записи
-        appointment = crud_appointment.get_appointment(db, appointment_id)
-        if not appointment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
-            )
-
-        # Получаем данные пациента
-        _ensure_doctor_can_send_appointment_reminder(db, appointment, current_user)
-        patient = crud_patient.get_patient(db, appointment.patient_id)
-        if not patient:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
-            )
-
-        # Ищем Telegram пользователя
-        telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient.phone)
-        if not telegram_user:
-            return {
-                "success": False,
-                "message": "Пациент не зарегистрирован в Telegram боте",
-            }
-
-        if not _telegram_notification_allowed(telegram_user, "appointment_reminders"):
-            return _telegram_notifications_disabled_response()
-
-        # Получаем сервис бота
-        bot_service = await get_telegram_bot_service()
-        # PR-2 (round 9): cross-process rotation/revocation visibility.
-        from app.api.v1.endpoints.telegram_webhook._helpers import (
-            _ensure_bot_service_fresh,
+        appointment, _, link = authorize_appointment(db, current_user, {"id": appointment_id})
+        initial = (appointment.patient_id, appointment.occurrence_revision, link.id,
+                   link.chat_id, link.patient_link_epoch)
+        bot_service = await _fresh_bot(db)
+        _require_active_bot(db, bot_service)
+        appointment, _, link = authorize_appointment(
+            db, current_user, {"id": appointment_id}, chat_id=initial[3]
         )
-
-        await _ensure_bot_service_fresh(db, bot_service)
-
-        # Формируем данные для шаблона
-        template_data = {
-            "patient_name": patient.full_name,
-            "doctor_name": appointment.doctor_name,
-            "specialty": appointment.specialty,
-            "appointment_date": appointment.date.strftime("%d.%m.%Y"),
-            "appointment_time": appointment.time,
-            "cabinet": appointment.cabinet or "Уточните в регистратуре",
-            "clinic_address": "г. Ташкент, ул. Медицинская, 15",
-            "clinic_phone": "+998 71 123-45-67",
-            "appointment_id": appointment.id,
-        }
-
-        # Получаем шаблон
-        templates_service = get_telegram_templates_service()
-        template = templates_service.get_template(
-            "appointment_reminder", telegram_user.language_code or "ru", template_data
+        if initial != (appointment.patient_id, appointment.occurrence_revision,
+                       link.id, link.chat_id, link.patient_link_epoch):
+            raise HTTPException(status_code=409, detail="Appointment changed; retry")
+        callback = make_appointment_callback(
+            "v", appointment.id, appointment.occurrence_revision,
+            link.chat_id, link.id, link.patient_link_epoch,
         )
-
-        # Отправляем сообщение
+        # Authorization is refreshed immediately before dispatch; an external
+        # send cannot be made atomic with a subsequent consent revocation.
         success = await bot_service._send_message(
-            chat_id=telegram_user.chat_id,
-            text=template["text"],
-            reply_markup=template.get("keyboard"),
+            chat_id=link.chat_id,
+            text="У вас новое уведомление. Откройте его в личном чате.",
+            reply_markup={"inline_keyboard": [[{"text": "Просмотреть", "callback_data": callback}]]},
         )
-
-        if success:
-            return {
-                "success": True,
-                "message": "Напоминание отправлено",
-                "appointment_id": appointment.id,
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка отправки напоминания",
-            )
-
+        if not success:
+            raise HTTPException(status_code=502, detail="Telegram delivery failed")
+        return {"success": True, "message": "Напоминание отправлено", "appointment_id": appointment.id}
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
+        raise HTTPException(status_code=500, detail="Internal server error") from None
 
 
-@router.post("/send-lab-results", response_model=dict[str, Any])
+@router.post("/send-lab-results", response_model=dict[str, Any], responses=_TELEGRAM_PATIENT_DELIVERY_ERRORS)
 async def send_lab_results(
     patient_id: int,
     lab_result_ids: list[int],
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
+    current_user: User = Depends(require_roles("Admin", "Lab", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
-    """Отправить результаты анализов пациенту"""
+    """Notify only when every result belongs to the patient and is finalized.
+
+    HTTP 200 with ``success: false`` means that no eligible chat was available.
+    """
+    del background_tasks
     try:
-        # Получаем данные пациента
-        patient = crud_patient.get_patient(db, patient_id)
-        if not patient:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
-            )
-
-        # Ищем Telegram пользователя
-        _ensure_doctor_can_send_patient_lab_results(db, patient_id, current_user)
-
-        telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient.phone)
-        if not telegram_user:
-            return {
-                "success": False,
-                "message": "Пациент не зарегистрирован в Telegram боте",
-            }
-
-        if not _telegram_notification_allowed(telegram_user, "lab_notifications"):
-            return _telegram_notifications_disabled_response()
-
-        # Получаем данные анализов
-        lab_results = []
+        if not lab_result_ids:
+            raise HTTPException(status_code=400, detail="Lab result IDs are required")
+        actor = _current_actor(db, current_user, {"doctor", "lab"})
+        _patient(db, patient_id)
         for result_id in lab_result_ids:
-            result = crud_lab.get_lab_result(db, result_id)
-            if result:
-                lab_results.append(result)
+            resolve_lab_notification(db, lab_result_id=result_id, patient_id=patient_id, current_user=actor)
+        link = _linked_patient_chat(db, patient_id, "lab_results")
+        if not link:
+            return _telegram_notifications_disabled_response()
+        identity = (link.id, link.chat_id, link.patient_link_epoch)
+        bot_service = await _fresh_bot(db)
+        _require_active_bot(db, bot_service)
+        actor = _current_actor(db, current_user, {"doctor", "lab"})
+        _patient(db, patient_id)
+        for result_id in lab_result_ids:
+            resolve_lab_notification(db, lab_result_id=result_id, patient_id=patient_id, current_user=actor)
+        link = _link(db, patient_id, "lab_results", identity[1])
+        if identity != (link.id, link.chat_id, link.patient_link_epoch):
+            raise HTTPException(status_code=409, detail="Recipient changed; retry")
+        message = _patient_telegram_event_message("lab_results", link.language_code)
+        if not message:
+            raise HTTPException(status_code=503, detail="Telegram notification is unavailable")
+        if not await bot_service._send_message(chat_id=link.chat_id, text=message, reply_markup=None):
+            raise HTTPException(status_code=502, detail="Telegram delivery failed")
+        return {"success": True, "message": "Уведомление отправлено", "lab_results_count": len(lab_result_ids)}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error") from None
 
-        if not lab_results:
+
+# LABN-FE-001 (audit 3886 round 10): the lab workbench «Отправить пациенту»
+# action operates on a lab report INSTANCE (new lab-reporting module). The
+# legacy /send-lab-results route serves legacy lab_result rows with a
+# templated TEXT message and cannot accept an instance ID — the pre-fix
+# frontend posted {patient_id, instance_id} JSON to it and was rejected 422
+# at validation before any business logic. This dedicated route renders the
+# same finalized-report PDF as GET /lab/report-instances/{id}/pdf and
+# delivers it through the bot's sendDocument path. Patient binding, doctor
+# scope and Telegram consent are enforced server-side.
+LAB_REPORT_INSTANCE_NOTIFY_ALLOWED_STATUSES = {"FINALIZED", "PRINTED"}
+
+
+class LabReportInstanceNotificationRequest(BaseModel):
+    """Explicit body contract for the instance-scoped report notification.
+
+    A wrong-shape request (e.g. the legacy field name ``instance_id`` or a
+    legacy ``lab_result_ids`` list) fails Pydantic validation with a
+    readable 422 instead of silently mapping unrelated ID spaces.
+    """
+
+    patient_id: int
+    report_instance_id: int
+
+
+@router.post(
+    "/send-lab-report-instance", response_model=dict[str, Any],
+    responses={code: response for code, response in _TELEGRAM_PATIENT_DELIVERY_ERRORS.items() if code != 502},
+)
+async def send_lab_report_instance_notification(
+    payload: LabReportInstanceNotificationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Lab", *DOCTOR_FAMILY_GATE_ROLES)),
+):
+    """Отправить финализированный лабораторный бланк пациенту в Telegram (PDF).
+
+    Семантика статусов зеркалит legacy /send-lab-results: 200 +
+    ``{"success": false, "message": ...}`` означает, что пациент
+    НЕ получил отправку (не связан с ботом или отключил уведомления) —
+    фронтенд обязан показывать это как неудачу (LABN-FE-002), а не как
+    «отправлено».
+    """
+    from app.services.lab_report_pdf_service import lab_report_pdf_service
+    from app.services.lab_reporting import LabReportingDomainError, LabReportingService
+
+    try:
+        _current_actor(db, current_user, {"doctor", "lab"})
+        _patient(db, payload.patient_id)
+        service = LabReportingService(db)
+        try:
+            instance = service.get_instance(payload.report_instance_id)
+        except LabReportingDomainError as exc:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Результаты анализов не найдены",
-            )
+                status_code=exc.status_code, detail=exc.detail
+            ) from exc
 
-        # Получаем сервис бота
-        _ensure_lab_results_belong_to_patient(
-            db,
-            patient_id=patient_id,
-            lab_results=lab_results,
-        )
+        _report_access(db, current_user, payload.patient_id, instance)
+        telegram_user = _linked_patient_chat(db, payload.patient_id, "lab_results")
+        if not telegram_user:
+            return _telegram_notifications_disabled_response()
+        link_identity = (telegram_user.id, telegram_user.chat_id, telegram_user.patient_link_epoch)
+        report_identity = (instance.id, instance.patient_id, instance.visit_id,
+                           instance.order_id, instance.status, instance.updated_at)
 
-        bot_service = await get_telegram_bot_service()
-        # PR-2 (round 9): cross-process rotation/revocation visibility.
-        from app.api.v1.endpoints.telegram_webhook._helpers import (
-            _ensure_bot_service_fresh,
-        )
-
-        await _ensure_bot_service_fresh(db, bot_service)
-
-        # Получаем сервис шаблонов
-        templates_service = get_telegram_templates_service()
-
-        # Формируем данные для шаблона
-        template_data = _safe_lab_template_data(
-            patient,
-            lab_results,
-            templates_service,
-            telegram_user.language_code or "ru",
-        )
-
-        # Получаем шаблон
-        template = templates_service.get_template(
-            "lab_results_ready", telegram_user.language_code or "ru", template_data
-        )
-
-        # Отправляем сообщение
-        success = await bot_service._send_message(
-            chat_id=telegram_user.chat_id,
-            text=template["text"],
-            reply_markup=template.get("keyboard"),
-        )
-
-        if success:
-            return {
-                "success": True,
-                "message": "Результаты анализов отправлены",
-                "lab_results_count": len(lab_results),
+        # Identical render payload to the download endpoint, so the
+        # delivered PDF is byte-equivalent to what staff prints.
+        materialized_sections = service.materialize_instance(instance)
+        critical_findings = service.summarize_critical_findings(materialized_sections)
+        pdf_bytes = lab_report_pdf_service.render_report(
+            {
+                "template_name": instance.template.name,
+                "layout_preset": instance.template_version.layout_preset,
+                "page_settings": instance.template_version.page_settings or {},
+                "branding": instance.branding_snapshot or {},
+                "patient": instance.patient_snapshot or {},
+                "signers": instance.signer_snapshot or {},
+                "sections": materialized_sections,
+                "critical_findings": critical_findings,
+                "footer_notes": instance.template_version.footer_notes,
+                "report_date": (
+                    instance.finalized_at or instance.created_at or datetime.now(UTC)
+                ).strftime("%d.%m.%Y"),
             }
-        else:
+        )
+
+        bot_service = await _fresh_bot(db)
+        _require_active_bot(db, bot_service)
+        # Re-read both authorization and report state after awaited setup.
+        instance = db.query(LabReportInstance).filter(
+            LabReportInstance.id == payload.report_instance_id
+        ).populate_existing().first()
+        if not instance:
+            raise HTTPException(status_code=404, detail="Report not found")
+        _report_access(db, current_user, payload.patient_id, instance)
+        if report_identity != (instance.id, instance.patient_id, instance.visit_id,
+                               instance.order_id, instance.status, instance.updated_at):
+            raise HTTPException(status_code=409, detail="Report changed; retry")
+        telegram_user = _link(db, payload.patient_id, "lab_results", link_identity[1])
+        if link_identity != (telegram_user.id, telegram_user.chat_id, telegram_user.patient_link_epoch):
+            raise HTTPException(status_code=409, detail="Recipient changed; retry")
+
+        filename = f"lab-report-{instance.id}.pdf"
+        # Caption intentionally empty: the PDF itself is the payload and
+        # carries the full report; no patient metadata is duplicated in
+        # the message text and nothing is logged.
+        sent, _message_id, _send_error = await bot_service._send_document(
+            chat_id=telegram_user.chat_id,
+            filename=filename,
+            document_bytes=pdf_bytes,
+        )
+
+        if not sent:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка отправки результатов",
+                detail="Ошибка отправки отчёта",
             )
 
+        return {
+            "success": True,
+            "message": "Отчёт отправлен пациенту",
+            "report_instance_id": payload.report_instance_id,
+        }
     except HTTPException:
         raise
     except Exception:
@@ -448,7 +378,7 @@ async def send_lab_results(
         )
 
 
-@router.post("/send-payment-confirmation", response_model=dict[str, Any])
+@router.post("/send-payment-confirmation", response_model=dict[str, Any], responses=_TELEGRAM_PATIENT_DELIVERY_ERRORS)
 async def send_payment_confirmation(
     patient_id: int,
     payment_data: PaymentData,
@@ -456,86 +386,49 @@ async def send_payment_confirmation(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
-    """Отправить подтверждение платежа.
+    """Use a verified paid record; caller-supplied amounts are ignored.
 
-    P0-6b FIX: ``payment_data`` is now typed as ``PaymentData`` (Pydantic
-    model with ``extra='allow'`` so unknown keys like ``transaction_id``
-    and ``receipt_link`` are preserved). The model validates field types
-    and sizes at the framework boundary, preventing mass-assignment of
-    arbitrary keys. Internally the model is converted back to a dict
-    via ``.model_dump()`` so existing helpers (``_safe_payment_template_data``,
-    ``_ensure_payment_confirmation_belongs_to_patient``) continue to work
-    unchanged.
+    HTTP 200 with ``success: false`` means that no eligible chat was available.
     """
+    del background_tasks
     try:
-        # Получаем данные пациента
-        patient = crud_patient.get_patient(db, patient_id)
-        if not patient:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
-            )
-
-        # Ишем Telegram пользователя
-        _ensure_payment_confirmation_belongs_to_patient(
-            db,
-            patient_id=patient_id,
-            payment_data=payment_data.model_dump(),
-        )
-
-        telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient.phone)
-        if not telegram_user:
-            return {
-                "success": False,
-                "message": "Пациент не зарегистрирован в Telegram боте",
-            }
-
-        if not _telegram_notification_allowed(telegram_user):
+        supplied = payment_data.model_dump(exclude_none=True)
+        payment = _verified_payment(db, current_user, patient_id, supplied)
+        link = _linked_patient_chat(db, patient_id, "payment_paid")
+        if not link:
             return _telegram_notifications_disabled_response()
-
-        # Получаем сервис бота
-        bot_service = await get_telegram_bot_service()
-        # PR-2 (round 9): cross-process rotation/revocation visibility.
-        from app.api.v1.endpoints.telegram_webhook._helpers import (
-            _ensure_bot_service_fresh,
+        identity = (link.id, link.chat_id, link.patient_link_epoch)
+        snapshot = (payment.id, payment.visit_id, payment.status, payment.amount,
+                    payment.currency, payment.method, payment.paid_at, payment.refunded_amount)
+        bot_service = await _fresh_bot(db)
+        _require_active_bot(db, bot_service)
+        payment = _verified_payment(db, current_user, patient_id, supplied)
+        if snapshot != (payment.id, payment.visit_id, payment.status, payment.amount,
+                        payment.currency, payment.method, payment.paid_at, payment.refunded_amount):
+            raise HTTPException(status_code=409, detail="Payment changed; retry")
+        link = _link(db, patient_id, "payment_paid", identity[1])
+        if identity != (link.id, link.chat_id, link.patient_link_epoch):
+            raise HTTPException(status_code=409, detail="Recipient changed; retry")
+        # Use a server-owned template and exact DB amount; never caller-provided
+        # payment details, raw provider IDs, or URLs.
+        data = _safe_payment_template_data({
+            "amount": f"{payment.amount:.2f}",
+            "currency": escape(str(payment.currency or "UZS")),
+            "payment_method": escape(str(payment.method or "")),
+        })
+        data["payment_date"] = payment.paid_at.strftime("%d.%m.%Y %H:%M") if payment.paid_at else "—"
+        template = get_telegram_templates_service().get_template(
+            "payment_confirmation", link.language_code or "ru", data
         )
-
-        await _ensure_bot_service_fresh(db, bot_service)
-
-        # Формируем данные для шаблона
-        template_data = _safe_payment_template_data(payment_data.model_dump())
-
-        # Получаем шаблон
-        templates_service = get_telegram_templates_service()
-        template = templates_service.get_template(
-            "payment_confirmation", telegram_user.language_code or "ru", template_data
-        )
-
-        # Отправляем сообщение
-        success = await bot_service._send_message(
-            chat_id=telegram_user.chat_id,
-            text=template["text"],
-            reply_markup=template.get("keyboard"),
-        )
-
-        if success:
-            return {
-                "success": True,
-                "message": "Подтверждение платежа отправлено",
-                "amount": payment_data.amount,  # Pydantic model field
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка отправки подтверждения",
-            )
-
+        if not await bot_service._send_message(
+            chat_id=link.chat_id, text=template["text"], reply_markup=template.get("keyboard")
+        ):
+            raise HTTPException(status_code=502, detail="Telegram delivery failed")
+        return {"success": True, "message": "Подтверждение платежа отправлено"}
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
+        raise HTTPException(status_code=500, detail="Internal server error") from None
 
 
 # TG-AUDIT-28 P0-7: cap recipients at 1000 to prevent broadcast abuse.

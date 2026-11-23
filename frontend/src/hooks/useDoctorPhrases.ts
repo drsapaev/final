@@ -80,6 +80,10 @@ export const useDoctorPhrases = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryRef = useRef('');
+  // EMRPHRASE-FE-001 (audit 3886 round 27): generation counter — any
+  // invalidation (short text, context identity change, pause, not-ready)
+  // bumps it so a late in-flight response can never commit stale suggestions.
+  const generationRef = useRef(0);
 
   const { debounceMs, minQueryLength, maxSuggestions } = {
     ...DEFAULT_CONFIG,
@@ -142,17 +146,33 @@ export const useDoctorPhrases = ({
   const fetchSuggestions = useCallback(async (text: string, cursor: number) => {
     // 🔒 НЕ запрашиваем если NOT READY
     if (!readiness.ready) {
+      // EMRPHRASE-FE-001: whatever is in flight is now obsolete
+      generationRef.current += 1;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setSuggestions([]);
       return;
     }
 
     // 🔒 НЕ запрашиваем если PAUSED (per-field control)
     if (paused) {
+      generationRef.current += 1;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setSuggestions([]);
       return;
     }
 
     if (!doctorId || !text) {
+      generationRef.current += 1;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setSuggestions([]);
       return;
     }
@@ -162,6 +182,7 @@ export const useDoctorPhrases = ({
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
+    const generation = ++generationRef.current;
 
     setRequestState(loadingState<unknown>());
 
@@ -177,6 +198,10 @@ export const useDoctorPhrases = ({
         signal: abortControllerRef.current.signal
       });
 
+      // EMRPHRASE-FE-001: only the request that still owns the current
+      // generation may commit its result.
+      if (generationRef.current !== generation) return;
+
       if (response.data?.suggestions) {
         setSuggestions(response.data.suggestions);
       } else {
@@ -184,6 +209,7 @@ export const useDoctorPhrases = ({
       }
       setRequestState(successState<unknown>(null));
     } catch (err: unknown) {
+      if (generationRef.current !== generation) return;
       if ((err as Error).name !== 'AbortError' && (err as Error).name !== 'CanceledError') {
         const errorMessage = formatNetworkErrorMessage({
           responseDetail: (err as Error & { response?: { data?: Record<string, unknown> } })?.response?.data?.detail,
@@ -217,20 +243,33 @@ export const useDoctorPhrases = ({
 
     // Не запрашиваем если текст слишком короткий
     if (text.length < minQueryLength) {
+      // EMRPHRASE-FE-001: dropping below the threshold invalidates the
+      // in-flight request — abort it, clear results and reset the query
+      // memo so growing back to the same text fetches again.
+      generationRef.current += 1;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setSuggestions([]);
+      lastQueryRef.current = '';
       return;
     }
 
     // Не запрашиваем если текст не изменился
-    if (text === lastQueryRef.current) {
+    // EMRPHRASE-FE-001: the memo is keyed by the FULL context
+    // (doctor + field + specialty + text) — the same text under a different
+    // principal is a NEW authorized query, not a duplicate.
+    const queryKey = `${doctorId ?? ''}|${field}|${specialty ?? ''}|${text}`;
+    if (queryKey === lastQueryRef.current) {
       return;
     }
-    lastQueryRef.current = text;
+    lastQueryRef.current = queryKey;
 
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(text, cursor);
     }, debounceMs);
-  }, [fetchSuggestions, debounceMs, minQueryLength, readiness.ready]);
+  }, [fetchSuggestions, debounceMs, minQueryLength, readiness.ready, doctorId, field, specialty]);
 
   // Эффект при изменении текста
   useEffect(() => {
@@ -242,6 +281,44 @@ export const useDoctorPhrases = ({
       }
     };
   }, [currentText, cursorPosition, debouncedFetch]);
+
+  // EMRPHRASE-FE-001 (audit 3886 round 27): a change of the doctor/field/
+  // specialty identity invalidates every in-flight request and every memoized
+  // query, and re-runs the current text under the new context.
+  useEffect(() => {
+    generationRef.current += 1;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setSuggestions([]);
+    setRequestState(idleState<unknown>());
+    lastQueryRef.current = '';
+    if (doctorId && currentText && currentText.length >= minQueryLength && readiness.ready && !paused) {
+      debouncedFetch(currentText, cursorPosition);
+    }
+    // Identity change only — re-running on text/readiness changes is owned by
+    // the text effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doctorId, field, specialty]);
+
+  // EMRPHRASE-FE-001: pausing or losing readiness ends the suggestion session
+  useEffect(() => {
+    if (paused || !readiness.ready) {
+      generationRef.current += 1;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setSuggestions([]);
+      // no newer request owns the loading state after this invalidation
+      setRequestState(idleState<unknown>());
+    }
+  }, [paused, readiness.ready]);
 
   // Очистка при размонтировании
   useEffect(() => {

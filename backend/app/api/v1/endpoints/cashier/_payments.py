@@ -31,6 +31,275 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     get_patient_name,
     router,
 )
+from app.models.payment import PaymentClientRequest
+
+
+def _payment_intent_fingerprint(
+    *,
+    endpoint: str,
+    patient_id: int | None,
+    visit_ids: tuple[int, ...],
+    amount: Any,
+    method: str,
+) -> str:
+    """RETRO-FIN-001: canonical SHA-256 over the SEMANTIC payment intent.
+
+    The fingerprint binds an idempotency key to WHAT is being charged:
+    endpoint + patient/visit allocation + amount + method. A key reused
+    for a different intent must NOT replay the original success — the
+    stored anchor's fingerprint is compared before replay and a mismatch
+    is refused with 409. Canonicalization rules:
+
+    * ``visit_ids`` are deduplicated and sorted (allocation order is
+      backend-owned, so [3, 1] and [1, 3] are the same intent);
+    * ``amount`` is normalized through ``Decimal.normalize()`` so equal
+      values produce equal strings (``100`` == ``100.00``);
+    * JSON keys are sorted and separators are compact — byte-stable hash
+      input regardless of Python version or field order at the call site.
+
+    Receipt-provenance fields (``received_amount``/``change_due``/``note``)
+    are deliberately NOT part of the intent: they do not change what is
+    charged, only how the receipt is rendered.
+    """
+    import hashlib
+    import json
+    from decimal import Decimal
+
+    canonical = {
+        "endpoint": endpoint,
+        "patient_id": patient_id,
+        "visit_ids": sorted(set(visit_ids)),
+        "amount": str(Decimal(str(amount)).normalize()),
+        "method": method,
+    }
+    encoded = json.dumps(
+        canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _find_payment_client_request(
+    db: Session, client_request_id: str
+) -> PaymentClientRequest | None:
+    """Look up the idempotency anchor row for a client key (issue 3859).
+
+    Module-level (not a closure) so the concurrent-race test can simulate
+    a lookup that missed the winner's row before either request committed.
+    """
+    return (
+        db.query(PaymentClientRequest)
+        .filter(PaymentClientRequest.client_request_id == client_request_id)
+        .first()
+    )
+
+
+def _replay_payment_client_request(
+    db: Session,
+    client_request_id: str,
+    endpoint: str,
+    *,
+    request_fingerprint: str | None = None,
+    current_user_id: int | None = None,
+) -> dict[str, Any] | None:
+    """Return the stored response payload for a duplicate client key.
+
+    A repeated ``client_request_id`` must get the ORIGINAL operation's
+    result (200 + stored snapshot), never a second payment row and never
+    a re-derivation from today's DB state — the visit debt may have moved
+    on since the first attempt, so re-running validation would 400 a
+    legitimate retry. A key minted by the OTHER endpoint is refused with
+    409 instead of being replayed through a mismatched response model.
+
+    RETRO-FIN-001 (intent binding): the anchor also stores the SHA-256
+    fingerprint of the original request's SEMANTIC intent (endpoint +
+    patient/visit allocation + amount + method). A repeated key carrying
+    a DIFFERENT intent is refused with 409
+    ``client_request_id_intent_mismatch`` — it must never replay the
+    original success as if the new intent had been charged. Historical
+    anchors (fingerprint NULL, minted before this guard) keep the
+    key+endpoint-only replay semantics. The replay is additionally bound
+    to the anchor owner: another authorized user replaying someone else's
+    key gets 409 instead of the stored payment metadata (``created_by``
+    NULL → unbound legacy anchor, replay allowed).
+    """
+    stored = _find_payment_client_request(db, client_request_id)
+    if stored is None:
+        return None
+    if stored.endpoint != endpoint:
+        logger.warning(
+            "payment.client_request_endpoint_mismatch client_request_id=%s "
+            "stored_endpoint=%s requested_endpoint=%s",
+            client_request_id,
+            stored.endpoint,
+            endpoint,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "client_request_id_endpoint_mismatch",
+                "message": (
+                    "Этот ключ идемпотентности был создан другим эндпоинтом "
+                    "оплаты. Сгенерируйте новый ключ для новой операции."
+                ),
+            },
+        )
+    if (
+        request_fingerprint is not None
+        and stored.request_fingerprint is not None
+        and stored.request_fingerprint != request_fingerprint
+    ):
+        logger.warning(
+            "payment.client_request_intent_mismatch client_request_id=%s "
+            "endpoint=%s stored_fingerprint=%s requested_fingerprint=%s",
+            client_request_id,
+            endpoint,
+            stored.request_fingerprint,
+            request_fingerprint,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "client_request_id_intent_mismatch",
+                "message": (
+                    "Ключ идемпотентности использован с другим платёжным "
+                    "назначением (пациент/визит/сумма/метод). Сгенерируйте "
+                    "новый ключ для новой операции."
+                ),
+            },
+        )
+    if (
+        current_user_id is not None
+        and stored.created_by is not None
+        and stored.created_by != current_user_id
+    ):
+        logger.warning(
+            "payment.client_request_owner_mismatch client_request_id=%s "
+            "endpoint=%s stored_owner=%s requesting_user=%s",
+            client_request_id,
+            endpoint,
+            stored.created_by,
+            current_user_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "client_request_id_owner_mismatch",
+                "message": (
+                    "Ключ идемпотентности принадлежит другой учётной записи. "
+                    "Сгенерируйте новый ключ для новой операции."
+                ),
+            },
+        )
+    logger.info(
+        "payment.client_request_replayed client_request_id=%s endpoint=%s "
+        "payment_id=%s",
+        client_request_id,
+        endpoint,
+        (stored.response_payload or {}).get("id"),
+    )
+    payload = stored.response_payload
+    if isinstance(payload, str):  # defensive: JSON column round-trip
+        import json
+
+        payload = json.loads(payload)
+    return payload
+
+
+def _commit_with_client_request(
+    db: Session,
+    *,
+    client_request_id: str,
+    endpoint: str,
+    response_payload: dict[str, Any],
+    created_by: int | None,
+    request_fingerprint: str | None = None,
+) -> dict[str, Any] | None:
+    """Commit the payment rows together with their idempotency anchor.
+
+    The anchor insert rides the CALLER-OWNED transaction (the payment
+    service must be invoked with ``commit=False``), so a crash can never
+    leave a payment without its anchor (duplicate charge window) or an
+    anchor without its payment (phantom replay). A concurrent duplicate
+    loses the unique-index race here: its whole transaction (payments +
+    anchor) rolls back and the caller replays the winner's snapshot.
+
+    RETRO-FIN-001: the anchor persists the request intent fingerprint.
+    In the concurrent-race recovery the WINNER's fingerprint must match
+    this request's fingerprint — a byte-equivalent duplicate recovers
+    into the winner's replay as before, while a same-key/different-intent
+    race (integration anomaly) is refused with 409 instead of replaying
+    an unrelated success.
+
+    Returns ``None`` on a clean commit, or the WINNER's stored payload
+    when this request lost the concurrent race (the caller must replay it
+    with 200 instead of surfacing an error to the cashier).
+    """
+    db.add(
+        PaymentClientRequest(
+            client_request_id=client_request_id,
+            endpoint=endpoint,
+            response_payload=response_payload,
+            request_fingerprint=request_fingerprint,
+            created_by=created_by,
+        )
+    )
+    try:
+        db.commit()
+        return None
+    except IntegrityError:
+        db.rollback()
+        stored = _find_payment_client_request(db, client_request_id)
+        if (
+            stored is not None
+            and stored.endpoint == endpoint
+            and (
+                request_fingerprint is None
+                or stored.request_fingerprint is None
+                or stored.request_fingerprint == request_fingerprint
+            )
+        ):
+            payload = stored.response_payload
+            if isinstance(payload, str):  # defensive: JSON round-trip
+                import json
+
+                payload = json.loads(payload)
+            logger.info(
+                "payment.client_request_race_recovered client_request_id=%s "
+                "endpoint=%s",
+                client_request_id,
+                endpoint,
+            )
+            return payload
+        if stored is not None and stored.request_fingerprint is not None:
+            logger.warning(
+                "payment.client_request_intent_mismatch client_request_id=%s "
+                "endpoint=%s stored_fingerprint=%s requested_fingerprint=%s",
+                client_request_id,
+                endpoint,
+                stored.request_fingerprint,
+                request_fingerprint,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "reason": "client_request_id_intent_mismatch",
+                    "message": (
+                        "Ключ идемпотентности использован с другим платёжным "
+                        "назначением (пациент/визит/сумма/метод). Сгенерируйте "
+                        "новый ключ для новой операции."
+                    ),
+                },
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "payment_already_in_progress",
+                "message": (
+                    "Платёж с этим ключом уже обрабатывается. "
+                    "Обновите список платежей."
+                ),
+            },
+        )
 
 
 @router.get("/pending-payments", response_model=dict[str, Any])
@@ -103,16 +372,11 @@ async def get_pending_payments(
             patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
             patients_map = {p.id: p for p in patients}
 
-        # Batch Loading: Платежи для всех визитов (этот запрос всё ещё нужен)
+        # CSH-FE-028: net settled (unrefunded) paid amounts via the canonical
+        # invariant service — gross sums understate remaining debt after
+        # partial refunds.
         visit_ids = [v.id for v in all_visits]
-        payments_map = defaultdict(list)  # visit_id -> list[Payment]
-        if visit_ids:
-            payments_batch = db.query(Payment).filter(
-                Payment.visit_id.in_(visit_ids),
-                Payment.status.in_(["paid", "completed"])
-            ).all()
-            for p in payments_batch:
-                payments_map[p.visit_id].append(p)
+        net_paid_by_visit = _cashier_paid_amounts_by_visit_id(db, visit_ids)
 
         # =====================================================
         # ГРУППИРОВКА ПО ПАЦИЕНТУ
@@ -175,10 +439,8 @@ async def get_pending_payments(
                     })
                     group["total_amount"] += Decimal(str(service_price)) * service_qty
 
-            # Оплаченная сумма для этого визита
-            visit_payments = payments_map.get(visit.id, [])
-            for payment in visit_payments:
-                group["paid_amount"] += payment.amount
+            # Оплаченная сумма для этого визита — net of refunds (CSH-FE-028)
+            group["paid_amount"] += net_paid_by_visit.get(visit.id, Decimal("0"))
 
         # Считаем remaining и фильтруем оплаченных
         pending_groups = []
@@ -395,7 +657,37 @@ async def create_grouped_payment(
     Allocation is backend-owned: visits must belong to one patient, amount is
     allocated oldest visit first by remaining backend-calculated debt, and
     overpay is rejected instead of being assigned to an arbitrary visit.
+
+    Idempotency (issue 3859): a request carrying ``client_request_id`` is
+    deduplicated server-side — a repeat with the same key replays the
+    stored response of the original allocation (200) instead of
+    allocating a second time. Keys are optional, so key-less callers keep
+    the legacy behavior.
     """
+    # Idempotency replay FIRST, before any validation: the original
+    # operation already succeeded; re-running today's checks against a
+    # since-settled debt would wrongly 400 a legitimate retry.
+    # RETRO-FIN-001: the key is bound to the request's SEMANTIC intent —
+    # a same-key/different-intent repeat is refused with 409 before the
+    # stored success can be falsely replayed.
+    intent_fingerprint = _payment_intent_fingerprint(
+        endpoint="grouped",
+        patient_id=payment_data.patient_id,
+        visit_ids=tuple(payment_data.visit_ids),
+        amount=payment_data.amount,
+        method=payment_data.method,
+    )
+    if payment_data.client_request_id is not None:
+        replayed = _replay_payment_client_request(
+            db,
+            str(payment_data.client_request_id),
+            "grouped",
+            request_fingerprint=intent_fingerprint,
+            current_user_id=current_user.id,
+        )
+        if replayed is not None:
+            return GroupedPaymentResponse.model_validate(replayed)
+
     normalized_visit_ids = list(dict.fromkeys(payment_data.visit_ids))
     if not normalized_visit_ids:
         raise HTTPException(
@@ -494,6 +786,18 @@ async def create_grouped_payment(
                 method=payment_data.method,
                 note=payment_data.note,
                 current_user=current_user,
+                # CSH-FE-040: общая для всей группы квитанция «внесено/сдача»
+                # (валидировано на DTO) — каждая нога групповой аллокации
+                # несёт то же подтверждение, что и client_request_id.
+                cash_tender=(
+                    {
+                        "received_amount": str(payment_data.received_amount),
+                        "change_due": str(payment_data.change_due),
+                    }
+                    if payment_data.received_amount is not None
+                    and payment_data.change_due is not None
+                    else None
+                ),
                 commit=False,  # CRITICAL: grouped payment owns the transaction
             )
 
@@ -514,8 +818,60 @@ async def create_grouped_payment(
                 detail="Grouped cashier payment could not allocate full amount",
             )
 
-        # Single commit for the whole grouped payment (caller-owned transaction)
-        db.commit()
+        if payment_data.client_request_id is not None:
+            # Issue 3859: the caller owns the transaction — stage the anchor
+            # and commit payments + anchor atomically. The snapshot is built
+            # from the staged rows (ids assigned at flush; every other field
+            # is Python-set), which is byte-identical to the response below.
+            client_request_key = str(payment_data.client_request_id)
+            for staged_payment in created_payments:
+                staged_payment.client_request_id = client_request_key
+            staged_response = GroupedPaymentResponse(
+                patient_id=patient_id,
+                amount=payment_data.amount,
+                method=payment_data.method,
+                status="paid",
+                created_at=created_at,
+                payments=[
+                    PaymentResponse(
+                        id=staged_payment.id,
+                        visit_id=staged_payment.visit_id,
+                        patient_id=patient_id,
+                        amount=staged_payment.amount,
+                        method=staged_payment.method,
+                        status=staged_payment.status,
+                        created_at=staged_payment.created_at,
+                        paid_at=staged_payment.paid_at,
+                        note=staged_payment.note,
+                    )
+                    for staged_payment in created_payments
+                ],
+                allocations=[
+                    GroupedPaymentAllocationItem(
+                        visit_id=visit.id,
+                        payment_id=payment.id,
+                        amount=allocation_amount,
+                        remaining_before=remaining_before,
+                        remaining_after=remaining_after,
+                    )
+                    for payment, visit, allocation_amount, remaining_before, remaining_after in allocation_rows
+                ],
+            )
+            race_replay = _commit_with_client_request(
+                db,
+                client_request_id=client_request_key,
+                endpoint="grouped",
+                response_payload=staged_response.model_dump(mode="json"),
+                created_by=getattr(current_user, "id", None),
+                request_fingerprint=intent_fingerprint,
+            )
+            if race_replay is not None:
+                # This request lost the concurrent race: the winner's
+                # allocation stands, replay its stored response.
+                return GroupedPaymentResponse.model_validate(race_replay)
+        else:
+            # Single commit for the whole grouped payment (caller-owned transaction)
+            db.commit()
         for payment in created_payments:
             db.refresh(payment)
 
@@ -545,6 +901,9 @@ async def create_grouped_payment(
                 }))
         except Exception as ws_error:
             logger.warning(f"WebSocket broadcast failed: {ws_error}")
+
+        if payment_data.client_request_id is not None:
+            return staged_response
 
         return GroupedPaymentResponse(
             patient_id=patient_id,
@@ -598,7 +957,40 @@ async def create_payment(
 ):
     """
     Создать новый платеж.
+
+    Idempotency (issue 3859): a request carrying ``client_request_id`` is
+    deduplicated server-side — a repeat with the same key replays the
+    stored response of the original payment (200) instead of creating a
+    second payment row. Keys are optional, so key-less callers keep the
+    legacy behavior.
     """
+    # Idempotency replay FIRST, before any validation: the original
+    # operation already succeeded; re-running today's checks against a
+    # since-settled visit would wrongly 400 a legitimate retry (e.g. after
+    # the rest of the debt was paid with a different key).
+    # RETRO-FIN-001: the key is bound to the request's SEMANTIC intent —
+    # a same-key/different-intent repeat is refused with 409 before the
+    # stored success can be falsely replayed.
+    intent_fingerprint = _payment_intent_fingerprint(
+        endpoint="single",
+        patient_id=payment_data.patient_id,
+        visit_ids=(
+            (payment_data.visit_id,) if payment_data.visit_id is not None else ()
+        ),
+        amount=payment_data.amount,
+        method=payment_data.method,
+    )
+    if payment_data.client_request_id is not None:
+        replayed = _replay_payment_client_request(
+            db,
+            str(payment_data.client_request_id),
+            "single",
+            request_fingerprint=intent_fingerprint,
+            current_user_id=current_user.id,
+        )
+        if replayed is not None:
+            return PaymentResponse.model_validate(replayed)
+
     try:
         # Определяем patient_id
         patient_id = payment_data.patient_id
@@ -691,14 +1083,13 @@ async def create_payment(
                 elif hasattr(visit, 'total_amount') and visit.total_amount:
                     total_cost = Decimal(str(visit.total_amount))
 
-            # 2. Считаем уже оплаченное
-            paid_amount = Decimal("0")
-            existing_payments = db.query(Payment).filter(
-                Payment.visit_id == visit.id,
-                Payment.status.in_(["paid", "completed"])
-            ).all()
-            for p in existing_payments:
-                paid_amount += p.amount
+            # 2. Считаем уже оплаченное — net of refunds via the canonical
+            # invariant service (CSH-FE-028): a partially refunded payment
+            # re-opens debt that the cashier must be able to accept here,
+            # matching what the service check below computes.
+            paid_amount = _cashier_paid_amounts_by_visit_id(db, [visit.id]).get(
+                visit.id, Decimal("0")
+            )
 
             # 3. Проверяем остаток
             remaining_debt = total_cost - paid_amount
@@ -772,7 +1163,55 @@ async def create_payment(
             method=payment_data.method,
             note=payment_data.note,
             current_user=current_user,
+            # CSH-FE-040: кассовое «внесено/сдача» (валидировано на DTO:
+            # только cash, внесено = сумма + сдача) — сохраняется в
+            # provider_data строки платежа как документальное подтверждение.
+            cash_tender=(
+                {
+                    "received_amount": str(payment_data.received_amount),
+                    "change_due": str(payment_data.change_due),
+                }
+                if payment_data.received_amount is not None
+                and payment_data.change_due is not None
+                else None
+            ),
+            # Issue 3859: with a client key the endpoint owns the transaction
+            # so the payment row and its idempotency anchor commit atomically
+            # (commit=True would leave a window: payment persisted, anchor
+            # lost — a retry would then double-charge).
+            commit=payment_data.client_request_id is None,
         )
+
+        staged_keyed_response: PaymentResponse | None = None
+        if payment_data.client_request_id is not None:
+            client_request_key = str(payment_data.client_request_id)
+            new_payment.client_request_id = client_request_key
+            # Snapshot built from the staged row (id assigned at flush;
+            # every other field is Python-set) — identical to the response
+            # returned below on the legacy path.
+            staged_keyed_response = PaymentResponse(
+                id=new_payment.id,
+                visit_id=new_payment.visit_id,
+                patient_id=patient_id,
+                amount=new_payment.amount,
+                method=new_payment.method,
+                status=new_payment.status,
+                created_at=new_payment.created_at,
+                paid_at=new_payment.paid_at,
+                note=new_payment.note,
+            )
+            race_replay = _commit_with_client_request(
+                db,
+                client_request_id=client_request_key,
+                endpoint="single",
+                response_payload=staged_keyed_response.model_dump(mode="json"),
+                created_by=getattr(current_user, "id", None),
+                request_fingerprint=intent_fingerprint,
+            )
+            if race_replay is not None:
+                # This request lost the concurrent race: the winner's
+                # payment stands, replay its stored response.
+                return PaymentResponse.model_validate(race_replay)
 
         await _emit_payment_notification(
             db=db,
@@ -798,6 +1237,9 @@ async def create_payment(
             }))
         except Exception as ws_error:
             logger.warning(f"WebSocket broadcast failed: {ws_error}")
+
+        if staged_keyed_response is not None:
+            return staged_keyed_response
 
         return PaymentResponse(
             id=new_payment.id,

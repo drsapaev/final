@@ -7316,6 +7316,15 @@ def test_doctor_fall_through_scopes_to_the_queue_department(
             .filter(OnlineQueueEntry.source == "force_majeure_transfer")
             .one()
         )
+        # 3808 review round 8: the untagged source queue transfers into the
+        # doctor's UNTAGGED next-day queue — the specialty tag is no longer
+        # re-derived for the destination surface
+        moved_queue = db_session.query(DailyQueue).filter(
+            DailyQueue.id == moved.queue_id
+        ).one()
+        assert moved_queue.specialist_id == therapist.id
+        assert moved_queue.queue_tag is None
+        assert moved_queue.day == new_day
 
         # the patient ALREADY has an open visit on the new day with
         # the SAME doctor under ANOTHER queue tag (ultrasound)
@@ -7339,10 +7348,15 @@ def test_doctor_fall_through_scopes_to_the_queue_department(
 
         db_session.refresh(other_tag_visit)
         db_session.refresh(moved)
-        # the therapy-tag ticket resolves its OWN queue-department visit
+        # the ticket resolves its OWN queue-department visit
         assert moved.visit_id != other_tag_visit.id
         own = db_session.query(Visit).filter(Visit.id == moved.visit_id).one()
-        assert own.department == "therapy"
+        # 3808 review round 8: the untagged doctor source queue now keeps
+        # its untagged destination (no more specialty-tag relabel), and the
+        # visit fall-through uses the queue's OWN canonical department
+        # mapping (tag or «general») — «general» for an untagged queue,
+        # never the other tag's «ultrasound» department
+        assert own.department == "general"
         assert own.visit_date == new_day
         assert own.doctor_id == therapist.id
         # the unrelated ultrasound visit stays untouched (still open)
@@ -7623,7 +7637,12 @@ def test_force_majeure_transfer_numbers_from_day_snapshot_resource_queue(
     the old path floored at the LIVE
     QueueResource.start_number_online, so an admin bump after the day
     was frozen (41 -> 501) made transferred tickets jump outside the
-    frozen sequence while ordinary registration kept the snapshot."""
+    frozen sequence while ordinary registration kept the snapshot.
+
+    3808 review round 7 (P1 destination owner): источник — РЕСУРСНАЯ
+    очередь того же тега: перенос сохраняет владельца поверхности,
+    врачебный источник больше не «переезжает» на общий ресурсный
+    surface (для него назначение — врачебная очередь)."""
     from app.services.force_majeure_service import ForceMajeureService
 
     res_user = _make_user(db_session, username="fm_snap_res1", role="Resource")
@@ -7660,8 +7679,9 @@ def test_force_majeure_transfer_numbers_from_day_snapshot_resource_queue(
     source_queue = _make_queue(
         db_session,
         day=_dt_now_tashkent_day(),
-        specialist_id=synthetic.id,
+        specialist_id=None,
         queue_tag="lab_r19b",
+        queue_resource_id=resource.id,
     )
     entry = _make_waiting_entry(db_session, source_queue)
 

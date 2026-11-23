@@ -83,6 +83,21 @@ export interface DirtyGuardTransitionOptions {
    * им достаточно тоста «сохраняется…».
    */
   onPendingBlock?: () => void;
+  /**
+   * LABGUARD-FE-003 (audit 3886, round 13): политика владения интентом
+   * при открытом диалоге.
+   * - 'leave' (guardRouteLeave: Logout/Back/покидание /lab): диалог
+   *   иммутабелен — новый dirty-переход отклоняется (false), pending не
+   *   трогается; подтверждение выполняет ПЕРВЫЙ интент. Прежнее поведение
+   *   молча подменяло onLeave (например Logout clearToken) чужим
+   *   коллбеком под тем же открытым окном.
+   * - 'context' (default; панельный urlIntent-флоу): сохраняет прежний
+   *   контракт supersede — in-lab URL-intent обновляет цель (например
+   *   переход на другой отчёт), база отката не меняется. Это
+   *   ВНУТРИЛАБОРАТОРНЫЙ переход, он не уничтожает сессию, и обновление
+   *   цели легитимно (e2e round 7: superseding tab-less intent).
+   */
+  intentPolicy?: 'leave' | 'context';
 }
 
 export interface DirtyTransitionGuard {
@@ -113,6 +128,7 @@ interface PendingDirtyTransition {
   run: () => void | Promise<void>;
   onCancel?: () => void | Promise<void>;
   sourceIds: string[] | null;
+  intentPolicy: 'leave' | 'context';
 }
 
 /** Источники, входящие в область перехода. null — все зарегистрированные. */
@@ -169,6 +185,15 @@ export function useDirtyTransitionGuard(options?: {
     transition: () => void | Promise<void>,
     transitionOptions?: DirtyGuardTransitionOptions,
   ) => {
+    const intentPolicy = transitionOptions?.intentPolicy ?? 'context';
+    const currentPending = pendingTransitionRef.current;
+    // LABGUARD-FE-004 (RETRO-LAB-001, audit 3920): once a route-leave
+    // confirmation owns the dialog, even a clean/in-scope context intent
+    // must not clear it and navigate around the user's decision. Preserve
+    // the original intent until Save, Discard, or Cancel resolves it.
+    if (currentPending && (currentPending.intentPolicy === 'leave' || intentPolicy === 'leave')) {
+      return false;
+    }
     const affected = selectScopedSources(
       sourcesRef.current,
       transitionOptions?.sourceIds ?? null,
@@ -180,13 +205,17 @@ export function useDirtyTransitionGuard(options?: {
       void transition();
       return true;
     }
-    const pending: PendingDirtyTransition = {
+    // LABGUARD-FE-003 (audit 3886, round 13): route-leave intents remain
+    // immutable while a dialog is open. In-lab context intents may still
+    // supersede another context intent, preserving the URL-intent contract.
+    const nextPending: PendingDirtyTransition = {
       run: transition,
       onCancel: transitionOptions?.onCancel,
       sourceIds: transitionOptions?.sourceIds ?? null,
+      intentPolicy,
     };
-    pendingTransitionRef.current = pending;
-    setPendingTransition(pending);
+    pendingTransitionRef.current = nextPending;
+    setPendingTransition(nextPending);
     return false;
   }, []);
 

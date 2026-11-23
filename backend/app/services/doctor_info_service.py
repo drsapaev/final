@@ -39,6 +39,7 @@ class DoctorInfoService:
                     "phone": None,
                     "email": None,
                     "is_active": False,
+                    "experience_years": None,
                 }
 
             # Получаем информацию о пользователе
@@ -46,7 +47,7 @@ class DoctorInfoService:
             if doctor.user:
                 user_info = {
                     "full_name": doctor.user.full_name or doctor.user.username,
-                    "phone": getattr(doctor.user, 'phone', None),
+                    "phone": getattr(doctor.user, "phone", None),
                     "email": doctor.user.email,
                     "is_active": doctor.user.is_active,
                 }
@@ -69,6 +70,7 @@ class DoctorInfoService:
                     department_info["name"] if department_info else "Общее отделение"
                 ),
                 "specialty": doctor.specialty,
+                "experience_years": doctor.experience_years,
                 "cabinet": {"number": doctor.cabinet, "floor": None, "building": None},
                 "phone": user_info["phone"],
                 "email": user_info["email"],
@@ -90,6 +92,7 @@ class DoctorInfoService:
                 "phone": None,
                 "email": None,
                 "is_active": False,
+                "experience_years": None,
             }
 
     def get_doctor_by_user_id(self, user_id: int) -> dict[str, Any] | None:

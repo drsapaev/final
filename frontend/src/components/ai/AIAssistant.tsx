@@ -1,5 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
   Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
@@ -10,6 +10,7 @@ import { apiClient } from '../../api/client';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { sanitizeAIContent } from '../../utils/sanitizer';
+import { assertMedicalAiSafety } from '../../utils/aiSafety';
 import logger from '../../utils/logger';
 import type { HttpApiError } from '../../types/errors';
 
@@ -63,6 +64,44 @@ type AIResult = Record<string, unknown> | unknown[];
 /** Type guard: narrows `AIResult | null` to the object variant. */
 function isResultObject(value: AIResult | null | undefined): value is Record<string, unknown> {
   return !!value && !Array.isArray(value);
+}
+
+// LABAI-FE-003 (post-merge review of PR 3909, P2): stable content fingerprint
+// of an analysis input. Parents pass INLINE data literals, so the object
+// identity changes on every incidental parent re-render (queue polling,
+// autosave timers, toasts) — identity-based staleness would mint a "newer
+// input" out of IDENTICAL content and silently drop the in-flight
+// analysis. Blobs/Files (skin/imaging inputs) are tokenized per object so
+// two different images never share a fingerprint.
+const aiBlobTokens = new WeakMap<object, number>();
+let aiBlobTokenSeq = 0;
+
+function aiInputFingerprint(input: unknown): string {
+  try {
+    return JSON.stringify(input, (_key, value: unknown) => {
+      if (value instanceof Blob) {
+        let token = aiBlobTokens.get(value);
+        if (token === undefined) {
+          token = ++aiBlobTokenSeq;
+          aiBlobTokens.set(value, token);
+        }
+        return `blob:${token}`;
+      }
+      return value;
+    }) ?? 'null';
+  } catch {
+    // Unserializable input (cyclic structure): fall back to a unique
+    // per-object token — never a shared constant, so a replaced input is
+    // still detected as changed.
+    const obj = input as object | null | undefined;
+    if (!obj || typeof obj !== 'object') return String(input);
+    let token = aiBlobTokens.get(obj);
+    if (token === undefined) {
+      token = ++aiBlobTokenSeq;
+      aiBlobTokens.set(obj, token);
+    }
+    return `object:${token}`;
+  }
 }
 
 function getAIResponseError(payload: unknown): string | null {
@@ -167,33 +206,60 @@ const AIAssistant = ({
   const mcpAPI = useMcpClient();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIResult | null>(null);
+  const [resultInputKey, setResultInputKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState('deepseek');
   const [retryCount, setRetryCount] = useState(0);
   const [isOpen, setIsOpen] = useState(expanded);
+  // LABAI-FE-001 (audit 3886): the initiating input's identity — a pending
+  // analysis must never publish its result/error into a NEWER input's dialog.
+  // LABAI-FE-003: the staleness comparison uses the input's CONTENT
+  // fingerprint (see aiInputFingerprint) — object identity alone changes on
+  // every incidental parent re-render of inline data literals.
+  const inputFingerprintRef = useRef('');
+  inputFingerprintRef.current = aiInputFingerprint({ data, analysisType: analysisType || (specialty ? 'icd10' : undefined), useMCP });
+  // LABAI-FE-003: the LATEST analyzeData invocation owns the loading flag —
+  // an older run's finally must not clear the flag a newer run raised.
+  const analysisRunRef = useRef(0);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
-  // X-1 (UX audit): If specialty is provided, auto-configure analysisType and data
-  // so the AI tab works without the parent having to pass analysisType explicitly.
+  // X-1 (UX audit) + CARDAI-FE-001 (audit 3886): a specialty-only mount
+  // derives the default analysis type, but NO clinical data exists in
+  // such a mount — `analyzeData` stays fail-closed on `!data` and the
+  // analysis UI is suppressed (see `hasAnalysisData`) instead of offering
+  // provider controls and a disabled refresh as a false affordance.
+  // Wiring an empty synthetic payload in place of real patient context
+  // would mint meaningless suggestions (per the finding's repair note),
+  // so the honest state is an explicit no-context notice.
   const effectiveAnalysisType = analysisType || (specialty ? 'icd10' : undefined);
-  const effectiveData = data || (specialty ? {
-    complaint: '',
-    specialty: specialty,
-    patient_age: null,
-    patient_gender: null,
-  } : undefined);
+  // CARDAI-FE-001: analysis actions exist only when the parent supplied
+  // authorized clinical data.
+  const hasAnalysisData = data != null;
 
   const analyzeData = async (manualRetry = false) => {
     if (!data) return;
+    // LABAI-FE-001/002: capture the initiating input generation — the run's
+    // identity is BOTH its invocation epoch and its input's content
+    // fingerprint (the trigger is disabled while loading, so a newer run
+    // for a newer input can only start after this one released the flag).
+    const inputKey = inputFingerprintRef.current;
+    const runId = ++analysisRunRef.current;
     setLoading(true);
     setError(null);
+    setResult(null);
+    setResultInputKey(null);
     if (!manualRetry) {
-      setResult(null);
       setRetryCount(0);
     }
 
     try {
       let response: { data?: unknown } | undefined;
       let mcpResult: McpResultDto | undefined;
+      let verifiedMcpEnvelope = false;
 
       switch (effectiveAnalysisType) {
         case 'complaint':
@@ -204,13 +270,17 @@ const AIAssistant = ({
               patientGender: data.patient_gender,
               provider: provider
             }) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
               throw new Error(mcpResult.error || 'MCP analysis failed');
             }
           } else {
-            response = await apiClient.post('/api/v1/ai/complaint-to-plan', {
+            // CARDAI-FE-002 (audit 3886): the shared client's baseURL already
+            // ends with /api/v1 — pass only the versioned-relative path.
+            response = await apiClient.post('/ai/complaint-to-plan', {
               ...data,
               provider,
               use_mcp: false
@@ -227,6 +297,8 @@ const AIAssistant = ({
               provider: provider,
               maxSuggestions: data.maxSuggestions || 5
             }) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               if (mcpResult.data?.clinical_recommendations) {
                 response = { data: mcpResult.data };
@@ -239,7 +311,8 @@ const AIAssistant = ({
               throw new Error(mcpResult.error || 'MCP ICD10 suggestion failed');
             }
           } else {
-            response = await apiClient.post('/api/v1/ai/icd-suggest', { ...data, provider });
+            // CARDAI-FE-002: versioned-relative path (baseURL owns /api/v1).
+            response = await apiClient.post('/ai/icd-suggest', { ...data, provider });
           }
           break;
 
@@ -252,18 +325,22 @@ const AIAssistant = ({
               provider: provider,
               includeRecommendations: true
             }) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
               throw new Error(mcpResult.error || 'MCP lab interpretation failed');
             }
           } else {
-            response = await apiClient.post('/api/v1/ai/lab-interpret', { ...data, provider });
+            // CARDAI-FE-002: versioned-relative path (baseURL owns /api/v1).
+            response = await apiClient.post('/ai/lab-interpret', { ...data, provider });
           }
           break;
 
         case 'ecg':
-          response = await apiClient.post('/api/v1/ai/ecg-interpret', { ...data, provider });
+          // CARDAI-FE-002: versioned-relative path (baseURL owns /api/v1).
+          response = await apiClient.post('/ai/ecg-interpret', { ...data, provider });
           break;
 
         case 'skin':
@@ -274,6 +351,8 @@ const AIAssistant = ({
               data.patientHistory as Record<string, unknown> | null,
               provider
             ) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -284,7 +363,8 @@ const AIAssistant = ({
             formData.append('image', data.image as Blob);
             if (data.metadata) formData.append('metadata', JSON.stringify(data.metadata));
             formData.append('provider', provider);
-            response = await apiClient.post('/api/v1/ai/skin-analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            // CARDAI-FE-002: versioned-relative path (baseURL owns /api/v1).
+            response = await apiClient.post('/ai/skin-analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
           }
           break;
 
@@ -295,6 +375,8 @@ const AIAssistant = ({
               (data.imageType as string) || 'general',
               { modality: data.modality, clinicalContext: data.clinicalContext, provider: provider }
             ) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -309,13 +391,31 @@ const AIAssistant = ({
           throw new Error(t('misc.aia_unknown_type'));
       }
 
+      if (!verifiedMcpEnvelope) {
+        assertMedicalAiSafety(response?.data);
+        // The legacy ICD endpoint now uses an object envelope so the safety
+        // metadata also exists for an empty suggestion list. Validate the
+        // envelope before exposing its array to the existing UI consumers.
+        if (effectiveAnalysisType === 'icd10') {
+          response = { data: (response?.data as Record<string, unknown>).data };
+        }
+      }
+
       // Санитизируем AI-generated контент перед отображением (XSS защита)
       const responseError = getAIResponseError(response?.data);
       if (responseError) {
         throw new Error(responseError);
       }
 
+      // LABAI-FE-001/002: the input CONTENT changed while this analysis was
+      // in flight — the response belongs to the OLD input; never publish it
+      // into the newer input's dialog (result, side effect or success notice).
+      if (!mountedRef.current || analysisRunRef.current !== runId || inputFingerprintRef.current !== inputKey) {
+        logger.warn('[AIAssistant] Stale AI response ignored for a changed input generation');
+        return;
+      }
       const sanitizedData = sanitizeAIResponse(response?.data) as AIResult;
+      setResultInputKey(inputKey);
       setResult(sanitizedData);
       if (onResult) onResult(sanitizedData);
       notify.success(t('misc.aia_analysis_done'));
@@ -326,11 +426,25 @@ const AIAssistant = ({
       const errorMsg = normalizeAIErrorMessage(
         errData?.detail || errData?.error || (err instanceof Error ? err.message : String(err))
       );
+      if (!mountedRef.current || analysisRunRef.current !== runId || inputFingerprintRef.current !== inputKey) {
+        // LABAI-FE-001/002: a stale input's failure must not surface as the
+        // newer input's error.
+        logger.warn('[AIAssistant] Stale AI failure ignored for a changed input generation');
+        return;
+      }
       setError(errorMsg);
       notify.error(t('misc.aia_analysis_error', { message: errorMsg }));
       setRetryCount((prev) => prev + 1);
     } finally {
-      setLoading(false);
+      // LABAI-FE-003: only the LATEST run owns the loading flag. An older
+      // invocation's finally must not clear the flag a newer run raised
+      // (double-submit overlap between the click and the re-render that
+      // disables the trigger); when this run IS the latest, the release is
+      // honest even if the input content changed mid-flight — a newer run
+      // cannot exist yet, and leaving the flag up would wedge the dialog.
+      if (mountedRef.current && analysisRunRef.current === runId) {
+        setLoading(false);
+      }
     }
   };
 
@@ -619,6 +733,7 @@ const AIAssistant = ({
 
   const renderResult = () => {
     if (error) return <Alert severity="error">{error}</Alert>;
+    if (resultInputKey !== inputFingerprintRef.current) return null;
     if (!result) return null;
     switch (effectiveAnalysisType) {
       case 'complaint':
@@ -638,7 +753,7 @@ const AIAssistant = ({
     }
   };
 
-  const resultProvider = getResultProvider(result);
+  const resultProvider = getResultProvider(resultInputKey === inputFingerprintRef.current ? result : null);
   const usesFallbackProvider = isFallbackProvider(resultProvider);
   const usesServerDefaultProvider = provider === 'default';
 
@@ -652,6 +767,11 @@ const AIAssistant = ({
             {useMCP && <Badge variant="success">MCP</Badge>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* CARDAI-FE-001 (audit 3886): provider controls and the refresh
+             * action exist only when clinical data was supplied — a
+             * specialty-only mount must not present startable-looking
+             * controls that can never start. */}
+            {hasAnalysisData && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {providerOptions.map((prov) =>
               <Button key={prov} size="small" variant={provider === prov ? 'primary' : 'outline'} onClick={() => setProvider(prov)} disabled={loading}>
@@ -659,10 +779,13 @@ const AIAssistant = ({
                 </Button>
               )}
             </div>
-            <Button size="small" variant="outline" onClick={() => analyzeData(true)} disabled={loading || !data}>
+            )}
+            {hasAnalysisData && (
+            <Button size="small" variant="outline" onClick={() => analyzeData(true)} disabled={loading}>
               <RefreshCw style={{ width: 14, height: 14, marginRight: 6 }} />
               {t('misc.aia_refresh')}
             </Button>
+            )}
             <Button
               type="button"
               size="small"
@@ -710,7 +833,12 @@ const AIAssistant = ({
         }
 
         {!result && !loading && !error &&
-        <Alert severity="info">{t('misc.aia_click_refresh')}</Alert>
+        (hasAnalysisData
+          ? <Alert severity="info">{t('misc.aia_click_refresh')}</Alert>
+          : /* CARDAI-FE-001: explicit no-context state — explain WHY analysis
+             * is unavailable instead of prompting a click that can never
+             * start. */
+            <Alert severity="info">{t('misc.aia_no_context_notice')}</Alert>)
         }
 
         {error && retryCount > 0 &&

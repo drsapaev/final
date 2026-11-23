@@ -12,7 +12,7 @@
  * registrar.css classes (same values — zero visual delta).
  */
 import ModernDialog from '../../../components/dialogs/ModernDialog';
-import { normalizePatientGender, formatPreviewList } from '../registrarHelpers';
+import { normalizePatientGender, formatPreviewList, formatPreviewQueueTickets } from '../registrarHelpers';
 import type { Appointment } from '../../../types/domain/clinic';
 
 interface RecordPreviewDialogProps {
@@ -55,7 +55,12 @@ const RecordPreviewDialog = ({ isOpen, row, onClose, onEdit, tI18n }: RecordPrev
           [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(row as unknown as Parameters<typeof normalizePatientGender>[0] as Record<string, unknown>)],
           [tI18n('registrarPanel.rp_field_department'), (row as Record<string, unknown>).queue_name || row.department || row.specialty],
           [tI18n('registrarPanel.rp_field_services'), formatPreviewList(row.services || row.service_details)],
-          [tI18n('registrarPanel.rp_field_queue'), formatPreviewList(row.queue_numbers)],
+          // REG-FE-083 (follow-up audit 2026-11-02): «Очередь» печатает
+          // ВЫДАННЫЕ НОМЕРА ТАЛОНОВ (№17 — Кардиология), а не только метку
+          // очереди: прежде formatPreviewList никогда не читал `number`, и
+          // предпросмотр терял номера. Запись без номера — честный
+          // плейсхолдер «без номера», никогда не выдуманный №.
+          [tI18n('registrarPanel.rp_field_queue'), formatPreviewQueueTickets(row.queue_numbers, tI18n('registrarPanel.rp_queue_no_ticket'))],
           [tI18n('registrarPanel.rp_field_status'), row.status || row.canonical_status],
           [tI18n('registrarPanel.rp_field_payment'), row.payment_status || row.payment_type],
           [tI18n('registrarPanel.rp_field_amount'), row.cost]

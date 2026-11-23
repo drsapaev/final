@@ -51,12 +51,16 @@ def _post_doctor(client: TestClient, **overrides) -> tuple[int, dict]:
         payload.pop(key, None)
     payload.pop("_remove", None)
     response = client.post("/api/v1/users/users", json=payload)
-    return response.status_code, (response.json() if response.status_code != 422 else response.json())
+    return response.status_code, (
+        response.json() if response.status_code != 422 else response.json()
+    )
 
 
 class TestOnboardingValidationMatrix:
     def test_doctor_without_profile_is_rejected(self, client, auth_headers):
-        response = client.post("/api/v1/users/users", headers=auth_headers, json=_DOCTOR_PAYLOAD)
+        response = client.post(
+            "/api/v1/users/users", headers=auth_headers, json=_DOCTOR_PAYLOAD
+        )
         assert response.status_code == 422
 
     def test_doctor_with_general_sentinel_is_rejected(self, client, auth_headers):
@@ -67,8 +71,12 @@ class TestOnboardingValidationMatrix:
         )
         assert response.status_code == 422
 
-    @pytest.mark.parametrize("specialty", ["dental", "stomatology", "dentist", "Cardiology", "kardio", ""])
-    def test_doctor_with_non_canonical_specialty_is_rejected(self, client, auth_headers, specialty):
+    @pytest.mark.parametrize(
+        "specialty", ["dental", "stomatology", "dentist", "Cardiology", "kardio", ""]
+    )
+    def test_doctor_with_non_canonical_specialty_is_rejected(
+        self, client, auth_headers, specialty
+    ):
         response = client.post(
             "/api/v1/users/users",
             headers=auth_headers,
@@ -99,7 +107,9 @@ class TestOnboardingValidationMatrix:
         )
         assert response.status_code == 422
 
-    def test_doctor_profile_on_legacy_doctor_role_is_rejected(self, client, auth_headers):
+    def test_doctor_profile_on_legacy_doctor_role_is_rejected(
+        self, client, auth_headers
+    ):
         """Legacy spellings are a compatibility surface without a UI path:
         they must keep the auto-map, not the canonical block."""
         response = client.post(
@@ -175,8 +185,108 @@ class TestOnboardingSuccess:
         assert doctor.max_online_per_day == 15
 
 
+def test_admin_doctor_profile_persists_optional_experience_years(
+    client, auth_headers, test_doctor, db_session
+):
+    response = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"experience_years": 24},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["experience_years"] == 24
+    db_session.refresh(test_doctor)
+    assert test_doctor.experience_years == 24
+
+    invalid = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"experience_years": -1},
+    )
+    assert invalid.status_code == 422
+
+    out_of_range = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"experience_years": 2_147_483_648},
+    )
+    assert out_of_range.status_code == 422
+
+    create_out_of_range = client.post(
+        "/api/v1/admin/doctors",
+        headers=auth_headers,
+        json={"specialty": "cardiology", "experience_years": 2_147_483_648},
+    )
+    assert create_out_of_range.status_code == 422
+
+    maximum_supported = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"experience_years": 100},
+    )
+    assert maximum_supported.status_code == 200, maximum_supported.text
+    assert maximum_supported.json()["experience_years"] == 100
+
+    cleared = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"experience_years": None},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["experience_years"] is None
+    db_session.refresh(test_doctor)
+    assert test_doctor.experience_years is None
+
+
+def test_admin_doctor_profile_persists_only_supported_professional_categories(
+    client, auth_headers, test_doctor, db_session
+):
+    response = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"professional_category": "highest"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["professional_category"] == "highest"
+    db_session.refresh(test_doctor)
+    assert test_doctor.professional_category == "highest"
+
+    invalid = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"professional_category": "honorary"},
+    )
+    assert invalid.status_code == 422
+
+    cleared = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"professional_category": None},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["professional_category"] is None
+    db_session.refresh(test_doctor)
+    assert test_doctor.professional_category is None
+
+
+def test_doctor_professional_category_database_constraint_rejects_unknown_value(
+    test_doctor, db_session
+):
+    from sqlalchemy.exc import IntegrityError
+
+    test_doctor.professional_category = "honorary"
+    db_session.add(test_doctor)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+    db_session.refresh(test_doctor)
+    assert test_doctor.professional_category is None
+
+
 class TestOnboardingAtomicity:
-    def test_doctor_failure_leaves_no_user(self, client, auth_headers, db_session, monkeypatch):
+    def test_doctor_failure_leaves_no_user(
+        self, client, auth_headers, db_session, monkeypatch
+    ):
         """Regression (owner invariant): if Doctor creation fails inside the
         transaction, the User must NOT remain created."""
         from app.services.user_mgmt import _core as user_mgmt_core
@@ -205,7 +315,9 @@ class TestOnboardingAtomicity:
         request = TypeAdapter(UserCreateRequest).validate_python(
             {**_DOCTOR_PAYLOAD, "doctor_profile": {"specialty": "cardiology"}}
         )
-        success, _message, _user = service.create_user(db_session, request, created_by=1)
+        success, _message, _user = service.create_user(
+            db_session, request, created_by=1
+        )
         assert success is True
 
         duplicate = TypeAdapter(UserCreateRequest).validate_python(
@@ -215,7 +327,9 @@ class TestOnboardingAtomicity:
                 "doctor_profile": {"specialty": "cardiology"},
             }
         )
-        success2, _message2, _user2 = service.create_user(db_session, duplicate, created_by=1)
+        success2, _message2, _user2 = service.create_user(
+            db_session, duplicate, created_by=1
+        )
         assert success2 is False
 
         doctors = (
@@ -272,11 +386,23 @@ class TestConditionalCreateContract:
         # M-1 (main post-#3032): 'Manager' is equally write-frozen — the
         # merged vocabulary rejects it on create (asserted below).
         accepted = [
-            "Admin", "Registrar", "Doctor",
-            "Cashier", "Lab", "Patient", "SuperAdmin",
+            "Admin",
+            "Registrar",
+            "Doctor",
+            "Cashier",
+            "Lab",
+            "Patient",
+            "SuperAdmin",
         ] + [
-            "cardio", "cardiologist", "cardiology", "dentist", "dentistry",
-            "derma", "dermatologist", "dermatology", "doctor",
+            "cardio",
+            "cardiologist",
+            "cardiology",
+            "dentist",
+            "dentistry",
+            "derma",
+            "dermatologist",
+            "dermatology",
+            "doctor",
         ]
         for role in accepted:
             assert pattern.match(role), f"test data drift: {role}"
@@ -322,9 +448,9 @@ class TestConditionalCreateContract:
             ),
             None,
         )
-        assert spec_path is not None, (
-            "openapi.json not found in any parent directory of the test file"
-        )
+        assert (
+            spec_path is not None
+        ), "openapi.json not found in any parent directory of the test file"
         spec = json.loads(spec_path.read_text(encoding="utf-8"))
 
         body = spec["paths"]["/api/v1/users/users"]["post"]["requestBody"]["content"][
@@ -341,9 +467,9 @@ class TestConditionalCreateContract:
         ]
         assert doctor_refs, "DoctorUserCreateRequest variant missing from oneOf"
         doctor_schema = schemas[doctor_refs[0]]
-        assert "doctor_profile" in doctor_schema.get("required", []), (
-            "doctor_profile must be REQUIRED in the published Doctor variant"
-        )
+        assert "doctor_profile" in doctor_schema.get(
+            "required", []
+        ), "doctor_profile must be REQUIRED in the published Doctor variant"
 
         non_doctor_refs = [
             ref["$ref"].rsplit("/", 1)[-1]
@@ -367,7 +493,9 @@ def test_doctor_profile_price_precision_contract():
     from app.schemas.user_management import DoctorProfileCreate
 
     # boundary values pass
-    ok = DoctorProfileCreate(specialty="cardiology", price_default=Decimal("99999999.99"))
+    ok = DoctorProfileCreate(
+        specialty="cardiology", price_default=Decimal("99999999.99")
+    )
     assert ok.price_default == Decimal("99999999.99")
     ok2 = DoctorProfileCreate(specialty="cardiology", price_default=Decimal("0"))
     assert ok2.price_default == Decimal("0")

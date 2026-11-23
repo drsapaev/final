@@ -32,9 +32,27 @@ class RegistrarNotificationService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.telegram_service = TelegramBotService()
-        self.email_sms_service = EmailSMSEnhancedService()
-        self.doctor_info_service = get_doctor_info_service(db)
+        self._telegram_service: TelegramBotService | None = None
+        self._email_sms_service: EmailSMSEnhancedService | None = None
+        self._doctor_info_service = None
+
+    @property
+    def telegram_service(self) -> TelegramBotService:
+        if self._telegram_service is None:
+            self._telegram_service = TelegramBotService()
+        return self._telegram_service
+
+    @property
+    def email_sms_service(self) -> EmailSMSEnhancedService:
+        if self._email_sms_service is None:
+            self._email_sms_service = EmailSMSEnhancedService()
+        return self._email_sms_service
+
+    @property
+    def doctor_info_service(self):
+        if self._doctor_info_service is None:
+            self._doctor_info_service = get_doctor_info_service(self.db)
+        return self._doctor_info_service
 
     async def _record_registrar_canonical_event(
         self,
@@ -45,15 +63,24 @@ class RegistrarNotificationService:
         metadata: dict[str, Any],
         roles: list[str] | None = None,
         deep_link: str | None = None,
+        entity_type: str | None = None,
+        entity_id: str | int | None = None,
     ) -> bool:
+        notification_args: dict[str, Any] = {
+            "db": self.db,
+            "event_type": event_type,
+            "title": title,
+            "message": message,
+            "metadata": metadata,
+            "roles": roles,
+            "deep_link": deep_link or "/registrar",
+        }
+        if entity_type is not None:
+            notification_args["entity_type"] = entity_type
+        if entity_id is not None:
+            notification_args["entity_id"] = entity_id
         created = await notification_sender_service.send_registrar_event_notification(
-            db=self.db,
-            event_type=event_type,
-            title=title,
-            message=message,
-            metadata=metadata,
-            roles=roles,
-            deep_link=deep_link or "/registrar",
+            **notification_args
         )
         if not created:
             logger.warning(
@@ -61,6 +88,56 @@ class RegistrarNotificationService:
                 extra={"event_type": event_type, "metadata": metadata},
             )
         return created
+
+    async def notify_public_booking_request(
+        self,
+        *,
+        request_id: str,
+        request_version: int,
+        resubmitted: bool = False,
+    ) -> bool:
+        """Notify registrars without patient or appointment details in the inbox."""
+        event_type = (
+            "public_booking_request_resubmitted"
+            if resubmitted
+            else "public_booking_request_submitted"
+        )
+        title = (
+            "Пациент выбрал другое время"
+            if resubmitted
+            else "Новая заявка на онлайн-запись"
+        )
+        message = (
+            "Пациент обновил время в заявке на онлайн-запись. Откройте рабочий список."
+            if resubmitted
+            else "Поступила заявка на онлайн-запись. Откройте рабочий список."
+        )
+        metadata = {"request_id": request_id, "request_version": request_version}
+        try:
+            created = await self._record_registrar_canonical_event(
+                event_type=event_type,
+                title=title,
+                message=message,
+                metadata=metadata,
+                roles=["registrar"],
+                deep_link="/registrar/booking-requests",
+                entity_type="public_booking_request",
+                entity_id=request_id,
+            )
+            if not created:
+                # Canonical delivery can convert a DB exception into False;
+                # reset the request session before the response is returned.
+                self.db.rollback()
+            return created
+        except Exception:
+            # The request has already been committed. Notification failure must
+            # not make the patient retry a successful submission.
+            self.db.rollback()
+            logger.warning(
+                "[FIX:NOTIFICATIONS] public booking request notification failed",
+                extra={"request_id": request_id, "event_type": event_type},
+            )
+            return False
 
     @staticmethod
     def _resolve_system_alert_event_type(alert_type: str) -> str:
@@ -80,7 +157,8 @@ class RegistrarNotificationService:
             .options(joinedload(User.profile))
             .filter(
                 and_(
-                    func.lower(User.role) == "registrar",  # E-4: receptionist alias removed
+                    func.lower(User.role)
+                    == "registrar",  # E-4: receptionist alias removed
                     User.is_active == True,
                 )
             )
@@ -94,7 +172,8 @@ class RegistrarNotificationService:
             .options(joinedload(User.profile))
             .filter(
                 and_(
-                    func.lower(User.role) == "registrar",  # E-4: receptionist alias removed
+                    func.lower(User.role)
+                    == "registrar",  # E-4: receptionist alias removed
                     User.is_active == True,
                 )
             )
@@ -132,7 +211,7 @@ class RegistrarNotificationService:
             doctor_name = "Не назначен"
             department_name = "Не указано"
 
-            if hasattr(appointment, 'doctor_id') and appointment.doctor_id:
+            if hasattr(appointment, "doctor_id") and appointment.doctor_id:
                 doctor_info = self.doctor_info_service.get_doctor_full_info(
                     appointment.doctor_id
                 )
@@ -177,19 +256,19 @@ class RegistrarNotificationService:
 
 📋 Тип: {appointment_type}
 👤 Пациент: {patient.full_name}
-📞 Телефон: {patient.phone or 'Не указан'}
+📞 Телефон: {patient.phone or "Не указан"}
 👨‍⚕️ Врач: {doctor_name}
 🏥 Отделение: {department_name}
-📅 Дата: {appointment.appointment_date.strftime('%d.%m.%Y') if hasattr(appointment, 'appointment_date') else 'Не указана'}
-⏰ Время: {appointment.appointment_time.strftime('%H:%M') if hasattr(appointment, 'appointment_time') else 'Не указано'}
+📅 Дата: {appointment.appointment_date.strftime("%d.%m.%Y") if hasattr(appointment, "appointment_date") else "Не указана"}
+⏰ Время: {appointment.appointment_time.strftime("%H:%M") if hasattr(appointment, "appointment_time") else "Не указано"}
 
 🔧 Услуги:
 {services_text}
 
 💰 Сумма: {total_amount} сум
-🔄 Статус: {appointment.status if hasattr(appointment, 'status') else 'Новая'}
+🔄 Статус: {appointment.status if hasattr(appointment, "status") else "Новая"}
 
-⏰ Создано: {datetime.now().strftime('%d.%m.%Y %H:%M')}
+⏰ Создано: {datetime.now().strftime("%d.%m.%Y %H:%M")}
             """.strip()
 
             canonical_created = await self._record_registrar_canonical_event(
@@ -271,7 +350,7 @@ class RegistrarNotificationService:
 📝 Причина: {price_override.reason}
 {f"📋 Детали: {price_override.details}" if price_override.details else ""}
 
-⏰ Время: {price_override.created_at.strftime('%d.%m.%Y %H:%M')}
+⏰ Время: {price_override.created_at.strftime("%d.%m.%Y %H:%M")}
 🔄 Статус: Ожидает одобрения
 
 Для одобрения/отклонения перейдите в панель регистратора.
@@ -376,9 +455,9 @@ class RegistrarNotificationService:
 
 👤 {patient_info}
 🏥 {queue_info}
-🎫 Номер: {queue_entry.queue_number or 'Не назначен'}
-📅 Дата: {queue_entry.visit_date.strftime('%d.%m.%Y') if queue_entry.visit_date else 'Не указана'}
-⏰ Время: {datetime.now().strftime('%H:%M')}
+🎫 Номер: {queue_entry.queue_number or "Не назначен"}
+📅 Дата: {queue_entry.visit_date.strftime("%d.%m.%Y") if queue_entry.visit_date else "Не указана"}
+⏰ Время: {datetime.now().strftime("%H:%M")}
 
 {f"ℹ️ Дополнительно: {additional_info}" if additional_info else ""}
             """.strip()
@@ -424,11 +503,12 @@ class RegistrarNotificationService:
             if not registrars:
                 return {"success": False, "error": "Нет активных регистраторов"}
 
-            priority_emoji = (
-                "🔴"
-                if priority == "critical"
-                else "🟡" if priority == "warning" else "ℹ️"
-            )
+            if priority == "critical":
+                priority_emoji = "🔴"
+            elif priority == "warning":
+                priority_emoji = "🟡"
+            else:
+                priority_emoji = "ℹ️"
             alert_emojis = {
                 "system_error": "⚠️",
                 "payment_issue": "💳",
@@ -443,9 +523,9 @@ class RegistrarNotificationService:
             formatted_message = f"""
 {priority_emoji} СИСТЕМНОЕ УВЕДОМЛЕНИЕ
 
-{alert_emoji} Тип: {alert_type.replace('_', ' ').title()}
+{alert_emoji} Тип: {alert_type.replace("_", " ").title()}
 📝 Сообщение: {message}
-⏰ Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}
+⏰ Время: {datetime.now().strftime("%d.%m.%Y %H:%M")}
 {f"🏥 Отделение: {department}" if department else ""}
 
 Требуется внимание регистратуры.
@@ -491,30 +571,30 @@ class RegistrarNotificationService:
             stats = await self._collect_daily_stats(target_date)
 
             message = f"""
-📊 ЕЖЕДНЕВНАЯ СВОДКА - {target_date.strftime('%d.%m.%Y')}
+📊 ЕЖЕДНЕВНАЯ СВОДКА - {target_date.strftime("%d.%m.%Y")}
 
 👥 Пациенты:
-• Всего записей: {stats['total_appointments']}
-• Новые пациенты: {stats['new_patients']}
-• Подтвержденные визиты: {stats['confirmed_visits']}
-• Отмененные: {stats['cancelled_appointments']}
+• Всего записей: {stats["total_appointments"]}
+• Новые пациенты: {stats["new_patients"]}
+• Подтвержденные визиты: {stats["confirmed_visits"]}
+• Отмененные: {stats["cancelled_appointments"]}
 
 💰 Финансы:
-• Общая сумма: {stats['total_revenue']} сум
-• Оплачено: {stats['paid_amount']} сум
-• К доплате: {stats['pending_amount']} сум
+• Общая сумма: {stats["total_revenue"]} сум
+• Оплачено: {stats["paid_amount"]} сум
+• К доплате: {stats["pending_amount"]} сум
 
 🏥 Очереди:
-• Активные очереди: {stats['active_queues']}
-• Онлайн записи: {stats['online_entries']}
-• Средняя загрузка: {stats['average_load']}%
+• Активные очереди: {stats["active_queues"]}
+• Онлайн записи: {stats["online_entries"]}
+• Средняя загрузка: {stats["average_load"]}%
 
 ⚠️ Требует внимания:
-• Неподтвержденные визиты: {stats['unconfirmed_visits']}
-• Изменения цен: {stats['pending_price_changes']}
-• Системные ошибки: {stats['system_errors']}
+• Неподтвержденные визиты: {stats["unconfirmed_visits"]}
+• Изменения цен: {stats["pending_price_changes"]}
+• Системные ошибки: {stats["system_errors"]}
 
-📈 Сравнение с вчера: {stats['comparison_text']}
+📈 Сравнение с вчера: {stats["comparison_text"]}
 
 Хорошего рабочего дня! 🌟
             """.strip()
@@ -595,9 +675,9 @@ class RegistrarNotificationService:
 🏥 НОВЫЕ НАЗНАЧЕННЫЕ УСЛУГИ
 
 📋 Пациент: {patient_name}
-👨‍⚕️ Врач: {doctor.full_name if hasattr(doctor, 'full_name') else doctor.username}
+👨‍⚕️ Врач: {doctor.full_name if hasattr(doctor, "full_name") else doctor.username}
 📅 Дата записи: {appointment.appointment_date}
-🕐 Время: {appointment.appointment_time or 'Не указано'}
+🕐 Время: {appointment.appointment_time or "Не указано"}
 
 💰 Назначенные услуги:
 {services_text}
@@ -636,7 +716,7 @@ class RegistrarNotificationService:
                 "patient_name": patient_name,
                 "doctor_name": (
                     doctor.full_name
-                    if hasattr(doctor, 'full_name')
+                    if hasattr(doctor, "full_name")
                     else doctor.username
                 ),
                 "services_count": len(services),
@@ -648,7 +728,6 @@ class RegistrarNotificationService:
             return {"success": False, "error": str(e)}
 
     # ===================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====================
-
 
     async def _collect_daily_stats(self, target_date: date) -> dict[str, Any]:
         """Собирает статистику за день"""

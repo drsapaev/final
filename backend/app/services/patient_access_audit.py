@@ -229,6 +229,7 @@ def log_patient_access_many(
     *,
     actor_user: User | None = None,
     subject_patient_ids: list[int] | None = None,
+    resource_entries: list[tuple[int, str | None]] | None = None,
     resource_type: str,
     action: str,
     request: Request | None = None,
@@ -243,15 +244,22 @@ def log_patient_access_many(
     non-blocking on failure.
     """
     try:
-        # dedupe while preserving order — one entry per subject read
-        ids = list(dict.fromkeys(subject_patient_ids or []))
+        # A resource list represents individual records read, so duplicate
+        # patient IDs must remain distinct when their resource IDs differ.
+        # The legacy subject-only form still dedupes to one entry per patient.
+        entries = (
+            resource_entries
+            if resource_entries is not None
+            else [(pid, None) for pid in dict.fromkeys(subject_patient_ids or [])]
+        )
         added = 0
-        for pid in ids:
+        for pid, resource_id in entries:
             entry = _build_patient_access_entry(
                 db,
                 actor_user=actor_user,
                 subject_patient_id=pid,
                 resource_type=resource_type,
+                resource_id=resource_id,
                 action=action,
                 request=request,
             )
@@ -271,6 +279,6 @@ def log_patient_access_many(
             "(resource_type=%s, action=%s, subjects=%s): %s",
             resource_type,
             action,
-            len(subject_patient_ids or []),
+            len(resource_entries or subject_patient_ids or []),
             exc,
         )

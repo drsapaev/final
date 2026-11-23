@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-const { fetchMock, loggerInfo, loggerError, tokenGetAccessToken } = vi.hoisted(() => ({
-  fetchMock: vi.fn(),
+const { apiGet, apiPost, loggerInfo, loggerError, tokenGetAccessToken } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
   loggerInfo: vi.fn(),
   loggerError: vi.fn(),
   tokenGetAccessToken: vi.fn(() => 'doctor-token'),
@@ -24,6 +25,13 @@ vi.mock('../../../utils/tokenManager', () => ({
   default: {
     getAccessToken: tokenGetAccessToken,
   },
+}));
+
+// DOCQ-FE-002 (audit 3886): the panel routes through the canonical api
+// client (refresh/retry/CSRF are the client's own tested surface —
+// api/__tests__/client.401.test.ts); these tests mock that boundary.
+vi.mock('../../../api/client', () => ({
+  api: { get: apiGet, post: apiPost },
 }));
 
 const {
@@ -74,18 +82,16 @@ import DoctorQueuePanel from '../DoctorQueuePanel';
 
 describe('DoctorQueuePanel', () => {
   beforeEach(() => {
-    fetchMock.mockReset();
+    apiGet.mockReset();
+    apiPost.mockReset();
     loggerInfo.mockReset();
     loggerError.mockReset();
     tokenGetAccessToken.mockReturnValue('doctor-token');
 
-    fetchMock.mockImplementation(async (input) => {
-      const url = String(input);
-
+    apiGet.mockImplementation(async (url: string) => {
       if (url.includes('/doctor/my-info')) {
         return {
-          ok: true,
-          json: async () => ({
+          data: {
             id: 7,
             name: 'Dr. Test',
             specialty: 'cardiology',
@@ -97,14 +103,13 @@ describe('DoctorQueuePanel', () => {
             doctor: {
               cabinet: '101',
             },
-          }),
+          },
         };
       }
 
       if (url.includes('/doctor/cardiology/queue/today')) {
         return {
-          ok: true,
-          json: async () => ({
+          data: {
             queue_exists: true,
             opened_at: '2026-03-30T00:00:00Z',
             stats: {
@@ -133,50 +138,44 @@ describe('DoctorQueuePanel', () => {
                 created_at: '2026-03-30T08:00:00Z',
               },
             ],
-          }),
+          },
         };
       }
 
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      throw new Error(`Unexpected api.get URL: ${url}`);
     });
-
-    global.fetch = fetchMock;
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('uses the canonical backend origin instead of legacy port 8000', async () => {
+  it('routes reads through the canonical api client instead of raw fetch', async () => {
+    const fetchSpy = vi.fn();
+    global.fetch = fetchSpy as never;
+
     render(<DoctorQueuePanel specialty="cardiology" />);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalled();
+      expect(apiGet).toHaveBeenCalled();
     });
 
-    const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
-
+    // DOCQ-FE-002: the client owns the API origin (baseURL) and the
+    // JWT refresh/retry machinery — the panel never issues a raw fetch.
+    const requestedUrls = apiGet.mock.calls.map(([url]) => String(url));
     expect(requestedUrls).toEqual([
-      expect.stringMatching(/^http:\/\/(?:localhost|127\.0\.0\.1):18000\/api\/v1\/doctor\/my-info$/),
-      expect.stringMatching(/^http:\/\/(?:localhost|127\.0\.0\.1):18000\/api\/v1\/doctor\/cardiology\/queue\/today$/),
+      '/doctor/my-info',
+      '/doctor/cardiology/queue/today',
     ]);
-    expect(requestedUrls.some((url) => url.includes(':8000'))).toBe(false);
-    expect(loggerInfo).toHaveBeenCalledWith(
-      '[FIX:DOCTOR_QUEUE_PANEL] Loading doctor info from canonical API origin',
-      expect.objectContaining({
-        url: expect.stringMatching(/^http:\/\/(?:localhost|127\.0\.0\.1):18000\/api\/v1\/doctor\/my-info$/),
-      }),
-    );
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('does not render queue command buttons from status alone', async () => {
-    fetchMock.mockImplementation(async (input) => {
-      const url = String(input);
+    apiGet.mockImplementation(async (url: string) => {
 
       if (url.includes('/doctor/my-info')) {
         return {
-          ok: true,
-          json: async () => ({
+          data: {
             id: 7,
             name: 'Dr. Test',
             specialty: 'cardiology',
@@ -188,14 +187,13 @@ describe('DoctorQueuePanel', () => {
             doctor: {
               cabinet: '101',
             },
-          }),
+          },
         };
       }
 
       if (url.includes('/doctor/cardiology/queue/today')) {
         return {
-          ok: true,
-          json: async () => ({
+          data: {
             queue_exists: true,
             opened_at: '2026-03-30T00:00:00Z',
             stats: {
@@ -245,19 +243,18 @@ describe('DoctorQueuePanel', () => {
                 created_at: '2026-03-30T08:10:00Z',
               },
             ],
-          }),
+          },
         };
       }
 
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      throw new Error(`Unexpected api.get URL: ${url}`);
     });
 
     const { container } = render(<DoctorQueuePanel specialty="cardiology" />);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
+      expect(apiGet).toHaveBeenCalledWith(
         expect.stringMatching(/\/doctor\/cardiology\/queue\/today$/),
-        expect.any(Object),
       );
     });
 

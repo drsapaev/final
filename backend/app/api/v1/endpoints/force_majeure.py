@@ -32,6 +32,36 @@ router = APIRouter()
 # reject / complete = money movement). No other role was widened.
 
 
+def _domain_http_exception(exc: ForceMajeureApiDomainError) -> HTTPException:
+    """3808 review round 11 (P2 409 disambiguation): единая трансляция
+    доменной ошибки в HTTP.
+
+    Статус и текст — как раньше (контракт round 3). Новое: машинно-читаемый
+    класс отказа ``exc.code`` уходит в заголовок ``X-Error-Code`` (по образцу
+    X-CSRF-Status в csrf_middleware), когда он задан. Клиент регистратора
+    обязан различать ОЖИДАЕМЫЕ конфликты с одинаковым статусом 409:
+
+    * ``force_majeure_preview_drift`` — состав очереди изменился после
+      предпросмотра: повторный предпросмотр и новое подтверждение;
+    * ``force_majeure_domain_refusal`` (конфликт владельцев поверхности
+      назначения) и ``force_majeure_concurrent_refund`` (гонка возвратов) —
+      НЕ дрейф: предпросмотр актуален, показывается объяснение сервера,
+      повторный предпросмотр причину не устраняет.
+
+    ``Access-Control-Expose-Headers`` — чтобы заголовок был читаем и из
+    cross-origin-сборки фронтенда (same-origin-прокси это игнорирует).
+    """
+    headers: dict[str, str] = {}
+    if exc.code:
+        headers["X-Error-Code"] = exc.code
+        headers["Access-Control-Expose-Headers"] = "X-Error-Code"
+    return HTTPException(
+        status_code=exc.status_code,
+        detail=exc.detail,
+        headers=headers or None,
+    )
+
+
 # ========================= СХЕМЫ =========================
 
 
@@ -40,6 +70,21 @@ class ForceMajeureTransferRequest(BaseModel):
 
     specialist_id: int = Field(..., description="ID специалиста")
     target_date: date | None = Field(None, description="Дата очереди (по умолчанию сегодня)")
+    # 3808 review round 2 (P1 queue identity): канонический ID очереди
+    # (DailyQueue) из read-модели регистратора. Жёстко ограничивает и preview,
+    # и мутацию ЭТОЙ очередью — резолюция specialist→реестровая поверхность
+    # больше не может молча подменить цель операции. Взаимоисключающе с entry_ids.
+    daily_queue_id: int | None = Field(None, description="ID канонической очереди строки (ограничивает операцию этой очередью)")
+    # 3808 review round 3 (P1 preview set binding): снимок ID записей,
+    # показанных регистратору предпросмотром. ОБЯЗАТЕЛЕН при daily_queue_id:
+    # сервер выполняет мутацию ровно над этим набором и отказывает (409),
+    # если состав очереди успел измениться — пациент, добавленный в очередь
+    # после предпросмотра, не может попасть под перенос «молча».
+    # Взаимоисключающе с entry_ids; без daily_queue_id не задан.
+    expected_entry_ids: list[int] | None = Field(
+        None,
+        description="Снимок ID записей из предпросмотра (обязателен при daily_queue_id)",
+    )
     reason: str = Field(..., min_length=5, description="Причина переноса")
     entry_ids: list[int] | None = Field(None, description="ID конкретных записей (все если не указано)")
     send_notifications: bool = Field(True, description="Отправить уведомления пациентам")
@@ -50,6 +95,13 @@ class ForceMajeureCancelRequest(BaseModel):
 
     specialist_id: int = Field(..., description="ID специалиста")
     target_date: date | None = Field(None, description="Дата очереди (по умолчанию сегодня)")
+    # 3808 review round 2 (P1 queue identity): см. ForceMajeureTransferRequest.
+    daily_queue_id: int | None = Field(None, description="ID канонической очереди строки (ограничивает операцию этой очередью)")
+    # 3808 review round 3 (P1 preview set binding): см. ForceMajeureTransferRequest.
+    expected_entry_ids: list[int] | None = Field(
+        None,
+        description="Снимок ID записей из предпросмотра (обязателен при daily_queue_id)",
+    )
     reason: str = Field(..., min_length=5, description="Причина отмены")
     refund_type: str = Field("deposit", description="Тип возврата: deposit или bank_transfer")
     entry_ids: list[int] | None = Field(None, description="ID конкретных записей (все если не указано)")
@@ -159,7 +211,7 @@ async def transfer_queue_to_tomorrow(
             current_user_id=current_user.id,
         )
     except ForceMajeureApiDomainError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise _domain_http_exception(exc) from exc
 
 
 @router.post("/cancel-with-refund", response_model=dict[str, Any])
@@ -182,13 +234,17 @@ async def cancel_queue_with_refund(
             current_user_id=current_user.id,
         )
     except ForceMajeureApiDomainError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise _domain_http_exception(exc) from exc
 
 
 @router.get("/pending-entries", response_model=list[dict[str, Any]])
 async def get_pending_entries_for_force_majeure(
     specialist_id: int = Query(..., description="ID специалиста"),
     target_date: date | None = Query(None, description="Дата очереди"),
+    daily_queue_id: int | None = Query(
+        None,
+        description="ID канонической очереди строки (ограничивает preview этой очередью)",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
@@ -199,10 +255,17 @@ async def get_pending_entries_for_force_majeure(
 
     Доступно: Admin, Registrar
     """
-    return ForceMajeureApiService(db).get_pending_entries(
-        specialist_id=specialist_id,
-        target_date=target_date,
-    )
+    # 3808 review round 3 (P2 error mapping): несуществующая очередь или
+    # несовпадение дня/владельца — это доменные 404/422, а не ошибка
+    # сервера: без этого перехвата GET-preview отдавал HTTP 500.
+    try:
+        return ForceMajeureApiService(db).get_pending_entries(
+            specialist_id=specialist_id,
+            target_date=target_date,
+            daily_queue_id=daily_queue_id,
+        )
+    except ForceMajeureApiDomainError as exc:
+        raise _domain_http_exception(exc) from exc
 
 
 # ========================= ЗАЯВКИ НА ВОЗВРАТ =========================
@@ -246,7 +309,7 @@ async def get_refund_request(
         payload = ForceMajeureApiService(db).get_refund_request(request_id=request_id)
         return RefundRequestResponse(**payload)
     except ForceMajeureApiDomainError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise _domain_http_exception(exc) from exc
 
 
 @router.post("/refund-requests/{request_id}/process", response_model=RefundRequestResponse)
@@ -275,7 +338,7 @@ async def process_refund_request(
         )
         return RefundRequestResponse(**payload)
     except ForceMajeureApiDomainError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise _domain_http_exception(exc) from exc
     except Exception:
         service.rollback()
         raise
@@ -322,7 +385,7 @@ async def get_patient_deposit(
         payload = ForceMajeureApiService(db).get_patient_deposit(patient_id=patient_id)
         return DepositResponse(**payload)
     except ForceMajeureApiDomainError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise _domain_http_exception(exc) from exc
 
 
 @router.get("/deposits/{deposit_id}/transactions", response_model=list[DepositTransactionResponse])
@@ -389,7 +452,7 @@ async def use_deposit_for_payment(
         )
         return DepositResponse(**payload)
     except ForceMajeureApiDomainError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise _domain_http_exception(exc) from exc
     except Exception:
         service.rollback()
         raise

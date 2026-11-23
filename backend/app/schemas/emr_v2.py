@@ -118,11 +118,23 @@ class EMRAmendRequest(ORMModel):
 
 
 class EMRRestoreRequest(ORMModel):
-    """Schema for restoring to specific version"""
+    """Schema for restoring to specific version.
+
+    EMRRESTORE-FE-001/002 (audit 3886 round 16): restore is a guarded
+    clinical-history operation - it requires an explicit reason (min 10
+    chars, same policy as an amendment) and the caller's current
+    row_version so a stale view cannot silently overwrite newer edits.
+    """
 
     target_version: int = Field(..., ge=1, description="Version to restore to")
-    reason: str | None = Field(
-        default=None, max_length=1000, description="Reason for restore"
+    row_version: int = Field(
+        ..., description="Current row version (optimistic locking)"
+    )
+    reason: str = Field(
+        ...,
+        min_length=10,
+        max_length=1000,
+        description="Reason for restore (required, min 10 chars)",
     )
 
 

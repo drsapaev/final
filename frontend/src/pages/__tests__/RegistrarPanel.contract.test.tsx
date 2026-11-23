@@ -492,3 +492,14 @@ describe('RegistrarPanel command contract', () => {
   });
 });
 
+
+describe('REG-FE-056 — both registrar table surfaces use the backend ticket', () => {
+  it('explicitly opts in both WelcomeView and WorklistView without changing unrelated consumers', () => {
+    for (const rel of ['../registrar/views/WelcomeView.tsx', '../registrar/views/WorklistView.tsx']) {
+      const source = normalizeSource(fs.readFileSync(path.resolve(__dirname, rel), 'utf8'));
+      const table = source.indexOf('<EnhancedAppointmentsTable');
+      expect(table).toBeGreaterThanOrEqual(0);
+      expect(source.slice(table, table + 700)).toContain('preferCanonicalQueueNumber');
+    }
+  });
+});

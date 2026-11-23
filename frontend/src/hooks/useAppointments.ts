@@ -68,15 +68,19 @@ const buildAppointmentPayload = (appointmentData: Record<string, unknown>, docto
     (doctor) => String(doctor.id) === String(appointmentData.doctorId)
   );
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     patient_id: Number(appointmentData.patientId),
     doctor_id: Number(appointmentData.doctorId),
     department: selectedDoctor?.specialty || null,
     appointment_date: appointmentData.appointmentDate,
     appointment_time: appointmentData.appointmentTime,
-    notes: String(appointmentData.reason ?? "").trim() || String(appointmentData.notes ?? "").trim() || '',
-    services: [],
+    notes: String(appointmentData.reason ?? '').trim() || String(appointmentData.notes ?? '').trim() || '',
   };
+
+  const serviceId = Number(appointmentData.serviceId);
+  if (Number.isInteger(serviceId) && serviceId > 0) {
+    payload.service_ids = [serviceId];
+  }
 
   if ((appointmentData as Record<string, unknown>).status) {
     (payload as Record<string, unknown>).status = (appointmentData as Record<string, unknown>).status;

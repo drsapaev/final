@@ -36,10 +36,13 @@ class MedicalMixin(NotificationSenderMixinBase):
 
             results = {}
 
-            # Telegram
-            if user.telegram_id:
-                tele_msg = f"🔬 <b>{subject}</b>\n\n{message}"
-                results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
+            tele_msg = f"🔬 <b>{subject}</b>\n\n{message}"
+            results["telegram"] = await self.send_linked_user_telegram_notification(
+                db=db,
+                user_id=user.id,
+                event_type="lab_results",
+                message=tele_msg,
+            )
 
             # Push
             if user:
@@ -75,9 +78,7 @@ class MedicalMixin(NotificationSenderMixinBase):
 
             results = {}
 
-            # Telegram
-            if user.telegram_id:
-                tele_msg = f"""
+            tele_msg = f"""
 💊 <b>{subject}</b>
 
 👨‍⚕️ Врач: {doctor_name}
@@ -86,10 +87,12 @@ class MedicalMixin(NotificationSenderMixinBase):
 
 Рецепт доступен в приложении.
 """
-                # TODO: Add download button if using pure telegram bot API manually,
-                # but send_telegram_message is simple text.
-                # For now keeping clear text.
-                results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
+            results["telegram"] = await self.send_linked_user_telegram_notification(
+                db=db,
+                user_id=user.id,
+                event_type="prescription_ready",
+                message=tele_msg,
+            )
 
             # Push
             if user:
@@ -136,10 +139,13 @@ class MedicalMixin(NotificationSenderMixinBase):
 
             results = {}
 
-            # Telegram
-            if user.telegram_id:
-                tele_msg = f"📅 <b>{subject}</b>\n\n{message}"
-                results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
+            tele_msg = f"📅 <b>{subject}</b>\n\n{message}"
+            results["telegram"] = await self.send_linked_user_telegram_notification(
+                db=db,
+                user_id=user.id,
+                event_type="schedule_change",
+                message=tele_msg,
+            )
 
             # Push
             if user:
@@ -165,9 +171,14 @@ class MedicalMixin(NotificationSenderMixinBase):
     ) -> bool:
         """Отправка уведомления об отмене записи (Wrapper logic)"""
         from app.models.appointment import Appointment
+        from app.models.patient import Patient
 
         appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
         if not appointment:
+            return False
+
+        patient = db.query(Patient).filter(Patient.id == appointment.patient_id).first()
+        if patient is None or patient.user_id is None:
             return False
 
         old_data = {
@@ -178,14 +189,15 @@ class MedicalMixin(NotificationSenderMixinBase):
 
         return await self.send_schedule_change_notification(
             db=db,
-            user_id=appointment.patient_id,
+            user_id=patient.user_id,
             change_type="cancelled",
             old_data=old_data
         )
 
 
     async def send_visit_confirmation_invitation(
-        self, db: Session, visit_id: int, channel: str = "auto"
+        self, db: Session, visit_id: int, channel: str = "auto", *,
+        expected_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Отправляет приглашение на подтверждение визита
@@ -194,33 +206,59 @@ class MedicalMixin(NotificationSenderMixinBase):
         from app.models.visit import Visit
 
         try:
-            visit = db.query(Visit).filter(Visit.id == visit_id).first()
+            # The scheduling request freezes its authorized context before
+            # commit. Never derive a recipient from a later transferred row.
+            required = {"patient_id", "confirmation_context_epoch", "confirmation_token"}
+            if (expected_context is None or set(expected_context) != required
+                or not isinstance(expected_context.get("confirmation_token"), str)
+                or not expected_context["confirmation_token"]):
+                return {"success": False, "error": "Контекст визита недоступен"}
+            visit = db.query(Visit).filter(Visit.id == visit_id).populate_existing().first()
             if not visit:
                 return {"success": False, "error": "Визит не найден"}
+            if visit.status != "pending_confirmation" or any(
+                getattr(visit, field) != expected_context[field] for field in required
+            ):
+                return {"success": False, "error": "Контекст визита изменился"}
 
-            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+            patient = db.query(Patient).filter(Patient.id == visit.patient_id).populate_existing().first()
             if not patient:
                 return {"success": False, "error": "Пациент не найден"}
 
             # Определяем канал автоматически если нужно
             if channel == "auto":
-                channel = self._determine_best_channel(patient)
+                channel = self._determine_best_channel(patient, db)
 
             # Формируем данные для уведомления
             notification_data = self._prepare_notification_data(db, visit, patient)
 
+            current = db.query(
+                Visit.patient_id, Visit.confirmation_context_epoch,
+                Visit.confirmation_token, Visit.status,
+            ).filter(Visit.id == visit_id).first()
+            if (current is None or current.status != "pending_confirmation" or any(
+                getattr(current, field) != expected_context[field] for field in required
+            )):
+                return {"success": False, "error": "Контекст визита изменился"}
+
             # Отправляем уведомление по выбранному каналу
             if channel == "telegram":
-                return await self._send_telegram_invitation(patient, notification_data)
+                return await self._send_telegram_invitation(
+                    patient, notification_data, db=db
+                )
             elif channel == "pwa":
-                return await self._send_pwa_invitation(patient, notification_data)
+                return await self._send_pwa_invitation(
+                    patient, notification_data, db=db
+                )
             elif channel == "phone":
-                return await self._send_phone_invitation(patient, notification_data)
+                return await self._send_phone_invitation(
+                    patient, notification_data, db=db
+                )
             else:
                 return {"success": False, "error": f"Неподдерживаемый канал: {channel}"}
 
         except Exception as e:
-            logger.error(f"Ошибка отправки приглашения на подтверждение: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error("Ошибка отправки приглашения на подтверждение (%s)", type(e).__name__)
+            return {"success": False, "error": "Ошибка отправки приглашения"}
 
 

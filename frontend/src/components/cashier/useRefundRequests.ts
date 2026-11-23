@@ -2,22 +2,27 @@
  * PR-UI-14-6: refund-request data lifecycle + process actions (verbatim
  * move from RefundRequestsTable.tsx — behavior-preserving decomposition).
  *
+ * CSH-FE-011/012 (#3813): the list GET and the process POST now go through
+ * the shared axios instance from api/client.ts instead of raw fetch calls —
+ * canonical /api/v1 base URL and configured API origin (011), CSRF
+ * X-CSRF-Token on the POST, single-flight 401 token refresh and 429
+ * cooldown handling (012). Bearer attachment and error-detail surfacing
+ * follow the shared client contract used by ForceMajeureModal and the
+ * cashier payment contracts.
+ *
  * Owns: requests/loading/error/processingId/filter state, the
  * status_filter query load, and the approve/reject/complete process
  * command routed through the existing backend endpoint
  * POST /force-majeure/refund-requests/{id}/process.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
+import { api } from '../../api/client';
+import { getErrorMessage } from '../../utils/type-guards';
 import type { RefundRequest, RefundTranslationFn } from './refundRequestsContracts';
-
-const getAuthToken = () => {
-  return tokenManager.getAccessToken() || '';
-};
 
 export const useRefundRequests = (t: RefundTranslationFn, onRefresh?: () => void) => {
   const [requests, setRequests] = useState<RefundRequest[]>([]);
@@ -26,41 +31,49 @@ export const useRefundRequests = (t: RefundTranslationFn, onRefresh?: () => void
   const [processingId, setProcessingId] = useState<string | number | null>(null);
   const [filter, setFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected' | 'completed'
 
+  // CSH-FE-015: request epoch — only the latest load may write
+  // requests/loading/error. The effect cleanup bumps the counter, so a
+  // response landing after its request was superseded (filter change or
+  // unmount) is dropped BEFORE touching state; a late rejection of a
+  // superseded request must not raise a misleading error banner either.
+  const loadEpochRef = useRef(0);
+
   // Load refund requests
   const loadRequests = useCallback(async () => {
+    const myEpoch = ++loadEpochRef.current;
     setLoading(true);
     setError(null);
 
     try {
-      const token = getAuthToken();
-      const params = new URLSearchParams();
+      const params: Record<string, unknown> = {};
       if (filter !== 'all') {
-        params.append('status_filter', filter);
+        params.status_filter = filter;
       }
 
-      const response = await fetch(`/force-majeure/refund-requests?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get('/force-majeure/refund-requests', { params });
+      if (loadEpochRef.current !== myEpoch) return; // superseded/unmounted
 
-      if (response.ok) {
-        const data = await response.json() as RefundRequest[] | { requests?: RefundRequest[] };
-        setRequests(Array.isArray(data) ? data : data.requests || []);
-      } else {
-        throw new Error('Failed to load refund requests');
-      }
+      const data = response.data as RefundRequest[] | { requests?: RefundRequest[] };
+      setRequests(Array.isArray(data) ? data : data.requests || []);
     } catch (err) {
+      if (loadEpochRef.current !== myEpoch) return;
       logger.error('[RefundRequestsTable] Error loading requests:', err);
-      setError((err instanceof Error ? err.message : String(err)));
+      // CSH-FE-001 convention: keep the previously loaded list — a failed
+      // read is not a confirmed empty list.
+      setError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (loadEpochRef.current === myEpoch) {
+        setLoading(false);
+      }
     }
   }, [filter]);
 
   useEffect(() => {
     loadRequests();
+    // Capture the ref OBJECT (not .current) for the cleanup: bumping the
+    // epoch invalidates any in-flight load on supersede/unmount.
+    const epochRef = loadEpochRef;
+    return () => { epochRef.current += 1; };
   }, [loadRequests]);
 
   const processRefundRequest = async (
@@ -70,27 +83,17 @@ export const useRefundRequests = (t: RefundTranslationFn, onRefresh?: () => void
   ) => {
     setProcessingId(requestId);
     try {
-      const token = getAuthToken();
-      const response = await fetch(`/force-majeure/refund-requests/${requestId}/process`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ action, ...extraPayload })
+      await api.post(`/force-majeure/refund-requests/${requestId}/process`, {
+        action,
+        ...extraPayload,
       });
 
-      if (response.ok) {
-        logger.log('[RefundRequestsTable] Processed request:', { requestId, action });
-        await loadRequests();
-        if (onRefresh) onRefresh();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to process refund request');
-      }
+      logger.log('[RefundRequestsTable] Processed request:', { requestId, action });
+      await loadRequests();
+      if (onRefresh) onRefresh();
     } catch (err) {
       logger.error('[RefundRequestsTable] Process error:', err);
-      notify.error(t('payment.refund_error') + ((err instanceof Error ? err.message : String(err)) || t('payment.unknown_error')));
+      notify.error(t('payment.refund_error') + (getErrorMessage(err) || t('payment.unknown_error')));
     } finally {
       setProcessingId(null);
     }

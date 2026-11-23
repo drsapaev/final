@@ -523,6 +523,9 @@ def get_telegram_integration_status(
                 )
 
         webhook_set = bool(webhook_info and webhook_info.get("url"))
+        patient_mini_app_ready = bool(
+            bot_token and str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+        )
         webhook_url = (
             webhook_info.get("url")
             if webhook_info
@@ -608,8 +611,8 @@ def get_telegram_integration_status(
                     },
                     {
                         "key": "patient_booking_entrypoint",
-                        "label": "Безопасная подсказка для записи",
-                        "enabled": bool(bot_token),
+                        "label": "Запись к врачу через защищенный Mini App",
+                        "enabled": patient_mini_app_ready,
                         "contract": PATIENT_BOOKING_ENTRY_CONTRACT,
                     },
                     {
@@ -634,8 +637,8 @@ def get_telegram_integration_status(
                     },
                     {
                         "key": "patient_payments_mini_app_entry",
-                        "label": "Защищенный вход к оплатам пациента",
-                        "enabled": bool(bot_token),
+                        "label": "Защищенный раздел оплат пациента",
+                        "enabled": patient_mini_app_ready,
                         "contract": PATIENT_PAYMENT_ENTRY_CONTRACT,
                     },
                     {
@@ -650,25 +653,33 @@ def get_telegram_integration_status(
                         "enabled": bool(bot_token),
                     },
                     {
-                        "key": "patient_forms_placeholder",
-                        "label": "Анкеты пациента: безопасная заглушка Mini App",
-                        "enabled": bool(bot_token),
+                        "key": "patient_forms_entrypoint",
+                        "label": "Анкеты пациента в защищенном Mini App",
+                        "enabled": patient_mini_app_ready,
                         "contract": PATIENT_FORMS_ENTRY_CONTRACT,
                     },
                     {
                         "key": "patient_documents_placeholder",
-                        "label": "Документы и чеки: будущий защищенный кабинет",
-                        "enabled": bool(bot_token),
+                        "label": "Полный архив документов и чеков пока не подключен",
+                        "enabled": False,
                     },
                     {
-                        "key": "doctor_schedule_placeholder",
-                        "label": "Врачи и расписание: безопасная подсказка",
-                        "enabled": bool(bot_token),
+                        "key": "doctor_schedule_entrypoint",
+                        "label": "Выбор врача и времени в защищенной записи",
+                        "enabled": patient_mini_app_ready,
+                        "contract": PATIENT_BOOKING_ENTRY_CONTRACT,
                     },
                     {
-                        "key": "patient_cabinet_placeholder",
-                        "label": "Кабинет пациента: будущий защищенный вход",
-                        "enabled": bool(bot_token),
+                        "key": "patient_cabinet_entrypoint",
+                        "label": "Защищенная сводка кабинета пациента",
+                        "enabled": patient_mini_app_ready,
+                        "contract": {
+                            "contract_version": "patient-cabinet-entrypoint-v1",
+                            "route": f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section=cabinet",
+                            "auth": "telegram_init_data_or_short_lived_entry_token",
+                            "scope": "linked_patient",
+                            "contains_medical_documents": False,
+                        },
                     },
                     {
                         "key": "patient_language_notification_settings",
@@ -681,9 +692,9 @@ def get_telegram_integration_status(
                         "enabled": bool(bot_token),
                     },
                     {
-                        "key": "staff_entry_placeholder",
-                        "label": "Режим сотрудника: вход по персональной ссылке",
-                        "enabled": bool(bot_token),
+                        "key": "staff_entrypoint",
+                        "label": "Вход сотрудника по персональной ссылке",
+                        "enabled": bool(staff_bot_token_status.get("ready")),
                     },
                 ],
                 "results_delivery": "telegram_pdf",

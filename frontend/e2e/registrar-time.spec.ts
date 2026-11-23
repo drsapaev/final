@@ -271,5 +271,15 @@ test.describe('Registrar queue time rendering', () => {
     await expect(row).toContainText('09:30:00');
     await expect(row).toContainText('10:45:00');
     await expect(row).not.toContainText('04:30:00');
+
+    // REG-FE-056: the selected date is historical, yet the registrar's
+    // № cell must show the backend ticket (7), not its list index (#1)
+    // or the doctor cabinet numbers (12 / 14).
+    const ticketCell = row.locator('.eat-cell--center.eat-cell--secondary').first();
+    await expect(ticketCell).toBeVisible();
+    await expect(ticketCell).toContainText('7');
+    await expect(ticketCell).not.toContainText('#1');
+    await expect(ticketCell).not.toContainText('12');
+    await expect(ticketCell).not.toContainText('14');
   });
 });

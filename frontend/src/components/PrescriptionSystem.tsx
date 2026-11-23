@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
 import { Card, Button, Badge,
   Input } from './ui/macos';
@@ -58,6 +58,27 @@ const createEmptyPrescription = (): Prescription => ({
   printedAt: null
 });
 
+/**
+ * DERMARX-FE-002 (audit 3892): stable value key for the canonical
+ * prescription source — only the fields the editor displays participate,
+ * so a same-visit status refresh that recreates the prop objects with
+ * identical values maps to the SAME key and cannot clobber local edits.
+ */
+function prescriptionSourceKey(source: Prescription | null | undefined): string {
+  if (!source) return 'empty';
+  const medications = Array.isArray(source.medications)
+    ? source.medications.map((m) => [m.id, m.name, m.dosage, m.frequency, m.duration, m.instructions, m.quantity])
+    : [];
+  return JSON.stringify([
+    medications,
+    source.instructions,
+    source.doctorNotes,
+    source.isDraft,
+    source.createdAt,
+    source.printedAt,
+  ]);
+}
+
 const PrescriptionSystem = ({
   appointment,
   emr,
@@ -71,11 +92,35 @@ const PrescriptionSystem = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // DERMARX-FE-002 (audit 3892): the canonical record this editor last
+  // hydrated from, as a stable value key — rehydrate only when the
+  // canonical CONTENT changes, never when the parent merely recreates the
+  // prop objects (a same-visit status refresh must not discard edits).
+  const lastHydratedKeyRef = useRef<string | null>(null);
+  // DERMARX-FE-003 (audit 3892): bumped on every local edit so a save
+  // acknowledgement can tell whether the submitted revision is still the
+  // newest one.
+  const editVersionRef = useRef(0);
 
   useEffect(() => {
     // Загрузка существующего рецепта
     const rawSource = initialPrescription || appointment?.prescription;
     const sourcePrescription = rawSource as Prescription | null | undefined;
+    const sourceKey = prescriptionSourceKey(sourcePrescription);
+
+    if (sourceKey === lastHydratedKeyRef.current) {
+      // Same canonical content: a no-op refresh (fresh object identities,
+      // identical values) must not touch the local draft at all.
+      return;
+    }
+
+    if (hasUnsavedChanges && lastHydratedKeyRef.current !== null) {
+      // The server-side canonical record changed while the clinician has
+      // unsaved local edits: keep the dirty draft visible instead of
+      // silently discarding it (the explicit Save remains the merge path).
+      logger.warn('Prescription: canonical record changed while local edits are unsaved — draft kept');
+      return;
+    }
 
     if (sourcePrescription) {
       setPrescription({
@@ -83,12 +128,12 @@ const PrescriptionSystem = ({
         ...sourcePrescription
       });
       setHasUnsavedChanges(false);
-      return;
+    } else {
+      setPrescription(createEmptyPrescription());
+      setHasUnsavedChanges(false);
     }
-
-    setPrescription(createEmptyPrescription());
-    setHasUnsavedChanges(false);
-  }, [appointment, initialPrescription]);
+    lastHydratedKeyRef.current = sourceKey;
+  }, [appointment, initialPrescription, hasUnsavedChanges]);
 
   const handleMedicationAdd = () => {
     const newMedication: Medication = {
@@ -105,6 +150,7 @@ const PrescriptionSystem = ({
       ...prev,
       medications: [...prev.medications, newMedication]
     }));
+    editVersionRef.current += 1;
     setHasUnsavedChanges(true);
   };
 
@@ -113,6 +159,7 @@ const PrescriptionSystem = ({
       ...prev,
       medications: prev.medications.filter((m) => m.id !== id)
     }));
+    editVersionRef.current += 1;
     setHasUnsavedChanges(true);
   };
 
@@ -123,6 +170,7 @@ const PrescriptionSystem = ({
       m.id === id ? { ...m, [field]: value } : m
       )
     }));
+    editVersionRef.current += 1;
     setHasUnsavedChanges(true);
   };
 
@@ -131,11 +179,15 @@ const PrescriptionSystem = ({
       ...prev,
       [field]: value
     }));
+    editVersionRef.current += 1;
     setHasUnsavedChanges(true);
   };
 
   const handleSavePrescription = async () => {
     setIsSaving(true);
+    // DERMARX-FE-003 (audit 3892): remember which local revision is being
+    // submitted — edits typed after this point were NOT in the request.
+    const submittedEditVersion = editVersionRef.current;
     try {
       const prescriptionToSave: Prescription = {
         ...prescription,
@@ -155,7 +207,11 @@ const PrescriptionSystem = ({
 
       await onSave(payload);
       setPrescription((prev) => ({ ...prev, isDraft: false }));
-      setHasUnsavedChanges(false);
+      if (editVersionRef.current === submittedEditVersion) {
+        setHasUnsavedChanges(false);
+      }
+      // If newer edits exist they were not part of the request: keep the
+      // unsaved-changes flag on so the record is never falsely "saved".
     } catch (error) {
       logger.error('Prescription: Save error:', error);
     } finally {
@@ -167,6 +223,15 @@ const PrescriptionSystem = ({
     try {
       if (typeof onPrint !== 'function') {
         logger.warn('Prescription: Print skipped because onPrint handler is missing');
+        return;
+      }
+
+      // DERMARX-FE-001 (audit 3892): printing a dirty local draft would
+      // produce a clinical document that diverges from the canonical
+      // server prescription while the form still shows "saved". Only the
+      // acknowledged record may be printed.
+      if (hasUnsavedChanges || isSaving) {
+        logger.warn('Prescription: Print blocked because there are unsaved changes');
         return;
       }
 
@@ -468,7 +533,7 @@ const PrescriptionSystem = ({
             <Button
               variant="outline"
               onClick={handlePrintPrescription}
-              disabled={prescription.isDraft || typeof onPrint !== 'function'}>
+              disabled={prescription.isDraft || typeof onPrint !== 'function' || hasUnsavedChanges || isSaving}>
 
               <Printer className="w-4 h-4 mr-2" />
               {t('misc.ps_print')}

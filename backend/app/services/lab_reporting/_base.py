@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import weakref
 
 import asyncio  # noqa: F401
 import hashlib  # noqa: F401
@@ -89,7 +90,12 @@ class LabReportingServiceMixinBase:
 # first successful pass: lab templates/catalog rows only change via admin
 # tooling or migrations, and self-heal is re-armed on a template 404
 # (see TemplatesMixin.get_template) so accidental data loss still recovers.
-_SEED_ENSURED = {"bind_id": None, "catalog": False, "templates": False, "bindings": False}
+_SEED_ENSURED = {
+    "bind_ref": None,
+    "catalog": False,
+    "templates": False,
+    "bindings": False,
+}
 
 # Codex P1: the warmup thread and concurrent first requests can each observe
 # an unlocked False flag and seed the same rows — unique constraints turn the
@@ -103,13 +109,22 @@ def _seed_cache_fresh(bind: object, part: str) -> bool:
 
     Tests build a fresh database per test while the process lives on, so the
     cache is keyed by the bind object identity — a new engine re-runs the
-    seeders, the production engine keeps the once-per-process win.
+    seeders, the production engine keeps the once-per-process win. Identity is
+    verified through a weakref, never through id(bind): id values are
+    recycled once the previous engine is garbage-collected, and a fresh test
+    database that inherits a dead engine's id would be treated as already
+    seeded — every catalog code resolving unmapped (CI 2026-11-11,
+    test_real_catalog_codes_l23_l24_l54_resolve_to_exact_templates).
     """
-    if _SEED_ENSURED.get("bind_id") != id(bind):
-        # A NEW bind resets every part: per-part flags belonged to the
+    ref = _SEED_ENSURED.get("bind_ref")
+    if ref is None or ref() is not bind:
+        # A DIFFERENT bind resets every part: per-part flags belonged to the
         # previous database (tests roll data back between cases).
+        _SEED_ENSURED["bind_ref"] = weakref.ref(bind)
         _SEED_ENSURED.update(
-            bind_id=id(bind), catalog=False, templates=False, bindings=False,
+            catalog=False,
+            templates=False,
+            bindings=False,
             templates_sig=None,
         )
     return not _SEED_ENSURED.get(part, False)
@@ -127,7 +142,9 @@ def _template_definitions_signature(definitions: list[dict]) -> str:
 
 
 def _mark_seed_ensured(bind: object, part: str) -> None:
-    _SEED_ENSURED["bind_id"] = id(bind)
+    ref = _SEED_ENSURED.get("bind_ref")
+    if ref is None or ref() is not bind:
+        _SEED_ENSURED["bind_ref"] = weakref.ref(bind)
     _SEED_ENSURED[part] = True
 
 

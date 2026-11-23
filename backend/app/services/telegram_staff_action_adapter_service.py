@@ -14,6 +14,7 @@ from app.crud import audit as crud_audit
 from app.models.clinic import Schedule
 from app.models.payment import Payment
 from app.models.visit import Visit
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.billing_service import BillingService
 from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.queue_service import QueueBusinessService
@@ -778,6 +779,21 @@ class TelegramStaffActionAdapterService:
         try:
             schedule = (
                 self.db.query(Schedule).filter(Schedule.id == schedule_id).first()
+            )
+            if not schedule:
+                raise TelegramStaffActionAdapterError("schedule_not_found")
+
+            # Serialize this alternate schedule writer with booking
+            # confirmation. Re-read the schedule after acquiring the Doctor
+            # lock so a concurrent Admin edit cannot leave us with stale row
+            # state while applying the Telegram change.
+            lock_doctor_for_slot_reservation(self.db, schedule.doctor_id)
+            schedule = (
+                self.db.query(Schedule)
+                .filter(Schedule.id == schedule_id)
+                .populate_existing()
+                .with_for_update()
+                .first()
             )
             if not schedule:
                 raise TelegramStaffActionAdapterError("schedule_not_found")

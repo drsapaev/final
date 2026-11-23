@@ -1,6 +1,7 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
@@ -15,6 +16,7 @@ import {
   Typography,
 } from '../ui/macos';
 import { DataTable } from '../ui/DataTable';
+import type { QueueSetupEditorDestination, QueueSetupEntityRef, QueueSetupReturnContext, QueueSetupSection } from './AdminSetupDirections';
 import {
   Plus,
   Edit,
@@ -47,6 +49,65 @@ interface ManagedUser {
   [key: string]: unknown;
 }
 
+const isValidSetupDay = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000-')) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
+const isValidSetupKey = (value: string) =>
+  value.length > 0 && value.length <= 128 && value.trim() === value &&
+  !Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 0x1f || code === 0x7f;
+  });
+
+export const parseSetupReturnContext = (search: string): QueueSetupReturnContext | null => {
+  const params = new URLSearchParams(search);
+  const setupParams = [
+    'setupReturn', 'setupSection', 'setupProfile', 'setupDay',
+    'setupEntityKind', 'setupEntityKey', 'setupEntityId',
+  ];
+  if (setupParams.some((name) => params.getAll(name).length > 1)) return null;
+  if (params.get('setupReturn') !== 'queue-directions-v1') return null;
+  const sectionValue = params.get('setupSection');
+  if (sectionValue !== 'checklist' && sectionValue !== 'resources') return null;
+  const profileKey = params.get('setupProfile');
+  if (profileKey !== null && !isValidSetupKey(profileKey)) return null;
+  const day = params.get('setupDay');
+  if (day !== null && !isValidSetupDay(day)) return null;
+  const kind = params.get('setupEntityKind');
+  const key = params.get('setupEntityKey');
+  const rawId = params.get('setupEntityId');
+  let entity: QueueSetupEntityRef | null = null;
+  if (kind === 'queue_tag' && key !== null && isValidSetupKey(key) && rawId === null) {
+    entity = { kind, key };
+  } else if (kind === 'doctor' && rawId !== null && key === null) {
+    if (!/^[1-9]\d*$/.test(rawId)) return null;
+    const id = Number(rawId);
+    if (!Number.isSafeInteger(id) || id <= 0) return null;
+    entity = { kind, id };
+  } else if (kind !== null || key !== null || rawId !== null) {
+    return null;
+  }
+  return {
+    version: 1,
+    destination: 'user-management' satisfies QueueSetupEditorDestination,
+    profileKey,
+    section: sectionValue as QueueSetupSection,
+    day,
+    entity,
+  };
+};
+
+export const buildSetupReturnLocation = (context: QueueSetupReturnContext) => {
+  const params = new URLSearchParams();
+  if (context.profileKey) params.set('profile', context.profileKey);
+  params.set('section', context.section);
+  if (context.day) params.set('day', context.day);
+  return { pathname: '/admin/setup-directions', search: `?${params.toString()}` };
+};
+
 interface ActionsMenuPosition {
   top: number;
   left: number;
@@ -55,6 +116,8 @@ interface ActionsMenuPosition {
 const UserManagement = () => {
   const { t: rawT } = useTranslation();
   const t = rawT;
+  const location = useLocation();
+  const setupReturnContext = parseSetupReturnContext(location.search);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -491,6 +554,17 @@ const UserManagement = () => {
 
   return (
     <Box className="admin-p-24">
+      {setupReturnContext && (
+        <div className="admin-sdx-step-nav" data-testid="queue-setup-return">
+          <Link
+            className="admin-sdx-link"
+            to={buildSetupReturnLocation(setupReturnContext)}
+            data-testid="queue-setup-return-link"
+          >
+            {t('admin2.sdx_title')}
+          </Link>
+        </div>
+      )}
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" className="admin-mb-24">
         <Typography variant="h1" className="admin-fs-24-fw-600">

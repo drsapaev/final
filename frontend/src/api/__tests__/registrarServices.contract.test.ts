@@ -89,7 +89,8 @@ describe('RQ-05.b: wizard consumes the typed catalog (end-to-end linkage)', () =
   const loadServicesBlock = () => {
     const source = readWizard();
     return source.slice(
-      source.indexOf('const loadServices = useCallback(async () => {'),
+      // REG-FE-070: сигнатура loadServices теперь возвращает Promise<boolean>.
+      source.indexOf('const loadServices = useCallback(async (): Promise<boolean> => {'),
       source.indexOf('// ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================')
     );
   };

@@ -454,7 +454,7 @@ const AdminDashboard = () => {
   return (
     <ErrorBoundary>
       <div className="flex flex-col gap-6">
-        <AdminRouteSwitcher current="dashboard" />
+        <AdminRouteSwitcher current="admin-dashboard" />
 
         {/* PR-UI-11-1: greeting + current-date header. */}
         <Card
@@ -844,7 +844,7 @@ const AdminDashboard = () => {
                   <p className="admin-fs-sm-fw-med-primary-m-0">{alert.message}</p>
                   <p className="admin-fs-12-secondary-m-4px-0-0-0">{alert.time}</p>
                 </div>
-                <Badge variant={(alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info') as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
+                <Badge variant={(alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info') as unknown as 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'outline'}>
                   {/* UX Audit Stage 3 (Dashboard issue 4.2): локализация приоритета. */}
                   {getPriorityLabel(alert.priority, t)}
                 </Badge>

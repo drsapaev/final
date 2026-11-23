@@ -1,12 +1,20 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
 import QueueProfilesManager from '../QueueProfilesManager';
 
-const { apiMock } = vi.hoisted(() => {
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+const mockScrollIntoView = () => {
+  const mock = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: mock });
+  return mock;
+};
+
+const { apiMock, syntheticProfiles } = vi.hoisted(() => {
   const syntheticProfiles = [
     {
       key: 'synthetic-active',
@@ -61,7 +69,7 @@ const { apiMock } = vi.hoisted(() => {
   const apiMock = {
     get: vi.fn((url: string) => {
       if (url.startsWith('/queues/profiles')) {
-        return Promise.resolve({ data: { profiles: syntheticProfiles } });
+        return Promise.resolve({ data: { profiles: syntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] })) } });
       }
       if (url === '/admin/departments') {
         return Promise.resolve({ data: { data: [] } });
@@ -69,12 +77,24 @@ const { apiMock } = vi.hoisted(() => {
       return Promise.resolve({ data: { data: [] } });
     }),
     post: vi.fn(() => Promise.resolve({ data: { success: true } })),
-    put: vi.fn(() => Promise.resolve({ data: { success: true } })),
-    delete: vi.fn(() => Promise.resolve({ data: { success: true } })),
+    put: vi.fn((url: string, payload: Record<string, unknown>) => {
+      const key = url.split('/').at(-1);
+      const profile = syntheticProfiles.find((item) => item.key === key);
+      if (profile) Object.assign(profile, payload);
+      return Promise.resolve({ data: { success: true } });
+    }),
+    delete: vi.fn((url: string) => {
+      const key = url.split('/').at(-1);
+      const index = syntheticProfiles.findIndex((item) => item.key === key);
+      if (index >= 0) syntheticProfiles.splice(index, 1);
+      return Promise.resolve({ data: { success: true } });
+    }),
   };
 
-  return { apiMock };
+  return { apiMock, syntheticProfiles };
 });
+
+const baselineSyntheticProfiles = syntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] }));
 
 vi.mock('../../../api/client', () => ({
   default: apiMock,
@@ -102,11 +122,16 @@ const openCreateDialog = async (user: ReturnType<typeof userEvent.setup>) => {
 };
 
 beforeEach(() => {
+  syntheticProfiles.splice(0, syntheticProfiles.length, ...baselineSyntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] })));
   vi.clearAllMocks();
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.clearAllMocks();
+  if (originalScrollIntoView) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+  else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  window.sessionStorage.removeItem('admin.queueProfiles.pendingCsvPublication.v1');
+  await i18n.changeLanguage('ru');
 });
 
 describe('QueueProfilesManager interactions', () => {
@@ -131,6 +156,37 @@ describe('QueueProfilesManager interactions', () => {
 
     expect(titleInput).toHaveValue('Новое направление');
     expect(screen.getByRole('dialog', { name: 'Новая вкладка' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['en', 'Direction and QR profiles', 'Add'],
+    ['kk', 'Бағыттар мен QR профильдері', 'Қосу'],
+    ['uz-Cyrl', 'Йўналишлар ва QR профиллари', 'Қўшиш'],
+  ])('shows a localized title and add action for %s', async (locale, title, addAction) => {
+    await i18n.changeLanguage(locale);
+    render(
+      <ThemeProvider>
+        <QueueProfilesManager />
+      </ThemeProvider>,
+    );
+
+    expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: addAction })).toBeInTheDocument();
+  });
+
+  it('keeps the create dialog above the sticky header and within the dynamic viewport', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+    await openCreateDialog(user);
+
+    const dialog = screen.getByRole('dialog', { name: 'Новая вкладка' });
+    const overlay = dialog.parentElement;
+
+    expect(overlay?.style.zIndex).toBe('1200');
+    expect(overlay?.parentElement).toBe(document.body);
+    expect(overlay?.style.padding).toBe('16px');
+    expect(dialog.style.maxHeight).toBe('min(90vh, calc(100dvh - 32px))');
+    expect(dialog.style.overflowY).toBe('auto');
   });
 
   it('creates new profiles hidden and keeps QR publication for the edit action', async () => {
@@ -169,7 +225,7 @@ describe('QueueProfilesManager interactions', () => {
     const profileName = screen.getByText('Синтетическое неопубликованное направление');
     const row = profileName.closest('tr')!;
 
-    expect(within(row).getByText('Активен в регистратуре')).toBeInTheDocument();
+    expect(within(row).getByText('Профиль активен')).toBeInTheDocument();
     expect(within(row).getByText('Не опубликован на QR')).toBeInTheDocument();
 
     await user.click(within(row).getByRole('button', {
@@ -189,7 +245,7 @@ describe('QueueProfilesManager interactions', () => {
       .getByText('Синтетическая архивная очередь с настройкой QR')
       .closest('tr')!;
 
-    expect(within(row).getByText('В архиве регистратуры')).toBeInTheDocument();
+    expect(within(row).getByText('Профиль в архиве')).toBeInTheDocument();
     expect(within(row).getByText('Настроен для QR')).toBeInTheDocument();
     expect(within(row).getByText('Доступность профиля: недоступна')).toBeInTheDocument();
     expect(within(row).queryByText('Опубликован на QR')).not.toBeInTheDocument();
@@ -239,6 +295,11 @@ describe('QueueProfilesManager interactions', () => {
     await renderManager();
 
     await user.click(screen.getAllByTitle('Редактировать')[0]);
+    // QR-FE-024: an untouched form no longer sends a PUT at all (dirty
+    // payload only), so the binding-refusal scenario must actually change a
+    // binding field to reach the backend refusal.
+    const tagsInput = screen.getByLabelText('Queue Tags');
+    await user.type(tagsInput, ', synthetic_extra');
     await user.click(screen.getByRole('button', { name: 'Сохранить вкладку очереди' }));
 
     expect(
@@ -246,6 +307,54 @@ describe('QueueProfilesManager interactions', () => {
         'Связи используемого профиля менять нельзя. Заблокированные поля: queue_tags, department_key',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('restores focus after a refused QR publication so Escape closes and returns to the opener', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+
+    const profileTitle = screen.getByText('Синтетическое неопубликованное направление');
+    const row = profileTitle.closest('tr')!;
+    const editButton = within(row).getByRole('button', {
+      name: 'Редактировать профиль Синтетическое неопубликованное направление для настройки QR-публикации',
+    });
+    await user.click(editButton);
+
+    const dialog = screen.getByRole('dialog', { name: 'Редактирование вкладки' });
+    const qrCheckbox = within(dialog).getByRole('checkbox', { name: 'Показывать профиль на QR-странице' });
+    await user.click(qrCheckbox);
+    const saveButton = within(dialog).getByRole('button', { name: 'Сохранить вкладку очереди' });
+    let refuseUpdate!: (reason: unknown) => void;
+    apiMock.put.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      refuseUpdate = reject;
+    }));
+    await user.click(saveButton);
+    await waitFor(() => expect(saveButton).toBeDisabled());
+    // JSDOM keeps focus on a button after it is disabled; browsers can drop it
+    // outside the dialog, so model that blur with an enabled page control.
+    const searchInput = screen.getByRole('textbox', { name: 'Поиск профилей очереди' });
+    searchInput.focus();
+    expect(searchInput).toHaveFocus();
+
+    refuseUpdate({
+      response: {
+        status: 409,
+        data: { detail: { reason: 'profile_publication_blocked', message: 'Для публикации нет доступного владельца очереди.' } },
+      },
+    });
+
+    expect(await screen.findByText('Для публикации нет доступного владельца очереди.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Название вкладки очереди на английском')).toHaveFocus();
+    expect(qrCheckbox).toBeChecked();
+    expect(apiMock.put).toHaveBeenCalledWith(
+      '/queues/profiles/synthetic-unpublished',
+      expect.objectContaining({ show_on_qr_page: true }),
+    );
+    expect(syntheticProfiles.find((profile) => profile.key === 'synthetic-unpublished')?.show_on_qr_page).toBe(false);
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(editButton).toHaveFocus();
   });
 
   it.each([
@@ -261,6 +370,7 @@ describe('QueueProfilesManager interactions', () => {
     },
   ])('shows the structured delete refusal $reason and preserves the profile', async (detail) => {
     const user = userEvent.setup();
+    const scrollIntoView = mockScrollIntoView();
     apiMock.get.mockResolvedValueOnce({
       data: {
         profiles: [{
@@ -289,12 +399,147 @@ describe('QueueProfilesManager interactions', () => {
     await user.click(within(confirmation).getByRole('button', { name: 'Удалить' }));
 
     expect(await screen.findByText(detail.message)).toBeInTheDocument();
+    expect(within(row).getByRole('alert')).toHaveTextContent(detail.message);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
     expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
     expect(apiMock.delete).toHaveBeenCalledExactlyOnceWith('/queues/profiles/specialists');
     expect(apiMock.put).not.toHaveBeenCalled();
     expect(screen.getByText('Синтетический профиль для проверки удаления')).toBeInTheDocument();
     expect(within(row).getByTitle('Архивировать профиль')).toBeEnabled();
     expect(apiMock.get.mock.calls.filter(([url]) => url.startsWith('/queues/profiles'))).toHaveLength(1);
+    await user.click(within(row).getByRole('button', { name: 'Скрыть сообщение об ошибке' }));
+    expect(within(row).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('announces a delete refusal even if the profile is filtered out while the request is pending', async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = mockScrollIntoView();
+    let rejectDelete!: (reason: unknown) => void;
+    apiMock.delete.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectDelete = reject; }));
+    await renderManager();
+
+    const row = screen.getByText('Синтетическая активная очередь').closest('tr')!;
+    await user.click(within(row).getByTitle('Удалить'));
+    const confirmation = screen.getByRole('dialog', { name: 'Удаление вкладки очереди' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Удалить' }));
+    await waitFor(() => expect(apiMock.delete).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole('button', { name: 'Все' }));
+    await user.click(screen.getByRole('option', { name: 'Профили в архиве' }));
+    rejectDelete({ response: { status: 409, data: { detail: { reason: 'profile_has_significant_links' } } } });
+
+    const deleteAlert = await screen.findByRole('alert');
+    expect(deleteAlert).toHaveTextContent('Синтетическая активная очередь');
+    expect(deleteAlert).toHaveTextContent('Профиль используется: архивируйте его');
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+
+    apiMock.post.mockRejectedValueOnce({ response: { data: { detail: 'Ошибка создания синтетического профиля' } } });
+    await openCreateDialog(user);
+    const dialog = screen.getByRole('dialog', { name: 'Новая вкладка' });
+    fireEvent.change(screen.getByLabelText('Уникальный ключ вкладки очереди'), { target: { value: 'synthetic_new' } });
+    fireEvent.change(screen.getByLabelText('Название вкладки очереди на английском'), { target: { value: 'Synthetic new direction' } });
+    fireEvent.change(screen.getByLabelText('Название вкладки очереди на русском'), { target: { value: 'Синтетическое новое направление' } });
+    await user.click(within(dialog).getByRole('button', { name: 'Создать вкладку очереди' }));
+    await screen.findByText('Ошибка создания синтетического профиля');
+    await user.keyboard('{Escape}');
+
+    const createAlert = screen.getByText('Ошибка создания синтетического профиля').closest('[role="alert"]')!;
+    expect(deleteAlert).toBeInTheDocument();
+    await user.click(within(createAlert as HTMLElement).getByRole('button', { name: 'Скрыть сообщение об ошибке' }));
+    expect(createAlert).not.toBeInTheDocument();
+    expect(deleteAlert).toBeInTheDocument();
+    await user.click(within(deleteAlert).getByRole('button', { name: 'Скрыть сообщение об ошибке' }));
+    expect(deleteAlert).not.toBeInTheDocument();
+  }, 15000);
+
+  it('localizes the single-delete refusal instead of displaying the server message', async () => {
+    const user = userEvent.setup();
+    await i18n.changeLanguage('en');
+    apiMock.delete.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            reason: 'profile_has_significant_links',
+            message: 'Профиль используется: архивируйте его (is_active=false) вместо удаления.',
+          },
+        },
+      },
+    });
+    render(<ThemeProvider><QueueProfilesManager /></ThemeProvider>);
+
+    const profile = await screen.findByText('Синтетическая активная очередь');
+    const row = profile.closest('tr')!;
+    await user.click(within(row).getByTitle('Удалить'));
+    const confirmation = screen.getByRole('dialog', { name: 'Удаление вкладки очереди' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Удалить' }));
+
+    expect(await screen.findByText('This profile is in use. Archive it instead of deleting it.')).toBeInTheDocument();
+    expect(screen.queryByText('Профиль используется: архивируйте его (is_active=false) вместо удаления.')).not.toBeInTheDocument();
+    expect(apiMock.delete).toHaveBeenCalledExactlyOnceWith('/queues/profiles/synthetic-active');
+  });
+
+  it('localizes the bulk-delete refusal in per-profile results', async () => {
+    const user = userEvent.setup();
+    await i18n.changeLanguage('en');
+    apiMock.delete.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            reason: 'profile_binding_changed',
+            message: 'Привязка направления изменилась во время удаления. Обновите страницу и повторите действие.',
+          },
+        },
+      },
+    });
+    await renderManager();
+
+    await user.click(screen.getByRole('button', { name: 'Выбрать вкладку Синтетическая активная очередь' }));
+    await user.click(screen.getByRole('button', { name: /^Удалить$/ }));
+    const confirmation = screen.getByRole('dialog', { name: 'Массовое удаление вкладок' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Удалить все' }));
+
+    const results = await screen.findByRole('region', { name: 'Operation results' });
+    const row = within(results).getByRole('listitem');
+    expect(row).toHaveTextContent('synthetic-active');
+    expect(row).toHaveTextContent('The direction binding changed while deleting this profile. Refresh the list and try again.');
+    expect(row).not.toHaveTextContent('Привязка направления изменилась во время удаления.');
+    expect(apiMock.delete).toHaveBeenCalledExactlyOnceWith('/queues/profiles/synthetic-active');
+  });
+
+  it('reports each bulk result and retries only the refused profile after rereading current state', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+
+    await user.click(screen.getByRole('button', { name: 'Выбрать вкладку Синтетическая активная очередь' }));
+    await user.click(screen.getByRole('button', { name: 'Выбрать вкладку Синтетическое неопубликованное направление' }));
+    apiMock.put.mockRejectedValueOnce({
+      response: { status: 409, data: { detail: { reason: 'profile_binding_changed', message: 'Связь профиля изменилась. Обновите список.' } } },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Архивировать выбранные профили' }));
+    const preview = await screen.findByRole('dialog', { name: 'Подтвердите массовое изменение' });
+    await user.click(within(preview).getByRole('button', { name: 'Продолжить' }));
+
+    await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(2));
+    const results = await screen.findByRole('region', { name: 'Результаты операции' });
+    expect(within(results).getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(within(results).getByText('synthetic-active')).toBeInTheDocument();
+    const resultRows = within(results).getAllByRole('listitem');
+    expect(resultRows).toHaveLength(2);
+    expect(resultRows[0]).toHaveTextContent('synthetic-active');
+    expect(resultRows[0]).toHaveTextContent('Отклонено');
+    expect(resultRows[0]).toHaveTextContent('Связь профиля изменилась. Обновите список.');
+    expect(resultRows[1]).toHaveTextContent('synthetic-unpublished');
+    expect(resultRows[1]).toHaveTextContent('Выполнено');
+
+    await user.click(within(results).getByRole('button', { name: 'Повторить оставшиеся после проверки' }));
+
+    await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(3));
+    expect(apiMock.put.mock.calls.filter(([url]) => url.endsWith('/synthetic-unpublished'))).toHaveLength(1);
+    expect(apiMock.get.mock.calls.filter(([url]) => url.startsWith('/queues/profiles'))).toHaveLength(5);
+    expect(within(results).getAllByRole('listitem').filter((row) => row.textContent?.includes('Выполнено'))).toHaveLength(2);
   });
 
   it('traps keyboard focus, closes on Escape, and restores focus to the opener', async () => {

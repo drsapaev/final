@@ -22,11 +22,12 @@ import logging
 import time
 from contextvars import ContextVar
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.core.activation_rate_limit import enforce_activation_budget
 from app.db.session import engine as _app_engine
 from app.schemas.setup import SetupInitializeIn, SetupInitializeOut, SetupStatusOut
 from app.services.setup_service import SetupService
@@ -93,6 +94,30 @@ def get_setup_status(db: Session = Depends(get_db)):
     "/initialize",
     response_model=SetupInitializeOut,
     summary="Initialize clinic deployment from first-run setup",
+    responses={
+        429: {
+            "description": "Activation attempt budget exceeded",
+            "headers": {
+                "Retry-After": {
+                    "schema": {"type": "string"},
+                    "description": "Seconds until retry",
+                }
+            },
+            "content": {"application/json": {"schema": {
+                "type": "object", "required": ["detail"],
+                "properties": {"detail": {"type": "string"}},
+            }}},
+        },
+        503: {
+            "description": "Activation temporarily unavailable",
+            "content": {"application/json": {"schema": {
+                "type": "object", "required": ["detail"],
+                "properties": {"detail": {"type": "string"}},
+            }}},
+        },
+    },
 )
-def initialize_setup(body: SetupInitializeIn, db: Session = Depends(get_db)):
+def initialize_setup(body: SetupInitializeIn, request: Request, db: Session = Depends(get_db)):
+    if body.activation_key:
+        enforce_activation_budget(request, db)
     return SetupService(db).initialize(body)

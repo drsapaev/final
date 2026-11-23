@@ -19,7 +19,7 @@ import {
   formatRegistrarTime,
   parseRegistrarTimestamp,
 } from '../utils/dateUtils';
-import { finalizePrintableWindow, openPrintableWindow } from '../utils/printWindow';
+import { finalizePrintableWindow, openPrintableWindow, type PrintableWindowResult } from '../utils/printWindow';
 
 function normalizePrintableDateString(value: unknown): string | null {
   if (value === null || value === undefined || value === '') {
@@ -95,39 +95,67 @@ function normalizeTimeOnly(value: unknown): string | null {
   return parsed ? formatPrintableTime(parsed) : null;
 }
 
-function formatTicketTimeWindow(row: Record<string, unknown>): string | null {
-  const fullDateTimeCandidate = getFirstDefined(
-    row?.appointment_time,
-    row?.queue_time,
-    row?.visit_datetime,
-    row?.created_at
-  );
-  const parsedFullDateTime = tryParsePrintableDate(fullDateTimeCandidate);
-  if (parsedFullDateTime) {
-    return formatPrintableDateTime(parsedFullDateTime);
+// REG-FE-081 (follow-up audit 2026-11-02): источник времени талона.
+// 'appointment'  — каноническое время приёма (appointment_time / visit_datetime);
+// 'scheduled'    — явно назначенный приём (visit_date [± visit_time]);
+// 'registration' — штамп регистрации в очереди (queue_time / created_at):
+//                  «время регистрации в очереди», НЕ время приёма — талон
+//                  обязан помечать его отдельной меткой, а не выдавать за приём.
+export type TicketTimeWindowSource = 'appointment' | 'scheduled' | 'registration' | null;
+
+export interface TicketTimeWindow {
+  value: string | null;
+  source: TicketTimeWindowSource;
+}
+
+function formatTicketTimeWindow(row: Record<string, unknown>): TicketTimeWindow {
+  // 1. Каноническое время приёма — выше всего.
+  const parsedAppointment = tryParsePrintableDate(row?.appointment_time);
+  if (parsedAppointment) {
+    return { value: formatPrintableDateTime(parsedAppointment), source: 'appointment' };
   }
 
+  // REG-FE-081: ЯВНО назначенный приём (visit_date + visit_time) теперь
+  // ВЫШЕ штампов регистрации/создания. Прежде очередь «впереди» явного
+  // назначения: пациент, записанный на 03.11 14:00, но зарегистрированный
+  // в очереди 02.11 09:00, получал на талоне штамп регистрации, а не время
+  // приёма. Формат «дд.мм.гггг чч:мм» сохранён.
   const visitDate = normalizeDateOnly(row?.visit_date);
   const visitTime = normalizeTimeOnly(row?.visit_time);
   if (visitDate && visitTime) {
-    return `${visitDate} ${visitTime}`;
+    return { value: `${visitDate} ${visitTime}`, source: 'scheduled' };
   }
-
   if (visitDate) {
-    return visitDate;
+    return { value: visitDate, source: 'scheduled' };
   }
 
+  // 2. Штампы регистрации/создания — ниже явного назначения. Помечаются
+  // источником 'registration': талон покажет их под меткой «Время
+  // регистрации» (см. renderPanelTicketMarkup), а не под «Дата и время».
+  const registrationCandidate = getFirstDefined(row?.queue_time, row?.created_at);
+  const parsedRegistration = tryParsePrintableDate(registrationCandidate);
+  if (parsedRegistration) {
+    return { value: formatPrintableDateTime(parsedRegistration), source: 'registration' };
+  }
+
+  // visit_datetime — datetime самой записи приёма (не штамп регистрации).
+  const parsedVisitDatetime = tryParsePrintableDate(row?.visit_datetime);
+  if (parsedVisitDatetime) {
+    return { value: formatPrintableDateTime(parsedVisitDatetime), source: 'appointment' };
+  }
+
+  // Хвостовые одиночные поля — как прежде, но с источником.
   const parsedVisitTime = tryParsePrintableDate(row?.visit_time);
   if (parsedVisitTime) {
-    return formatPrintableDateTime(parsedVisitTime);
+    return { value: formatPrintableDateTime(parsedVisitTime), source: 'scheduled' };
   }
 
   const parsedVisitDate = tryParsePrintableDate(row?.visit_date);
   if (parsedVisitDate) {
-    return formatPrintableDate(parsedVisitDate);
+    return { value: formatPrintableDate(parsedVisitDate), source: 'scheduled' };
   }
 
-  return null;
+  return { value: null, source: null };
 }
 
 function extractQueueNumberCandidate(value: unknown): string | null {
@@ -147,21 +175,30 @@ function extractQueueNumberCandidate(value: unknown): string | null {
 
   if (typeof value === 'object' && value !== null) {
     const obj = value as Record<string, unknown>;
+    // QUEUEPRINT-FE-003: a generic `obj.id` is the record's PK (the backend
+    // contract keeps a distinct pair OnlineQueueEntry.id vs .number) — a
+    // missing issued number cannot be derived from it.
     const direct = getFirstDefined(
       obj.queue_number,
       obj.number,
       obj.ticket_number,
       obj.queue_position,
       obj.queue_no,
-      obj.display_number,
-      obj.id
+      obj.display_number
     );
 
     if (direct !== null && direct !== undefined && direct !== '') {
       return String(direct);
     }
 
-    for (const nestedValue of Object.values(value)) {
+    for (const [nestedKey, nestedValue] of Object.entries(value)) {
+      // QUEUEPRINT-FE-003: identifier-keyed values (`id`, `queue_id`,
+      // `appointment_id`, `visit_id`, …) are never issued per-queue
+      // numbers — printing them as «Очередь №…» fabricates ticket identity
+      // from unrelated internal PKs.
+      if (nestedKey === 'id' || nestedKey.endsWith('_id')) {
+        continue;
+      }
       const nestedCandidate = extractQueueNumberCandidate(nestedValue);
       if (nestedCandidate !== null && nestedCandidate !== undefined && nestedCandidate !== '') {
         return String(nestedCandidate);
@@ -224,10 +261,16 @@ function getFirstDefined(...values: unknown[]): unknown {
   return null;
 }
 
+// REG-FE-082 (follow-up audit 2026-11-02): дефолты брендинга — ПУСТЫЕ.
+// Прежде дефолт подставлял «Programma Clinic» + '/static/logo.png':
+// при сбое настроек (или настройках без clinic_name) талон любой клиники
+// молча идентифицировал себя как Programma Clinic. Теперь дефолт ничего
+// не подменяет: имя/логотип появятся только из реальных настроек или из
+// снапшота строки (row.clinic_name / row.clinic_logo_url).
 function normalizeClinicBrandingSettings(settings: Record<string, unknown>): Record<string, unknown> {
   const normalized = {
-    clinic_name: 'Programma Clinic',
-    logo_url: '/static/logo.png',
+    clinic_name: '',
+    logo_url: '',
   };
 
   if (!Array.isArray(settings)) {
@@ -274,12 +317,16 @@ function resolveClinicLogo(row: Record<string, unknown>, overrides: Record<strin
 }
 
 function resolveClinicName(row: Record<string, unknown>, overrides: Record<string, unknown> = {}, branding: Record<string, unknown> = {}): unknown {
+  // REG-FE-082 (follow-up audit 2026-11-02): удалён финальный фолбэк
+  // 'Programma Clinic'. Раньше при недоступных настройках клиники (или
+  // настройках без clinic_name) ТАЛОН ДРУГОЙ КЛИНИКИ печатался под брендом
+  // «Programma Clinic» — подмена чужой идентичности без ведома оператора.
+  // Теперь пустое имя не подменяется: строка имени просто не печатается.
   return getFirstDefined(
     overrides.clinicName,
     row?.clinic_name,
     row?.clinic,
-    branding?.clinic_name,
-    'Programma Clinic'
+    branding?.clinic_name
   );
 }
 
@@ -547,12 +594,14 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
   const queueNumber = resolveQueueNumber(row);
   if (!queueNumber) {
     // Desk/laboratory visits never join the queue machinery (prod:
-    // queue_entries is empty by workflow — visits carry their own id), so
-    // a missing queue number is EXPECTED there. Fall back to the visit
-    // identifier instead of failing the print: "В-<id>" identifies the
-    // talon just as well for these flows. Only rows with no identifier at
-    // all still fail.
-    const visitFallback = getFirstDefined(row?.visit_id, row?.id);
+    // queue_entries is empty by workflow), so a missing queue number is
+    // EXPECTED there. QUEUEPRINT-FE-003: only an EXPLICIT `visit_id` proves
+    // the row is a queue-less VISIT — the visit identifier falls back to
+    // "В-<visit_id>" just as well for these flows. A generic `row.id` is
+    // NOT proven to be a Visit PK (appointment / payment / aggregate rows)
+    // and must never be fabricated into a visit talon; such rows fail
+    // honestly with a recoverable lookup instead.
+    const visitFallback = getFirstDefined(row?.visit_id);
     if (visitFallback === null || visitFallback === undefined || visitFallback === '') {
       logger.warn('[PanelPrint] Queue number missing in row payload', {
         rowKeys: row && typeof row === 'object' ? Object.keys(row) : [],
@@ -565,6 +614,7 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
     logger.info('[PanelPrint] No queue entry — printing visit-based talon', {
       visitId: visitFallback,
     });
+    const timeWindow = formatTicketTimeWindow(row);
     return {
       queue_number: `В-${visitFallback}`,
       doctor_name:
@@ -592,11 +642,14 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
       logo_url: getFirstDefined(overrides.logoUrl, row?.logo_url, row?.clinic_logo_url),
       service_price: resolveServicePrice(row, overrides),
       qr_payload: resolveQrPayload(row, overrides),
-      time_window: formatTicketTimeWindow(row),
+      // REG-FE-081: значение + источник (метка в шаблоне зависит от источника).
+      time_window: timeWindow.value,
+      time_window_source: timeWindow.source,
       printer_name: overrides.printerName || null
     };
   }
 
+  const timeWindow = formatTicketTimeWindow(row);
   return {
     queue_number: String(queueNumber),
     doctor_name:
@@ -625,7 +678,9 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
     logo_url: getFirstDefined(overrides.logoUrl, row?.logo_url, row?.clinic_logo_url),
     service_price: resolveServicePrice(row, overrides),
     qr_payload: resolveQrPayload(row, overrides),
-    time_window: formatTicketTimeWindow(row),
+    // REG-FE-081: значение + источник (метка в шаблоне зависит от источника).
+    time_window: timeWindow.value,
+    time_window_source: timeWindow.source,
     printer_name: overrides.printerName || null
   };
 }
@@ -685,12 +740,17 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
   const showPriceValue = settings.show_price && servicePrice !== null && servicePrice !== undefined && String(servicePrice) !== '' && Number(servicePrice) !== 0;
   const priceValue = showPriceValue ? formatMoney(servicePrice, 'UZS') : null;
 
+  // REG-FE-082: блок бренда рендерится только при честном имени/логотипе
+  // (реальные настройки или снапшот строки); пустые значения не
+  // подменяются посторонним брендом и не рисуют пустой блок.
+  // REG-FE-081: если источником времени стал штамп регистрации в очереди
+  // (queue_time/created_at) — метка «Время регистрации», не «Дата и время».
   return `
     <div class="ticket">
-      ${settings.show_clinic_name || settings.show_logo ? `
+      ${(settings.show_clinic_name && clinicName) || (settings.show_logo && logoUrl) ? `
         <div class="clinic-brand">
           ${settings.show_logo && logoUrl ? `<img class="clinic-logo" src="${escapeHtml(logoUrl)}" alt="Логотип клиники" />` : ''}
-          ${settings.show_clinic_name ? `<div class="clinic-name">${escapeHtml(clinicName)}</div>` : ''}
+          ${settings.show_clinic_name && clinicName ? `<div class="clinic-name">${escapeHtml(clinicName)}</div>` : ''}
         </div>
       ` : ''}
       ${settings.show_service_name ? `<div class="center service-name">${escapeHtml(payload.specialty_name)}</div>` : ''}
@@ -701,7 +761,11 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
       ${renderTicketMetadata('Врач', payload.doctor_name, settings.show_doctor_name)}
       ${renderTicketMetadata('Кабинет', payload.cabinet || 'Не указан', settings.show_cabinet)}
       ${renderTicketMetadata('Цена', priceValue, settings.show_price)}
-      ${renderTicketMetadata('Дата и время', payload.time_window, Boolean(payload.time_window))}
+      ${renderTicketMetadata(
+        payload.time_window_source === 'registration' ? 'Время регистрации' : 'Дата и время',
+        payload.time_window,
+        Boolean(payload.time_window)
+      )}
       ${renderTicketQrMarkup(qrPayload, settings.show_qr_code)}
       <div class="line"></div>
       ${settings.show_printed_at ? `
@@ -889,8 +953,14 @@ function renderPanelTicketErrorHtml(message: unknown, details: string = '') {
   `;
 }
 
-async function loadPanelTicketRenderContext(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Promise<any> {
-  const payloads = resolvePanelTicketPayloads(row, overrides);
+async function loadPanelTicketRenderContextForRows(
+  rows: Array<Record<string, unknown>>,
+  overrides: Record<string, unknown> = {}
+): Promise<any> {
+  // CSH-FE-045: контекст рендера умеет собирать НЕСКОЛЬКО строк в один
+  // документ (один запрос настроек на весь пакет) — основа для
+  // пакетной печати одним окном из прямого жеста пользователя.
+  const payloads = rows.flatMap((row) => resolvePanelTicketPayloads(row, overrides));
 
   const [ticketSettingsResult, clinicSettingsResult] = await Promise.allSettled([
     fetchTicketPrintSettings(),
@@ -902,12 +972,23 @@ async function loadPanelTicketRenderContext(row: Record<string, unknown>, overri
       ? normalizeTicketPrintSettings(ticketSettingsResult.value)
       : { ...TICKET_PRINT_SETTINGS_DEFAULTS };
 
+  // REG-FE-082: при сбое запроса настроек клиники талон печатается БЕЗ
+  // бренда (никакой «Programma Clinic»), с честным предупреждением в
+  // лог; имя/логотип берутся только из реальных настроек либо из
+  // снапшота строки (payload.clinic_name / payload.clinic_logo_url).
   const branding =
     clinicSettingsResult.status === 'fulfilled'
       ? normalizeClinicBrandingSettings(clinicSettingsResult.value)
-      : normalizeClinicBrandingSettings({});
+      : (() => {
+          logger.warn('[PanelPrint] Clinic settings unavailable — ticket will print unbranded');
+          return { clinic_name: '', logo_url: '' };
+        })();
 
   return { payloads, settings, branding };
+}
+
+async function loadPanelTicketRenderContext(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Promise<any> {
+  return loadPanelTicketRenderContextForRows([row], overrides);
 }
 
 export async function buildPanelTicketPrintableHtml(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Promise<any> {
@@ -915,10 +996,29 @@ export async function buildPanelTicketPrintableHtml(row: Record<string, unknown>
   return renderPanelTicketHtml(payloads, settings, branding);
 }
 
+// CSH-FE-045: HTML одного документа с несколькими талонами (по одному
+// .ticket-page на талон, page-break между ними — порядок печати задан
+// порядком строк в массиве).
+export async function buildPanelTicketsBatchPrintableHtml(
+  rows: Array<Record<string, unknown>>,
+  overrides: Record<string, unknown> = {}
+): Promise<any> {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('Пакетная печать: список талонов пуст');
+  }
+  const { payloads, settings, branding } = await loadPanelTicketRenderContextForRows(rows, overrides);
+  return renderPanelTicketHtml(payloads, settings, branding);
+}
+
 async function buildAndFinalizePanelTicketWindow(printWindow: Window, row: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
   const html = await buildPanelTicketPrintableHtml(row, overrides);
-  finalizePrintableWindow(printWindow, html, logger);
-  return { success: true };
+  // CSH-FE-044: успех талона теперь включает честный вызов print():
+  // printInvoked (синхронно прошёл) либо deferred (окно открыто, печать
+  // отложена). Исключение print() больше не маскируется под успех —
+  // вызывающий (кнопка «Печать», пакетная печать) видит провал и может
+  // оставить пользователю путь восстановления.
+  const fin = finalizePrintableWindow(printWindow, html, logger);
+  return { success: Boolean(fin.printInvoked || fin.deferred) };
 }
 
 function renderPrintableErrorWindow(printWindow: Window, error: unknown, row: Record<string, unknown>) {
@@ -953,8 +1053,8 @@ export async function printPanelTicketInBrowserAsync(row: Record<string, unknown
   }
 
   try {
-    await buildAndFinalizePanelTicketWindow(printWindow, row, overrides);
-    return { opened: true, success: true };
+    const fin = await buildAndFinalizePanelTicketWindow(printWindow, row, overrides);
+    return { opened: true, success: fin.success };
   } catch (error) {
     logger.error('[PanelPrint] Failed to build ticket preview', error);
     renderPrintableErrorWindow(printWindow, error, row);
@@ -962,9 +1062,54 @@ export async function printPanelTicketInBrowserAsync(row: Record<string, unknown
   }
 }
 
-export function printPanelTicketInBrowser(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): boolean {
-  void printPanelTicketInBrowserAsync(row, overrides);
-  return true;
+// CSH-FE-043: удалена «синхронная» обёртка printPanelTicketInBrowser,
+// которая запускала промис через void и НЕУСЛОВНО возвращала true —
+// её единственный живой потребитель (PaymentProviderDialog.printTicket)
+// проверял `if (!opened)` в недостижимой ветке. Потребители переведены на
+// await printPanelTicketInBrowserAsync (типизированный {opened, success}).
+
+// CSH-FE-045: пакетная печать одним документом. Окно открывается
+// СИНХРОННО в прямом жесте пользователя (клик «Печать всех»), до любых
+// сетевых запросов; заполнение и print() — позже (отсчёт/подготовка).
+// Прежде окно открывалось на 5с+800мс ПОСЛЕ клика — вне окна доверенной
+// активации, и popup-блокировщик отклонял окно.
+export function openPanelTicketBatchWindow(): Window | null {
+  const printWindow = window.open('', '_blank', 'width=420,height=720');
+  if (!printWindow) {
+    return null;
+  }
+  try {
+    printWindow.document.open();
+    printWindow.document.write(
+      '<!DOCTYPE html><html lang="ru"><head><title>Талоны</title></head>' +
+      '<body style="font-family: Arial, sans-serif; padding: 24px; color: #111827;">' +
+      '<p>Подготовка талонов к печати…</p></body></html>'
+    );
+    printWindow.document.close();
+  } catch {
+    // Плейсхолдер — best-effort: главное, окно уже открыто в жесте.
+  }
+  return printWindow;
+}
+
+// CSH-FE-045: заполнить уже открытое окно пакетом талонов и вызвать печать.
+export async function printPanelTicketsBatchInExistingWindow(
+  printWindow: Window | null,
+  rows: Array<Record<string, unknown>>,
+  overrides: Record<string, unknown> = {}
+): Promise<{ opened: boolean; success: boolean; error?: unknown }> {
+  if (!printWindow) {
+    return { opened: false, success: false, error: new Error('Окно пакетной печати не открыто') };
+  }
+  try {
+    const html = await buildPanelTicketsBatchPrintableHtml(rows, overrides);
+    const fin = finalizePrintableWindow(printWindow, html, logger);
+    return { opened: true, success: Boolean(fin.printInvoked || fin.deferred) };
+  } catch (error) {
+    logger.error('[PanelPrint] Failed to build batch ticket preview', error);
+    renderPrintableErrorWindow(printWindow, error, rows[0] ?? {});
+    return { opened: true, success: false, error };
+  }
 }
 
 export async function printPanelTicket(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Promise<any> {
@@ -1179,7 +1324,14 @@ export function buildPanelReceiptPrintableHtml(receiptPayload: Record<string, un
   `;
 }
 
-export function printPanelReceiptInBrowser(receiptPayload: Record<string, unknown>): boolean {
+// CSH-FE-044 (follow-up audit 2026-11-02): квитанция возвращает
+// типизированный исход печати (PrintableWindowResult), а не «true всегда».
+// Прежнее булево означало «окно открыто» даже когда print() бросил
+// исключение — кассирный путь (useCashierActions) на этом «успехе»
+// пропускал серверный PDF-fallback. printInvoked/deferred позволяют
+// вызывающему честно ветвиться (диалог открыт / печать не подтверждена /
+// вызов печати провалился → PDF).
+export function printPanelReceiptInBrowser(receiptPayload: Record<string, unknown>): PrintableWindowResult {
   return openPrintableWindow({
     features: 'width=720,height=900',
     html: buildPanelReceiptPrintableHtml(receiptPayload),

@@ -9,8 +9,8 @@ import gzip
 # the module of the same name). Using importlib avoids the shadowing.
 import importlib
 import json
-from datetime import UTC, date, datetime
-
+import logging
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -37,28 +37,32 @@ from app.db.session import get_db
 from app.schemas.authentication import RefreshTokenResponse
 from app.schemas.mobile import (
     AppointmentUpcomingOut,
-    MobileBookAppointmentRequest,
     LabResultOut,
     MobileAppointmentDetailOut,
     MobileAttestRequest,
+    MobileBookAppointmentRequest,
     MobileLoginRequest,
     MobileLoginResponse,
     MobileQuickStats,
     PatientProfileOut,
 )
-from app.services.mobile_api_service import MobileApiService
+from app.services.appointment_duration_snapshot import (
+    InvalidServiceSelection,
+    resolve_exact_service_selection,
+)
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # Функция для сжатия JSON ответов (будет использоваться в endpoints)
 def compress_json_response(data: dict) -> Response:
     """Сжимает JSON ответ если он большой"""
-    json_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
+    json_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
     if len(json_data) > 1024:  # Сжимаем только большие ответы
         compressed_data = gzip.compress(json_data)
@@ -89,6 +93,7 @@ def _get_mobile_notification_rows(
     NotificationEvent/NotificationDelivery (the canonical platform tables).
     """
     from app.models.user import User
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         return []
@@ -104,19 +109,49 @@ def _get_mobile_notification_rows(
     # показывало уведомления.
     items = result.get("items", [])
     # Apply offset manually since get_inbox uses cursor-based pagination
-    return items[offset:offset + limit] if items else []
+    return items[offset : offset + limit] if items else []
 
 
-@router.post("/auth/login", response_model=MobileLoginResponse)
-def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db)):
-    """
-    Мобильная аутентификация
+_MOBILE_LOGIN_ERROR = {
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "required": ["detail"],
+                "properties": {"detail": {"type": "string"}},
+            }
+        }
+    }
+}
 
-    Поддерживает:
-    - Вход по номеру телефона и паролю
-    - Вход через Telegram ID
-    - Регистрация нового пользователя
-    """
+
+@router.post(
+    "/auth/login",
+    response_model=MobileLoginResponse,
+    responses={
+        200: {
+            "headers": {
+                "Cache-Control": {
+                    "required": True,
+                    "schema": {"type": "string", "const": "no-store"},
+                }
+            }
+        },
+        400: {"description": "Unsupported login method", **_MOBILE_LOGIN_ERROR},
+        401: {
+            "description": "Invalid credentials or second factor",
+            **_MOBILE_LOGIN_ERROR,
+        },
+        500: {
+            "description": "Authentication service unavailable",
+            **_MOBILE_LOGIN_ERROR,
+        },
+    },
+)
+def mobile_login(
+    credentials: MobileLoginRequest, response: Response, db: Session = Depends(get_db)
+):
+    """Authenticate a linked active patient by phone/password and configured 2FA."""
     try:
         # Поиск пользователя по телефону или Telegram ID
         user = None
@@ -133,60 +168,105 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        # QD-1.1 (queue resource role cleanup, Codex round-1): the phone-based
-        # mobile login must reject internal-only sentinel roles exactly like
-        # the web funnels — synthetic queue-resource accounts are structural
-        # non-logins on every credential surface.
-        if is_login_blocked_role(getattr(user, "role", None)):
+        if (
+            not credentials.password
+            or not user.hashed_password
+            or not crud_user.verify_password(credentials.password, user.hashed_password)
+        ):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not credentials.password or not user.hashed_password:
+        # The password lookup and Patient relationship are hints until the
+        # account and card have been locked and re-read in revocation order.
+        expected_user_id, expected_patient_id = user.id, patient.id
+        expected_hash, expected_epoch = user.hashed_password, user.auth_epoch
+        from uuid import uuid4
+
+        from app.models.authentication import RefreshToken
+        from app.models.patient import Patient
+        from app.models.two_factor_auth import TwoFactorAuth
+        from app.models.user import User
+        from app.services.authentication_service import get_authentication_service
+        from app.services.two_factor_service import get_two_factor_service
+
+        user = (
+            db.query(User)
+            .filter(User.id == expected_user_id)
+            .with_for_update(key_share=True)
+            .populate_existing()
+            .first()
+        )
+        if (
+            user is None
+            or not user.is_active
+            or user.is_superuser
+            or user.role != "Patient"
+            or is_login_blocked_role(user.role)
+            or user.hashed_password != expected_hash
+            or user.auth_epoch != expected_epoch
+        ):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        patient = (
+            db.query(Patient)
+            .filter(Patient.id == expected_patient_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if (
+            patient is None
+            or patient.is_deleted is not False
+            or patient.user_id != user.id
+            or patient.phone != credentials.phone
+        ):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not crud_user.verify_password(credentials.password, user.hashed_password):
+        two_factor = (
+            db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user.id).first()
+        )
+        if two_factor and bool(two_factor.totp_enabled) != bool(
+            two_factor.totp_verified
+        ):
             raise HTTPException(status_code=401, detail="Invalid credentials")
+        if two_factor and two_factor.totp_enabled:
+            if not two_factor.totp_verified or not (
+                credentials.totp_code or credentials.backup_code
+            ):
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            success, _, _ = get_two_factor_service().verify_two_factor(
+                db,
+                user.id,
+                totp_code=credentials.totp_code,
+                backup_code=credentials.backup_code,
+                commit=False,
+            )
+            if not success:
+                raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        # Генерируем access token
-        access_token = crud_user.create_access_token(data={"sub": user.username})
-
-        # Issue refresh token so the mobile client can use /mobile/auth/refresh
-        # after the access token expires (default 30 min). Uses the same
-        # AuthenticationService.create_refresh_token() as web login, but does
-        # NOT call login_user() — mobile login has its own auth flow (phone
-        # search, no 2FA, no session fixation revocation).
-        refresh_token = None
-        try:
-            import uuid as _uuid
-            from datetime import UTC, datetime, timedelta
-
-            from app.models.authentication import RefreshToken
-            from app.services.authentication_service import get_authentication_service
-
-            auth_service = get_authentication_service()
-            jti = str(_uuid.uuid4())
-            refresh_token = auth_service.create_refresh_token(user.id, jti)
-            refresh_token_obj = RefreshToken(
+        # Rotate old sessions and consume a backup code in the same commit as
+        # the refresh-token record. A failure never returns a usable bearer.
+        auth_service = get_authentication_service()
+        auth_service.revoke_all_for_new_login_locked(db, user)
+        access_token = auth_service.create_access_token(
+            {"sub": str(user.id), "auth_epoch": user.auth_epoch}
+        )
+        jti = str(uuid4())
+        refresh_token = auth_service.create_refresh_token(
+            user.id, jti, auth_epoch=user.auth_epoch
+        )
+        db.add(
+            RefreshToken(
                 user_id=user.id,
                 token=refresh_token,
                 jti=jti,
                 expires_at=datetime.now(UTC)
                 + timedelta(days=auth_service.refresh_token_expire_days),
             )
-            db.add(refresh_token_obj)
-            db.commit()
-        except Exception as exc:
-            # If refresh token creation fails, still return access_token —
-            # the mobile client works for 30 min, just cannot refresh.
-            log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-
-        # Обновляем токен устройства
+        )
         if credentials.device_token:
-            MobileApiService(db).update_user_device_token(
-                user=user,
-                device_token=credentials.device_token,
-            )
+            user.device_token = credentials.device_token
+            user.push_notifications_enabled = True
 
-        return MobileLoginResponse(
+        result = MobileLoginResponse(
             access_token=access_token,
             refresh_token=refresh_token,
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -199,11 +279,16 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
             },
             permissions=crud_user.get_user_permissions(user),
         )
+        db.commit()
+        response.headers["Cache-Control"] = "no-store"
+        return result
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as exc:
-        log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
+        db.rollback()
+        logger.error("Mobile login failed: %s", type(exc).__name__)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -236,7 +321,9 @@ def mobile_refresh_token(
             "access_token": result["access_token"],
             "refresh_token": result.get("refresh_token") or refresh_token,
             "token_type": result.get("token_type", "bearer"),
-            "expires_in": result.get("expires_in", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60),
+            "expires_in": result.get(
+                "expires_in", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            ),
         }
 
     except HTTPException:
@@ -282,10 +369,11 @@ def get_mobile_patient_profile(
     except Exception as e:
         import logging
         import traceback
-        logging.getLogger(__name__).error('GET /patients/me failed: %s\n%s', e, traceback.format_exc())
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
+
+        logging.getLogger(__name__).error(
+            "GET /patients/me failed: %s\n%s", e, traceback.format_exc()
         )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/appointments/upcoming", response_model=list[AppointmentUpcomingOut])
@@ -315,7 +403,9 @@ def get_upcoming_appointments(
             if doctor is not None:
                 specialty = doctor.specialty or "Врач"
                 if doctor.user is not None:
-                    doctor_name = doctor.user.full_name or doctor.user.username or "Врач"
+                    doctor_name = (
+                        doctor.user.full_name or doctor.user.username or "Врач"
+                    )
 
             result.append(
                 AppointmentUpcomingOut(
@@ -335,10 +425,11 @@ def get_upcoming_appointments(
     except Exception as e:
         import logging
         import traceback
-        logging.getLogger(__name__).error('GET /appointments/upcoming failed: %s\n%s', e, traceback.format_exc())
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
+
+        logging.getLogger(__name__).error(
+            "GET /appointments/upcoming failed: %s\n%s", e, traceback.format_exc()
         )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/appointments/{appointment_id}", response_model=MobileAppointmentDetailOut)
@@ -393,9 +484,7 @@ def get_appointment_detail(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/appointments/book", response_model=AppointmentUpcomingOut)
@@ -462,29 +551,27 @@ async def book_mobile_appointment(
         # only Service.active == True rows, so a booking must never persist
         # an unavailable service; the former stub loop
         # (add_appointment_service) wrote nothing and is retired.
-        service_names: list[str] = []
-        if request.services:
-            from app.models.service import Service
-
-            service_rows = (
-                db.query(Service)
-                .filter(
-                    Service.id.in_(request.services),
-                    Service.active.is_(True),
-                )
-                .all()
+        try:
+            service_selection = resolve_exact_service_selection(
+                db,
+                request.services,
+                doctor_id=request.doctor_id,
             )
-            found_ids = {s.id for s in service_rows}
-            unavailable = [sid for sid in request.services if sid not in found_ids]
-            if unavailable:
+        except InvalidServiceSelection as exc:
+            if str(exc) == "service_not_found_or_inactive":
                 raise HTTPException(
                     status_code=400,
                     detail=(
                         "Услуги недоступны (не найдены или деактивированы): "
-                        f"{sorted(unavailable)}"
+                        f"{sorted(request.services)}"
                     ),
-                )
-            service_names = [s.name for s in service_rows]
+                ) from exc
+            raise HTTPException(
+                status_code=422,
+                detail={"code": str(exc), "field": "services"},
+            ) from exc
+        service_names = list(service_selection.names)
+        duration_minutes_snapshot = service_selection.duration_minutes_snapshot
 
         # Создаем запись. NOTE: the handler used to bind the wrong request
         # schema and referenced nonexistent Appointment columns (complaint,
@@ -503,12 +590,14 @@ async def book_mobile_appointment(
             "notes": "\n".join(notes_parts) or None,
             "status": "scheduled",
             "services": service_names,
+            "duration_minutes_snapshot": duration_minutes_snapshot,
         }
 
         appointment = crud_appointment.create_appointment(db, appointment_data)
 
         # PR-3: doctor lives in the doctors table, not users. Use clinic CRUD.
         from app.crud import clinic as crud_clinic
+
         doctor = crud_clinic.get_doctor_by_id(db, doctor_id=request.doctor_id)
         doctor_name = "Врач"
         specialty = "Врач"
@@ -520,7 +609,9 @@ async def book_mobile_appointment(
         # Отправляем уведомление
         # Используем notification_sender_service
         try:
-            await notification_sender_service.send_appointment_confirmation(db, appointment.id)
+            await notification_sender_service.send_appointment_confirmation(
+                db, appointment.id
+            )
         except Exception:
             pass  # Don't fail booking if notification fails
 
@@ -579,10 +670,11 @@ def get_lab_results(
     except Exception as e:
         import logging
         import traceback
-        logging.getLogger(__name__).error('GET /lab/results failed: %s\n%s', e, traceback.format_exc())
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
+
+        logging.getLogger(__name__).error(
+            "GET /lab/results failed: %s\n%s", e, traceback.format_exc()
         )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/stats", response_model=MobileQuickStats)
@@ -640,7 +732,10 @@ def get_mobile_quick_stats(
                 ).label("upcoming_count"),
                 func.max(
                     case(
-                        (Appointment.status.in_(completed_status_set), Appointment.appointment_date),
+                        (
+                            Appointment.status.in_(completed_status_set),
+                            Appointment.appointment_date,
+                        ),
                     )
                 ).label("last_visit_date"),
             )
@@ -683,9 +778,7 @@ def get_mobile_quick_stats(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/notifications", response_model=list[dict])
@@ -721,9 +814,7 @@ def get_mobile_notifications(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/notifications/{notification_id}/read", response_model=dict[str, Any])
@@ -752,9 +843,7 @@ async def mark_notification_read(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/health", response_model=dict[str, Any])
@@ -780,7 +869,7 @@ async def test_push_notification(
             title="Тестовое уведомление",
             message="Это тестовое push-уведомление от мобильного API",
             data={"test": "true", "timestamp": datetime.now(UTC).isoformat()},
-            db=db
+            db=db,
         )
 
         if success:
@@ -798,9 +887,7 @@ async def test_push_notification(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== PR-6: Missing endpoints ====================
@@ -820,6 +907,7 @@ def list_mobile_doctors(
     """
     try:
         from app.crud import clinic as crud_clinic
+
         # Lifecycle eligibility (Codex round-2 P2, refined round-7 P2): the
         # incomplete-profile ("general" sentinel) predicate is applied IN
         # THE DATABASE QUERY (eligible_only=True) — this list feeds the
@@ -828,12 +916,16 @@ def list_mobile_doctors(
         # the requested limit allowed more rows.
         if specialty:
             doctors = crud_clinic.get_doctors_by_specialty(
-                db, specialty=specialty, eligible_only=True,
+                db,
+                specialty=specialty,
+                eligible_only=True,
                 exclude_internal_only=True,
             )
         else:
             doctors = crud_clinic.get_doctors(
-                db, active_only=True, eligible_only=True,
+                db,
+                active_only=True,
+                eligible_only=True,
                 exclude_internal_only=True,
             )
         # Limit
@@ -844,22 +936,22 @@ def list_mobile_doctors(
             name = "Врач"
             if doctor.user is not None:
                 name = doctor.user.full_name or doctor.user.username or "Врач"
-            result.append({
-                "id": doctor.id,
-                "name": name,
-                "specialty": doctor.specialty,
-                "cabinet": doctor.cabinet,
-                "active": doctor.active,
-            })
+            result.append(
+                {
+                    "id": doctor.id,
+                    "name": name,
+                    "specialty": doctor.specialty,
+                    "cabinet": doctor.cabinet,
+                    "active": doctor.active,
+                }
+            )
         return result
 
     except HTTPException:
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/attest", response_model=dict[str, Any])
@@ -921,6 +1013,4 @@ def attest_device(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")

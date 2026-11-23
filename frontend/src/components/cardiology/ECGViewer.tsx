@@ -4,7 +4,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Просмотр и анализ ЭКГ файлов
  * Согласно MASTER_TODO_LIST строка 247
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Alert,
@@ -39,7 +39,8 @@ import { api } from '../../api/client';
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import { getErrorMessage } from '../../utils/errorHandler';
-import { parseECGFile, analyzeECGParameters } from './ECGParser';
+import { parseECGFile, analyzeECGParameters, toFiniteNumber } from './ECGParser';
+import { assertMedicalAiSafety } from '../../utils/aiSafety';
 
 
 const iconSize = 16;
@@ -49,6 +50,10 @@ interface EcgParameters {
   prInterval?: number;
   qrsInterval?: number;
   qtInterval?: number;
+  // ECGPARSER-FE-003 (audit 3886 round 25): the XML parser emits
+  // `qtcInterval` (device-measured corrected QT) — declared here so the
+  // structured persistence mapping can read it type-safely.
+  qtcInterval?: number;
   qtCorrected?: number;
   rhythm?: string;
   stSegment?: string;
@@ -281,6 +286,44 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   const [uploadProgress, setUploadProgress] = useState(0);
   const [ecgParameters, setEcgParameters] = useState<EcgParameters | null>(null);
 
+  // ECGVIEW-FE-002 (audit 3886 round 20): the viewer's local stores (file
+  // list, selected preview, parsed parameters, AI analysis) belong to one
+  // patient/visit context. When that context changes, the previous
+  // patient's local files and previews must disappear and any in-flight
+  // async work started for the old context must not commit into the new
+  // one. Async callbacks capture the epoch at request start and compare it
+  // against the live ref before every commit.
+  const ownerKey = `${String(patientId ?? 'none')}|${String(visitId ?? 'none')}`;
+  const ownerEpochRef = useRef(0);
+  const ownerKeyRef = useRef(ownerKey);
+  if (ownerKeyRef.current !== ownerKey) {
+    ownerKeyRef.current = ownerKey;
+    ownerEpochRef.current += 1;
+  }
+  const isStaleContext = (epochAtStart: number) => epochAtStart !== ownerEpochRef.current;
+
+  useEffect(() => {
+    // ECGVIEW-FE-002: reset every patient-scoped local store when the
+    // owner context changes (the tab may stay mounted across selections —
+    // EcgTab additionally keys this component by patient/visit).
+    setEcgFiles([]);
+    setSelectedFile(null);
+    setAnalysisResult(null);
+    setEcgParameters(null);
+    setAnalyzing(false);
+    setUploadProgress(0);
+    setViewerError('');
+    setViewerLoading(false);
+    setViewerOpen(false);
+    // viewerBlobUrl cleanup is handled by its own revoke effect below.
+    setViewerBlobUrl((prev) => {
+      if (prev) {
+        window.URL.revokeObjectURL(prev);
+      }
+      return null;
+    });
+  }, [ownerKey]);
+
   useEffect(() => () => {
     if (viewerBlobUrl) {
       window.URL.revokeObjectURL(viewerBlobUrl);
@@ -288,22 +331,39 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   }, [viewerBlobUrl]);
 
   // Поддерживаемые форматы
+  // ECGVIEW-FE-003 (audit 3886 round 20): `.xml` is accepted regardless of
+  // the MIME the browser reports (`text/xml`, `application/xml` or empty) —
+  // the parser dispatches by extension, so the upload gate must too.
   const acceptedFormats = {
     'application/pdf': ['.pdf'],
     'text/xml': ['.xml'],
+    'application/xml': ['.xml'],
     'application/scp': ['.scp'],
     'image/jpeg': ['.jpg', '.jpeg'],
     'image/png': ['.png'],
   };
 
+  // ECGVIEW-FE-003: extension-driven dispatch — a valid `.xml` file must
+  // reach the parser even when the browser tags it `application/xml` or
+  // leaves the MIME empty. MIME-only gating silently skipped parsing.
+  const shouldParseEcgFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    return name.endsWith('.xml') || name.endsWith('.scp');
+  };
+
   // Загрузка файлов
   const onDrop = async (acceptedFiles: File[]) => {
     for (const file of acceptedFiles) {
+      const epochAtStart = ownerEpochRef.current;
       setUploadProgress(0);
       
       try {
         const formData = new FormData();
-        formData.append('file', String(file));
+        // ECGVIEW-FE-001 (audit 3886 round 20): append the real binary File
+        // part (with its filename). `String(file)` serialized to the literal
+        // text "[object File]" and could never satisfy the backend's
+        // `UploadFile` multipart contract.
+        formData.append('file', file, file.name);
         formData.append('file_type', 'medical_record');
         formData.append('title', file.name);
         formData.append('tags', 'ecg,cardiology');
@@ -324,6 +384,10 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
           },
         });
         
+        // ECGVIEW-FE-002: the owner context may have changed while the
+        // upload was in flight — do not surface the old patient's file.
+        if (isStaleContext(epochAtStart)) return;
+        
         const responseData = response.data as Record<string, unknown>;
         const newFile: EcgFile = {
           id: responseData.id as string | number,
@@ -336,15 +400,17 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         
         setEcgFiles(prev => [...prev, newFile]);
         
-        // Если это SCP/XML, пытаемся парсить
-        if (file.type === 'text/xml' || file.name.endsWith('.scp')) {
+        // Если это SCP/XML, пытаемся парсить (ECGVIEW-FE-003: по расширению)
+        if (shouldParseEcgFile(file)) {
           await parseECGFileData(file, newFile);
         }
 
+        if (isStaleContext(epochAtStart)) return;
         setUploadProgress(0);
         onDataUpdate?.(undefined);
         
       } catch (error) {
+        if (isStaleContext(epochAtStart)) return;
         logger.error('Ошибка загрузки ЭКГ:', error);
         notify.error(getErrorMessage(error, t('cardio.cardio_ecg_upload_failed')));
         setUploadProgress(0);
@@ -360,6 +426,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
 
   // Парсинг ЭКГ файла
   const parseECGFileData = async (originalFile: File, uploadedFile: EcgFile) => {
+    const epochAtStart = ownerEpochRef.current;
     try {
       // Сначала пробуем локальный парсинг
       const parseResult = await parseECGFile(originalFile) as Record<string, unknown>;
@@ -371,6 +438,9 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
           ...analysis,
         };
         
+        // ECGVIEW-FE-002: a parse that started under patient A must not
+        // populate parameters or persist records after the context moved.
+        if (isStaleContext(epochAtStart)) return;
         setEcgParameters(enrichedParams as EcgParameters);
         
         // Обновляем файл с параметрами
@@ -389,32 +459,70 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         // to review the ECG; we surface a non-blocking toast instead.
         if (patientId) {
           try {
+            // ECGPARSER-FE-003 (audit 3886 round 25): canonical typed
+            // mapping for device measurements. The old payload read only
+            // `qrs_duration ?? qrsDuration` and `qt_corrected ??
+            // qtCorrected` — keys the parser never emits — so every parsed
+            // QRS/QTc silently disappeared from the structured
+            // cardio_ecg_records columns (the values survived only inside
+            // the raw `parameters` dict). The mapping now reads the
+            // parser's actual keys (`qrsInterval`, `qtcInterval`), keeps QT
+            // and QTc distinct sources, and normalizes each measurement to
+            // a finite number — never a fabricated one.
+            const p = enrichedParams as Record<string, unknown>;
+            const firstFiniteNumber = (...values: unknown[]): number | null => {
+              for (const value of values) {
+                const numeric = toFiniteNumber(value);
+                if (numeric !== null) return numeric;
+              }
+              return null;
+            };
+            const axisValue = toFiniteNumber(p.axis);
             await api.post('/cardio/ecg', {
               patient_id: Number(patientId),
               visit_id: visitId ? Number(visitId) : null,
               file_id: uploadedFile.id,
               ecg_date: new Date().toISOString().slice(0, 10),
-              heart_rate: (enrichedParams as Record<string, unknown>).heart_rate ?? (enrichedParams as Record<string, unknown>).heartRate ?? null,
-              pr_interval: (enrichedParams as Record<string, unknown>).pr_interval ?? (enrichedParams as Record<string, unknown>).prInterval ?? null,
-              qrs_duration: (enrichedParams as Record<string, unknown>).qrs_duration ?? (enrichedParams as Record<string, unknown>).qrsDuration ?? null,
-              qt_interval: (enrichedParams as Record<string, unknown>).qt_interval ?? (enrichedParams as Record<string, unknown>).qtInterval ?? null,
-              qt_corrected: (enrichedParams as Record<string, unknown>).qt_corrected ?? (enrichedParams as Record<string, unknown>).qtCorrected ?? null,
-              rhythm: (enrichedParams as Record<string, unknown>).rhythm ?? null,
-              st_segment: (enrichedParams as Record<string, unknown>).st_segment ?? (enrichedParams as Record<string, unknown>).stSegment ?? null,
-              t_wave: (enrichedParams as Record<string, unknown>).t_wave ?? (enrichedParams as Record<string, unknown>).tWave ?? null,
-              axis: (enrichedParams as Record<string, unknown>).axis ?? null,
-              interpretation: (enrichedParams as Record<string, unknown>).interpretation ?? null,
+              heart_rate: firstFiniteNumber(p.heart_rate, p.heartRate),
+              pr_interval: firstFiniteNumber(p.pr_interval, p.prInterval),
+              qrs_duration: firstFiniteNumber(p.qrs_duration, p.qrsDuration, p.qrsInterval),
+              qt_interval: firstFiniteNumber(p.qt_interval, p.qtInterval),
+              qt_corrected: firstFiniteNumber(p.qt_corrected, p.qtCorrected, p.qtcInterval),
+              rhythm: (p.rhythm as string | null | undefined) ?? null,
+              st_segment: ((p.st_segment ?? p.stSegment) as string | null | undefined) ?? null,
+              t_wave: ((p.t_wave ?? p.tWave) as string | null | undefined) ?? null,
+              axis: axisValue === null ? null : String(axisValue),
+              interpretation: (p.interpretation as string | null | undefined) ?? null,
               source: 'device',
               parameters: enrichedParams,
             });
+            if (isStaleContext(epochAtStart)) return;
             notify.success(t('final.ecg_saved'));
           } catch (persistError) {
+            if (isStaleContext(epochAtStart)) return;
             logger.error('Не удалось сохранить ЭКГ в истории пациента:', persistError);
             notify.error(t('final.ecg_not_saved'));
           }
         }
+      } else if (parseResult.success === false) {
+        // ECGPARSER-FE-001 (audit 3886 round 25): a failed parse must be a
+        // visible negative state for the doctor. Previously the failure was
+        // completely silent: an unrecognizable XML (or an unsupported
+        // binary) stayed in the file list as an ordinary attachment while
+        // nothing told the doctor that it was never analyzed and never
+        // persisted to the structured ECG history. This branch also
+        // finally surfaces the C-1 "SCP parsing not implemented" contract
+        // of parseSCPFile. View-only formats (PDF: success:true with
+        // parameters:null) intentionally stay silent.
+        if (isStaleContext(epochAtStart)) return;
+        logger.warn('Файл не распознан как ЭКГ:', {
+          fileName: originalFile?.name,
+          error: parseResult.error,
+        });
+        notify.warning(String(parseResult.error || t('final.ecg_parse_warning')));
       }
     } catch (error) {
+      if (isStaleContext(epochAtStart)) return;
       logger.error('Ошибка парсинга ЭКГ:', error);
       notify.warning(t('final.ecg_parse_warning'));
     }
@@ -450,6 +558,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
 
   // AI анализ ЭКГ
   const analyzeECG = async (file: EcgFile) => {
+    const epochAtStart = ownerEpochRef.current;
     setAnalyzing(true);
     setAnalysisResult(null);
     
@@ -460,21 +569,29 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         patient_id: patientId,
       })) as import('axios').AxiosResponse<Record<string, unknown>>;
       
+      // ECGVIEW-FE-002: an analysis for the previous patient's file must
+      // not render under the new context.
+      if (isStaleContext(epochAtStart)) return;
+      assertMedicalAiSafety(response.data);
       setAnalysisResult(response.data as unknown as AnalysisResult);
       onDataUpdate?.(undefined);
       
     } catch (error) {
+      if (isStaleContext(epochAtStart)) return;
       logger.error('Ошибка AI анализа:', error);
       setAnalysisResult({
         error: t('cardio.cardio_ecg_ai_failed'),
       });
     } finally {
-      setAnalyzing(false);
+      if (!isStaleContext(epochAtStart)) {
+        setAnalyzing(false);
+      }
     }
   };
 
   // Открыть просмотрщик
   const openViewer = async (file: EcgFile) => {
+    const epochAtStart = ownerEpochRef.current;
     setSelectedFile(file);
     setViewerOpen(true);
     setViewerLoading(true);
@@ -490,13 +607,22 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
       }
 
       const blobUrl = await openFileBlobUrl(file.id, 'preview');
+      // ECGVIEW-FE-002: a preview fetched for the previous patient must
+      // not open under the new context.
+      if (isStaleContext(epochAtStart)) {
+        window.URL.revokeObjectURL(blobUrl);
+        return;
+      }
       setViewerBlobUrl(blobUrl);
     } catch (error) {
+      if (isStaleContext(epochAtStart)) return;
       logger.info('Предпросмотр файла недоступен, используем только скачивание:', error);
       setViewerBlobUrl(null);
       setViewerError(t('cardio.cardio_ecg_preview_unavailable'));
     } finally {
-      setViewerLoading(false);
+      if (!isStaleContext(epochAtStart)) {
+        setViewerLoading(false);
+      }
     }
   };
 
@@ -512,11 +638,14 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
 
   // Удалить файл
   const deleteFile = async (fileId: string | number) => {
+    const epochAtStart = ownerEpochRef.current;
     try {
       await api.delete(`/files/${fileId}`);
+      if (isStaleContext(epochAtStart)) return;
       setEcgFiles(prev => prev.filter(f => f.id !== fileId));
       onDataUpdate?.(undefined);
     } catch (error) {
+      if (isStaleContext(epochAtStart)) return;
       logger.error('Ошибка удаления файла:', error);
       notify.error(t('final.ecg_delete_failed'));
     }
@@ -835,7 +964,12 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
                       <p style={styles.metricValue}>{t('cardio.cardio_ecg_ms_value', { count: ecgParameters.qtInterval })}</p>
                     </div>
 
-                    {ecgParameters.axis && (
+                    {/* RETRO-3972-02 (post-merge review 4000): a legally
+                        measured 0° axis is falsy — `axis && (...)` hid the
+                        «Электрическая ось сердца» card and leaked a bare "0"
+                        text node. Absence is null/undefined/''; 0 renders. */}
+                    {((ecgParameters.axis ?? null) !== null &&
+                      ecgParameters.axis !== '') && (
                       <div style={styles.metricCard}>
                         <p style={styles.caption}>{t('cardio.cardio_ecg_heart_axis')}</p>
                         <p style={styles.metricValue}>{ecgParameters.axis}°</p>

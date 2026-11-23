@@ -23,7 +23,8 @@ from uuid import uuid4
 
 import jwt
 import pytest
-from fastapi.testclient import TestClient
+from sqlalchemy.orm import sessionmaker
+from starlette.websockets import WebSocketDisconnect
 
 from app.db import session as session_module
 
@@ -32,10 +33,11 @@ def _suffix() -> str:
     return uuid4().hex[:10]
 
 
-def _make_jwt(*, sub: str | int = 1) -> str:
+def _make_jwt(*, sub: str | int = 1, auth_epoch: int = 0) -> str:
     from app.core.config import settings
     payload = {
         "sub": sub,
+        "auth_epoch": auth_epoch,
         "exp": datetime.now(timezone.utc) + timedelta(hours=1),
         "iat": datetime.now(timezone.utc),
         "jti": uuid4().hex,
@@ -45,22 +47,21 @@ def _make_jwt(*, sub: str | int = 1) -> str:
 
 @pytest.fixture(autouse=True)
 def _patch_session_local(db_session, monkeypatch):
-    """Make WS handlers' `SessionLocal()` return the test session."""
-    class _Factory:
-        def __call__(self):
-            return db_session
-
-        def close(self):
-            pass
-
-    factory = _Factory()
+    """Give WS handlers their own session on the fixture's test connection."""
+    factory = sessionmaker(
+        bind=db_session.connection(), expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
     monkeypatch.setattr(session_module, "SessionLocal", factory)
     import app.api.v1.endpoints.websocket_auth as _ws_auth
     monkeypatch.setattr(_ws_auth, "SessionLocal", factory)
 
 
-def test_ws_queue_rejects_no_token_even_with_ws_dev_allow(client, db_session, monkeypatch):
-    """/ws/queue with WS_DEV_ALLOW=1 but no token must be REJECTED.
+@pytest.mark.parametrize("token_kind", ["missing", "invalid", "username_only"])
+def test_ws_queue_rejects_bad_token_even_with_ws_dev_allow(
+    client, db_session, monkeypatch, token_kind
+):
+    """WS_DEV_ALLOW never grants access without a valid numeric user token.
 
     PR-5: WS_DEV_ALLOW no longer bypasses auth. It was a security risk
     because CI used it and the flag could leak to production.
@@ -68,11 +69,20 @@ def test_ws_queue_rejects_no_token_even_with_ws_dev_allow(client, db_session, mo
     monkeypatch.setenv("WS_DEV_ALLOW", "1")
     monkeypatch.delenv("TESTING", raising=False)
 
-    with pytest.raises(Exception):
-        with client.websocket_connect(
-            "/api/v1/ws/queue?department=cardiology&date=2026-01-01"
-        ) as ws:
+    headers = {"origin": "http://localhost:5173"}
+    if token_kind != "missing":
+        token = "invalid" if token_kind == "invalid" else _make_jwt(sub="retired-user")
+        headers["authorization"] = f"Bearer {token}"
+
+    with client.websocket_connect(
+        "/ws/queue?department=cardiology&date=2026-01-01",
+        headers=headers,
+    ) as ws:
+        assert ws.receive_json() == {"type": "error", "reason": "auth required"}
+        with pytest.raises(WebSocketDisconnect) as exc:
             ws.receive_json()
+        assert exc.value.code == 1008
+
 
 
 def test_ws_noauth_endpoint_removed(client, monkeypatch):
@@ -99,17 +109,22 @@ def test_ws_noauth_endpoint_removed(client, monkeypatch):
 
 
 def test_ws_queue_accepts_valid_token_without_ws_dev_allow(client, db_session, monkeypatch):
-    """/ws/queue with valid JWT but WS_DEV_ALLOW unset → accepted (regression).
+    """A real doctor token opens the authorized room without WS_DEV_ALLOW."""
+    from unittest.mock import AsyncMock
 
-    PR-5: removing the bypass must NOT break legitimate auth. Connection
-    should be accepted. In TESTING=1 mode _auth_ok returns True, so the
-    connection gets past auth. It may still close later for other reasons
-    (heartbeat, etc.) — that's fine, we only verify auth didn't block it.
-    """
+    from app.api.v1.endpoints import websocket_auth
+    from app.ws import queue_ws
     from app.core.security import get_password_hash
+    from app.models.clinic import Doctor
+    from app.models.department import Department
     from app.models.user import User
 
     monkeypatch.delenv("WS_DEV_ALLOW", raising=False)
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("ENV", "dev")
+    monkeypatch.setattr(websocket_auth, "QUEUE_WS_AUTH_RECHECK_SECONDS", 0.05)
+    monkeypatch.setattr(queue_ws.ws_manager, "_ensure_room_subscription", AsyncMock())
+    monkeypatch.setattr(queue_ws.ws_manager, "_remove_room_subscription", AsyncMock())
 
     suffix = _suffix()
     user = User(
@@ -124,27 +139,34 @@ def test_ws_queue_accepts_valid_token_without_ws_dev_allow(client, db_session, m
     db_session.commit()
     db_session.refresh(user)
 
-    token = _make_jwt(sub=user.username)
-    # In TESTING mode, _auth_ok returns True regardless. The point of this
-    # test is that removing WS_DEV_ALLOW doesn't break the endpoint —
-    # the connection should at least be established (no immediate 4401
-    # rejection). We accept any outcome (message, close, or disconnect)
-    # as long as it's not an auth-required rejection.
-    try:
-        with client.websocket_connect(
-            f"/api/v1/ws/queue?department=cardiology&date=2026-01-01&token={token}",
-        ) as ws:
-            try:
-                msg = ws.receive_json()
-                # If we got a message, it must NOT be an auth error
-                assert not (msg.get("type") == "error" and "auth" in msg.get("reason", "").lower()), \
-                    f"Auth rejected despite valid token: {msg}"
-            except Exception:
-                pass  # Disconnect is fine
-    except Exception:
-        # In TESTING mode the connection should be accepted. If it's
-        # rejected, that's a regression — but we can't easily distinguish
-        # auth rejection from other close codes here. Pass the test since
-        # the main bypass-removal test (test_ws_queue_rejects_no_token...)
-        # already proves WS_DEV_ALLOW no longer bypasses.
-        pass
+    # WS-POSTMERGE-03: a doctor-family role owns rooms through its Doctor
+    # row. The department 'cardiology' room is joined through the row's
+    # Department key, so seed the ownership SSOT for this principal.
+    department = Department(key="cardiology", name_ru=f"SYNTH-cardiology-{suffix}", active=True)
+    db_session.add(department)
+    db_session.commit()
+    db_session.refresh(department)
+    doctor = Doctor(
+        user_id=user.id,
+        specialty="cardio",
+        department_id=department.id,
+        active=True,
+    )
+    db_session.add(doctor)
+    db_session.commit()
+
+    token = _make_jwt(sub=str(user.id), auth_epoch=user.auth_epoch)
+    room = "cardiology::2026-01-01"
+    with client.websocket_connect(
+        "/ws/queue?department=cardiology&date=2026-01-01",
+        headers={
+            "origin": "http://localhost:5173",
+            "authorization": f"Bearer {token}",
+        },
+    ) as ws:
+        assert ws.receive_json() == {"type": "queue.connected", "room": room}
+        assert room in queue_ws.ws_manager.rooms
+        assert ws.receive_json()["type"] == "ping"
+        ws.send_json({"type": "pong"})
+        assert ws.receive_json()["type"] == "ping"
+    assert room not in queue_ws.ws_manager.rooms

@@ -1,0 +1,95 @@
+{
+  "task": "T19 unified registrar tabs",
+  "sourceCommit": "5a209da6bbe016a9540dd231d85b48603ce7c0e1",
+  "project": "clinic-t19-p4117-5a209-r2",
+  "checks": [
+    {
+      "name": "admin normal TOTP enrollment",
+      "result": "PASS"
+    },
+    {
+      "name": "admin password and TOTP login",
+      "result": "PASS"
+    },
+    {
+      "name": "initial legacy state",
+      "result": "PASS"
+    },
+    {
+      "name": "synthetic typed targets available",
+      "result": "PASS"
+    },
+    {
+      "name": "profile initially visible",
+      "result": "PASS"
+    },
+    {
+      "name": "profile hide selected",
+      "result": "PASS"
+    },
+    {
+      "name": "admin UI save accepted",
+      "result": "PASS"
+    },
+    {
+      "name": "mixed order rename and hide persisted",
+      "result": "PASS"
+    },
+    {
+      "name": "new doctor does not auto-append",
+      "result": "PASS"
+    },
+    {
+      "name": "stale version refused",
+      "result": "PASS"
+    },
+    {
+      "name": "admin UI save accepted",
+      "result": "PASS"
+    },
+    {
+      "name": "explicit show persisted",
+      "result": "PASS"
+    },
+    {
+      "name": "registrar API mixed order",
+      "result": "PASS"
+    },
+    {
+      "name": "registrar write denied",
+      "result": "PASS"
+    },
+    {
+      "name": "registrar UI mixed order",
+      "result": "PASS"
+    },
+    {
+      "name": "admin UI save accepted",
+      "result": "PASS"
+    },
+    {
+      "name": "explicit empty registry",
+      "result": "PASS"
+    },
+    {
+      "name": "staff empty registry",
+      "result": "PASS"
+    },
+    {
+      "name": "queue and entry identity snapshot",
+      "result": "NOT_RUN",
+      "note": "parent must compare seed.py snapshots"
+    },
+    {
+      "name": "browser asset bytes match verified manifest",
+      "result": "NOT_RUN"
+    },
+    {
+      "name": "no browser page errors",
+      "result": "PASS"
+    }
+  ],
+  "result": "PARTIAL",
+  "pageErrors": 0,
+  "consoleErrors": 7
+}

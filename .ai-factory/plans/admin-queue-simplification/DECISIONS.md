@@ -1,7 +1,21 @@
+## D-T19-STAGING-RECOVERY — сохранять окружение при ошибке — 2026-11-19
+
+Явное решение пользователя: если проверка собственного синтетического staging остановилась из-за ошибки, сохранять проект и его данные для диагностики, исправлять причину и продолжать оставшиеся проверки в том же окружении. Перед `Start` и `Session` задавать `KEEP_STAGING=1` в окружении запускающего процесса и записывать проект, владельца, срок жизни и причину в checkpoint. Не сбрасывать и не засевать существующую базу повторно без проверки состояния. Успешная `Session` удаляет собственный проект; после неё проверить очистку и удалить его синтетический env. Проверки принадлежности, актуальности кода и изоляции не обходятся. Выбор не разрешает production, изменения реальных данных или бессрочное накопление забытых проектов.
+
+## T19 — единые вкладки — 2026-11-16
+
+D-T19 implemented: internal Registrar tabs have one explicit configuration in ClinicSettings registrar_tabs_v1 with typed profile/doctor IDs, order, visibility and optional custom label. QueueProfile/Doctor/queue records are not tab entities. First save explicitly fixes legacy snapshot; future targets do not auto-add. Empty saved list stays empty. profile_filters preserve old dept links; missing selected filter is visible and cleared only by the user.
+
 # Decisions and contract
 
 Plan version: 2.9
 Last updated: 2026-10-04T08:31:13+05:00
+
+## D6 — T18 Tier-2 disposition — 2026-10-29
+
+- **Decision source:** explicit user instruction: keep Tier-2 partial and continue under the existing plan.
+- **Meaning:** preserve T18 as `PARTIAL`; this does not accept a staging deferral, waive the T18 acceptance criteria, complete the plan, or establish production readiness. Existing individual PASS/NOT_RUN evidence remains unchanged.
+- **Execution boundary:** this checkpoint runs no new staging project and does not alter runtime, PR, merge, deployment, or the plan's acceptance criteria. The full `STAGING_VALIDATION.md` remains required before production deployment.
 
 ## Current execution instruction
 
@@ -210,3 +224,30 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - **Publication readiness:** assess each hidden profile as the sole hypothetical published candidate against the current catalog; other hidden profiles remain hidden. Reuse the snapshot's preloaded availability, owner scopes, and eligible specialties.
 - **Precreate owner matching:** detect existing queues by (owner_type, owner_id, queue_tag) for the selected target owner. A same-tag queue for another owner does not satisfy or block this target.
 - **Precreate field meaning:** can_precreate describes policy feasibility from the active service/resource-or-explicit-doctor owner. state and existing_daily_queue_ids describe whether that exact typed owner/tag queue exists for the selected day; therefore an eligible policy with an existing exact-day queue is can_precreate=true, state=already_exists.
+
+## T15 — URL and typed return-context contract — 2026-10-19
+
+- **Destination-specific validation:** each editor accepts only entity kinds it can safely interpret: queue profile/tag in queue-profile management, service/tag in the service catalog, and doctor/tag in user management. Queue resources remain within the existing setup resources section and are not forwarded to unrelated editors. Return targets are built only from the fixed setup path and validated page state.
+- **Duplicate query fields:** repeated setup state or return-context fields are malformed. The setup page clears repeated day/profile values and normalizes repeated section values to checklist; editor return links are hidden when their context contains duplicate fields.
+
+- **Setup-page query state:** `/admin/setup-directions` owns `profile`, `section`, and `day`. `profile` is an optional canonical `QueueProfile.key`; `section` is the closed set `checklist | resources` and defaults to `checklist`; `day` is an optional real ISO calendar date `YYYY-MM-DD`. An absent day means the T13 endpoint's clinic-local current day; the browser must not infer that date.
+- **Removed local workflow state:** the five-step executor/services/display/verify/QR wizard, its `step`, `axis`, and `tag`, and any local “complete” flags are not persisted or recreated. Completion remains derived from T13 facts and `allowed_next_actions`.
+- **Editor return context:** outgoing links may carry `setupReturn=queue-directions-v1`, `setupProfile`, `setupSection`, and optional `setupDay`; `setupEntityKind` is a closed enum (`queue_profile | queue_tag | service | doctor | queue_resource`) with a corresponding `setupEntityKey` for profile/tag keys or positive `setupEntityId` for numeric service/doctor/resource IDs. An entity is included only when the current server action identifies it unambiguously.
+- **Fixed internal destinations:** `service-catalog` maps only to `/admin/services?servicesTab=catalog`; `queue-profiles` maps only to `/admin/services?servicesTab=queue-profiles`; `user-management` maps only to `/admin/users`. These destinations are selected by code, never read as an arbitrary redirect URL. Return links always target the fixed `/admin/setup-directions` route and serialize only validated profile/section/day values.
+- **Reload and mutation behavior:** setup-page URL is the source of selected profile, section, and day. Re-entering through a typed return link or browser history restores that URL and re-reads T13 facts; saving or cancelling an editor never marks a step complete locally. Existing Admin guards and the existing UserModal doctor-onboarding flow remain unchanged.
+- **Unknown input:** invalid dates are ignored; unknown sections fall back to `checklist`; a profile key absent from fresh T13 facts does not select another profile; malformed or unknown return contexts render no return action. No auth/RBAC/API/backend/database behavior changes are authorized by T15.
+
+## T18 — Narrow QueueProfile parent-conflict repair — 2026-10-24
+
+- **Decision source:** the user explicitly approved the source-grounded narrow repair proposal and then said “GO”.
+- **Allowed repair:** only clear a conflicting explicit `QueueProfile.department_key` so the existing `QueueProfile.key` → same-key Department convention becomes authoritative. The existing availability resolver stays unchanged. The command does not accept an arbitrary target parent.
+- **Required flow:** Admin-only read-only preview, then explicit apply bound to a fresh preview fingerprint, fixed reason code, and target confirmation. A stale or mismatched preview returns 409. T10's ordinary PUT guard remains unchanged.
+- **Impact confirmation:** preview reports linked entity counts, services entering/leaving Department scope, and whether the canonical public selector would restore QR/permanent-address booking. Apply requires explicit confirmations for reported service-scope changes and restored public access.
+- **Preservation:** no service row, queue owner/tag/row, issued number, patient entry/status/time, public address, token, publication flag, or QueueProfile tags are changed. The profile field update and strict audit row are committed atomically.
+- **Out of scope:** no arbitrary parent selection, resolver precedence change, migration, new entity, queue ownership/routing change, provisioning/retirement of addresses, clinical record change, merge, or deployment.
+
+## T18 queue-profile deletion refusal localization — 2026-10-29T15:42+05:00
+
+- Technical implementation choice (not a new product decision): map only the existing delete refusal codes `profile_has_significant_links` and `profile_binding_changed` to localized messages in the single-delete and bulk-delete UI. Preserve the backend contract and deletion/archive behavior; unknown error codes continue to use the existing server-message/fallback behavior.
+- Languages covered: `ru`, `en`, `kk`, `uz-Cyrl`, and `uz-Latn`. The in-use refusal explicitly tells the administrator to archive the profile instead of deleting it.
+- Tier-2 remains `PARTIAL` by user direction. This UI follow-up is not a Tier-2 pass, deferral, waiver, or acceptance of the outstanding live specs.

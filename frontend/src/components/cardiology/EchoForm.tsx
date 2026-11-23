@@ -4,7 +4,7 @@
  * Форма для ввода результатов ЭхоКГ
  * Phase 3: stale MASTER_TODO_LIST reference removed.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -26,7 +26,7 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 import type { HttpApiError } from '../../types/errors';
 
 // === Domain types ===
@@ -78,6 +78,15 @@ export interface EchoFormProps {
   initialData?: Partial<EchoData> | null;
   [key: string]: unknown;
 }
+
+/** UI_AUDIT_PLAN Phase 0 ratchet: shared style constant instead of
+ * another inline `style={{…}}` literal. */
+const ALERT_MARGIN_STYLE: React.CSSProperties = { marginBottom: 16 };
+
+/** RETRO-3941-02: same ratchet rule for the hydration-failure alert's icon
+ * and retry button. */
+const HYDRATION_ALERT_ICON_STYLE: React.CSSProperties = { width: 16, height: 16, marginRight: 8 };
+const RETRY_BUTTON_STYLE: React.CSSProperties = { marginLeft: 12 };
 
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
@@ -203,10 +212,44 @@ function buildEchoEmrPayload(existingEmr: Record<string, unknown> | null, echoDa
 const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFormProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
   const [echoData, setEchoData] = useState<EchoData>(DEFAULT_ECHO_DATA as EchoData);
+  // RETRO-3947-01 (post-merge review of PR 3947, dossier PR 3958): mirror of the
+  // visible form data so async hydration handlers can read the doctor's
+  // CURRENT draft without stale render closures.
+  const echoDataRef = useRef<EchoData>(DEFAULT_ECHO_DATA as EchoData);
+  const applyEchoData = (next: EchoData) => {
+    echoDataRef.current = next;
+    setEchoData(next);
+  };
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // ECHO-FE-001 (audit 3886 round 20): hydration and dirty tracking.
+  // The form previously initialized blank and hydrated ONLY from an
+  // `initialData` prop that no caller passed, while Save unconditionally
+  // replaced `specialty_data.echo` with the local state — an untouched
+  // Save could wipe stored EF/EDD/conclusion with a blank revision.
+  const [hydrating, setHydrating] = useState(false);
+  const [info, setInfo] = useState('');
+  const dirtyRef = useRef(false);
+  const formEpochRef = useRef(0);
+  // RETRO-3941-02 (post-merge review of PR 3941): a hydration failure of the
+  // canonical EMR must fail CLOSED — the stored echo subtree is unknown, so
+  // a blank/partial local form may never overwrite it. Save stays blocked
+  // until a canonical load succeeds (Retry re-runs it via hydrationAttempt).
+  const [hydrationFailed, setHydrationFailed] = useState(false);
+  const [hydrationAttempt, setHydrationAttempt] = useState(0);
+  // RETRO-3941-03: edits are counted per form epoch so a save that lands
+  // AFTER newer edits never clears the dirty flag for them.
+  const editEpochRef = useRef(0);
+  // RETRO-3947-01: while the canonical EMR state is UNKNOWN (a failed
+  // hydration or a retry GET in flight), edits typed by the doctor form a
+  // LOCAL DRAFT that must survive the retry — tracked per touched field
+  // path so a successful retry can overlay exactly those fields on the
+  // freshly loaded canonical data instead of silently discarding them.
+  const canonicalUnknownRef = useRef(false);
+  const draftTouchedRef = useRef<Set<string>>(new Set());
+  const lastVisitIdRef = useRef<string | number | null | undefined>(undefined);
   const [expandedSections, setExpandedSections] = useState({
     leftVentricle: true,
     rightVentricle: false,
@@ -216,21 +259,133 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   });
 
   useEffect(() => {
+    // Explicit initialData still wins: callers that own the data pass it.
     if (initialData) {
-      setEchoData(deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, initialData as Record<string, unknown>) as EchoData);
+      applyEchoData(deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, initialData as Record<string, unknown>) as EchoData);
+      canonicalUnknownRef.current = false;
+      draftTouchedRef.current.clear();
+      setHydrationFailed(false);
+      return;
     }
-  }, [initialData]);
+
+    const epoch = ++formEpochRef.current;
+    // RETRO-3947-01: a local draft belongs to ONE visit lifecycle — a visit
+    // switch voids it (the draft would belong to the previous visit).
+    if (lastVisitIdRef.current !== visitId) {
+      lastVisitIdRef.current = visitId;
+      draftTouchedRef.current.clear();
+    }
+    // RETRO-3947-01: the pre-existing dirty reset must not wipe a draft
+    // that this very retry is about to re-hydrate.
+    if (draftTouchedRef.current.size === 0) {
+      dirtyRef.current = false;
+    }
+
+    if (!visitId) {
+      applyEchoData(DEFAULT_ECHO_DATA as EchoData);
+      setInfo('');
+      canonicalUnknownRef.current = false;
+      draftTouchedRef.current.clear();
+      setHydrationFailed(false);
+      return;
+    }
+
+    // ECHO-FE-001: hydrate from the canonical EMR draft for this visit so
+    // the doctor sees the stored echo measurements before any save.
+    // RETRO-3947-01: the canonical state is unknown for the whole duration
+    // of this attempt (first load AND retries) — edits made meanwhile are
+    // tracked as a draft, never silently discarded by the result.
+    canonicalUnknownRef.current = true;
+    setHydrating(true);
+    setInfo('');
+    setSuccess('');
+    setError('');
+    setHydrationFailed(false);
+    loadExistingEmrDraft(visitId)
+      .then((existing) => {
+        if (epoch !== formEpochRef.current) return; // visit switched mid-flight
+        const storedData = (existing as Record<string, unknown> | null)?.data as Record<string, unknown> | undefined;
+        const specialtyData = storedData?.specialty_data as Record<string, unknown> | undefined;
+        const storedEcho = specialtyData?.echo;
+        const serverBase = (storedEcho && typeof storedEcho === 'object'
+          ? deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, storedEcho as Record<string, unknown>)
+          : { ...(DEFAULT_ECHO_DATA as Record<string, unknown>) }) as EchoData;
+        if (draftTouchedRef.current.size > 0) {
+          // RETRO-3947-01: the doctor typed while the canonical state was
+          // unknown. Overlay ONLY the touched draft fields on the freshly
+          // loaded canonical data: no silent data loss, and no wholesale
+          // draft either (which would blank untouched stored fields). The
+          // form stays dirty and the notice says so honestly.
+          const merged: Record<string, unknown> = { ...(serverBase as Record<string, unknown>) };
+          for (const path of draftTouchedRef.current) {
+            if (path === 'conclusion') {
+              // Top-level scalar field, not a section.
+              merged.conclusion = echoDataRef.current.conclusion;
+              continue;
+            }
+            const separator = path.indexOf('.');
+            const section = path.slice(0, separator);
+            const field = path.slice(separator + 1);
+            const draftValue = getNestedValue(echoDataRef.current[section], field);
+            merged[section] = setNestedValue(
+              (merged[section] as Record<string, unknown>) || {},
+              field,
+              draftValue
+            );
+          }
+          applyEchoData(merged as EchoData);
+          dirtyRef.current = true;
+          setInfo(t('cardio.cardio_echo_draft_preserved'));
+        } else {
+          applyEchoData(serverBase);
+          dirtyRef.current = false;
+        }
+        draftTouchedRef.current.clear();
+        canonicalUnknownRef.current = false;
+        setHydrationFailed(false);
+      })
+      .catch(() => {
+        if (epoch !== formEpochRef.current) return;
+        // RETRO-3941-02: fail CLOSED. The canonical echo subtree could not
+        // be read (transient 5xx / network error): we do not know what is
+        // stored, so the blank local form must not be savable — a save
+        // would overwrite every stored field it did not hydrate. Surface
+        // the failure, block Save and offer an explicit retry.
+        // RETRO-3947-01: a failed retry must not destroy the typed draft
+        // either — the draft survives until a canonical load succeeds;
+        // with no draft the previous blank-reset behavior applies.
+        if (draftTouchedRef.current.size === 0) {
+          applyEchoData(DEFAULT_ECHO_DATA as EchoData);
+          dirtyRef.current = false;
+        }
+        setHydrationFailed(true);
+      })
+      .finally(() => {
+        if (epoch === formEpochRef.current) {
+          setHydrating(false);
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `t` is a stable i18n lookup; adding it would re-trigger the canonical hydration on every render.
+  }, [visitId, initialData, hydrationAttempt]);
 
   const handleChange = (section: string, field: string, value: unknown) => {
-    setEchoData((prev) => ({
-      ...prev,
-      [section]: field.includes('.')
-        ? setNestedValue((prev[section] || {}) as Record<string, unknown>, field, value)
-        : {
+    dirtyRef.current = true;
+    editEpochRef.current += 1; // RETRO-3941-03: count every edit
+    // RETRO-3947-01: edits typed while the canonical EMR state is unknown
+    // (failed hydration or retry GET in flight) form a local draft that
+    // must survive the retry — remember the touched field path.
+    if (canonicalUnknownRef.current) {
+      draftTouchedRef.current.add(`${section}.${field}`);
+    }
+    setInfo('');
+    const prev = echoDataRef.current;
+    const nextSection = field.includes('.')
+      ? setNestedValue((prev[section] || {}) as Record<string, unknown>, field, value)
+      : {
           ...((prev[section] as Record<string, unknown>) || {}),
           [field]: value
-        }
-    }));
+        };
+    applyEchoData({ ...prev, [section]: nextSection } as EchoData);
   };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -241,9 +396,15 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   };
 
   const handleSave = async () => {
+    const epoch = formEpochRef.current;
+    // RETRO-3941-03: snapshot the edit counter at submission start. If the
+    // doctor edits while the GET/POST is in flight, the request persists
+    // this submitted snapshot — the newer values must stay marked unsaved.
+    const editEpochAtSubmit = editEpochRef.current;
     try {
       setLoading(true);
       setError('');
+      setInfo('');
 
       if (!visitId) {
         if (onSave) {
@@ -254,10 +415,46 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         throw new Error('visit_id is required to save Echo results');
       }
 
+      // ECHO-FE-001: a blank/unhydrated form must never be able to
+      // overwrite the stored echo subtree — block Save until the canonical
+      // EMR state for this visit has been loaded.
+      // RETRO-3941-02: a FAILED hydration is just as unknown as a pending
+      // one — Save stays blocked until Retry loads the canonical state.
+      if (hydrating || hydrationFailed) {
+        setInfo(t('cardio.cardio_echo_loading_existing'));
+        return;
+      }
+
       const existingEmr = await loadExistingEmrDraft(visitId);
+
+      // ECHO-FE-001: pristine form + existing echo subtree → nothing to
+      // change; skip the POST instead of writing an identical (or blank)
+      // new revision of the EMR.
+      const storedData = (existingEmr as Record<string, unknown> | null)?.data as Record<string, unknown> | undefined;
+      const existingEcho = (storedData?.specialty_data as Record<string, unknown> | undefined)?.echo;
+      const hasExistingEcho = Boolean(existingEcho && typeof existingEcho === 'object');
+      if (!dirtyRef.current && hasExistingEcho) {
+        setInfo(t('cardio.cardio_echo_no_changes'));
+        return;
+      }
+
       const response = await api.post(`/v2/emr/${visitId}`, buildEchoEmrPayload(existingEmr, echoData));
 
+      if (epoch !== formEpochRef.current) return; // visit switched mid-save
+
       if (response.status === 200) {
+        if (editEpochRef.current !== editEpochAtSubmit) {
+          // RETRO-3941-03: edits happened after the submission started. The
+          // POST persisted the submitted snapshot, NOT the values now on
+          // screen: keep the form dirty, say so honestly, and require a
+          // follow-up save. Never clear dirty tracking for edits the
+          // request could not have carried.
+          dirtyRef.current = true;
+          setInfo(t('cardio.cardio_echo_saved_stale_edit'));
+          return;
+        }
+        // The server-side state now matches the form: reset dirty tracking.
+        dirtyRef.current = false;
         setSuccess(t('cardio.cardio_echo_saved_success'));
         if (onSave) {
           onSave(response.data?.data?.specialty_data?.echo || echoData);
@@ -265,10 +462,14 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         onDataUpdate?.();
       }
     } catch (err) {
-      setError(t('cardio.cardio_echo_save_error'));
+      if (epoch === formEpochRef.current) {
+        setError(t('cardio.cardio_echo_save_error'));
+      }
       logger.error('Echo form save error:', err);
     } finally {
-      setLoading(false);
+      if (epoch === formEpochRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -344,10 +545,10 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={loading}>
+              disabled={loading || hydrating || hydrationFailed}>
               
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
-              {t('cardio.cardio_echo_save_button')}
+              {hydrating ? t('cardio.cardio_echo_loading_existing') : t('cardio.cardio_echo_save_button')}
             </Button>
           </div>
         </div>
@@ -363,6 +564,29 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         <Alert severity="success" style={{ marginBottom: 16 }}>
             <CheckCircle style={{ width: 16, height: 16, marginRight: 8 }} />
             {success}
+          </Alert>
+        }
+
+        {/* ECHO-FE-001: hydration/no-change status is informational. */}
+        {info && !success && !error &&
+        <Alert severity="info" style={ALERT_MARGIN_STYLE}>
+            {info}
+          </Alert>
+        }
+
+        {/* RETRO-3941-02: a failed canonical load fails closed — visible
+            failure + explicit retry, Save blocked in between. */}
+        {hydrationFailed &&
+        <Alert severity="error" style={ALERT_MARGIN_STYLE}>
+            <AlertTriangle style={HYDRATION_ALERT_ICON_STYLE} />
+            {t('cardio.cardio_echo_hydration_error')}
+            <Button
+              variant="outline"
+              size="small"
+              style={RETRY_BUTTON_STYLE}
+              onClick={() => setHydrationAttempt((attempt) => attempt + 1)}>
+              {t('cardio.cardio_echo_retry')}
+            </Button>
           </Alert>
         }
 
@@ -447,7 +671,17 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           </Typography>
           <Textarea
             value={echoData.conclusion}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setEchoData((prev) => ({ ...prev, conclusion: e.target.value }))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+              dirtyRef.current = true;
+              editEpochRef.current += 1; // RETRO-3941-03: count every edit
+              // RETRO-3947-01: conclusion edits made while the canonical
+              // state is unknown are part of the retry-surviving draft.
+              if (canonicalUnknownRef.current) {
+                draftTouchedRef.current.add('conclusion');
+              }
+              setInfo('');
+              applyEchoData({ ...echoDataRef.current, conclusion: e.target.value });
+            }}
             placeholder={t('cardio.cardio_echo_ph_conclusion')}
             rows={6} />
           

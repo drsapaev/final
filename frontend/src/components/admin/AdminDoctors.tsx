@@ -22,7 +22,7 @@ import {
 } from '../ui/macos';
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
-import React from "react";
+import React from 'react';
 import type { Doctor } from '../../types/domain/clinic';
 
 interface DepartmentOption {
@@ -393,7 +393,7 @@ const AdminDoctors = () => {
                       </Badge>
                     </td>
                     <td className="admin-patients-td">
-                      {doctor.experience ? t('admin2.ad_experience_years', { count: doctor.experience }) : t('admin2.ad_not_specified')}
+                      {doctor.experience_years != null ? t('admin2.ad_experience_years', { count: doctor.experience_years }) : t('admin2.ad_not_specified')}
                     </td>
                     <td className="admin-p-12-16">
                       <Badge variant={doctor.active ? 'success' : 'warning'}>

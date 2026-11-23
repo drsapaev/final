@@ -7,7 +7,7 @@
  * H6 fix: status / color / label / FDI-number constants now imported
  * from dentalConstants.js (SSOT) instead of being redefined here.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Card,
@@ -55,52 +55,76 @@ export interface ToothData {
 export type TeethChartMap = Record<string, ToothData>;
 
 export interface TeethChartProps {
-  /** Called whenever a tooth is clicked. Receives the tooth number and its current data. */
-  onToothClick?: (toothNumber: number, toothData: ToothData) => void;
-  /** Initial per-tooth state (typically loaded from EMR specialty_data.tooth_status). */
+  /** Called whenever a tooth is clicked. Receives the tooth number, its current data and the palette-suggested status. */
+  onToothClick?: (toothNumber: number, toothData: ToothData, suggestedStatus?: string) => void;
+  /**
+   * Read-only inspection callback (DENTCHART-FE-002, audit 3886): the ONLY
+   * callback invoked when readOnly=true. It can never reach the parent EMR
+   * mutation path, so a locked chart stays inspectable without becoming
+   * editable.
+   */
+  onInspect?: (toothNumber: number, toothData: ToothData) => void;
+  /**
+   * Controlled Clear All (DENTCHART-FE-003, audit 3886): notifies the owner
+   * that the whole chart was cleared, so the canonical
+   * specialty_data.tooth_status is emptied too — not just the local copy.
+   */
+  onClearAll?: () => void;
+  /** Current per-tooth state (typically loaded from EMR specialty_data.tooth_status). */
   initialData?: TeethChartMap;
-  /** When true, the chart only emits clicks without mutating internal state. */
+  /** When true, the chart never invokes onToothClick; only onInspect may fire (inspection). */
   readOnly?: boolean;
   /** Optional patient ID (passed through for downstream consumers). */
   patientId?: string | number | null;
   [key: string]: unknown;
 }
 
-const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethChartProps) => {
+const TeethChart = ({ onToothClick, onInspect, onClearAll, initialData = {}, readOnly = false }: TeethChartProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
+  // DENTVISIT-FE-003 (audit 3892): the chart is a VIEW of the canonical
+  // specialty_data.tooth_status. It never paints a status on click — the
+  // status only changes after the parent commits a confirmed modal save,
+  // which lands here as a new initialData reference.
   const [teethData, setTeethData] = useState<TeethChartMap>(initialData);
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>(TOOTH_STATUS.CARIES);
   const [viewMode, setViewMode] = useState('adult'); // adult, child
   const [zoom, setZoom] = useState(1);
 
+  // Follow the canonical per-tooth state whenever the parent's data changes
+  // (e.g. a confirmed ToothModal save updates specialty_data.tooth_status).
+  useEffect(() => {
+    setTeethData(initialData);
+  }, [initialData]);
+
   // Обработка клика по зубу
   const handleToothClick = (toothNumber: number) => {
+    // DENTVISIT-FE-003 (audit 3892): a click only SELECTS the tooth and emits
+    // its CURRENT data plus the palette-suggested status for the modal to
+    // confirm. The displayed status is never mutated before that
+    // confirmation, so cancelling the modal leaves no inconsistent chart.
     if (readOnly) {
-      onToothClick && onToothClick(toothNumber, teethData[toothNumber] || {});
+      // DENTCHART-FE-002 (audit 3886): a read-only chart must never reach the
+      // parent EMR mutation callback — not by pointer and not by keyboard
+      // activation of a focused tooth button. Inspection stays available
+      // through the dedicated onInspect callback plus each tooth's
+      // title/aria-label.
+      onInspect?.(toothNumber, teethData[String(toothNumber)] || {});
       return;
     }
-
     setSelectedTooth(toothNumber);
-
-    // Обновляем статус зуба
-    const newData: TeethChartMap = {
-      ...teethData,
-      [String(toothNumber)]: {
-        ...(teethData[String(toothNumber)] || {}),
-        status: selectedStatus,
-        updatedAt: new Date().toISOString()
-      }
-    };
-
-    setTeethData(newData);
-    onToothClick && onToothClick(toothNumber, newData[String(toothNumber)]);
+    onToothClick && onToothClick(toothNumber, teethData[String(toothNumber)] || {}, selectedStatus);
   };
 
   // Очистить все данные
   const handleClearAll = () => {
+    // DENTCHART-FE-003 (audit 3886): Clear All is a CONTROLLED chart
+    // mutation. Clearing only the local copy left the canonical
+    // specialty_data.tooth_status untouched, so a refresh silently restored
+    // every "cleared" caries/implant label.
     setTeethData({});
     setSelectedTooth(null);
+    onClearAll?.();
   };
 
   // Отрисовка одного зуба
@@ -139,7 +163,11 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
             justifyContent: 'center',
             cursor: 'pointer'
           }}
-          disabled={readOnly && !onToothClick}>
+          disabled={readOnly && !onInspect}>
+          {/* RETRO-3966-01 (review 3968): the disabled contract is honest by
+              itself — a readOnly chart without an inspection handler renders
+              DISABLED teeth, never enabled-but-dead ones. With onInspect the
+              tooth stays clickable for inspection only. */}
           
           {status === TOOTH_STATUS.MISSING ?
           <X /> :
