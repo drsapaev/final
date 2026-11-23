@@ -839,6 +839,20 @@ Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '•••567',
   `frontend/src/services/sentry.ts`. The two lists are intentionally
   separate (frontend covers auth tokens + payment fields per BS-57).
 
+### Public-site analytics through Nginx
+
+Before enabling collection behind an Nginx config from this repo, run
+`bash scripts/smoke_test_public_site_analytics_proxy.sh` from the release
+checkout. Use an isolated Linux or WSL Docker environment with the
+`nginx:1.27-alpine` image already available.
+
+The probe uses synthetic requests and checks that the collector is absent
+from both configured access logs. It also checks that nearby paths remain
+logged and that the proxy forwards the same request to the backend.
+Validate error logs and any external ingress separately. The clinic's
+Windows production API uses Cloudflare Tunnel, so its HTTP logging and
+monitoring settings require their own evidence.
+
 ---
 
 ## Check 8 — Pre-commit hooks installed
