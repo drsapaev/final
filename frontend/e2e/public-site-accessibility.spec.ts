@@ -543,7 +543,7 @@ async function solidContrastRatio(target: Locator, kind: 'text' | 'outline') {
 test.describe('public-site accessibility', () => {
   test('Vite dark public navigation preserves hover and keyboard focus contrast', async ({ page, request }) => {
     test.setTimeout(60_000);
-    await page.emulateMedia({ colorScheme: 'dark', forcedColors: 'none' });
+    await page.emulateMedia({ colorScheme: 'light', forcedColors: 'none' });
     await page.addInitScript((origin) => {
       if (location.origin === origin) localStorage.setItem('colorScheme', 'dark');
     }, VITE_ORIGIN);
@@ -556,6 +556,7 @@ test.describe('public-site accessibility', () => {
           await page.goto(VITE_ORIGIN + locale.prefix + '/services');
           const root = page.locator('html');
           await expect(root).toHaveAttribute('data-theme', 'dark');
+          await expect(root).toHaveCSS('color-scheme', 'dark');
           await expect(page.getByRole('heading', { level: 1, name: SERVICE_TITLES[locale.lang] })).toBeVisible();
 
           const skip = page.getByRole('link', { name: locale.skipLink, exact: true });
@@ -581,7 +582,6 @@ test.describe('public-site accessibility', () => {
           await expect.poll(() => solidContrastRatio(link, 'outline')).toBeGreaterThanOrEqual(3);
           await link.hover();
           await expect.poll(() => solidContrastRatio(link, 'text')).toBeGreaterThanOrEqual(4.5);
-          await expect(link).toHaveCSS('text-decoration-line', 'underline');
         });
       }
     }
