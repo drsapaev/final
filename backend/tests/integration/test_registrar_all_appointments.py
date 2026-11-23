@@ -935,6 +935,7 @@ class TestRegistrarAllAppointments:
             ("diagnostics", 409),
             ("in_progress", 409),
             ("called", 409),
+            ("unknown_state", 409),
         ],
     )
     def test_start_queue_visit_checks_unlinked_status(
