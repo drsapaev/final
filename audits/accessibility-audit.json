@@ -509,5 +509,23 @@
       "limits": "These sampled points in touch-emulated Chromium and Firefox do not measure full hit-region boundaries or the native select popup. Physical devices and WCAG conformance remain open."
     },
     "limitations": "Evidence covers the listed synthetic pages and sampled states. Full WCAG 2.2 AA, screen-reader speech, native mobile browsers, physical devices and other desktop configurations remain open."
+  },
+  "orca_speech_follow_up": {
+    "date": "2026-11-23",
+    "application_sha": "3552d1119b421186f4b0d0665d391bb4e7db7fca",
+    "runtime": "Fresh Nitro build with the repository's loopback synthetic catalogue in a disposable Ubuntu 24.04 container. The runtime had no external network.",
+    "browser": "Chrome 153.0.8010.12",
+    "screen_reader": "Orca 46.1 with Speech Dispatcher and eSpeak NG",
+    "status": "uzbek_skip_navigation_confirmed; russian_and_independent_heading_checks_open",
+    "method": "Use a private Orca profile with automatic page reading turned off. Send native X11 keyboard events to headed Chromium. Correlate DOM focus, Orca focus-driven output and matching Speech Dispatcher queue acknowledgments after each action.",
+    "routes": [
+      {
+        "path": "/services",
+        "locale": "uz-Latn",
+        "first_tab": "Orca sent Asosiy mazmunga o‘tish to the speech queue after the skip link received focus.",
+        "enter": "Focus moved to main#main-content. Orca sent main content to the speech queue."
+      }
+    ],
+    "limits": "This verifies speech text and focus for the tested skip navigation. The Russian route and independent heading navigation remain open. The final repeat timed out during installation of the disposable container's packages. The owned containers were removed. Physical sound, pronunciation, Windows Narrator, native Safari, physical devices and full WCAG 2.2 AA conformance remain open."
   }
 }
