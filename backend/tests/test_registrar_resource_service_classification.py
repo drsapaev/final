@@ -104,7 +104,7 @@ def _doctor(db_session, *, username: str, specialty: str = "cardiology") -> Doct
     return doctor
 
 
-def _cart(patient_id: int, service_id: int, doctor_id: int | None) -> dict:
+def _cart(patient_id: int, service_id: int, doctor_id: int | None, visit_day: date) -> dict:
     return {
         "patient_id": patient_id,
         "discount_mode": "none",
@@ -112,7 +112,7 @@ def _cart(patient_id: int, service_id: int, doctor_id: int | None) -> dict:
         "visits": [
             {
                 "doctor_id": doctor_id,
-                "visit_date": date.today().isoformat(),
+                "visit_date": visit_day.isoformat(),
                 "department": "echokg",
                 "services": [{"service_id": service_id, "quantity": 1}],
             }
@@ -160,7 +160,7 @@ def test_k10_resource_service_books_without_doctor_into_resource_queue(
     response = client.post(
         "/api/v1/registrar/cart",
         headers=_headers(admin_user),
-        json=_cart(test_patient.id, service.id, None),
+        json=_cart(test_patient.id, service.id, None, clinic_today(db_session)),
     )
     assert response.status_code == 200, response.text
 
@@ -169,7 +169,7 @@ def test_k10_resource_service_books_without_doctor_into_resource_queue(
     queue = (
         db_session.query(DailyQueue)
         .filter(
-            DailyQueue.day == date.today(),
+            DailyQueue.day == visit.visit_date,
             DailyQueue.queue_tag == service.queue_tag,
         )
         .one()
@@ -197,7 +197,7 @@ def test_k10_resource_service_with_doctor_fails_closed(
     response = client.post(
         "/api/v1/registrar/cart",
         headers=_headers(admin_user),
-        json=_cart(test_patient.id, service.id, doctor.id),
+        json=_cart(test_patient.id, service.id, doctor.id, clinic_today(db_session)),
     )
     assert response.status_code == 409, response.text
     assert "ресурсная" in response.json()["detail"]
@@ -223,7 +223,7 @@ def test_k10_resource_service_specialty_never_blocks_the_resource_surface(
     response = client.post(
         "/api/v1/registrar/cart",
         headers=_headers(admin_user),
-        json=_cart(test_patient.id, service.id, None),
+        json=_cart(test_patient.id, service.id, None, clinic_today(db_session)),
     )
     assert response.status_code == 200, response.text
 
@@ -256,7 +256,7 @@ def test_doctor_owned_requires_doctor_service_still_requires_a_doctor(
     response = client.post(
         "/api/v1/registrar/cart",
         headers=_headers(admin_user),
-        json=_cart(test_patient.id, service.id, None),
+        json=_cart(test_patient.id, service.id, None, clinic_today(db_session)),
     )
     assert response.status_code == 400, response.text
     assert "требует выбора врача" in response.json()["detail"]
