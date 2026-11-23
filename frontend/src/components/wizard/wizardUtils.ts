@@ -1545,8 +1545,18 @@ export const getWizardServiceTabFilter = (
   };
 };
 
+/** Explicit catalog routing tags can be more specific than a legacy specialty category. */
+export const queueTagToWizardCategory = (value: unknown): 'laboratory' | 'procedures' | null => {
+  const tag = String(value ?? '').trim().toLowerCase();
+  if (tag === 'lab' || tag === 'laboratory') return 'laboratory';
+  if (tag === 'procedures' || tag === 'procedure') return 'procedures';
+  return null;
+};
+
 export const serviceCodeToWizardCategory = (value: unknown): 'laboratory' | 'procedures' | 'specialists' | null => {
-  const prefix = String(value || '').trim().toUpperCase().charAt(0);
+  const code = String(value || '').trim().toUpperCase();
+  if (/^D_PROC\d+$/u.test(code)) return 'procedures';
+  const prefix = code.charAt(0);
   if (prefix === 'L') return 'laboratory';
   if (prefix === 'P' || prefix === 'C') return 'procedures';
   if (prefix === 'K' || prefix === 'D' || prefix === 'S') return 'specialists';
@@ -1573,7 +1583,7 @@ export const resolveInitialServiceCategory = (
   activeTabValue: unknown = ''
 ): 'laboratory' | 'procedures' | 'specialists' => {
   const firstItem = (Array.isArray(items) ? items : []).find(Boolean) as ServiceItemLike | undefined;
-  const itemCategory = serviceCodeToWizardCategory(
+  const itemCategory = queueTagToWizardCategory(firstItem?.queue_tag) ?? serviceCodeToWizardCategory(
     firstItem?.service_code || firstItem?.code || firstItem?._temp_name || firstItem?.service_name
   );
   return itemCategory || activeTabToWizardCategory(activeTabValue);
@@ -1584,10 +1594,10 @@ export const resolveInitialServiceCategory = (
 // =====================================================================
 
 export const categories = [
-  { id: 'specialists', label: 'Специалисты', icon: Stethoscope },
-  { id: 'laboratory', label: 'Лаборатория', icon: FlaskConical },
-  { id: 'procedures', label: 'Процедуры', icon: Syringe },
-  { id: 'other', label: 'Прочее', icon: ClipboardList },
+  { id: 'specialists', labelKey: 'misc.aw_category_specialists', icon: Stethoscope },
+  { id: 'laboratory', labelKey: 'misc.aw_category_laboratory', icon: FlaskConical },
+  { id: 'procedures', labelKey: 'misc.aw_category_procedures', icon: Syringe },
+  { id: 'other', labelKey: 'misc.aw_category_other', icon: ClipboardList },
 ];
 
 // =====================================================================
