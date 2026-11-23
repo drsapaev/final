@@ -28,7 +28,9 @@ trap 'exit 1' HUP INT TERM
 cat > "$fixture/nginx.conf" <<'NGINX'
 worker_processes 1;
 pid /tmp/analytics-proxy/nginx.pid;
-error_log /tmp/analytics-proxy/error.log;
+error_log /tmp/analytics-proxy/error-primary.log;
+error_log /tmp/analytics-proxy/error-secondary.log;
+error_log stderr;
 events {}
 http {
     access_log /tmp/analytics-proxy/access-primary.log combined;
@@ -45,6 +47,9 @@ http {
         listen 127.0.0.1:18000;
         access_log off;
         location / {
+            if ($arg_failure = upstream-close) {
+                return 444;
+            }
             return 200 "$request_method|$request_uri|$http_host|$http_x_real_ip|$http_x_forwarded_for|$http_x_forwarded_proto|$http_content_length|$server_protocol";
         }
     }
@@ -70,6 +75,16 @@ probe_post() {
     fi
 }
 
+probe_bad_gateway() {
+    target=$1
+    if response=$(wget -S -T 5 -O /dev/null --header="Host: $host" \
+        --post-data=site_view "http://127.0.0.1$target" 2>&1) ||
+        ! printf '%s\n' "$response" | grep -Eq 'HTTP/1\.[01] 502([[:space:]]|$)'; then
+        echo "FAIL $variant: synthetic upstream close did not return 502" >&2
+        exit 1
+    fi
+}
+
 for variant in docker staging vps; do
     expected_forwarded="$forwarded, 127.0.0.1"
     protocol=HTTP/1.1
@@ -85,7 +100,9 @@ for variant in docker staging vps; do
     fi
     : > "$fixture/access-primary.log"
     : > "$fixture/access-secondary.log"
-    nginx -p "$fixture/" -c "$fixture/nginx.conf" -g 'daemon off;' > /dev/null 2>&1 &
+    : > "$fixture/error-primary.log"
+    : > "$fixture/error-secondary.log"
+    nginx -p "$fixture/" -c "$fixture/nginx.conf" -g 'daemon off;' > "$fixture/error-stderr.log" 2>&1 &
     pid=$!
     for attempt in 1 2 3 4 5; do
         if wget -q -T 1 -O /dev/null http://127.0.0.1:18000/ready 2>/dev/null; then break; fi
@@ -102,6 +119,10 @@ for variant in docker staging vps; do
     probe_post "$collector-extra?check=neighbor-canary"
     probe_post "$collector/info?check=nested-canary"
     probe_post '/api/v1/health?check=health-canary'
+    probe_bad_gateway "$collector?failure=upstream-close&check=collector-error-canary"
+    probe_bad_gateway "$collector/?failure=upstream-close&check=collector-error-canary"
+    probe_bad_gateway "$encoded?failure=upstream-close&check=collector-error-canary"
+    probe_bad_gateway "$collector-extra?failure=upstream-close&check=neighbor-error-canary"
     stop_proxy
 
     logged=0
@@ -113,12 +134,28 @@ for variant in docker staging vps; do
                 exit 1
             fi
         done
-        logged=$((logged + $(grep -Fc 'check=collector-canary' "$log" || :)))
+        logged=$((logged + $(grep -Ec 'check=collector(-error)?-canary' "$log" || :)))
     done
     if [ "$logged" -eq 0 ]; then
         echo "PASS $variant: forwarding intact, controls present and collector absent in both sinks"
     else
         echo "FAIL $variant: $logged collector entries across both access-log sinks" >&2
+        failed=1
+    fi
+
+    logged=0
+    for sink in primary secondary stderr; do
+        log="$fixture/error-$sink.log"
+        if ! grep -Fq 'check=neighbor-error-canary' "$log"; then
+            echo "FAIL $variant: missing neighboring upstream error-log control in $sink" >&2
+            exit 1
+        fi
+        logged=$((logged + $(grep -Fc 'check=collector-error-canary' "$log" || :)))
+    done
+    if [ "$logged" -eq 0 ]; then
+        echo "PASS $variant: upstream 502 preserved, neighboring error present and collector absent in all error sinks"
+    else
+        echo "FAIL $variant: $logged collector entries across all error sinks" >&2
         failed=1
     fi
 done
