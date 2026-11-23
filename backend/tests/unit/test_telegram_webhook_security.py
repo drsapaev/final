@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
+from sqlalchemy import func
 
 from app.api.v1.endpoints import admin_telegram, telegram_webhook
 from app.models.appointment import Appointment
@@ -30,6 +31,7 @@ from app.models.telegram_config import (
     TelegramStaffLinkToken,
     TelegramUser,
 )
+from app.models.visit import Visit
 from app.schemas.notifications import SendMessageRequest
 from app.services import telegram_bot
 from app.services.telegram_templates import TelegramTemplatesService
@@ -167,6 +169,39 @@ def _seed_ticket_qr(db_session, visit) -> str:
     visit.confirmation_expires_at = parsed["expires_at"]
     db_session.commit()
     return token
+
+
+@pytest.fixture
+def qr_test_visit(db_session):
+    # Earlier tests can leave a Telegram profile referencing a recycled chart
+    # ID in the shared unit-test database. Start with a fresh synthetic chart.
+    patient_id = 1 + max(
+        db_session.query(func.max(Patient.id)).scalar() or 0,
+        db_session.query(func.max(TelegramUser.patient_id)).scalar() or 0,
+    )
+    patient = Patient(
+        id=patient_id,
+        first_name="SYNTHETIC",
+        last_name="QR fixture",
+        phone="+998000000000",
+    )
+    visit = Visit(
+        patient=patient,
+        status="pending_confirmation",
+        confirmation_channel="telegram",
+    )
+    db_session.add(visit)
+    db_session.commit()
+    return visit
+
+
+@pytest.fixture
+def qr_test_chat_id(db_session) -> int:
+    return 1 + max(
+        8000,
+        db_session.query(func.max(TelegramUser.chat_id)).scalar() or 0,
+        db_session.query(func.max(TelegramMessage.chat_id)).scalar() or 0,
+    )
 
 
 def _published_booking_service(db_session, *, name: str, slug: str):
@@ -3064,16 +3099,16 @@ class TestMiniAppClinicCalendarDateValidation:
 
     @pytest.mark.asyncio
     async def test_ticket_qr_link_new_user_prompts_notification_consent(
-        self, db_session, test_visit
+        self, db_session, qr_test_visit, qr_test_chat_id
     ):
         fake_service = FakeTelegramBotService(active=True)
-        token = _seed_ticket_qr(db_session, test_visit)
+        token = _seed_ticket_qr(db_session, qr_test_visit)
         update = {
             "update_id": 128,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7025, "type": "private"},
-                "from": {"id": 7025, "language_code": "uz"},
+                "chat": {"id": qr_test_chat_id, "type": "private"},
+                "from": {"id": qr_test_chat_id, "language_code": "uz"},
                 "text": f"/start {token}",
             },
         }
@@ -3084,14 +3119,16 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         telegram_user = (
-            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7025).one()
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == qr_test_chat_id)
+            .one()
         )
-        assert telegram_user.patient_id == test_visit.patient_id
+        assert telegram_user.patient_id == qr_test_visit.patient_id
         assert telegram_user.notifications_enabled is False
         assert telegram_user.appointment_reminders is False
         assert telegram_user.lab_notifications is False
         chat_id, text, reply_markup = fake_service._send_message.await_args.args
-        assert chat_id == 7025
+        assert chat_id == qr_test_chat_id
         assert telegram_webhook._localized_text("ticket_qr_linked", "uz-Latn") in text
         assert (
             telegram_webhook._localized_text("notification_consent", "uz-Latn") in text
@@ -3099,8 +3136,8 @@ class TestMiniAppClinicCalendarDateValidation:
         assert reply_markup == telegram_webhook._localized_notification_consent_menu(
             "uz-Latn"
         )
-        db_session.refresh(test_visit)
-        assert test_visit.confirmation_token is None
+        db_session.refresh(qr_test_visit)
+        assert qr_test_visit.confirmation_token is None
 
         fake_service._send_message.reset_mock()
         assert await telegram_webhook._handle_ticket_qr_start(
@@ -3121,12 +3158,18 @@ class TestMiniAppClinicCalendarDateValidation:
     )
     @pytest.mark.asyncio
     async def test_qr_and_contact_require_matching_private_chat(
-        self, db_session, test_visit, chat, sender_id
+        self, db_session, qr_test_visit, chat, sender_id
     ):
         fake_service = FakeTelegramBotService(active=True)
-        token = _seed_ticket_qr(db_session, test_visit)
-        token_hash = test_visit.confirmation_token
+        token = _seed_ticket_qr(db_session, qr_test_visit)
+        token_hash = qr_test_visit.confirmation_token
         sender = {"id": sender_id}
+        profiles = (
+            db_session.query(TelegramUser.id, TelegramUser.patient_id)
+            .filter(TelegramUser.chat_id.in_({int(chat["id"]), int(sender_id)}))
+            .order_by(TelegramUser.id)
+        )
+        original_profiles = profiles.all()
         assert await telegram_webhook._handle_ticket_qr_start(
             {"message": {"chat": chat, "from": sender, "text": f"/start {token}"}},
             db_session,
@@ -3141,40 +3184,57 @@ class TestMiniAppClinicCalendarDateValidation:
             db_session,
             fake_service,
         )
-        db_session.refresh(test_visit)
-        assert test_visit.confirmation_token == token_hash
-        assert db_session.query(TelegramUser).count() == 0
+        db_session.refresh(qr_test_visit)
+        assert qr_test_visit.confirmation_token == token_hash
+        assert profiles.all() == original_profiles
+        assert (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.patient_id == qr_test_visit.patient_id)
+            .one_or_none()
+            is None
+        )
         fake_service._send_message.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_qr_link_conflict_rolls_back_token_consumption(
-        self, db_session, test_visit
+        self, db_session, qr_test_visit, qr_test_chat_id
     ):
         fake_service = FakeTelegramBotService(active=True)
-        token = _seed_ticket_qr(db_session, test_visit)
-        token_hash = test_visit.confirmation_token
-        expires_at = test_visit.confirmation_expires_at
+        token = _seed_ticket_qr(db_session, qr_test_visit)
+        token_hash = qr_test_visit.confirmation_token
+        expires_at = qr_test_visit.confirmation_expires_at
+        linked_chat_id = qr_test_chat_id + 1
         linked_user = _link_patient_to_chat(
-            db_session, chat_id=7027, patient_id=test_visit.patient_id
+            db_session,
+            chat_id=linked_chat_id,
+            patient_id=qr_test_visit.patient_id,
         )
         assert await telegram_webhook._handle_ticket_qr_start(
             {
                 "message": {
-                    "chat": {"id": 7025, "type": "private"},
-                    "from": {"id": 7025},
+                    "chat": {"id": qr_test_chat_id, "type": "private"},
+                    "from": {"id": qr_test_chat_id},
                     "text": f"/start {token}",
                 }
             },
             db_session,
             fake_service,
         )
-        db_session.refresh(test_visit)
-        assert test_visit.confirmation_token == token_hash
-        assert test_visit.confirmation_expires_at == expires_at
+        db_session.refresh(qr_test_visit)
+        assert qr_test_visit.confirmation_token == token_hash
+        assert qr_test_visit.confirmation_expires_at == expires_at
         db_session.refresh(linked_user)
-        assert linked_user.patient_id == test_visit.patient_id
+        assert linked_user.patient_id == qr_test_visit.patient_id
         assert linked_user.notifications_enabled is True
-        assert db_session.query(TelegramUser).count() == 1
+        assert (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == qr_test_chat_id)
+            .one_or_none()
+            is None
+        )
+        assert db_session.query(TelegramUser.chat_id).filter(
+            TelegramUser.patient_id == qr_test_visit.patient_id
+        ).all() == [(linked_chat_id,)]
         assert fake_service._send_message.await_args.args[1] == (
             telegram_webhook._localized_text("ticket_qr_link_failed", "ru")
         )
@@ -3226,12 +3286,12 @@ class TestMiniAppClinicCalendarDateValidation:
 
     @pytest.mark.asyncio
     async def test_contact_guidance_then_qr_consent_reaches_localized_menu(
-        self, db_session, test_visit, test_patient, monkeypatch
+        self, db_session, qr_test_visit, qr_test_chat_id, monkeypatch
     ):
         monkeypatch.setattr(
             telegram_webhook.settings, "FRONTEND_URL", "https://example.test"
         )
-        chat_id = 7026
+        chat_id = qr_test_chat_id
         fake_service = FakeTelegramBotService(active=True)
         start_update = {
             "update_id": 129,
@@ -3293,7 +3353,7 @@ class TestMiniAppClinicCalendarDateValidation:
                 "from": {"id": chat_id, "language_code": "uz"},
                 "contact": {
                     "user_id": chat_id,
-                    "phone_number": test_patient.phone,
+                    "phone_number": qr_test_visit.patient.phone,
                 },
             },
         }
@@ -3316,7 +3376,7 @@ class TestMiniAppClinicCalendarDateValidation:
         )
         fake_service._send_message.reset_mock()
 
-        token = _seed_ticket_qr(db_session, test_visit)
+        token = _seed_ticket_qr(db_session, qr_test_visit)
         qr_update = {
             "update_id": 132,
             "message": {
@@ -3330,7 +3390,7 @@ class TestMiniAppClinicCalendarDateValidation:
             qr_update, db_session, fake_service
         )
         db_session.refresh(telegram_user)
-        assert telegram_user.patient_id == test_patient.id
+        assert telegram_user.patient_id == qr_test_visit.patient_id
         assert telegram_user.notifications_enabled is False
         chat_arg, text_arg, reply_markup = fake_service._send_message.await_args.args
         assert chat_arg == chat_id

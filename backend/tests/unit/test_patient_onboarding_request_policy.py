@@ -9,10 +9,12 @@ from urllib.parse import urlencode
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import delete, select
+from sqlalchemy import create_engine, delete, select
+from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker
 
 from app.api.v1.endpoints import telegram_webhook
+from app.db.base_class import Base
 from app.models.appointment import Appointment
 from app.models.audit import AuditLog
 from app.models.patient import Patient
@@ -28,6 +30,38 @@ from app.services.patient_onboarding import PatientOnboardingService
 from app.services.patient_onboarding import _core as onboarding_core
 
 MINI_APP_BOT_TOKEN = "123456:test-mini-app-token"
+
+
+@pytest.fixture(scope="module")
+def test_db(tmp_path_factory):
+    """Keep numeric patient IDs independent of links in the shared test database."""
+    db_path = tmp_path_factory.mktemp("patient-onboarding") / "test.sqlite3"
+    engine = create_engine(
+        URL.create("sqlite", database=str(db_path)),
+        connect_args={"check_same_thread": False},
+    )
+    try:
+        Base.metadata.create_all(bind=engine)
+        yield engine
+    finally:
+        engine.dispose()
+
+
+def _safe_review_error_reason(response) -> str:
+    detail = response.json().get("detail")
+    reason = detail.get("reason") if isinstance(detail, dict) else None
+    if reason in (
+        "onboarding_request_not_found",
+        "onboarding_request_not_reviewable",
+        "duplicate_review_required",
+        "duplicate_review_override_required",
+        "candidate_review_required",
+        "patient_not_found",
+        "telegram_user_not_found",
+        "telegram_patient_link_conflict",
+    ):
+        return reason
+    return "unrecognized_review_error"
 
 
 def _signed_mini_app_init_data(
@@ -349,7 +383,7 @@ def test_registrar_links_existing_patient_and_writes_audit(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, _safe_review_error_reason(response)
     db_session.refresh(request_row)
     db_session.refresh(telegram_user)
     assert request_row.status == "linked_existing"
@@ -809,7 +843,7 @@ def test_registrar_creates_patient_only_by_staff_action_and_writes_audit(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, _safe_review_error_reason(response)
     db_session.refresh(request_row)
     db_session.refresh(telegram_user)
     assert db_session.query(Patient).count() == initial_patients + 1

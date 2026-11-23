@@ -270,10 +270,19 @@ def consume_telegram_ticket_start_token(db, token: str) -> Visit | None:
     ):
         return None
 
-    visit.confirmation_token = None
-    visit.confirmation_expires_at = None
-    db.flush()
-    return visit
+    # Reuse the audited metadata-only UPDATE after validating under both locks.
+    updated = (
+        db.query(Visit)
+        .filter(Visit.id == visit.id, Visit.confirmation_token == token_hash)
+        .update(
+            {
+                "confirmation_token": None,
+                "confirmation_expires_at": None,
+            },
+            synchronize_session=False,
+        )
+    )
+    return visit if updated == 1 else None
 
 
 class VisitConfirmationService:
