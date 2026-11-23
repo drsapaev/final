@@ -685,7 +685,10 @@ def _sync_derma_history(session: Session) -> None:
             legacy_exams[obj.id] = obj
         elif isinstance(obj, DermaProcedure):
             legacy_procs[obj.id] = obj
-        else:
+        elif any(
+            sa.inspect(obj).attrs[column.key].history.has_changes()
+            for column in _VISIT_SOURCE_COLUMNS
+        ):
             affected_visit_ids.add(obj.id)
 
     for obj in session.deleted:
