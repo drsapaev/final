@@ -67,6 +67,7 @@ const NO_CACHE_PATTERNS = [
   /\/api\/v1\/auth\/logout/,
   /\/api\/v1\/auth\/me/,
   /\/api\/v1\/payments/,
+  /\/api\/v1\/registrar\/invoice(?:\/|$)/,
   /\/api\/v1\/ai/,
   /\/api\/v1\/telegram/,
   /\/api\/v1\/print/

@@ -132,7 +132,7 @@ describe('PaymentProviderDialog — CSH-FE-043 honest per-ticket print', () => {
     expect(rowArg.source).toBe('payment');
     expect(rowArg.specialty_name).toBe('Cardio');
     // Прежде обёртка возвращала true безусловно — теперь blocked честно виден.
-    expect(warnSpy).toHaveBeenCalledWith('Browser popup blocked for payment ticket print', expect.anything());
+    expect(warnSpy).toHaveBeenCalledWith('Browser popup blocked for payment ticket print');
   });
 
   it('opened + success → no popup-block warning', async () => {
@@ -142,7 +142,7 @@ describe('PaymentProviderDialog — CSH-FE-043 honest per-ticket print', () => {
     await mountAndReachSuccess();
     fireEvent.click(screen.getAllByRole('button', { name: /pay_dlg_print_ticket_aria/ })[0]);
     await waitFor(() => expect(singlePrintMock).toHaveBeenCalledTimes(1));
-    expect(warnSpy).not.toHaveBeenCalledWith('Browser popup blocked for payment ticket print', expect.anything());
+    expect(warnSpy).not.toHaveBeenCalledWith('Browser popup blocked for payment ticket print');
   });
 });
 
@@ -165,6 +165,18 @@ describe('PaymentProviderDialog — CSH-FE-045 batch print in a single gesture',
     expect((rowsArg as Array<Record<string, unknown>>).every((r) => r.source === 'payment')).toBe(true);
     // Один документ вместо попапа на каждый талон.
     expect(singlePrintMock).not.toHaveBeenCalled();
+  });
+
+  it('logs a fixed warning when the batch renderer fails', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const fakeWindow = { document: { write: vi.fn() } } as unknown as Window;
+    batchOpenMock.mockReturnValue(fakeWindow);
+    batchFillMock.mockResolvedValue({ opened: true, success: false, error: PRINT_TICKETS });
+
+    await mountAndReachSuccess();
+    fireEvent.click(screen.getByRole('button', { name: /pay_dlg_print_tickets/ }));
+
+    await waitFor(() => expect(warnSpy).toHaveBeenCalledWith('Browser batch ticket print failed'));
   });
 
   it('blocked batch window → honest warn, no fill call', async () => {

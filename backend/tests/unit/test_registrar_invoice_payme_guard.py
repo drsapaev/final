@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -8,6 +9,8 @@ import pytest
 
 from app.api.v1.endpoints.registrar_wizard import _invoice as invoice_module
 from app.api.v1.endpoints.registrar_wizard._helpers import InvoicePaymentRequest
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit, VisitService
@@ -699,3 +702,110 @@ def test_provider_completion_does_not_apply_redistributed_allocation(db_session,
     assert rejected.value.status_code == 409
     assert invoice.status == "processing"
     assert db_session.query(Payment).count() == 0
+
+
+def test_invoice_status_returns_only_already_issued_tickets_for_its_patient(
+    client, db_session, auth_headers, test_visit, patient_token, monkeypatch,
+):
+    invoice = _create_invoice(db_session, test_visit)
+    test_visit.status = "confirmed"
+    other_patient = Patient(first_name="Synthetic", last_name="Other")
+    db_session.add(other_patient)
+    db_session.flush()
+    unrelated_visit = Visit(
+        patient_id=test_visit.patient_id,
+        visit_date=test_visit.visit_date,
+        status="confirmed",
+    )
+    foreign_visit = Visit(
+        patient_id=other_patient.id,
+        visit_date=test_visit.visit_date,
+        status="confirmed",
+    )
+    benefit_visit = Visit(
+        patient_id=test_visit.patient_id,
+        visit_date=test_visit.visit_date,
+        status="confirmed",
+        discount_mode="all_free",
+        approval_status="pending",
+    )
+    db_session.add_all([unrelated_visit, foreign_visit, benefit_visit])
+    ready = DailyQueue(
+        day=test_visit.visit_date, queue_tag="cardiology_common",
+        specialist_id=test_visit.doctor_id, active=True, cabinet_number="37",
+    )
+    archive = DailyQueue(
+        day=test_visit.visit_date, queue_tag="cardiology_archive",
+        specialist_id=test_visit.doctor_id, active=False,
+    )
+    old_date = DailyQueue(
+        day=test_visit.visit_date - timedelta(days=1), queue_tag="cardiology_common",
+        specialist_id=test_visit.doctor_id, active=True,
+    )
+    db_session.add_all([ready, archive, old_date])
+    db_session.flush()
+    db_session.add_all(
+        [
+            PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=visit_id, visit_amount=0)
+            for visit_id in (test_visit.id, foreign_visit.id, benefit_visit.id)
+        ]
+    )
+    issued = [
+        (ready, test_visit, test_visit.patient_id, 41, "waiting"),
+        (archive, test_visit, test_visit.patient_id, 42, "completed"),
+        (archive, test_visit, test_visit.patient_id, 43, "waiting"),
+        (ready, test_visit, test_visit.patient_id, 44, "cancelled"),
+        (ready, test_visit, other_patient.id, 45, "waiting"),
+        (ready, foreign_visit, other_patient.id, 46, "waiting"),
+        (ready, unrelated_visit, test_visit.patient_id, 47, "waiting"),
+        (old_date, test_visit, test_visit.patient_id, 48, "waiting"),
+        (ready, benefit_visit, test_visit.patient_id, 49, "waiting"),
+    ]
+    db_session.add_all(
+        [
+            OnlineQueueEntry(
+                queue_id=queue.id, visit_id=visit.id, patient_id=patient_id,
+                number=number, status=status,
+            )
+            for queue, visit, patient_id, number, status in issued
+        ]
+    )
+    db_session.commit()
+    payment_manager = Mock(side_effect=AssertionError("paid and pending reads use stored state"))
+    monkeypatch.setattr(invoice_module, "get_payment_manager", payment_manager)
+    endpoint = f"/api/v1/registrar/invoice/{invoice.id}/status"
+
+    pending = client.get(endpoint, headers=auth_headers)
+    assert pending.status_code == 200
+    assert pending.headers["cache-control"] == "private, no-store"
+    assert pending.json()["print_tickets"] == []
+
+    invoice.status = "paid"
+    db_session.commit()
+    receipt_count = db_session.query(Payment).count()
+    queue_count = db_session.query(OnlineQueueEntry).count()
+    first = client.get(endpoint, headers=auth_headers)
+    second = client.get(endpoint, headers=auth_headers)
+
+    assert first.status_code == second.status_code == 200
+    assert first.headers["cache-control"] == second.headers["cache-control"] == "private, no-store"
+    assert first.json() == second.json()
+    assert first.json()["status"] == "paid"
+    denied = client.get(endpoint, headers={"Authorization": f"Bearer {patient_token}"})
+    assert denied.status_code == 403
+    assert "print_tickets" not in denied.json()
+    tickets = first.json()["print_tickets"]
+    assert [(t["queue_id"], t["queue_number"]) for t in tickets] == [
+        (ready.id, 41),
+        (archive.id, 42),
+    ]
+    assert all(t["visit_id"] == test_visit.id and t["patient_id"] == test_visit.patient_id for t in tickets)
+    assert tickets[0]["doctor_cabinet"] == "37"
+    assert set(tickets[0]) == {
+        "visit_id", "queue_tag", "queue_name", "queue_number", "queue_id",
+        "patient_id", "patient_name", "doctor_name", "doctor_cabinet",
+        "department", "visit_date", "visit_time",
+    }
+    assert db_session.query(Payment).count() == receipt_count
+    assert db_session.query(OnlineQueueEntry).count() == queue_count
+    payment_manager.assert_not_called()

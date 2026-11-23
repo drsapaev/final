@@ -4,20 +4,28 @@ from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 
-from sqlalchemy import or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy import and_, or_, select
+from sqlalchemy.orm import load_only, selectinload
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import (
     _build_repeat_eligibility_preview_item,
     _load_registration_discount_settings,
 )  # noqa: F401
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.payment import Payment
-from app.services.all_free_approval import awaits_all_free_decision
+from app.services.all_free_approval import (
+    all_free_decision_required_clause,
+    awaits_all_free_decision,
+)
 from app.services.money_input import MoneyInputError, parse_money
 from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.payment_invoice_service import PaymentInvoiceService
 from app.services.payment_providers.base import PaymentResult
+from app.services.queue_status import (
+    POSITION_VISIBLE_RAW_STATUSES,
+    normalize_queue_status,
+)
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
 _FINAL_INVOICE_STATES = frozenset({"paid", "failed", "cancelled"})
@@ -377,7 +385,99 @@ def _record_completed_invoice(
     invoice.paid_at = datetime.now(UTC)
 
 
-def _invoice_status_response(invoice: PaymentInvoice) -> dict[str, Any]:
+def _paid_invoice_print_tickets(
+    db: Session, invoice: PaymentInvoice,
+) -> list[dict[str, Any]]:
+    """Project the clinic's issued numbers for this invoice and its patient."""
+    linked_visit = (
+        select(PaymentInvoiceVisit.id)
+        .where(
+            PaymentInvoiceVisit.invoice_id == invoice.id,
+            PaymentInvoiceVisit.visit_id == Visit.id,
+        )
+        .exists()
+    )
+    statement = (
+        select(
+            OnlineQueueEntry.number.label("queue_number"),
+            OnlineQueueEntry.status.label("queue_status"),
+            DailyQueue.id.label("queue_id"),
+            DailyQueue.active.label("queue_active"),
+            DailyQueue.queue_tag,
+            DailyQueue.cabinet_number,
+            Visit.id.label("visit_id"),
+            Visit.department,
+            Visit.visit_date,
+            Visit.visit_time,
+            Patient,
+            QueueResource.display_name.label("queue_name"),
+            User.full_name.label("doctor_name"),
+            Doctor.cabinet.label("doctor_cabinet"),
+        )
+        .select_from(OnlineQueueEntry)
+        .join(Visit, Visit.id == OnlineQueueEntry.visit_id)
+        .join(DailyQueue, DailyQueue.id == OnlineQueueEntry.queue_id)
+        .join(Patient, Patient.id == Visit.patient_id)
+        .outerjoin(QueueResource, QueueResource.id == DailyQueue.queue_resource_id)
+        .outerjoin(
+            Doctor,
+            and_(
+                Doctor.id == DailyQueue.specialist_id,
+                DailyQueue.queue_resource_id.is_(None),
+            ),
+        )
+        .outerjoin(User, User.id == Doctor.user_id)
+        .options(load_only(Patient.first_name, Patient.last_name, Patient.middle_name))
+        .where(
+            linked_visit,
+            Visit.patient_id == invoice.patient_id,
+            OnlineQueueEntry.patient_id == invoice.patient_id,
+            DailyQueue.day == Visit.visit_date,
+            OnlineQueueEntry.number > 0,
+            ~all_free_decision_required_clause(),
+            Visit.status.notin_(
+                (
+                    "pending_confirmation",
+                    "confirmation_processing",
+                    "cancelled",
+                    "canceled",
+                    "no_show",
+                    "rescheduled",
+                )
+            ),
+        )
+        .order_by(Visit.id, DailyQueue.id, OnlineQueueEntry.number, OnlineQueueEntry.id)
+    )
+
+    tickets = []
+    for row in db.execute(statement):
+        status = normalize_queue_status(row.queue_status)
+        if status != "served" and (
+            not row.queue_active or status not in POSITION_VISIBLE_RAW_STATUSES
+        ):
+            continue
+        tickets.append(
+            {
+                "visit_id": row.visit_id,
+                "queue_tag": row.queue_tag,
+                "queue_name": row.queue_name or row.queue_tag,
+                "queue_number": row.queue_number,
+                "queue_id": row.queue_id,
+                "patient_id": row.Patient.id,
+                "patient_name": row.Patient.short_name(),
+                "doctor_name": row.doctor_name,
+                "doctor_cabinet": row.cabinet_number or row.doctor_cabinet,
+                "department": row.department,
+                "visit_date": row.visit_date.isoformat(),
+                "visit_time": row.visit_time,
+            }
+        )
+    return tickets
+
+
+def _invoice_status_response(
+    db: Session, invoice: PaymentInvoice,
+) -> dict[str, Any]:
     return {
         "invoice_id": invoice.id,
         "status": invoice.status,
@@ -385,10 +485,19 @@ def _invoice_status_response(invoice: PaymentInvoice) -> dict[str, Any]:
         "currency": invoice.currency,
         "provider_payment_id": invoice.provider_payment_id,
         "paid_at": invoice.paid_at,
+        "print_tickets": _paid_invoice_print_tickets(db, invoice) if invoice.status == "paid" else [],
     }
 
 
-@router.get("/registrar/invoice/{invoice_id}/status", response_model=dict[str, Any])
+def _invoice_status_no_store(response: Response) -> None:
+    response.headers["Cache-Control"] = "private, no-store"
+
+
+@router.get(
+    "/registrar/invoice/{invoice_id}/status",
+    response_model=dict[str, Any],
+    dependencies=[Depends(_invoice_status_no_store)],
+)
 def check_invoice_status(
     invoice_id: int,
     db: Session = Depends(get_db),
@@ -400,14 +509,14 @@ def check_invoice_status(
         if invoice is None:
             raise HTTPException(status_code=404, detail="Invoice не найден")
         if invoice.status != "processing" or not invoice.provider_payment_id or not invoice.provider:
-            return _invoice_status_response(invoice)
+            return _invoice_status_response(db, invoice)
 
         snapshot = _invoice_checkout_binding(invoice, _read_invoice_links(db, invoice_id))
         provider_name = invoice.provider.lower()
         provider_payment_id = invoice.provider_payment_id
         payment_manager = get_payment_manager()
         if not payment_manager.supports_registrar_invoice_payment(provider_name):
-            return _invoice_status_response(invoice)
+            return _invoice_status_response(db, invoice)
 
         db.rollback()
         result = payment_manager.check_payment_status(provider_name, provider_payment_id)
@@ -415,11 +524,11 @@ def check_invoice_status(
             invoice = db.get(PaymentInvoice, invoice_id, populate_existing=True)
             if invoice is None:
                 raise HTTPException(status_code=404, detail="Invoice не найден")
-            return _invoice_status_response(invoice)
+            return _invoice_status_response(db, invoice)
 
         invoice, visits, links = _lock_invoice_settlement_context(db, invoice_id)
         if invoice.status in _FINAL_INVOICE_STATES:
-            status_payload = _invoice_status_response(invoice)
+            status_payload = _invoice_status_response(db, invoice)
             db.rollback()
             return status_payload
         if invoice.status != "processing" or _invoice_checkout_binding(invoice, links) != snapshot:
@@ -431,7 +540,7 @@ def check_invoice_status(
         else:
             invoice.status = result.status
         db.commit()
-        return _invoice_status_response(invoice)
+        return _invoice_status_response(db, invoice)
     except HTTPException:
         db.rollback()
         raise

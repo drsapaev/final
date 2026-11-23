@@ -12,22 +12,25 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
-from app.api.v1.endpoints.registrar_wizard import _invoice
-from app.core.config import settings
-from app.models.encounter import Encounter
-from app.models.patient import Patient
-from app.models.payment import Payment
-from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
-from app.models.service import Service
-from app.models.visit import Visit, VisitService
-from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
-from app.services.payment_providers.base import PaymentResult
 from tests.integration.test_registrar_benefit_decision_pg import (
     OWNER,
     RUNTIME,
     configured_benefit_db,  # noqa: F401
 )
+
+from app.api.v1.endpoints.registrar_wizard import _invoice
+from app.core.config import settings
+from app.models.clinic import Doctor
+from app.models.encounter import Encounter
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
+from app.models.payment import Payment
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.service import Service
+from app.models.user import User
+from app.models.visit import Visit, VisitService
+from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
+from app.services.payment_providers.base import PaymentResult
 
 pytestmark = pytest.mark.integration
 AMOUNT = Decimal("125.45")
@@ -46,6 +49,23 @@ def checkout_database(configured_benefit_db):  # noqa: F811
         )
         conn.exec_driver_sql(f"GRANT UPDATE (status, paid_at, provider_transaction_id) ON payment_invoices TO {RUNTIME}")
         conn.exec_driver_sql(f"GRANT UPDATE (id) ON visits TO {RUNTIME}")
+        # Match the ticket projection's column reads without granting queue writes.
+        ticket_columns = {
+            "queue_entries": "id, queue_id, visit_id, patient_id, number, status",
+            "daily_queues": "id, day, active, queue_tag, cabinet_number, queue_resource_id, specialist_id",
+            "queue_resources": "id, display_name",
+            "doctors": "id, user_id, cabinet",
+        }
+        for table, columns in ticket_columns.items():
+            conn.exec_driver_sql(f"GRANT SELECT ({columns}) ON {table} TO {RUNTIME}")
+            if conn.execute(
+                text("SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass(:table)"),
+                {"table": table},
+            ).scalar_one():
+                conn.exec_driver_sql(
+                    f"CREATE POLICY synthetic_checkout_ticket_read ON {table} "
+                    f"FOR SELECT TO {RUNTIME} USING (true)"
+                )
         for table, policy, command, condition in (
             ("payments", "synthetic_checkout_insert", "INSERT", "WITH CHECK (true)"),
             ("visits", "synthetic_checkout_row_lock", "UPDATE", "USING (true) WITH CHECK (false)"),
@@ -178,3 +198,55 @@ def test_two_pollers_write_one_receipt_under_postgres_locks(invoice_engines, mon
         assert [db.get(Visit, visit_id).status for visit_id in visit_ids] == [
             "pending_confirmation", "pending_confirmation",
         ]
+
+
+def test_paid_invoice_reads_existing_ticket_in_read_only_postgres_transaction(
+    invoice_engines, monkeypatch,
+):
+    admin, runtime = invoice_engines
+    invoice_id, _, visit_ids = _seed_invoice(admin, processing=False)
+    with Session(admin) as db:
+        invoice = db.get(PaymentInvoice, invoice_id)
+        invoice.status = "paid"
+        visit = db.get(Visit, visit_ids[0])
+        visit.status = "confirmed"
+        physician_user = User(
+            username=f"synthetic-ticket-{uuid4().hex}",
+            role="Doctor", full_name="Synthetic Doctor", hashed_password="!",
+        )
+        db.add(physician_user)
+        db.flush()
+        doctor = Doctor(user_id=physician_user.id, specialty="cardiology", active=True)
+        db.add(doctor)
+        db.flush()
+        queue = DailyQueue(
+            day=visit.visit_date, specialist_id=doctor.id, active=True,
+            queue_tag="cardiology_common", cabinet_number="71",
+        )
+        db.add(queue)
+        db.flush()
+        db.add(OnlineQueueEntry(
+            queue_id=queue.id, visit_id=visit.id, patient_id=visit.patient_id,
+            number=41, status="waiting",
+        ))
+        queue_id = queue.id
+        db.commit()
+
+    manager = Mock(side_effect=AssertionError("stored paid status must not call provider"))
+    monkeypatch.setattr(_invoice, "get_payment_manager", manager)
+    with Session(runtime, autoflush=False) as db:
+        db.execute(text("SET TRANSACTION READ ONLY"))
+        assert db.execute(text("SHOW transaction_read_only")).scalar_one() == "on"
+        assert db.execute(
+            text("SELECT has_table_privilege(current_user, 'queue_entries', 'INSERT,UPDATE,DELETE')")
+        ).scalar_one() is False
+        first = _invoice.check_invoice_status(invoice_id, db, _registrar())
+        second = _invoice.check_invoice_status(invoice_id, db, _registrar())
+        assert first == second
+        assert first["status"] == "paid"
+        ticket, = first["print_tickets"]
+        assert (ticket["queue_id"], ticket["queue_number"], ticket["doctor_cabinet"]) == (
+            queue_id, 41, "71",
+        )
+        assert ticket["doctor_name"] == "Synthetic Doctor"
+    manager.assert_not_called()
