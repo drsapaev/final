@@ -17,6 +17,7 @@ import {
   type PublicSiteService,
 } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
+import { getPublicSiteAnalyticsEndpoint } from './publicSiteAnalytics';
 import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_TITLES } from './publicSiteMetadata';
 import {
   getPublicClinicContacts,
@@ -27,6 +28,7 @@ import {
 
 export interface PublicSiteRuntimeConfig {
   apiOrigin?: string;
+  publicSiteAnalyticsEnabled?: boolean | string;
   siteOrigin?: string;
   deploymentEnvironment?: string;
 }
@@ -152,6 +154,7 @@ function renderPublicDocument(
   origin: string,
   styles: string[],
   pageStyleText?: string,
+  analyticsEndpoint?: string,
 ): string {
   const meta = getPublicSitePageMetadata(route, data);
   const canonical = new URL(pagePath(route, route.locale), origin).href;
@@ -173,7 +176,7 @@ function renderPublicDocument(
   const entityJsonLd = route.kind === 'contacts'
     ? renderMedicalClinicJsonLd(data.clinic, origin)
     : renderDetailJsonLd(route, data, origin, canonical);
-  const body = renderToString(<PublicSitePage route={route} data={data} />);
+  const body = renderToString(<PublicSitePage route={route} data={data} analyticsEndpoint={analyticsEndpoint} />);
   const css = renderPageStyles(styles, pageStyleText);
 
   return `<!doctype html><html lang="${escapeHtml(route.locale)}"><head>` +
@@ -368,7 +371,11 @@ export async function handlePublicSiteRequest(
     const missingDetail = (route.kind === 'service' && !data.service) ||
       (route.kind === 'doctor' && !data.doctor);
     const status = missingDetail ? 404 : 200;
-    const html = renderPublicDocument(route, data, origin, assets.pageStyles, assets.pageStyleText);
+    const analyticsEnabled = config.publicSiteAnalyticsEnabled === true || config.publicSiteAnalyticsEnabled === 'true';
+    const analyticsEndpoint = analyticsEnabled && status === 200 && request.method === 'GET'
+      ? getPublicSiteAnalyticsEndpoint(config.apiOrigin)
+      : undefined;
+    const html = renderPublicDocument(route, data, origin, assets.pageStyles, assets.pageStyleText, analyticsEndpoint);
     return htmlResponse(html, status, route.locale, noIndex || status === 404, request.method);
   } catch {
     // Error details can contain upstream response data; keep the public response generic.

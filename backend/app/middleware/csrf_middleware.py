@@ -69,6 +69,7 @@ Integration notes:
   site in ``main.py``; when ``False`` the middleware is a no-op pass
   through.
 """
+
 from __future__ import annotations
 
 import hmac
@@ -78,6 +79,8 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+
+from app.core.pii_masker import PUBLIC_SITE_ANALYTICS_INGEST_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -133,11 +136,15 @@ CSRF_EXEMPT_PREFIXES: tuple[str, ...] = (
 # Example: /api/v1/telegram/webhook is a webhook (exempted), but
 # /api/v1/telegram/webhook/test is an admin endpoint (NOT exempted).
 # If we used prefix match, /webhook/test would be incorrectly exempted.
-CSRF_EXEMPT_EXACT: frozenset[str] = frozenset({
-    "/api/v1/telegram/webhook",
-    "/api/v1/telegram/webhook/enhanced",
-    "/api/v1/telegram/bot/webhook",
-})
+CSRF_EXEMPT_EXACT: frozenset[str] = frozenset(
+    {
+        "/api/v1/telegram/webhook",
+        "/api/v1/telegram/webhook/enhanced",
+        "/api/v1/telegram/bot/webhook",
+        # The anonymous intake validates the origin and rejects credentials.
+        PUBLIC_SITE_ANALYTICS_INGEST_PATH,
+    }
+)
 
 # Backward compatibility: combined set for any code that still references
 # CSRF_EXEMPT_PATHS. New code should use CSRF_EXEMPT_PREFIXES or
