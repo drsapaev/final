@@ -3,10 +3,14 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
+from unittest.mock import AsyncMock, Mock
 from urllib.parse import urlencode
 
 import pytest
+from fastapi import HTTPException
+from sqlalchemy import delete, select
+from sqlalchemy.orm import sessionmaker
 
 from app.api.v1.endpoints import telegram_webhook
 from app.models.appointment import Appointment
@@ -17,7 +21,11 @@ from app.models.telegram_config import (
     TelegramConfig,
     TelegramUser,
 )
-
+from app.models.user_profile import UserAuditLog
+from app.schemas.patient_onboarding import PatientOnboardingSubmitRequest
+from app.services import patient_service
+from app.services.patient_onboarding import PatientOnboardingService
+from app.services.patient_onboarding import _core as onboarding_core
 
 MINI_APP_BOT_TOKEN = "123456:test-mini-app-token"
 
@@ -98,6 +106,55 @@ def _create_onboarding_request(
     db_session.commit()
     db_session.refresh(request_row)
     return request_row
+
+
+@pytest.fixture
+def committed_onboarding(test_db):
+    sessions = sessionmaker(bind=test_db, expire_on_commit=False)
+    with sessions() as seed:
+        request_row = _create_onboarding_request(seed, chat_id=69120)
+        request_row.expires_at = datetime.now(UTC) + timedelta(hours=1)
+        request_row.contact_name = "SYNTHETIC Original"
+        patient = Patient(last_name="SYNTHETIC", first_name="Linked")
+        seed.add(patient)
+        seed.commit()
+
+    try:
+        yield sessions, request_row, patient.id
+    finally:
+        # These sessions commit independently of the usual per-test savepoint.
+        with sessions() as cleanup:
+            request_ids = select(PatientOnboardingRequest.id).where(
+                PatientOnboardingRequest.telegram_chat_id
+                == request_row.telegram_chat_id
+            )
+            cleanup.execute(
+                delete(AuditLog).where(
+                    AuditLog.entity_type == "patient_onboarding_request",
+                    AuditLog.entity_id.in_(request_ids),
+                )
+            )
+            cleanup.execute(
+                delete(PatientOnboardingRequest).where(
+                    PatientOnboardingRequest.telegram_chat_id
+                    == request_row.telegram_chat_id
+                )
+            )
+            cleanup.delete(cleanup.get(TelegramUser, request_row.telegram_user_id))
+            cleanup.delete(cleanup.get(Patient, patient.id))
+            cleanup.commit()
+
+
+def _commit_onboarding_decision(sessions, request_id: int, patient_id: int) -> None:
+    with sessions() as registrar:
+        row = registrar.get(PatientOnboardingRequest, request_id)
+        profile = registrar.get(TelegramUser, row.telegram_user_id)
+        profile.patient_id = patient_id
+        row.resolved_patient_id = patient_id
+        row.status = "linked_existing"
+        row.review_message = "SYNTHETIC Reviewed"
+        row.reviewed_at = datetime.now(UTC)
+        registrar.commit()
 
 
 def _search_candidate_id(
@@ -310,6 +367,74 @@ def test_registrar_links_existing_patient_and_writes_audit(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("existing_link", ["different_patient", "different_chat"])
+def test_registrar_cannot_replace_an_existing_telegram_patient_link(
+    client,
+    db_session,
+    registrar_auth_headers,
+    existing_link,
+):
+    request_row = _create_onboarding_request(db_session, chat_id=9120)
+    candidate = Patient(
+        last_name="SYNTHETIC", first_name="Candidate", phone="+998000000021"
+    )
+    db_session.add(candidate)
+    db_session.commit()
+    candidate_id = _search_candidate_id(
+        client,
+        request_id=request_row.id,
+        headers=registrar_auth_headers,
+        phone=candidate.phone,
+    )
+
+    source = db_session.get(TelegramUser, request_row.telegram_user_id)
+    if existing_link == "different_patient":
+        existing_patient = Patient(last_name="SYNTHETIC", first_name="Previous")
+        db_session.add(existing_patient)
+        db_session.flush()
+        linked_profile = source
+    else:
+        existing_patient = candidate
+        linked_profile = _create_unlinked_telegram_user(db_session, chat_id=9121)
+
+    # A verified binding arrived after staff opened the candidate list.
+    linked_profile.patient_id = existing_patient.id
+    db_session.commit()
+    previous_source_patient_id = source.patient_id
+    previous_link_epoch = linked_profile.patient_link_epoch
+
+    response = client.post(
+        f"/api/v1/telegram/onboarding/requests/{request_row.id}/link-existing",
+        headers=registrar_auth_headers,
+        json={"candidateId": candidate_id, "reasonCode": "duplicate_suspected"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == {"reason": "telegram_patient_link_conflict"}
+    db_session.refresh(request_row)
+    db_session.refresh(source)
+    db_session.refresh(linked_profile)
+    assert request_row.status == "pending_review"
+    assert request_row.resolved_patient_id is None
+    assert request_row.reviewed_by_user_id is None
+    assert source.patient_id == previous_source_patient_id
+    assert linked_profile.patient_id == existing_patient.id
+    assert linked_profile.patient_link_epoch == previous_link_epoch
+    assert (
+        db_session.query(AuditLog)
+        .filter(
+            AuditLog.entity_type == "patient_onboarding_request",
+            AuditLog.entity_id == request_row.id,
+            AuditLog.action.in_(
+                ["registrar_onboarding_reviewed", "patient_onboarding_linked_existing"]
+            ),
+        )
+        .count()
+        == 0
+    )
+
+
+@pytest.mark.unit
 def test_onboarding_duplicate_search_keeps_exact_phone_match_beyond_page_limit(
     client,
     db_session,
@@ -413,6 +538,84 @@ def test_onboarding_duplicate_review_is_invalid_after_patient_resubmits_request(
     assert link_response.json()["detail"]["reason"] == "duplicate_review_required"
     db_session.refresh(telegram_user)
     assert telegram_user.patient_id is None
+
+
+@pytest.mark.unit
+def test_stale_expired_snapshot_keeps_committed_registrar_decision(
+    committed_onboarding,
+    monkeypatch,
+):
+    sessions, request_row, patient_id = committed_onboarding
+    with sessions() as reader:
+        stale = reader.get(PatientOnboardingRequest, request_row.id)
+        reader.commit()
+
+        _commit_onboarding_decision(sessions, request_row.id, patient_id)
+        assert stale.status == "pending_review"
+        after_deadline = stale.expires_at.replace(tzinfo=UTC) + timedelta(seconds=1)
+        monkeypatch.setattr(onboarding_core, "_utc_now", lambda: after_deadline)
+
+        result = PatientOnboardingService(reader)._refresh_expired(stale)
+        assert result.status == "linked_existing"
+        assert result.resolved_patient_id == patient_id
+
+    with sessions() as verifier:
+        saved = verifier.get(PatientOnboardingRequest, request_row.id)
+        assert saved.status == "linked_existing"
+        assert saved.review_message == "SYNTHETIC Reviewed"
+        assert saved.resolved_patient_id == patient_id
+        assert (
+            verifier.query(AuditLog)
+            .filter(
+                AuditLog.entity_type == "patient_onboarding_request",
+                AuditLog.entity_id == request_row.id,
+                AuditLog.action == "patient_onboarding_expired",
+            )
+            .count()
+            == 0
+        )
+
+
+@pytest.mark.unit
+def test_resubmission_with_stale_unlinked_profile_keeps_committed_registrar_decision(
+    committed_onboarding,
+):
+    sessions, request_row, patient_id = committed_onboarding
+    with sessions() as reader:
+        stale_profile = reader.get(TelegramUser, request_row.telegram_user_id)
+        stale_request = reader.get(PatientOnboardingRequest, request_row.id)
+        reader.commit()
+
+        _commit_onboarding_decision(sessions, request_row.id, patient_id)
+        assert stale_profile.patient_id is None
+        assert stale_request.status == "pending_review"
+
+        with pytest.raises(HTTPException) as error:
+            PatientOnboardingService(reader).submit(
+                telegram_user=stale_profile,
+                payload=PatientOnboardingSubmitRequest(
+                    contact_name="SYNTHETIC Changed"
+                ),
+            )
+        assert error.value.status_code == 409
+        assert error.value.detail == {"reason": "linked_patient_already_exists"}
+
+    with sessions() as verifier:
+        profile = verifier.get(TelegramUser, request_row.telegram_user_id)
+        assert profile.patient_id == patient_id
+        saved = (
+            verifier.query(PatientOnboardingRequest)
+            .filter(
+                PatientOnboardingRequest.telegram_chat_id
+                == request_row.telegram_chat_id
+            )
+            .one()
+        )
+        assert saved.id == request_row.id
+        assert saved.status == "linked_existing"
+        assert saved.resolved_patient_id == patient_id
+        assert saved.contact_name == "SYNTHETIC Original"
+        assert saved.review_message == "SYNTHETIC Reviewed"
 
 
 @pytest.mark.unit
@@ -624,6 +827,97 @@ def test_registrar_creates_patient_only_by_staff_action_and_writes_audit(
 
 
 @pytest.mark.unit
+def test_registrar_create_conflict_preserves_card_and_rolls_back_side_effects(
+    client,
+    db_session,
+    registrar_auth_headers,
+    monkeypatch,
+):
+    request_row = _create_onboarding_request(db_session, chat_id=9122)
+    duplicate_review = client.post(
+        f"/api/v1/telegram/onboarding/requests/{request_row.id}/search-patients",
+        headers=registrar_auth_headers,
+        json={"name": "SYNTHETIC New Chart"},
+    )
+    assert duplicate_review.status_code == 200
+
+    existing_patient = Patient(last_name="SYNTHETIC", first_name="Previous")
+    db_session.add(existing_patient)
+    db_session.flush()
+    telegram_user = db_session.get(TelegramUser, request_row.telegram_user_id)
+    telegram_user.patient_id = existing_patient.id
+    db_session.commit()
+
+    send_registered = AsyncMock(return_value=True)
+    dispatch_registered = Mock()
+    monkeypatch.setattr(
+        patient_service.notification_sender_service,
+        "send_patient_registered_notification",
+        send_registered,
+    )
+    monkeypatch.setattr(
+        patient_service,
+        "_dispatch_patient_registered_notification_async",
+        dispatch_registered,
+    )
+    initial_patients = db_session.query(Patient).count()
+    initial_chart_audits = (
+        db_session.query(UserAuditLog)
+        .filter(
+            UserAuditLog.action == "CREATE", UserAuditLog.resource_type == "patients"
+        )
+        .count()
+    )
+    initial_link_epoch = telegram_user.patient_link_epoch
+
+    response = client.post(
+        f"/api/v1/telegram/onboarding/requests/{request_row.id}/create-patient",
+        headers=registrar_auth_headers,
+        json={
+            "patient": {
+                "last_name": "SYNTHETIC",
+                "first_name": "New Chart",
+                "phone": "+998000000023",
+            },
+            "reasonCode": "other",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == {"reason": "telegram_patient_link_conflict"}
+    db_session.refresh(request_row)
+    db_session.refresh(telegram_user)
+    assert db_session.query(Patient).count() == initial_patients
+    assert telegram_user.patient_id == existing_patient.id
+    assert telegram_user.patient_link_epoch == initial_link_epoch
+    assert request_row.status == "pending_review"
+    assert request_row.resolved_patient_id is None
+    assert request_row.reviewed_by_user_id is None
+    assert (
+        db_session.query(UserAuditLog)
+        .filter(
+            UserAuditLog.action == "CREATE", UserAuditLog.resource_type == "patients"
+        )
+        .count()
+        == initial_chart_audits
+    )
+    assert (
+        db_session.query(AuditLog)
+        .filter(
+            AuditLog.entity_type == "patient_onboarding_request",
+            AuditLog.entity_id == request_row.id,
+            AuditLog.action.in_(
+                ["registrar_onboarding_reviewed", "patient_onboarding_created_patient"]
+            ),
+        )
+        .count()
+        == 0
+    )
+    send_registered.assert_not_called()
+    dispatch_registered.assert_not_called()
+
+
+@pytest.mark.unit
 def test_onboarding_analytics_summary_returns_safe_dashboard_metrics(
     client,
     db_session,
@@ -636,21 +930,27 @@ def test_onboarding_analytics_summary_returns_safe_dashboard_metrics(
         tzinfo=timezone.utc,
     )
     today_created_at = max(now - timedelta(minutes=30), start_of_today)
-    pending_request = _create_onboarding_request(db_session, chat_id=9201, status="pending_review")
+    pending_request = _create_onboarding_request(
+        db_session, chat_id=9201, status="pending_review"
+    )
     needs_info_request = _create_onboarding_request(
         db_session,
         chat_id=9202,
         status="needs_more_info",
         review_message="Please confirm contact details.",
     )
-    linked_request = _create_onboarding_request(db_session, chat_id=9203, status="linked_existing")
+    linked_request = _create_onboarding_request(
+        db_session, chat_id=9203, status="linked_existing"
+    )
     rejected_request = _create_onboarding_request(
         db_session,
         chat_id=9204,
         status="rejected",
         review_message="Please contact the clinic.",
     )
-    today_request = _create_onboarding_request(db_session, chat_id=9206, status="pending_review")
+    today_request = _create_onboarding_request(
+        db_session, chat_id=9206, status="pending_review"
+    )
 
     pending_request.created_at = now - timedelta(hours=5)
     needs_info_request.created_at = now - timedelta(hours=3)
@@ -665,12 +965,20 @@ def test_onboarding_analytics_summary_returns_safe_dashboard_metrics(
             AuditLog(
                 action="patient_onboarding_started",
                 entity_type="telegram_onboarding_telemetry",
-                payload={"role": "patient", "scope": "onboarding", "section": "appointments"},
+                payload={
+                    "role": "patient",
+                    "scope": "onboarding",
+                    "section": "appointments",
+                },
             ),
             AuditLog(
                 action="patient_onboarding_opened",
                 entity_type="telegram_onboarding_telemetry",
-                payload={"role": "patient", "scope": "onboarding", "section": "appointments"},
+                payload={
+                    "role": "patient",
+                    "scope": "onboarding",
+                    "section": "appointments",
+                },
             ),
         ]
     )
@@ -704,12 +1012,14 @@ def test_onboarding_csv_export_masks_sensitive_fields(
     db_session,
     registrar_auth_headers,
 ):
-    request_row = _create_onboarding_request(db_session, chat_id=9205, status="needs_more_info")
+    request_row = _create_onboarding_request(
+        db_session, chat_id=9205, status="needs_more_info"
+    )
     request_row.contact_phone = "+998901234567"
     request_row.contact_name = "Sensitive Patient"
     request_row.desired_service = "Cardiology"
     request_row.desired_branch = "Main"
-    request_row.reviewed_at = datetime.now(timezone.utc)
+    request_row.reviewed_at = datetime.now(UTC)
     db_session.commit()
 
     response = client.get(

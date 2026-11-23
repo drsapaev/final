@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -33,6 +33,10 @@ from app.models.telegram_config import (
 from app.schemas.notifications import SendMessageRequest
 from app.services import telegram_bot
 from app.services.telegram_templates import TelegramTemplatesService
+from app.services.visit_confirmation_service import (
+    build_telegram_ticket_start_token,
+    parse_telegram_ticket_start_token,
+)
 
 
 class FakeTelegramBotService:
@@ -151,6 +155,18 @@ def _link_patient_to_chat(
     db_session.commit()
     db_session.refresh(telegram_user)
     return telegram_user
+
+
+def _seed_ticket_qr(db_session, visit) -> str:
+    token = build_telegram_ticket_start_token(
+        expires_at=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    parsed = parse_telegram_ticket_start_token(token)
+    assert parsed is not None
+    visit.confirmation_token = parsed["token_hash"]
+    visit.confirmation_expires_at = parsed["expires_at"]
+    db_session.commit()
+    return token
 
 
 def _published_booking_service(db_session, *, name: str, slug: str):
@@ -1721,19 +1737,31 @@ class TestMiniAppClinicCalendarDateValidation:
             reply_markup=None,
         )
 
+    @pytest.mark.parametrize(
+        "contact_fields,message_fields",
+        [
+            ({"user_id": 222, "phone_number": "+998000000000"}, {}),
+            ({"phone_number": "+998000000000"}, {}),
+            ({"user_id": 7001}, {}),
+            (
+                {"user_id": 7001, "phone_number": "+998000000000"},
+                {"forward_origin": {"type": "user"}},
+            ),
+        ],
+    )
     @pytest.mark.asyncio
-    async def test_contact_spoof_is_rejected(self, db_session):
+    async def test_invalid_contact_is_rejected(
+        self, db_session, contact_fields, message_fields
+    ):
         fake_service = FakeTelegramBotService(active=True)
         update = {
             "update_id": 101,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7001},
-                "from": {"id": 111},
-                "contact": {
-                    "user_id": 222,
-                    "phone_number": "+998900000121",
-                },
+                "chat": {"id": 7001, "type": "private"},
+                "from": {"id": 7001},
+                "contact": contact_fields,
+                **message_fields,
             },
         }
 
@@ -2987,18 +3015,23 @@ class TestMiniAppClinicCalendarDateValidation:
         assert handled is True
         assert calls == ["staff"]
 
+    @pytest.mark.parametrize("matches_patient", [True, False])
     @pytest.mark.asyncio
-    async def test_contact_link_new_user_prompts_notification_consent(
-        self, db_session, test_patient
+    async def test_contact_requests_verification_regardless_of_phone_match(
+        self, db_session, test_patient, monkeypatch, matches_patient
     ):
+        monkeypatch.setattr(
+            telegram_webhook.settings, "FRONTEND_URL", "https://example.test"
+        )
         fake_service = FakeTelegramBotService(active=True)
+        phone_number = test_patient.phone if matches_patient else "+998000000000"
         message = {
             "message_id": 1,
-            "chat": {"id": 7024},
+            "chat": {"id": 7024, "type": "private"},
             "from": {"id": 7024, "language_code": "ru"},
             "contact": {
                 "user_id": 7024,
-                "phone_number": test_patient.phone,
+                "phone_number": phone_number,
             },
         }
 
@@ -3010,35 +3043,38 @@ class TestMiniAppClinicCalendarDateValidation:
         telegram_user = (
             db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7024).one()
         )
-        assert telegram_user.patient_id == test_patient.id
+        assert telegram_user.patient_id is None
         assert telegram_user.notifications_enabled is False
         assert telegram_user.appointment_reminders is False
         assert telegram_user.lab_notifications is False
         chat_id, text, reply_markup = fake_service._send_message.await_args.args
         assert chat_id == 7024
-        assert telegram_webhook._localized_text("contact_linked", "ru") in text
-        assert telegram_webhook._localized_text("notification_consent", "ru") in text
-        assert reply_markup == telegram_webhook._localized_notification_consent_menu(
-            "ru"
+        assert text == telegram_webhook._localized_text(
+            "contact_verification_required", "ru"
+        )
+        assert phone_number not in text
+        assert test_patient.short_name() not in text
+        button = reply_markup["inline_keyboard"][0][0]
+        assert button["text"] == telegram_webhook._localized_text(
+            "onboarding_entry_button", "ru"
+        )
+        assert button["web_app"]["url"] == (
+            "https://example.test" + telegram_webhook.PATIENT_BOOKING_ENTRY_ROUTE
         )
 
     @pytest.mark.asyncio
     async def test_ticket_qr_link_new_user_prompts_notification_consent(
-        self, db_session, test_patient, monkeypatch
+        self, db_session, test_visit
     ):
         fake_service = FakeTelegramBotService(active=True)
-        monkeypatch.setattr(
-            telegram_webhook,
-            "consume_telegram_ticket_start_token",
-            lambda _db, _token: SimpleNamespace(patient_id=test_patient.id),
-        )
+        token = _seed_ticket_qr(db_session, test_visit)
         update = {
             "update_id": 128,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7025},
+                "chat": {"id": 7025, "type": "private"},
                 "from": {"id": 7025, "language_code": "uz"},
-                "text": f"/start {telegram_webhook.TELEGRAM_TICKET_QR_PREFIX}_abc",
+                "text": f"/start {token}",
             },
         }
 
@@ -3050,7 +3086,7 @@ class TestMiniAppClinicCalendarDateValidation:
         telegram_user = (
             db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7025).one()
         )
-        assert telegram_user.patient_id == test_patient.id
+        assert telegram_user.patient_id == test_visit.patient_id
         assert telegram_user.notifications_enabled is False
         assert telegram_user.appointment_reminders is False
         assert telegram_user.lab_notifications is False
@@ -3063,11 +3099,138 @@ class TestMiniAppClinicCalendarDateValidation:
         assert reply_markup == telegram_webhook._localized_notification_consent_menu(
             "uz-Latn"
         )
+        db_session.refresh(test_visit)
+        assert test_visit.confirmation_token is None
+
+        fake_service._send_message.reset_mock()
+        assert await telegram_webhook._handle_ticket_qr_start(
+            update, db_session, fake_service
+        )
+        assert fake_service._send_message.await_args.args[1] == (
+            telegram_webhook._localized_text("ticket_qr_expired", "uz-Latn")
+        )
+
+    @pytest.mark.parametrize(
+        "chat,sender_id",
+        [
+            ({"id": 7025, "type": "group"}, 7025),
+            ({"id": 7025, "type": "private"}, 7027),
+            ({"id": "7025", "type": "private"}, "7025"),
+            ({"id": True, "type": "private"}, True),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_qr_and_contact_require_matching_private_chat(
+        self, db_session, test_visit, chat, sender_id
+    ):
+        fake_service = FakeTelegramBotService(active=True)
+        token = _seed_ticket_qr(db_session, test_visit)
+        token_hash = test_visit.confirmation_token
+        sender = {"id": sender_id}
+        assert await telegram_webhook._handle_ticket_qr_start(
+            {"message": {"chat": chat, "from": sender, "text": f"/start {token}"}},
+            db_session,
+            fake_service,
+        )
+        assert await telegram_webhook._handle_contact_link(
+            {
+                "chat": chat,
+                "from": sender,
+                "contact": {"user_id": sender_id, "phone_number": "+998000000000"},
+            },
+            db_session,
+            fake_service,
+        )
+        db_session.refresh(test_visit)
+        assert test_visit.confirmation_token == token_hash
+        assert db_session.query(TelegramUser).count() == 0
+        fake_service._send_message.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_patient_onboarding_contact_consent_reaches_localized_menu(
-        self, db_session, test_patient
+    async def test_qr_link_conflict_rolls_back_token_consumption(
+        self, db_session, test_visit
     ):
+        fake_service = FakeTelegramBotService(active=True)
+        token = _seed_ticket_qr(db_session, test_visit)
+        token_hash = test_visit.confirmation_token
+        expires_at = test_visit.confirmation_expires_at
+        linked_user = _link_patient_to_chat(
+            db_session, chat_id=7027, patient_id=test_visit.patient_id
+        )
+        assert await telegram_webhook._handle_ticket_qr_start(
+            {
+                "message": {
+                    "chat": {"id": 7025, "type": "private"},
+                    "from": {"id": 7025},
+                    "text": f"/start {token}",
+                }
+            },
+            db_session,
+            fake_service,
+        )
+        db_session.refresh(test_visit)
+        assert test_visit.confirmation_token == token_hash
+        assert test_visit.confirmation_expires_at == expires_at
+        db_session.refresh(linked_user)
+        assert linked_user.patient_id == test_visit.patient_id
+        assert linked_user.notifications_enabled is True
+        assert db_session.query(TelegramUser).count() == 1
+        assert fake_service._send_message.await_args.args[1] == (
+            telegram_webhook._localized_text("ticket_qr_link_failed", "ru")
+        )
+
+    @pytest.mark.asyncio
+    async def test_contact_and_ordinary_start_preserve_link_and_profile_flags(
+        self, db_session, test_patient, monkeypatch
+    ):
+        monkeypatch.setattr(
+            telegram_webhook.settings, "FRONTEND_URL", "https://example.test"
+        )
+        fake_service = FakeTelegramBotService(active=True)
+        chat_id = 7028
+        profile = _link_patient_to_chat(
+            db_session, chat_id=chat_id, patient_id=test_patient.id
+        )
+        profile.active = False
+        profile.blocked = True
+        profile.lab_notifications = False
+        db_session.commit()
+
+        message = {
+            "chat": {"id": chat_id, "type": "private"},
+            "from": {"id": chat_id},
+        }
+        assert await telegram_webhook._handle_contact_link(
+            {
+                **message,
+                "contact": {
+                    "user_id": chat_id,
+                    "phone_number": test_patient.phone,
+                },
+            },
+            db_session,
+            fake_service,
+        )
+        assert await telegram_webhook._handle_clinic_bot_update(
+            {"message": {**message, "text": "/start"}},
+            db_session,
+            fake_service,
+        )
+        db_session.refresh(profile)
+        assert profile.patient_id == test_patient.id
+        assert profile.active is False
+        assert profile.blocked is True
+        assert profile.notifications_enabled is True
+        assert profile.appointment_reminders is True
+        assert profile.lab_notifications is False
+
+    @pytest.mark.asyncio
+    async def test_contact_guidance_then_qr_consent_reaches_localized_menu(
+        self, db_session, test_visit, test_patient, monkeypatch
+    ):
+        monkeypatch.setattr(
+            telegram_webhook.settings, "FRONTEND_URL", "https://example.test"
+        )
         chat_id = 7026
         fake_service = FakeTelegramBotService(active=True)
         start_update = {
@@ -3126,7 +3289,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 131,
             "message": {
                 "message_id": 3,
-                "chat": {"id": chat_id},
+                "chat": {"id": chat_id, "type": "private"},
                 "from": {"id": chat_id, "language_code": "uz"},
                 "contact": {
                     "user_id": chat_id,
@@ -3141,11 +3304,39 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         db_session.refresh(telegram_user)
+        assert telegram_user.patient_id is None
+        assert telegram_user.notifications_enabled is False
+        chat_arg, text_arg, reply_markup = fake_service._send_message.await_args.args
+        assert chat_arg == chat_id
+        assert text_arg == telegram_webhook._localized_text(
+            "contact_verification_required", "uz-Latn"
+        )
+        assert reply_markup["inline_keyboard"][0][0]["text"] == (
+            telegram_webhook._localized_text("onboarding_entry_button", "uz-Latn")
+        )
+        fake_service._send_message.reset_mock()
+
+        token = _seed_ticket_qr(db_session, test_visit)
+        qr_update = {
+            "update_id": 132,
+            "message": {
+                "message_id": 4,
+                "chat": {"id": chat_id, "type": "private"},
+                "from": {"id": chat_id, "language_code": "uz"},
+                "text": f"/start {token}",
+            },
+        }
+        assert await telegram_webhook._handle_clinic_bot_update(
+            qr_update, db_session, fake_service
+        )
+        db_session.refresh(telegram_user)
         assert telegram_user.patient_id == test_patient.id
         assert telegram_user.notifications_enabled is False
         chat_arg, text_arg, reply_markup = fake_service._send_message.await_args.args
         assert chat_arg == chat_id
-        assert telegram_webhook._localized_text("contact_linked", "uz-Latn") in text_arg
+        assert (
+            telegram_webhook._localized_text("ticket_qr_linked", "uz-Latn") in text_arg
+        )
         assert (
             telegram_webhook._localized_text("notification_consent", "uz-Latn")
             in text_arg
@@ -3156,9 +3347,9 @@ class TestMiniAppClinicCalendarDateValidation:
         fake_service._send_message.reset_mock()
 
         consent_update = {
-            "update_id": 132,
+            "update_id": 133,
             "message": {
-                "message_id": 4,
+                "message_id": 5,
                 "chat": {"id": chat_id},
                 "from": {"id": chat_id, "language_code": "uz"},
                 "text": "Xabarnomalarga roziman",
@@ -3191,7 +3382,7 @@ class TestMiniAppClinicCalendarDateValidation:
         assert template_keys == [
             "telegram_patient_language_prompt",
             "telegram_patient_language_selected_needs_contact",
-            "telegram_patient_contact_linked",
+            "telegram_patient_contact_verification_required",
             "telegram_patient_notifications_enabled",
         ]
 

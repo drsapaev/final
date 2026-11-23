@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -152,9 +153,7 @@ class PatientService:
             if current_patient is None or current_patient.id != patient_id:
                 raise PatientReadAccessDenied("patient_self_scope_mismatch")
 
-        if current_user.is_superuser or not is_doctor_role_spelling(
-            current_user.role
-        ):
+        if current_user.is_superuser or not is_doctor_role_spelling(current_user.role):
             return None
 
         allowed_doctor_ids = self._doctor_allowed_doctor_ids(current_user)
@@ -176,10 +175,7 @@ class PatientService:
         phone: str | None,
     ) -> list[Patient]:
         doctor_ids = None
-        if (
-            is_doctor_role_spelling(current_user.role)
-            and not current_user.is_superuser
-        ):
+        if is_doctor_role_spelling(current_user.role) and not current_user.is_superuser:
             doctor_ids = self._doctor_allowed_doctor_ids(current_user)
         return patient_crud.get_patients(
             self.db,
@@ -244,7 +240,9 @@ class PatientService:
         request: Request,
         patient_in: PatientCreate,
         current_user: User,
+        before_commit: Callable[[Patient], None] | None = None,
     ) -> Patient:
+        """Create a patient, optionally staging related writes before its commit."""
         if patient_in.phone:
             existing_patient = patient_crud.get_patient_by_phone(
                 self.db, phone=patient_in.phone
@@ -372,7 +370,12 @@ class PatientService:
             address=patient_in.address,
         )
 
-        patient = patient_crud.create(db=self.db, obj_in=validated_patient)
+        if before_commit is None:
+            patient = patient_crud.create(db=self.db, obj_in=validated_patient)
+        else:
+            patient = patient_crud.create(
+                db=self.db, obj_in=validated_patient, commit=False
+            )
         self.db.refresh(patient)
         if not patient.last_name or not patient.last_name.strip():
             raise HTTPException(
@@ -404,6 +407,8 @@ class PatientService:
             # идентифицируем пациента ID (AGENTS.md L390-407).
             description=f"Создан пациент #{patient.id}",
         )
+        if before_commit is not None:
+            before_commit(patient)
         self.db.commit()
         # Perf (P0 2026-09-04): the registration fan-out (role-target lookups,
         # profiles, deliveries) costs dozens of remote-DB roundtrips — it ran
@@ -417,9 +422,7 @@ class PatientService:
             else "registrar_panel"
         )
         try:
-            _request_bind_is_sqlite = (
-                self.db.get_bind().dialect.name == "sqlite"
-            )
+            _request_bind_is_sqlite = self.db.get_bind().dialect.name == "sqlite"
         except Exception:
             _request_bind_is_sqlite = False
 
