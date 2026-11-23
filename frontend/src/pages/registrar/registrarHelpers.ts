@@ -444,28 +444,46 @@ export const buildPostWizardPaymentRow = (wizardResult: Record<string, unknown> 
       .map((service) => service?.name || service?.code)
       .filter(Boolean)
   );
-  const queueNumbers = flattenWizardQueueNumbers(wizardResult.queue_numbers);
-  const firstQueueNumber = queueNumbers.find((queueItem) => (
-    queueItem?.queue_number !== null &&
-    queueItem?.queue_number !== undefined &&
-    queueItem?.queue_number !== ''
-  ));
-  const printTickets = (Array.isArray(wizardResult.print_tickets) ? (wizardResult.print_tickets as Array<Record<string, unknown>>) : [])
-    .map((ticket, index) => {
-      if (!ticket || typeof ticket !== 'object') return null;
-      const queueNumber = ticket.queue_number ??
-        ticket.number ??
-        ticket.ticket_number ??
-        queueNumbers[index]?.queue_number ??
-        queueNumbers[index]?.number ??
-        null;
-      if (queueNumber === null || queueNumber === undefined || queueNumber === '') return null;
-      return {
-        ...ticket,
-        queue_number: queueNumber,
-      };
-    })
-    .filter(Boolean);
+  const visitDetails = new Map(createdVisits
+    .filter((visit) => hasQueueIdentityValue(visit.visit_id))
+    .map((visit) => [String(visit.visit_id), visit]));
+  const withVisitDetails = (ticket: Record<string, unknown>): Record<string, unknown> => {
+    const visit = visitDetails.get(String(ticket.visit_id));
+    return {
+      doctor_name: visit?.doctor_name,
+      department: visit?.department,
+      visit_date: visit?.visit_date,
+      visit_time: visit?.visit_time,
+      ...ticket,
+    };
+  };
+  const queueNumbers = flattenWizardQueueNumbers(wizardResult.queue_numbers)
+    .flatMap((assignment) => assignment ? [withVisitDetails(assignment)] : []);
+  const issuedAssignments = queueNumbers.filter((assignment) =>
+    normalizeIssuedQueueTicket(assignment.queue_number) !== null);
+  const firstQueueNumber = issuedAssignments[0];
+  const usedAssignments = new Set<Record<string, unknown>>();
+  const printTickets = (Array.isArray(wizardResult.print_tickets)
+    ? wizardResult.print_tickets as Array<Record<string, unknown>>
+    : []).flatMap((ticket) => {
+    if (!ticket || typeof ticket !== 'object') return [];
+    const explicitNumber = normalizeIssuedQueueTicket(ticket.queue_number ?? ticket.number ?? ticket.ticket_number);
+    const candidates = hasQueueIdentityValue(ticket.visit_id) ? issuedAssignments.filter((assignment) =>
+      String(assignment.visit_id) === String(ticket.visit_id) &&
+      (!hasQueueIdentityValue(ticket.queue_id) || String(assignment.queue_id) === String(ticket.queue_id)) &&
+      (!hasQueueIdentityValue(ticket.queue_tag) || String(assignment.queue_tag) === String(ticket.queue_tag)) &&
+      (!explicitNumber || normalizeIssuedQueueTicket(assignment.queue_number) === explicitNumber)
+    ) : [];
+    const assignment = candidates.length === 1 ? candidates[0] : undefined;
+    if (assignment) usedAssignments.add(assignment);
+    const queueNumber = explicitNumber ?? assignment?.queue_number;
+    // A partially shaped print item may only inherit from its own assignment.
+    if (!queueNumber) return [];
+    return [withVisitDetails({ ...assignment, ...ticket, queue_number: queueNumber })];
+  });
+  if (printTickets.length > 0) {
+    printTickets.push(...issuedAssignments.filter((assignment) => !usedAssignments.has(assignment)));
+  }
   const totalAmount = Number(wizardResult.total_amount ?? 0);
 
   return {
