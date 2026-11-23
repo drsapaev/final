@@ -12,7 +12,16 @@ from app.schemas.public_site import (
     PublicSiteClinicOut,
     PublicSiteDoctorOut,
     PublicSiteLocale,
+    PublicSiteRelatedDoctorOut,
+    PublicSiteServiceDetailOut,
     PublicSiteServiceOut,
+)
+from app.schemas.public_site_admin import WEBSITE_SLUG_PATTERN
+from app.services.registrar_doctor_eligibility import (
+    accepted_specialty_variants_for_department_key,
+    is_named_eligible_real_doctor,
+    service_has_explicit_doctor_assignment,
+    service_requires_doctor_selection,
 )
 
 if TYPE_CHECKING:
@@ -196,9 +205,53 @@ class PublicSiteReadService:
 
     def get_service(
         self, slug: str, locale: PublicSiteLocale
-    ) -> PublicSiteServiceOut | None:
+    ) -> PublicSiteServiceDetailOut | None:
         row = self.repository.get_public_service_by_slug(slug)
-        return self._service_out(row, locale) if row is not None else None
+        if row is None or (card := self._service_out(row, locale)) is None:
+            return None
+        return PublicSiteServiceDetailOut(
+            **card.model_dump(), related_doctors=self._related_doctors(row)
+        )
+
+    def _related_doctors(self, service: Service) -> list[PublicSiteRelatedDoctorOut]:
+        if not (
+            service_requires_doctor_selection(service)
+            or service_has_explicit_doctor_assignment(service)
+        ):
+            return []
+        queue_tag = _clean_text(service.queue_tag)
+        if (service.is_consultation and queue_tag is None) or (
+            self.repository.service_has_resource_queue(queue_tag)
+        ):
+            return []
+
+        specialties = accepted_specialty_variants_for_department_key(
+            service.department_key
+        )
+        result = []
+        for doctor in self.repository.list_public_service_doctor_candidates(service):
+            if not self._doctor_content_is_complete(doctor) or not (
+                is_named_eligible_real_doctor(doctor, doctor.user)
+            ):
+                continue
+            if specialties is not None:
+                if (doctor.specialty or "").strip().lower() not in specialties:
+                    continue
+                if doctor.department is not None:
+                    department_specialties = (
+                        accepted_specialty_variants_for_department_key(
+                            doctor.department.key
+                        )
+                    )
+                    if not department_specialties or specialties.isdisjoint(
+                        department_specialties
+                    ):
+                        continue
+            slug = doctor.slug
+            name = _clean_text(doctor.user.full_name) if doctor.user else None
+            if slug and name and re.fullmatch(WEBSITE_SLUG_PATTERN, slug):
+                result.append(PublicSiteRelatedDoctorOut(slug=slug, name=name))
+        return result
 
     @classmethod
     def _category_rows(

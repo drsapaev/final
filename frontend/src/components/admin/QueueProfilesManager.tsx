@@ -298,6 +298,10 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [deleteError, setDeleteError] = useState<{ key: string; message: string } | null>(null);
+    const revealDeleteError = useCallback((node: HTMLDivElement | null) => {
+        node?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    }, []);
     const [editingProfile, setEditingProfile] = useState<QueueProfileDto | null>(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
     // PR-21: load departments for department_key Select in ProfileForm
@@ -329,6 +333,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     const loadProfiles = useCallback(async (options: { silent?: boolean; clearSelection?: boolean } = {}): Promise<QueueProfileDto[] | null> => {
         try {
             setError(null);
+            setDeleteError(null);
             if (!options.silent) setLoading(true);
             const response = (await api.get('/queues/profiles?active_only=false')) as import('axios').AxiosResponse<Record<string, unknown>>;
             const loadedProfiles = ((response.data.profiles as unknown[]) || []) as unknown as QueueProfileDto[];
@@ -478,6 +483,9 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             return matchesSearch && matchesStatus;
         });
     }, [profiles, searchTerm, statusFilter]);
+
+    const hiddenDeleteError = deleteError && !filteredProfiles.some((profile) => profile.key === deleteError.key);
+    const deleteErrorProfile = deleteError && profiles.find((profile) => profile.key === deleteError.key);
 
     // ⭐ New: Statistics
     const stats = useMemo(() => ({
@@ -798,6 +806,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
         try {
             setSaving(true);
             setError(null);
+            setDeleteError(null);
             await api.put(`/queues/profiles/${profileKey}`, profileData);
             const refreshedProfiles = await loadProfiles();
             if (profileData.show_on_qr_page === true
@@ -832,13 +841,14 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
         try {
             setSaving(true);
             setError(null);
+            setDeleteError(null);
             await api.delete(`/queues/profiles/${profileKey}`);
             await loadProfiles();
             removePendingCsvPublication(profileKey);
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
-            logger.error('Error deleting profile:', err);
-            setError(queueProfileDeleteErrorMessage(err, t('admin2.qp_delete_error'), t));
+            logger.error('[FIX] Error deleting profile:', err);
+            setDeleteError({ key: profileKey, message: queueProfileDeleteErrorMessage(err, t('admin2.qp_delete_error'), t) });
         } finally {
             setSaving(false);
         }
@@ -1115,7 +1125,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
 
                 {/* Error message */}
                 {error && (
-                    <div className="admin-qp-error">
+                    <div className="admin-qp-error" role="alert">
                         <AlertCircle size={16} />
                         {error}
                         <button
@@ -1124,6 +1134,21 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                             aria-label={t('admin2.qp_hide_error_aria')}
                         >
                             <X size={16} />
+                        </button>
+                    </div>
+                )}
+
+                {hiddenDeleteError && deleteError && (
+                    <div className="admin-qp-error" role="alert" ref={revealDeleteError}>
+                        <AlertCircle size={16} aria-hidden="true" />
+                        <span><strong>{deleteErrorProfile ? getQueueProfileDisplayName(deleteErrorProfile) : deleteError.key}</strong>: {deleteError.message}</span>
+                        <button
+                            type="button"
+                            className="admin-ml-auto-bg-none-bd-none-cur-pointer"
+                            onClick={() => setDeleteError(null)}
+                            aria-label={t('admin2.qp_hide_error_aria')}
+                        >
+                            <X size={16} aria-hidden="true" />
                         </button>
                     </div>
                 )}
@@ -1435,6 +1460,20 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                             <Trash2 size={16} />
                                         </button>
                                     </div>
+                                    {deleteError?.key === profile.key && (
+                                        <div className="admin-qp-error" role="alert" ref={revealDeleteError}>
+                                            <AlertCircle size={16} aria-hidden="true" />
+                                            {deleteError.message}
+                                            <button
+                                                type="button"
+                                                className="admin-ml-auto-bg-none-bd-none-cur-pointer"
+                                                onClick={() => setDeleteError(null)}
+                                                aria-label={t('admin2.qp_hide_error_aria')}
+                                            >
+                                                <X size={16} aria-hidden="true" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </td>
                             </tr>
                         ))}

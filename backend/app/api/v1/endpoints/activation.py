@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.activation import activate_key, issue_key, validate_server_activation
+from app.core.activation_rate_limit import enforce_activation_budget
 from app.models.activation import ActivationStatus
 from app.schemas.activation import (
     ActivationActivateIn,
@@ -45,12 +46,36 @@ async def activation_issue(
     "/activate",
     response_model=ActivationActivateOut,
     summary="Активировать ключ на этом сервере",
+    responses={
+        429: {
+            "description": "Activation attempt budget exceeded",
+            "headers": {
+                "Retry-After": {
+                    "schema": {"type": "string"},
+                    "description": "Seconds until retry",
+                }
+            },
+            "content": {"application/json": {"schema": {
+                "type": "object", "required": ["detail"],
+                "properties": {"detail": {"type": "string"}},
+            }}},
+        },
+        503: {
+            "description": "Activation temporarily unavailable",
+            "content": {"application/json": {"schema": {
+                "type": "object", "required": ["detail"],
+                "properties": {"detail": {"type": "string"}},
+            }}},
+        },
+    },
 )
-async def activation_activate(
+def activation_activate(
     body: ActivationActivateIn,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     # Разрешаем без токена, чтобы сервер можно было активировать «с нуля».
+    enforce_activation_budget(request, db)
     res = activate_key(db, key=body.key)
     return ActivationActivateOut(
         ok=res.ok,
@@ -73,11 +98,16 @@ async def activation_status(
     return ActivationStatusOut(
         ok=st.ok,
         reason=st.reason,
-        key=st.key,
+        key=_mask_activation_value(st.key),
         expiry_date=st.expiry_date,
         status=st.status,  # type: ignore[arg-type]
-        machine_hash=st.machine_hash,
+        machine_hash=_mask_activation_value(st.machine_hash),
     )
+
+
+def _mask_activation_value(value: str | None) -> str | None:
+    """Expose only a short suffix of public status identifiers."""
+    return ("****" + value[-4:]) if value and len(value) > 4 else ("****" if value else None)
 
 
 # -------- Admin management: list / revoke / extend --------

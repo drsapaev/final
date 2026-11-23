@@ -1,22 +1,28 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.core.config import settings
 from app.models.online_queue import DailyQueue
 from app.models.service import Service
-from app.models.telegram_config import TelegramConfig
+from app.models.telegram_config import TelegramConfig, TelegramUser
 from app.models.visit import VisitService
 from app.services.visit_confirmation_service import (
-    build_telegram_ticket_start_token,
-    consume_telegram_ticket_start_token,
-    parse_telegram_ticket_start_token,
     TELEGRAM_TICKET_QR_TTL_MINUTES,
     VisitConfirmationDomainError,
     VisitConfirmationService,
+    build_telegram_ticket_start_token,
+    build_telegram_visit_action_token,
+    consume_telegram_ticket_start_token,
+    parse_telegram_ticket_start_token,
 )
+
+
+@pytest.fixture(autouse=True)
+def _future_telegram_start(monkeypatch):
+    monkeypatch.setattr("app.tasks.worker._appointment_start_utc", lambda visit: datetime.now(UTC) + timedelta(days=1))
 
 
 @pytest.mark.unit
@@ -65,12 +71,26 @@ class TestVisitConfirmationService:
         test_visit.confirmation_channel = "telegram"
         test_visit.confirmation_expires_at = datetime.utcnow() + timedelta(hours=1)
         test_visit.created_at = datetime.utcnow() - timedelta(minutes=2)
+        link = db_session.query(TelegramUser).filter_by(chat_id=12345).first()
+        if link is None:
+            link = TelegramUser(chat_id=12345)
+            db_session.add(link)
+        link.patient_id = test_visit.patient_id
+        link.active = True
+        link.blocked = False
+        link.notifications_enabled = True
+        link.appointment_reminders = True
         db_session.commit()
 
         service = VisitConfirmationService(db_session)
+        capability = build_telegram_visit_action_token(
+            visit_id=test_visit.id, confirmation_token=test_visit.confirmation_token,
+            link_id=link.id, chat_id=link.chat_id, patient_id=test_visit.patient_id,
+            link_epoch=link.patient_link_epoch, visit_context_epoch=test_visit.confirmation_context_epoch,
+        )
 
         result = service.confirm_by_telegram(
-            token=test_visit.confirmation_token,
+            token=capability,
             telegram_user_id="12345",
             source_ip="127.0.0.1",
             user_agent="Mozilla/5.0",

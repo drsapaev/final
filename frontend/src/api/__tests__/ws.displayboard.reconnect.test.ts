@@ -120,6 +120,55 @@ describe('openDisplayBoardWS reconnect policy (DISPLAYWS-FE-004)', () => {
     expect(FakeWebSocket.instances.length).toBe(4);
   });
 
+  it('requests a fresh board-scoped token before every connection', async () => {
+    const tokenProvider = vi.fn()
+      .mockResolvedValueOnce('device-token-one')
+      .mockResolvedValueOnce('device-token-two');
+    openDisplayBoardWS('main_board', () => {}, () => {}, () => {}, tokenProvider);
+    await Promise.resolve();
+
+    expect(FakeWebSocket.instances[0].protocols).toEqual(['bearer.device-token-one']);
+    FakeWebSocket.instances[0].simulateOpen();
+    FakeWebSocket.instances[0].simulateAbnormalClose(1008);
+    vi.advanceTimersByTime(3500);
+    await Promise.resolve();
+
+    expect(tokenProvider).toHaveBeenCalledTimes(2);
+    expect(FakeWebSocket.instances[1].protocols).toEqual(['bearer.device-token-two']);
+  });
+
+  it('waits for provisioning after a missing or revoked device session', async () => {
+    const provisioningError = Object.assign(new Error('Provisioning required'), {
+      code: 'DISPLAY_DEVICE_PROVISIONING_REQUIRED',
+    });
+    const tokenProvider = vi.fn().mockRejectedValue(provisioningError);
+
+    openDisplayBoardWS('main_board', () => {}, () => {}, () => {}, tokenProvider);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(tokenProvider).toHaveBeenCalledTimes(1);
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    vi.advanceTimersByTime(120_000);
+    await Promise.resolve();
+    expect(tokenProvider).toHaveBeenCalledTimes(1);
+    expect(FakeWebSocket.instances).toHaveLength(0);
+  });
+
+  it('checks device provisioning when WebSockets are disabled', async () => {
+    vi.stubEnv('VITE_ENABLE_WS', '0');
+    const tokenProvider = vi.fn().mockResolvedValue('device-token');
+    const onConnect = vi.fn();
+
+    openDisplayBoardWS('main_board', () => {}, onConnect, () => {}, tokenProvider);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(tokenProvider).toHaveBeenCalledTimes(1);
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    expect(onConnect).not.toHaveBeenCalled();
+  });
+
   it('does not reconnect after a manual close (code 1000)', () => {
     const close = openDisplayBoardWS('main_board', () => {}, () => {}, () => {});
     const socket = FakeWebSocket.instances[0];

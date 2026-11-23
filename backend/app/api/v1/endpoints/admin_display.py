@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -31,17 +31,29 @@ from app.models.display_config import (
     DisplayAnnouncement,
     DisplayBanner,
     DisplayBoard,
+    DisplayBoardDevice,
     DisplayTheme,
     DisplayVideo,
 )
 from app.models.user import User
 from app.schemas.display_config import DisplayBoardUpdate
+from app.schemas.display_device import (
+    DisplayBoardDeviceCreateRequest,
+    DisplayBoardDeviceCreatedResponse,
+    DisplayBoardDeviceResponse,
+)
 from app.schemas.misc_endpoints import DisplayBannerRequest, DisplayTestRequest
+from app.services.display_device_credentials import (
+    create_display_board_device,
+    revoke_display_board_device,
+    rotate_display_board_device,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ADMIN_DISPLAY_PUBLIC_ERROR = "Internal server error"
+DISPLAY_DEVICE_ADMIN_ROLES = ("Admin", "SuperAdmin")
 
 
 def _admin_display_http_error(exc: Exception) -> HTTPException:
@@ -233,6 +245,121 @@ def update_display_board(
         raise
     except Exception as e:
         raise _admin_display_http_error(e) from e
+
+
+@router.get(
+    "/display/boards/{board_id}/devices",
+    response_model=list[DisplayBoardDeviceResponse],
+)
+def list_display_board_devices(
+    board_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(*DISPLAY_DEVICE_ADMIN_ROLES)),
+):
+    """List device metadata without returning any stored credential material."""
+    board = db.query(DisplayBoard).filter(DisplayBoard.id == board_id).first()
+    if board is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+    devices = (
+        db.query(DisplayBoardDevice)
+        .filter(DisplayBoardDevice.board_id == board_id)
+        .order_by(DisplayBoardDevice.id)
+        .all()
+    )
+    return [
+        DisplayBoardDeviceResponse(
+            id=device.id,
+            board_id=device.board_id,
+            device_name=device.device_name,
+            status=device.status,
+            last_connected_at=device.last_connected_at,
+            created_at=device.created_at,
+            rotated_at=device.rotated_at,
+        )
+        for device in devices
+    ]
+
+
+@router.post(
+    "/display/boards/{board_id}/devices",
+    response_model=DisplayBoardDeviceCreatedResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_display_board_device_endpoint(
+    board_id: int,
+    body: DisplayBoardDeviceCreateRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(*DISPLAY_DEVICE_ADMIN_ROLES)),
+):
+    """Create a board device; return its random credential only in this response."""
+    response.headers["Cache-Control"] = "no-store"
+    board = db.query(DisplayBoard).filter(DisplayBoard.id == board_id).first()
+    if board is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+    device, secret = create_display_board_device(
+        db,
+        board=board,
+        device_name=body.device_name,
+        created_by=int(current_user.id),
+    )
+    return DisplayBoardDeviceCreatedResponse(
+        id=device.id,
+        board_id=device.board_id,
+        device_name=device.device_name,
+        status=device.status,
+        secret=secret,
+    )
+
+
+@router.post(
+    "/display/boards/{board_id}/devices/{device_id}/rotate",
+    response_model=DisplayBoardDeviceCreatedResponse,
+)
+def rotate_display_board_device_endpoint(
+    board_id: int,
+    device_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(*DISPLAY_DEVICE_ADMIN_ROLES)),
+):
+    """Replace a device credential and invalidate every previously issued JWT."""
+    response.headers["Cache-Control"] = "no-store"
+    device = (
+        db.query(DisplayBoardDevice)
+        .filter(
+            DisplayBoardDevice.id == device_id,
+            DisplayBoardDevice.board_id == board_id,
+        )
+        .first()
+    )
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    secret = rotate_display_board_device(db, device)
+    return DisplayBoardDeviceCreatedResponse(
+        id=device.id,
+        board_id=device.board_id,
+        device_name=device.device_name,
+        status=device.status,
+        secret=secret,
+    )
+
+
+@router.delete("/display/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_display_board_device_endpoint(
+    device_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(*DISPLAY_DEVICE_ADMIN_ROLES)),
+):
+    """Revoke one display device and terminate its already-issued JWT grants."""
+    device = (
+        db.query(DisplayBoardDevice)
+        .filter(DisplayBoardDevice.id == device_id)
+        .first()
+    )
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    revoke_display_board_device(db, device)
 
 
 # ===================== БАННЕРЫ =====================

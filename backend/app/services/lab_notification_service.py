@@ -10,6 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
 from app.models.lab import LabOrder, LabResult
+from app.models.notification import (
+    NotificationDelivery,
+    NotificationEvent,
+    NotificationHistory,
+)
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
@@ -58,6 +63,55 @@ class LabNotificationService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _lab_inbox_delivery_exists(
+        self,
+        *,
+        event_type: str,
+        recipient_id: int,
+        entity_id: int,
+        expected_value: float | None = None,
+    ) -> bool:
+        snapshots = (
+            self.db.query(NotificationEvent.payload_snapshot)
+            .select_from(NotificationEvent)
+            .join(
+                NotificationDelivery,
+                NotificationDelivery.event_id == NotificationEvent.id,
+            )
+            .filter(
+                NotificationDelivery.recipient_type == "user",
+                NotificationDelivery.recipient_id == recipient_id,
+                NotificationDelivery.channel == "in_app_inbox",
+                NotificationEvent.event_type == event_type,
+                NotificationEvent.source_module == "lab",
+                NotificationEvent.entity_type == "lab_result",
+                NotificationEvent.entity_id == str(entity_id),
+            )
+            .all()
+        )
+        if expected_value is None:
+            return bool(snapshots)
+        return any(
+            ((snapshot or {}).get("metadata") or {}).get("value") == expected_value
+            for (snapshot,) in snapshots
+        )
+
+    def _lab_sms_delivery_exists(self, *, patient_id: int, order_id: int) -> bool:
+        return (
+            self.db.query(NotificationHistory.id)
+            .filter(
+                NotificationHistory.recipient_type == "patient",
+                NotificationHistory.recipient_id == patient_id,
+                NotificationHistory.notification_type == "lab_results",
+                NotificationHistory.channel == "sms",
+                NotificationHistory.related_entity_type == "lab_order",
+                NotificationHistory.related_entity_id == order_id,
+                NotificationHistory.status.in_(["sent", "delivered"]),
+            )
+            .first()
+            is not None
+        )
+
     async def check_and_notify_ready_results(self) -> dict[str, Any]:
         """
         Проверяет готовые результаты и отправляет уведомления пациентам
@@ -66,8 +120,8 @@ class LabNotificationService:
             Статистика отправленных уведомлений
         """
         try:
-            # Находим готовые результаты. Дедупликация здесь не хранится в модели,
-            # поэтому этот сервис отвечает только за canonical delivery.
+            # Existing inbox/SMS history records are the durable dedup markers;
+            # this scheduler can safely revisit completed orders after retries.
             ready_orders = self.db.query(LabOrder).filter(LabOrder.status == "completed").all()
 
             notifications_sent = 0
@@ -75,8 +129,8 @@ class LabNotificationService:
 
             for order in ready_orders:
                 try:
-                    await self._notify_patient_results_ready(order)
-                    notifications_sent += 1
+                    if await self._notify_patient_results_ready(order):
+                        notifications_sent += 1
                 except Exception as e:
                     errors.append({"order_id": order.id, "error": str(e)})
 
@@ -92,53 +146,56 @@ class LabNotificationService:
             logger.error(f"Error checking ready results: {e}")
             return {"error": str(e)}
 
-    async def _notify_patient_results_ready(self, order: LabOrder):
+    async def _notify_patient_results_ready(self, order: LabOrder) -> bool:
         """Отправляет уведомление пациенту о готовности результатов"""
         patient = self.db.query(Patient).filter(Patient.id == order.patient_id).first()
 
         if not patient:
-            return
+            return False
+
+        newly_delivered = False
 
         # Получаем пользователя пациента
         user = None
         if patient.user_id:
             user = self.db.query(User).filter(User.id == patient.user_id).first()
 
-        message = f"""
-✅ Результаты анализов готовы!
-
-Уважаемый(ая) {patient.short_name()},
-
-Ваши результаты лабораторных исследований готовы.
-Номер заказа: {order.id}
-Дата забора: {order.created_at.strftime('%d.%m.%Y')}
-
-Вы можете просмотреть результаты в личном кабинете или получить их в регистратуре клиники.
-
-С уважением,
-Ваша клиника
-        """.strip()
-
         # Отправляем через доступные каналы
         if user:
-            canonical_created = await notification_sender_service.send_lab_event_notification(
-                db=self.db,
-                recipient=user,
+            canonical_recorded = self._lab_inbox_delivery_exists(
                 event_type="lab_results",
-                title="Результаты анализов готовы",
-                message=f"Результаты лабораторных исследований по заказу #{order.id} готовы.",
-                metadata={
-                    "order_id": order.id,
-                    "patient_id": order.patient_id,
-                    "result_id": None,
-                },
+                recipient_id=user.id,
+                entity_id=order.id,
             )
-            if not canonical_created:
-                logger.warning(
-                    "[FIX:NOTIFICATIONS] lab_results canonical delivery failed",
-                    extra={"order_id": order.id, "patient_user_id": user.id},
+            if canonical_recorded:
+                logger.debug(
+                    "Lab result inbox delivery already exists for order %s",
+                    order.id,
                 )
             else:
+                canonical_recorded = await notification_sender_service.send_lab_event_notification(
+                    db=self.db,
+                    recipient=user,
+                    event_type="lab_results",
+                    title="Результаты анализов готовы",
+                    message=f"Результаты лабораторных исследований по заказу #{order.id} готовы.",
+                    metadata={
+                        "order_id": order.id,
+                        "patient_id": order.patient_id,
+                        "result_id": None,
+                    },
+                )
+                newly_delivered = canonical_recorded
+                if not canonical_recorded:
+                    logger.warning(
+                        "[FIX:NOTIFICATIONS] lab_results canonical delivery failed",
+                        extra={"order_id": order.id, "patient_user_id": user.id},
+                    )
+            if canonical_recorded and not self._lab_inbox_delivery_exists(
+                event_type="lab_result_sent_confirmation",
+                recipient_id=user.id,
+                entity_id=order.id,
+            ):
                 confirmation_created = await notification_sender_service.send_lab_event_notification(
                     db=self.db,
                     recipient=user,
@@ -151,29 +208,88 @@ class LabNotificationService:
                         "result_id": None,
                     },
                 )
+                newly_delivered = newly_delivered or confirmation_created
                 if not confirmation_created:
                     logger.warning(
                         "[FIX:NOTIFICATIONS] lab_result_sent_confirmation canonical delivery failed",
                         extra={"order_id": order.id, "patient_user_id": user.id},
                     )
 
-            if hasattr(user, 'telegram_id') and user.telegram_id:
-                await notification_sender_service.send_telegram_message(
-                    user_id=user.telegram_id,
-                    message=message,
-                )
-
         # SMS если есть телефон
-        if patient.phone:
+        sms_opted_in = patient.phone and notification_sender_service._patient_channel_opted_in(
+            db=self.db,
+            patient_id=patient.id,
+            channel="sms",
+            event_type="lab_results",
+        )
+        sms_already_delivered = bool(
+            patient.phone
+            and self._lab_sms_delivery_exists(
+                patient_id=patient.id,
+                order_id=order.id,
+            )
+        )
+        if sms_opted_in:
             _short_message = f"Ваши анализы готовы! Заказ #{order.id}. Просмотр в личном кабинете."
-            # NOTIF-REAUDIT-28 P1-5: uncommented — patients without app/Telegram
-            # must receive lab result alerts via SMS. PR #1932 left this commented out.
-            try:
-                await notification_sender_service.send_sms(patient.phone, _short_message)
-            except Exception as sms_err:
-                logger.warning('Lab result SMS send failed for patient %s: %s', patient.id, sms_err)
+            if sms_already_delivered:
+                logger.debug(
+                    "Lab result SMS delivery already exists for order %s",
+                    order.id,
+                )
+            else:
+                # NOTIF-REAUDIT-28 P1-5: patients without a linked app still
+                # receive SMS, while persisted history prevents scheduler repeats.
+                try:
+                    sms_sent = await notification_sender_service.send_sms(
+                        patient.phone, _short_message
+                    )
+                    if sms_sent:
+                        self.db.add(
+                            NotificationHistory(
+                                recipient_type="patient",
+                                recipient_id=patient.id,
+                                recipient_contact=patient.phone,
+                                notification_type="lab_results",
+                                channel="sms",
+                                subject="Результаты анализов готовы",
+                                content=_short_message,
+                                status="sent",
+                                related_entity_type="lab_order",
+                                related_entity_id=order.id,
+                                notification_metadata={"order_id": order.id},
+                                sent_at=datetime.now(UTC).replace(tzinfo=None),
+                            )
+                        )
+                        self.db.flush()
+                        newly_delivered = True
+                    else:
+                        logger.warning(
+                            "Lab result SMS delivery failed for patient %s",
+                            patient.id,
+                        )
+                except Exception as sms_err:
+                    logger.warning(
+                        "Lab result SMS delivery failed for patient %s: %s",
+                        patient.id,
+                        sms_err,
+                    )
+        elif patient.phone:
+            logger.info(
+                "Lab result SMS skipped by patient preferences for patient %s",
+                patient.id,
+            )
 
-        logger.info(f"Notification sent for order {order.id} to patient {patient.id}")
+        if newly_delivered:
+            logger.info(
+                "Lab result notification delivered for order %s",
+                order.id,
+            )
+        elif not user and not sms_already_delivered:
+            logger.warning(
+                "Lab result notification was not delivered for order %s",
+                order.id,
+            )
+        return newly_delivered
 
     async def check_critical_values(self) -> dict[str, Any]:
         """
@@ -249,90 +365,90 @@ class LabNotificationService:
         if not doctor or not doctor.user_id:
             return
 
-        patient = self.db.query(Patient).filter(Patient.id == order.patient_id).first()
-
-        alert_type = "⬇️ КРИТИЧЕСКИ НИЗКОЕ" if value < thresholds["low"] else "⬆️ КРИТИЧЕСКИ ВЫСОКОЕ"
-
-        message = f"""
-🚨 КРИТИЧЕСКОЕ ЗНАЧЕНИЕ!
-
-{alert_type} значение:
-
-📊 Показатель: {result.test_name}
-📈 Значение: {value} {thresholds.get('unit', '')}
-📉 Норма: {thresholds['low']} - {thresholds['high']}
-
-👤 Пациент: {patient.short_name() if patient else f'ID {order.patient_id}'}
-
-Требуется срочное внимание!
-        """.strip()
-
-        # Отправляем врачу
+        # Отправляем врачу в защищённый inbox.
         doctor_user = self.db.query(User).filter(User.id == doctor.user_id).first()
-        if doctor_user:
-            canonical_created = await notification_sender_service.send_lab_event_notification(
+        if not doctor_user:
+            logger.warning(
+                "Critical value alert skipped: doctor account missing for result %s",
+                result.id,
+            )
+            return
+
+        metadata = {
+            "result_id": result.id,
+            "order_id": result.order_id,
+            "patient_id": order.patient_id,
+            "test_name": result.test_name,
+            "value": value,
+            "unit": thresholds.get("unit", ""),
+            "critical_low": thresholds["low"],
+            "critical_high": thresholds["high"],
+            "is_critical": True,
+        }
+        canonical_recorded = self._lab_inbox_delivery_exists(
+            event_type="lab_critical_result",
+            recipient_id=doctor_user.id,
+            entity_id=result.id,
+            expected_value=value,
+        )
+        newly_recorded = False
+        if canonical_recorded:
+            logger.debug(
+                "Critical result inbox delivery already exists for result %s",
+                result.id,
+            )
+        else:
+            canonical_recorded = await notification_sender_service.send_lab_event_notification(
                 db=self.db,
                 recipient=doctor_user,
                 event_type="lab_critical_result",
                 title="Критический результат анализа",
                 message=f"{result.test_name}: {value} {thresholds.get('unit', '')} у пациента #{order.patient_id}.",
-                metadata={
+                metadata=metadata,
+            )
+            newly_recorded = canonical_recorded
+        if not canonical_recorded:
+            logger.error(
+                "[FIX:NOTIFICATIONS] lab_critical_result canonical delivery failed",
+                extra={
                     "result_id": result.id,
-                    "order_id": result.order_id,
-                    "patient_id": order.patient_id,
-                    "test_name": result.test_name,
-                    "value": value,
-                    "unit": thresholds.get("unit", ""),
-                    "critical_low": thresholds["low"],
-                    "critical_high": thresholds["high"],
-                    "is_critical": True,
-                },
-            )
-            if not canonical_created:
-                logger.error(
-                    "[FIX:NOTIFICATIONS] lab_critical_result canonical delivery failed",
-                    extra={
-                        "result_id": result.id,
-                        "doctor_user_id": doctor_user.id,
+                    "doctor_user_id": doctor_user.id,
                     "order_id": result.order_id,
                 },
             )
-            else:
-                finding_created = await notification_sender_service.send_lab_event_notification(
-                    db=self.db,
-                    recipient=doctor_user,
-                    event_type="lab_critical_finding",
-                    title="Критическая находка в исследовании",
-                    message=f"В анализе {result.test_name} у пациента #{order.patient_id} обнаружена критическая находка.",
-                    metadata={
-                        "result_id": result.id,
-                        "order_id": result.order_id,
-                        "patient_id": order.patient_id,
-                        "test_name": result.test_name,
-                        "value": value,
-                        "unit": thresholds.get("unit", ""),
-                        "critical_low": thresholds["low"],
-                        "critical_high": thresholds["high"],
-                        "is_critical": True,
-                    },
-                )
-                if not finding_created:
-                    logger.warning(
-                        "[FIX:NOTIFICATIONS] lab_critical_finding canonical delivery failed",
-                        extra={
-                            "result_id": result.id,
-                            "doctor_user_id": doctor_user.id,
-                            "order_id": result.order_id,
-                        },
-                    )
+            return
 
-            if hasattr(doctor_user, 'telegram_id') and doctor_user.telegram_id:
-                await notification_sender_service.send_telegram_message(
-                    user_id=doctor_user.telegram_id,
-                    message=message,
-                )
+        finding_recorded = self._lab_inbox_delivery_exists(
+            event_type="lab_critical_finding",
+            recipient_id=doctor_user.id,
+            entity_id=result.id,
+            expected_value=value,
+        )
+        if not finding_recorded:
+            finding_recorded = await notification_sender_service.send_lab_event_notification(
+                db=self.db,
+                recipient=doctor_user,
+                event_type="lab_critical_finding",
+                title="Критическая находка в исследовании",
+                message=f"В анализе {result.test_name} у пациента #{order.patient_id} обнаружена критическая находка.",
+                metadata=metadata,
+            )
+            newly_recorded = newly_recorded or finding_recorded
+        if not finding_recorded:
+            logger.warning(
+                "[FIX:NOTIFICATIONS] lab_critical_finding canonical delivery failed",
+                extra={
+                    "result_id": result.id,
+                    "doctor_user_id": doctor_user.id,
+                    "order_id": result.order_id,
+                },
+            )
 
-        logger.warning(f"Critical value alert sent for result {result.id}")
+        if newly_recorded:
+            logger.info(
+                "Critical value alert recorded in doctor inbox for result %s",
+                result.id,
+            )
 
     async def send_follow_up_reminders(self, days_before: int = 3) -> dict[str, Any]:
         """

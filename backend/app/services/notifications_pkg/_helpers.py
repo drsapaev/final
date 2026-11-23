@@ -15,13 +15,13 @@ from html import escape  # noqa: F401
 from typing import Any  # noqa: F401
 
 import httpx  # noqa: F401
-from jinja2 import Environment, select_autoescape  # noqa: F401
+from jinja2.sandbox import SandboxedEnvironment  # noqa: F401
 
 # NOTIF-REAUDIT-28 P1-1: autoescape для защиты от SSTI/XSS.
 # Раньше Template(template_text) использовался без autoescape —
 # admin-controlled templates могли выполнять произвольный Python (SSTI),
 # а user data с HTML попадала в email body unescaped.
-_jinja_env = Environment(autoescape=True)
+_jinja_env = SandboxedEnvironment(autoescape=True)
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.core.config import settings  # noqa: F401
@@ -45,6 +45,15 @@ from app.services.notification_websocket import (
 from app.services.telegram.bot import telegram_bot  # noqa: F401
 
 logger = logging.getLogger(__name__)
+
+
+def _is_private_telegram_chat_id(chat_id: Any) -> bool:
+    """Telegram private chat IDs are positive; groups and channels are not.
+
+    A positive ID alone does not prove how a historical link was created.
+    Callers must also enforce the patient ownership and consent checks.
+    """
+    return isinstance(chat_id, int) and not isinstance(chat_id, bool) and chat_id > 0
 
 
 def _fresh_db():
@@ -139,6 +148,14 @@ QUEUE_NOTIFICATION_EVENT_TYPES = {
 
 PATIENT_TELEGRAM_EVENT_PREFERENCES = {
     "appointment_reminder": "appointment_reminders",
+    "appointment_confirmation": "appointment_reminders",
+    "appointment_confirmation_task": "appointment_reminders",
+    "appointment_cancellation": "appointment_reminders",
+    "new_appointment": "appointment_reminders",
+    "visit_confirmation": "appointment_reminders",
+    "schedule_change": "appointment_reminders",
+    "prescription_ready": "lab_notifications",
+    "lab_results_ready": "lab_notifications",
     "visit_created": "appointment_reminders",
     "queue_ticket_issued": "appointment_reminders",
     "queue_status_changed": "appointment_reminders",
@@ -146,13 +163,53 @@ PATIENT_TELEGRAM_EVENT_PREFERENCES = {
     "payment_created": "notifications_enabled",
     "payment_notification": "notifications_enabled",
     "payment_paid": "notifications_enabled",
-    "lab_results": "lab_notifications",
+    "payment_reminder": "notifications_enabled",
+    "notification": "notifications_enabled",
+    "message_received": "notifications_enabled",
+    "patient_registered": "notifications_enabled",
+    "system_alert": "notifications_enabled",
+    "registrar_system_alert": "notifications_enabled",
+    "security_alert": "notifications_enabled",
+    "billing_alert": "notifications_enabled",
+    "price_change": "notifications_enabled",
+    "all_free_requested": "notifications_enabled",
+    "all_free_approved": "notifications_enabled",
+    "all_free_rejected": "notifications_enabled",
+    "public_booking_request_submitted": "notifications_enabled",
+    "public_booking_request_resubmitted": "notifications_enabled",
+    **dict.fromkeys(QUEUE_NOTIFICATION_EVENT_TYPES, "appointment_reminders"),
+    **dict.fromkeys(LAB_NOTIFICATION_EVENT_TYPES, "lab_notifications"),
 }
+
+
+def _patient_telegram_preferences_enabled(telegram_user: Any, event_type: str) -> bool:
+    """Honor global and all applicable category preferences for a linked patient."""
+    event_type = _normalize_notification_event_type(event_type, fallback="notification")
+    if not bool(getattr(telegram_user, "notifications_enabled", False)):
+        return False
+
+    preference = PATIENT_TELEGRAM_EVENT_PREFERENCES.get(event_type)
+    # An unclassified event could belong to either category. Require both opt-ins
+    # until it is explicitly classified, while preserving general notifications.
+    required = {preference} if preference else {"appointment_reminders", "lab_notifications"}
+    if event_type in QUEUE_NOTIFICATION_EVENT_TYPES:
+        required.add("appointment_reminders")
+    if event_type in LAB_NOTIFICATION_EVENT_TYPES:
+        required.add("lab_notifications")
+    return all(bool(getattr(telegram_user, field, False)) for field in required)
 
 PATIENT_TELEGRAM_EVENT_MESSAGES = {
     "appointment_reminder": {
         "ru": "Напоминание о записи. Дата: {date}. Врач: {doctor}.",
         "uz-Latn": "Qabul eslatmasi. Sana: {date}. Shifokor: {doctor}.",
+    },
+    "appointment_confirmation": {
+        "ru": "Запись подтверждена. Дата: {date}. Врач: {doctor}.",
+        "uz-Latn": "Qabul tasdiqlandi. Sana: {date}. Shifokor: {doctor}.",
+    },
+    "visit_confirmation": {
+        "ru": "Визит подтвержден. Дата: {date}. Врач: {doctor}.",
+        "uz-Latn": "Tashrif tasdiqlandi. Sana: {date}. Shifokor: {doctor}.",
     },
     "visit_created": {
         "ru": "Запись создана. Дата: {date}. Врач: {doctor}.",

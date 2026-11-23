@@ -16,11 +16,26 @@ from app.services.notifications_pkg._base import (
 class FormattingMixin(NotificationSenderMixinBase):
     """Formatting methods for NotificationSenderService."""
 
-    def _determine_best_channel(self, patient: Any) -> str:
+    def _determine_best_channel(self, patient: Any, db: Session | None = None) -> str:
         """Определяет лучший канал для отправки уведомления"""
         # Приоритет: Telegram > PWA > Phone
-        if hasattr(patient, 'telegram_id') and patient.telegram_id:
-            return "telegram"
+        if db is not None and getattr(patient, "id", None) is not None:
+            from app.models.telegram_config import TelegramUser
+
+            linked_chat = (
+                db.query(TelegramUser.id)
+                .filter(
+                    TelegramUser.patient_id == patient.id,
+                    TelegramUser.chat_id > 0,
+                    TelegramUser.active.is_(True),
+                    TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
+                    TelegramUser.appointment_reminders.is_(True),
+                )
+                .first()
+            )
+            if linked_chat:
+                return "telegram"
         if patient.phone and patient.phone.startswith('+998'):
             return "pwa"
         return "phone"
@@ -58,6 +73,7 @@ class FormattingMixin(NotificationSenderMixinBase):
             "services": services_text,
             "total_amount": total_amount,
             "confirmation_token": visit.confirmation_token,
+            "confirmation_context_epoch": visit.confirmation_context_epoch,
             "expires_at": visit.confirmation_expires_at,
             "visit_type": self._get_visit_type_text(visit.discount_mode),
         }
@@ -100,23 +116,21 @@ class FormattingMixin(NotificationSenderMixinBase):
     def _create_telegram_keyboard(
         self, confirmation_token: str
     ) -> list[list[dict[str, str]]]:
+        # DOCINVITE-BE-001 / NOTIFYTGPHONEURL-BE-001 (audit #3892): the
+        # historical third button used a ``tel:`` URL scheme that Telegram
+        # inline keyboards do not support, built from
+        # ``settings.CLINIC_PHONE`` — a field the Settings model never
+        # declared. Every invitation died with AttributeError inside the
+        # keyboard builder (caught downstream as success:false) BEFORE the
+        # bot dispatch, so even the merged TelegramUser identity resolution
+        # never delivered an initial invitation. Telegram inline keyboards
+        # support only https/tg:// URLs — the unsupported contact button is
+        # removed; authenticated preview must precede a decision.
         return [
             [
                 {
-                    "text": "✅ Подтвердить визит",
-                    "callback_data": f"confirm_visit:{confirmation_token}",
-                }
-            ],
-            [
-                {
-                    "text": "❌ Отменить визит",
-                    "callback_data": f"cancel_visit:{confirmation_token}",
-                }
-            ],
-            [
-                {
-                    "text": "📞 Связаться с клиникой",
-                    "url": f"tel:{settings.CLINIC_PHONE}",
+                    "text": "Просмотреть",
+                    "callback_data": f"view_visit:{confirmation_token}",
                 }
             ],
         ]
@@ -131,19 +145,63 @@ class FormattingMixin(NotificationSenderMixinBase):
 
 
     async def _send_telegram_invitation(
-        self, patient: Any, data: dict[str, Any]
+        self, patient: Any, data: dict[str, Any], db: Session | None = None
     ) -> dict[str, Any]:
         """Отправляет приглашение через Telegram"""
         try:
-            if not hasattr(patient, 'telegram_id') or not patient.telegram_id:
-                return {"success": False, "error": "У пациента нет Telegram ID"}
+            if db is None:
+                return {"success": False, "error": "Для Telegram нужна привязка пациента"}
 
-            message = self._format_telegram_message(data)
-            keyboard = self._create_telegram_keyboard(data["confirmation_token"])
+            from app.models.telegram_config import TelegramUser
+
+            telegram_user = (
+                db.query(TelegramUser)
+                .filter(
+                    TelegramUser.patient_id == patient.id,
+                    TelegramUser.chat_id > 0,
+                    TelegramUser.active.is_(True),
+                    TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
+                    TelegramUser.appointment_reminders.is_(True),
+                )
+                .order_by(TelegramUser.id.desc())
+                .first()
+            )
+            if telegram_user is None:
+                return {"success": False, "error": "У пациента нет активной привязки Telegram"}
+
+            from app.services.visit_confirmation_service import (
+                build_telegram_visit_action_token,
+            )
+
+            capability = build_telegram_visit_action_token(
+                visit_id=data["visit_id"], confirmation_token=data["confirmation_token"],
+                link_id=telegram_user.id, chat_id=telegram_user.chat_id,
+                patient_id=patient.id, link_epoch=telegram_user.patient_link_epoch,
+                visit_context_epoch=data["confirmation_context_epoch"], purpose="view",
+            )
+            # Telegram delivery cannot be recalled after a concurrent opt-out.
+            # Keep the push itself neutral; the action remains actor-bound.
+            message = "У вас новое уведомление."
+            keyboard = self._create_telegram_keyboard(capability)
+
+            current_link = (
+                db.query(TelegramUser).filter(
+                    TelegramUser.id == telegram_user.id,
+                    TelegramUser.patient_id == patient.id,
+                    TelegramUser.chat_id == telegram_user.chat_id,
+                    TelegramUser.patient_link_epoch == telegram_user.patient_link_epoch,
+                    TelegramUser.active.is_(True), TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
+                    TelegramUser.appointment_reminders.is_(True),
+                ).populate_existing().first()
+            )
+            if current_link is None:
+                return {"success": False, "error": "У пациента нет активной привязки Telegram"}
 
             # Используем telegram_bot для отправки
             result = await self.telegram_bot.send_confirmation_invitation(
-                chat_id=patient.telegram_id, message=message, keyboard=keyboard
+                chat_id=current_link.chat_id, message=message, keyboard=keyboard
             )
 
             if result.get("success"):
@@ -156,21 +214,35 @@ class FormattingMixin(NotificationSenderMixinBase):
             else:
                 return {
                     "success": False,
-                    "error": result.get("error", "Ошибка отправки Telegram"),
+                    "error": "Ошибка отправки Telegram",
                 }
 
         except Exception as e:
-            logger.error(f"Ошибка отправки Telegram приглашения: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error("Ошибка отправки Telegram приглашения (%s)", type(e).__name__)
+            return {"success": False, "error": "Ошибка отправки Telegram"}
 
 
     async def _send_pwa_invitation(
-        self, patient: Any, data: dict[str, Any]
+        self,
+        patient: Any,
+        data: dict[str, Any],
+        db: Session | None = None,
+        *,
+        sms_opted_in: bool | None = None,
     ) -> dict[str, Any]:
         """Отправляет приглашение через PWA (SMS с deep link)"""
         try:
             if not patient.phone:
                 return {"success": False, "error": "У пациента нет номера телефона"}
+            if sms_opted_in is None:
+                sms_opted_in = self._patient_channel_opted_in(
+                    db=db,
+                    patient_id=getattr(patient, "id", None),
+                    channel="sms",
+                    event_type="appointment_confirmation",
+                )
+            if not sms_opted_in:
+                return {"success": False, "error": "SMS отключены настройками пациента"}
 
             # Canonical public base URL for user-facing deep links — the
             # same source as the password-reset link, Telegram web-app
@@ -202,13 +274,37 @@ class FormattingMixin(NotificationSenderMixinBase):
 
 
     async def _send_phone_invitation(
-        self, patient: Any, data: dict[str, Any]
+        self, patient: Any, data: dict[str, Any], db: Session | None = None
     ) -> dict[str, Any]:
-        """Создает задачу для регистратуры - позвонить пациенту"""
-        # Пока просто логируем, в будущем можно интегрировать с CRM/Task системой
-        logger.info(f"Создано уведомление для регистратуры: позвонить пациенту {patient.id} для подтверждения визита {data['visit_id']}")
+        """Create a durable protected-inbox action for the registrar team."""
+        if db is None:
+            return {
+                "success": False,
+                "error": "Не удалось создать задачу регистратуре",
+            }
+
+        visit_id = data.get("visit_id")
+        patient_id = getattr(patient, "id", None)
+        created = await self.send_canonical_notification_to_roles(
+            db=db,
+            roles=["registrar"],
+            event_type="appointment_confirmation_task",
+            title="Задача регистратуре: позвонить пациенту",
+            message=f"Позвоните пациенту для подтверждения визита №{visit_id}.",
+            source_module="visit_confirmation",
+            metadata={"visit_id": visit_id, "patient_id": patient_id},
+            deep_link="/registrar",
+            severity="warning",
+            priority="high",
+            entity_type="visit",
+            entity_id=visit_id,
+        )
         return {
-            "success": True,
+            "success": created,
             "channel": "phone",
-            "message": "Создана задача для регистратуры",
+            "message": (
+                "Создана задача для регистратуры"
+                if created
+                else "Не удалось создать задачу для регистратуры"
+            ),
         }

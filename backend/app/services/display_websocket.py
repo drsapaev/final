@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -19,6 +20,16 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services.ws_redis_pubsub import RedisPubSubBridge
 
 logger = logging.getLogger(__name__)
+
+# DISPLAYPRIVACY-BE-001 residual (group-87 reconciliation): the cross-worker
+# nameformat_invalidate control message is best-effort — a worker that misses
+# it must not keep a stale 'full' formatter forever. Cache entries therefore
+# carry their caching moment and revalidate against the registry at most
+# NAME_FORMAT_CACHE_TTL_SECONDS later (bounded revalidation with a safe
+# transition policy, per the audit's required remediation). Explicit
+# invalidation still clears entries immediately; resolver failures are never
+# cached and resolve fail-closed to 'none' (DISPLAYPRIVACY-BE-002).
+NAME_FORMAT_CACHE_TTL_SECONDS = 30.0
 
 
 class DisplayWebSocketManager:
@@ -40,7 +51,13 @@ class DisplayWebSocketManager:
         # успешном админ-обновлении show_patient_names (локально +
         # control-сообщение другим воркерам) — раньше устаревший 'full'
         # раскрывал имена до рестарта.
-        self._name_format_cache: dict[str, str] = {}
+        # DISPLAYPRIVACY-BE-001 residual (group-87 reconciliation): запись
+        # кэша теперь несёт момент кэширования и перечитывается из реестра
+        # не позднее NAME_FORMAT_CACHE_TTL_SECONDS — потерянное
+        # control-сообщение больше не держит устаревший 'full' вечно
+        # (bounded revalidation); сбои резолва не кэшируются и дают
+        # fail-closed 'none' (DISPLAYPRIVACY-BE-002).
+        self._name_format_cache: dict[str, tuple[str, float]] = {}
         # Redis pubsub-обработчики по board_id (connect/disconnect):
         # восстановлено — черновик PR #3214 заменил эту строку кэшем
         # вместо добавления, что ломало connect() (CI RED HEAD).
@@ -709,7 +726,23 @@ class DisplayWebSocketManager:
             db = SessionLocal()
             try:
                 for b in ids:
-                    cached = cache.get(b)
+                    entry = cache.get(b)
+                    cached = None
+                    if entry is not None:
+                        # Legacy shape: callers/tests that write plain strings
+                        # directly into the cache are treated as freshly
+                        # cached entries — the TTL contract applies from that
+                        # moment on (the entry normalizes to (value, moment)
+                        # on its next write).
+                        if isinstance(entry, str):
+                            fmt, cached_at = entry, time.monotonic()
+                        else:
+                            fmt, cached_at = entry
+                        # TTL-bounded revalidation: a lost nameformat_invalidate
+                        # control message can hold a stale entry only until the
+                        # TTL elapses, then the registry row is re-read.
+                        if time.monotonic() - cached_at <= NAME_FORMAT_CACHE_TTL_SECONDS:
+                            cached = fmt
                     if cached is None:
                         row = (
                             db.query(DisplayBoard)
@@ -722,7 +755,7 @@ class DisplayWebSocketManager:
                             "none",
                         ):
                             cached = row.show_patient_names
-                            cache[b] = cached
+                            cache[b] = (cached, time.monotonic())
                         else:
                             # Fail-closed: неизвестное табло или невалидное
                             # значение маскирует имя; НЕ кэшируем — строка

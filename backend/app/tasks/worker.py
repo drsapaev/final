@@ -271,12 +271,11 @@ async def send_visit_reminder(
 
         # Post-claim revalidation + snapshot pin (Codex round 9, P1): a
         # reschedule may commit between the claim and the provider call.
-        # Re-read the row now to (a) abort BEFORE sending when the claimed
-        # schedule version no longer matches, and (b) pin the claimed
-        # snapshot in the session's identity map — the real service
-        # re-queries the visit through THIS session, so it builds the
-        # message from the claimed state instead of a later one.
-        claimed_visit = db.query(Visit).filter(Visit.id == visit_id).first()
+        # Re-read from the database, bypassing any stale identity-map row.
+        # The issuer independently checks the pinned context before sending.
+        claimed_visit = (
+            db.query(Visit).populate_existing().filter(Visit.id == visit_id).first()
+        )
         if not _claim_still_valid(claimed_visit, schedule_version):
             db.execute(
                 update(Visit)
@@ -323,58 +322,83 @@ async def send_visit_reminder(
         # UNUSABLE confirmation link/button. Re-issue the token (same
         # generator + lifetime) while the visit still holds the lease and
         # BEFORE the dispatch, so the reminder carries a working link.
+        # Pin the identity and generation from the claim. An ORM update by
+        # primary key could otherwise mint a token for a different patient if
+        # a transfer committed while this worker held an old identity map.
+        pinned_patient = claimed_visit.patient_id
+        pinned_epoch = claimed_visit.confirmation_context_epoch
+        pinned_generation = claimed_visit.reminder_generation
+        pinned_token = claimed_visit.confirmation_token
         token_expires = claimed_visit.confirmation_expires_at
         if token_expires is not None and token_expires.tzinfo is None:
             token_expires = token_expires.replace(tzinfo=UTC)
+        changes = {}
         if (
-            claimed_visit.confirmation_token is None
+            pinned_token is None
             or token_expires is None
             or token_expires <= datetime.now(UTC)
         ):
             import uuid
 
-            claimed_visit.confirmation_token = str(uuid.uuid4())
-            claimed_visit.confirmation_expires_at = datetime.now(UTC) + timedelta(
-                hours=48
+            pinned_token = str(uuid.uuid4())
+            changes.update(
+                confirmation_token=pinned_token,
+                confirmation_expires_at=datetime.now(UTC) + timedelta(hours=48),
             )
-            db.commit()
-            logger.info(
-                "job.send_visit_reminder: confirmation token for visit %s "
-                "was missing or expired — re-issued before dispatch",
-                visit_id,
-            )
-
-        # Round 17+18, P1: the delivery channel must be PERMITTED BY THE
-        # VISIT'S contract AND reachable by the patient.
-        # - A NULL/empty channel (GraphQL-created visits) is NORMALIZED to
-        #   'auto' in the persisted contract: confirm_by_pwa() accepts only
-        #   literal 'pwa'/'auto', so the old null passthrough would send a
-        #   reminder whose confirmation link answers 400.
-        # - An explicit contract picks the dispatch channel; the reminder
-        #   producer pins it via the service's channel parameter instead of
-        #   letting the patient-based auto-selection send an unusable link.
-        # - 'telegram' additionally requires a live TelegramUser link
-        #   (Patient has NO telegram_id column — the linkage lives there).
-        service = NotificationService(db)
-        patient = (
-            db.query(Patient).filter(Patient.id == claimed_visit.patient_id).first()
-        )
         raw_channel = claimed_visit.confirmation_channel
         if raw_channel is None or str(raw_channel).strip() == "":
-            claimed_visit.confirmation_channel = "auto"
-            db.commit()
-            logger.info(
-                "job.send_visit_reminder: visit %s had no confirmation "
-                "channel — normalized to 'auto'",
-                visit_id,
-            )
+            changes["confirmation_channel"] = "auto"
             allowed_channel = "auto"
         else:
             allowed_channel = str(raw_channel).strip().lower()
 
+        if changes:
+            issued = db.execute(
+                update(Visit)
+                .where(
+                    Visit.id == visit_id,
+                    Visit.patient_id == pinned_patient,
+                    Visit.confirmation_context_epoch == pinned_epoch,
+                    Visit.reminder_generation == pinned_generation,
+                    Visit.reminder_claimed_at == our_lease,
+                    Visit.status == "pending_confirmation",
+                    Visit.confirmation_token == claimed_visit.confirmation_token,
+                )
+                .values(**changes)
+                .execution_options(synchronize_session=False)
+            )
+            db.commit()
+            if issued.rowcount != 1:
+                db.execute(
+                    update(Visit)
+                    .where(Visit.id == visit_id, Visit.reminder_claimed_at == our_lease)
+                    .values(reminder_claimed_at=None)
+                )
+                db.commit()
+                logger.info(
+                    "job.send_visit_reminder: visit %s context changed before issuance",
+                    visit_id,
+                )
+                return
+
+        expected_context = {
+            "patient_id": pinned_patient,
+            "confirmation_context_epoch": pinned_epoch,
+            "reminder_generation": pinned_generation,
+            "reminder_claimed_at": our_lease,
+            "confirmation_token": pinned_token,
+        }
+        service = NotificationService(db)
+        patient = (
+            db.query(Patient)
+            .populate_existing()
+            .filter(Patient.id == pinned_patient)
+            .first()
+        )
+
         if allowed_channel == "auto":
             best_channel = (
-                service._determine_best_channel(patient)
+                service._determine_best_channel(patient, db)
                 if patient is not None
                 else None
             )
@@ -388,6 +412,7 @@ async def send_visit_reminder(
                     TelegramUser.patient_id == claimed_visit.patient_id,
                     TelegramUser.active.is_(True),
                     TelegramUser.blocked.is_(False),
+                    TelegramUser.notifications_enabled.is_(True),
                     TelegramUser.appointment_reminders.is_(True),
                 )
                 .first()
@@ -430,6 +455,7 @@ async def send_visit_reminder(
                 visit_id,
                 hours_before=REMINDER_HOURS_BEFORE,
                 channel=dispatch_channel,
+                expected_context=expected_context,
             )
         except Exception as exc:
             raise _delivery_retry(
@@ -761,6 +787,26 @@ async def run_data_retention(ctx) -> None:
         db.close()
 
 
+def _purge_public_site_analytics() -> int:
+    from app.db.session import SessionLocal
+    from app.repositories.public_site_analytics_repository import (
+        PublicSiteAnalyticsRepository,
+    )
+
+    with SessionLocal() as db:
+        removed = PublicSiteAnalyticsRepository(db).delete_older_than_retention(
+            as_of=datetime.now(UTC)
+        )
+        db.commit()
+        return removed
+
+
+async def run_public_site_analytics_retention(_ctx) -> int:
+    removed = await asyncio.to_thread(_purge_public_site_analytics)
+    logger.info("job.run_public_site_analytics_retention removed=%d", removed)
+    return removed
+
+
 def _process_public_booking_request_notification_outbox_batch(
     database_url: str,
 ) -> dict[str, int]:
@@ -903,6 +949,7 @@ class WorkerSettings:
     functions = [
         send_visit_reminder,
         run_data_retention,
+        run_public_site_analytics_retention,
         run_public_booking_request_notification_outbox,
         generate_scheduled_report,
         run_lab_follow_up_reminders,
@@ -927,6 +974,8 @@ class WorkerSettings:
     # path ever called enqueue_reminder and patients never got reminders.
     cron_jobs = [
         cron(run_data_retention, hour=3, minute=0),  # Daily 03:00 UTC
+        # Hourly, so the purge follows the Tashkent day rollover independently of worker TZ.
+        cron(run_public_site_analytics_retention, minute=0),
         cron(
             run_public_booking_request_notification_outbox,
             minute=set(range(60)),  # every minute, lease-safe across workers
@@ -945,6 +994,7 @@ __all__ = [
     "REMINDER_HOURS_BEFORE",
     "send_visit_reminder",
     "run_data_retention",
+    "run_public_site_analytics_retention",
     "run_public_booking_request_notification_outbox",
     "generate_scheduled_report",
     "run_lab_follow_up_reminders",

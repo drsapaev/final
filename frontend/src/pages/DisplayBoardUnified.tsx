@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
 import type { CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -19,6 +19,12 @@ import {
 'lucide-react';
 import { api } from '../api/client';
 import { openDisplayBoardWS } from '../api/ws';
+import {
+  exchangeDisplayDeviceSession,
+  exchangeDisplayDeviceCredential,
+  forgetDisplayDeviceSession,
+  DisplayDeviceProvisioningRequiredError,
+} from '../api/displayDeviceAuth';
 import { useTheme } from '../contexts/ThemeContext';
 
 import logger from '../utils/logger';
@@ -26,6 +32,7 @@ import { formatRegistrarTime } from '../utils/dateUtils';
 import './displayboard.css';
 import { useTranslation } from '../i18n/useTranslation';
 import { safeJsonParse } from '../utils/safeJsonParse';
+import { tokenManager } from '../utils/tokenManager';
 
 const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
 
@@ -306,6 +313,14 @@ export default function DisplayBoardUnified({
   // Получаем board_id из URL или используем переданный
   const currentBoardId = new URLSearchParams(window.location.search).get('board') || boardId;
   const isBoardView = window.location.pathname.startsWith('/queue-board') || window.location.pathname.startsWith('/display-board');
+  const [displayDeviceState, setDisplayDeviceState] = useState<'ready' | 'connecting' | 'unconfigured'>(() => {
+    if (!isBoardView || tokenManager.getAccessToken()) return 'ready';
+    return 'connecting';
+  });
+  const [setupDeviceId, setSetupDeviceId] = useState('');
+  const [setupDeviceSecret, setSetupDeviceSecret] = useState('');
+  const [setupError, setSetupError] = useState('');
+  const [setupSubmitting, setSetupSubmitting] = useState(false);
 
   // /board/state is a stats/settings snapshot; live rows/calls/announcements come from WebSocket initial_state.
   // DISPLAYDEPT-FE-001: department уходит в params только когда валиден —
@@ -420,12 +435,37 @@ export default function DisplayBoardUnified({
         wsRef.current = null;
       }
 
+      const staffToken = tokenManager.getAccessToken();
+      const needsDeviceSession = !staffToken && isBoardView;
+      if (needsDeviceSession) setDisplayDeviceState('connecting');
+      const tokenProvider = needsDeviceSession
+        ? async () => {
+            // Staff access always takes precedence, including on reconnect
+            // after a staff session is established in this browser.
+            const currentStaffToken = tokenManager.getAccessToken();
+            if (currentStaffToken) return currentStaffToken;
+            try {
+              const deviceToken = await exchangeDisplayDeviceSession(currentBoardId);
+              setDisplayDeviceState('ready');
+              setSetupError('');
+              return deviceToken;
+            } catch (error) {
+              if (error instanceof DisplayDeviceProvisioningRequiredError) {
+                setDisplayDeviceState('unconfigured');
+                setSetupError('Табло не настроено или доступ отозван. Введите выданный администратором код.');
+              }
+              throw error;
+            }
+          }
+        : undefined;
+
       // Создаем новое соединение
       const closeWS = openDisplayBoardWS(
         currentBoardId,
         handleWebSocketMessage,
         () => { setConnected(true); setWsEverConnected(true); },
-        () => setConnected(false)
+        () => setConnected(false),
+        tokenProvider,
       );
 
       wsRef.current = closeWS;
@@ -433,6 +473,32 @@ export default function DisplayBoardUnified({
     } catch (error) {
       logger.error('Ошибка создания WebSocket:', error);
       setConnected(false);
+    }
+  };
+
+  const submitDeviceProvisioning = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const deviceId = Number(setupDeviceId.trim());
+    const secret = setupDeviceSecret.trim();
+    if (!Number.isSafeInteger(deviceId) || deviceId <= 0 || secret.length < 32 || secret.length > 128) {
+      setSetupError('Введите корректный ID устройства и выданный администратором код.');
+      return;
+    }
+
+    setSetupSubmitting(true);
+    setSetupError('');
+    try {
+      // The server replaces the one-time code with an HttpOnly, board-scoped
+      // session cookie; the reusable secret is never persisted by the page.
+      await exchangeDisplayDeviceCredential(deviceId, secret, currentBoardId);
+      setSetupDeviceSecret('');
+      setDisplayDeviceState('connecting');
+      connectWebSocketRef.current();
+    } catch {
+      setSetupError('Не удалось подтвердить устройство. Проверьте данные или обратитесь к администратору.');
+      setDisplayDeviceState('unconfigured');
+    } finally {
+      setSetupSubmitting(false);
     }
   };
 
@@ -722,9 +788,36 @@ export default function DisplayBoardUnified({
 
   // Инициализация
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const forgetDeviceRequested = params.get('forget-device') === '1';
+    const hasStaffToken = Boolean(tokenManager.getAccessToken());
+    if (forgetDeviceRequested) {
+      if (!hasStaffToken) {
+        setDisplayDeviceState('unconfigured');
+        setSetupDeviceId('');
+        setSetupDeviceSecret('');
+        setSetupSubmitting(true);
+      }
+      void forgetDisplayDeviceSession(currentBoardId).then(() => {
+        params.delete('forget-device');
+        const query = params.toString();
+        window.history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
+        );
+        setSetupError('');
+      }).catch(() => {
+        if (!hasStaffToken) {
+          setSetupError('Не удалось удалить данные табло. Проверьте соединение и повторите попытку.');
+        }
+      }).finally(() => {
+        if (!hasStaffToken) setSetupSubmitting(false);
+      });
+    }
     loadBoardStateRef.current();
     loadWindowsRef.current();
-    connectWebSocketRef.current();
+    if (!forgetDeviceRequested || hasStaffToken) connectWebSocketRef.current();
 
     const clock = setInterval(() => setNowStr(timeNow()), 1000);
 
@@ -929,6 +1022,48 @@ export default function DisplayBoardUnified({
     '--board-border': currentTheme.border,
     '--board-font-scale': String(boardSettings.fontScale)
   } as CSSProperties;
+
+  if (isBoardView && displayDeviceState === 'unconfigured') {
+    return (
+      <main
+        data-testid="display-device-provisioning"
+        className="display-device-provisioning"
+      >
+        <section className="display-device-provisioning__card">
+          <h1 className="display-device-provisioning__title">Табло не настроено</h1>
+          <p>Попросите администратора выдать ID устройства и код для этого табло.</p>
+          <form onSubmit={submitDeviceProvisioning}>
+            <label className="display-device-provisioning__label" htmlFor="display-device-id">ID устройства</label>
+            <input
+              className="display-device-provisioning__input"
+              id="display-device-id"
+              aria-label="ID устройства"
+              inputMode="numeric"
+              autoComplete="off"
+              value={setupDeviceId}
+              onChange={(event) => setSetupDeviceId(event.target.value)}
+              required
+            />
+            <label className="display-device-provisioning__label" htmlFor="display-device-secret">Код устройства</label>
+            <input
+              className="display-device-provisioning__input"
+              id="display-device-secret"
+              aria-label="Код устройства"
+              type="password"
+              autoComplete="new-password"
+              value={setupDeviceSecret}
+              onChange={(event) => setSetupDeviceSecret(event.target.value)}
+              required
+            />
+            {setupError && <p className="display-device-provisioning__error" role="alert">{setupError}</p>}
+            <button className="display-device-provisioning__submit" type="submit" disabled={setupSubmitting}>
+              {setupSubmitting ? 'Проверка…' : 'Подключить табло'}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className={rootClassName} style={rootCssVars}>

@@ -22,6 +22,15 @@ class AppointmentFlowApiRepository:
     def get_visit(self, visit_id: int) -> Visit | None:
         return self.db.query(Visit).filter(Visit.id == visit_id).first()
 
+    def get_locked_appointment(self, appointment_id: int) -> AppointmentModel | None:
+        return (
+            self.db.query(AppointmentModel)
+            .filter(AppointmentModel.id == appointment_id)
+            .with_for_update(of=AppointmentModel)
+            .populate_existing()
+            .first()
+        )
+
     def get_existing_appointment_for_visit(
         self, visit: Visit
     ) -> AppointmentModel | None:

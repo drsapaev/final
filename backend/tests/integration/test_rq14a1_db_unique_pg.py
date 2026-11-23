@@ -188,23 +188,28 @@ def pg_engine():
     admin_url, _host = _verified_admin_url()
     db_name, sa_url = _scratch_pair(admin_url, "main")
     _create_scratch(admin_url, db_name)
-    result = _upgrade(sa_url)
-    assert result.returncode == 0, result.stderr[-1500:]
-
-    engine = create_engine(sa_url, future=True)
-    _assert_pg_head(engine)
-    yield engine
-    engine.dispose()
-    _drop_scratch(admin_url, db_name)
+    engine = None
+    try:
+        result = _upgrade(sa_url)
+        assert result.returncode == 0, result.stderr[-1500:]
+        engine = create_engine(sa_url, future=True)
+        _assert_pg_head(engine)
+        yield engine
+    finally:
+        if engine is not None:
+            engine.dispose()
+        _drop_scratch(admin_url, db_name)
 
 
 @pytest.fixture
 def pg_session(pg_engine):
     Session = sessionmaker(bind=pg_engine, future=True)
     session = Session()
-    yield session
-    session.rollback()
-    session.close()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
 
 
 @pytest.fixture(autouse=True)
@@ -225,17 +230,21 @@ def _make_doctor(session, suffix: str):
     the 0064 schemas used by the populated-upgrade and duplicate proofs.
     """
     from app.core.security import get_password_hash
-    from app.models.user import User
-
-    user = User(
-        username=f"rq14a2_{suffix}_{_RUN}",
-        email=f"rq14a2_{suffix}_{_RUN}@example.com",
-        full_name=f"RQ-14.a.2 {suffix}",
-        hashed_password=get_password_hash("rq14a2-synthetic-pw"),
-        role="Doctor",
-        is_active=True,
-    )
-    session.add(user)
+    user_id = session.execute(
+        text(
+            "INSERT INTO users "
+            "(username, email, full_name, hashed_password, role, "
+            "is_active, is_superuser, must_change_password) "
+            "VALUES (:username, :email, :full_name, :hashed_password, "
+            "'Doctor', true, false, false) RETURNING id"
+        ),
+        {
+            "username": f"rq14a2_{suffix}_{_RUN}",
+            "email": f"rq14a2_{suffix}_{_RUN}@example.com",
+            "full_name": f"RQ-14.a.2 {suffix}",
+            "hashed_password": get_password_hash("rq14a2-synthetic-pw"),
+        },
+    ).scalar_one()
     session.commit()
     doctor_id = session.execute(
         text(
@@ -245,7 +254,7 @@ def _make_doctor(session, suffix: str):
             "VALUES (:user_id, 'cardiology', '601', 1, 15, true) "
             "RETURNING id"
         ),
-        {"user_id": user.id},
+        {"user_id": user_id},
     ).scalar_one()
     session.commit()
     return SimpleNamespace(id=doctor_id)
@@ -389,57 +398,61 @@ def test_populated_upgrade_preserves_row_values():
         assert _upgrade(sa_url, "0064_push_devices_registry").returncode == 0
 
         engine = create_engine(sa_url, future=True)
-        Session = sessionmaker(bind=engine, future=True)
-        session = Session()
-        day = date(2026, 9, 14)
-        doc_a = _make_doctor(session, "pa")
-        doc_b = _make_doctor(session, "pb")
-        qa = _seed_queue(session, doc_a.id, day, "cardiology")
-        qb = _seed_queue(session, doc_b.id, day, "cardiology")
-        _seed_queue(session, doc_a.id, day, None)  # NULL-tag batch-style row
-        _seed_queue(session, doc_a.id, day, "cardiology", active=False)
-        for number, status in enumerate(
-            ("waiting", "called", "served", "completed", "cancelled"), start=1
-        ):
-            _seed_entry(session, qa.id, number, status=status)
-        _seed_entry(session, qb.id, 3, status="waiting", source="online")
-        session.close()
-        engine.dispose()
+        try:
+            with sessionmaker(bind=engine, future=True)() as session:
+                day = date(2026, 9, 14)
+                doc_a = _make_doctor(session, "pa")
+                doc_b = _make_doctor(session, "pb")
+                qa = _seed_queue(session, doc_a.id, day, "cardiology")
+                qb = _seed_queue(session, doc_b.id, day, "cardiology")
+                _seed_queue(session, doc_a.id, day, None)  # NULL-tag batch-style row
+                _seed_queue(session, doc_a.id, day, "cardiology", active=False)
+                for number, status in enumerate(
+                    ("waiting", "called", "served", "completed", "cancelled"), start=1
+                ):
+                    _seed_entry(session, qa.id, number, status=status)
+                _seed_entry(session, qb.id, 3, status="waiting", source="online")
+        finally:
+            engine.dispose()
 
         before_engine = create_engine(sa_url, future=True)
-        with before_engine.connect() as conn:
-            entries_before = conn.execute(
-                text(
-                    "select queue_id, number, patient_name, status, source "
-                    "from queue_entries order by queue_id, number"
-                )
-            ).fetchall()
-            queues_before = conn.execute(
-                text(
-                    "select day, specialist_id, coalesce(queue_tag, '<NULL>'), "
-                    "active from daily_queues order by id"
-                )
-            ).fetchall()
-        before_engine.dispose()
+        try:
+            with before_engine.connect() as conn:
+                entries_before = conn.execute(
+                    text(
+                        "select queue_id, number, patient_name, status, source "
+                        "from queue_entries order by queue_id, number"
+                    )
+                ).fetchall()
+                queues_before = conn.execute(
+                    text(
+                        "select day, specialist_id, coalesce(queue_tag, '<NULL>'), "
+                        "active from daily_queues order by id"
+                    )
+                ).fetchall()
+        finally:
+            before_engine.dispose()
 
         assert _upgrade(sa_url).returncode == 0
 
         after_engine = create_engine(sa_url, future=True)
-        _assert_pg_head(after_engine)
-        with after_engine.connect() as conn:
-            entries_after = conn.execute(
-                text(
-                    "select queue_id, number, patient_name, status, source "
-                    "from queue_entries order by queue_id, number"
-                )
-            ).fetchall()
-            queues_after = conn.execute(
-                text(
-                    "select day, specialist_id, coalesce(queue_tag, '<NULL>'), "
-                    "active from daily_queues order by id"
-                )
-            ).fetchall()
-        after_engine.dispose()
+        try:
+            _assert_pg_head(after_engine)
+            with after_engine.connect() as conn:
+                entries_after = conn.execute(
+                    text(
+                        "select queue_id, number, patient_name, status, source "
+                        "from queue_entries order by queue_id, number"
+                    )
+                ).fetchall()
+                queues_after = conn.execute(
+                    text(
+                        "select day, specialist_id, coalesce(queue_tag, '<NULL>'), "
+                        "active from daily_queues order by id"
+                    )
+                ).fetchall()
+        finally:
+            after_engine.dispose()
 
         assert entries_after == entries_before, (entries_before, entries_after)
         assert queues_after == queues_before, (queues_before, queues_after)
@@ -480,28 +493,30 @@ def _dup_scenario(db_label: str, seeder):
     try:
         assert _upgrade(sa_url, "0064_push_devices_registry").returncode == 0
         engine = create_engine(sa_url, future=True)
-        Session = sessionmaker(bind=engine, future=True)
-        session = Session()
-        seeder(session)
-        session.commit()
-        session.close()
-        engine.dispose()
+        try:
+            with sessionmaker(bind=engine, future=True)() as session:
+                seeder(session)
+                session.commit()
+        finally:
+            engine.dispose()
 
         snapshot_engine = create_engine(sa_url, future=True)
-        with snapshot_engine.connect() as conn:
-            before_entries = conn.execute(
-                text(
-                    "select queue_id, number, patient_name, status "
-                    "from queue_entries order by queue_id, number"
-                )
-            ).fetchall()
-            before_queues = conn.execute(
-                text(
-                    "select day, specialist_id, coalesce(queue_tag,'<N>'), active "
-                    "from daily_queues order by id"
-                )
-            ).fetchall()
-        snapshot_engine.dispose()
+        try:
+            with snapshot_engine.connect() as conn:
+                before_entries = conn.execute(
+                    text(
+                        "select queue_id, number, patient_name, status "
+                        "from queue_entries order by queue_id, number"
+                    )
+                ).fetchall()
+                before_queues = conn.execute(
+                    text(
+                        "select day, specialist_id, coalesce(queue_tag,'<N>'), active "
+                        "from daily_queues order by id"
+                    )
+                ).fetchall()
+        finally:
+            snapshot_engine.dispose()
 
         result = _upgrade(sa_url)
         assert result.returncode != 0, "upgrade must fail on duplicates"
@@ -511,28 +526,30 @@ def _dup_scenario(db_label: str, seeder):
         assert "SYNTHETIC" not in combined  # no PII/patient data in diagnostics
 
         check_engine = create_engine(sa_url, future=True)
-        with check_engine.connect() as conn:
-            version = conn.execute(
-                text("select version_num from alembic_version")
-            ).scalar()
-            after_entries = conn.execute(
-                text(
-                    "select queue_id, number, patient_name, status "
-                    "from queue_entries order by queue_id, number"
-                )
-            ).fetchall()
-            after_queues = conn.execute(
-                text(
-                    "select day, specialist_id, coalesce(queue_tag,'<N>'), active "
-                    "from daily_queues order by id"
-                )
-            ).fetchall()
-        assert version == "0064_push_devices_registry", version
-        assert _both_unique_objects(check_engine) == {
-            "entry_constraint": False,
-            "doctor_index": False,
-        }
-        check_engine.dispose()
+        try:
+            with check_engine.connect() as conn:
+                version = conn.execute(
+                    text("select version_num from alembic_version")
+                ).scalar()
+                after_entries = conn.execute(
+                    text(
+                        "select queue_id, number, patient_name, status "
+                        "from queue_entries order by queue_id, number"
+                    )
+                ).fetchall()
+                after_queues = conn.execute(
+                    text(
+                        "select day, specialist_id, coalesce(queue_tag,'<N>'), active "
+                        "from daily_queues order by id"
+                    )
+                ).fetchall()
+            assert version == "0064_push_devices_registry", version
+            assert _both_unique_objects(check_engine) == {
+                "entry_constraint": False,
+                "doctor_index": False,
+            }
+        finally:
+            check_engine.dispose()
 
         assert after_entries == before_entries
         assert after_queues == before_queues

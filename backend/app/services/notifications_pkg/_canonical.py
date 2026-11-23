@@ -17,13 +17,54 @@ from app.services.notifications_pkg._helpers import (  # noqa: F401
     PATIENT_TELEGRAM_EVENT_PREFERENCES,
     QUEUE_NOTIFICATION_EVENT_TYPES,
     REGISTRAR_NOTIFICATION_EVENT_TYPES,
+    _is_private_telegram_chat_id,
     _normalize_notification_event_type,
     _patient_telegram_event_message,
+    _patient_telegram_preferences_enabled,
 )
 
 
 class CanonicalMixin(NotificationSenderMixinBase):
     """Canonical methods for NotificationSenderService."""
+
+    async def send_linked_user_telegram_notification(
+        self,
+        *,
+        db: Session,
+        user_id: int,
+        event_type: str,
+        message: str,
+    ) -> bool:
+        """Send only to an active Telegram link owned by this app user."""
+        from app.models.patient import Patient
+        from app.models.telegram_config import TelegramUser
+
+        normalized_event_type = _normalize_notification_event_type(
+            event_type, fallback="notification"
+        )
+        live_link_filter = (
+            TelegramUser.active.is_(True),
+            TelegramUser.blocked.is_(False),
+        )
+        patient = db.query(Patient).filter(Patient.user_id == user_id).first()
+        if patient is None:
+            return False
+        telegram_user = (
+            db.query(TelegramUser)
+            .filter(
+                TelegramUser.patient_id == patient.id,
+                *live_link_filter,
+            )
+            .order_by(TelegramUser.id.desc())
+            .first()
+        )
+
+        if telegram_user is None or not _is_private_telegram_chat_id(telegram_user.chat_id) or not _patient_telegram_preferences_enabled(
+            telegram_user, normalized_event_type
+        ):
+            return False
+
+        return await self.send_telegram(message, chat_id=str(telegram_user.chat_id))
 
     async def send_patient_telegram_event_notification(
         self,
@@ -58,18 +99,14 @@ class CanonicalMixin(NotificationSenderMixinBase):
             .order_by(TelegramUser.id.desc())
             .first()
         )
-        if not telegram_user:
+        if not telegram_user or not _is_private_telegram_chat_id(telegram_user.chat_id):
             logger.info(
                 "Patient Telegram event skipped: linked chat not found",
                 extra={"event_type": normalized_event_type},
             )
             return False
 
-        if not bool(getattr(telegram_user, "notifications_enabled", False)):
-            return False
-        if preference_field != "notifications_enabled" and not bool(
-            getattr(telegram_user, preference_field, False)
-        ):
+        if not _patient_telegram_preferences_enabled(telegram_user, normalized_event_type):
             return False
 
         message = _patient_telegram_event_message(

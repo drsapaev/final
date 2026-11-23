@@ -6,6 +6,7 @@ Tests for:
 2. auth_svc/_tokens.py no longer logs raw usernames (must use mask_identifier)
 3. AuditMiddleware logs mutating requests with PII masking
 """
+
 from __future__ import annotations
 
 import re
@@ -23,6 +24,7 @@ AUDIT_MIDDLEWARE_PY = BACKEND_DIR / "app" / "middleware" / "audit_middleware.py"
 
 # ---------- 1. mask_identifier helper ----------
 
+
 def test_mask_identifier_function_exists():
     """A new mask_identifier() helper must be exported from pii_masker.py.
 
@@ -32,20 +34,22 @@ def test_mask_identifier_function_exists():
     or an email (web admin login) — both are PII.
     """
     src = PII_MASKER_PY.read_text(encoding="utf-8")
-    assert re.search(r"^def\s+mask_identifier\s*\(", src, re.MULTILINE), (
-        "mask_identifier() function not found in pii_masker.py"
-    )
+    assert re.search(
+        r"^def\s+mask_identifier\s*\(", src, re.MULTILINE
+    ), "mask_identifier() function not found in pii_masker.py"
 
 
 def test_mask_identifier_masks_phone():
-    """+998901234567 → +998901•••567"""
+    """+998901234567 → •••567"""
     from app.core.pii_masker import mask_identifier
-    assert mask_identifier("+998901234567") == "+998901•••567"
+
+    assert mask_identifier("+998901234567") == "•••567"
 
 
 def test_mask_identifier_masks_email():
     """john.doe@example.com → j•••@example.com"""
     from app.core.pii_masker import mask_identifier
+
     assert mask_identifier("john.doe@example.com") == "j•••@example.com"
 
 
@@ -57,6 +61,7 @@ def test_mask_identifier_masks_plain_username_partially():
     None    → None.
     """
     from app.core.pii_masker import mask_identifier
+
     assert mask_identifier("admin") == "a•••n"
     assert mask_identifier("a") == "a"
     assert mask_identifier(None) is None
@@ -66,6 +71,7 @@ def test_mask_identifier_masks_plain_username_partially():
 def test_mask_identifier_handles_short_usernames():
     """Short usernames (2-3 chars) get partial masking."""
     from app.core.pii_masker import mask_identifier
+
     # 2 chars: ab → a•
     assert mask_identifier("ab") == "a•"
     # 3 chars: abc → a•c
@@ -73,6 +79,7 @@ def test_mask_identifier_handles_short_usernames():
 
 
 # ---------- 2. auth_svc/_tokens.py masks usernames ----------
+
 
 def test_auth_tokens_does_not_log_raw_username():
     """auth_svc/_tokens.py must NOT log raw username values.
@@ -108,12 +115,11 @@ def test_auth_tokens_does_not_log_raw_username():
 def test_auth_tokens_imports_mask_identifier():
     """_tokens.py must import mask_identifier from pii_masker."""
     src = TOKENS_PY.read_text(encoding="utf-8")
-    assert "mask_identifier" in src, (
-        "mask_identifier not imported/used in _tokens.py"
-    )
+    assert "mask_identifier" in src, "mask_identifier not imported/used in _tokens.py"
 
 
 # ---------- 3. AuditMiddleware logs mutating requests ----------
+
 
 def test_audit_middleware_logs_mutating_requests():
     """AuditMiddleware must log POST/PUT/PATCH/DELETE requests with PII masking.
@@ -144,6 +150,6 @@ def test_audit_middleware_masks_query_string():
     """
     src = AUDIT_MIDDLEWARE_PY.read_text(encoding="utf-8")
     # Must import or reference mask_pii / mask_identifier
-    assert "mask_pii" in src or "mask_identifier" in src, (
-        "AuditMiddleware must use mask_pii or mask_identifier to scrub query strings"
-    )
+    assert (
+        "mask_pii" in src or "mask_identifier" in src
+    ), "AuditMiddleware must use mask_pii or mask_identifier to scrub query strings"

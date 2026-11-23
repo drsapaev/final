@@ -1,3 +1,11 @@
+## D-T19-STAGING-RECOVERY — сохранять окружение при ошибке — 2026-11-19
+
+Явное решение пользователя: если проверка собственного синтетического staging остановилась из-за ошибки, сохранять проект и его данные для диагностики, исправлять причину и продолжать оставшиеся проверки в том же окружении. Перед `Start` и `Session` задавать `KEEP_STAGING=1` в окружении запускающего процесса и записывать проект, владельца, срок жизни и причину в checkpoint. Не сбрасывать и не засевать существующую базу повторно без проверки состояния. Успешная `Session` удаляет собственный проект; после неё проверить очистку и удалить его синтетический env. Проверки принадлежности, актуальности кода и изоляции не обходятся. Выбор не разрешает production, изменения реальных данных или бессрочное накопление забытых проектов.
+
+## T19 — единые вкладки — 2026-11-16
+
+D-T19 implemented: internal Registrar tabs have one explicit configuration in ClinicSettings registrar_tabs_v1 with typed profile/doctor IDs, order, visibility and optional custom label. QueueProfile/Doctor/queue records are not tab entities. First save explicitly fixes legacy snapshot; future targets do not auto-add. Empty saved list stays empty. profile_filters preserve old dept links; missing selected filter is visible and cleared only by the user.
+
 # Decisions and contract
 
 Plan version: 2.9

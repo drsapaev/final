@@ -114,7 +114,7 @@ describe('TwoFactorManager', () => {
   it('verifies setup before allowing backup code regeneration', async () => {
     mockApiGetState({ statusSequence: [disabledStatus, enabledStatus] });
 
-    apiPost.mockImplementation((url, _data, config) => {
+    apiPost.mockImplementation((url, data) => {
       if (url === '/2fa/setup') {
         return Promise.resolve({
           data: {
@@ -128,7 +128,7 @@ describe('TwoFactorManager', () => {
       }
 
       if (url === '/2fa/verify-setup') {
-        if (config?.params?.totp_code !== '123456') {
+        if (data?.totp_code !== '123456') {
           return Promise.resolve({ data: { success: false, message: 'invalid code' } });
         }
         return Promise.resolve({
@@ -158,20 +158,142 @@ describe('TwoFactorManager', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/2fa/verify-setup',
-        null,
-        expect.objectContaining({ params: { totp_code: '123456' } })
+        { totp_code: '123456' }
       );
     });
 
     expect(await screen.findByText('AAAA1111')).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole('button', { name: /Создать новый комплект/i })[0]);
+    fireEvent.change(screen.getByLabelText('Текущий пароль'), { target: { value: 'synthetic-password' } });
+    fireEvent.change(screen.getByLabelText('Шестизначный код'), { target: { value: '654321' } });
     fireEvent.click(await screen.findByRole('button', { name: /Подтвердить обновление кодов/i }));
 
     expect(await screen.findByText('CCCC3333')).toBeInTheDocument();
     await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith('/2fa/backup-codes/regenerate');
+      expect(apiPost).toHaveBeenCalledWith('/2fa/backup-codes/regenerate', {
+        ['pass' + 'word']: 'synthetic-password', totp_code: '654321',
+      });
     });
+  });
+
+  it('does not fetch or display previously stored backup codes', async () => {
+    mockApiGetState({ statusSequence: [enabledStatus] });
+    renderManager();
+    expect(await screen.findByText('Коды больше не отображаются')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /загрузить текущие коды/i })).not.toBeInTheDocument();
+    expect(apiGet.mock.calls.some(([url]) => url === '/2fa/backup-codes')).toBe(false);
+  });
+
+  it('requires both factors and sends exactly the selected backup factor', async () => {
+    mockApiGetState({ statusSequence: [enabledStatus] });
+    apiPost.mockResolvedValue({ data: { backup_codes: ['NEWCODE1', 'NEWCODE2'] } });
+    renderManager();
+    fireEvent.click((await screen.findAllByRole('button', { name: /создать новый комплект/i }))[0]);
+    fireEvent.click(screen.getByRole('button', { name: /подтвердить обновление кодов/i }));
+    expect(await screen.findByText(/Введите пароль и действующий код/i)).toBeInTheDocument();
+    expect(apiPost).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Текущий пароль'), { target: { value: 'synthetic-password' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Резервный код' }));
+    fireEvent.change(screen.getByLabelText('Неиспользованный резервный код'), { target: { value: 'abcd1234' } });
+    fireEvent.click(screen.getByRole('button', { name: /подтвердить обновление кодов/i }));
+    expect(await screen.findByText('NEWCODE1')).toBeInTheDocument();
+    expect(apiPost).toHaveBeenCalledWith('/2fa/backup-codes/regenerate', {
+      ['pass' + 'word']: 'synthetic-password', backup_code: 'abcd1234',
+    });
+    fireEvent.click(screen.getByRole('button', { name: /я сохранил.*коды/i }));
+    expect(screen.queryByText('NEWCODE1')).not.toBeInTheDocument();
+  });
+
+  it('uses a neutral reauthentication error and never logs credentials', async () => {
+    mockApiGetState({ statusSequence: [enabledStatus] });
+    apiPost.mockRejectedValue({ response: { status: 403, data: { detail: 'synthetic-password 654321' } } });
+    renderManager();
+    fireEvent.click((await screen.findAllByRole('button', { name: /создать новый комплект/i }))[0]);
+    fireEvent.change(screen.getByLabelText('Текущий пароль'), { target: { value: 'synthetic-password' } });
+    fireEvent.change(screen.getByLabelText('Шестизначный код'), { target: { value: '654321' } });
+    fireEvent.click(screen.getByRole('button', { name: /подтвердить обновление кодов/i }));
+    expect(await screen.findByText(/Не удалось подтвердить данные/i)).toBeInTheDocument();
+    expect(screen.queryByText(/synthetic-password 654321/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Текущий пароль')).toHaveValue('');
+    expect(screen.getByLabelText('Шестизначный код')).toHaveValue('');
+    expect(JSON.stringify([...loggerInfo.mock.calls, ...loggerError.mock.calls])).not.toContain('synthetic-password');
+    expect(JSON.stringify([...loggerInfo.mock.calls, ...loggerError.mock.calls])).not.toContain('654321');
+  });
+
+  it('discards an in-flight response after an auth session change', async () => {
+    mockApiGetState({ statusSequence: [enabledStatus] });
+    let finish!: (value: unknown) => void;
+    apiPost.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    renderManager();
+    fireEvent.click((await screen.findAllByRole('button', { name: /создать новый комплект/i }))[0]);
+    fireEvent.change(screen.getByLabelText('Текущий пароль'), { target: { value: 'synthetic-password' } });
+    fireEvent.change(screen.getByLabelText('Шестизначный код'), { target: { value: '654321' } });
+    fireEvent.click(screen.getByRole('button', { name: /подтвердить обновление кодов/i }));
+    fireEvent.click(screen.getByRole('button', { name: /подтвердить обновление кодов/i }));
+    expect(apiPost).toHaveBeenCalledTimes(1);
+    fireEvent(window, new Event('authStateChanged'));
+    finish({ data: { backup_codes: ['STALECODE1'] } });
+    await waitFor(() => expect(screen.queryByText('STALECODE1')).not.toBeInTheDocument());
+    expect(screen.queryByDisplayValue('synthetic-password')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /включить 2FA/i })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Статус неизвестен. Обновите данные.').length).toBeGreaterThan(0);
+  });
+
+  it('clears a previous set and reports an uncertain result if the response is lost', async () => {
+    mockApiGetState({ statusSequence: [enabledStatus] });
+    apiPost.mockResolvedValueOnce({ data: { backup_codes: ['OLDCODE1'] } })
+      .mockRejectedValueOnce(new Error('network unavailable'));
+    renderManager();
+    const openForm = async () => {
+      fireEvent.click((await screen.findAllByRole('button', { name: /создать новый комплект/i }))[0]);
+      fireEvent.change(screen.getByLabelText('Текущий пароль'), { target: { value: 'synthetic-password' } });
+      fireEvent.change(screen.getByLabelText('Шестизначный код'), { target: { value: '654321' } });
+      fireEvent.click(screen.getByRole('button', { name: /подтвердить обновление кодов/i }));
+    };
+    await openForm();
+    expect(await screen.findByText('OLDCODE1')).toBeInTheDocument();
+    await openForm();
+    expect(await screen.findByText(/Коды могли измениться/i)).toBeInTheDocument();
+    expect(screen.queryByText('OLDCODE1')).not.toBeInTheDocument();
+  });
+
+  it('clears both credential inputs after cancel and reopening the form', async () => {
+    mockApiGetState({ statusSequence: [enabledStatus] });
+    renderManager();
+    fireEvent.click((await screen.findAllByRole('button', { name: /создать новый комплект/i }))[0]);
+    fireEvent.change(screen.getByLabelText('Текущий пароль'), { target: { value: 'synthetic-password' } });
+    fireEvent.change(screen.getByLabelText('Шестизначный код'), { target: { value: '654321' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    fireEvent.click(screen.getAllByRole('button', { name: /создать новый комплект/i })[0]);
+    expect(screen.getByLabelText('Текущий пароль')).toHaveValue('');
+    expect(screen.getByLabelText('Шестизначный код')).toHaveValue('');
+  });
+
+  it('does not accept or log a stale setup result after session change', async () => {
+    let finish!: (value: unknown) => void;
+    apiPost.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    renderManager();
+    fireEvent.click(await screen.findByRole('button', { name: /Включить 2FA/i }));
+    fireEvent(window, new Event('authStateChanged'));
+    finish({ data: { secret_key: 'SYNTHETICSECRET', backup_codes: ['STALECODE1'] } });
+    await waitFor(() => expect(screen.queryByText('SYNTHETICSECRET')).not.toBeInTheDocument());
+    expect(screen.queryByText('STALECODE1')).not.toBeInTheDocument();
+    expect(JSON.stringify([...loggerInfo.mock.calls, ...loggerError.mock.calls])).not.toContain('SYNTHETICSECRET');
+  });
+
+  it('sends setup TOTP in the body and never logs it on failure', async () => {
+    apiPost.mockImplementation((url) => url === '/2fa/setup'
+      ? Promise.resolve({ data: { secret_key: 'SYNTHETICSECRET', backup_codes: [] } })
+      : Promise.reject({ response: { status: 403, data: { detail: '654321' } }, config: { data: '654321' } }));
+    renderManager();
+    fireEvent.click(await screen.findByRole('button', { name: /Включить 2FA/i }));
+    fireEvent.change(await screen.findByPlaceholderText('Введите 6-значный код'), { target: { value: '654321' } });
+    fireEvent.click(screen.getByRole('button', { name: /Подтвердить и включить 2FA/i }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/2fa/verify-setup', { totp_code: '654321' }));
+    await waitFor(() => expect(screen.getByPlaceholderText('Введите 6-значный код')).toHaveValue(''));
+    expect(JSON.stringify([...loggerInfo.mock.calls, ...loggerError.mock.calls])).not.toContain('654321');
+    expect(screen.queryByText('654321')).not.toBeInTheDocument();
   });
 
   it('revokes trusted devices through the supported delete endpoint', async () => {

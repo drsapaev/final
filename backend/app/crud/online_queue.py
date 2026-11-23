@@ -32,7 +32,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.core.pii_masker import mask_phone
@@ -41,12 +41,10 @@ from app.core.pii_masker import mask_phone
 def _mask_phone_failclosed(phone: str | None) -> str | None:
     """#3579 P2-1 (Codex): fail-closed маска для лога нового пациента.
 
-    Каноническая mask_phone распознаёт только `+` + 12 цифр подряд;
-    приклад допускает и хранит неканонические форматы (`998901234567`,
-    `+998 90 123 45 67`, через дефис), для которых маска вернула бы
-    строку без изменений и лог попал бы сырым телефоном. Если маска
-    ничего не заменила — сырую строку в лог не выводим никогда: остаётся
-    только хвост (3 цифры) без префикса, либо полное скрытие."""
+    Каноническая mask_phone скрывает все цифры, кроме трёх последних,
+    в том числе в номерах с пробелами и дефисами. Если маска ничего не
+    заменила, сырую строку в лог не выводим: остаётся только хвост либо
+    полное скрытие."""
     if not phone:
         return phone
     masked = mask_phone(phone)
@@ -1154,11 +1152,17 @@ def get_or_create_daily_queue(
         DailyQueue.day == day,
         DailyQueue.specialist_id == actual_specialist_id,
     ]
-
     if queue_tag:
         query_filters.append(DailyQueue.queue_tag == queue_tag)
     else:
-        query_filters.append(DailyQueue.queue_tag.is_(None))
+        # The active doctor/day index treats NULL and empty as one tag.
+        # Never send an untagged admission to an archived queue.
+        query_filters.extend(
+            (
+                DailyQueue.active.is_(True),
+                or_(DailyQueue.queue_tag.is_(None), DailyQueue.queue_tag == ""),
+            )
+        )
 
     daily_queue = db.query(DailyQueue).filter(and_(*query_filters)).first()
 

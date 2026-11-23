@@ -16,15 +16,12 @@ import {
   Eye,
   EyeOff } from
 'lucide-react';
-import { tokenManager } from '../../utils/tokenManager';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface SMSEmail2FAProps {
   method?: 'sms' | 'email';
   onSuccess?: (data: unknown) => void;
   onCancel?: () => void;
-  phoneNumber?: string;
-  emailAddress?: string;
 }
 
 /**
@@ -34,9 +31,7 @@ interface SMSEmail2FAProps {
 const SMSEmail2FA = ({
   method = 'sms', // 'sms' или 'email'
   onSuccess,
-  onCancel,
-  phoneNumber = '',
-  emailAddress = ''
+  onCancel
 }: SMSEmail2FAProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
   const [loading, setLoading] = useState(false);
@@ -47,6 +42,7 @@ const SMSEmail2FA = ({
   const [canResend, setCanResend] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [showCode, setShowCode] = useState(false);
+  const [destination, setDestination] = useState('');
 
   const maxAttempts = 3;
   const codeLength = 6;
@@ -67,31 +63,17 @@ const SMSEmail2FA = ({
     setSuccess('');
 
     try {
-      const response = await api.post('/2fa/send-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify({
-          method: method,
-          phone_number: phoneNumber,
-          email_address: emailAddress
-        })
-      });
-
-      const data = await (response as unknown as { json: () => Promise<unknown> }).json();
-
-      if (response.status >= 200 && response.status < 300) {
-        setSuccess(t('misc.sef_kod_otpravlen_na_method_sms_', { emailAddress: method === 'sms' ? phoneNumber : emailAddress }));
-        setTimeLeft(resendDelay);
-        setCanResend(false);
-        setAttempts(0);
-      } else {
-        setError(String((data as Record<string, unknown>)?.detail) || t('misc.sef_oshibka_otpravki_koda'));
-      }
-    } catch {
-      setError(t('misc.sef_oshibka_otpravki_koda'));
+      const path = destination ? '/2fa/resend-code' : '/2fa/send-code';
+      const response = await api.post<{ destination?: string }>(path, { method });
+      setDestination(response.data.destination ?? destination);
+      setSuccess(t('misc.sef_kod_otpravlen_na_method_sms_', { emailAddress: response.data.destination ?? '' }));
+      setTimeLeft(resendDelay);
+      setCanResend(false);
+      setAttempts(0);
+      setCode('');
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : t('misc.sef_oshibka_otpravki_koda'));
     } finally {
       setLoading(false);
     }
@@ -107,38 +89,18 @@ const SMSEmail2FA = ({
     setError('');
 
     try {
-      const response = await api.post('/2fa/verify-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify({
-          method: method,
-          code: code,
-          phone_number: phoneNumber,
-          email_address: emailAddress
-        })
-      });
-
-      const data = await (response as unknown as { json: () => Promise<unknown> }).json();
-
-      if (response.status >= 200 && response.status < 300) {
-        setSuccess(t('misc.sef_kod_podtverzhden_uspeshno'));
-        if (onSuccess) {
-          onSuccess(data);
-        }
+      const response = await api.post('/2fa/verify-code', { method, code });
+      setSuccess(t('misc.sef_kod_podtverzhden_uspeshno'));
+      onSuccess?.(response.data);
+    } catch (error) {
+      const nextAttempts = attempts + 1;
+      setAttempts(nextAttempts);
+      const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      if (nextAttempts >= maxAttempts) {
+        setError(t('misc.sef_prevysheno_kolichestvo_popyt'));
       } else {
-        setError(String((data as Record<string, unknown>)?.detail) || t('misc.sef_nevernyy_kod'));
-        setAttempts((prev) => prev + 1);
-
-        if (attempts + 1 >= maxAttempts) {
-          setError(t('misc.sef_prevysheno_kolichestvo_popyt'));
-          setCanResend(false);
-        }
+        setError(typeof detail === 'string' ? detail : t('misc.sef_oshibka_proverki_koda'));
       }
-    } catch {
-      setError(t('misc.sef_oshibka_proverki_koda'));
     } finally {
       setLoading(false);
     }
@@ -174,18 +136,6 @@ const SMSEmail2FA = ({
     return method === 'sms' ? 'SMS' : 'Email';
   };
 
-  const getMaskedContact = () => {
-    if (method === 'sms' && phoneNumber) {
-      const phone = phoneNumber.replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '+7 ($1) $2-**-**');
-      return phone;
-    } else if (method === 'email' && emailAddress) {
-      const [local, domain] = emailAddress.split('@');
-      const maskedLocal = local.slice(0, 2) + '*'.repeat(local.length - 2);
-      return `${maskedLocal}@${domain}`;
-    }
-    return '';
-  };
-
   return (
     <div className="max-w-md mx-auto">
       <Card className="p-6">
@@ -199,10 +149,10 @@ const SMSEmail2FA = ({
             Подтверждение через {getMethodLabel()}
           </h3>
           <p className="text-gray-600">
-            Мы отправили 6-значный код на:
+            {destination ? 'Мы отправили 6-значный код на:' : 'Код будет отправлен на настроенный контакт:'}
           </p>
           <p className="font-medium text-gray-900 mt-1">
-            {getMaskedContact()}
+            {destination || '••••'}
           </p>
         </div>
 

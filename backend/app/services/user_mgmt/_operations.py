@@ -6,10 +6,10 @@ from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
     MedicalSpecialtyCatalogService,
 )
-from app.services.patient_otp_service import normalize_phone
 from app.services.patient_phone_scope import (
     ERR_PHONE_SCOPE_CONFLICT,
     acquire_phone_scope_lock,
+    canonical_phone_identity,
     ensure_phone_scope_free,
     lock_candidate_state_rows,
 )
@@ -375,7 +375,7 @@ class OperationsMixin(UserManagementServiceMixinBase):
                     entering_rows = []
                 batch_order = {uid: i for i, uid in enumerate(action_data.user_ids)}
                 for row in entering_rows:
-                    normalized = normalize_phone(row.phone or "")
+                    normalized = canonical_phone_identity(row.phone or "")
                     if normalized:
                         entering.append((row.id, normalized))
                 entering.sort(key=lambda item: batch_order.get(item[0], len(batch_order)))
@@ -462,12 +462,21 @@ class OperationsMixin(UserManagementServiceMixinBase):
                                 user.profile.status = prev_status
                             raise
                     elif action_data.action == "deactivate":
-                        user.is_active = False
-                        if user.profile:
-                            user.profile.status = UserStatus.INACTIVE
-                        self._sync_doctor_active(
-                            db, user_id, False, reason="bulk_deactivate"
+                        # Keep per-user failure isolation: a failed revoke or
+                        # doctor mirror rolls back this user's whole action,
+                        # including the epoch bump and session changes.
+                        from app.services.token_blacklist_service import (
+                            revoke_account_sessions_locked,
                         )
+
+                        with db.begin_nested():
+                            revoke_account_sessions_locked(db, user, revoke_password_resets=True)
+                            user.is_active = False
+                            if user.profile:
+                                user.profile.status = UserStatus.INACTIVE
+                            self._sync_doctor_active(
+                                db, user_id, False, reason="bulk_deactivate"
+                            )
                     elif action_data.action == "suspend":
                         if user.profile:
                             user.profile.status = UserStatus.SUSPENDED
@@ -484,12 +493,14 @@ class OperationsMixin(UserManagementServiceMixinBase):
                                     db, user.profile.phone, exclude_user_id=user.id
                                 )
                             old_role = user.role
-                            # Codex #3031 round-4 P1: same restore contract —
-                            # if the lifecycle's catalog guard rejects the
-                            # promotion, the assigned role must not survive
-                            # the final commit of a batch that reports this
-                            # user as failed.
-                            try:
+                            from app.services.token_blacklist_service import (
+                                revoke_account_sessions_locked,
+                            )
+
+                            # A failed promotion must roll back both the role
+                            # and credential revocation for this account.
+                            with db.begin_nested():
+                                revoke_account_sessions_locked(db, user, revoke_password_resets=True)
                                 user.role = action_data.role
                                 # Lifecycle invariant: bulk role changes follow the
                                 # SAME transition contract as update_user —
@@ -504,9 +515,6 @@ class OperationsMixin(UserManagementServiceMixinBase):
                                     action_data.role,
                                     prelocked_queue_tags=prelocked_doctor_tags,
                                 )
-                            except Exception:
-                                user.role = old_role
-                                raise
                     elif action_data.action == "delete":
                         # Проверяем, что не удаляем последнего администратора
                         if user.role == "Admin" and user.is_superuser:

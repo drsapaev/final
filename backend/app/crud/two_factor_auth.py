@@ -3,7 +3,7 @@ CRUD операции для двухфакторной аутентификац
 """
 
 
-from datetime import UTC
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
@@ -325,31 +325,57 @@ class CRUDTwoFactorDevice(CRUDBase[TwoFactorDevice, TwoFactorDeviceCreate, None]
                     TwoFactorDevice.user_id == user_id,
                     TwoFactorDevice.trusted == True,
                     TwoFactorDevice.active == True,
+                    TwoFactorDevice.trusted_until > datetime.now(UTC),
                 )
             )
             .all()
         )
 
-    def trust_device(self, db: Session, device_id: int) -> bool:
-        """Доверять устройству"""
+    def trust_device(
+        self,
+        db: Session,
+        device_id: int,
+        user_id: int,
+        trusted_until: datetime,
+    ) -> bool:
+        """Доверять только активному устройству владельца на срок до 30 дней."""
+        now = datetime.now(UTC)
+        if trusted_until.tzinfo is None:
+            trusted_until = trusted_until.replace(tzinfo=UTC)
+        if trusted_until <= now or trusted_until > now + timedelta(days=30):
+            return False
         device = (
-            db.query(TwoFactorDevice).filter(TwoFactorDevice.id == device_id).first()
+            db.query(TwoFactorDevice)
+            .filter(
+                TwoFactorDevice.id == device_id,
+                TwoFactorDevice.user_id == user_id,
+                TwoFactorDevice.active == True,
+            )
+            .with_for_update()
+            .first()
         )
         if device:
             device.trusted = True
-            device.active = True
+            device.trusted_until = trusted_until
             db.commit()
             return True
         return False
 
-    def untrust_device(self, db: Session, device_id: int) -> bool:
-        """Отозвать доверие к устройству"""
+    def untrust_device(self, db: Session, device_id: int, user_id: int) -> bool:
+        """Revoke only a device owned by the current user."""
         device = (
-            db.query(TwoFactorDevice).filter(TwoFactorDevice.id == device_id).first()
+            db.query(TwoFactorDevice)
+            .filter(
+                TwoFactorDevice.id == device_id,
+                TwoFactorDevice.user_id == user_id,
+            )
+            .with_for_update()
+            .first()
         )
         if device:
             device.trusted = False
             device.active = False
+            device.trusted_until = None
             db.commit()
             return True
         return False
@@ -374,6 +400,8 @@ class CRUDTwoFactorDevice(CRUDBase[TwoFactorDevice, TwoFactorDeviceCreate, None]
         )
         if device:
             device.active = False
+            device.trusted = False
+            device.trusted_until = None
             db.commit()
             return True
         return False

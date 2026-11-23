@@ -11,10 +11,24 @@ import jwt
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from jwt import PyJWTError as JWTError
 from sqlalchemy import func
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import ObjectDeletedError
 
 from app.core.config import settings
-from app.core.roles import is_login_blocked_role
+from app.core.roles import (
+    ADMIN_ROLES,
+    DOCTOR_ROLE_SPELLINGS,
+    is_login_blocked_role,
+    normalize_role_value,
+)
+from app.core.user_token_claims import (
+    has_patient_binding,
+    is_user_access_claims,
+    is_user_allowed_for_claims,
+    user_auth_epoch_matches,
+)
 from app.crud import user as crud_user
 from app.db.session import SessionLocal
 from app.middleware.websocket_rate_limit import websocket_rate_limiter
@@ -23,6 +37,9 @@ from app.ws.queue_ws import ws_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+QUEUE_WS_AUTH_RECHECK_SECONDS = 15
+QUEUE_WS_AUTH_TIMEOUT_SECONDS = 2
+_ADMIN_WS_ROLES = frozenset(normalize_role_value(role) for role in ADMIN_ROLES)
 
 # ===================== WEBSOCKET АУТЕНТИФИКАЦИЯ =====================
 
@@ -47,10 +64,31 @@ def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
         )
         return None
 
+    # NOTIFYLIVEAUTH-BE-001 residual (re-check freshness): the periodic live
+    # re-authorization reuses the handshake DB session, so a plain re-query
+    # emits the SELECT but keeps the identity-map copy loaded at handshake
+    # time without overwriting its column values — a deactivation or role
+    # change committed by another session/process stayed invisible and the
+    # socket survived revocation. refresh() forces the current row to
+    # overwrite cached attributes on every resolution, so the handshake and
+    # each periodic re-check across the notify, queue and display-board
+    # planes that share this resolver observe current principal state.
+    try:
+        persistent_here = sa_inspect(user).persistent
+    except NoInspectionAvailable:
+        persistent_here = False
+    if persistent_here:
+        try:
+            db.refresh(user)
+        except ObjectDeletedError:
+            # The row was removed after the handshake identity map cached it.
+            logger.warning(
+                "WebSocket auth rejected: token subject row no longer exists"
+            )
+            return None
+
     if user is None:
-        logger.warning(
-            "WebSocket auth rejected: no user matched token subject %r", subject
-        )
+        logger.warning("WebSocket auth rejected: no user matched token subject")
         return None
 
     # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
@@ -76,10 +114,8 @@ def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
     return user
 
 
-async def authenticate_websocket_token(token: str | None, db: Session) -> User | None:
-    """
-    Аутентификация WebSocket соединения по JWT токену
-    """
+def resolve_websocket_token_user(token: str | None, db: Session) -> User | None:
+    """Resolve a valid, active, non-revoked JWT to its current user row."""
     if not token:
         return None
 
@@ -90,8 +126,24 @@ async def authenticate_websocket_token(token: str | None, db: Session) -> User |
     except JWTError:
         return None
 
+    if not is_user_access_claims(payload):
+        return None
+
     user = _resolve_websocket_user(payload, db)
     if user is None:
+        return None
+
+    if not user_auth_epoch_matches(payload, getattr(user, "auth_epoch", None)):
+        return None
+
+    if not is_user_allowed_for_claims(
+        payload,
+        role=getattr(user, "role", None),
+        is_active=getattr(user, "is_active", None),
+        is_superuser=getattr(user, "is_superuser", None),
+    ):
+        return None
+    if not has_patient_binding(db, payload, user.id):
         return None
 
     # The subject may be a username instead of a numeric ID. Resolve the
@@ -101,13 +153,57 @@ async def authenticate_websocket_token(token: str | None, db: Session) -> User |
 
     jti = payload.get("jti")
     lookup_jti = jti if isinstance(jti, str) else ""
-    if TokenBlacklistService.is_token_blacklisted(db, lookup_jti, user_id=user.id):
+    if TokenBlacklistService.is_token_blacklisted(
+        db, lookup_jti, user_id=user.id, auth_epoch=user.auth_epoch
+    ):
         logger.warning(
             "WebSocket auth rejected: token revoked for user_id=%s", user.id
         )
         return None
 
     return user
+
+
+async def authenticate_websocket_token(token: str | None, db: Session) -> User | None:
+    """Async compatibility wrapper around the synchronous JWT/database check."""
+    return resolve_websocket_token_user(token, db)
+
+
+def reauthorize_queue_websocket(token: str | None, department: str) -> User | None:
+    """Re-check live queue authorization using a short-lived DB session."""
+    db = SessionLocal()
+    try:
+        user = resolve_websocket_token_user(token, db)
+        if user is None or not _has_department_access(user, department, db):
+            return None
+        return user
+    finally:
+        db.close()
+
+
+async def _bounded_queue_authorization(token: str | None, department: str) -> User | None:
+    """Keep a stalled database from blocking the loop or extending access indefinitely."""
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(reauthorize_queue_websocket, token, department),
+            timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return None
+
+
+async def _close_expired_queue_socket(websocket: WebSocket) -> None:
+    """Do not let an unresponsive close delay room cleanup indefinitely."""
+    try:
+        await asyncio.wait_for(
+            websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Queue authorization expired or revoked",
+            ),
+            timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        pass
 
 
 # ===================== АУТЕНТИФИЦИРОВАННЫЕ WEBSOCKET ENDPOINTS =====================
@@ -137,7 +233,7 @@ async def ws_queue_authenticated(
     if secure_token and not token:
         token = secure_token
 
-    db = SessionLocal()
+    db = None
     ip_address = websocket.client.host if websocket.client else "unknown"
 
     try:
@@ -154,33 +250,17 @@ async def ws_queue_authenticated(
             return
 
         # Обязательная аутентификация
-        authenticated_user = await authenticate_websocket_token(token, db)
+        authenticated_user = await _bounded_queue_authorization(token, department)
         if not authenticated_user:
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token"
             )
             return
 
-        # Проверяем права доступа к отделению (WS-POSTMERGE-03: ownership
-        # через SSOT doctors.user_id; сессия уже в скоупе — передаём её).
-        if not _has_department_access(authenticated_user, department, db):
-            await websocket.close(
-                code=status.WS_1003_UNSUPPORTED_DATA,
-                reason="Access denied to department",
-            )
-            return
-
+        # The bounded worker checked both the user and department grant and
+        # released its short-lived DB session before returning.
         # ✅ SECURITY: Record connection after successful auth
         websocket_rate_limiter.record_connection(ip_address)
-
-        # LEGACYWSPOOL-BE-001 (P1 conditional): release the checked-out pool
-        # connection BEFORE the unlimited receive loop. The session was held
-        # for the whole WS lifetime; with the transport actually working
-        # (WS-POSTMERGE-04) every connected staff client pinned one of the
-        # PostgreSQL pool's 8+2 connections until disconnect. Per-message DB
-        # work opens short-lived sessions instead.
-        db.close()
-        db = None
 
         # WSHELPER-FE-001: echo the offered subprotocol so browser
         # handshakes complete.
@@ -203,7 +283,9 @@ async def ws_queue_authenticated(
         HEARTBEAT_INTERVAL = 30  # seconds
         CONNECTION_TIMEOUT = 120  # seconds
         # ✅ BUGFIX: Use list to allow mutation from nested scopes (nonlocal doesn't work in nested try blocks)
-        last_pong = [asyncio.get_event_loop().time()]
+        loop = asyncio.get_running_loop()
+        last_pong = [loop.time()]
+        last_auth_check = [loop.time()]
 
         async def send_heartbeat():
             """Send periodic ping to detect dead connections"""
@@ -222,13 +304,32 @@ async def ws_queue_authenticated(
 
         heartbeat_task = asyncio.create_task(send_heartbeat())
 
+        async def refresh_queue_auth() -> bool:
+            """Close this session when its current JWT or room grant is revoked."""
+            nonlocal authenticated_user
+            current_user = await _bounded_queue_authorization(token, department)
+            if current_user is None:
+                return False
+            authenticated_user = current_user
+            last_auth_check[0] = loop.time()
+            return True
+
         try:
             while True:
                 try:
+                    elapsed = loop.time() - last_auth_check[0]
                     # ✅ SECURITY: Set receive timeout
                     data = await asyncio.wait_for(
-                        websocket.receive_text(), timeout=CONNECTION_TIMEOUT
+                        websocket.receive_text(),
+                        timeout=min(
+                            CONNECTION_TIMEOUT,
+                            max(0.01, QUEUE_WS_AUTH_RECHECK_SECONDS - elapsed),
+                        ),
                     )
+                    if loop.time() - last_auth_check[0] >= QUEUE_WS_AUTH_RECHECK_SECONDS:
+                        if not await refresh_queue_auth():
+                            await _close_expired_queue_socket(websocket)
+                            break
                     message = json.loads(data)
 
                     # Handle pong response
@@ -243,14 +344,20 @@ async def ws_queue_authenticated(
                     # Обрабатываем сообщения от аутентифицированного клиента
                     # (LEGACYWSPOOL-BE-001: без удерживаемой сессии —
                     # обработчики открывают короткие сессии сами)
-                    await _handle_authenticated_message(
-                        websocket, message, authenticated_user, department, date, None
+                    await asyncio.wait_for(
+                        _handle_authenticated_message(
+                            websocket, message, authenticated_user, department, date, None
+                        ), timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
                     )
 
                 except TimeoutError:
+                    if loop.time() - last_auth_check[0] >= QUEUE_WS_AUTH_RECHECK_SECONDS:
+                        if not await refresh_queue_auth():
+                            await _close_expired_queue_socket(websocket)
+                            break
                     # Check if connection is still alive
                     # ✅ BUGFIX: Access list element to get current value
-                    time_since_pong = asyncio.get_event_loop().time() - last_pong[0]
+                    time_since_pong = loop.time() - last_pong[0]
                     if time_since_pong > CONNECTION_TIMEOUT:
                         logger.warning(
                             f"Connection timeout for user {authenticated_user.username}, closing..."
@@ -258,11 +365,13 @@ async def ws_queue_authenticated(
                         break
                     # Send ping to check connection
                     try:
-                        await websocket.send_json(
-                            {
-                                "type": "ping",
-                                "timestamp": asyncio.get_event_loop().time(),
-                            }
+                        await asyncio.wait_for(
+                            websocket.send_json(
+                                {
+                                    "type": "ping",
+                                    "timestamp": asyncio.get_event_loop().time(),
+                                }
+                            ), timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
                         )
                     except Exception:
                         break  # Connection is dead
@@ -330,35 +439,20 @@ async def ws_queue_optional_auth(
         )
         return
 
-    db = SessionLocal()
+    db = None
     authenticated_user = None
 
     try:
         # ✅ SECURITY: Require valid authentication
-        authenticated_user = await authenticate_websocket_token(token, db)
+        authenticated_user = await _bounded_queue_authorization(token, department)
         if not authenticated_user:
             await websocket.close(
                 code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token"
             )
             return
 
-        # WS-POSTMERGE-04: the latent RBAC trap — any authenticated JWT
-        # (including Patient) used to be accepted here. The same canonical
-        # department policy as /ws/queue/auth now runs BEFORE accept, so a
-        # repaired transport can never become a Patient/foreign-specialist
-        # subscription vector.
-        if not _has_department_access(authenticated_user, department, db):
-            await websocket.close(
-                code=status.WS_1008_POLICY_VIOLATION,
-                reason="Access denied to department",
-            )
-            return
-
-        # LEGACYWSPOOL-BE-001 (P1 conditional): release the pool connection
-        # before the unlimited receive loop (see /ws/queue/auth).
-        db.close()
-        db = None
-
+        # The bounded worker has already checked the canonical department
+        # policy and released its short-lived DB session.
         # WSHELPER-FE-001: echo the offered subprotocol so browser
         # handshakes complete.
         await accept_echoing_subprotocol(websocket)
@@ -372,16 +466,40 @@ async def ws_queue_optional_auth(
             f"Аутентифицированное WebSocket подключение (deprecated optional-auth): пользователь {authenticated_user.username}, отделение {department}, комната {room}"
         )
 
+        loop = asyncio.get_running_loop()
+        last_auth_check = loop.time()
         try:
             while True:
-                data = await websocket.receive_text()
+                timeout = max(
+                    0.01,
+                    QUEUE_WS_AUTH_RECHECK_SECONDS - (loop.time() - last_auth_check),
+                )
+                try:
+                    data = await asyncio.wait_for(
+                        websocket.receive_text(), timeout=timeout
+                    )
+                except TimeoutError:
+                    data = None
+
+                if loop.time() - last_auth_check >= QUEUE_WS_AUTH_RECHECK_SECONDS:
+                    current_user = await _bounded_queue_authorization(token, department)
+                    if current_user is None:
+                        await _close_expired_queue_socket(websocket)
+                        break
+                    authenticated_user = current_user
+                    last_auth_check = loop.time()
+
+                if data is None:
+                    continue
                 message = json.loads(data)
 
                 # Обрабатываем сообщения (только для аутентифицированных
                 # пользователей). LEGACYWSPOOL-BE-001: без удерживаемой
                 # сессии — обработчики открывают короткие сессии сами.
-                await _handle_authenticated_message(
-                    websocket, message, authenticated_user, department, date, None
+                await asyncio.wait_for(
+                    _handle_authenticated_message(
+                        websocket, message, authenticated_user, department, date, None
+                    ), timeout=QUEUE_WS_AUTH_TIMEOUT_SECONDS,
                 )
 
         except WebSocketDisconnect:
@@ -418,17 +536,7 @@ async def ws_queue_optional_auth(
 # with WS 1008 on their own departments' queue rooms. Deliberately NOT
 # widened: lab/laboratory, Nurse, Cashier and unknown roles keep being
 # rejected, exactly as before.
-_STAFF_DOCTOR_ROLES = frozenset(
-    {
-        "doctor",
-        "cardio",
-        "cardiology",
-        "cardiologist",
-        "derma",
-        "dermatologist",
-        "dentist",
-    }
-)
+_STAFF_DOCTOR_ROLES = DOCTOR_ROLE_SPELLINGS
 
 _SPECIALIST_ROOM_PREFIX = "specialist_"
 
@@ -439,14 +547,17 @@ def _resolve_doctor_for_user(db: Session, user: User):
     A doctor principal's queue rooms are the ``specialist_{doctors.id}``
     rooms broadcast by ``queue_update_departments`` — the doctor row is
     resolved through the UNIQUE ``doctors.user_id`` bridge (1 doctor = 1
-    User). No ``active`` filter, mirroring the routing SSOT
-    (``queue_resource_routing.routing_specialist_ids``): a deactivated
-    synthetic still names the surface for already-connected subscribers,
-    and employment status is enforced at the JWT/active-user layer.
+    User). The canonical real-doctor owner policy is applied as well, so a
+    disabled Doctor profile loses queue access even if its User account
+    remains active.
     """
     from app.crud.clinic import get_doctor_by_user_id
+    from app.crud.queue_owner_policy import eligible_real_doctor
 
-    return get_doctor_by_user_id(db, int(user.id))
+    doctor = get_doctor_by_user_id(db, int(user.id))
+    if doctor is None or not eligible_real_doctor(db, int(doctor.id)):
+        return None
+    return doctor
 
 
 def _doctor_owns_queue_room(db: Session, user: User, department: str) -> bool:
@@ -461,9 +572,9 @@ def _doctor_owns_queue_room(db: Session, user: User, department: str) -> bool:
       routing fan-out (``queue_update_departments``) already broadcasts to
       every routing sibling's own room.
     - Department-name rooms: the principal's own ``Department.key`` or the
-      canonical specialty family of their ``Doctor.specialty``
-      (``specialty_variants``) must match the requested name
-      case-insensitively. Forged/foreign department strings are denied.
+      queue-room specialty family of their ``Doctor.specialty`` must match
+      the requested name case-insensitively. Forged/foreign department
+      strings are denied.
     - A doctor-family role WITHOUT a doctor row owns nothing (fail
       closed).
     """
@@ -477,7 +588,13 @@ def _doctor_owns_queue_room(db: Session, user: User, department: str) -> bool:
 
     if room_department.startswith(_SPECIALIST_ROOM_PREFIX):
         specialist_suffix = room_department[len(_SPECIALIST_ROOM_PREFIX) :]
-        if not specialist_suffix.isdigit():
+        if (
+            not specialist_suffix
+            or len(specialist_suffix) > 10
+            or not specialist_suffix.isascii()
+            or not specialist_suffix.isdigit()
+            or specialist_suffix.startswith("0")
+        ):
             return False
         return int(specialist_suffix) == int(doctor.id)
 
@@ -490,9 +607,9 @@ def _doctor_owns_queue_room(db: Session, user: User, department: str) -> bool:
 
     specialty = str(getattr(doctor, "specialty", "") or "").strip()
     if specialty:
-        from app.core.specialties import specialty_variants
+        from app.core.specialties import queue_room_specialty_variants
 
-        for variant in specialty_variants(specialty):
+        for variant in queue_room_specialty_variants(specialty):
             if variant.strip().casefold() == room_department.casefold():
                 return True
 
@@ -516,17 +633,21 @@ def _has_department_access(
     canonical ``/ws/queue`` endpoint); a short-lived session is opened
     internally in that case.
     """
-    # Админы имеют доступ ко всем отделениям
-    if user.role == "Admin":
-        return True
+    role = normalize_role_value(getattr(user, "role", None))
 
-    # Регистраторы имеют доступ ко всем отделениям
-    if user.role == "Registrar":
+    # Match canonical IAM: Admin and SuperAdmin roles (normalized in the
+    # same way as HTTP role gates), explicit superusers, and Registrar keep
+    # all-department queue access.
+    if (
+        bool(getattr(user, "is_superuser", False))
+        or role in _ADMIN_WS_ROLES
+        or role == "registrar"
+    ):
         return True
 
     # Врачи имеют доступ только к своему отделению — теперь это не только
     # комментарий, а проверка владения комнатой через SSOT doctors.user_id.
-    if str(user.role).casefold() in _STAFF_DOCTOR_ROLES:
+    if role in _STAFF_DOCTOR_ROLES:
         if db is not None:
             return _doctor_owns_queue_room(db, user, department)
         session = SessionLocal()
@@ -576,13 +697,14 @@ async def _handle_authenticated_message(
             # patient identifiers to the broadcast. Validate against the
             # queue SSOT (entry exists, is callable, lives in the room's
             # queue scope) with a SHORT-LIVED session before relaying.
-            session = SessionLocal()
-            try:
-                allowed, rejection_reason = _validate_patient_call(
-                    session, department, date, patient_id
-                )
-            finally:
-                session.close()
+            def validate_call():
+                session = SessionLocal()
+                try:
+                    return _validate_patient_call(session, department, date, patient_id)
+                finally:
+                    session.close()
+
+            allowed, rejection_reason = await asyncio.to_thread(validate_call)
             if allowed:
                 await _broadcast_patient_call(
                     department, date, patient_id, user.username

@@ -15,11 +15,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../api/client', () => ({
-  api: {
-    get: vi.fn(),
-  },
-}));
+vi.mock('../../../../api/registrarTabs', () => ({ getRegistrarTabs: vi.fn() }));
 
 vi.mock('../../../../i18n/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -41,15 +37,12 @@ vi.mock('../../../../components/ui/macos', () => ({
 
 import WorklistView from '../WorklistView';
 import Tabs, { doctorTabButtonIdFor, tabButtonIdFor } from '../../../../components/navigation/Tabs';
-import { toDoctorId } from '../../../../types/domain/branded';
-import { api } from '../../../../api/client';
+import { getRegistrarTabs } from '../../../../api/registrarTabs';
 
 afterEach(() => cleanup());
 
 beforeEach(() => {
-  vi.mocked(api.get).mockResolvedValue({
-    data: { success: true, source: 'database', profiles: [] },
-  });
+  vi.mocked(getRegistrarTabs).mockReset().mockResolvedValue({ mode: 'configured', version: 1, tabs: [], profile_filters: [] });
 });
 
 const baseProps = {
@@ -105,21 +98,24 @@ describe('RQ-19 — worklist tabpanel wiring', () => {
   });
 
   it('Tabs + WorklistView agree: the panel labelledby resolves to the actual selected tab button', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({
-      data: {
-        success: true,
-        source: 'database',
-        profiles: [
-          {
-            key: 'ecg',
-            title: 'ECG',
-            title_ru: 'ЭКГ',
-            queue_tags: ['ecg'],
-            icon: 'Activity',
-            color: 'var(--mac-accent-purple)',
-          },
-        ],
-      },
+    vi.mocked(getRegistrarTabs).mockResolvedValueOnce({
+      mode: 'configured',
+      version: 1,
+      tabs: [{
+        target_kind: 'profile',
+        target_id: 1,
+        custom_title: null,
+        title: 'ECG',
+        title_ru: 'ЭКГ',
+        profile_key: 'ecg',
+        queue_tags: ['ecg'],
+        icon: 'Activity',
+        color: 'var(--mac-accent-purple)',
+        visible: true,
+        available: true,
+        reason_code: null,
+      }],
+      profile_filters: [{ key: 'ecg', title: 'ECG', title_ru: 'ЭКГ', queue_tags: ['ecg'] }],
     });
 
     render(
@@ -154,11 +150,30 @@ describe('RQ-19 — worklist tabpanel wiring', () => {
   });
 
   it('selected doctor controls the same worklist tabpanel and uses records as its counter unit', async () => {
+    vi.mocked(getRegistrarTabs).mockResolvedValueOnce({
+      mode: 'configured',
+      version: 1,
+      tabs: [{
+        target_kind: 'doctor',
+        target_id: 7,
+        custom_title: null,
+        title: 'SYNTHETIC Doctor',
+        title_ru: null,
+        profile_key: null,
+        queue_tags: [],
+        icon: null,
+        color: null,
+        visible: true,
+        available: true,
+        reason_code: null,
+      }],
+      profile_filters: [],
+    });
     render(<>
-      <Tabs activeDoctorId={7} doctors={[{ id: toDoctorId(7), user: { full_name: 'Иванов Иван' } }]} />
-      <WorklistView {...baseProps} activeTab={null} activeDoctorId={7} currentWorklistLabel="Иванов Иван" />
+      <Tabs activeDoctorId={7} />
+      <WorklistView {...baseProps} activeTab={null} activeDoctorId={7} currentWorklistLabel="SYNTHETIC Doctor" />
     </>);
-    const doctorTab = await screen.findByRole('tab', { name: 'Иванов Иван' });
+    const doctorTab = await screen.findByRole('tab', { name: 'SYNTHETIC Doctor' });
     const panel = screen.getByRole('tabpanel');
     expect(doctorTab.id).toBe(doctorTabButtonIdFor(7));
     expect(panel).toHaveAttribute('aria-labelledby', doctorTab.id);

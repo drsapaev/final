@@ -37,6 +37,8 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from app.services.telegram_mini_app_init_data import TelegramMiniAppSessionScope
 
 logger = logging.getLogger(__name__)
@@ -169,6 +171,7 @@ class AuthorizationService:
         resource_type: str,
         action: str,
         resource_id: str | None = None,
+        db: Session | None = None,
     ) -> AuthorizationResult:
         """Check if a scope can access PHI for a given patient.
 
@@ -178,6 +181,13 @@ class AuthorizationService:
             resource_type: One of ResourceType values
             action: One of Action values
             resource_id: Optional specific resource ID
+            db: Optional caller-owned session. When omitted the
+                relationship check falls back to the ambient SessionLocal
+                factory (production semantics unchanged). Callers that
+                already hold a request-scoped session (or tests using the
+                test-world engine) should pass it so the relationship
+                query runs against the SAME database as the rest of the
+                request instead of an ambient one.
 
         Returns:
             AuthorizationResult with decision + reason + actor_type
@@ -222,6 +232,7 @@ class AuthorizationService:
                 subject_patient_id=int(subject_patient_id),
                 resource_type=resource_type,
                 action=action,
+                db=db,
             )
             return rel_result
 
@@ -274,6 +285,7 @@ class AuthorizationService:
         resource_type: str,
         action: str,
         resource_id: str | None = None,
+        db: Session | None = None,
     ) -> "TelegramMiniAppSessionScope":
         """Check authorization and raise if denied.
 
@@ -286,6 +298,7 @@ class AuthorizationService:
             resource_type=resource_type,
             action=action,
             resource_id=resource_id,
+            db=db,
         )
 
         if not result.allowed:
@@ -307,6 +320,7 @@ class AuthorizationService:
         subject_patient_id: int,
         resource_type: str,
         action: str,
+        db: Session | None = None,
     ) -> AuthorizationResult:
         """M4-P1-3: Check if actor has a guardian/heir/caregiver relationship
         that grants access to subject's PHI.
@@ -324,24 +338,36 @@ class AuthorizationService:
             AuthorizationResult with decision + reason + actor_type
         """
         try:
-            from app.db.session import SessionLocal
             from app.models.patient_relationship import PatientRelationship
-            from sqlalchemy.orm import Session
 
-            db: Session = SessionLocal()
+            # AUTHZAMBIENTDB-BE-001: the relationship query must run against
+            # the caller's session when one is provided. The previous
+            # unconditional ambient SessionLocal() opened a connection to
+            # the settings-DATABASE_URL — in a local sqlite test world that
+            # database has no schema, so the fail-closed branch fired and
+            # returned relationship_check_error instead of the canonical
+            # patient_scope_mismatch contract (tests red on main, CI green
+            # only because CI's settings-URL is a migrated PostgreSQL).
+            owns_session = db is None
+            if owns_session:
+                from app.db.session import SessionLocal
 
-            # Find active relationships where actor can access subject's PHI
-            relationships = (
-                db.query(PatientRelationship)
-                .filter(
-                    PatientRelationship.actor_patient_id == actor_patient_id,
-                    PatientRelationship.subject_patient_id == subject_patient_id,
-                    PatientRelationship.active == True,
+                db = SessionLocal()
+
+            try:
+                # Find active relationships where actor can access subject's PHI
+                relationships = (
+                    db.query(PatientRelationship)
+                    .filter(
+                        PatientRelationship.actor_patient_id == actor_patient_id,
+                        PatientRelationship.subject_patient_id == subject_patient_id,
+                        PatientRelationship.active == True,
+                    )
+                    .all()
                 )
-                .all()
-            )
-
-            db.close()
+            finally:
+                if owns_session:
+                    db.close()
 
             if not relationships:
                 return AuthorizationResult(

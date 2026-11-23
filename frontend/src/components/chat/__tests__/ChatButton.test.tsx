@@ -79,5 +79,17 @@ describe('ChatButton lazy window', () => {
     expect(await screen.findByTestId('chat-window')).toHaveAttribute('data-open', 'true');
     expect(chatMock.loadMessages).toHaveBeenCalledExactlyOnceWith(42);
     expect(chatMock.setIsChatOpen).toHaveBeenLastCalledWith(true);
+
+    chatMock.loadMessages.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Close chat' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-window')).toHaveAttribute('data-open', 'false');
+    });
+    act(() => {
+      window.dispatchEvent(new CustomEvent('openChat', { detail: {} }));
+    });
+
+    expect(await screen.findByTestId('chat-window')).toHaveAttribute('data-open', 'true');
+    expect(chatMock.loadMessages).not.toHaveBeenCalled();
   });
 });

@@ -281,18 +281,132 @@ class TelegramBotService:
         try:
             chat_id = callback_query["message"]["chat"]["id"]
             data = callback_query["data"]
-            _user_id = callback_query["from"]["id"]
+            user_id = callback_query["from"]["id"]
+
+            # This handler is reached only after webhook-secret validation or
+            # polling Telegram's getUpdates, never from the public visit API.
+            # A shared/group message or another sender is not a patient actor.
+            if data.startswith(("view_visit:", "confirm_visit:", "cancel_visit:", "ar:")):
+                chat = callback_query["message"]["chat"]
+                if (chat.get("type") != "private" or isinstance(user_id, bool)
+                    or not isinstance(user_id, int) or user_id <= 0 or chat_id != user_id):
+                    await self._answer_callback_query(
+                        callback_query["id"], "Действие доступно только в личном чате"
+                    )
+                    return
+
+                from starlette.concurrency import run_in_threadpool
+
+                if data.startswith("ar:"):
+                    from app.services.appointment_rsvp import (
+                        apply_appointment_decision,
+                        preview_appointment_decision,
+                    )
+
+                    if data.startswith("ar:v:"):
+                        try:
+                            preview = await run_in_threadpool(
+                                lambda: preview_appointment_decision(db, callback_data=data, chat_id=user_id)
+                            )
+                            if not preview:
+                                raise ValueError("Preview unavailable")
+                            rows = [[{"text": "✅ Подтвердить", "callback_data": preview["confirm_data"]}]]
+                            if preview.get("cancel_data"):
+                                rows.append([{"text": "❌ Отменить", "callback_data": preview["cancel_data"]}])
+                            response = await self._httpx_post(
+                                f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+                                json={"chat_id": chat_id, "text": preview["text"], "reply_markup": {"inline_keyboard": rows}},
+                                timeout=5,
+                            )
+                            sent = response.status_code == 200 and response.json().get("ok", False)
+                        except Exception:
+                            sent = False
+                        await self._answer_callback_query(callback_query["id"], "" if sent else "Запись недоступна. Обратитесь в клинику.")
+                        return
+
+                    try:
+                        result = await run_in_threadpool(
+                            lambda: apply_appointment_decision(db, callback_data=data, chat_id=user_id)
+                        )
+                    except Exception:
+                        result = "unavailable"
+                    message = {
+                        "confirmed": "Запись подтверждена.",
+                        "already_confirmed": "Запись уже подтверждена.",
+                        "cancelled": "Запись отменена.",
+                    }.get(result, "Запись недоступна. Обратитесь в клинику.")
+                    await self._answer_callback_query(callback_query["id"], message)
+                    return
+
+                from app.services.visit_confirmation_service import (
+                    VisitConfirmationService,
+                )
+
+                token = data.split(":", 1)[1]
+                if data.startswith("view_visit:"):
+                    def _preview_visit():
+                        try:
+                            return VisitConfirmationService(db).preview_by_telegram(
+                                token=token, telegram_user_id=str(user_id)
+                            )
+                        finally:
+                            db.rollback()
+
+                    try:
+                        preview = await run_in_threadpool(_preview_visit)
+                        keyboard = {"inline_keyboard": [
+                            [{"text": "✅ Подтвердить", "callback_data": f"confirm_visit:{preview['action_token']}"}],
+                            [{"text": "❌ Отменить", "callback_data": f"cancel_visit:{preview['action_token']}"}],
+                        ]}
+                        # Revocation can race after the final DB check and
+                        # before provider delivery; no lock is held over I/O.
+                        response = await self._httpx_post(
+                            f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+                            json={"chat_id": chat_id, "text": preview["text"], "reply_markup": keyboard},
+                            timeout=5,
+                        )
+                        sent = response.status_code == 200 and response.json().get("ok", False)
+                    except Exception:
+                        sent = False
+                    await self._answer_callback_query(callback_query["id"], "" if sent else "Визит недоступен. Обратитесь в клинику.")
+                    return
+                confirm = data.startswith("confirm_visit:")
+
+                def _apply_visit_action() -> dict[str, Any]:
+                    service = VisitConfirmationService(db)
+                    operation = service.confirm_by_telegram if confirm else service.cancel_by_telegram
+                    return operation(
+                        token=token,
+                        telegram_user_id=str(user_id),
+                        source_ip=None,
+                        user_agent="telegram",
+                    )
+
+                try:
+                    result = await run_in_threadpool(_apply_visit_action)
+                except Exception:
+                    await self._answer_callback_query(
+                        callback_query["id"], "Не удалось обработать визит. Обратитесь в клинику."
+                    )
+                    return
+                message = (
+                    "Визит подтверждён. Номера очереди уточните в приложении."
+                    if confirm else "Визит отменён."
+                ) if result.get("success") else "Не удалось обработать визит. Обратитесь в клинику."
+                await self._answer_callback_query(callback_query["id"], message)
+                return
 
             # Обрабатываем callback данные
-            if data.startswith("confirm_"):
-                appointment_id = data.replace("confirm_", "")
-                await self._handle_appointment_confirmation(chat_id, appointment_id, db)
+            if data.startswith(("confirm_", "cancel_")):
+                # Legacy unsigned appointment buttons do not bind a patient,
+                # chat, occurrence, or link revocation generation.
+                await self._answer_callback_query(
+                    callback_query["id"], "Кнопка устарела. Обратитесь в клинику."
+                )
+                return
             elif data.startswith("reschedule_"):
                 appointment_id = data.replace("reschedule_", "")
                 await self._handle_appointment_reschedule(chat_id, appointment_id, db)
-            elif data.startswith("cancel_"):
-                appointment_id = data.replace("cancel_", "")
-                await self._handle_appointment_cancellation(chat_id, appointment_id, db)
             elif data.startswith("book_"):
                 doctor_id = data.replace("book_", "")
                 await self._handle_booking_request(chat_id, doctor_id, db)
@@ -301,7 +415,7 @@ class TelegramBotService:
             await self._answer_callback_query(callback_query["id"])
 
         except Exception as e:
-            logger.error(f"Ошибка обработки callback: {e}")
+            logger.error("Telegram callback failed error_type=%s", type(e).__name__)
 
     async def _handle_inline_query(self, inline_query: dict[str, Any], db: Session):
         """Обработка inline запросов"""
@@ -626,7 +740,7 @@ class TelegramBotService:
                 return False
 
         except Exception as e:
-            logger.error(f"Ошибка отправки сообщения: {e}")
+            logger.error("Ошибка отправки сообщения (%s)", type(e).__name__)
             return False
 
     async def send_plain_message(self, chat_id: int, text: str) -> bool:
