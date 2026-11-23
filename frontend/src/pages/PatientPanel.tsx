@@ -1,4 +1,6 @@
+import type { components } from '../types/api';
 import type { HttpApiError } from '../types/errors';
+import { formatRegistrarDate } from '../utils/dateUtils';
 import { extractDetailReason } from '../utils/error-utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
@@ -26,13 +28,7 @@ import './patient.css';
 import { useTranslation } from '../i18n/useTranslation';
 import { AlertTriangle, Calendar, FileText, Heart, Home, RotateCw, type LucideIcon } from 'lucide-react';
 
-interface PatientAppointment {
-  id: string | number;
-  doctor: string;
-  date: string;
-  time: string;
-  status: string;
-}
+type PatientAppointment = components['schemas']['AppointmentHistoryItem'];
 
 interface PatientResult {
   id: string | number;
@@ -65,7 +61,7 @@ interface FormsPreview {
  * отдельно продолжает использовать Telegram Mini App identity (initData).
  */
 const PatientPanel = () => {
-  const { t: rawT } = useTranslation();
+  const { t: rawT, language } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useBreakpoint();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -327,9 +323,13 @@ const PatientPanel = () => {
                   {appointments.length > 0 ? (
                     appointments.map((a) => (
                       <div key={a.id} className="pp-home-list-item">
-                        <div>
-                          <div className="pp-list-item-primary">{a.doctor}</div>
-                          <div className="pp-list-item-secondary">{a.date} · {a.time}</div>
+                        <div className="pp-list-item-primary">
+                          <time dateTime={a.appointment_date}>
+                            {formatRegistrarDate(a.appointment_date, language)}
+                          </time>
+                          {a.appointment_time && (
+                            <> · <time dateTime={a.appointment_time}>{a.appointment_time}</time></>
+                          )}
                         </div>
                         <Badge variant={a.status === 'scheduled' ? 'info' : 'success'}>
                           {a.status === 'scheduled' ? t('misc.pp_zaplanirovan') : t('misc.pp_zavershyon')}
