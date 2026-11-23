@@ -409,7 +409,7 @@
       "smaller_observations_meeting_spacing_model": 672,
       "smaller_observations_flagged_for_review": 0,
       "states_with_horizontal_overflow": 0,
-      "limits": "Counts include repeated observations across page states. The sampler compares DOM geometry. Effective pointer hit regions and painted clipping remain unverified."
+      "limits": "Counts include repeated observations across page states. This sampler compares DOM geometry. Separate hit point observations are recorded in mobile_pointer_dispatch. Full hit-region boundaries and painted clipping remain unverified."
     },
     "desktop_text_spacing": {
       "criterion": "WCAG 2.2 SC 1.4.12",
@@ -442,6 +442,30 @@
       "skip_navigation_exercises_passed": 168,
       "catalog_filter_empty_reset_and_focus_exercises_passed": 72,
       "limits": "The sampler compares DOM geometry at three light-mode desktop widths. It does not inspect painted glyphs, the native select popup or spoken output."
+    },
+    "mobile_pointer_dispatch": {
+      "observed_at_utc": "2026-11-23T07:31:57.217Z",
+      "nitro_build_sha": "8564b7e4906f3dc4ea40981225f96612230175ad",
+      "color_scheme": "light",
+      "viewport_widths_css_px": [
+        320,
+        390
+      ],
+      "viewport_height_css_px": 844,
+      "browsers": {
+        "Chromium": "153.0.8010.12",
+        "Firefox": "155.0"
+      },
+      "browser_route_width_menu_states": 112,
+      "control_observations": 1832,
+      "method": "Compare the browser hit target at the center and four interior points of each visible client rectangle after scrolling it into view. In the same contexts dispatch a coordinate tap at the center of the largest fragment of each small control and record the trusted touchstart target. Suppress activation only during these bulk probes. Use normal taps for menu toggle and catalog reset checks.",
+      "hit_points_tested": 10260,
+      "hit_points_on_expected_control": 10260,
+      "small_control_center_taps": 672,
+      "small_control_center_taps_delivered": 672,
+      "menu_open_and_close_checks_passed": 56,
+      "catalog_reset_and_search_focus_checks_passed": 24,
+      "limits": "These sampled points in touch-emulated Chromium and Firefox do not measure full hit-region boundaries or the native select popup. Physical devices and WCAG conformance remain open."
     },
     "limitations": "Evidence covers the listed synthetic pages and sampled states. Full WCAG 2.2 AA, screen-reader speech, native mobile browsers, physical devices and other desktop configurations remain open."
   }
