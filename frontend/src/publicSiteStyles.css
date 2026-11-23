@@ -9,6 +9,11 @@ html.public-site-document body {
   --public-site-hero-padding: clamp(28px, 6vw, 68px);
   --public-site-section-gap: clamp(38px, 6vw, 68px);
   --public-site-runtime-padding: clamp(24px, 5vw, 48px);
+  --public-site-hover-ink: color-mix(
+    in srgb,
+    var(--mac-success-strong, rgb(20, 122, 56)),
+    var(--mac-text-primary, rgb(0, 0, 0)) 18%
+  );
   min-height: 100vh;
   background: var(--mac-bg-primary, rgb(238, 243, 250));
   color: var(--mac-text-primary, rgb(0, 0, 0));
@@ -23,11 +28,14 @@ html.public-site-document body {
 }
 
 .public-site a:hover {
-  color: color-mix(
-    in srgb,
-    var(--mac-success-strong, rgb(20, 122, 56)),
-    var(--mac-text-primary, rgb(0, 0, 0)) 18%
-  );
+  color: var(--public-site-hover-ink);
+}
+
+:where(html.public-site-document) .public-site a:hover {
+  color: var(--mac-link-ink, rgb(0, 102, 214));
+  @supports (color: light-dark(black, white)) {
+    color: light-dark(var(--public-site-hover-ink), var(--mac-link-ink, rgb(90, 200, 250)));
+  }
 }
 
 .public-site a:focus-visible {
@@ -463,6 +471,13 @@ html.public-site-document body {
 .public-site :is(button, input, select):focus-visible {
   outline: 3px solid var(--mac-warning-strong, rgb(168, 98, 0));
   outline-offset: 3px;
+}
+
+:where(html.public-site-document) .public-site :is(a, button, input, select):focus-visible {
+  outline-color: var(--mac-link-ink, rgb(0, 102, 214));
+  @supports (color: light-dark(black, white)) {
+    outline-color: light-dark(var(--mac-warning-strong, rgb(168, 98, 0)), var(--mac-link-ink, rgb(90, 200, 250)));
+  }
 }
 
 .public-site__contact-list {
