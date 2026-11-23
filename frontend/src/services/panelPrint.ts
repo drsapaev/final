@@ -280,17 +280,21 @@ function resolveServicePrice(row: Record<string, unknown>, overrides: Record<str
 }
 
 const QUEUE_DISPLAY_NAMES = {
+  cardio: 'Кардиология',
   cardiology: 'Кардиология',
   cardiology_common: 'Кардиология',
+  derma: 'Дерматология',
   dermatology: 'Дерматология',
   stomatology: 'Стоматология',
   dentistry: 'Стоматология',
+  dental: 'Стоматология',
   echokg: 'ЭхоКГ',
   ecg: 'ЭКГ',
   laboratory: 'Лаборатория',
   lab: 'Лаборатория',
   general: 'Общая очередь',
   cosmetology: 'Косметология',
+  procedures: 'Процедуры',
 };
 
 function normalizeDisplayLabel(value: unknown): string | null {
@@ -312,6 +316,11 @@ function normalizeDisplayLabel(value: unknown): string | null {
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function localizeTicketLabel(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  return QUEUE_DISPLAY_NAMES[value.trim().toLowerCase() as keyof typeof QUEUE_DISPLAY_NAMES] ?? value;
 }
 
 function normalizeTicketSources(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): unknown[] {
@@ -429,18 +438,18 @@ function buildPanelTicketPayloadForSource(
       row?.specialist_name
     ),
     specialty_name: getFirstDefined(
-      source?.queue_name,
+      localizeTicketLabel(source?.queue_name),
       source?.service_name,
       source?.specialty_name,
       normalizeDisplayLabel(source?.queue_tag),
       normalizeDisplayLabel(source?.specialty),
       normalizeDisplayLabel(source?.department),
       row?.specialty_name,
-      row?.queue_name,
+      localizeTicketLabel(row?.queue_name),
       row?.service_name
     ),
     queue_name: getFirstDefined(
-      source?.queue_name,
+      localizeTicketLabel(source?.queue_name),
       source?.service_name,
       normalizeDisplayLabel(source?.queue_tag),
       normalizeDisplayLabel(source?.specialty),
@@ -574,8 +583,8 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
         'Специалист',
       specialty_name:
         overrides.specialtyName ||
-        row?.specialty_name ||
-        row?.queue_name ||
+        localizeTicketLabel(row?.specialty_name) ||
+        localizeTicketLabel(row?.queue_name) ||
         row?.specialty ||
         row?.department ||
         row?.service_name ||
@@ -609,8 +618,8 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
       'Специалист',
     specialty_name:
       overrides.specialtyName ||
-      row?.specialty_name ||
-      row?.queue_name ||
+      localizeTicketLabel(row?.specialty_name) ||
+      localizeTicketLabel(row?.queue_name) ||
       row?.specialty ||
       row?.department ||
       row?.service_name ||

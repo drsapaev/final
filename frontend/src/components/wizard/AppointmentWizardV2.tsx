@@ -3026,9 +3026,9 @@ const AppointmentWizardV2 = ({
 
   // Улучшенный заголовок для Шага 2
   const Step2Header =
-  <div style={wizardHeaderShellStyle}>
+  <div className="wizard-service-header" style={wizardHeaderShellStyle}>
       {/* 1. Поиск (Слева) */}
-      <div style={{ flex: '0 0 300px', minWidth: 0 }}>
+      <div className="wizard-service-search">
         <Input
         placeholder={t('misc.aw_search_service_placeholder')}
         value={serviceSearchQuery}
@@ -3043,18 +3043,12 @@ const AppointmentWizardV2 = ({
       </div>
 
       {/* 2. Категории (Центр) */}
-      <div style={{
-      flex: 1,
-      display: 'flex',
-      justifyContent: 'center',
-      gap: 'var(--mac-spacing-2)',
-      padding: '0 8px',
-      flexWrap: 'wrap'
-    }}>
+      <div className="wizard-service-categories">
         {categories.map((cat) =>
       <button
         key={cat.id}
         type="button"
+        aria-pressed={activeServiceCategory === cat.id}
         onClick={() => setActiveServiceCategory(cat.id)}
         style={{
           ...wizardSegmentButtonBase,
@@ -3085,25 +3079,20 @@ const AppointmentWizardV2 = ({
             <span style={{ fontSize: 'var(--mac-font-size-lg)', display: 'inline-flex', alignItems: 'center' }}>
             {cat.icon && <cat.icon size={16} aria-hidden="true" />}
           </span>
-            {cat.label}
+            {t(cat.labelKey)}
           </button>
       )}
       </div>
 
       {/* 3. Действия (Справа) */}
-      <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 'var(--mac-spacing-2)',
-      flex: '0 0 auto'
-    }}>
+      <div className="wizard-service-actions">
         {/* Кнопка обновления */}
         <button
         type="button"
         onClick={handleReloadServices}
         disabled={isReloadingServices}
         title={t('misc.aw_refresh_services_title')}
-        aria-label={isReloadingServices ? 'Refreshing service list' : 'Refresh service list'}
+        aria-label={t('misc.aw_refresh_services_title')}
         style={{
           width: '34px',
           height: '34px',
