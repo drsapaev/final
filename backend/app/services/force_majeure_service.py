@@ -16,6 +16,8 @@ from decimal import Decimal
 from typing import Any, Final
 
 from sqlalchemy import false, func, insert, or_, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, lazyload, load_only
 
@@ -921,18 +923,9 @@ class ForceMajeureService:
         самоисцеление покрывает любой путь отклонения/отмены заявки,
         включая строки, занесённые до этого фикса.
 
-        Savepoint берётся НА УРОВНЕ ПОДКЛЮЧЕНИЯ
-        (``session.connection().begin_nested()``), а не сессии: session-level
-        begin_nested ломает внешнюю savepoint-машину тестовой фикстуры
-        db_session (listener after_transaction_end), а get_bind() для
-        сессии, привязанной к engine, возвращает сам engine. Явный flush
-        ДО savepoint выталкивает pending-изменения ORM (например,
-        status="cancelled" текущей записи) НАРУЖУ отката: IntegrityError
-        откатывает только INSERT claim-а, отмена записи не теряется.
-        Вставка — Core, без ORM объекта: после rollback в сессии не
-        остаётся рассинхронизированного состояния.
-        ``uq_payment_refund_claims_payment`` — DB-бэкстоп для любых путей
-        в обход сервиса.
+        Savepoint подключения сохраняет транзакцию вызывающего при ошибке.
+        Конфликт только по ``payment_id`` допускает чтение резерва победителя.
+        Остальные ошибки и отсутствие подтверждённого резерва требуют сверки.
         """
         existing = (
             self.db.query(PaymentRefundClaim)
@@ -955,33 +948,32 @@ class ForceMajeureService:
             else:
                 return self._already_refunded_by_claim(payment_id, existing)
 
-        # Pending-изменения ORM — наружу savepoint (см. docstring).
+        claims = PaymentRefundClaim.__table__
+        insert_claim = sqlite_insert if self.db.get_bind().dialect.name == "sqlite" else pg_insert
+        statement = (
+            insert_claim(claims)
+            .values(payment_id=payment_id, channel=channel, reason=reason)
+            .on_conflict_do_nothing(index_elements=[claims.c.payment_id])
+            .returning(claims.c.id)
+        )
+
         self.db.flush()
-        bind = self.db.connection()
         try:
-            with bind.begin_nested():
-                result = self.db.execute(
-                    insert(PaymentRefundClaim)
-                    .values(payment_id=payment_id, channel=channel, reason=reason)
-                )
+            with self.db.connection().begin_nested():
+                claim_id = self.db.execute(statement).scalar_one_or_none()
         except IntegrityError:
-            # Проиграли гонку за платёж: другая транзакция закоммитила
-            # (или держит) claim — в READ COMMITTED после ожидания на
-            # уникальном индексе победитель уже виден. Деньги не двигаем.
-            winner = (
-                self.db.query(PaymentRefundClaim)
-                .filter(PaymentRefundClaim.payment_id == payment_id)
-                .first()
-            )
-            if winner is not None:
-                return self._already_refunded_by_claim(payment_id, winner)
-            return {
-                "already_refunded": True,
-                "payment_id": payment_id,
-                "prior_channel": channel,
-                "conflict": "unique_payment_refund_claim",
-            }
-        return int(result.inserted_primary_key[0])
+            raise ForceMajeureError("Резерв возврата требует сверки") from None
+        if claim_id is not None:
+            return claim_id
+
+        winner = (
+            self.db.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment_id)
+            .first()
+        )
+        if winner is None:
+            raise ForceMajeureError("Резерв возврата требует сверки")
+        return self._already_refunded_by_claim(payment_id, winner)
 
     def _require_refund_history(self) -> None:
         if self.db.get_bind().dialect.name != "postgresql":

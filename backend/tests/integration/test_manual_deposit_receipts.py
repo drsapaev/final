@@ -473,7 +473,14 @@ def test_postgres_deposit_tender_requires_the_atomic_balance_trigger(visit_depos
 def test_postgres_batch_failure_rolls_back_only_its_refund_and_redacts_details(
     visit_deposit_pg, monkeypatch, caplog,
 ):
-    owner, _, ids = visit_deposit_pg
+    owner, runtime, ids = visit_deposit_pg
+    quote = owner.dialect.identifier_preparer.quote_identifier
+    schema, role = quote(owner.dialect.default_schema_name), quote(runtime.url.username)
+    with owner.begin() as setup:
+        setup.exec_driver_sql(
+            f"GRANT SELECT, UPDATE (status, incomplete_reason, updated_at) ON {schema}.queue_entries TO {role}"
+        )
+
     with Session(owner, expire_on_commit=False) as db:
         first_visit = db.get(Visit, ids["visit"])
         other_visit = Visit(patient_id=ids["patient"], visit_date=first_visit.visit_date, status="open", source="desk")
@@ -496,20 +503,23 @@ def test_postgres_batch_failure_rolls_back_only_its_refund_and_redacts_details(
         db.add_all([*entries, *payments])
         db.commit()
 
-        service = ForceMajeureService(db)
-        add_credit = service._add_to_deposit
+        failed_payment_id = payments[0].id
+        with Session(runtime) as refund_db:
+            runtime_entries = [refund_db.get(OnlineQueueEntry, entry.id) for entry in entries]
+            service = ForceMajeureService(refund_db)
+            add_credit = service._add_to_deposit
 
-        def stage_then_fail(**kwargs):
-            credit = add_credit(**kwargs)
-            if kwargs["payment_id"] == payments[0].id:
-                raise RuntimeError("SYNTHETIC INTERNAL REFUND DETAIL")
-            return credit
+            def stage_then_fail(**kwargs):
+                credit = add_credit(**kwargs)
+                if kwargs["payment_id"] == failed_payment_id:
+                    raise RuntimeError("SYNTHETIC INTERNAL REFUND DETAIL")
+                return credit
 
-        monkeypatch.setattr(service, "_add_to_deposit", stage_then_fail)
-        result = service.cancel_entries_with_refund(
-            entries, reason="SYNTHETIC REFUND REASON", refund_type=RefundType.DEPOSIT,
-            performed_by_id=ids["stage"], send_notifications=False,
-        )
+            monkeypatch.setattr(service, "_add_to_deposit", stage_then_fail)
+            result = service.cancel_entries_with_refund(
+                runtime_entries, reason="SYNTHETIC REFUND REASON", refund_type=RefundType.DEPOSIT,
+                performed_by_id=ids["stage"], send_notifications=False,
+            )
         db.expire_all()
         assert [entry.status for entry in entries] == ["waiting", "cancelled"]
         assert result["cancelled"] == result["failed"] == result["deposit_credits_created"] == 1

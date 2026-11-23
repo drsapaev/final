@@ -16,7 +16,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import event
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.sql.dml import Insert
 from tests.conftest import mint_access_token
 
 from app.models.audit import AuditLog
@@ -643,3 +645,53 @@ def test_force_refund_preserves_ambiguous_or_already_reserved_funds(
     assert db_session.query(PaymentRefundClaim).filter_by(payment_id=payment.id).count() == 0
     assert db_session.query(DepositTransaction).filter_by(payment_id=payment.id).count() == 0
     assert db_session.query(RefundRequest).filter_by(payment_id=payment.id).count() == int(not is_split)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("channel", ["deposit", "bank_transfer"])
+def test_refund_claim_write_failure_keeps_queue_entry_retryable(
+    client, db_session, test_doctor, test_patient, admin_auth_headers, channel,
+):
+    queue, (entry,), (payment,) = _seed_bound_queue(db_session, test_doctor, test_patient, entries=1)
+    body = {
+        "specialist_id": test_doctor.id, "entry_ids": [entry.id],
+        "target_date": str(queue.day), "refund_type": channel,
+        "reason": "SYNTHETIC", "send_notifications": False,
+    }
+    engine = db_session.get_bind()
+
+    def fail_claim_insert(_conn, statement, _multiparams, _params, _options):
+        if isinstance(statement, Insert) and statement.table.name == "payment_refund_claims":
+            raise IntegrityError("synthetic claim insert", (), RuntimeError("synthetic storage failure"))
+
+    event.listen(engine, "before_execute", fail_claim_insert)
+    try:
+        response = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
+    finally:
+        event.remove(engine, "before_execute", fail_claim_insert)
+
+    assert response.status_code == 200, response.text
+    failed = response.json()
+    assert failed["cancelled"] == 0 and failed["failed"] == 1
+    assert failed["errors"] == [{"entry_id": entry.id, "error": "Резерв возврата требует сверки"}]
+    assert failed["refund_requests_existing"] == failed["deposit_credits_existing"] == 0
+    db_session.expire_all()
+    assert entry.status == "waiting"
+    for model in (PaymentRefundClaim, RefundRequest, DepositTransaction):
+        assert db_session.query(model.id).filter_by(payment_id=payment.id).count() == 0
+    assert db_session.query(AuditLog.id).filter_by(event_type="REFUND_REQUEST_CREATED").count() == 0
+
+    retry = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
+    assert retry.status_code == 200 and retry.json()["cancelled"] == 1, retry.text
+    db_session.expire_all()
+    assert entry.status == "cancelled"
+    claim = db_session.query(PaymentRefundClaim).filter_by(payment_id=payment.id).one()
+    if channel == "deposit":
+        credit = db_session.query(DepositTransaction).filter_by(payment_id=payment.id).one()
+        assert claim.deposit_transaction_id == credit.id
+    else:
+        request = db_session.query(RefundRequest).filter_by(payment_id=payment.id).one()
+        assert claim.refund_request_id == request.id
+        assert db_session.query(AuditLog.id).filter_by(
+            entity_type="refund_request", entity_id=request.id, event_type="REFUND_REQUEST_CREATED",
+        ).count() == 1
