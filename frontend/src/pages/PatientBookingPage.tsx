@@ -23,6 +23,7 @@ import {
   type PublicBookingRequestBody,
   type PublicBookingRequestResubmitBody,
 } from '../api/publicBooking';
+import { getVitePublicSiteAnalyticsEndpoint, PublicSiteAnalytics } from '../publicSiteAnalytics';
 import { getState } from '../stores/auth';
 
 type Copy = {
@@ -789,9 +790,15 @@ export default function PatientBookingPage() {
 
   const selectedService = options?.services.find((service) => service.slug === serviceSlug);
   const selectedDoctor = options?.doctors.find((doctor) => doctor.slug === doctorSlug);
+  const showBookingForm = !optionsLoading && bookingConfigurationUsable && options && !completed
+    && (!hasResubmitNavigationState || Boolean(resubmitContext && pairIsAllowed));
 
   return (
     <div className="public-site">
+      <PublicSiteAnalytics
+        endpoint={getVitePublicSiteAnalyticsEndpoint()}
+        event={showBookingForm ? 'booking_form_open' : undefined}
+      />
       <a className="public-site__skip-link" href="#main-content">{locale === 'ru' ? 'Перейти к основному содержимому' : 'Asosiy mazmunga o‘tish'}</a>
       <header className="public-site__header">
         <a className="public-site__brand" href={locale === 'ru' ? '/ru' : '/'}>
@@ -858,8 +865,7 @@ export default function PatientBookingPage() {
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
-        {!optionsLoading && bookingConfigurationUsable && options && !completed
-          && (!hasResubmitNavigationState || Boolean(resubmitContext && pairIsAllowed)) ? (
+        {showBookingForm ? (
           <form className="public-site__booking-form" onSubmit={handleSubmit} aria-label={copy.title}>
             <label className="public-site__booking-field" htmlFor="public-booking-service">
               {copy.service}
