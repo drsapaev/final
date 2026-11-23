@@ -206,7 +206,12 @@ describe('Doctor panels SSOT contract', () => {
     expect(dermatology).toContain('appointmentCompletionStatus.canComplete');
     expect(dermatology).toContain('{emr && !emr.is_draft &&');
     expect(dermatology).toContain('canCompleteDermatologyVisit(');
-    expect(dermatology).toContain('onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)}');
+    // DERMAHIST-FE-003: the onPersisted binding keeps the canonical status
+    // refresh AND reloads the same-patient history (async callback — the
+    // canonical refresh stays awaited first, then the history hook reloads).
+    expect(dermatology).toContain('onPersisted={async () => {');
+    expect(dermatology).toContain('await refreshCanonicalStatus(currentVisitContext, true);');
+    expect(dermatology).toContain('patientHistory.reload();');
 
     expect(prescriptionSystem).toContain('canCreatePrescription');
     expect(prescriptionSystem).toContain('const prescriptionEligible = canCreatePrescription === true');

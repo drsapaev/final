@@ -1721,7 +1721,17 @@ const DermatologistPanelUnified = () => {
                   visitId={(currentAppointment?.visit_id ?? undefined) as string | number}
                   patientId={(currentAppointment?.patient_id ?? undefined) as string | number | null | undefined}
                   specialty="dermatology"
-                  onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)} />
+                  onPersisted={async () => {
+                    // DERMAHIST-FE-003: a persisted EMR must also refresh the
+                    // same-patient history — returning to Patients/History
+                    // without re-selecting the patient must show the new
+                    // examination/procedure, not the stale snapshot. The
+                    // hook's request-generation guard makes the refetch safe;
+                    // EMRContainerV2 fires onPersisted only on successful
+                    // writes, so a failed save retains the prior snapshot.
+                    await refreshCanonicalStatus(currentVisitContext, true);
+                    patientHistory.reload();
+                  }} />
 
                 </div>
 
