@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from slowapi import Limiter
 
 from app.core import rate_limiter
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.pii_masker import PUBLIC_SITE_ANALYTICS_INGEST_PATH
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.csrf_middleware import CSRFMiddleware
@@ -124,7 +124,7 @@ def test_analytics_rate_limit_preserves_the_limit_without_logging_the_client(
     )
     monkeypatch.setattr(rate_limiter, "limiter", isolated_limiter)
     monkeypatch.setattr(rate_limiter, "TRUSTED_PROXIES", set())
-    monkeypatch.setattr(settings, "TESTING", False)
+    monkeypatch.setattr(get_settings(), "TESTING", False)
 
     app = FastAPI()
     rate_limiter.setup_rate_limiting(app)
