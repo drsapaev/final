@@ -856,12 +856,26 @@ class ForceMajeureService:
         }
 
     def _claim_is_stale(self, claim: PaymentRefundClaim) -> bool:
-        """Return whether a bank reservation ended without a payout."""
-        if claim.channel == self.REFUND_CHANNEL_DEPOSIT and claim.refund_request_id is None:
+        """Verify a prior outcome or identify a bank reservation that can be released."""
+        if claim.channel == self.REFUND_CHANNEL_DEPOSIT:
+            if claim.refund_request_id is not None or claim.deposit_transaction_id is None:
+                raise ForceMajeureError("Резерв возврата требует сверки")
+            credit = (
+                self.db.query(DepositTransaction.id)
+                .filter(
+                    DepositTransaction.id == claim.deposit_transaction_id,
+                    DepositTransaction.payment_id == claim.payment_id,
+                    DepositTransaction.transaction_type == DepositTransactionType.CREDIT.value,
+                )
+                .scalar()
+            )
+            if credit is None:
+                raise ForceMajeureError("Резерв возврата требует сверки")
             return False
         if claim.channel != self.REFUND_CHANNEL_REFUND_REQUEST or claim.deposit_transaction_id is not None:
             raise ForceMajeureError("Резерв возврата требует сверки")
 
+        known_statuses = self.REFUND_REQUEST_ACTIVE_STATUSES + self.REFUND_REQUEST_FAILED_STATUSES
         if claim.refund_request_id is not None:
             request = (
                 self.db.query(RefundRequest.status)
@@ -871,7 +885,7 @@ class ForceMajeureService:
                 )
                 .first()
             )
-            if request is None:
+            if request is None or request.status not in known_statuses:
                 raise ForceMajeureError("Резерв возврата требует сверки")
             return request.status in self.REFUND_REQUEST_FAILED_STATUSES
 
@@ -885,17 +899,14 @@ class ForceMajeureService:
             )
             .all()
         )
-        if automatic_requests:
+        if automatic_requests and all(req.status in known_statuses for req in automatic_requests):
             return all(req.status in self.REFUND_REQUEST_FAILED_STATUSES for req in automatic_requests)
         logger.warning(
-            "PaymentRefundClaim %s (payment %s, channel %s) has no bound "
-            "refund request and no automatic requests — treating as live "
-            "(fail-closed); investigate manually",
+            "PaymentRefundClaim %s (payment %s) has no verified bank refund history",
             claim.id,
             claim.payment_id,
-            claim.channel,
         )
-        return False
+        raise ForceMajeureError("Резерв возврата требует сверки")
 
     def _claim_payment_refund(
         self,
@@ -1099,7 +1110,7 @@ class ForceMajeureService:
             self.db.execute(text("UPDATE visits SET id=id WHERE 0"))
 
         existing_credit = (
-            self.db.query(DepositTransaction)
+            self.db.query(DepositTransaction.deposit_id, DepositTransaction.amount)
             .filter(
                 DepositTransaction.payment_id == payment_id,
                 DepositTransaction.transaction_type
@@ -1319,7 +1330,7 @@ class ForceMajeureService:
             # 3808 round 4: кросс-канальная проверка — платёж уже
             # зачислен на депозит (строка могла быть создана до 0088).
             prior_credit = (
-                self.db.query(DepositTransaction)
+                self.db.query(DepositTransaction.id)
                 .filter(
                     DepositTransaction.payment_id == payment_id,
                     DepositTransaction.transaction_type
