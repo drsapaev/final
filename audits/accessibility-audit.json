@@ -527,5 +527,55 @@
       }
     ],
     "limits": "This verifies speech text and focus for the tested skip navigation. The Russian route and independent heading navigation remain open. The final repeat timed out during installation of the disposable container's packages. The owned containers were removed. Physical sound, pronunciation, Windows Narrator, native Safari, physical devices and full WCAG 2.2 AA conformance remain open."
+  },
+  "orca_bilingual_structural_navigation": {
+    "observed_from_utc": "2026-11-23T11:01:30Z",
+    "observed_to_utc": "2026-11-23T11:01:58Z",
+    "application_sha": "35b6cd9ddbff4d82eb9b05d081dcbd1722175f7a",
+    "browser": "Chrome for Testing 153.0.8010.12",
+    "assistive_technology": "Orca 46.1, Speech Dispatcher 0.12.0 RC2 and eSpeak NG 1.51 in disposable Ubuntu 24.04",
+    "method": "Use the built Nitro application and synthetic catalogue with a private Orca profile in a container with loopback networking only. With automatic page reading off, send native X11 Tab and Enter, verify DOM focus and correlate the resulting Orca text with Speech Dispatcher queue acknowledgments and the eSpeak module beginning synthesis. On a freshly opened page, press the native 1 key and verify the Orca command for the next level 1 heading and its utterance.",
+    "routes": [
+      {
+        "path": "/ru/services",
+        "language": "ru",
+        "tab_utterance": "Перейти к основному содержимому link.",
+        "enter_focus": "main#main-content",
+        "enter_utterance": "main content.",
+        "heading_utterance": "Услуги heading level 1.",
+        "queue_message_ids_in_action_order": [17, 19, 28]
+      },
+      {
+        "path": "/services",
+        "language": "uz-Latn",
+        "tab_utterance": "Asosiy mazmunga o‘tish link.",
+        "enter_focus": "main#main-content",
+        "enter_utterance": "main content.",
+        "heading_utterance": "Xizmatlar heading level 1.",
+        "queue_message_ids_in_action_order": [34, 36, 45]
+      }
+    ],
+    "limitations": "An independent English calibration page timed out waiting for Enter focus. The six reported utterances apply to the Russian and Uzbek fixture routes and were independently confirmed in their raw traces. Physical audio, pronunciation, other assistive technologies, native Safari, physical devices and full WCAG 2.2 AA remain open."
+  },
+  "native_chromium_page_zoom_follow_up": {
+    "observed_from_utc": "2026-11-23T11:07:43.490Z",
+    "observed_to_utc": "2026-11-23T11:07:56.055Z",
+    "application_sha": "35b6cd9ddbff4d82eb9b05d081dcbd1722175f7a",
+    "fixture": "Local Nitro build with the repository's synthetic catalogue, borrowed read-only and verified against its stamped service worker and runtime asset hashes.",
+    "browser": "Playwright Chromium 153, headless on Windows with a temporary profile",
+    "method": "Set native tab zoom through the Chromium extension API. On direct loads of seven representative page types per locale, compare document language, heading, text rectangle bounds and horizontal scroll at 100% and 400%. Tab to the skip link and press Enter to focus the main landmark at 400%. Exercise the compact menu, catalog filter, empty state and reset with the keyboard on both services pages.",
+    "viewport_css_px_at_100_and_400_percent": [[1280, 928], [320, 232]],
+    "device_pixel_ratio_at_100_and_400_percent": [1, 4],
+    "visual_viewport_scale_at_both_levels": 1,
+    "routes_http_200_without_horizontal_overflow_or_text_rect_outliers": 14,
+    "routes_first_tab_exposed_skip_and_enter_focused_main": 14,
+    "localized_catalog_keyboard_scenarios_passed": 2,
+    "painted_focus": {
+      "method": "Compare paired raw 1280 by 928 device-pixel screenshots at the same focus, scroll and geometry, with the outline temporarily suppressed in the reference capture.",
+      "control_locale_pairs": 14,
+      "min_changed_pixels_in_control_region": 10658,
+      "min_changed_pixels_with_reference_contrast_at_least_3_to_1": 6744
+    },
+    "limits": "Measures the sampled keyboard controls and representative synthetic routes in one Chromium configuration. Raster focus samples do not establish WCAG conformance. Native select popup, rendered glyph clipping across the full document, physical hardware and other native browsers remain open."
   }
 }
