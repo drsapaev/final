@@ -335,5 +335,82 @@
       "smooth_scroll_observed": false
     },
     "limits": "Contrast ratios use computed colors at sampled states. The automatic main outlines have computed visibility and style observations. Speech, native system high contrast, physical devices, native Safari and full WCAG conformance remain unverified."
+  },
+  "synthetic_text_spacing_target_size_follow_up": {
+    "date": "2026-11-23",
+    "runtime": "Local synthetic Nitro over loopback",
+    "source_sha": "046e5474c29722d391f9c18aef5f5a76ec6cd7e3",
+    "source_parity": {
+      "compared_sha": "8564b7e4906f3dc4ea40981225f96612230175ad",
+      "paths": [
+        "frontend",
+        "backend",
+        "ops"
+      ],
+      "tracked_differences": 0
+    },
+    "scope": {
+      "browsers": [
+        "Headless Playwright Chromium 153.0.8010.12 on Windows",
+        "Headless Playwright Firefox 155.0 on Windows"
+      ],
+      "locales": [
+        "ru",
+        "uz-Latn"
+      ],
+      "routes_per_locale": 7,
+      "route_types": [
+        "home",
+        "services catalog",
+        "service detail",
+        "doctors catalog",
+        "doctor detail",
+        "prices",
+        "contacts"
+      ]
+    },
+    "text_spacing": {
+      "criterion": "WCAG 2.2 SC 1.4.12",
+      "report_written_at_utc": "2026-11-23T06:16:54.207Z",
+      "viewport_css_px": [
+        320,
+        800
+      ],
+      "method": "Compare baseline with four CSS overrides using !important. Apply line-height 1.5, paragraph margin-block-end 2em, letter-spacing 0.12em and word-spacing 0.16em. Check the computed ratios, rendered text rectangles, clipping ancestors, document scroll width, and menu and catalog interactions.",
+      "browser_route_pairs": 28,
+      "snapshots": {
+        "total": 136,
+        "menu_closed": 56,
+        "menu_open": 56,
+        "catalog_empty": 24
+      },
+      "geometry_candidates": {
+        "baseline": 0,
+        "override": 0
+      },
+      "rendered_text_nodes_lost": 0,
+      "max_document_scroll_width_css_px": 320,
+      "menu_exercises_passed": 56,
+      "catalog_filter_empty_reset_and_focus_exercises_passed": 24,
+      "limits": "The layout check uses text rectangles. Painted glyphs and the native select popup remain unverified."
+    },
+    "target_size_geometry": {
+      "criterion": "WCAG 2.2 SC 2.5.8",
+      "observed_at_utc": "2026-11-23T06:40:45.865Z",
+      "viewport_widths_css_px": [
+        320,
+        390
+      ],
+      "viewport_height_css_px": 844,
+      "method": "In touch-emulated contexts, sample DOM rectangles with the mobile menu closed and open. Exclude hidden or disabled candidates and descendants of closed details outside its first summary. Count candidates with a client rectangle at least 24 by 24 CSS pixels. For smaller candidates, check whether a centered circle 24 CSS pixels in diameter intersects another candidate rectangle or undersized candidate circle.",
+      "browser_route_width_menu_states": 112,
+      "dom_box_observations": 1832,
+      "observations_with_rect_at_least_24_by_24": 1160,
+      "smaller_observations_meeting_spacing_model": 672,
+      "smaller_observations_flagged_for_review": 0,
+      "states_with_horizontal_overflow": 0,
+      "limits": "Counts include repeated observations across page states. The sampler compares DOM geometry. Effective pointer hit regions and painted clipping remain unverified."
+    },
+    "limitations": "Evidence covers the listed synthetic pages and sampled states. Full WCAG 2.2 AA, screen-reader speech, native mobile browsers, physical devices and desktop text-spacing behavior remain open."
   }
 }
