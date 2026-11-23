@@ -16,10 +16,13 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+from tests.conftest import mint_access_token
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.payment import Payment
 from app.models.refund_deposit import DepositTransaction, PatientDeposit
+from app.models.user import User
+from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
 
 PREVIEW_PATH = "/api/v1/force-majeure/pending-entries"
@@ -469,3 +472,73 @@ class TestForceMajeureEndpoints:
             db_session.query(DailyQueue).filter(DailyQueue.day == tomorrow).count()
             == 0
         )
+
+
+FINANCIAL_PREFIX = "/api/v1/force-majeure"
+DEPOSIT_COMMAND = {
+    "patient_id": 1,
+    "amount": "2.00",
+    "client_request_id": "00000000-0000-4000-8000-000000000001",
+}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("method", "path", "role", "superuser", "body"),
+    [
+        pytest.param("GET", "/refund-requests", "Cashier", False, None, id="refund-list"),
+        pytest.param("GET", "/refund-requests/1", "Cashier", False, None, id="refund-detail"),
+        pytest.param(
+            "POST", "/refund-requests/1/process", "Cashier", False,
+            {"action": "reject", "rejection_reason": "SYNTHETIC"},
+            id="refund-decision",
+        ),
+        pytest.param("GET", "/deposits", "Cashier", False, None, id="deposit-list"),
+        pytest.param("GET", "/deposits/patient/1", "Registrar", False, None, id="patient-deposit"),
+        pytest.param("GET", "/deposits/1/transactions", "Cashier", False, None, id="deposit-history"),
+        pytest.param("POST", "/deposits/add", "Cashier", False, DEPOSIT_COMMAND, id="deposit-credit"),
+        pytest.param("POST", "/deposits/use", "Cashier", False, DEPOSIT_COMMAND, id="deposit-debit"),
+        pytest.param(
+            "POST", "/cancel-with-refund", "Registrar", False,
+            {"specialist_id": 1, "reason": "SYNTHETIC", "send_notifications": False},
+            id="queue-refund",
+        ),
+        pytest.param("GET", "/deposits", "Admin", True, None, id="superuser"),
+    ],
+)
+def test_financial_route_refuses_an_inactive_account(
+    client, db_session, method, path, role, superuser, body,
+):
+    actor = User(
+        username="SYNTHETIC-force-finance",
+        hashed_password="!",
+        role=role,
+        is_active=True,
+        is_superuser=superuser,
+    )
+    db_session.add(actor)
+    db_session.commit()
+    headers = {"Authorization": f"Bearer {mint_access_token(actor)}"}
+
+    actor.is_active = False
+    db_session.commit()
+
+    response = client.request(method, f"{FINANCIAL_PREFIX}{path}", json=body, headers=headers)
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Пользователь деактивирован"
+    [denial] = db_session.query(UserAuditLog).filter_by(user_id=actor.id, action="ACCESS_DENIED").all()
+    assert denial.new_values["denial_reason"] == "user_deactivated"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("role", "status"), [("Cashier", 200), ("Registrar", 403)])
+def test_active_refund_reader_respects_existing_roles(client, db_session, role, status):
+    actor = User(username="SYNTHETIC-refund-reader", hashed_password="!", role=role, is_active=True)
+    db_session.add(actor)
+    db_session.commit()
+    headers = {"Authorization": f"Bearer {mint_access_token(actor)}"}
+
+    response = client.get(f"{FINANCIAL_PREFIX}/refund-requests", headers=headers)
+
+    assert response.status_code == status

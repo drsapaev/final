@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_active_roles, require_roles
 from app.db.session import get_db
 from app.models.user import User
 from app.services.force_majeure_api_service import (
@@ -219,7 +219,7 @@ async def transfer_queue_to_tomorrow(
 async def cancel_queue_with_refund(
     request: ForceMajeureCancelRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    current_user: User = Depends(require_active_roles("Admin", "Registrar")),
 ):
     """
     Массовая отмена очереди с возвратом средств (форс-мажор)
@@ -279,7 +279,7 @@ async def get_refund_requests(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Получить список заявок на возврат
@@ -299,7 +299,7 @@ async def get_refund_requests(
 async def get_refund_request(
     request_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Получить заявку на возврат по ID
@@ -318,7 +318,7 @@ async def process_refund_request(
     request_id: int,
     process_request: ProcessRefundRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Обработать заявку на возврат
@@ -355,7 +355,7 @@ async def get_deposits(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Получить список депозитов пациентов
@@ -375,7 +375,7 @@ async def get_deposits(
 async def get_patient_deposit(
     patient_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier", "Registrar")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier", "Registrar")),
 ):
     """
     Получить депозит пациента
@@ -395,7 +395,7 @@ async def get_deposit_transactions(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Получить историю транзакций депозита
@@ -422,7 +422,7 @@ async def _exact_deposit_amount(request: Request) -> Decimal:
 async def add_to_deposit(
     request: AddDepositRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
     exact_amount: Decimal = Depends(_exact_deposit_amount),
 ):
     """
@@ -451,7 +451,7 @@ async def add_to_deposit(
 async def use_deposit_for_payment(
     request: UseDepositRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
     exact_amount: Decimal = Depends(_exact_deposit_amount),
 ):
     """
