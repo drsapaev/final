@@ -550,8 +550,6 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             "[Notifications] mark_all_read",
             extra={
                 "user_id": current_user.id,
-                "role": normalized_role,
-                "department_key": normalized_department,
                 "count": count,
             },
         )

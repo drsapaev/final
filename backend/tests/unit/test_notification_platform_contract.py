@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -113,6 +114,48 @@ async def test_notification_platform_service_creates_persistent_delivery_and_ded
     )
     assert archived_inbox["total"] == 1
     assert archived_inbox["items"][0]["delivery_status"] == "archived"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", [None, " Admin "])
+async def test_mark_all_read_uses_filters_without_logging_them(
+    db_session, admin_user, registrar_user, caplog, role,
+):
+    service = NotificationPlatformService(db_session)
+    service.ws_manager = SimpleNamespace(send_json=AsyncMock(return_value=None))
+    scopes = (
+        (admin_user, "admin", "cardiologist"),
+        (admin_user, "admin", "dentist"),
+        (admin_user, "registrar", "cardiologist"),
+        (registrar_user, "admin", "cardiologist"),
+    )
+    deliveries = []
+    for index, (recipient, panel_role, department) in enumerate(scopes):
+        delivery = await service.record_delivery_for_user(
+            user=recipient,
+            event_type="queue_update",
+            title="SYNTHETIC queue update",
+            message="Synthetic delivery for mark-all-read",
+            entity_type="visit",
+            entity_id=f"SYNTHETIC-mark-all-read-{index}",
+        )
+        delivery.role = panel_role
+        delivery.department_key = department
+        deliveries.append(delivery)
+    db_session.commit()
+
+    with caplog.at_level(logging.INFO, logger="app.services.notification_platform._base"):
+        count = await service.mark_all_read(
+            current_user=admin_user, role=role, department_key="Cardiology",
+        )
+
+    assert count == 1
+    assert [delivery.read_at is not None for delivery in deliveries] == [True, False, False, False]
+    (event,) = [record for record in caplog.records if record.msg == "[Notifications] mark_all_read"]
+    assert event.user_id == admin_user.id
+    assert event.count == 1
+    assert "role" not in vars(event)
+    assert "department_key" not in vars(event)
 
 
 @pytest.mark.asyncio
