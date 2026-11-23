@@ -13,6 +13,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _resolve_effective_discount_mode,
     _revalidate_cart_doctor_eligibility_locked,
 )  # noqa: F401
+from app.crud.clinic import clinic_today
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
 from app.services.price_override_approval import (
@@ -108,9 +109,9 @@ def create_cart_appointments(
         # lock first, then Doctor FOR UPDATE) and deadlocked PostgreSQL
         # under concurrency. Pre-acquired scopes are re-entrant inside the
         # assignment pass (idempotent transaction-scoped xact locks).
-        # ``today`` is computed once and reused for the assignment call so
-        # the pre-locked scope set cannot drift across a midnight rollover.
-        today = date.today()
+        # Capture the clinic calendar day once for validation, locking and
+        # assignment, even if the clinic and host cross midnight separately.
+        today = clinic_today(db)
         RegistrarWizardQueueAssignmentService.assert_unique_same_day_resource_queue_visits(
             db,
             cart_data.visits,

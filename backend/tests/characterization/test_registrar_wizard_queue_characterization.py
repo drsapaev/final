@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -76,7 +76,7 @@ def _create_daily_queue(
     queue_tag: str,
 ) -> DailyQueue:
     queue = DailyQueue(
-        day=date.today(),
+        day=clinic_today(db_session),
         specialist_id=specialist_id,
         queue_tag=queue_tag,
         active=True,
@@ -126,6 +126,26 @@ def _cart_payload(*, patient_id: int, visits: list[dict]) -> dict:
     }
 
 
+@pytest.fixture(params=[time(18, 59, 59), time(19)], ids=["before-midnight", "at-midnight"])
+def cart_clinic_day(request, monkeypatch):
+    from app.api.v1.endpoints.registrar_wizard import _cart
+
+    utc_day = datetime.now(UTC).date()
+    instant = datetime.combine(utc_day, request.param, tzinfo=UTC)
+    clinic_day = instant.astimezone(ZoneInfo("Asia/Tashkent")).date()
+
+    class HostDate(date):
+        @classmethod
+        def today(cls):
+            return utc_day
+
+    # Patch the cart's sources only. Other date/timestamp logic still runs
+    # normally, and the route exercises real writes and ticket assignment.
+    monkeypatch.setattr(_cart, "date", HostDate)
+    monkeypatch.setattr(_cart, "clinic_today", lambda _db: clinic_day, raising=False)
+    return clinic_day
+
+
 @pytest.mark.integration
 @pytest.mark.queue
 def test_registrar_wizard_characterization_same_day_cart_creates_desk_queue_entry(
@@ -135,6 +155,7 @@ def test_registrar_wizard_characterization_same_day_cart_creates_desk_queue_entr
     test_patient,
     test_doctor,
     test_service,
+    cart_clinic_day,
 ):
     test_doctor.cabinet = "6"
     db_session.commit()
@@ -146,7 +167,7 @@ def test_registrar_wizard_characterization_same_day_cart_creates_desk_queue_entr
             visits=[
                 {
                     "doctor_id": test_doctor.id,
-                    "visit_date": clinic_today(db_session).isoformat(),
+                    "visit_date": cart_clinic_day.isoformat(),
                     "department": "cardiology",
                     "services": [
                         {
@@ -176,6 +197,7 @@ def test_registrar_wizard_characterization_same_day_cart_creates_desk_queue_entr
     assert entry.source == "desk"
     assert entry.status == "waiting"
     assert entry.queue_time is not None
+    assert db_session.get(DailyQueue, entry.queue_id).day == cart_clinic_day
     assert entry.number == 1  # The cabinet is 6, but this queue is empty.
     assert payload["queue_numbers"][str(visit_id)][0]["number"] == entry.number
     assert payload["queue_numbers"][str(visit_id)][0]["queue_cabinet"] == "6"
@@ -220,7 +242,7 @@ def test_registrar_wizard_characterization_reuses_existing_same_queue_row(
             visits=[
                 {
                     "doctor_id": test_doctor.id,
-                    "visit_date": date.today().isoformat(),
+                    "visit_date": clinic_today(db_session).isoformat(),
                     "department": "cardiology",
                     "services": [
                         {
@@ -286,7 +308,7 @@ def test_registrar_wizard_characterization_same_specialist_different_queue_tags_
             visits=[
                 {
                     "doctor_id": test_doctor.id,
-                    "visit_date": date.today().isoformat(),
+                    "visit_date": clinic_today(db_session).isoformat(),
                     "department": "cardiology",
                     "services": [
                         {
@@ -328,7 +350,7 @@ def test_registrar_wizard_characterization_same_specialist_different_queue_tags_
     doctor_queues = (
         db_session.query(DailyQueue)
         .filter(
-            DailyQueue.day == date.today(),
+            DailyQueue.day == clinic_today(db_session),
             DailyQueue.specialist_id == test_doctor.id,
             DailyQueue.active.is_(True),
         )
@@ -488,13 +510,13 @@ def test_registrar_wizard_rejects_duplicate_same_day_resource_queue_visits_befor
             visits=[
                 {
                     "doctor_id": None,
-                    "visit_date": date.today().isoformat(),
+                    "visit_date": clinic_today(db_session).isoformat(),
                     "department": "dermatology",
                     "services": [{"service_id": first_service.id, "quantity": 1}],
                 },
                 {
                     "doctor_id": None,
-                    "visit_date": date.today().isoformat(),
+                    "visit_date": clinic_today(db_session).isoformat(),
                     "department": "procedures",
                     "services": [{"service_id": second_service.id, "quantity": 1}],
                 },
@@ -544,6 +566,7 @@ def test_registrar_wizard_accepts_same_resource_queue_services_in_one_visit(
     test_patient,
     queue_tag,
     department,
+    cart_clinic_day,
 ):
     test_patient.birth_date = date(1990, 4, 17)
     test_patient.address = "SYNTHETIC-TEST address"
@@ -580,7 +603,7 @@ def test_registrar_wizard_accepts_same_resource_queue_services_in_one_visit(
             visits=[
                 {
                     "doctor_id": None,
-                    "visit_date": clinic_today(db_session).isoformat(),
+                    "visit_date": cart_clinic_day.isoformat(),
                     "department": department,
                     "services": [
                         {"service_id": first_service.id, "quantity": 1},
@@ -601,12 +624,13 @@ def test_registrar_wizard_accepts_same_resource_queue_services_in_one_visit(
         .all()
     )
     assert len(entries) == 1
+    assert db_session.get(DailyQueue, entries[0].queue_id).day == cart_clinic_day
     assignment = payload["queue_numbers"][str(visit_id)][0]
     assert assignment["number"] == entries[0].number == 1
     assert assignment["queue_cabinet"] == "34"
     worklist = client.get(
         "/api/v1/registrar/queues/today",
-        params={"target_date": clinic_today(db_session).isoformat()},
+        params={"target_date": cart_clinic_day.isoformat()},
         headers=registrar_auth_headers,
     )
     assert worklist.status_code == 200, worklist.text
@@ -631,8 +655,9 @@ def test_registrar_wizard_characterization_future_day_cart_defers_queue_creation
     test_patient,
     test_doctor,
     test_service,
+    cart_clinic_day,
 ):
-    tomorrow = date.today() + timedelta(days=1)
+    tomorrow = cart_clinic_day + timedelta(days=1)
 
     response = client.post(
         "/api/v1/registrar/cart",
