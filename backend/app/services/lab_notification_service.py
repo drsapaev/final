@@ -497,9 +497,10 @@ class LabNotificationService:
         if not math.isfinite(value):
             return []
         test_name = (result.test_name or "").lower()
+        unit = (result.unit or "").strip()
         measurements = []
         for marker, thresholds in self.CRITICAL_VALUES.items():
-            if marker not in test_name:
+            if marker not in test_name or unit != thresholds["unit"]:
                 continue
             if value < thresholds["low"]:
                 measurements.append((value, thresholds, "low"))

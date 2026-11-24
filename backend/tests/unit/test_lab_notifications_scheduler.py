@@ -271,7 +271,9 @@ async def test_scheduler_keeps_valid_historical_linked_and_unlinked_fallback(
     db_session, released_result, monkeypatch,
 ):
     linked, source = released_result(evaluation=None, test_name="SYNTHETIC-glucose")
-    unlinked = LabResult(order_id=linked.order_id, test_name="SYNTHETIC-glucose", value="30")
+    unlinked = LabResult(
+        order_id=linked.order_id, test_name="SYNTHETIC-glucose", value="30", unit=linked.unit,
+    )
     db_session.add(unlinked)
     db_session.flush()
     sender = AsyncMock(return_value=True)
@@ -283,6 +285,28 @@ async def test_scheduler_keeps_valid_historical_linked_and_unlinked_fallback(
     metadata = [call.kwargs["metadata"] for call in sender.await_args_list]
     assert [item["report_instance_id"] for item in metadata if item["result_id"] == linked.id] == [source.id] * 2
     assert all("report_instance_id" not in item for item in metadata if item["result_id"] == unlinked.id)
+
+
+@pytest.mark.asyncio
+async def test_scheduler_does_not_apply_historical_threshold_to_a_different_or_missing_unit(
+    db_session, released_result, monkeypatch,
+):
+    linked, _ = released_result(
+        evaluation=None, test_name="SYNTHETIC-glucose", amount="30", projected_unit="mg/dL",
+    )
+    db_session.add_all([
+        LabResult(order_id=linked.order_id, test_name="SYNTHETIC-glucose", value="30", unit=unit)
+        for unit in (None, "mg/dL", "mmol/l")
+    ])
+    db_session.flush()
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(mod.notification_sender_service, "send_lab_event_notification", sender)
+
+    outcome = await mod.LabNotificationService(db_session).check_critical_values()
+
+    assert outcome["checked"] == 4
+    assert outcome["critical_found"] == 0
+    sender.assert_not_awaited()
 
 
 @pytest.fixture
