@@ -1556,6 +1556,7 @@ const uzLatn = {
     derma_panel_patient_history_title: "Bemor tarixi",
     derma_panel_patient_history_select_prompt: "Tarixini ko‘rish uchun bemorni qidiring va tanlang.",
     derma_panel_patient_history_loading: "Bemor tarixi yuklanmoqda...",
+    derma_panel_patient_history_load_more_failed: "Tarixning keyingi sahifasini yuklash amalga oshmadi — faqat yuklangan yozuvlar ko‘rsatilgan. Qaytadan urinib ko‘ring.",
     derma_panel_patient_history_error: "Bemor tarixining bir qismini yuklab bo‘lmadi.",
     derma_panel_patient_history_appointments: "Qabullar",
     derma_panel_patient_history_examinations: "Teri ko‘riklari",

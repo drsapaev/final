@@ -67,6 +67,10 @@ interface DermaPatientsTabProps {
   hasMoreProcedures: boolean;
   loadingMoreExaminations: boolean;
   loadingMoreProcedures: boolean;
+  /** DERMAHIST-FE-002: surfaced failed-page states (optional with a
+   * false default — callers predating the fix stay valid). */
+  loadMoreExaminationsError?: boolean;
+  loadMoreProceduresError?: boolean;
   onLoadMoreExaminations: () => void;
   onLoadMoreProcedures: () => void;
   historyLoading: boolean;
@@ -86,6 +90,8 @@ export function DermaPatientsTab({
   hasMoreProcedures,
   loadingMoreExaminations,
   loadingMoreProcedures,
+  loadMoreExaminationsError = false,
+  loadMoreProceduresError = false,
   onLoadMoreExaminations,
   onLoadMoreProcedures,
   historyLoading,
@@ -266,6 +272,8 @@ export function DermaPatientsTab({
               hasMoreProcedures={hasMoreProcedures}
               loadingMoreExaminations={loadingMoreExaminations}
               loadingMoreProcedures={loadingMoreProcedures}
+              loadMoreExaminationsError={loadMoreExaminationsError}
+              loadMoreProceduresError={loadMoreProceduresError}
               onLoadMoreExaminations={onLoadMoreExaminations}
               onLoadMoreProcedures={onLoadMoreProcedures}
             />
