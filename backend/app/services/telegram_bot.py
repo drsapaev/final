@@ -8,6 +8,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
+from html import escape
 from typing import Any
 
 import httpx
@@ -254,27 +255,45 @@ class TelegramBotService:
     async def _handle_message(self, message: dict[str, Any], db: Session):
         """Обработка текстовых сообщений"""
         try:
-            chat_id = message["chat"]["id"]
-            text = message.get("text", "")
-            user_id = message["from"]["id"]
-            username = message["from"].get("username", "")
-            first_name = message["from"].get("first_name", "")
-            last_name = message["from"].get("last_name", "")
-            language_code = message["from"].get("language_code", "ru")
+            chat = message.get("chat") or {}
+            sender = message.get("from") or {}
+            chat_id = chat.get("id")
+            sender_id = sender.get("id")
+            if (
+                chat.get("type") != "private"
+                or type(chat_id) is not int
+                or type(sender_id) is not int
+                or chat_id <= 0
+                or sender_id != chat_id
+                or sender.get("is_bot") is True
+            ):
+                return
 
-            # Регистрируем или обновляем пользователя
+            text = message.get("text")
+            if not isinstance(text, str) or not text.strip():
+                return
+
             telegram_user = await self._register_telegram_user(
-                db, user_id, username, first_name, last_name, language_code, chat_id
+                db,
+                chat_id,
+                sender.get("username", ""),
+                sender.get("first_name", ""),
+                sender.get("last_name", ""),
+                sender.get("language_code", "ru"),
             )
+            if telegram_user is None:
+                return
 
-            # Обрабатываем команды
             if text.startswith("/"):
                 await self._handle_command(text, chat_id, telegram_user, db)
             else:
-                await self._handle_text_message(text, chat_id, telegram_user, db)
+                await self.send_plain_message(
+                    chat_id,
+                    "Откройте меню командой /start, чтобы выбрать нужный раздел.",
+                )
 
         except Exception as e:
-            logger.error(f"Ошибка обработки сообщения: {e}")
+            logger.error("Telegram legacy message failed error_type=%s", type(e).__name__)
 
     async def _handle_callback_query(self, callback_query: dict[str, Any], db: Session):
         """Обработка callback запросов (кнопки)"""
@@ -462,81 +481,37 @@ class TelegramBotService:
         except Exception as e:
             logger.error(f"Ошибка обработки команды {command}: {e}")
 
-    async def _handle_text_message(
-        self, text: str, chat_id: int, telegram_user, db: Session
-    ):
-        """Обработка обычных текстовых сообщений"""
-        try:
-            # Простой AI-ассистент для ответов на вопросы
-            if any(
-                word in text.lower() for word in ["время", "работа", "часы", "открыт"]
-            ):
-                await self._send_working_hours(chat_id)
-            elif any(
-                word in text.lower()
-                for word in ["адрес", "где", "найти", "расположение"]
-            ):
-                await self._send_clinic_address(chat_id)
-            elif any(
-                word in text.lower() for word in ["телефон", "звонок", "связаться"]
-            ):
-                await self._send_contact_info(chat_id)
-            elif any(word in text.lower() for word in ["цена", "стоимость", "сколько"]):
-                await self._send_pricing_info(chat_id)
-            else:
-                await self._send_general_response(chat_id, text)
-
-        except Exception as e:
-            logger.error(f"Ошибка обработки текстового сообщения: {e}")
-
     async def _register_telegram_user(
         self,
         db: Session,
-        user_id: int,
+        chat_id: int,
         username: str,
         first_name: str,
         last_name: str,
         language_code: str,
-        chat_id: int,
-    ):
-        """Регистрация или обновление пользователя Telegram"""
+    ) -> TelegramUser | None:
+        """Refresh a verified private chat's metadata without granting any link."""
         try:
-            telegram_user = crud_telegram.get_telegram_user_by_id(db, user_id)
-
-            if not telegram_user:
-                # Создаем нового пользователя
-                telegram_user = crud_telegram.create_telegram_user(
+            telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+            profile = {
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+                "language_code": language_code or "ru",
+                "last_activity": datetime.now(UTC),
+            }
+            if telegram_user is None:
+                return crud_telegram.create_telegram_user(
                     db,
-                    {
-                        "user_id": user_id,
-                        "username": username,
-                        "first_name": first_name,
-                        "last_name": last_name,
-                        "language_code": language_code,
-                        "chat_id": chat_id,
-                        "active": True,
-                        "notifications_enabled": True,
-                    },
+                    {**profile, "chat_id": chat_id, "notifications_enabled": False},
                 )
-            else:
-                # Обновляем существующего пользователя
-                crud_telegram.update_telegram_user(
-                    db,
-                    user_id,
-                    {
-                        "username": username,
-                        "first_name": first_name,
-                        "last_name": last_name,
-                        "language_code": language_code,
-                        "chat_id": chat_id,
-                        "last_activity": datetime.now(UTC),
-                    },
-                )
-
-            return telegram_user
-
+            if not telegram_user.active or telegram_user.blocked:
+                return None
+            # update_telegram_user accepts the TelegramUser row ID, not a
+            # Telegram sender ID or a clinic User ID.
+            return crud_telegram.update_telegram_user(db, telegram_user.id, profile)
         except Exception as e:
-            logger.error(f"Ошибка регистрации пользователя: {e}")
+            logger.error("Telegram private profile refresh failed error_type=%s", type(e).__name__)
             return None
 
     async def _send_welcome_message(self, chat_id: int, telegram_user):
@@ -544,7 +519,7 @@ class TelegramBotService:
         message = f"""
 🏥 <b>Добро пожаловать в Programma Clinic!</b>
 
-Привет, {telegram_user.first_name}! 👋
+Привет, {escape(telegram_user.first_name or "")}! 👋
 
 Я ваш персональный помощник в клинике. Я могу помочь вам:
 

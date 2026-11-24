@@ -10,6 +10,8 @@
  *   (=, +, -, @) are prefixed with single quote to prevent formula injection.
  */
 
+import { normalizeIssuedQueueTicket } from './registrarHelpers';
+
 /**
  * Mask phone number for CSV export (PHI protection).
  * Example: +998 90 123 45 67 → +998 ***-**-67
@@ -25,6 +27,19 @@ function maskPhoneForCSV(phone: unknown): string {
   return `${country} ***-**-${lastTwo}`;
 }
 
+const formatCsvQueueTickets = (row: Record<string, unknown>): string => {
+  const direct = normalizeIssuedQueueTicket(row.queue_number);
+  const tickets = Array.isArray(row.queue_numbers)
+    ? row.queue_numbers.flatMap((ticket) => {
+        if (!ticket || typeof ticket !== 'object') return [];
+        const number = normalizeIssuedQueueTicket(ticket.number);
+        return number ? [{ number, label: ticket.queue_name || ticket.queue_tag || '' }] : [];
+      })
+    : [];
+  if (tickets.length <= 1) return direct ?? tickets[0]?.number ?? '';
+  return tickets.map(({ number, label }) => label ? `${label}: ${number}` : number).join('; ');
+};
+
 /**
  * Generate CSV string from appointment rows.
  * @param {Array} data - appointment rows
@@ -32,6 +47,7 @@ function maskPhoneForCSV(phone: unknown): string {
  * @param {boolean} options.maskPhone - mask phone numbers for PHI protection (default: true)
  * @param {boolean} options.includeAddress - include address column (default: false)
  * @param {boolean} options.includeTimestamps - include date/time/changed columns (default: false)
+ * @param {boolean} options.includeQueueNumber - label and export backend-issued tickets separately
  * @returns {string} CSV content with BOM-safe headers
  */
 export function generateCSV(data: Record<string, unknown>[], options: Record<string, unknown> = {}) {
@@ -39,7 +55,8 @@ export function generateCSV(data: Record<string, unknown>[], options: Record<str
     maskPhone = true,
     includeAddress = false,
     includeTimestamps = false,
-  } = options as { maskPhone?: boolean; includeAddress?: boolean; includeTimestamps?: boolean };
+    includeQueueNumber = false,
+  } = options as { maskPhone?: boolean; includeAddress?: boolean; includeTimestamps?: boolean; includeQueueNumber?: boolean };
 
   // UX Audit R-3.1: unified CSV generation with PHI masking.
   // Раньше: handleExport в EnhancedAppointmentsTable использовал formatPhoneNumber
@@ -48,7 +65,9 @@ export function generateCSV(data: Record<string, unknown>[], options: Record<str
     ? (p: unknown) => maskPhoneForCSV(p)
     : (p: unknown) => (p ? String(p) : '');
 
-  const headers = ['№', 'ФИО', 'Год рождения', 'Телефон'];
+  const headers = includeQueueNumber
+    ? ['№ строки', '№ талона', 'ФИО', 'Год рождения', 'Телефон']
+    : ['№', 'ФИО', 'Год рождения', 'Телефон'];
   if (includeAddress) headers.push('Адрес');
   headers.push('Услуги', 'Тип обращения', 'Вид оплаты');
   if (includeTimestamps) headers.push('Дата', 'Время', 'Изменено');
@@ -57,6 +76,7 @@ export function generateCSV(data: Record<string, unknown>[], options: Record<str
   const rows = data.map((row, index) => {
     const baseRow = [
       index + 1,
+      ...(includeQueueNumber ? [formatCsvQueueTickets(row)] : []),
       row.patient_fio || '',
       row.patient_birth_year || '',
       // R-05 fix: маскируем телефон в CSV-экспорте

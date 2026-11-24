@@ -790,3 +790,31 @@
     height: 28px;
   }
 }
+
+/* Service search, categories and controls remain reachable in a narrow dialog. */
+.wizard-service-header { box-sizing: border-box; }
+.wizard-service-search { flex: 0 1 300px; min-width: 0; }
+.wizard-service-categories {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-2);
+  padding: 0 8px;
+}
+.wizard-service-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  flex: 0 0 auto;
+}
+@media (max-width: 768px) {
+  .wizard-service-header { flex-wrap: wrap; }
+  .wizard-service-search { flex: 1 1 0; }
+  .wizard-service-categories {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    padding: 0;
+  }
+}

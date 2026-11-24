@@ -13,6 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from app.core.observability import observability_state
+from app.core.pii_masker import is_public_site_analytics_ingest_path
 
 # Static per-process config snapshot; read once so request-path code never
 # depends on the state object's internals (tests stub the state bare).
@@ -56,6 +57,11 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
     async def dispatch(  # type: ignore[override]
         self, request: Request, call_next: Callable[[Request], Response]
     ) -> Response:
+        if is_public_site_analytics_ingest_path(request.url.path):
+            response = await call_next(request)
+            response.headers["Cache-Control"] = "no-store"
+            return response
+
         started_at = time.perf_counter()
         trace_id = self._extract_trace_id(request)
         request.state.trace_id = trace_id
