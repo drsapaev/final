@@ -383,6 +383,49 @@ def test_lab_specimen_labels_and_reads_require_active_staff(
     ]
 
 
+def test_specimen_label_keeps_full_material_and_container_codes_on_stock(
+    client, specimen_context, monkeypatch
+):
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen.canvas import Canvas
+
+    actor, _, _, visit, test, _, _ = specimen_context
+    headers = _headers(actor)
+    material_code = "m" * 32
+    container_code = "w" * 32
+    created = client.post(
+        f"{LAB_API}/visits/{visit.id}/specimens",
+        json=_create(
+            test.id, material_code=material_code, container_code=container_code
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    specimen = created.json()
+    centered_text = []
+    draw_centred_string = Canvas.drawCentredString
+
+    def capture_text(canvas, x, y, text, *args, **kwargs):
+        centered_text.append((x, canvas.stringWidth(text), text))
+        return draw_centred_string(canvas, x, y, text, *args, **kwargs)
+
+    monkeypatch.setattr(Canvas, "drawCentredString", capture_text)
+    label = client.post(
+        f"{LAB_API}/specimens/{specimen['id']}/label",
+        json={"request_id": str(uuid4()), "expected_revision": specimen["revision"]},
+        headers=headers,
+    )
+
+    assert label.status_code == 200, label.text
+    printed_text = [text for _, _, text in centered_text]
+    assert specimen["barcode"] in printed_text
+    assert f"Specimen {specimen['id']} / Order {specimen['order_id']}" in printed_text
+    assert material_code in " ".join(printed_text)
+    assert container_code in " ".join(printed_text)
+    for center, width, text in centered_text:
+        assert 0 <= center - width / 2 < center + width / 2 <= 100 * mm, text
+
+
 def test_specimen_openapi_documents_context_and_binary_labels(client):
     paths = client.get("/openapi.json").json()["paths"]
     order_path = paths[f"{LAB_API}/orders/{{order_id}}/specimens"]

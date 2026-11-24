@@ -578,12 +578,12 @@ def _render_label(specimen: LabSpecimen) -> bytes:
     canvas.drawCentredString(page_width / 2, 12 * mm, specimen.barcode)
     canvas.setFont("Helvetica", 8)
     canvas.drawCentredString(
-        page_width / 2, 7 * mm, f"Specimen {specimen.id} / Order {specimen.order_id}"
+        page_width / 2, 8.5 * mm, f"Specimen {specimen.id} / Order {specimen.order_id}"
     )
+    # Each allowed 32-character code fits on its own line.
     canvas.setFont("Helvetica", 6)
-    canvas.drawCentredString(
-        page_width / 2, 3 * mm, f"{specimen.material_code} / {specimen.container_code}"
-    )
+    canvas.drawCentredString(page_width / 2, 5.25 * mm, specimen.material_code)
+    canvas.drawCentredString(page_width / 2, 2 * mm, specimen.container_code)
     canvas.showPage()
     canvas.save()
     return buffer.getvalue()
