@@ -35,6 +35,27 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
     });
   });
 
+  it.each([
+    ['en', 'Collapse sidebar', 'Expand sidebar'],
+    ['ru', 'Свернуть боковую панель', 'Развернуть боковую панель'],
+    ['kk', 'Бүйірлік тақтаны жию', 'Бүйірлік тақтаны жаю'],
+    ['uz-Latn', 'Yon panelni yig‘ish', 'Yon panelni kengaytirish'],
+    ['uz-Cyrl', 'Ён панелни йиғиш', 'Ён панелни кенгайтириш'],
+  ] as const)('localizes the sidebar toggle with and without a header in %s', async (locale, collapse, expand) => {
+    await act(async () => {
+      await i18n.changeLanguage(locale);
+    });
+
+    for (const withHeader of [false, true]) {
+      const header = withHeader ? <span>Sidebar</span> : undefined;
+      const { rerender, unmount } = render(<Sidebar items={[]} header={header} collapsible collapsed={false} />);
+      expect(screen.getByRole('button', { name: collapse, exact: true })).toBeInTheDocument();
+      rerender(<Sidebar items={[]} header={header} collapsible collapsed />);
+      expect(screen.getByRole('button', { name: expand, exact: true })).toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it('renders a labelKey item through t() and switches language reactively', async () => {
     await act(async () => {
       await i18n.changeLanguage('ru');
