@@ -559,7 +559,7 @@ def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
         source, key, result, *, unit="synthetic-unit", root=None, projected="1",
         kind="numeric", observed_on="2026-01-01", method="SYNTHETIC-METHOD",
         material="SYNTHETIC-SERUM", frozen=True, status="evaluated",
-        interpretation="normal",
+        interpretation="normal", snapshot_override=None,
     ):
         result_payload = {"kind": kind}
         if kind == "qualified_numeric":
@@ -576,6 +576,7 @@ def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
             "reference_date_source": "study_date",
             "age_at_date": observed_on,
         }
+        evaluation_snapshot.update(snapshot_override or {})
         db_session.add_all([
             LabReportValue(
                 instance_id=source.id,
@@ -602,7 +603,14 @@ def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
         status="not_evaluated", interpretation=None,
     )
     value(old, "legacy", Decimal("6"), projected="6", frozen=False)
-    value(old, "undated", Decimal("9"), projected="9", observed_on=None)
+    value(
+        old, "legacy-unit", Decimal("8"), projected="8",
+        snapshot_override={"unit": {"legacy": "synthetic-unit"}},
+    )
+    value(
+        old, "undated", Decimal("9"), projected="9", observed_on=None,
+        snapshot_override={"unit": None},
+    )
     prior_different_definition = report(earlier, other_version.id)
     value(prior_different_definition, "same-field", Decimal("110"), projected="110")
     prior_different_unit = report(earlier, version.id)
@@ -637,7 +645,7 @@ def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
     previous = payload["history"][0]
     assert previous["visit_id"] == earlier.id
     previous_values = previous["laboratory"]
-    assert len(previous_values) == 11
+    assert len(previous_values) == 12
     comparable = [v for v in previous_values if v["comparison"]]
     assert len(comparable) == 6
     zero, = [v for v in comparable if Decimal(v["comparison"]["value"]) == 0]
@@ -653,6 +661,11 @@ def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
     assert by_value["6"]["evaluation_status"] == "unknown"
     assert by_value["6"]["abnormal"] is None
     assert by_value["6"]["comparison"] is None
+    assert by_value["8"]["unit"] == "synthetic-unit"
+    assert by_value["8"]["evaluation_status"] == "unknown"
+    assert by_value["8"]["interpretation"] is None
+    assert by_value["8"]["comparison"] is None
+    assert by_value["9"]["unit"] is None
     assert by_value["9"]["comparison"] is None
 
 

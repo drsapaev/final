@@ -189,6 +189,10 @@ class EMRWorkspaceService:
             snapshot = row["evaluation_snapshot"]
             if not isinstance(snapshot, dict):
                 snapshot = {}
+            unit = snapshot.get("unit", row["unit"])
+            if unit is not None and not isinstance(unit, str):
+                unit = row["unit"]
+                snapshot = {}
             status, interpretation, abnormal = frozen_assessment(snapshot, value)
             observation = released_numeric_observation(
                 value, row["result_payload"], snapshot, row["value_numeric"]
@@ -214,7 +218,7 @@ class EMRWorkspaceService:
                     instance_id=row["source_instance_id"],
                     name=row["test_name"],
                     value=value,
-                    unit=snapshot.get("unit") if snapshot else row["unit"],
+                    unit=unit,
                     finalized_at=row["released_at"],
                     abnormal=abnormal,
                     evaluation_status=status,
