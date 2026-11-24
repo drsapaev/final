@@ -45753,7 +45753,7 @@ export type components = {
         WorkspaceLabComparison: {
             /**
              * Key
-             * @description Opaque key for an exact template version, field and unit
+             * @description Opaque key for the template field and frozen measurement context
              */
             key: string;
             /** Field Key */
@@ -45767,6 +45767,12 @@ export type components = {
              * @description Persisted numeric value from the source lab report
              */
             value: string;
+            /**
+             * Observed On
+             * Format: date
+             * @description Frozen study or specimen collection date
+             */
+            observed_on: string;
         };
         /** WorkspaceLabOrder */
         WorkspaceLabOrder: {
@@ -45812,7 +45818,15 @@ export type components = {
             /** Finalized At */
             finalized_at: string | null;
             /** Abnormal */
-            abnormal: boolean;
+            abnormal: boolean | null;
+            /**
+             * Evaluation Status
+             * @default unknown
+             * @enum {string}
+             */
+            evaluation_status: "missing" | "not_evaluated" | "not_applicable" | "evaluated" | "unknown";
+            /** Interpretation */
+            interpretation?: ("normal" | "low" | "high" | "warning" | "abnormal" | "critical" | "negative" | "positive" | "indeterminate") | null;
             comparison?: components["schemas"]["WorkspaceLabComparison"] | null;
         };
         /** WorkspaceLabs */

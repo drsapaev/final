@@ -135170,7 +135170,7 @@
           "key": {
             "type": "string",
             "title": "Key",
-            "description": "Opaque key for an exact template version, field and unit"
+            "description": "Opaque key for the template field and frozen measurement context"
           },
           "field_key": {
             "type": "string",
@@ -135188,6 +135188,12 @@
             "type": "string",
             "title": "Value",
             "description": "Persisted numeric value from the source lab report"
+          },
+          "observed_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Observed On",
+            "description": "Frozen study or specimen collection date"
           }
         },
         "type": "object",
@@ -135196,7 +135202,8 @@
           "field_key",
           "template_name",
           "template_version",
-          "value"
+          "value",
+          "observed_on"
         ],
         "title": "WorkspaceLabComparison"
       },
@@ -135331,8 +135338,49 @@
             "title": "Finalized At"
           },
           "abnormal": {
-            "type": "boolean",
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Abnormal"
+          },
+          "evaluation_status": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "not_evaluated",
+              "not_applicable",
+              "evaluated",
+              "unknown"
+            ],
+            "title": "Evaluation Status",
+            "default": "unknown"
+          },
+          "interpretation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "low",
+                  "high",
+                  "warning",
+                  "abnormal",
+                  "critical",
+                  "negative",
+                  "positive",
+                  "indeterminate"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interpretation"
           },
           "comparison": {
             "anyOf": [
