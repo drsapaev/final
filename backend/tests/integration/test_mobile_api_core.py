@@ -250,18 +250,23 @@ def test_mobile_lab_result_uses_exact_release_snapshot_and_preserves_legacy(
         )
     )
     for field, raw_value, evaluation_status, interpretation in values:
+        source_text = {
+            "qualified": "1.0000",
+            "cleared": "SYNTHETIC SUPPRESSED",
+        }.get(field, raw_value)
         db_session.add_all(
             [
                 LabReportValue(
                     instance_id=revised.id,
                     field_key=field,
-                    value_text="1.0000" if field == "qualified" else raw_value,
+                    value_text=source_text,
                     value_numeric=Decimal(1) if field == "qualified" else None,
                     resolved_reference_text="1–10" if raw_value else None,
                     evaluation_snapshot={
                         "status": evaluation_status,
                         "interpretation": interpretation,
                         "unit": "mg/L",
+                        "visible": field != "cleared",
                     },
                 ),
                 LabResult(
@@ -326,6 +331,7 @@ def test_mobile_lab_result_uses_exact_release_snapshot_and_preserves_legacy(
     assert emr_values["full_text"]["value"] == long_text
     assert emr_values["full_text"]["source_instance_id"] == revised.id
     assert emr_values["qualified"]["value"] == "<1"
+    assert emr_values["cleared"]["value"] is None
 
     response = client.get("/api/v1/mobile/lab/results", headers=_login(client, user))
     assert response.status_code == 200, response.text

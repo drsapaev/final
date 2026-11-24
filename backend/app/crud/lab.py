@@ -143,12 +143,15 @@ def patient_lab_results_statement(patient_id: int, *, include_observation: bool 
     observation = (
         (value.c.result_payload, value.c.value_numeric) if include_observation else ()
     )
-    # The legacy projection stores at most 128 characters. Released text
-    # is available in full through its exact source value. Numeric displays
-    # use the projection's already formatted value and qualifier.
+    # The legacy projection stores at most 128 characters. Read full text
+    # for visible observations, preserving suppressed rows and formatted numbers.
     displayed_value = case(
         (
-            and_(value.c.value_numeric.is_(None), value.c.value_text.is_not(None)),
+            and_(
+                r.c.value.is_not(None),
+                value.c.value_numeric.is_(None),
+                value.c.value_text.is_not(None),
+            ),
             value.c.value_text,
         ),
         else_=r.c.value,
