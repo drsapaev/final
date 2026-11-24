@@ -123,8 +123,8 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
   const metadataFailed = activeLabState?.refresh === labReload && activeLabState.error;
   const canReview = !loading && !resultsFailed && activeLabState?.refresh === labReload && !activeLabState.error;
   const criticalVisitId = Number(visitId);
-  // Only current report summaries with explicit chart identity can expose a critical task.
-  const criticalReports = !loading && !resultsFailed && patientId != null
+  // Exact-chart rows keep in-flight acknowledgements mounted during a refresh.
+  const criticalReports = patientId != null
     && Number.isSafeInteger(criticalVisitId) && criticalVisitId > 0
     ? instances.filter((instance) => String(instance.patient_id) === String(patientId)
       && String(instance.visit_id) === String(visitId)
@@ -481,8 +481,10 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
         {renderContent()}
         {criticalReports.some((instance) => instance.managed_release) && (
           <LabCriticalAcknowledgement
-            key={`${labScope}:${labReload}`}
+            key={labScope}
             visitId={criticalVisitId}
+            refresh={labReload}
+            reportsReady={!loading && !resultsFailed}
             reportIds={criticalReports.map((instance) => Number(instance.id))}
             labels={labLabels}
           />

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import i18n from '@/i18n';
 import type { WorkspaceLabReport, WorkspaceLabs } from '@/api/emrWorkspace';
+import type { LabCriticalTask } from '@/api/labOperations';
 
 /**
  * EMRLAB-FE-001..004 (audit 3886, round 15) — fail-first.
@@ -495,8 +496,18 @@ describe('Lab results refresh within the same encounter', () => {
 });
 
 describe('managed critical communications in the physician workspace', () => {
-  function task(id: number, reportInstanceId: number) {
-    return { id, report_instance_id: reportInstanceId, state: 'pending', available_actions: ['acknowledge'] };
+  function task(id: number, reportInstanceId: number): LabCriticalTask {
+    return {
+      id, report_instance_id: reportInstanceId, state: 'pending', available_actions: ['acknowledge'],
+      attempts: 0, created_at: '2026-07-01T11:00:00Z', acknowledged_at: null,
+    };
+  }
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: Error) => void;
+    const promise = new Promise<T>((complete, fail) => { resolve = complete; reject = fail; });
+    return { promise, resolve, reject };
   }
 
   it('keeps correction lineage, exact-version review and critical acknowledgement independent', async () => {
@@ -534,6 +545,58 @@ describe('managed critical communications in the physician workspace', () => {
     expect(updateCriticalMock).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['inbox first', 'acknowledgement first', 'acknowledgement retry'])('preserves same-chart ACK through review (%s)', async (order) => {
+    const selected = report(7702, 'SYNTHETIC managed report');
+    const summary = {
+      ...finalized(selected.id, selected.template_name), patient_id: 1, visit_id: 5, managed_release: true,
+    };
+    const pending = task(8811, selected.id);
+    const acknowledged: LabCriticalTask = { ...pending, state: 'acknowledged', available_actions: [] };
+    const reports = deferred<typeof summary[]>();
+    const inbox = deferred<LabCriticalTask[]>();
+    const acknowledgement = deferred<LabCriticalTask>();
+    listInstancesMock.mockResolvedValueOnce([summary]).mockResolvedValueOnce([])
+      .mockReturnValueOnce(reports.promise).mockResolvedValueOnce([]);
+    getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([selected]));
+    listCriticalMock.mockResolvedValueOnce([pending]).mockReturnValueOnce(inbox.promise);
+    updateCriticalMock.mockReturnValueOnce(acknowledgement.promise);
+    reviewLabVersionMock.mockResolvedValueOnce(undefined);
+
+    render(<ThemeProvider><LabResultsSection patientId={1} visitId={5} reviewerId={19} /></ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить получение' }));
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('emr_workspace.lab_review') }));
+    await waitFor(() => expect(listInstancesMock).toHaveBeenCalledTimes(3));
+    expect(screen.queryByRole('region', { name: 'Критические сообщения' })).not.toBeInTheDocument();
+    expect(reviewLabVersionMock).toHaveBeenCalledExactlyOnceWith(5, 1, 7702, '');
+    expect(updateCriticalMock).toHaveBeenCalledExactlyOnceWith(8811, 'acknowledge');
+
+    await act(async () => reports.resolve([summary]));
+    await waitFor(() => expect(listCriticalMock).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole('region', { name: 'Критические сообщения' })).not.toBeInTheDocument();
+    if (order === 'inbox first') {
+      await act(async () => inbox.resolve([pending]));
+      expect(screen.getByRole('button', { name: 'Подтвердить получение' })).toBeDisabled();
+      await act(async () => acknowledgement.resolve(acknowledged));
+    } else if (order === 'acknowledgement first') {
+      await act(async () => acknowledgement.resolve(acknowledged));
+      await act(async () => inbox.resolve([pending]));
+    } else {
+      await act(async () => acknowledgement.reject(new Error('SYNTHETIC acknowledgement response lost')));
+      await act(async () => inbox.resolve([pending]));
+      const critical = within(screen.getByRole('region', { name: 'Критические сообщения' }));
+      expect(critical.getByRole('alert')).toHaveTextContent('Не удалось выполнить запрос. Повторите попытку.');
+      updateCriticalMock.mockResolvedValueOnce(acknowledged);
+      await act(async () => fireEvent.click(critical.getByRole('button', { name: 'Подтвердить получение' })));
+      expect(updateCriticalMock).toHaveBeenNthCalledWith(2, 8811, 'acknowledge');
+      expect(critical.queryByRole('alert')).not.toBeInTheDocument();
+    }
+
+    const critical = within(screen.getByRole('region', { name: 'Критические сообщения' }));
+    expect(critical.getByRole('status')).toHaveTextContent('Получение подтверждено');
+    expect(critical.queryByRole('button', { name: 'Подтвердить получение' })).not.toBeInTheDocument();
+  });
+
   it('discards a late critical response when the active patient and visit change', async () => {
     let resolvePrevious!: (rows: ReturnType<typeof task>[]) => void;
     listCriticalMock.mockImplementation((visitId: number) => visitId === 5
@@ -560,5 +623,33 @@ describe('managed critical communications in the physician workspace', () => {
     await act(async () => resolvePrevious([task(61, 11)]));
     expect(screen.queryByText(/Отчёт #11/)).not.toBeInTheDocument();
     expect(screen.getByText(/Отчёт #22/)).toBeVisible();
+  });
+
+  it('does not show a previous chart acknowledgement after changing patient and visit', async () => {
+    const previous = task(61, 11);
+    const acknowledgement = deferred<LabCriticalTask>();
+    listCriticalMock.mockImplementation((visitId: number) => Promise.resolve(visitId === 5 ? [previous] : [task(62, 22)]));
+    updateCriticalMock.mockReturnValueOnce(acknowledgement.promise);
+    listInstancesMock.mockImplementation(({ patient_id, visit_ids, status }) => Promise.resolve(
+      status === 'FINALIZED' ? [{
+        ...finalized(patient_id === 1 ? 11 : 22, `SYNTHETIC report ${patient_id}`),
+        patient_id, visit_id: visit_ids[0], managed_release: true,
+      }] : [],
+    ));
+    const chart = (patientId: number, visitId: number) => (
+      <ThemeProvider><LabResultsSection patientId={patientId} visitId={visitId} /></ThemeProvider>
+    );
+
+    const view = render(chart(1, 5));
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить получение' }));
+    expect(updateCriticalMock).toHaveBeenCalledExactlyOnceWith(61, 'acknowledge');
+    view.rerender(chart(2, 6));
+    expect(await screen.findByText(/Отчёт #22/)).toBeVisible();
+
+    await act(async () => acknowledgement.resolve({ ...previous, state: 'acknowledged', available_actions: [] }));
+    const critical = within(screen.getByRole('region', { name: 'Критические сообщения' }));
+    expect(critical.queryByText(/Отчёт #11|Получение подтверждено/)).not.toBeInTheDocument();
+    expect(critical.getByRole('button', { name: 'Подтвердить получение' })).toBeEnabled();
   });
 });
