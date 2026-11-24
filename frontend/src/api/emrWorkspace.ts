@@ -192,6 +192,10 @@ export async function getWorkspaceLabs(visitId: string | number, patientId: stri
   const { data } = await apiClient.get<WorkspaceLabs>(`${emrWorkspacePath(visitId)}/labs`, {
     params: { patient_id: patientId ?? undefined }, signal, silent: true,
   });
+  if (!Array.isArray(data?.orders) || !Array.isArray(data.unlinked_reports)
+    || !Array.isArray(data.executions) || !Array.isArray(data.invoices)) {
+    throw new Error('Invalid EMR laboratory workspace response');
+  }
   return data;
 }
 

@@ -264,3 +264,58 @@ def test_editing_a_reviewed_template_requires_review_of_the_new_version(
         ).status_code
         == 409
     )
+
+
+def test_transfer_rejects_a_signed_note_from_a_different_patient(
+    client,
+    db_session,
+    auth_headers,
+    test_visit,
+):
+    other = Patient(first_name="SYNTHETIC-Workspace", last_name="Other")
+    db_session.add(other)
+    db_session.flush()
+    prior = Visit(
+        patient_id=other.id,
+        doctor_id=test_visit.doctor_id,
+        visit_date=test_visit.visit_date,
+    )
+    db_session.add(prior)
+    db_session.flush()
+    prior_root = emr_path(prior.id)
+    original = {
+        "specialty": "cardiology",
+        "recommendations": "SYNTHETIC separate patient",
+    }
+    saved = client.post(
+        prior_root, headers=auth_headers, json={"data": original, "is_draft": False}
+    ).json()
+    signed = client.post(
+        f"{prior_root}/sign",
+        headers=auth_headers,
+        json={"data": original, "row_version": saved["row_version"]},
+    ).json()
+    root = emr_path(test_visit.id)
+    preview = client.get(
+        f"{root}/workspace/history/{prior.id}/{signed['version']}", headers=auth_headers
+    )
+    assert preview.status_code == 409
+    blocked = client.post(
+        root,
+        headers=auth_headers,
+        json={
+            "data": {
+                "follow_up": {
+                    "transferred_fields": [
+                        {
+                            "source_visit_id": prior.id,
+                            "source_version": signed["version"],
+                            "field": "recommendations",
+                        }
+                    ]
+                }
+            }
+        },
+    )
+    assert blocked.status_code == 409
+    assert client.get(root, headers=auth_headers).status_code == 404

@@ -7,6 +7,7 @@
 
 const uzLatn = {
   emr_workspace: {
+    print_error: "Hujjatni chop etish oynasini ochib bo‘lmadi.",
     height: "Bo‘y",
     weight: "Vazn",
     cm: "sm",

@@ -863,12 +863,8 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     });
   });
 
-  // --- Surface 5/5: EMR (doctor panel visit view → EMRContainerV2). No data
-  // table on this screen (form sections) — nothing to wire sticky headers on;
-  // the baseline locks the zero-delta invariant for the screen. The EMR GET
-  // is mocked 404 → the canonical "new visit draft" state (the same path
-  // production takes for a first visit).
-  test('PR-UI-12-4 EMR screen — dermatology visit view (zero-delta lock, no tables)', async ({ page }) => {
+  // The first-visit draft uses the workspace patient identity and empty longitudinal data.
+  test('PR-UI-12-4 EMR screen — dermatology visit workspace', async ({ page }) => {
     await installAuth(page, doctorProfile);
     const dermaQueueEntry = {
       id: 1001,
@@ -928,6 +924,25 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
       // 200 would need the full section schema; the draft path is production
       // behavior for a first visit).
       if (pathname === '/api/v1/v2/emr/501') { await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'not found' }) }); return; }
+      if (pathname === '/api/v1/v2/emr/501/workspace') {
+        await route.fulfill(jsonResponse({
+          patient: { id: 101, full_name: 'SYNTHETIC-EMR', birth_date: '1990-02-12', legacy_allergies: null, legacy_conditions: null },
+          visit: { id: 501, date: '2026-08-29', status: 'open' },
+          allergy_state: 'not_checked',
+          clinical_entries: [],
+          history: [],
+          has_more_history: false,
+        }));
+        return;
+      }
+      if (pathname === '/api/v1/v2/emr/501/workspace/labs') {
+        await route.fulfill(jsonResponse({ orders: [], unlinked_reports: [], executions: [], invoices: [] }));
+        return;
+      }
+      if (pathname === '/api/v1/v2/emr/501/workspace/prescription') {
+        await route.fulfill(jsonResponse(null));
+        return;
+      }
       if (pathname === '/api/v1/derma/examinations') { await route.fulfill(jsonResponse({ items: [], total: 0, page: 1, size: 20, pages: 0 })); return; }
       if (pathname === '/api/v1/derma/procedures') { await route.fulfill(jsonResponse({ items: [], total: 0, page: 1, size: 20, pages: 0 })); return; }
       if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
@@ -938,7 +953,8 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     // the mocked derma queue (URL resolution in DermatologistPanelUnified).
     await page.goto('/doctor/dermatology?visitId=501&patientId=101');
     await page.locator('.emr-v2-container').first().waitFor({ state: 'visible', timeout: 20000 });
-    await page.waitForTimeout(500);
+    await expect(page.getByRole('heading', { name: 'SYNTHETIC-EMR', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Клиническая сводка', exact: true })).toBeVisible();
 
     await expect(page.locator('.emr-v2-container').first()).toHaveScreenshot('pr124-emr-screen.png', {
       maxDiffPixelRatio: 0.01,

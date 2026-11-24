@@ -44,6 +44,7 @@
 
 const ru = {
   emr_workspace: {
+    print_error: "Не удалось открыть печать документа.",
     height: "Рост",
     weight: "Вес",
     cm: "см",

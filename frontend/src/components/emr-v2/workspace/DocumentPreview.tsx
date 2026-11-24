@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '@/api/client';
 import type { EMRWorkspaceData, FollowUp } from '@/api/emrWorkspace';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -29,6 +29,9 @@ export function DocumentPreview({
 }) {
   const { t, language } = useTranslation();
   const [amendment, setAmendment] = useState<string>();
+  const [printFailed, setPrintFailed] = useState(false);
+  const previewRef = useRef<HTMLElement>(null);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
   const signed = status === 'signed' || status === 'amended';
   const dateFormat = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -42,6 +45,43 @@ export function DocumentPreview({
     }).catch(() => {});
     return () => controller.abort();
   }, [visitId, status, version]);
+  useEffect(() => () => frameRef.current?.remove(), []);
+
+  function printPreview() {
+    if (!previewRef.current) return;
+    setPrintFailed(false);
+    frameRef.current?.remove();
+    const frame = window.document.createElement('iframe');
+    frame.className = 'emr-workspace-print-frame';
+    frame.title = t('emr_workspace.preview');
+    frame.tabIndex = -1;
+    frame.setAttribute('aria-hidden', 'true');
+    window.document.body.appendChild(frame);
+    frameRef.current = frame;
+    const printWindow = frame.contentWindow;
+    const printDocument = frame.contentDocument;
+    if (!printWindow || !printDocument) {
+      frame.remove();
+      setPrintFailed(true);
+      return;
+    }
+
+    printDocument.title = t('misc.emr_title');
+    printDocument.documentElement.lang = language;
+    const styles = printDocument.createElement('style');
+    styles.textContent = '@page { margin: 12mm; } body { color: black; background: white; font: 11pt/1.45 system-ui, sans-serif; }'
+      + ' h2, h3 { break-after: avoid; } p { white-space: pre-wrap; overflow-wrap: anywhere; }';
+    printDocument.head.appendChild(styles);
+    printDocument.body.appendChild(printDocument.importNode(previewRef.current, true));
+    printWindow.addEventListener('afterprint', () => frame.remove(), { once: true });
+    try {
+      printWindow.focus();
+      printWindow.print();
+    } catch {
+      frame.remove();
+      setPrintFailed(true);
+    }
+  }
 
   const vitals = asRecord(data.vitals);
   const bloodPressure = asRecord(vitals.blood_pressure);
@@ -60,7 +100,7 @@ export function DocumentPreview({
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>{t('emr_workspace.preview')}</DialogTitle>
       <DialogContent className="emr-workspace-preview-body">
-        <article className="emr-workspace-print" data-emr-print>
+        <article className="emr-workspace-print" data-emr-print ref={previewRef}>
           <header>
             <h2>{t('misc.emr_title')}</h2>
             <p><strong>{workspace?.patient.full_name || patientName || t('misc.emr_patient', { id: patientId })}</strong></p>
@@ -127,10 +167,11 @@ export function DocumentPreview({
             <p className="emr-workspace-document-text">{ecgConclusion}</p>
           </section>}
         </article>
+        {printFailed && <p role="alert">{t('emr_workspace.print_error')}</p>}
       </DialogContent>
       <DialogActions>
         <Button type="button" variant="ghost" onClick={onClose}>{t('misc.cancel')}</Button>
-        <Button type="button" onClick={() => window.print()}>{t('emr_workspace.print')}</Button>
+        <Button type="button" onClick={printPreview}>{t('emr_workspace.print')}</Button>
       </DialogActions>
     </Dialog>
   );

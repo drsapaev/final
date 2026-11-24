@@ -7,6 +7,7 @@
 
 const uzCyrl = {
   emr_workspace: {
+    print_error: "Ҳужжатни чоп этиш ойнасини очиб бўлмади.",
     height: "Бўй",
     weight: "Вазн",
     cm: "см",

@@ -4,7 +4,7 @@
 }
 
 .emr-v2-header {
-    gap: var(--mac-spacing-3);
+    gap: var(--mac-spacing-3, 12px);
     flex-wrap: wrap;
 }
 
@@ -13,7 +13,7 @@
     min-width: 0;
     align-items: flex-start;
     flex-direction: column;
-    gap: var(--mac-spacing-1);
+    gap: var(--mac-spacing-1, 4px);
     overflow-wrap: anywhere;
 }
 
@@ -27,20 +27,20 @@
     position: sticky;
     bottom: 0;
     z-index: 2;
-    background: var(--mac-bg-primary);
+    background: var(--mac-bg-primary, Canvas);
 }
 
 .emr-workspace-identity,
 .emr-workspace-controls {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--mac-spacing-2);
+    gap: var(--mac-spacing-2, 8px);
     align-items: center;
 }
 
 .emr-workspace-identity {
-    color: var(--mac-text-secondary);
-    font-size: var(--mac-font-size-sm);
+    color: var(--mac-text-secondary, GrayText);
+    font-size: var(--mac-font-size-sm, 0.875rem);
 }
 
 .emr-workspace-layout {
@@ -53,39 +53,39 @@
 }
 
 .emr-workspace-sidebar {
-    padding: var(--mac-spacing-4);
-    background: var(--mac-bg-secondary);
-    border-top: 1px solid var(--mac-separator);
+    padding: var(--mac-spacing-4, 16px);
+    background: var(--mac-bg-secondary, Canvas);
+    border-top: 1px solid var(--mac-separator, currentColor);
     overflow-wrap: anywhere;
 }
 
 .emr-workspace-visit-section {
-    margin: 0 0 var(--mac-spacing-4);
-    padding: var(--mac-spacing-3);
-    border-bottom: 1px solid var(--mac-separator);
+    margin: 0 0 var(--mac-spacing-4, 16px);
+    padding: var(--mac-spacing-3, 12px);
+    border-bottom: 1px solid var(--mac-separator, currentColor);
 }
 
 .emr-workspace-sidebar h3,
 .emr-workspace-sidebar h4,
 .emr-workspace-visit-section h3 {
-    margin: 0 0 var(--mac-spacing-2);
+    margin: 0 0 var(--mac-spacing-2, 8px);
 }
 
 .emr-workspace-sidebar p {
-    margin: var(--mac-spacing-2) 0;
+    margin: var(--mac-spacing-2, 8px) 0;
 }
 
 .emr-workspace-group {
-    margin-top: var(--mac-spacing-3);
-    padding-top: var(--mac-spacing-3);
-    border-top: 1px solid var(--mac-separator);
+    margin-top: var(--mac-spacing-3, 12px);
+    padding-top: var(--mac-spacing-3, 12px);
+    border-top: 1px solid var(--mac-separator, currentColor);
 }
 
 .emr-workspace-entry {
     display: grid;
-    gap: var(--mac-spacing-1);
-    padding: var(--mac-spacing-2) 0;
-    border-bottom: 1px solid var(--mac-separator);
+    gap: var(--mac-spacing-1, 4px);
+    padding: var(--mac-spacing-2, 8px) 0;
+    border-bottom: 1px solid var(--mac-separator, currentColor);
 }
 
 .emr-workspace-entry > button {
@@ -101,56 +101,56 @@
 .emr-workspace-line {
     display: flex;
     align-items: center;
-    gap: var(--mac-spacing-2);
+    gap: var(--mac-spacing-2, 8px);
     justify-content: space-between;
 }
 
 .emr-workspace-allergy {
-    color: var(--mac-text-primary);
-    background: var(--mac-bg-tertiary);
-    border-inline-start: 3px solid var(--mac-warning);
-    padding: var(--mac-spacing-1) var(--mac-spacing-2);
+    color: var(--mac-text-primary, CanvasText);
+    background: var(--mac-bg-tertiary, Canvas);
+    border-inline-start: 3px solid var(--mac-warning, currentColor);
+    padding: var(--mac-spacing-1, 4px) var(--mac-spacing-2, 8px);
 }
 
 .emr-workspace-form fieldset,
 .emr-workspace-follow-up {
     display: grid;
-    gap: var(--mac-spacing-2);
+    gap: var(--mac-spacing-2, 8px);
     padding: 0;
     border: 0;
     min-width: 0;
 }
 
 .emr-workspace-form {
-    margin-top: var(--mac-spacing-3);
-    padding-top: var(--mac-spacing-3);
-    border-top: 1px solid var(--mac-separator);
+    margin-top: var(--mac-spacing-3, 12px);
+    padding-top: var(--mac-spacing-3, 12px);
+    border-top: 1px solid var(--mac-separator, currentColor);
 }
 
 .emr-workspace-layout select {
     display: block;
     width: 100%;
     min-height: 36px;
-    color: var(--mac-text-primary);
-    background: var(--mac-bg-primary);
-    border: 1px solid var(--mac-border);
-    border-radius: var(--mac-radius-sm);
-    padding: var(--mac-spacing-1) var(--mac-spacing-2);
+    color: var(--mac-text-primary, CanvasText);
+    background: var(--mac-bg-primary, Canvas);
+    border: 1px solid var(--mac-border, currentColor);
+    border-radius: var(--mac-radius-sm, 6px);
+    padding: var(--mac-spacing-1, 4px) var(--mac-spacing-2, 8px);
 }
 
 .emr-workspace-follow-up {
-    margin-top: var(--mac-spacing-3);
+    margin-top: var(--mac-spacing-3, 12px);
 }
 
 .emr-workspace-check {
     display: flex;
-    gap: var(--mac-spacing-2);
+    gap: var(--mac-spacing-2, 8px);
     align-items: flex-start;
 }
 
 .emr-workspace-field {
     display: grid;
-    gap: var(--mac-spacing-1);
+    gap: var(--mac-spacing-1, 4px);
 }
 
 .emr-workspace-document-text {
@@ -164,32 +164,60 @@
 
 .emr-workspace-sidebar :focus-visible,
 .emr-workspace-visit-section :focus-visible {
-    outline: 2px solid var(--mac-accent-blue);
+    outline: 2px solid var(--mac-accent-blue, Highlight);
     outline-offset: 2px;
 }
 
-@media (min-width: 1050px) {
+@media (min-width: 1024px) {
     .emr-workspace-layout {
         grid-template-columns: minmax(0, 1fr) minmax(275px, 32%);
     }
 
     .emr-workspace-sidebar {
         border-top: 0;
-        border-inline-start: 1px solid var(--mac-separator);
+        border-inline-start: 1px solid var(--mac-separator, currentColor);
     }
 }
 
 @media (max-width: 640px) {
+    .emr-v2-container {
+        overflow-x: clip;
+    }
+
     .emr-v2-container,
     .emr-v2-sections,
     .emr-v2-header,
     .emr-v2-toolbar,
     .emr-v2-actions {
-        padding-inline: var(--mac-spacing-2);
+        padding-inline: var(--mac-spacing-2, 8px);
     }
 
     .emr-v2-container--with-sidebar .emr-v2-main {
         max-width: 100%;
+    }
+
+    .emr-v2-header__left h2 {
+        font-size: var(--mac-font-size-lg, 1.125rem);
+    }
+
+    .emr-v2-sections .emr-section__header-wrapper,
+    .emr-v2-sections .emr-section__header-action > div,
+    .emr-v2-sections .cardiology-tabs {
+        flex-wrap: wrap;
+    }
+
+    .emr-v2-sections .emr-section__header-action {
+        max-width: 100%;
+        padding-inline: var(--mac-spacing-2, 8px);
+    }
+
+    .emr-v2-sections .emr-section__header,
+    .emr-v2-sections .emr-section__content {
+        padding-inline: var(--mac-spacing-2, 8px);
+    }
+
+    .emr-v2-sections :is(button, input, select, textarea, summary) {
+        scroll-margin-block: 14vh 10vh;
     }
 
     .emr-workspace-visit-section .emr-vitals__row {
@@ -198,12 +226,12 @@
 }
 
 .emr-workspace-print > section {
-    padding-block: var(--mac-spacing-2);
-    border-top: 1px solid var(--mac-separator);
+    padding-block: var(--mac-spacing-2, 8px);
+    border-top: 1px solid var(--mac-separator, currentColor);
 }
 
 .emr-workspace-print h3 {
-    margin-bottom: var(--mac-spacing-1);
+    margin-bottom: var(--mac-spacing-1, 4px);
 }
 
 .emr-workspace-preview-body {
@@ -212,34 +240,13 @@
     overscroll-behavior: contain;
 }
 
-@media print {
-    body:has([data-emr-print]) :not(:has([data-emr-print]), [data-emr-print], [data-emr-print] *) {
-        display: none !important;
-    }
-
-    body:has([data-emr-print]) :has([data-emr-print]) {
-        position: static !important;
-        display: block !important;
-        overflow: visible !important;
-        max-width: none !important;
-        max-height: none !important;
-        max-block-size: none !important;
-        height: auto !important;
-        transform: none !important;
-    }
-
-    [data-emr-print], [data-emr-print] * {
-        visibility: visible !important;
-        color: #000 !important;
-    }
-
-    [data-emr-print] {
-        background: #fff;
-        padding: var(--mac-spacing-6);
-    }
-
-    [data-emr-print] h2,
-    [data-emr-print] h3 {
-        break-after: avoid;
-    }
+.emr-workspace-print-frame {
+    position: fixed;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    width: 1px;
+    height: 1px;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
 }
