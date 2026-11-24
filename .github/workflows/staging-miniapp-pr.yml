@@ -731,6 +731,8 @@ jobs:
             echo '::error::PR #4251 acceptance requires its full current head SHA.'
             exit 1
           fi
+          # The PR's REST base.sha can lag main. The checkout step verifies the
+          # live refs/heads/main against WORKFLOW_SHA before building anything.
           if ! gh api --hostname github.com repos/drsapaev/final/pulls/4251 | python3 -c '
           import json
           import sys
@@ -741,10 +743,10 @@ jobs:
               pr["number"] == 4251 and pr["state"] == "open"
               and head["repo"]["full_name"] == base["repo"]["full_name"] == "drsapaev/final"
               and head["ref"] == "codex/laboratory-panel-v2" and base["ref"] == "main"
-              and head["sha"] == sys.argv[1] and base["sha"] == sys.argv[2]
+              and head["sha"] == sys.argv[1]
           ))
-          ' "$REVIEWED_SHA" "$WORKFLOW_SHA" 2>/dev/null; then
-            echo '::error::Could not verify open same-repository PR #4251 and its exact app head and current main base.'
+          ' "$REVIEWED_SHA" 2>/dev/null; then
+            echo '::error::Could not verify open same-repository PR #4251, its exact app head and expected base branch.'
             exit 1
           fi
 
