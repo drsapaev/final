@@ -1,3 +1,4 @@
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import { hasDraftDifference, readReportDraft } from './hooks/useLabReportState';
@@ -34,6 +35,20 @@ export default function ReportSaveStatus({
   onRetry, onCompare, onResolve,
 }: ReportSaveStatusProps) {
   const { t } = useTranslation();
+  const comparisonRegion = useRef<HTMLElement>(null);
+  const focusComparison = useRef(false);
+  const compareTrigger = useCallback((button: HTMLButtonElement | null) => {
+    if (!button) return;
+    // Read focus as React detaches the trigger, before its DOM node is removed.
+    return () => {
+      focusComparison.current = button.ownerDocument.activeElement === button;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    if (comparison && focusComparison.current) comparisonRegion.current?.focus();
+    focusComparison.current = false;
+  }, [comparison, failure]);
+
   const time = lastSavedAt?.toLocaleTimeString(language, {
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
@@ -79,13 +94,20 @@ export default function ReportSaveStatus({
           </Button>
         )}
         {failure === 'conflict' && !comparison && (
-          <Button size="sm" variant="outline" onClick={onCompare} disabled={comparing}>
+          <Button
+            ref={compareTrigger}
+            size="sm"
+            variant="outline"
+            aria-disabled={comparing}
+            aria-busy={comparing}
+            onClick={() => { if (!comparing) onCompare(); }}
+          >
             {t('workbench.save_compare')}
           </Button>
         )}
       </div>
       {comparison && (
-        <div className="lab-save-comparison">
+        <section className="lab-save-comparison" ref={comparisonRegion} aria-label={t('workbench.save_comparison')} tabIndex={-1}>
           {differences.length ? (
             <div className="lab-save-comparison-scroll">
               <table className="lab-save-comparison-table">
@@ -115,7 +137,7 @@ export default function ReportSaveStatus({
               {t('workbench.save_load_server')}
             </Button>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );
