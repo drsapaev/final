@@ -1357,6 +1357,74 @@ def test_bulk_values_optimistic_locking_bumps_token_and_rejects_stale(
 
 
 @pytest.mark.integration
+def test_draft_request_id_binds_each_operation_to_its_actor_payload_and_version(
+    client, auth_headers, db_session, test_patient, test_visit, test_doctor_user,
+):
+    instance = _create_lab_report_instance(
+        client, auth_headers=auth_headers, patient_id=test_patient.id, visit_id=test_visit.id,
+    )
+    route = f"/api/v1/lab/report-instances/{instance['id']}"
+    request_id = str(uuid4())
+    original_params = {
+        "draft_request_id": request_id,
+        "expected_updated_at": instance["updated_at"],
+    }
+    metadata = {"study_date": "2026-09-21"}
+
+    def report_with_normalized_version(report):
+        # SQLite drops timezone information on reload. PostgreSQL separately
+        # proves the replay returns the exact persisted version.
+        version = datetime.fromisoformat(report["updated_at"])
+        if version.tzinfo is None:
+            version = version.replace(tzinfo=UTC)
+        return {**report, "updated_at": version.astimezone(UTC)}
+
+    malformed = client.put(
+        route, params={**original_params, "draft_request_id": "invalid"},
+        headers=auth_headers, json=metadata,
+    )
+    assert malformed.status_code == 422, malformed.text
+    unversioned = client.put(
+        route, params={"draft_request_id": request_id}, headers=auth_headers, json=metadata,
+    )
+    assert unversioned.status_code == 400, unversioned.text
+
+    first = client.put(route, params=original_params, headers=auth_headers, json=metadata)
+    assert first.status_code == 200, first.text
+    replay = client.put(route, params=original_params, headers=auth_headers, json=metadata)
+    assert replay.status_code == 200, replay.text
+    assert report_with_normalized_version(replay.json()) == report_with_normalized_version(first.json())
+
+    lab_user = _create_lab_user(db_session, label="other_replay_actor")
+    other_actor = {"Authorization": f"Bearer {_mint_access_token(lab_user)}"}
+    cannot_replay = client.put(route, params=original_params, headers=other_actor, json=metadata)
+    assert cannot_replay.status_code == 409, cannot_replay.text
+    doctor = {"Authorization": f"Bearer {_mint_access_token(test_doctor_user)}"}
+    forbidden = client.put(route, params=original_params, headers=doctor, json=metadata)
+    assert forbidden.status_code == 403, forbidden.text
+
+    current_params = {**original_params, "expected_updated_at": first.json()["updated_at"]}
+    rebound = client.put(
+        route, params=current_params, headers=auth_headers, json={"study_date": "2026-09-22"},
+    )
+    assert rebound.status_code == 409, rebound.text
+    bulk = client.post(
+        f"{route}/bulk-values", params=current_params, headers=auth_headers,
+        json=[{"field_key": "wbc", "value_text": "5.2"}],
+    )
+    assert bulk.status_code == 200, bulk.text
+    assert bulk.json()["updated_field_keys"] == ["wbc"]
+
+    superseded = client.put(route, params=original_params, headers=auth_headers, json=metadata)
+    assert superseded.status_code == 409, superseded.text
+    latest = client.get(route, headers=auth_headers)
+    assert latest.status_code == 200, latest.text
+    assert report_with_normalized_version(latest.json()) == report_with_normalized_version(
+        bulk.json()["instance"]
+    )
+
+
+@pytest.mark.integration
 def test_instance_update_advances_token_monotonically(
     client,
     auth_headers,

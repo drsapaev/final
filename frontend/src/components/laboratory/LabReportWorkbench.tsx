@@ -61,12 +61,44 @@ export interface LabReportOperationContext {
   patientId: string | number | null;
 }
 
-interface PersistDraftResult {
-  instance: Record<string, unknown> | null;
-  accepted: boolean;
+interface DraftSaveScope {
+  instanceId: string | number;
+  patientId: unknown;
+  baseUpdatedAt: string | null;
+}
+
+interface DraftSaveAttempt extends DraftSaveScope {
+  submitted: ReportDraftSnapshot;
+  editSequence: number;
+  metadata: Record<string, unknown> | null;
+  values: Array<Record<string, unknown>>;
+  expectedUpdatedAt: string | null;
+  requestId: string;
+}
+
+interface PartialDraftCommit extends DraftSaveScope {
+  instance: Record<string, unknown>;
+  updatedAt: string;
+  signerSnapshot: Record<string, unknown>;
+  studyDate: string;
 }
 
 class StaleLabReportContextError extends Error {}
+
+function draftSaveScopeMatches(left: DraftSaveScope, right: DraftSaveScope) {
+  return String(left.instanceId) === String(right.instanceId)
+    && String(left.patientId ?? '') === String(right.patientId ?? '')
+    && left.baseUpdatedAt === right.baseUpdatedAt;
+}
+
+function newDraftRequestId() {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 function getRequestStatus(error: unknown) {
   return typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;
@@ -159,13 +191,8 @@ export default function LabReportWorkbench({
   const confirm = confirmRaw;
   // ADR-0015: lab reporting API accessed via hook.
   const labReportingApi = useLabReporting();
-  const partialDraftCommitRef = useRef<{
-    instanceId: string | number;
-    baseUpdatedAt: string | null;
-    updatedAt: string;
-    signerSnapshot: Record<string, unknown>;
-    studyDate: string;
-  } | null>(null);
+  const partialDraftCommitRef = useRef<PartialDraftCommit | null>(null);
+  const pendingDraftSaveRef = useRef<DraftSaveAttempt | null>(null);
   const draftSaveInFlightRef = useRef(false);
   const editSequenceRef = useRef(0);
   const visibleReportRef = useRef(activeInstance);
@@ -348,20 +375,12 @@ export default function LabReportWorkbench({
     };
   }, [onOperationPendingChange, reportBlocksContextTransition, reportBlocksDocumentLeave]);
 
-  useEffect(() => {
-    const partial = partialDraftCommitRef.current;
-    if (!partial) return;
-    const activeId = activeInstance?.id as string | number | null | undefined;
-    const activeUpdatedAt = activeInstance?.updated_at == null
-      ? null
-      : String(activeInstance.updated_at);
-    if (
-      String(activeId ?? '') !== String(partial.instanceId)
-      || activeUpdatedAt !== partial.baseUpdatedAt
-    ) {
+  useLayoutEffect(() => {
+    return () => {
+      pendingDraftSaveRef.current = null;
       partialDraftCommitRef.current = null;
-    }
-  }, [activeInstance?.id, activeInstance?.updated_at]);
+    };
+  }, [activeInstance?.id, activeInstance?.patient_id, activeInstance?.updated_at]);
 
   useLayoutEffect(() => {
     conflictAttemptRef.current += 1;
@@ -577,31 +596,15 @@ export default function LabReportWorkbench({
     return String(visibleReportRef.current?.id ?? '') === String(id) && isOperationCurrent(operation);
   }
 
-  async function persistDraft(
-    operation: LabReportOperationContext,
+  function buildDraftAttempt(
+    instance: Record<string, unknown>,
+    scope: DraftSaveScope,
+    partial: PartialDraftCommit | null,
     submitted: ReportDraftSnapshot,
-  ): Promise<PersistDraftResult> {
-    if (!activeInstance) {
-      return { instance: null, accepted: false };
-    }
-    const expectedInstanceId = activeInstance.id as string | number;
-    // WF-06 fix: передаём updated_at для optimistic locking.
-    // Если backend обнаружит, что бланк был изменён другим пользователем
-    // после этого timestamp — вернёт 409, persistDraft выбросит exception.
-    const activeUpdatedAt = initialValuesRef.current.updatedAt;
-    const cachedPartial = partialDraftCommitRef.current;
-    const reusablePartial = cachedPartial
-      && String(cachedPartial.instanceId) === String(expectedInstanceId)
-      && cachedPartial.baseUpdatedAt === activeUpdatedAt
-      ? cachedPartial
-      : null;
-    if (!reusablePartial && cachedPartial) {
-      partialDraftCommitRef.current = null;
-    }
-    let expectedUpdatedAt = reusablePartial?.updatedAt ?? activeUpdatedAt;
-
-    const payload: Array<Record<string, unknown>> = [];
-    (activeInstance.sections as Array<Record<string, unknown>>).forEach((section: Record<string, unknown>) => {
+    editSequence: number,
+  ): DraftSaveAttempt {
+    const values: Array<Record<string, unknown>> = [];
+    (instance.sections as Array<Record<string, unknown>>).forEach((section: Record<string, unknown>) => {
       ((section.fields as Array<Record<string, unknown>>) || []).forEach((field: Record<string, unknown>) => {
         const fieldKey = String(field.field_key);
         const currentValue = submitted.values[fieldKey];
@@ -610,7 +613,7 @@ export default function LabReportWorkbench({
         }
         const absenceReason = String(submitted.values[`${fieldKey}__absence_reason`] ?? '').trim();
         const unchanged = !hasDraftDifference(currentValue, initialValuesRef.current.values[fieldKey]);
-        payload.push({
+        values.push({
           field_key: field.field_key,
           value_text: absenceReason || currentValue === '' ? null : String(currentValue),
           ...(absenceReason ? { result_kind: 'absent', absence_reason: absenceReason } : {}),
@@ -623,67 +626,90 @@ export default function LabReportWorkbench({
       });
     });
 
-    let latestInstance: Record<string, unknown> | null = reusablePartial
-      ? {
-        ...activeInstance,
-        updated_at: reusablePartial.updatedAt,
-        signer_snapshot: reusablePartial.signerSnapshot,
-      }
-      : activeInstance;
-    const persistedSignerSnapshot = reusablePartial?.signerSnapshot ?? initialValuesRef.current.signer;
-    const persistedStudyDate = reusablePartial?.studyDate ?? initialValuesRef.current.studyDate;
+    const persistedSignerSnapshot = partial?.signerSnapshot ?? initialValuesRef.current.signer;
+    const persistedStudyDate = partial?.studyDate ?? initialValuesRef.current.studyDate;
     const instanceChanges: Record<string, unknown> = {};
     if (JSON.stringify(persistedSignerSnapshot) !== JSON.stringify(submitted.signer)) {
       instanceChanges.signer_snapshot = submitted.signer;
     }
     if (persistedStudyDate !== submitted.studyDate) instanceChanges.study_date = submitted.studyDate || null;
-    if (Object.keys(instanceChanges).length > 0) {
-      latestInstance = await labReportingApi.updateInstance(
-        expectedInstanceId, instanceChanges, expectedUpdatedAt,
-      ) as Record<string, unknown>;
-      // PR3: signer-запрос продвинул updated_at — последующий bulk-запрос
-      // обязан использовать token из ответа первого запроса, иначе получит
-      // 409 от собственного сохранения.
-      const signerUpdatedAt = latestInstance?.updated_at as string | undefined;
-      if (signerUpdatedAt) {
-        expectedUpdatedAt = signerUpdatedAt;
-        partialDraftCommitRef.current = {
-          instanceId: expectedInstanceId,
-          baseUpdatedAt: reusablePartial?.baseUpdatedAt ?? activeUpdatedAt,
-          updatedAt: signerUpdatedAt,
-          signerSnapshot: { ...submitted.signer },
-          studyDate: submitted.studyDate,
-        };
-      }
-      if (!isCurrentReport(expectedInstanceId, operation)) throw new StaleLabReportContextError();
-    }
-    if (payload.length > 0) {
-      const response = (await labReportingApi.bulkSaveValues(activeInstance.id as string | number, payload, expectedUpdatedAt)) as Record<string, unknown>;
-      latestInstance = response.instance as Record<string, unknown>;
-      // The server commit is authoritative even if navigation changed while
-      // the request was in flight. Cache its advanced token before rejecting
-      // stale UI work so a failed target transition can safely retry the still
-      // visible report instead of conflicting with our own completed write.
-      const committedUpdatedAt = latestInstance?.updated_at as string | undefined;
-      if (committedUpdatedAt) {
-        partialDraftCommitRef.current = {
-          instanceId: expectedInstanceId,
-          baseUpdatedAt: reusablePartial?.baseUpdatedAt ?? activeUpdatedAt,
-          updatedAt: committedUpdatedAt,
-          signerSnapshot: { ...submitted.signer },
-          studyDate: submitted.studyDate,
-        };
-      }
-      if (!isCurrentReport(expectedInstanceId, operation)) throw new StaleLabReportContextError();
-    }
-    if (!latestInstance || !isCurrentReport(expectedInstanceId, operation)
-      || String(latestInstance.id) !== String(expectedInstanceId)) {
-      throw new StaleLabReportContextError();
-    }
     return {
-      instance: latestInstance,
-      accepted: true,
+      ...scope,
+      submitted,
+      editSequence,
+      metadata: Object.keys(instanceChanges).length > 0 ? instanceChanges : null,
+      values,
+      expectedUpdatedAt: partial?.updatedAt ?? scope.baseUpdatedAt,
+      requestId: newDraftRequestId(),
     };
+  }
+
+  async function persistDraft(
+    instance: Record<string, unknown>,
+    operation: LabReportOperationContext,
+    submitted: ReportDraftSnapshot,
+    editSequence: number,
+  ) {
+    const scope = {
+      instanceId: instance.id as string | number,
+      patientId: instance.patient_id,
+      baseUpdatedAt: initialValuesRef.current.updatedAt,
+    };
+    const { instanceId } = scope;
+    const cachedPartial = partialDraftCommitRef.current;
+    const partial = cachedPartial && draftSaveScopeMatches(cachedPartial, scope) ? cachedPartial : null;
+    const pending = pendingDraftSaveRef.current;
+    let attempt = pending && draftSaveScopeMatches(pending, scope)
+      ? pending
+      : buildDraftAttempt(instance, scope, partial, submitted, editSequence);
+    let latest = partial?.instance ?? instance;
+
+    // Metadata comes first. An ambiguous result keeps the exact request and
+    // its submitted values in memory until the operator retries or discards.
+    while (attempt.metadata || attempt.values.length) {
+      const { metadata, values, expectedUpdatedAt, requestId } = attempt;
+      pendingDraftSaveRef.current = attempt;
+      let updatedAt: string;
+      try {
+        const response = metadata
+          ? await labReportingApi.updateInstance(instanceId, metadata, expectedUpdatedAt, requestId)
+          : await labReportingApi.bulkSaveValues(instanceId, values, expectedUpdatedAt, requestId);
+        const saved = (
+          metadata ? response : (response as { instance?: unknown } | null)?.instance
+        ) as Record<string, unknown> | null;
+        if (!saved || String(saved.id) !== String(instanceId)
+          || String(saved.patient_id ?? '') !== String(scope.patientId ?? '')
+          || typeof saved.updated_at !== 'string' || !saved.updated_at
+          || !Array.isArray(saved.sections)) {
+          throw new TypeError('Invalid draft save response');
+        }
+        latest = saved;
+        updatedAt = saved.updated_at;
+      } catch (error) {
+        const status = getRequestStatus(error);
+        const rejected = isSaveConflict(error) || (typeof status === 'number'
+          && status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429);
+        if (rejected && pendingDraftSaveRef.current === attempt) pendingDraftSaveRef.current = null;
+        throw error;
+      }
+
+      if (pendingDraftSaveRef.current !== attempt) throw new StaleLabReportContextError();
+      pendingDraftSaveRef.current = null;
+      // An acknowledged response can supply the next token if a target
+      // transition failed and the same report is still visible.
+      partialDraftCommitRef.current = {
+        ...scope,
+        instance: latest,
+        updatedAt,
+        signerSnapshot: attempt.submitted.signer,
+        studyDate: attempt.submitted.studyDate,
+      };
+      if (!isCurrentReport(instanceId, operation)) throw new StaleLabReportContextError();
+      if (!metadata || !values.length) break;
+      attempt = { ...attempt, metadata: null, expectedUpdatedAt: updatedAt, requestId: newDraftRequestId() };
+    }
+    if (!isCurrentReport(instanceId, operation)) throw new StaleLabReportContextError();
+    return { latest, submitted: attempt.submitted, editSequence: attempt.editSequence };
   }
 
   // PR3: ядро сохранения — бросает исключение при неудаче, чтобы autosave
@@ -702,10 +728,11 @@ export default function LabReportWorkbench({
     setSaving(true);
     setBusyAction('save');
     try {
-      const { instance: latest, accepted } = await persistDraft(operation, submitted);
-      if (!accepted || !latest) return false;
+      const saved = await persistDraft(activeInstance, operation, submitted, editSequence);
+      const { latest } = saved;
       if (onInstanceChange?.(latest, { kind: 'update', expectedInstanceId, operation }) === false) return false;
-      reconcileReportDraft(latest as unknown as LabReportInstance, submitted, true);
+      reconcileReportDraft(latest as unknown as LabReportInstance, saved.submitted, true);
+      partialDraftCommitRef.current = null;
       const timestamp = typeof latest.updated_at === 'string' ? Date.parse(latest.updated_at) : NaN;
       setLastSavedAt(Number.isFinite(timestamp) ? new Date(timestamp) : new Date());
       setConflictReport(null);
@@ -713,7 +740,8 @@ export default function LabReportWorkbench({
       // acknowledged write pending or convert it to a failed save.
       void Promise.resolve().then(() => onRefreshHistory?.(activeInstance.patient_id as string | number)).catch(() => {});
       if (!isCurrentReport(expectedInstanceId, operation)) return false;
-      if (mode !== 'auto') {
+      const allEditsSaved = editSequenceRef.current === saved.editSequence;
+      if (mode !== 'auto' && allEditsSaved) {
         if (previousStatus === 'DRAFT' && latest.status === 'IN_PROGRESS') {
           notify?.('info', t('success.draft_saved_in_progress'));
         } else {
@@ -722,7 +750,7 @@ export default function LabReportWorkbench({
       }
       // A navigation save covers only the submitted snapshot. Do not proceed
       // if a newer local edit arrived before the guard could leave the report.
-      return mode !== 'leave' || editSequenceRef.current === editSequence;
+      return mode !== 'leave' || allEditsSaved;
     } catch (error) {
       if (!isCurrentReport(expectedInstanceId, operation)) {
         throw new StaleLabReportContextError();
@@ -798,6 +826,7 @@ export default function LabReportWorkbench({
     }) !== false;
     if (!accepted || !isCurrentReport(expectedInstanceId, operation)) return;
     reconcileReportDraft(conflictReport, keepLocal ? initialValuesRef.current : undefined);
+    pendingDraftSaveRef.current = null;
     partialDraftCommitRef.current = null;
     setLastSavedAt(null);
     setSaveFailure(null);
@@ -853,6 +882,8 @@ export default function LabReportWorkbench({
       // не будет закоммичен autosave от старого контекста.
       discard: () => {
         const baseline = initialValuesRef.current;
+        pendingDraftSaveRef.current = null;
+        partialDraftCommitRef.current = null;
         setDraftValues({ ...baseline.values });
         setSignerSnapshot({ ...baseline.signer });
         setStudyDate(baseline.studyDate);

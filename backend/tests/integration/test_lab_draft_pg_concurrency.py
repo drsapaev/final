@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
@@ -20,6 +20,10 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
+from app.api.v1.endpoints.lab_reporting import (
+    bulk_save_lab_report_values,
+    update_lab_report_instance,
+)
 from app.db.base_class import Base
 from app.models.lab import (
     LabReportFieldDef,
@@ -29,8 +33,11 @@ from app.models.lab import (
     LabReportTemplateVersion,
     LabReportValue,
 )
+from app.models.lab_release import LabDraftMutationReceipt
 from app.models.patient import Patient
+from app.models.user import User
 from app.repositories.lab_reporting_api_repository import LabReportingApiRepository
+from app.schemas.lab_reporting import LabReportInstanceUpdate, LabReportValueIn
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
@@ -135,6 +142,81 @@ def lab_instance_version(lab_lock_engine):
         version.published_at = datetime(2026, 9, 20, 9, 0, tzinfo=UTC)
         session.commit()
         return instance.id, instance.updated_at
+
+
+class _DisconnectedAfterCommit(Session):
+    def commit(self) -> None:
+        super().commit()
+        raise OSError("synthetic disconnect after PostgreSQL commit")
+
+
+@pytest.mark.parametrize("operation", ["metadata", "values"])
+def test_committed_draft_write_with_lost_response_replays_across_sessions(
+    lab_lock_engine,
+    lab_instance_version,
+    operation,
+):
+    instance_id, original = lab_instance_version
+    request_id = uuid4()
+    with Session(lab_lock_engine) as setup:
+        actor = User(
+            username=f"synthetic_lab_replay_{uuid4().hex[:8]}",
+            full_name="SYNTHETIC Lab Staff",
+            hashed_password="synthetic-unused",
+            role="Lab",
+        )
+        setup.add(actor)
+        setup.flush()
+        actor_id = actor.id
+        setup.commit()
+
+    def send(session: Session):
+        args = {
+            "instance_id": instance_id,
+            "expected_updated_at": original.isoformat(),
+            "draft_request_id": request_id,
+            "db": session,
+            "user": session.get(User, actor_id),
+        }
+        if operation == "metadata":
+            return update_lab_report_instance(
+                payload=LabReportInstanceUpdate(study_date=date(2026, 9, 21)), **args,
+            )
+        return bulk_save_lab_report_values(
+            payload=[LabReportValueIn(field_key="wbc", value_text="5.2")], **args,
+        )
+
+    # Keep the first connection checked out so the retry must use a different
+    # PostgreSQL backend, even when the process connection pool is warm.
+    with lab_lock_engine.connect() as first_connection:
+        with _DisconnectedAfterCommit(first_connection) as disconnected:
+            first_pid = disconnected.scalar(text("SELECT pg_backend_pid()"))
+            with pytest.raises(OSError, match="after PostgreSQL commit"):
+                send(disconnected)
+
+        with Session(lab_lock_engine) as retry:
+            assert retry.scalar(text("SELECT pg_backend_pid()")) != first_pid
+            receipt = retry.get(
+                LabDraftMutationReceipt, (instance_id, actor_id, operation, request_id),
+            )
+            assert receipt is not None
+            assert len(receipt.request_digest) == 64
+            applied_version = receipt.applied_version
+            assert applied_version > original
+            replay = send(retry)
+            if operation == "metadata":
+                assert replay.updated_at == applied_version
+                assert replay.patient_snapshot["study_date"] == "2026-09-21"
+            else:
+                assert replay.instance.updated_at == applied_version
+                assert replay.updated_field_keys == ["wbc"]
+                assert [event.kind for event in replay.instance.workflow_events] == ["entered"]
+
+    with Session(lab_lock_engine) as verification:
+        stored = verification.get(LabReportInstance, instance_id)
+        assert stored is not None and stored.updated_at == applied_version
+        if operation == "values":
+            assert [(value.field_key, value.value_text) for value in stored.values] == [("wbc", "5.2")]
 
 
 def _wait_for_blocker(engine, pid: int, finished: threading.Event) -> bool:

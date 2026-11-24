@@ -918,7 +918,8 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(mockedApi.updateInstance).toHaveBeenCalledWith(
       77,
       { signer_snapshot: expect.objectContaining({ lab_technician_name: 'Иванов И.И.' }) },
-      '2026-09-13T08:00:00.123456+00:00'
+      '2026-09-13T08:00:00.123456+00:00',
+      expect.any(String),
     );
     expect(ownBulkCall[2]).toBe(signerResponseUpdated);
   });
@@ -974,7 +975,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(mockedApi.updateInstance).toHaveBeenCalledTimes(1);
     expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(2);
     expect(mockedApi.bulkSaveValues.mock.calls[0][2]).toBe(signerUpdatedAt);
-    expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe(signerUpdatedAt);
+    expect(mockedApi.bulkSaveValues.mock.calls[1]).toEqual(mockedApi.bulkSaveValues.mock.calls[0]);
     expect(
       (mockedApi.bulkSaveValues.mock.calls[1][1] as Array<Record<string, unknown>>)
         .find((item) => item.field_key === 'wbc')?.value_text,
@@ -983,6 +984,84 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       expect.objectContaining({ updated_at: acceptedUpdatedAt }),
       expect.objectContaining({ kind: 'update', expectedInstanceId: 77 }),
     );
+  });
+
+  it('replays a metadata write after losing its response and uses the confirmed token for values', async () => {
+    const signerUpdatedAt = '2026-09-13T08:00:05.654321+00:00';
+    const committed = {
+      ...reopenedDraftInstance,
+      updated_at: signerUpdatedAt,
+      signer_snapshot: { lab_technician_name: 'SYNTHETIC-SIGNER' },
+    };
+    mockedApi.updateInstance.mockReset()
+      .mockRejectedValueOnce(new TypeError('Response lost after commit'))
+      .mockResolvedValueOnce(committed);
+    mockedApi.bulkSaveValues.mockReset().mockResolvedValueOnce({
+      instance: { ...committed, updated_at: '2026-09-13T08:00:06.654321+00:00' },
+    });
+
+    renderWithActiveInstance();
+    fireEvent.change(screen.getByLabelText('ФИО лаборанта'), { target: { value: 'SYNTHETIC-SIGNER' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    const retry = await screen.findByRole('button', { name: /повторить/i });
+    expect(mockedApi.bulkSaveValues).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
+    const [metadataWrite, metadataRetry] = mockedApi.updateInstance.mock.calls;
+    const valuesWrite = mockedApi.bulkSaveValues.mock.calls[0];
+    expect(metadataRetry).toEqual(metadataWrite);
+    expect(metadataWrite[3]).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/);
+    expect(valuesWrite[2]).toBe(signerUpdatedAt);
+    expect(valuesWrite[3]).not.toBe(metadataWrite[3]);
+  });
+
+  it('reconciles a lost values response without overwriting newer edits or allowing navigation', async () => {
+    const firstUpdatedAt = '2026-09-13T08:00:12.123456+00:00';
+    const secondUpdatedAt = '2026-09-13T08:00:13.123456+00:00';
+    const notify = vi.fn();
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => vi.fn(),
+    );
+    const reportVersion = (value: string, updatedAt: string) => ({
+      ...reopenedDraftInstance,
+      updated_at: updatedAt,
+      sections: reopenedDraftInstance.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => field.field_key === 'wbc' ? { ...field, value_text: value } : field),
+      })),
+    });
+    mockedApi.bulkSaveValues.mockReset()
+      .mockRejectedValueOnce(new TypeError('Response lost after commit'))
+      .mockResolvedValueOnce({ instance: reportVersion('6.1', firstUpdatedAt) })
+      .mockResolvedValueOnce({ instance: reportVersion('6.2', secondUpdatedAt) });
+
+    renderWithActiveInstance({ registerDirtySource, notify });
+    const input = screen.getByLabelText('Результат: Лейкоциты');
+    fireEvent.change(input, { target: { value: '6.1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await screen.findByRole('button', { name: /повторить/i });
+    fireEvent.change(input, { target: { value: '6.2' } });
+
+    const source = registerDirtySource.mock.calls[0][0];
+    await act(async () => {
+      await expect(source.save()).rejects.toBeInstanceOf(Error);
+    });
+    const [valuesWrite, valuesRetry] = mockedApi.bulkSaveValues.mock.calls;
+    expect(valuesRetry).toEqual(valuesWrite);
+    expect(input).toHaveValue('6.2');
+    expect(source.isDirty()).toBe(true);
+    expect(screen.getByRole('status')).toHaveTextContent(/несохранённые изменения/i);
+    expect(notify).not.toHaveBeenCalledWith('success', expect.any(String));
+
+    await act(async () => { await source.save(); });
+    const nextWrite = mockedApi.bulkSaveValues.mock.calls[2];
+    expect(nextWrite[1]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field_key: 'wbc', value_text: '6.2' }),
+    ]));
+    expect(nextWrite[2]).toBe(firstUpdatedAt);
+    expect(nextWrite[3]).not.toBe(valuesWrite[3]);
+    expect(source.isDirty()).toBe(false);
   });
 
   it('clears a partial signer commit after the active instance changes', async () => {

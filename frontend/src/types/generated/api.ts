@@ -81557,6 +81557,8 @@ export interface operations {
         parameters: {
             query?: {
                 expected_updated_at?: string | null;
+                /** @description UUID for retrying the same draft save. */
+                draft_request_id?: string | null;
             };
             header?: never;
             path: {
@@ -81594,6 +81596,8 @@ export interface operations {
         parameters: {
             query?: {
                 expected_updated_at?: string | null;
+                /** @description UUID for retrying the same draft save. */
+                draft_request_id?: string | null;
             };
             header?: never;
             path: {

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -17,6 +19,7 @@ from app.models.lab import (
     LabReportTemplateVersion,
     LabTemplateServiceBinding,
 )
+from app.models.lab_release import LabDraftMutationReceipt
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.setting import Setting
@@ -323,7 +326,9 @@ class LabReportingApiRepository:
             ))
         return self.db.execute(stmt).scalars().unique().all()
 
-    def get_instance(self, instance_id: int) -> LabReportInstance | None:
+    def get_instance(
+        self, instance_id: int, *, populate_existing: bool = False,
+    ) -> LabReportInstance | None:
         stmt = (
             select(LabReportInstance)
             .where(LabReportInstance.id == instance_id)
@@ -334,6 +339,7 @@ class LabReportingApiRepository:
                 .joinedload(LabReportSection.fields),
                 joinedload(LabReportInstance.values),
             )
+            .execution_options(populate_existing=populate_existing)
         )
         return self.db.execute(stmt).scalars().unique().first()
 
@@ -370,6 +376,16 @@ class LabReportingApiRepository:
         self.db.add(instance)
         self.db.flush()
         return instance
+
+    def get_draft_mutation_receipt(
+        self, instance_id: int, actor_user_id: int, operation: str, request_id: UUID,
+    ) -> LabDraftMutationReceipt | None:
+        return self.db.get(
+            LabDraftMutationReceipt, (instance_id, actor_user_id, operation, request_id),
+        )
+
+    def add_draft_mutation_receipt(self, receipt: LabDraftMutationReceipt) -> None:
+        self.db.add(receipt)
 
     def get_patient(self, patient_id: int) -> Patient | None:
         return self.db.get(Patient, patient_id)

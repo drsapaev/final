@@ -4,11 +4,16 @@ Split from lab_reporting_service.py.
 """
 from __future__ import annotations
 
-from datetime import timedelta
+import hmac
+import json
+from datetime import date, timedelta
+from typing import Literal
+from uuid import UUID
 
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.models.lab_release import LabDraftMutationReceipt
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
 
@@ -164,19 +169,24 @@ class InstancesMixin(LabReportingServiceMixinBase):
 
     def update_instance(
         self, instance_id: int, payload: dict[str, Any], expected_updated_at: str | None = None,
-        *, actor_user_id: int | None = None,
+        *, actor_user_id: int | None = None, commit: bool = True,
+        draft_request_id: UUID | None = None,
     ) -> LabReportInstance:
         logger.info("[LAB] update_instance instance_id=%s", instance_id)
         instance = self._get_locked_instance(instance_id)
         self._assert_instance_mutable_draft(instance)
         actor = (
             self._workflow_actor(actor_user_id)
-            if instance.managed_release or actor_user_id is not None
+            if instance.managed_release or actor_user_id is not None or draft_request_id is not None
             else None
         )
-        if instance.managed_release:
-            self._workflow_expected_version(expected_updated_at)
-        self._assert_not_concurrently_modified(instance, expected_updated_at)
+        receipt, replay = self._prepare_draft_write(
+            instance, actor, "metadata", draft_request_id, expected_updated_at, payload,
+        )
+        if replay:
+            if commit:
+                self.repository.commit()
+            return instance
         changed = False
         edited_metadata = False
         if "signer_snapshot" in payload and payload["signer_snapshot"] is not None:
@@ -201,6 +211,12 @@ class InstancesMixin(LabReportingServiceMixinBase):
             self._advance_instance_version(instance)
         if edited_metadata and actor is not None:
             self._record_report_draft_edit(instance, actor)
+        if receipt is not None:
+            receipt.applied_version = instance.updated_at
+            self.repository.add_draft_mutation_receipt(receipt)
+        if not commit:
+            self._flush_draft_response(instance, refresh=receipt is not None)
+            return instance
         self.repository.commit()
         return self.get_instance(instance.id)
 
@@ -210,6 +226,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
         expected_updated_at: str | None = None,
         *, actor_user_id: int | None = None, commit: bool = True,
         source_specimen_id: int | None = None,
+        draft_request_id: UUID | None = None,
     ) -> tuple[LabReportInstance, list[LabReportValue]]:
         logger.info(
             "[LAB] bulk_upsert_values instance_id=%s items=%s",
@@ -220,14 +237,21 @@ class InstancesMixin(LabReportingServiceMixinBase):
         self._assert_instance_mutable_draft(instance)
         actor = (
             self._workflow_actor(actor_user_id)
-            if instance.managed_release or actor_user_id is not None
+            if instance.managed_release or actor_user_id is not None or draft_request_id is not None
             else None
         )
-        if instance.managed_release:
-            self._workflow_expected_version(expected_updated_at)
-        self._assert_not_concurrently_modified(instance, expected_updated_at)
-        field_map = self._field_map(instance.template_version)
+        receipt, replay = self._prepare_draft_write(
+            instance, actor, "values", draft_request_id, expected_updated_at,
+            {"values": values_payload, "source_specimen_id": source_specimen_id},
+        )
         existing_by_key = {value.field_key: value for value in instance.values}
+        if replay:
+            updated = [existing_by_key[item["field_key"]] for item in values_payload]
+            if commit:
+                self.repository.commit()
+            return instance, updated
+
+        field_map = self._field_map(instance.template_version)
         normalized_by_key = {}
         for item in values_payload:
             field_key = item["field_key"]
@@ -300,11 +324,68 @@ class InstancesMixin(LabReportingServiceMixinBase):
                 self._append_workflow_event(instance, kind="entered", actor=actor)
             elif edited_draft:
                 self._record_report_draft_edit(instance, actor)
+        if receipt is not None:
+            receipt.applied_version = instance.updated_at
+            self.repository.add_draft_mutation_receipt(receipt)
         if not commit:
-            self.repository.flush()
+            self._flush_draft_response(instance, refresh=receipt is not None)
             return instance, updated_values
         self.repository.commit()
         return self.get_instance(instance.id), updated_values
+
+    def _flush_draft_response(self, instance: LabReportInstance, *, refresh: bool) -> None:
+        self.repository.flush()
+        if refresh:
+            # Reload this identity-map instance under the existing report lock.
+            # The DTO must use database values, including stored decimal scale.
+            self.repository.get_instance(instance.id, populate_existing=True)
+
+    def _prepare_draft_write(
+        self,
+        instance: LabReportInstance,
+        actor: User | None,
+        operation: Literal["metadata", "values"],
+        request_id: UUID | None,
+        expected_updated_at: str | None,
+        payload: dict[str, Any],
+    ) -> tuple[LabDraftMutationReceipt | None, bool]:
+        """Resolve a retry while holding the lock that protects the draft version."""
+        if instance.managed_release or request_id is not None:
+            self._workflow_expected_version(expected_updated_at)
+        if request_id is None:
+            self._assert_not_concurrently_modified(instance, expected_updated_at)
+            return None, False
+        if actor is None:
+            raise LabReportingDomainError(403, "Laboratory workflow access denied")
+
+        # Bind even the original version spelling and bulk item order. Store a
+        # keyed digest so low-entropy clinical inputs cannot be guessed from it.
+        encoded = json.dumps(
+            [instance.id, actor.id, operation, str(request_id), expected_updated_at, payload],
+            sort_keys=True, separators=(",", ":"), default=date.isoformat,
+        ).encode()
+        digest = hmac.new(
+            settings.SECRET_KEY.encode(), b"lab-draft-receipt-v1\x00" + encoded, "sha256",
+        ).hexdigest()
+        previous = self.repository.get_draft_mutation_receipt(
+            instance.id, actor.id, operation, request_id,
+        )
+        if previous is not None:
+            if not hmac.compare_digest(digest, previous.request_digest):
+                raise LabReportingDomainError(409, "Draft request ID already bound to a different save")
+            # Never acknowledge an old operation with another writer's version.
+            self._assert_not_concurrently_modified(instance, previous.applied_version.isoformat())
+            return None, True
+
+        self._assert_not_concurrently_modified(instance, expected_updated_at)
+        return LabDraftMutationReceipt(
+            instance_id=instance.id,
+            actor_user_id=actor.id,
+            operation=operation,
+            request_id=request_id,
+            request_digest=digest,
+            applied_version=instance.updated_at,
+        ), False
 
     def _same_measurement(
         self, value: LabReportValue, normalized: dict[str, Any], field_def: LabReportFieldDef,

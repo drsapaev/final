@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import AwareDatetime
@@ -645,6 +646,7 @@ def update_lab_report_instance(
     payload: LabReportInstanceUpdate,
     # WF-06 fix: optimistic locking — frontend передаёт updated_at последнего чтения
     expected_updated_at: str | None = Query(default=None, alias="expected_updated_at"),
+    draft_request_id: UUID | None = Query(default=None, description="UUID for retrying the same draft save."),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
@@ -653,8 +655,13 @@ def update_lab_report_instance(
         instance = service.update_instance(
             instance_id, payload.model_dump(exclude_unset=True),
             expected_updated_at=expected_updated_at, actor_user_id=user.id,
+            draft_request_id=draft_request_id, commit=draft_request_id is None,
         )
-        return _instance_out(service, instance, user.id)
+        result = _instance_out(service, instance, user.id)
+        if draft_request_id is not None:
+            # Capture this write's own version while the draft lock still holds.
+            db.commit()
+        return result
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -665,6 +672,7 @@ def bulk_save_lab_report_values(
     payload: list[LabReportValueIn],
     # WF-06 fix: optimistic locking — frontend передаёт updated_at последнего чтения
     expected_updated_at: str | None = Query(default=None, alias="expected_updated_at"),
+    draft_request_id: UUID | None = Query(default=None, description="UUID for retrying the same draft save."),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
@@ -675,11 +683,15 @@ def bulk_save_lab_report_values(
             [item.model_dump(mode="json") for item in payload],
             expected_updated_at=expected_updated_at,
             actor_user_id=user.id,
+            draft_request_id=draft_request_id, commit=draft_request_id is None,
         )
-        return LabReportBulkSaveResponse(
+        result = LabReportBulkSaveResponse(
             instance=_instance_out(service, instance, user.id),
             updated_field_keys=[item.field_key for item in updated],
         )
+        if draft_request_id is not None:
+            db.commit()
+        return result
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 

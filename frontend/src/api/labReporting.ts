@@ -6,6 +6,14 @@ import type { LabWorklistPage, LabWorklistQuery } from '../types/features/labWor
 const API_V1_BASE = getApiBaseUrl();
 const DRAFT_WRITE_TIMEOUT_MS = 25_000;
 
+function draftWriteSearch(expectedUpdatedAt: string | null, draftRequestId?: string) {
+  const search = new URLSearchParams();
+  if (expectedUpdatedAt) search.set('expected_updated_at', expectedUpdatedAt);
+  if (draftRequestId) search.set('draft_request_id', draftRequestId);
+  const query = search.toString();
+  return query ? `?${query}` : '';
+}
+
 /**
  * UX-AUDIT-FIX12: добавлена поддержка AbortSignal во все запросы.
  *
@@ -296,10 +304,13 @@ export const labReportingApi = {
   // WF-06 fix: expectedUpdatedAt — optimistic locking via updated_at.
   // Если backend обнаружит, что бланк был изменён после этого timestamp,
   // вернёт 409 Conflict. Frontend показывает dialog "обновите страницу".
-  updateInstance(instanceId: string | number, payload: Record<string, unknown>, expectedUpdatedAt: string | null = null) {
-    const search = expectedUpdatedAt
-      ? `?expected_updated_at=${encodeURIComponent(expectedUpdatedAt)}`
-      : '';
+  updateInstance(
+    instanceId: string | number,
+    payload: Record<string, unknown>,
+    expectedUpdatedAt: string | null = null,
+    draftRequestId?: string,
+  ) {
+    const search = draftWriteSearch(expectedUpdatedAt, draftRequestId);
     return request(`/lab/report-instances/${instanceId}${search}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -307,10 +318,13 @@ export const labReportingApi = {
     });
   },
 
-  bulkSaveValues(instanceId: string | number, payload: Array<Record<string, unknown>>, expectedUpdatedAt: string | null = null) {
-    const search = expectedUpdatedAt
-      ? `?expected_updated_at=${encodeURIComponent(expectedUpdatedAt)}`
-      : '';
+  bulkSaveValues(
+    instanceId: string | number,
+    payload: Array<Record<string, unknown>>,
+    expectedUpdatedAt: string | null = null,
+    draftRequestId?: string,
+  ) {
+    const search = draftWriteSearch(expectedUpdatedAt, draftRequestId);
     return request(`/lab/report-instances/${instanceId}/bulk-values${search}`, {
       method: 'POST',
       body: JSON.stringify(payload),
