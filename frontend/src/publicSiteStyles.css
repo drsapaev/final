@@ -517,6 +517,10 @@ html.public-site-document body {
   color: var(--mac-link-ink, rgb(0, 102, 214));
 }
 
+:where(html.public-site-document[data-theme="light"]) .public-site__footer a {
+  color: var(--mac-accent-blue-hover, #0051d5);
+}
+
 .public-site__footer-links {
   display: flex;
   flex-wrap: wrap;

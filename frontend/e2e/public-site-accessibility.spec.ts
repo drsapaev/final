@@ -560,6 +560,56 @@ async function solidContrastRatio(target: Locator, kind: 'text' | 'outline') {
 }
 
 test.describe('public-site accessibility', () => {
+  test('Vite public footer stays usable after the notification prompt delay', async ({ page, request }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.clock.install();
+    await page.addInitScript((origin) => {
+      if (location.origin !== origin) return;
+      localStorage.setItem('colorScheme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      Object.defineProperty(window, 'Notification', {
+        configurable: true,
+        value: class TestNotification {
+          static permission = 'default';
+          static requestPermission() {
+            throw new Error('Native notification permission is outside this test');
+          }
+        },
+      });
+    }, VITE_ORIGIN);
+    await installSyntheticApi(page, request);
+
+    const prompt = page.locator('.notification-prompt');
+    for (const [theme, color] of [['light', 'rgb(0, 81, 213)'], ['dark', 'rgb(90, 200, 250)']] as const) {
+      await page.emulateMedia({ colorScheme: theme, forcedColors: 'none', reducedMotion: 'reduce' });
+      for (const locale of LOCALES) {
+        await test.step(`${locale.lang} ${theme} footer`, async () => {
+          await page.goto(VITE_ORIGIN + locale.prefix + '/services');
+          await expect(page.getByRole('heading', { level: 1, name: SERVICE_TITLES[locale.lang], exact: true })).toBeVisible();
+          await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          await page.clock.runFor(6_000);
+          await expect(prompt).toHaveCount(0);
+
+          const footer = page.getByRole('contentinfo');
+          for (const path of [locale.prefix + '/contacts', '/login']) {
+            const link = footer.locator(`a[href="${path}"]`);
+            await expect(link).toHaveCSS('color', color);
+            await link.click({ trial: true });
+          }
+        });
+      }
+    }
+
+    await navigateInApp(page, '/login');
+    await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
+    await page.clock.runFor(6_000);
+    await expect(prompt).toBeVisible();
+
+    await navigateInApp(page, '/ru/services');
+    await expect(page.getByRole('heading', { level: 1, name: SERVICE_TITLES.ru, exact: true })).toBeVisible();
+    await expect(prompt).toHaveCount(0);
+  });
+
   test('Vite dark public navigation preserves hover and keyboard focus contrast', async ({ page, request }) => {
     test.setTimeout(60_000);
     await page.emulateMedia({ colorScheme: 'light', forcedColors: 'none' });
