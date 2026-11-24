@@ -1189,17 +1189,30 @@ def complete_patient_visit(
             # Flush it before refreshing under the lock, so populate_existing
             # cannot silently discard the staged move. Nothing is committed yet.
             db.flush()
-            appointment = (
-                db.query(Appointment)
-                .filter(
-                    Appointment.patient_id == queue_entry.patient_id,
-                    Appointment.appointment_date == (resolved_visit.visit_date or date.today()),
-                    Appointment.doctor_id == resolved_visit.doctor_id,
+            # DOCWORKLIST-neighbor hardening (2026-11-16, ported to the
+            # #4076 flow): Visit.visit_date IS nullable — a legacy dateless
+            # visit must NOT match the doctor's TODAY appointment via a
+            # host-day fallback: a false completion of an unrelated
+            # appointment is worse than skipping the sync with a warning.
+            if resolved_visit.visit_date is None:
+                logger.warning(
+                    "complete_patient_visit: visit %d has no visit_date "
+                    "— appointment sync skipped (no host-day fallback)",
+                    resolved_visit.id,
                 )
-                .with_for_update(of=Appointment)
-                .populate_existing()
-                .first()
-            )
+                appointment = None
+            else:
+                appointment = (
+                    db.query(Appointment)
+                    .filter(
+                        Appointment.patient_id == queue_entry.patient_id,
+                        Appointment.appointment_date == resolved_visit.visit_date,
+                        Appointment.doctor_id == resolved_visit.doctor_id,
+                    )
+                    .with_for_update(of=Appointment)
+                    .populate_existing()
+                    .first()
+                )
             if appointment is not None:
                 try:
                     _stage_locked_appointment_completion(appointment)
