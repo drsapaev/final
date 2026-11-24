@@ -18,9 +18,25 @@ interface VisitTimelineAppointment {
 }
 
 interface VisitTimelineRecord {
+  /** DERMATIMELINE-FE-001: canonical backend fields (snake_case, per
+   * backend/app/schemas/emr.py) — the parent feeds the raw status
+   * payload and normalizes its own state to `is_draft`. */
+  is_draft?: boolean | null;
+  saved_at?: string | null;
+  /** Legacy camelCase aliases, still accepted for older callers. */
   isDraft?: boolean;
   savedAt?: string;
 }
+
+/** DERMATIMELINE-FE-001: typed adapter at the component boundary — the
+ * draft state comes from explicit `=== true` comparisons of the
+ * canonical (or legacy alias) field, never from a truthiness fallback on
+ * a wrong-cased field, so a true draft is no longer rendered as
+ * completed. */
+const normalizeTimelineRecord = (record: VisitTimelineRecord | null | undefined) => ({
+  isDraft: record?.is_draft === true || record?.isDraft === true,
+  savedAt: record?.saved_at ?? record?.savedAt ?? undefined,
+});
 
 interface VisitTimelineProps {
   appointment?: VisitTimelineAppointment | null;
@@ -39,6 +55,10 @@ interface TimelineStep {
 
 const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
+  // DERMATIMELINE-FE-001: normalize both records once through the typed
+  // adapter before any status/next-step decision.
+  const emrState = normalizeTimelineRecord(emr);
+  const prescriptionState = normalizeTimelineRecord(prescription);
   const timelineSteps = [
     {
       id: 'appointment',
@@ -73,18 +93,16 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
       title: t('final.timeline_emr'),
       description: t('misc.vt_elektronnaya_meditsinskaya_k'),
       icon: FileText,
-      status: emr && !emr.isDraft ? 'completed' :
-              emr && emr.isDraft ? 'current' : 'pending',
-      completedAt: emr?.savedAt
+      status: emr ? (emrState.isDraft ? 'current' : 'completed') : 'pending',
+      completedAt: emrState.savedAt
     },
     {
       id: 'prescription',
       title: t('final.timeline_prescription'),
       description: t('misc.vt_naznachenie_preparatov'),
       icon: Pill,
-      status: prescription && !prescription.isDraft ? 'completed' :
-              prescription && prescription.isDraft ? 'current' : 'pending',
-      completedAt: prescription?.savedAt
+      status: prescription ? (prescriptionState.isDraft ? 'current' : 'completed') : 'pending',
+      completedAt: prescriptionState.savedAt
     }
   ];
 
@@ -203,9 +221,9 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
               t('misc.vt_ozhidaetsya_oplata_zapisi_dl')}
             {appointment?.status === APPOINTMENT_STATUS.PAID && 
               t('misc.vt_mozhno_nachat_priem_u_vracha')}
-            {appointment?.status === APPOINTMENT_STATUS.IN_VISIT && 
+            {appointment?.status === APPOINTMENT_STATUS.IN_VISIT &&
               (!emr ? t('misc.vt_sozdayte_emk_dlya_zapisi_pri') :
-               emr.isDraft ? t('misc.vt_sohranite_emk_dlya_zavershen') :
+               emrState.isDraft ? t('misc.vt_sohranite_emk_dlya_zavershen') :
                !prescription ? t('misc.vt_oformite_retsept_optsionalno') :
                t('misc.vt_priem_gotov_k_zaversheniyu'))}
           </div>
