@@ -9,9 +9,10 @@ on:
         options:
           - pr-4118-sessions
           - pr-4195-arq-reminder
+          - pr-4251-arq-reminder
         default: pr-4118-sessions
       source-sha:
-        description: Full current PR 4195 HEAD SHA for the ARQ acceptance only
+        description: Full reviewed PR HEAD SHA for the selected ARQ acceptance
         type: string
         required: false
 
@@ -30,7 +31,8 @@ jobs:
     with:
       source-sha: ${{ inputs.acceptance == 'pr-4118-sessions' && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
       native-live: ${{ inputs.acceptance == 'pr-4118-sessions' }}
-      native-arq: ${{ inputs.acceptance == 'pr-4195-arq-reminder' }}
+      native-arq: ${{ inputs.acceptance == 'pr-4195-arq-reminder' || inputs.acceptance == 'pr-4251-arq-reminder' }}
+      native-lab-arq: ${{ inputs.acceptance == 'pr-4251-arq-reminder' }}
     secrets:
       STAGING_TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
       STAGING_TELEGRAM_CHAT_ID: ${{ secrets.STAGING_TELEGRAM_CHAT_ID }}

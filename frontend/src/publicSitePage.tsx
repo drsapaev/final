@@ -7,6 +7,7 @@ import {
   type PublicSiteRouteMatch,
 } from './routing/publicSiteRouteEntries';
 import type { PublicSitePageData } from './publicSiteData';
+import { PublicSiteAnalytics } from './publicSiteAnalytics';
 import type {
   PublicSiteClinic,
   PublicSiteDoctor,
@@ -186,6 +187,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
 interface PublicSitePageProps {
   route: PublicSiteRouteMatch;
   data: PublicSitePageData;
+  analyticsEndpoint?: string;
 }
 
 interface PublicSiteRequestStateProps {
@@ -501,7 +503,7 @@ function CatalogFilter({ groups, groupLabel, searchLabel, locale, copy, children
   const groupId = `${fieldId}-group`;
   return (
     <>
-      <script async src="/public-site-catalog-filter.js" />
+      <script async src="/public-site-catalog-filter.js?v=2" />
       {createElement('public-site-catalog-filter', { className: 'public-site__catalog' }, (
         <>
           <search
@@ -536,8 +538,9 @@ function CatalogFilter({ groups, groupLabel, searchLabel, locale, copy, children
             <button className="public-site__button" type="button" data-catalog-reset="">
               {copy.catalogReset}
             </button>
-            <p className="public-site__catalog-status" role="status">
-              {copy.catalogCount} <span data-catalog-count="">{groups.length}</span>
+            <p className="public-site__catalog-status" role="status" aria-atomic="true"
+              data-catalog-result-label={copy.catalogCount}>
+              {`${copy.catalogCount} ${groups.length}`}
             </p>
           </search>
           {children}
@@ -679,6 +682,11 @@ export function PublicSitePage(props: PublicSitePageProps | PublicSiteRequestSta
   const data = 'data' in props ? props.data : undefined;
   const isError = 'status' in props && props.status === 'error';
   const copy = COPY[route.locale];
+  const analyticsEndpoint = 'data' in props
+    && (route.kind !== 'service' || props.data.service)
+    && (route.kind !== 'doctor' || props.data.doctor)
+    ? props.analyticsEndpoint
+    : undefined;
   return (
     <div className="public-site">
       <a className="public-site__skip-link" href="#main-content">{copy.skipToContent}</a>
@@ -710,6 +718,7 @@ export function PublicSitePage(props: PublicSitePageProps | PublicSiteRequestSta
         )}
       </main>
       <SiteFooter clinicName={data?.clinic?.name} locale={route.locale} copy={copy} />
+      <PublicSiteAnalytics endpoint={analyticsEndpoint} event="site_view" trackPhone />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { AxiosHeaders } from 'axios';
 import type { MouseEventHandler, PropsWithChildren } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
@@ -50,6 +51,8 @@ vi.mock('../../hooks/useEnhancedMediaQuery', () => ({ useBreakpoint: vi.fn() }))
 vi.mock('../../components/patient/PatientCabinetSummary', () => ({ default: () => <div>cabinet summary</div> }));
 vi.mock('../../components/patient/WebAuthnRegistration', () => ({ default: () => <div>passkey management</div> }));
 
+import { api } from '../../api/client';
+import type { components } from '../../types/api';
 import PublicBookingRequestsPanel from '../../components/patient/PublicBookingRequestsPanel';
 import PatientPanel from '../PatientPanel';
 
@@ -75,6 +78,36 @@ describe('patient panel public booking requests', () => {
     confirmAction.mockResolvedValue(true);
     withdrawRequest.mockResolvedValue({ ...pendingRequest, status: 'withdrawn', version: 3 });
     listRequests.mockResolvedValue([pendingRequest]);
+  });
+
+  it('shows appointment-history dates and preserves the stored time when present', async () => {
+    const appointments = [
+      { id: 1, appointment_date: '2026-10-30', appointment_time: '09:20', status: 'scheduled' },
+      { id: 2, appointment_date: '2026-10-31', appointment_time: null, status: 'scheduled' },
+    ] satisfies components['schemas']['AppointmentHistoryItem'][];
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: appointments,
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: { headers: new AxiosHeaders() },
+    });
+    listRequests.mockResolvedValueOnce([]);
+
+    render(<MemoryRouter initialEntries={['/patient']}><PatientPanel /></MemoryRouter>);
+
+    const scheduledLabels = await screen.findAllByText('misc.pp_zaplanirovan', { exact: true });
+    expect(scheduledLabels).toHaveLength(2);
+    expect(api.get).toHaveBeenCalledWith('/patients/appointments');
+
+    const timedRow = scheduledLabels[0].closest('.pp-home-list-item');
+    const dateOnlyRow = scheduledLabels[1].closest('.pp-home-list-item');
+    expect(timedRow).toBeVisible();
+    expect(timedRow).toHaveTextContent('30.10.2026 · 09:20');
+    expect(dateOnlyRow).toBeVisible();
+    expect(dateOnlyRow).toHaveTextContent('31.10.2026');
+    expect(dateOnlyRow).not.toHaveTextContent('·');
+    expect(dateOnlyRow).not.toHaveTextContent('09:20');
   });
 
   it('shows request status and refreshes the self-scoped list on demand', async () => {

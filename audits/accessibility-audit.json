@@ -527,5 +527,168 @@
       }
     ],
     "limits": "This verifies speech text and focus for the tested skip navigation. The Russian route and independent heading navigation remain open. The final repeat timed out during installation of the disposable container's packages. The owned containers were removed. Physical sound, pronunciation, Windows Narrator, native Safari, physical devices and full WCAG 2.2 AA conformance remain open."
+  },
+  "orca_bilingual_structural_navigation": {
+    "observed_from_utc": "2026-11-23T11:01:30Z",
+    "observed_to_utc": "2026-11-23T11:01:58Z",
+    "application_sha": "35b6cd9ddbff4d82eb9b05d081dcbd1722175f7a",
+    "browser": "Chrome for Testing 153.0.8010.12",
+    "assistive_technology": "Orca 46.1, Speech Dispatcher 0.12.0 RC2 and eSpeak NG 1.51 in disposable Ubuntu 24.04",
+    "method": "Use the built Nitro application and synthetic catalogue with a private Orca profile in a container with loopback networking only. With automatic page reading off, send native X11 Tab and Enter, verify DOM focus and correlate the resulting Orca text with Speech Dispatcher queue acknowledgments and the eSpeak module beginning synthesis. On a freshly opened page, press the native 1 key and verify the Orca command for the next level 1 heading and its utterance.",
+    "routes": [
+      {
+        "path": "/ru/services",
+        "language": "ru",
+        "tab_utterance": "Перейти к основному содержимому link.",
+        "enter_focus": "main#main-content",
+        "enter_utterance": "main content.",
+        "heading_utterance": "Услуги heading level 1.",
+        "queue_message_ids_in_action_order": [17, 19, 28]
+      },
+      {
+        "path": "/services",
+        "language": "uz-Latn",
+        "tab_utterance": "Asosiy mazmunga o‘tish link.",
+        "enter_focus": "main#main-content",
+        "enter_utterance": "main content.",
+        "heading_utterance": "Xizmatlar heading level 1.",
+        "queue_message_ids_in_action_order": [34, 36, 45]
+      }
+    ],
+    "limitations": "An independent English calibration page timed out waiting for Enter focus. The six reported utterances apply to the Russian and Uzbek fixture routes and were independently confirmed in their raw traces. Physical audio, pronunciation, other assistive technologies, native Safari, physical devices and full WCAG 2.2 AA remain open."
+  },
+  "native_chromium_page_zoom_follow_up": {
+    "observed_from_utc": "2026-11-23T11:07:43.490Z",
+    "observed_to_utc": "2026-11-23T11:07:56.055Z",
+    "application_sha": "35b6cd9ddbff4d82eb9b05d081dcbd1722175f7a",
+    "fixture": "Local Nitro build with the repository's synthetic catalogue, borrowed read-only and verified against its stamped service worker and runtime asset hashes.",
+    "browser": "Playwright Chromium 153, headless on Windows with a temporary profile",
+    "method": "Set native tab zoom through the Chromium extension API. On direct loads of seven representative page types per locale, compare document language, heading, text rectangle bounds and horizontal scroll at 100% and 400%. Tab to the skip link and press Enter to focus the main landmark at 400%. Exercise the compact menu, catalog filter, empty state and reset with the keyboard on both services pages.",
+    "viewport_css_px_at_100_and_400_percent": [[1280, 928], [320, 232]],
+    "device_pixel_ratio_at_100_and_400_percent": [1, 4],
+    "visual_viewport_scale_at_both_levels": 1,
+    "routes_http_200_without_horizontal_overflow_or_text_rect_outliers": 14,
+    "routes_first_tab_exposed_skip_and_enter_focused_main": 14,
+    "localized_catalog_keyboard_scenarios_passed": 2,
+    "painted_focus": {
+      "method": "Compare paired raw 1280 by 928 device-pixel screenshots at the same focus, scroll and geometry, with the outline temporarily suppressed in the reference capture.",
+      "control_locale_pairs": 14,
+      "min_changed_pixels_in_control_region": 10658,
+      "min_changed_pixels_with_reference_contrast_at_least_3_to_1": 6744
+    },
+    "limits": "Measures the sampled keyboard controls and representative synthetic routes in one Chromium configuration. Raster focus samples do not establish WCAG conformance. Native select popup, rendered glyph clipping across the full document, physical hardware and other native browsers remain open."
+  },
+  "orca_catalog_result_status": {
+    "baseline_sha": "d17976144d554ac5ddcccdd52812b43b33d34b2a",
+    "candidate_sha": "2f0176c24c98601cc296b462bf466275053cafae",
+    "browser": "Google Chrome for Testing 153.0.8010.12 (Playwright Chromium revision 1243)",
+    "assistive_technology": "Orca 46.1 (46.1-1ubuntu1), AT-SPI 2.52.0-1build1",
+    "synthesis": "Speech Dispatcher 0.12.0~rc2-2build3, speech-dispatcher-espeak-ng 0.12.0~rc2-2build3, eSpeak NG 1.51+dfsg-12build1",
+    "runtime": "Exact compiled Nitro with the repository's synthetic catalogue in an Ubuntu 24.04 container with loopback-only networking. The served service worker and versioned filter script matched the candidate hashes.",
+    "method": "Open and commit the native category popup using X11 keys. Search for a synthetic term with zero matches, then reset by keyboard. Check visible rows, focus, and the Speech Dispatcher start and end for the corresponding message ID.",
+    "native_keyboard": "Both popups opened. Enter committed the category, search kept focus while showing zero results, and reset restored four rows and returned focus to search.",
+    "baseline": {
+      "observed_from_utc": "2026-11-23T20:19:18.357Z",
+      "observed_to_utc": "2026-11-23T20:19:37.839521Z",
+      "ru_status_messages": [
+        "Найдено2",
+        "Найдено0",
+        "Найдено4"
+      ],
+      "uz_latn_status_messages": [
+        "Natijalar2",
+        "Natijalar0",
+        "Natijalar4"
+      ],
+      "finding": "All six announcements joined the label and number without a word boundary."
+    },
+    "candidate_routes": [
+      {
+        "path": "/ru/services",
+        "language": "ru",
+        "observed_from_utc": "2026-11-23T20:29:54.628Z",
+        "observed_to_utc": "2026-11-23T20:30:12.221732Z",
+        "announced_messages": [
+          "Найдено 2",
+          "Найдено 0",
+          "Найдено 4"
+        ],
+        "dispatcher_completed_message_ids": [
+          50,
+          55,
+          63
+        ]
+      },
+      {
+        "path": "/services",
+        "language": "uz-Latn",
+        "observed_from_utc": "2026-11-23T20:33:56.854Z",
+        "observed_to_utc": "2026-11-23T20:34:13.811737Z",
+        "announced_messages": [
+          "Natijalar 2",
+          "Natijalar 0",
+          "Natijalar 4"
+        ],
+        "dispatcher_completed_message_ids": [
+          42,
+          47,
+          58
+        ]
+      }
+    ],
+    "candidate_dom": "The same status region contained one complete text node with aria-atomic=true in all six observed updates.",
+    "windows_checks": "On the baseline exact build, headless Windows Chrome 157 verified keyboard interaction and passed eight scoped Axe scans for four states in both languages. The candidate passed both dedicated Vite and Nitro catalogue Playwright tests at 320 and 1440 CSS px, including the unenhanced-catalogue fallback.",
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html"
+    ],
+    "limits": "Candidate locales used separate Chromium and Orca sessions. The protocol confirms the phrases progressed through synthesis. Physical listening, pronunciation, popup clipping, other assistive technologies, native Safari, physical devices and full WCAG conformance remain open."
+  },
+  "vite_footer_accessibility_follow_up": {
+    "audit_date": "2026-11-24",
+    "source_base_sha": "0eae311131203de965e9ec08c54c508425dc48eb",
+    "measurement_checkout_sha": "755ce61ed3690b33f25fa5f933729ef51093b473",
+    "tested_runtime_blobs": {
+      "frontend/src/providers/AppProviders.tsx": "b79d7a68a784b83b139f3f0e220e53ef6c90d311",
+      "frontend/src/publicSiteStyles.css": "b1d30b4d673125756404e49ca853105d98e533d6"
+    },
+    "scope": "Synthetic Vite service catalog in Windows WebKit 26.6 at 320 CSS px. Public Contacts and Staff login footer links on /ru/services and /services in light mode, with /ru/services as the dark-mode control.",
+    "before": {
+      "occlusion_source_sha": "ff8c3703f7e2090c8392b7ed17a89a29551e4260",
+      "occlusion": "With the prompt visible, all twelve sampled points across the two footer links in both locales hit the notification banner.",
+      "contrast_source_sha": "aedaf577b7d2df03b3b42763c5579a99baea5cd5",
+      "default_light_link_contrast_after_dismissal": [4.38, 4.42]
+    },
+    "after": {
+      "notification": "With default browser notification permission, the prompt was absent 5700 to 5710 ms after the page heading was visible in all three route and theme combinations. Both links passed trial clicks in each combination.",
+      "light_link_contrast_default_and_focus": [5.41, 5.46],
+      "light_link_contrast_hover": [5.88, 5.93],
+      "dark_link_contrast_default_ru": [7.35, 7.45],
+      "focus": "Both light-mode links retained a solid 3 px focus-visible outline after keyboard modality and programmatic focus.",
+      "axe": "Three footer-scoped scans returned zero violations. Each scan left three color-contrast nodes incomplete. Painted-pixel contrast checks covered the two links."
+    },
+    "method": "Computed foreground colors were compared against rendered footer background pixels sampled in WebKit with glyph fill and text decoration temporarily hidden. Original inline styles were restored before checking actionability.",
+    "limitations": "The run covered a synthetic catalog at one width. It did not exercise native Safari, sequential keyboard reachability of the footer, assistive technology, physical devices or full WCAG conformance."
+  },
+  "vite_catalog_footer_sequential_keyboard": {
+    "date": "2026-11-24",
+    "source_sha": "0bbcc8087ab222cfbbd190c9aeb990d5408923c8",
+    "scope": "Local Vite production build and a synthetic GET-only catalog on loopback. Both locales at 320 CSS px in light and dark mode.",
+    "chromium": {
+      "version": "153.0.8010.12",
+      "input": "Tab",
+      "passed_cases": 4,
+      "checks": "Both Contacts and Staff login links were reached in every case. Each stayed in the viewport with a solid 3 px focus-visible outline."
+    },
+    "windows_webkit": {
+      "version": "26.6",
+      "inputs": [
+        "Tab",
+        "Alt+Tab"
+      ],
+      "passed_cases": 0,
+      "checks": "Neither sequence reached the two links in any of the four catalog cases. The same inputs also skipped both links in a minimal page with standard anchors, a summary, a button and an input."
+    },
+    "limitations": "Native Safari settings, screen reader output, physical devices and WCAG conformance remain unverified. The test exercised the public catalog footer."
   }
 }

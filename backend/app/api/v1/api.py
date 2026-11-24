@@ -99,6 +99,7 @@ from app.api.v1.endpoints import (
     print_templates,
     public_booking_requests,
     public_site,
+    public_site_analytics,
     push_devices,
     qr_queue,
     queue_auto_close,
@@ -192,6 +193,7 @@ api_router.include_router(services.router, prefix="/services")
 api_router.include_router(
     public_site.router, prefix="/public-site", tags=["public-site"]
 )
+api_router.include_router(public_site_analytics.router, tags=["public-site-analytics"])
 api_router.include_router(
     public_booking_requests.router,
     prefix="/admin/public-booking-requests",

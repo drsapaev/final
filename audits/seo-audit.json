@@ -239,5 +239,28 @@
       "x-default": "The corresponding uz-Latn URL."
     },
     "scope": "All pages listed in the sitemap during this run. Google index status and actual search appearance remain unverified."
+  },
+  "hosted_sitemap_xml_alternate_acceptance": {
+    "status": "passed",
+    "origin": "https://finalclinic.fyi",
+    "observed_from_utc": "2026-11-24T05:05:47.9791113+00:00",
+    "observed_to_utc": "2026-11-24T05:06:12.9747340+00:00",
+    "deployment_id": "dpl_EDyoEsRTfX9tUBHGswoKWHan57dQ",
+    "deployment_sha": "1e1fefb38bc954803a7684306b21b0e616843ce1",
+    "service_worker_before_and_after_matched": true,
+    "sitemap_sha256": "c771babacc8853d3e4097fe4e8b88dc219829633e825c1d7e0e2772fcec66e14",
+    "method": "Read sitemap XML, source HTML and service worker via anonymous GET with no-cache and redirects disabled. Compare each namespaced sitemap alternate and each HTML head alternate with the exact bilingual URL from the route contract.",
+    "checked_sitemap_pages": 14,
+    "pages_returning_http_200_without_redirect_with_no_store": 14,
+    "pages_with_one_self_canonical_and_expected_html_language": 14,
+    "reciprocal_locale_pairs": 7,
+    "html_alternate_links_checked": 42,
+    "sitemap_xml_alternate_links_checked": 42,
+    "expected_destinations": {
+      "ru": "The corresponding /ru path, with the home page at /ru.",
+      "uz-Latn": "The original path without the /ru prefix.",
+      "x-default": "The corresponding uz-Latn URL."
+    },
+    "limits": "Counts apply to the live deployment and the URLs listed in its sitemap at the observed time. Google index status and actual search appearance are pending."
   }
 }

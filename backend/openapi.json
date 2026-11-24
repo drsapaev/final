@@ -4449,6 +4449,89 @@
         }
       }
     },
+    "/api/v1/public-site/analytics/events": {
+      "post": {
+        "tags": [
+          "public-site-analytics"
+        ],
+        "summary": "Record Public Site Analytics Event",
+        "operationId": "record_public_site_analytics_event",
+        "requestBody": {
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "site_view",
+                  "phone_click",
+                  "booking_form_open"
+                ],
+                "maxLength": 17
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Invalid event or unexpected request data."
+          },
+          "403": {
+            "description": "Missing or disallowed browser origin."
+          },
+          "413": {
+            "description": "Event token exceeds the fixed byte limit."
+          },
+          "415": {
+            "description": "Expected an unencoded text/plain event token."
+          },
+          "429": {
+            "description": "Too many requests."
+          },
+          "503": {
+            "description": "Collection is disabled or temporarily unavailable."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/public-site/analytics": {
+      "get": {
+        "tags": [
+          "public-site-analytics"
+        ],
+        "summary": "Admin Get Public Site Analytics",
+        "operationId": "admin_get_public_site_analytics",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteAnalyticsReportOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "Administrator role required."
+          },
+          "503": {
+            "description": "Report temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/public-booking-requests": {
       "get": {
         "tags": [
@@ -11214,7 +11297,7 @@
           "qr-queue"
         ],
         "summary": "Restore Entry To Next",
-        "description": "Восстанавливает пациента no_show как следующего в очереди\nУстанавливает priority=1 для приоритетной обработки",
+        "description": "Возвращает пациента в очередь с действующим приоритетом восстановления\nУстанавливает priority=1 для приоритетной обработки",
         "operationId": "restore_entry_to_next_api_v1_queue_entry__entry_id__restore_next_post",
         "security": [
           {
@@ -83220,7 +83303,7 @@
           },
           "quantity": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "Quantity",
             "default": 1
           },
@@ -91883,7 +91966,7 @@
           },
           "quantity": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "Quantity",
             "default": 1
           },
@@ -111996,6 +112079,67 @@
         ],
         "title": "PublicDirectionStartResponse",
         "description": "Short-lived session opened through the permanent public address.\n\nThe ``session_token`` drives the EXISTING QueueJoin flow\n(``/queue/join/:token`` semantics preserved); the internal\ndirection-scoped QR token is deliberately NOT returned."
+      },
+      "PublicSiteAnalyticsDayOut": {
+        "properties": {
+          "clinic_day": {
+            "type": "string",
+            "format": "date",
+            "title": "Clinic Day"
+          },
+          "site_views": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Site Views"
+          },
+          "phone_clicks": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Phone Clicks"
+          },
+          "booking_form_opens": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Booking Form Opens"
+          },
+          "booking_requests_submitted": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Booking Requests Submitted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clinic_day",
+          "site_views",
+          "phone_clicks",
+          "booking_form_opens",
+          "booking_requests_submitted"
+        ],
+        "title": "PublicSiteAnalyticsDayOut"
+      },
+      "PublicSiteAnalyticsReportOut": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether new browser events are accepted."
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSiteAnalyticsDayOut"
+            },
+            "type": "array",
+            "title": "Days",
+            "description": "Daily totals for the latest 30 Tashkent calendar days, oldest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "days"
+        ],
+        "title": "PublicSiteAnalyticsReportOut"
       },
       "PublicSiteCategoryOut": {
         "properties": {
