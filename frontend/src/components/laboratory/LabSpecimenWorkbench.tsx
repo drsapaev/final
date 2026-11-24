@@ -133,8 +133,7 @@ export default function LabSpecimenWorkbench({
         showResult(result);
         setForm(null);
         restoreFocus.current = true;
-        await load();
-        await onChanged();
+        await Promise.all([load(), onChanged()]);
       }
     } catch (failure) {
       if (!mounted.current) return;
