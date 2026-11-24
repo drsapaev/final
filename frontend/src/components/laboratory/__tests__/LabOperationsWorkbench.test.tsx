@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LabImportEntry, LabImportOutcome } from '../../../api/labOperations';
 import LabOperationsWorkbench from '../LabOperationsWorkbench';
 
 const api = vi.hoisted(() => ({ importRows: vi.fn(), metrics: vi.fn() }));
@@ -9,12 +10,24 @@ vi.mock('../../../utils/tokenManager', () => ({ default: { getUserData: () => ({
 
 const updatedAt = '2026-11-24T05:00:00+05:00';
 
-function fillManualRow(index: number, report: string) {
+function fillManualRow(index: number, report: string, analyte = 'LAB-X') {
   for (const [label, value] of [
-    ['Отчёт', report], ['Штрихкод пробы', 'SP-SYNTHETIC'], ['Код показателя', 'LAB-X'], ['Результат', '0'],
+    ['Отчёт', report], ['Штрихкод пробы', 'SP-SYNTHETIC'], ['Код показателя', analyte], ['Результат', '0'],
   ]) {
     fireEvent.change(screen.getByRole('textbox', { name: `${label} ${index}` }), { target: { value } });
   }
+}
+
+function importOutcomes(entries: LabImportEntry[], status: LabImportOutcome['status']): LabImportOutcome[] {
+  return entries.map((entry, index) => ({
+    row_index: index,
+    message_id: entry.message_id,
+    report_instance_id: entry.report_instance_id,
+    status,
+    updated_at: updatedAt,
+    existing_values: 0,
+    error_code: null,
+  }));
 }
 
 describe('Laboratory operations', () => {
@@ -48,6 +61,111 @@ describe('Laboratory operations', () => {
     expect(rows[1]).toHaveTextContent('Сохранено');
     expect(onQueueChanged).toHaveBeenCalledOnce();
   });
+
+  it('gives a saved group a new import message when an analyte result is edited', async () => {
+    const receipts = new Map<string, string>();
+    api.importRows.mockImplementation(async (_source, entries: LabImportEntry[], preview: boolean) => ({
+      rows: importOutcomes(entries, preview ? 'ready' : 'saved').map((outcome, index) => {
+        const entry = entries[index];
+        const content = JSON.stringify(entry.values);
+        const recorded = receipts.get(entry.message_id);
+        if (recorded !== undefined) {
+          return recorded === content
+            ? { ...outcome, status: 'duplicate' }
+            : { ...outcome, status: 'error', error_code: 'message_conflict' };
+        }
+        if (!preview) receipts.set(entry.message_id, content);
+        return { ...outcome, existing_values: preview && receipts.size ? entry.values.length : 0 };
+      }),
+    }));
+    render(<LabOperationsWorkbench orderId={null} reportId={42} onQueueChanged={vi.fn().mockResolvedValue(undefined)} />);
+    fillManualRow(1, '42');
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить строку' }));
+    fillManualRow(2, '42', 'LAB-Y');
+    const preview = screen.getByRole('button', { name: 'Проверить строки' });
+    const save = screen.getByRole('button', { name: 'Сохранить проверенные строки' });
+
+    fireEvent.click(preview);
+    await screen.findByText('Готово к сохранению');
+    fireEvent.click(save);
+    await screen.findByText('Сохранено');
+    const [original] = api.importRows.mock.calls[1][1] as LabImportEntry[];
+    expect(original.values).toHaveLength(2);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Результат 2' }), { target: { value: '5' } });
+    fireEvent.click(preview);
+    await screen.findByText('Готово к сохранению');
+    const [edited] = api.importRows.mock.calls[2][1] as LabImportEntry[];
+    expect(edited.message_id).not.toBe(original.message_id);
+    expect(edited.values).toEqual([
+      { analyte_code: 'LAB-X', unit_code: null, value_text: '0' },
+      { analyte_code: 'LAB-Y', unit_code: null, value_text: '5' },
+    ]);
+    expect(save).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Разрешить замену показанных сохранённых значений' }));
+    fireEvent.click(save);
+    await screen.findByText('Сохранено');
+    expect(api.importRows).toHaveBeenLastCalledWith('manual', [{
+      ...edited, expected_updated_at: updatedAt, replace_existing: true,
+    }], false);
+  });
+
+  it('reuses the exact grouped message across a lost response and another preview', async () => {
+    api.importRows
+      .mockImplementationOnce(async (_source, entries: LabImportEntry[]) => ({ rows: importOutcomes(entries, 'ready') }))
+      .mockRejectedValueOnce(new Error('response lost'))
+      .mockImplementation(async (_source, entries: LabImportEntry[]) => ({ rows: importOutcomes(entries, 'duplicate') }));
+    render(<LabOperationsWorkbench orderId={null} reportId={42} onQueueChanged={vi.fn()} />);
+    fillManualRow(1, '42');
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить строку' }));
+    fillManualRow(2, '42', 'LAB-Y');
+    const preview = screen.getByRole('button', { name: 'Проверить строки' });
+    const save = screen.getByRole('button', { name: 'Сохранить проверенные строки' });
+
+    fireEvent.click(preview);
+    await screen.findByText('Готово к сохранению');
+    fireEvent.click(save);
+    await screen.findByRole('alert');
+    const initialSubmission = api.importRows.mock.calls[1];
+
+    fireEvent.click(save);
+    await screen.findByText('Уже импортировано');
+    expect(api.importRows.mock.calls[2]).toEqual(initialSubmission);
+
+    fireEvent.click(preview);
+    await screen.findByText('Уже импортировано');
+    expect(api.importRows.mock.calls[3]).toEqual(api.importRows.mock.calls[0]);
+    expect(save).toBeDisabled();
+  });
+
+  it.each([['Отчёт', '43'], ['Штрихкод пробы', 'SP-OTHER']])(
+    'changes the message IDs of both affected groups after moving %s',
+    async (label, target) => {
+      api.importRows.mockImplementation(async (_source, entries: LabImportEntry[]) => ({
+        rows: importOutcomes(entries, 'ready'),
+      }));
+      render(<LabOperationsWorkbench orderId={null} reportId={42} onQueueChanged={vi.fn()} />);
+      fillManualRow(1, '42');
+      const add = screen.getByRole('button', { name: 'Добавить строку' });
+      fireEvent.click(add);
+      fillManualRow(2, '42', 'LAB-Y');
+      fireEvent.click(add);
+      fillManualRow(3, '99');
+      const preview = screen.getByRole('button', { name: 'Проверить строки' });
+      fireEvent.click(preview);
+      expect(await screen.findAllByText('Готово к сохранению')).toHaveLength(2);
+      const [original, unchanged] = api.importRows.mock.calls[0][1] as LabImportEntry[];
+
+      fireEvent.change(screen.getByRole('textbox', { name: `${label} 2` }), { target: { value: target } });
+      fireEvent.click(preview);
+      expect(await screen.findAllByText('Готово к сохранению')).toHaveLength(3);
+      const [reduced, moved, unaffected] = api.importRows.mock.calls[1][1] as LabImportEntry[];
+      expect(reduced.values).toEqual(original.values.slice(0, 1));
+      expect(moved.values).toEqual(original.values.slice(1));
+      expect(new Set([original.message_id, reduced.message_id, moved.message_id]).size).toBe(3);
+      expect(unaffected).toEqual(unchanged);
+    },
+  );
 
   it('shows the coded rejection counts and includes uncategorized history', async () => {
     api.metrics.mockResolvedValue({ rejected_samples: 3, rejected_samples_by_reason: {

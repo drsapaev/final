@@ -28,23 +28,34 @@ function emptyRow(reportId: number | null): ManualRow {
   return { id: crypto.randomUUID(), report: String(reportId ?? ''), barcode: '', analyte: '', unit: '', value: '' };
 }
 
-function manualEntries(rows: ManualRow[]): LabImportEntry[] {
-  const grouped = new Map<string, LabImportEntry>();
+function prepareManualEntries(rows: ManualRow[], previousMessageIds: ReadonlyMap<string, string>) {
+  const grouped = new Map<string, Omit<LabImportEntry, 'message_id'>>();
   for (const row of rows) {
     const report = Number(row.report);
-    if (!Number.isSafeInteger(report) || report <= 0 || !row.barcode.trim() ||
-      !row.analyte.trim() || !row.value.trim()) throw new Error('row');
-    const key = `${report}/${row.barcode.trim().toUpperCase()}`;
-    const entry = grouped.get(key) ?? {
-      message_id: row.id,
+    const barcode = row.barcode.trim().toUpperCase();
+    const analyte = row.analyte.trim();
+    const value = row.value.trim();
+    if (!Number.isSafeInteger(report) || report <= 0 || !barcode || !analyte || !value) throw new Error('row');
+    const key = `${report}/${barcode}`;
+    const entry: Omit<LabImportEntry, 'message_id'> = grouped.get(key) ?? {
       report_instance_id: report,
-      specimen_barcode: row.barcode.trim().toUpperCase(),
+      specimen_barcode: barcode,
       values: [],
     };
-    entry.values.push({ analyte_code: row.analyte.trim(), unit_code: row.unit.trim() || null, value_text: row.value.trim() });
+    entry.values.push({ analyte_code: analyte, unit_code: row.unit.trim() || null, value_text: value });
     grouped.set(key, entry);
   }
-  return [...grouped.values()];
+
+  const messageIds = new Map<string, string>();
+  const entries = Array.from(grouped.values(), (entry) => {
+    // The receipt identifies the whole normalized group, independently of its React row keys.
+    const values = [...entry.values].sort((a, b) => a.analyte_code.localeCompare(b.analyte_code));
+    const content = JSON.stringify({ ...entry, values });
+    const messageId = previousMessageIds.get(content) ?? crypto.randomUUID();
+    messageIds.set(content, messageId);
+    return { ...entry, message_id: messageId };
+  });
+  return { entries, messageIds };
 }
 
 function CriticalDesk({ labels }: { labels: Labels }) {
@@ -179,6 +190,7 @@ export default function LabOperationsWorkbench({ reportId, onQueueChanged }: Lab
     ? (['manual', 'csv', 'critical', 'metrics'] as const)
     : (['manual', 'csv', 'critical'] as const);
   const [manual, setManual] = useState<ManualRow[]>(() => [emptyRow(reportId)]);
+  const manualMessageIds = useRef(new Map<string, string>());
   const [fileRows, setFileRows] = useState<LabImportEntry[]>([]);
   const fileRead = useRef(0);
   const [outcomes, setOutcomes] = useState<LabImportOutcome[]>([]);
@@ -216,9 +228,13 @@ export default function LabOperationsWorkbench({ reportId, onQueueChanged }: Lab
   async function preview(event: FormEvent) {
     event.preventDefault();
     if (tab !== 'manual' && tab !== 'csv') return;
-    let rows: LabImportEntry[];
+    let rows = fileRows;
     try {
-      rows = tab === 'manual' ? manualEntries(manual) : fileRows;
+      if (tab === 'manual') {
+        const manualPreview = prepareManualEntries(manual, manualMessageIds.current);
+        manualMessageIds.current = manualPreview.messageIds;
+        rows = manualPreview.entries;
+      }
       if (!rows.length) throw new Error('row');
     } catch {
       setError('formatError');
