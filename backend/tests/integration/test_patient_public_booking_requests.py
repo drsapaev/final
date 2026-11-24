@@ -1525,6 +1525,12 @@ def test_patient_can_withdraw_own_request_but_another_patient_cannot(
     db_session.flush()
     other_headers = {"Authorization": f"Bearer {mint_access_token(other_user)}"}
 
+    other_list = client.get(PATIENT_REQUESTS, headers=other_headers)
+    assert other_list.status_code == 200
+    assert all(
+        item["id"] != created.json()["id"] for item in other_list.json()["items"]
+    )
+
     denied = client.post(
         f"{PATIENT_REQUESTS}/{created.json()['id']}/withdraw",
         headers=other_headers,
@@ -1579,6 +1585,10 @@ def test_public_booking_request_openapi_routes_and_idempotency_contract(
     response = client.get("/openapi.json")
     assert response.status_code == 200
     schema = response.json()
+    patient_output = schema["components"]["schemas"]["PublicBookingRequestOut"]
+    display_fields = {"service_name_ru", "service_name_uz", "doctor_display_name"}
+    assert display_fields <= patient_output["properties"].keys()
+    assert not display_fields.intersection(patient_output.get("required", []))
     create = schema["paths"][PATIENT_REQUESTS]["post"]
     confirmed_create = schema["paths"][PATIENT_CONFIRMED_APPOINTMENTS]["post"]
     resubmit = schema["paths"][f"{PATIENT_REQUESTS}/{{request_id}}/resubmit"]["post"]
@@ -1632,3 +1642,41 @@ def test_public_booking_request_openapi_routes_and_idempotency_contract(
     ]
     assert {"anyOf", "oneOf"}.intersection(not_found_schema)
     assert staff_list.get("security") or schema.get("security")
+
+
+@pytest.mark.integration
+def test_patient_request_names_survive_unpublication_and_handle_unlinked_doctor(
+    client: TestClient, db_session: Session, public_booking_case
+):
+    case = public_booking_case
+    created = client.post(
+        PATIENT_REQUESTS,
+        headers={**case["patient_headers"], "Idempotency-Key": uuid4().hex},
+        json=_create_body(case),
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["service_name_ru"] == "Cardiology consultation"
+    assert created.json()["service_name_uz"] == "Kardiolog maslahati"
+    assert created.json()["doctor_display_name"] == "Синтетический врач"
+
+    case["service"].show_on_website = False
+    case["doctor"].show_on_website = False
+    db_session.flush()
+    listed = client.get(PATIENT_REQUESTS, headers=case["patient_headers"])
+    assert listed.status_code == 200, listed.text
+    item = next(
+        item for item in listed.json()["items"] if item["id"] == created.json()["id"]
+    )
+    assert item["service_name_ru"] == "Cardiology consultation"
+    assert item["service_name_uz"] == "Kardiolog maslahati"
+    assert item["doctor_display_name"] == "Синтетический врач"
+
+    case["doctor"].user_id = None
+    db_session.flush()
+    db_session.expire_all()
+    listed = client.get(PATIENT_REQUESTS, headers=case["patient_headers"])
+    assert listed.status_code == 200, listed.text
+    item = next(
+        item for item in listed.json()["items"] if item["id"] == created.json()["id"]
+    )
+    assert item["doctor_display_name"] is None

@@ -16,6 +16,7 @@ const ROOT = path.resolve(process.cwd());
 const CLIENT_JS = path.join(ROOT, 'src/api/client.ts');
 const TOKEN_MANAGER = path.join(ROOT, 'src/utils/tokenManager.ts');
 const NGINX_PROD = path.join(ROOT, 'docker/nginx.conf');
+const NGINX_STAGING = path.join(ROOT, 'docker/nginx.staging.conf');
 
 // ---------- 1. Medium-11: CSRF bootstrap enabled by default ----------
 
@@ -56,7 +57,7 @@ describe('P0-5: Sanitizers wired to production forms', () => {
   it('at least one production form uses useSafeInput or useSafeForm', () => {
     const srcDir = path.join(ROOT, 'src');
     const files = collectSourceFiles(srcDir);
-    const filesUsingSafeInput: string[] = []
+    const filesUsingSafeInput: string[] = [];
     for (const file of files) {
       if (file.includes('/examples/') || file.includes('/__tests__/')) continue;
       const src = fs.readFileSync(file, 'utf-8');
@@ -85,6 +86,23 @@ describe('P0-6: CSP script-src without unsafe-inline', () => {
     // (style-src 'unsafe-inline' is acceptable for Tailwind, but script-src is XSS-critical)
     expect(scriptSrc).not.toMatch(/'unsafe-inline'/);
   });
+
+  it.each([NGINX_PROD, NGINX_STAGING])('limits the Telegram SDK source to the Mini App in %s', (file) => {
+    const src = fs.readFileSync(file, 'utf-8');
+    const map = src.match(/map \$request_uri \$telegram_sdk_source \{\s*default "";\s*~(\S+) (\S+);\s*\}/);
+    expect(map).not.toBeNull();
+    if (!map) return;
+
+    const route = new RegExp(map[1]);
+    expect(map[2]).toBe('https://telegram.org/js/telegram-web-app.js');
+    expect(route.test('/telegram/mini-app/patient')).toBe(true);
+    expect(route.test('/telegram/mini-app/patient?section=cabinet')).toBe(true);
+    for (const url of ['/ru/doctors', '/login', '/index.html', '/telegram/mini-app/patient-extra']) {
+      expect(route.test(url)).toBe(false);
+    }
+    expect(src).toContain('script-src \'self\' $telegram_sdk_source;');
+    expect(src).toContain('Cross-Origin-Embedder-Policy "require-corp"');
+  });
 });
 
 // ---------- 5. P0-2: tokenManager does not use localStorage for tokens ----------
@@ -108,7 +126,7 @@ describe('P0-2: tokenManager storage', () => {
 
 function collectSourceFiles(dir: string) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files: string[] = []
+  const files: string[] = [];
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {

@@ -58,7 +58,7 @@ vi.mock('../../utils/logger', () => ({
 }));
 
 import axios from 'axios';
-import { api } from '../client';
+import { api, getAuthSessionGeneration, type AuthSessionRequestConfig } from '../client';
 import { replaceAccessOnlySession } from '../../stores/auth';
 
 // Some sibling suites stub the global URL with a non-constructor; capture the
@@ -807,5 +807,53 @@ describe('access-only patient session replacement (P1)', () => {
     } finally {
       window.removeEventListener('authStateChanged', onAuthChanged);
     }
+  });
+});
+
+describe('expected session generation', () => {
+  const endpoint = '/api/v1/patients/booking-requests/synthetic-request/resubmit';
+  const body = { expected_version: 2, appointment_time: '09:40' };
+
+  it('cancels a queued booking mutation before binding to a replacement session', async () => {
+    replaceAccessOnlySession(createJwt(3600), PATIENT_PROFILE);
+    const config: AuthSessionRequestConfig = {
+      expectedAuthSessionGeneration: getAuthSessionGeneration(),
+    };
+    const csrf = vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const refresh = vi.spyOn(axios, 'post').mockResolvedValue(make200({}));
+    const adapter = vi.fn(async (request: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config: request }));
+    api.defaults.adapter = adapter;
+
+    // Axios queues the async request interceptor after the caller returns.
+    const replacement = Promise.resolve().then(() => {
+      replaceAccessOnlySession(createJwt(7200), { id: 43, username: 'patient-43', role: 'Patient' });
+    });
+    const request = api.post(endpoint, body, config);
+
+    await expect(request).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+    await replacement;
+    expect(adapter).not.toHaveBeenCalled();
+    expect(csrf).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('sends a matched mutation without serializing the expected generation', async () => {
+    const token = createJwt(3600);
+    replaceAccessOnlySession(token, PATIENT_PROFILE);
+    const config: AuthSessionRequestConfig = {
+      expectedAuthSessionGeneration: getAuthSessionGeneration(),
+      headers: { 'Idempotency-Key': 'synthetic-retry-key' },
+    };
+    vi.spyOn(axios, 'get').mockResolvedValue(make200({ csrf_token: 'synthetic-csrf' }));
+    const adapter = vi.fn(async (request: InternalAxiosRequestConfig) => ({ ...make200({ ok: true }), config: request }));
+    api.defaults.adapter = adapter;
+
+    await expect(api.post(endpoint, body, config)).resolves.toMatchObject({ data: { ok: true } });
+    expect(adapter).toHaveBeenCalledTimes(1);
+    const [sent] = adapter.mock.calls[0];
+    expect(sent.headers.get('Authorization')).toBe('Bearer ' + token);
+    expect(sent.headers.get('Idempotency-Key')).toBe('synthetic-retry-key');
+    expect(sent.headers.has('expectedAuthSessionGeneration')).toBe(false);
+    expect(sent.data).toBe(JSON.stringify(body));
   });
 });

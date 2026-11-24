@@ -22,11 +22,21 @@ const CURRENT_CACHES = [STATIC_CACHE, DYNAMIC_CACHE, API_CACHE, ...PERSISTENT_CA
 // this worker's lifetime. A healthy storage can be used by the next worker.
 let noStoreEvictionFailed = false;
 
+const OFFLINE_PAGE = '/offline.html';
+const UZBEK_OFFLINE_PAGE = '/offline-uz.html';
+// Select a language only for catalogue page URLs, not for every no-cache path.
+const UZBEK_CATALOG_PATHS = [
+  /^\/$/,
+  /^\/(?:services|doctors)(?:\/[^/]+)?\/?$/,
+  /^\/(?:prices|contacts)\/?$/,
+];
+
 // Файлы для кэширования при установке
 const STATIC_FILES = [
   '/manifest.json',
   '/favicon.ico',
-  '/offline.html',
+  OFFLINE_PAGE,
+  UZBEK_OFFLINE_PAGE,
   // Основные страницы (только существующие)
   '/login',
   '/dashboard',
@@ -197,6 +207,10 @@ self.addEventListener('fetch', (event) => {
 // Обработка запросов
 async function handleRequest(request) {
   const url = new URL(request.url);
+  const isDocumentRequest = request.mode === 'navigate' || isHtmlRequest(request);
+  const isUzbekCatalogNavigation =
+    request.mode === 'navigate' && UZBEK_CATALOG_PATHS.some(pattern => pattern.test(url.pathname));
+  const offlineFallbackUrl = isUzbekCatalogNavigation ? UZBEK_OFFLINE_PAGE : OFFLINE_PAGE;
 
   try {
     // This must precede static-file and HTML routing: a sensitive path can
@@ -204,14 +218,14 @@ async function handleRequest(request) {
     if (isNoCacheRequest(request)) {
       return await networkFirst(
         request, DYNAMIC_CACHE,
-        request.mode === 'navigate' || isHtmlRequest(request) ? '/offline.html' : undefined,
+        isDocumentRequest ? offlineFallbackUrl : undefined,
       );
     }
     // Навигация: всегда сеть, кэш — только офлайн-фолбэк.
     // Стратегия гарантирует свежий index.html (и свежие хэшированные
     // ассеты) после каждого деплоя.
-    if (request.mode === 'navigate' || isHtmlRequest(request)) {
-      return await networkFirst(request, DYNAMIC_CACHE, '/offline.html');
+    if (isDocumentRequest) {
+      return await networkFirst(request, DYNAMIC_CACHE, offlineFallbackUrl);
     }
 
     // Стратегия для статических файлов
@@ -231,10 +245,11 @@ async function handleRequest(request) {
     console.error('Service Worker: Request failed');
 
     // Возвращаем офлайн страницу для навигации
-    if (request.mode === 'navigate' || isHtmlRequest(request)) {
-      const offline = await caches.match('/offline.html');
+    if (isDocumentRequest) {
+      const offline = await caches.match(offlineFallbackUrl);
       if (offline) return offline;
-      return new Response('Офлайн режим', { status: 503 });
+      const message = isUzbekCatalogNavigation ? 'Internetga ulanish yo‘q' : 'Офлайн режим';
+      return new Response(message, { status: 503 });
     }
 
     // Sensitive and publication-sensitive routes must not replay an older

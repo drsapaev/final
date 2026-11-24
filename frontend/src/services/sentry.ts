@@ -23,6 +23,7 @@ import { isSensitiveVerificationUrl, redactVerificationString } from '../utils/v
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 const SENTRY_ENV = import.meta.env.VITE_SENTRY_ENV || 'development';
 const SENTRY_TRACES_SAMPLE_RATE = Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE || 0.05);
+const PUBLIC_SITE_ANALYTICS_PATH = '/api/v1/public-site/analytics/events';
 
 const MEDICAL_PII_KEYS = [
   // Patient identifiers
@@ -645,6 +646,27 @@ export function createSentryPrivacyCallbacks(): Pick<
   };
 }
 
+export function createSentryBrowserRequestTracingOptions() {
+  // The SDK matches same-origin requests against their resolved pathnames.
+  // Without a location, it matches the original URL, so also exclude //host URLs.
+  const excludedPrefix = globalThis.location?.href ? '' : '/|';
+  const sameOriginExceptAnalytics = new RegExp(
+    `^/(?!${excludedPrefix}${PUBLIC_SITE_ANALYTICS_PATH.slice(1)}/?(?:[?#]|$))`,
+  );
+
+  return {
+    tracePropagationTargets: [sameOriginExceptAnalytics],
+    shouldCreateSpanForRequest(url: string): boolean {
+      try {
+        const { pathname } = new URL(url, globalThis.location?.href || 'https://sentry.invalid/');
+        return pathname !== PUBLIC_SITE_ANALYTICS_PATH && pathname !== `${PUBLIC_SITE_ANALYTICS_PATH}/`;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 let isInitialized = false;
 
 export function initSentry() {
@@ -655,11 +677,14 @@ export function initSentry() {
     return;
   }
 
+  const { tracePropagationTargets, shouldCreateSpanForRequest } = createSentryBrowserRequestTracingOptions();
+
   Sentry.init({
     dsn: SENTRY_DSN,
     environment: SENTRY_ENV,
     release: import.meta.env.VITE_APP_VERSION || 'unknown',
     tracesSampleRate: SENTRY_TRACES_SAMPLE_RATE,
+    tracePropagationTargets,
     sendDefaultPii: false,
     // Drop errors from browser extensions / preview bots.
     denyUrls: [
@@ -668,7 +693,7 @@ export function initSentry() {
       /^moz-extension:\/\//i,
     ],
     integrations: [
-      Sentry.browserTracingIntegration(),
+      Sentry.browserTracingIntegration({ shouldCreateSpanForRequest }),
       Sentry.replayIntegration({
         // Disable session replay by default — replays can capture form
         // inputs which is a PII risk for a medical app. Enable only after
