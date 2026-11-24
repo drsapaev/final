@@ -11,7 +11,9 @@ from __future__ import annotations
 import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
+from queue import Queue
 from uuid import uuid4
 
 import pytest
@@ -26,6 +28,7 @@ from app.api.v1.endpoints.lab_reporting import (
     finalize_lab_report,
     update_lab_report_instance,
 )
+from app.core.config import settings
 from app.db.base_class import Base
 from app.models.lab import (
     LabReportFieldDef,
@@ -479,3 +482,90 @@ def test_stale_finalize_after_second_save_preserves_latest_draft(
             .order_by(LabReportWorkflowEvent.id)
         ).all()
         assert events == [("entered", first_actor_id), ("entered", second_actor_id)]
+
+
+def test_concurrent_managed_corrections_create_one_draft(
+    lab_lock_engine, lab_instance_version, monkeypatch
+):
+    instance_id, original = lab_instance_version
+    reading = "SYNTHETIC-READING"
+    with Session(lab_lock_engine) as setup:
+        actors = [
+            User(
+                username=f"synthetic_correction_{uuid4().hex[:8]}",
+                full_name="SYNTHETIC Correction Staff",
+                hashed_password="synthetic-unused",
+                role="Lab",
+            )
+            for _ in range(2)
+        ]
+        setup.add_all(actors)
+        setup.flush()
+        first_actor_id, second_actor_id = (actor.id for actor in actors)
+        service = LabReportingService(setup)
+        saved, _ = service.bulk_upsert_values(
+            instance_id,
+            [{"field_key": "wbc", "value_text": reading}],
+            expected_updated_at=original.isoformat(),
+        )
+        released = service.finalize(
+            instance_id, expected_updated_at=saved.updated_at.isoformat()
+        )
+        assert released.status == "FINALIZED"
+        released_version = released.updated_at
+        finalized_at = released.finalized_at
+
+    # Managed corrections also apply to reports released before rollout.
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    command = {
+        "expected_updated_at": released_version.isoformat(),
+        "reason": "SYNTHETIC correction",
+    }
+    second_ready: Queue[int] = Queue()
+    second_finished = threading.Event()
+
+    def compete() -> None:
+        try:
+            with Session(lab_lock_engine) as session:
+                second_ready.put(session.scalar(text("SELECT pg_backend_pid()")))
+                LabReportingService(session).revise(
+                    instance_id, actor_user_id=second_actor_id, **command
+                )
+        finally:
+            second_finished.set()
+
+    with ThreadPoolExecutor(max_workers=1) as worker, Session(lab_lock_engine) as first:
+        repository = LabReportingApiRepository(first)
+        first_pid = first.scalar(text("SELECT pg_backend_pid()"))
+        assert repository.get_instance_for_update(instance_id) is not None
+        contender = worker.submit(compete)
+        second_pid = second_ready.get(timeout=5)
+        assert first_pid != second_pid
+        assert _wait_for_blocker(lab_lock_engine, second_pid, second_finished)
+
+        revision = LabReportingService(first, repository=repository).revise(
+            instance_id, actor_user_id=first_actor_id, **command
+        )
+        draft_id = revision.id
+        with pytest.raises(LabReportingDomainError, match="A correction already exists") as conflict:
+            contender.result(timeout=10)
+        assert conflict.value.status_code == 409
+
+    with Session(lab_lock_engine) as verification:
+        service = LabReportingService(verification)
+        replay = service.revise(instance_id, actor_user_id=first_actor_id, **command)
+        assert replay.id == draft_id
+        assert replay.status == "DRAFT" and replay.managed_release
+        assert [(value.field_key, value.value_text) for value in replay.values] == [("wbc", reading)]
+        assert verification.scalars(
+            select(LabReportInstance.id)
+            .where(LabReportInstance.supersedes_instance_id == instance_id)
+        ).all() == [draft_id]
+        events = service.workflow_history(draft_id)
+        assert [(event.kind, event.actor_user_id) for event in events] == [
+            ("revision_created", first_actor_id)
+        ]
+        source = verification.get(LabReportInstance, instance_id)
+        assert source is not None and source.status == "FINALIZED"
+        assert source.updated_at == released_version and source.finalized_at == finalized_at
+        assert [(value.field_key, value.value_text) for value in source.values] == [("wbc", reading)]
