@@ -1,5 +1,5 @@
 import { api } from '../../api/client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
@@ -75,6 +75,34 @@ const ScheduleNextModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // DERMSCHED-FE-004: the success auto-close timer handle is tracked so a
+  // stale session timer (started before a manual close, a fresh open for
+  // the next patient, or an unmount) is cancelled instead of firing into
+  // a dialog generation it does not belong to. The component is mounted
+  // persistently (the parent toggles `isOpen`), so an unmount-only
+  // cleanup would miss the reopened-dialog scenario.
+  const successTimerRef = useRef<number | null>(null);
+
+  // Cancel any pending success timer on every open-state transition.
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current !== null) {
+        window.clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+  // And on final unmount.
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current !== null) {
+        window.clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Загрузка данных при открытии модала
   useEffect(() => {
@@ -237,8 +265,13 @@ const ScheduleNextModal = ({
 
       setSuccess(t('misc.snm_visit_scheduled', { token: result?.confirmation?.token ?? '' }));
 
-      // Сброс формы через 2 секунды
-      setTimeout(() => {
+      // Сброс формы через 2 секунды (DERMSCHED-FE-004: хэндл отслеживается
+      // и отменяется при новом открытии / ручном закрытии / unmount)
+      if (successTimerRef.current !== null) {
+        window.clearTimeout(successTimerRef.current);
+      }
+      successTimerRef.current = window.setTimeout(() => {
+        successTimerRef.current = null;
         onClose?.();
         resetForm();
       }, 2000);
