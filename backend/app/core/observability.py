@@ -204,6 +204,8 @@ class ObservabilityState:
                 ),
                 details={
                     "latency_p95_ms": p95_latency,
+                    "latency_threshold_ms": self.thresholds.latency_p95_ms,
+                    "window_requests": window["requests"],
                     "window_seconds": self.thresholds.window_seconds,
                 },
             )
