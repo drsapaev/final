@@ -27,6 +27,7 @@ vi.mock('../../../api/patientAccess', () => ({
 vi.mock('../../../api/client', () => ({
   api: { post: vi.fn(), get: vi.fn() },
   ensureCSRFToken: vi.fn(() => Promise.resolve()),
+  getAuthSessionGeneration: vi.fn(() => 1),
 }));
 
 vi.mock('../../../stores/auth', () => ({

@@ -33,6 +33,7 @@ export default defineConfig({
   ].map((route) => ({ route, handler: './src/publicSiteHandler.tsx', format: 'web' as const })),
   runtimeConfig: {
     apiOrigin: '',
+    publicSiteAnalyticsEnabled: false,
     siteOrigin: productionDomain ? `https://${productionDomain}` : '',
     deploymentEnvironment: process.env.VERCEL_ENV || 'development',
   },

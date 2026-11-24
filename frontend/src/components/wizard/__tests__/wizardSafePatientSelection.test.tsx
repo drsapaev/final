@@ -17,14 +17,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { useRef, useState } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PATIENT_SELECTED_FROM_CARD_FLAG,
   buildInheritedPatientClearPatch,
   isPatientSelectedFromCard,
   isPhoneDuplicateErrorMessage,
+  wizardContentSignature,
 } from '../wizardUtils';
+import { useWizardEditBirthDate } from '../useWizardEditBirthDate';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.tsx');
@@ -178,4 +182,54 @@ describe('Fix A: wizard patient-selection contract', () => {
     // конфликт показывается сообщением + кнопкой явного выбора
     expect(source).toContain('aw_phone_already_exists');
   });
+});
+
+it('does not invent or submit a full birth date from a worklist birth year', () => {
+  const source = readWizardSource();
+  expect(source).not.toContain('patient_birth_year}-01-01');
+  const hydration = fs.readFileSync(path.resolve(__dirname, '../useWizardEditBirthDate.ts'), 'utf8');
+  expect(hydration).toContain('String(patient.id) !== String(patientId)');
+  expect(hydration).toContain('cancelled || birthDateEditedRef.current || !birthDate');
+  const qrUpdate = extractSourceBlock(source, 'const patientData: Record<string, unknown> = {\n              patient_name:', '// Подготавливаем услуги из корзины');
+  expect(qrUpdate).toContain('birth_date: wizardData.patient.birth_date');
+  expect(qrUpdate).not.toContain('birth_year:');
+});
+
+const renderBirthDateEditor = (getPatient: (id: string | number) => Promise<{ id: number; birth_date: string }>) => {
+  const initialData = { patient_id: 21, patient_birth_year: 1990 };
+  return renderHook(() => {
+    const [data, setWizardData] = useState({
+      patient: { id: 21, birth_date: '', fio: '', phone: '', address: '', gender: '' },
+      cart: { items: [], discount_mode: 'none', all_free: false },
+    });
+    const initialContentRef = useRef(wizardContentSignature(data));
+    const state = useWizardEditBirthDate({
+      isOpen: true, editMode: true, initialData, getPatient, initialContentRef, setWizardData,
+    });
+    return { ...state, data };
+  });
+};
+
+it('hydrates only a matching patient’s real full date and does not count it as a manual edit', async () => {
+  const getPatient = vi.fn().mockResolvedValue({ id: 21, birth_date: '1990-05-16' });
+  const { result } = renderBirthDateEditor(getPatient);
+  await waitFor(() => expect(result.current.data.patient.birth_date).toBe('1990-05-16'));
+  expect(getPatient).toHaveBeenCalledWith(21);
+  expect(result.current.birthDateEditedRef.current).toBe(false);
+});
+
+it('keeps a manually typed date when the in-flight card response arrives', async () => {
+  let finish!: (patient: { id: number; birth_date: string }) => void;
+  const { result } = renderBirthDateEditor(() => new Promise((resolve) => { finish = resolve; }));
+  act(() => result.current.handleBirthDateChange('11.12.1991'));
+  await act(async () => finish({ id: 21, birth_date: '1990-05-16' }));
+  expect(result.current.data.patient.birth_date).toBe('1991-12-11');
+  expect(result.current.birthDateEditedRef.current).toBe(true);
+});
+
+it('does not populate a date from an unrelated returned patient', async () => {
+  let finish!: (patient: { id: number; birth_date: string }) => void;
+  const { result } = renderBirthDateEditor(() => new Promise((resolve) => { finish = resolve; }));
+  await act(async () => finish({ id: 23, birth_date: '1990-05-16' }));
+  expect(result.current.data.patient.birth_date).toBe('');
 });

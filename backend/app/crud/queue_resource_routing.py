@@ -378,6 +378,23 @@ def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
     return int(resource.start_number_online)
 
 
+def effective_queue_cabinet(queue: DailyQueue | None) -> str | None:
+    """Resolve the cabinet of one proven daily queue, not a specialty group."""
+    if queue is None:
+        return None
+    daily_cabinet = getattr(queue, "cabinet_number", None)
+    if isinstance(daily_cabinet, str) and daily_cabinet.strip() not in {"", "N/A"}:
+        return daily_cabinet.strip()
+
+    if getattr(queue, "queue_resource_id", None) is not None:
+        owner_cabinet = getattr(getattr(queue, "queue_resource", None), "default_cabinet", None)
+    else:
+        owner_cabinet = getattr(getattr(queue, "specialist", None), "cabinet", None)
+    if isinstance(owner_cabinet, str) and owner_cabinet.strip() not in {"", "N/A"}:
+        return owner_cabinet.strip()
+    return None
+
+
 def effective_day_start_number(
     db: Session,
     *,

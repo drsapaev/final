@@ -80,7 +80,12 @@ describe('DERMSCHED-FE-001 — schedule-next uses the shared API client and the 
   it('loads patients and services through the shared client (pre-fix: raw SPA-relative fetch)', async () => {
     render(<ScheduleNextModal isOpen patient={QUEUE_ROW_PATIENT} />);
 
-    await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/patients'));
+    // DERMSCHED-FE-003: the canonical surface now carries an explicit
+    // default page (limit=100) — the pin moved with the request shape.
+    await waitFor(() => expect(mockedGet).toHaveBeenCalledWith(
+      '/patients',
+      expect.objectContaining({ params: expect.objectContaining({ limit: 100 }) }),
+    ));
     await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/services'));
     expect(global.fetch).not.toHaveBeenCalled();
   });
@@ -112,7 +117,10 @@ describe('DERMSCHED-FE-002 — schedule-next preselects the canonical patient_id
   it('preselects patient.patient_id for a queue-row-shaped patient (pre-fix: record id 101)', async () => {
     render(<ScheduleNextModal isOpen patient={QUEUE_ROW_PATIENT} />);
 
-    await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/patients'));
+    await waitFor(() => expect(mockedGet).toHaveBeenCalledWith(
+      '/patients',
+      expect.objectContaining({ params: expect.objectContaining({ limit: 100 }) }),
+    ));
     expect((screen.getByLabelText('Schedule next visit patient') as HTMLSelectElement).value).toBe('9');
   });
 

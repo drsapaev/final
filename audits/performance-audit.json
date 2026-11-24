@@ -372,8 +372,8 @@
     "next_actions": [
       {
         "id": "review-cloudflare-rum-configuration",
-        "status": "dashboard_disabled; live_browser_verification_pending",
-        "action": "The owner authorized disabling Web Analytics/RUM for finalclinic.fyi. Cloudflare shows Disable selected after reload. Verify after propagation in an ordinary browser that neither the beacon script nor /cdn-cgi/rum request is loaded; the first plain post-change HTML GET still contained the script marker, while a later no-cache GET did not."
+        "status": "dashboard_disabled; bounded_browser_follow_up_passed",
+        "action": "The owner authorized disabling Web Analytics/RUM for finalclinic.fyi. The later production_browser_network_follow_up records fresh Chromium visits to every current sitemap address. That sample covered initial navigation and about 2.2 seconds after load."
       },
       {
         "id": "obtain-server-duration-evidence",
@@ -450,5 +450,24 @@
     "teardown": "The owned loopback proxy and synthetic fixture stopped.",
     "remaining": "No hosted Preview was listed for the checked SHA. Hosted capacity, runtime duration and cost remain unverified."
   },
-  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. On 2026-10-22 the owner-authorized Cloudflare setting for finalclinic.fyi was changed to Disable and remained selected after reload. A later no-cache GET returned HTTP 200 without the beacon script or /cdn-cgi/rum marker; ordinary Chrome verification remains pending because navigation failed with ERR_CONNECTION_RESET. Vercel Speed Insights returned no p75 samples, Vercel Function duration required Observability Plus, and PageSpeed Insights returned HTTP 429 due to zero daily quota. No server-only timing or field p75 was obtained, and no external telemetry was enabled."
+  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. On 2026-10-22 the owner-authorized Cloudflare setting for finalclinic.fyi was changed to Disable and remained selected after reload. A later no-cache GET returned HTTP 200 without the beacon script or /cdn-cgi/rum marker; the October Chrome verification failed with ERR_CONNECTION_RESET. A subsequent bounded Chromium capture covered every current sitemap address with zero observed analytics requests. Vercel Speed Insights returned no p75 samples, Vercel Function duration required Observability Plus, and PageSpeed Insights returned HTTP 429 due to zero daily quota. No server-only timing or field p75 was obtained, and no external telemetry was enabled.",
+  "production_browser_network_follow_up": {
+    "observed_at_utc": "2026-11-23T05:36:59.528Z",
+    "origin": "https://finalclinic.fyi",
+    "pull_request": "https://github.com/drsapaev/final/pull/4195",
+    "deployment_id": "dpl_3S1tk9z38Uw57Rvc8nrejrArgJgE",
+    "squash_sha": "0a406bc0f531fa8627aa85e3eb971e3a78d867ce",
+    "browser": "Headless Playwright Chromium 153.0.8010.12 on Windows, with Chromium sandbox enabled and QUIC disabled",
+    "fresh_anonymous_contexts": 14,
+    "http_200_and_expected_language_in_dom_after_load": 14,
+    "observation_after_load_ms": [
+      2206,
+      2305
+    ],
+    "observed_http_requests": 22,
+    "observed_external_origins": [],
+    "observed_analytics_matches": 0,
+    "method": "Observe page-level HTTP(S) request events during initial navigation in a fresh context for each current sitemap URL and for the recorded interval after load. Classify Cloudflare RUM and other known analytics hosts or endpoint paths. Verify the service-worker revision before and after the run.",
+    "limits": "Other routes, interaction, consent, signed-in traffic and longer sessions were outside scope. Field p75 and hosted function duration remain unverified."
+  }
 }
