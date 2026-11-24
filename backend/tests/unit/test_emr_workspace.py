@@ -555,28 +555,65 @@ def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
         db_session.flush()
         return row
 
-    def value(source, key, result, *, unit="synthetic-unit", root=None, projected="1"):
+    def value(
+        source, key, result, *, unit="synthetic-unit", root=None, projected="1",
+        kind="numeric", observed_on="2026-01-01", method="SYNTHETIC-METHOD",
+        material="SYNTHETIC-SERUM", frozen=True, status="evaluated",
+        interpretation="normal",
+    ):
+        result_payload = {"kind": kind}
+        if kind == "qualified_numeric":
+            result_payload["comparator"] = "lt"
+        evaluation_snapshot = {
+            "status": status,
+            "interpretation": interpretation,
+            "visible": True,
+            "analyte_code": key,
+            "unit_code": unit,
+            "unit": unit,
+            "material_code": material,
+            "method_code": method,
+            "reference_date_source": "study_date",
+            "age_at_date": observed_on,
+        }
         db_session.add_all([
-            LabReportValue(instance_id=source.id, field_key=key, value_numeric=result),
+            LabReportValue(
+                instance_id=source.id,
+                field_key=key,
+                value_numeric=result,
+                result_payload=result_payload if frozen else None,
+                evaluation_snapshot=evaluation_snapshot if frozen else None,
+            ),
             LabResult(
                 order_id=source.order_id, source_instance_id=source.id,
                 source_root_instance_id=root or source.id, test_code=key,
                 test_name="SYNTHETIC Measure", value=projected, unit=unit,
+                abnormal=True,
             ),
         ])
 
     old = report(earlier, version.id)
-    value(old, "same-field", Decimal("0"))
-    value(old, "other-field", Decimal("7.125"))
-    value(old, "qualitative", None, projected="SYNTHETIC text")
+    value(old, "same-field", Decimal("0"), projected="0")
+    value(old, "other-field", Decimal("7.125"), projected="7.125")
+    value(old, "qualitative", None, projected="SYNTHETIC text", kind="text")
     value(old, "no-unit", Decimal("1"), unit=None)
+    value(
+        old, "qualified", Decimal("5"), projected="<5", kind="qualified_numeric",
+        status="not_evaluated", interpretation=None,
+    )
+    value(old, "legacy", Decimal("6"), projected="6", frozen=False)
+    value(old, "undated", Decimal("9"), projected="9", observed_on=None)
     prior_different_definition = report(earlier, other_version.id)
-    value(prior_different_definition, "same-field", Decimal("110"))
+    value(prior_different_definition, "same-field", Decimal("110"), projected="110")
     prior_different_unit = report(earlier, version.id)
-    value(prior_different_unit, "same-field", Decimal("120"), unit="synthetic-other-unit")
+    value(prior_different_unit, "same-field", Decimal("120"), unit="synthetic-other-unit", projected="120")
+    prior_different_method = report(earlier, version.id)
+    value(prior_different_method, "same-field", Decimal("130"), method="SYNTHETIC-OTHER", projected="130")
+    prior_different_material = report(earlier, version.id)
+    value(prior_different_material, "same-field", Decimal("140"), material="SYNTHETIC-OTHER", projected="140")
     original = report(test_visit, version.id)
     corrected = report(test_visit, version.id, previous=original)
-    value(corrected, "same-field", Decimal("2.5"), root=original.id)
+    value(corrected, "same-field", Decimal("2.5"), root=original.id, projected="2.5", observed_on="2026-02-01")
     value(corrected, "cleared", None, root=original.id, projected=None)
     foreign = report(test_visit, version.id, patient_id=other_patient.id)
     value(foreign, "same-field", Decimal("210"))
@@ -592,16 +629,31 @@ def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
     assert current["instance_id"] == corrected.id
     assert Decimal(current["comparison"]["value"]) == Decimal("2.5")
     assert current["comparison"]["template_version"] == 1
+    assert current["comparison"]["observed_on"] == "2026-02-01"
+    assert current["finalized_at"] == corrected.finalized_at.isoformat().replace("+00:00", "Z")
+    assert current["abnormal"] is False
+    assert current["evaluation_status"] == "evaluated"
+    assert current["interpretation"] == "normal"
     previous = payload["history"][0]
     assert previous["visit_id"] == earlier.id
     previous_values = previous["laboratory"]
-    assert len(previous_values) == 6
+    assert len(previous_values) == 11
     comparable = [v for v in previous_values if v["comparison"]]
-    assert len(comparable) == 4
+    assert len(comparable) == 6
     zero, = [v for v in comparable if Decimal(v["comparison"]["value"]) == 0]
     assert zero["comparison"]["key"] == current["comparison"]["key"]
+    assert zero["comparison"]["observed_on"] == "2026-01-01"
     assert zero["instance_id"] == old.id
     assert len({v["comparison"]["key"] for v in comparable}) == len(comparable)
+    by_value = {v["value"]: v for v in previous_values}
+    qualified = by_value["<5"]
+    assert qualified["evaluation_status"] == "not_evaluated"
+    assert qualified["abnormal"] is None
+    assert qualified["comparison"] is None
+    assert by_value["6"]["evaluation_status"] == "unknown"
+    assert by_value["6"]["abnormal"] is None
+    assert by_value["6"]["comparison"] is None
+    assert by_value["9"]["comparison"] is None
 
 
 def test_editing_a_reviewed_template_requires_review_of_the_new_version(

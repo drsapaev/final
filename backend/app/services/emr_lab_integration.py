@@ -4,7 +4,7 @@
 
 import logging
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -13,6 +13,11 @@ from app.crud import lab, lab_result
 from app.models.appointment import Appointment
 from app.models.emr import EMR
 from app.models.lab import LabOrder, LabResult
+from app.services.emr_lab_result_evidence import (
+    NON_NUMERIC_RESULT_KINDS,
+    frozen_assessment,
+    released_numeric_observation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -81,20 +86,9 @@ class EMRLabIntegrationService:
                     snapshot = result["evaluation_snapshot"]
                     if not isinstance(snapshot, dict):
                         snapshot = {}
-                    status = snapshot.get("status") or "unknown"
-                    interpretation = snapshot.get("interpretation")
-                    is_abnormal: bool | None = None
-                    if status == "evaluated" and result["value"]:
-                        if interpretation in (
-                            "low",
-                            "high",
-                            "warning",
-                            "abnormal",
-                            "critical",
-                        ):
-                            is_abnormal = True
-                        elif interpretation == "normal":
-                            is_abnormal = False
+                    status, interpretation, is_abnormal = frozen_assessment(
+                        snapshot, result["value"]
+                    )
                     formatted_result.update(
                         abnormal=is_abnormal,
                         is_abnormal=is_abnormal,
@@ -180,59 +174,29 @@ class EMRLabIntegrationService:
                 return {}
             payload, snapshot, numeric = evidence
             kind = payload.get("kind") if isinstance(payload, dict) else None
-            if kind in ("qualified_numeric", "coded_qualitative", "text", "absent"):
+            if kind in NON_NUMERIC_RESULT_KINDS:
                 continue
             released_at = result["released_at"]
+            observation = released_numeric_observation(
+                result["value"], payload, snapshot, numeric
+            )
             if (
-                kind != "numeric"
-                or payload.get("comparator") is not None
+                observation is None
                 or released_at is None
                 or released_at == previous_release
-                or snapshot.get("visible") is not True
-                or snapshot.get("status")
-                not in ("evaluated", "not_evaluated", "not_applicable")
-                or not isinstance(numeric, Decimal)
-                or not numeric.is_finite()
-            ):
-                return {}
-            reference_date = snapshot.get("age_at_date")
-            if not isinstance(reference_date, str) or snapshot.get(
-                "reference_date_source"
-            ) not in ("study_date", "specimen_collection"):
-                return {}
-            context = tuple(
-                snapshot.get(key)
-                for key in (
-                    "analyte_code",
-                    "unit_code",
-                    "unit",
-                    "material_code",
-                    "method_code",
-                    "reference_date_source",
+                or (
+                    comparison is not None and observation.context != comparison
                 )
-            )
-            if not all(isinstance(code, str) and code.strip() for code in context):
-                return {}
-            if comparison is not None and context != comparison:
-                return {}
-            try:
-                observation_date = date.fromisoformat(reference_date)
-                displayed_numeric = Decimal(result["value"])
-            except (InvalidOperation, TypeError, ValueError):
-                return {}
-            if (
-                displayed_numeric != numeric
-                or observation_date.isoformat() != reference_date
                 or (
                     previous_observation_date is not None
-                    and observation_date <= previous_observation_date
+                    and observation.observed_on <= previous_observation_date
                 )
             ):
                 return {}
-            comparison = context
+            comparison = observation.context
             previous_release = released_at
-            previous_observation_date = observation_date
-            values.append(numeric)
+            previous_observation_date = observation.observed_on
+            values.append(observation.value)
             if result["is_abnormal"] is not None:
                 assessments.append(result["is_abnormal"])
 

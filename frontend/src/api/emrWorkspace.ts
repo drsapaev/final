@@ -35,8 +35,17 @@ export interface WorkspaceLabValue {
   value: string;
   unit: string | null;
   finalized_at: string | null;
-  abnormal: boolean;
-  comparison?: { key: string; field_key?: string; template_name: string; template_version: number; value: string } | null;
+  abnormal: boolean | null;
+  evaluation_status?: string;
+  interpretation?: string | null;
+  comparison?: {
+    key: string;
+    field_key?: string;
+    template_name: string;
+    template_version: number;
+    value: string;
+    observed_on?: string;
+  } | null;
 }
 
 export interface HistorySummary {

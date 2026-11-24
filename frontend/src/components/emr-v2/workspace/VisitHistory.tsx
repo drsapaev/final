@@ -6,6 +6,7 @@ import {
 import { useTranslation } from '@/i18n/useTranslation';
 import { echoAdultTteFacts, echoMeasurementFacts } from '@/utils/echoMeasurements';
 import { useLabReporting } from '@/hooks/useLabReporting';
+import { getEvaluationLabelKey } from '../../laboratory/utils/labReportNormalize';
 import { Button, Input, Textarea } from '../../ui/macos';
 import { AdultTteSummary } from './AdultTteSummary';
 import { ClinicalSummary } from './ClinicalSummary';
@@ -177,9 +178,12 @@ export function WorkspaceSidePanel({
 }) {
   const { t, language } = useTranslation();
   const labReporting = useLabReporting();
-  const [extra, setExtra] = useState<HistorySummary[]>([]);
-  const [hasExtra, setHasExtra] = useState<boolean>();
-  const [pagination, setPagination] = useState<'loading' | 'error'>();
+  const [historyPage, setHistoryPage] = useState<{
+    snapshot: EMRWorkspaceData;
+    items: HistorySummary[];
+    hasMore?: boolean | undefined;
+    phase?: 'loading' | 'error';
+  }>();
   const [source, setSource] = useState<HistorySummary>();
   const [version, setVersion] = useState('');
   const [document, setDocument] = useState<HistoryDocument>();
@@ -190,14 +194,15 @@ export function WorkspaceSidePanel({
   const labDownloadContext = useRef(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const currentMeasurements = measurements({ vitals: currentVitals ?? {}, echo: currentEcho ?? {} });
+  const activePage = historyPage?.snapshot === workspace ? historyPage : undefined;
   const history = useMemo(() => {
     const firstPage = workspace?.history ?? [];
     const items = new Map(firstPage.map(item => [item.id, item]));
-    for (const item of extra) {
+    for (const item of activePage?.items ?? []) {
       if (!items.has(item.id)) items.set(item.id, item);
     }
     return [...items.values()];
-  }, [workspace, extra]);
+  }, [workspace, activePage?.items]);
   const labVisits = useMemo(() => workspace ? [
     { id: workspace.visit.id, date: workspace.visit.date, values: workspace.current_laboratory ?? [] },
     ...history.map(item => ({ id: item.visit_id, date: item.visit_date, values: item.laboratory ?? [] })),
@@ -246,15 +251,17 @@ export function WorkspaceSidePanel({
   }
 
   async function loadMore() {
-    if (!workspace || pagination === 'loading') return;
-    setPagination('loading');
+    if (!workspace || activePage?.phase === 'loading') return;
+    const items = activePage?.items ?? [];
+    const requestPage = { snapshot: workspace, items, hasMore: activePage?.hasMore, phase: 'loading' as const };
+    setHistoryPage(requestPage);
     try {
-      const page = await getEMRWorkspace(workspace.visit.id, workspace.patient.id, undefined, workspace.history.length + extra.length);
-      setExtra([...extra, ...page.history]);
-      setHasExtra(page.has_more_history);
-      setPagination(undefined);
+      const page = await getEMRWorkspace(workspace.visit.id, workspace.patient.id, undefined, workspace.history.length + items.length);
+      setHistoryPage(current => current === requestPage ? {
+        snapshot: workspace, items: [...items, ...page.history], hasMore: page.has_more_history,
+      } : current);
     } catch {
-      setPagination('error');
+      setHistoryPage(current => current === requestPage ? { ...requestPage, phase: 'error' } : current);
     }
   }
 
@@ -306,7 +313,11 @@ export function WorkspaceSidePanel({
                     <summary>{t('emr_workspace.previous_labs')}</summary>
                     <ul>
                       {item.laboratory.map((value, index) => <li key={`${value.instance_id}:${index}`}>
-                        <span>{value.name} {value.value} {value.unit} {value.abnormal && t('emr_workspace.lab_abnormal')}
+                        <span>{value.name} {value.value} {value.unit} · {t(getEvaluationLabelKey({
+                          evaluation_status: value.evaluation_status ?? 'unknown',
+                          interpretation: value.interpretation,
+                          value_text: value.value,
+                        }))}
                           {value.finalized_at && ` · ${new Date(value.finalized_at).toLocaleDateString(language)}`}</span>
                         <Button type="button" size="small" variant="ghost" onClick={() => void openLabReport(value.instance_id)}>
                           {t('emr_workspace.lab_report', { id: value.instance_id })}
@@ -322,11 +333,11 @@ export function WorkspaceSidePanel({
                 </li>
               ))}
             </ol>
-            {(hasExtra ?? workspace.has_more_history) && <Button type="button" size="small" variant="outline"
-              disabled={pagination === 'loading'} onClick={() => void loadMore()}>
-              {t(pagination === 'loading' ? 'emr_workspace.loading' : 'emr_workspace.more_history')}
+            {(activePage?.hasMore ?? workspace.has_more_history) && <Button type="button" size="small" variant="outline"
+              disabled={activePage?.phase === 'loading'} onClick={() => void loadMore()}>
+              {t(activePage?.phase === 'loading' ? 'emr_workspace.loading' : 'emr_workspace.more_history')}
             </Button>}
-            {pagination === 'error' && <p role="alert">{t('emr_workspace.load_error')}</p>}
+            {activePage?.phase === 'error' && <p role="alert">{t('emr_workspace.load_error')}</p>}
             {source && (
               <div className="emr-workspace-group">
                 <h4 tabIndex={-1} ref={headingRef}>{t('emr_workspace.source_document')}</h4>

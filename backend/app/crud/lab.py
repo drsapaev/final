@@ -5,7 +5,13 @@ from datetime import datetime
 from sqlalchemy import MetaData, Table, and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.lab import FINAL_INSTANCE_STATUSES, LabReportInstance, LabReportValue
+from app.models.lab import (
+    FINAL_INSTANCE_STATUSES,
+    LabOrder,
+    LabReportInstance,
+    LabReportValue,
+    LabResult,
+)
 
 
 def _orders(db: Session) -> Table:
@@ -108,76 +114,80 @@ def get_patient_lab_results(
     include_observation: bool = False,
 ) -> list[dict]:
     """Read patient results and the exact released evaluation behind each projection."""
-    r = _results(db)
-    o = _orders(db)
+    r = LabResult.__table__
     source = LabReportInstance.__table__
-    root = source.alias("lab_result_root")
-    value = LabReportValue.__table__
-    released_statuses = sorted(FINAL_INSTANCE_STATUSES)
     result_date = func.coalesce(source.c.finalized_at, r.c.created_at)
     date_filters = []
     if date_from is not None:
         date_filters.append(result_date >= date_from)
     if date_to is not None:
         date_filters.append(result_date <= date_to)
+    rows = db.execute(
+        patient_lab_results_statement(patient_id, include_observation=include_observation)
+        .where(*date_filters)
+        .order_by(r.c.id.desc())
+        .offset(offset)
+        .limit(limit)
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def patient_lab_results_statement(patient_id: int, *, include_observation: bool = False):
+    """Select exact released projections and genuine unlinked legacy results."""
+    r = LabResult.__table__
+    o = LabOrder.__table__
+    source = LabReportInstance.__table__
+    root = source.alias("lab_result_root")
+    value = LabReportValue.__table__
+    released_statuses = sorted(FINAL_INSTANCE_STATUSES)
     observation = (
         (value.c.result_payload, value.c.value_numeric) if include_observation else ()
     )
 
-    rows = (
-        db.execute(
-            select(
-                r,
-                source.c.finalized_at.label("released_at"),
-                source.c.supersedes_instance_id,
-                value.c.evaluation_snapshot,
-                value.c.resolved_reference_text,
-                *observation,
-            )
-            .join(o, r.c.order_id == o.c.id)
-            .outerjoin(
-                source,
-                and_(
-                    source.c.id == r.c.source_instance_id,
-                    source.c.patient_id == o.c.patient_id,
-                    source.c.order_id == o.c.id,
-                    source.c.status.in_(released_statuses),
-                ),
-            )
-            .outerjoin(
-                root,
-                and_(
-                    root.c.id == r.c.source_root_instance_id,
-                    root.c.patient_id == o.c.patient_id,
-                    root.c.order_id == o.c.id,
-                    root.c.supersedes_instance_id.is_(None),
-                    root.c.status.in_(released_statuses),
-                ),
-            )
-            .outerjoin(
-                value,
-                and_(
-                    value.c.instance_id == source.c.id,
-                    value.c.field_key == r.c.test_code,
-                ),
-            )
-            .where(
-                o.c.patient_id == patient_id,
-                or_(
-                    and_(
-                        r.c.source_instance_id.is_(None),
-                        r.c.source_root_instance_id.is_(None),
-                    ),
-                    and_(source.c.id.is_not(None), root.c.id.is_not(None)),
-                ),
-                *date_filters,
-            )
-            .order_by(r.c.id.desc())
-            .offset(offset)
-            .limit(limit)
+    return (
+        select(
+            r,
+            source.c.finalized_at.label("released_at"),
+            source.c.supersedes_instance_id,
+            value.c.evaluation_snapshot,
+            value.c.resolved_reference_text,
+            *observation,
         )
-        .mappings()
-        .all()
+        .join(o, r.c.order_id == o.c.id)
+        .outerjoin(
+            source,
+            and_(
+                source.c.id == r.c.source_instance_id,
+                source.c.patient_id == o.c.patient_id,
+                source.c.order_id == o.c.id,
+                source.c.status.in_(released_statuses),
+            ),
+        )
+        .outerjoin(
+            root,
+            and_(
+                root.c.id == r.c.source_root_instance_id,
+                root.c.patient_id == o.c.patient_id,
+                root.c.order_id == o.c.id,
+                root.c.supersedes_instance_id.is_(None),
+                root.c.status.in_(released_statuses),
+            ),
+        )
+        .outerjoin(
+            value,
+            and_(
+                value.c.instance_id == source.c.id,
+                value.c.field_key == r.c.test_code,
+            ),
+        )
+        .where(
+            o.c.patient_id == patient_id,
+            or_(
+                and_(
+                    r.c.source_instance_id.is_(None),
+                    r.c.source_root_instance_id.is_(None),
+                ),
+                and_(source.c.id.is_not(None), root.c.id.is_not(None)),
+            ),
+        )
     )
-
-    return [dict(row) for row in rows]

@@ -29,6 +29,7 @@ from app.schemas.emr_workspace import (
     WorkspaceVisit,
 )
 from app.services.emr_contract import get_emr_text_field
+from app.services.emr_lab_result_evidence import frozen_assessment, released_numeric_observation
 from app.services.emr_v2_service import emr_v2_service
 
 
@@ -184,31 +185,40 @@ class EMRWorkspaceService:
             **{item.visit_id: item.laboratory for item in history_items},
         }
         for row in self.repository.workspace_lab_values(patient.id, list(labs_by_visit)):
-            numeric = row.value_numeric
+            value = row["value"]
+            snapshot = row["evaluation_snapshot"]
+            if not isinstance(snapshot, dict):
+                snapshot = {}
+            status, interpretation, abnormal = frozen_assessment(snapshot, value)
+            observation = released_numeric_observation(
+                value, row["result_payload"], snapshot, row["value_numeric"]
+            )
             comparison = None
             if (
-                row.source_root_instance_id is not None
-                and row.test_code
-                and row.unit
-                and row.unit.strip()
-                and numeric is not None
-                and numeric.is_finite()
+                observation is not None
+                and row["released_at"] is not None
+                and row["test_code"]
             ):
                 comparison = WorkspaceLabComparison(
-                    key=dumps((row.template_version_id, row.test_code, row.unit)),
-                    field_key=row.test_code,
-                    template_name=row.template_name,
-                    template_version=row.template_version,
-                    value=format(numeric, "f"),
+                    key=dumps(
+                        (row["template_version_id"], row["test_code"], *observation.context)
+                    ),
+                    field_key=row["test_code"],
+                    template_name=row["template_name"],
+                    template_version=row["template_version"],
+                    value=format(observation.value, "f"),
+                    observed_on=observation.observed_on,
                 )
-            labs_by_visit[row.visit_id].append(
+            labs_by_visit[row["source_visit_id"]].append(
                 WorkspaceLabValue(
-                    instance_id=row.instance_id,
-                    name=row.test_name,
-                    value=row.value,
-                    unit=row.unit,
-                    finalized_at=row.finalized_at,
-                    abnormal=row.abnormal,
+                    instance_id=row["source_instance_id"],
+                    name=row["test_name"],
+                    value=value,
+                    unit=snapshot.get("unit") if snapshot else row["unit"],
+                    finalized_at=row["released_at"],
+                    abnormal=abnormal,
+                    evaluation_status=status,
+                    interpretation=interpretation,
                     comparison=comparison,
                 )
             )

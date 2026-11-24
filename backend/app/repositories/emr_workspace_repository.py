@@ -5,14 +5,13 @@ from uuid import UUID
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
+from app.crud.lab import patient_lab_results_statement
 from app.models.emr_v2 import EMRRecord
 from app.models.lab import (
-    FINAL_INSTANCE_STATUSES,
     LabOrder,
     LabReportInstance,
     LabReportTemplate,
     LabReportTemplateVersion,
-    LabReportValue,
     LabResult,
 )
 from app.models.patient import Patient
@@ -121,30 +120,13 @@ class EMRWorkspaceRepository:
     def workspace_lab_values(self, patient_id: int, visit_ids: list[int]):
         if not visit_ids:
             return []
-        return (
-            self.db.query(
-                LabReportInstance.id.label("instance_id"),
-                LabReportInstance.visit_id,
-                LabReportInstance.finalized_at,
+        statement = (
+            patient_lab_results_statement(patient_id, include_observation=True)
+            .add_columns(
+                LabReportInstance.visit_id.label("source_visit_id"),
                 LabReportInstance.template_version_id,
-                LabResult.test_name,
-                LabResult.value,
-                LabResult.unit,
-                LabResult.abnormal,
-                LabResult.test_code,
-                LabResult.source_root_instance_id,
-                LabReportValue.value_numeric,
                 LabReportTemplate.name.label("template_name"),
                 LabReportTemplateVersion.version_no.label("template_version"),
-            )
-            .select_from(LabReportInstance)
-            .join(LabResult, LabResult.source_instance_id == LabReportInstance.id)
-            .join(
-                LabOrder,
-                and_(
-                    LabOrder.id == LabResult.order_id,
-                    LabOrder.id == LabReportInstance.order_id,
-                ),
             )
             .join(
                 LabReportTemplateVersion,
@@ -155,19 +137,9 @@ class EMRWorkspaceRepository:
                 ),
             )
             .join(LabReportTemplate, LabReportTemplate.id == LabReportInstance.template_id)
-            .outerjoin(
-                LabReportValue,
-                and_(
-                    LabReportValue.instance_id == LabReportInstance.id,
-                    LabReportValue.field_key == LabResult.test_code,
-                ),
-            )
-            .filter(
-                LabOrder.patient_id == patient_id,
-                LabReportInstance.patient_id == patient_id,
+            .where(
                 LabOrder.visit_id == LabReportInstance.visit_id,
                 LabReportInstance.visit_id.in_(visit_ids),
-                LabReportInstance.status.in_(FINAL_INSTANCE_STATUSES),
                 LabResult.value.is_not(None),
             )
             .order_by(
@@ -175,5 +147,5 @@ class EMRWorkspaceRepository:
                 LabReportInstance.finalized_at.desc(),
                 LabResult.id,
             )
-            .all()
         )
+        return self.db.execute(statement).mappings().all()

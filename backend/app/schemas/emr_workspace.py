@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from app.schemas.lab_reporting import LabEvaluationStatus, LabInterpretation
+
 NamedClinicalValue = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)
 ]
@@ -102,11 +104,12 @@ class WorkspaceVisit(BaseModel):
 
 
 class WorkspaceLabComparison(BaseModel):
-    key: str = Field(description="Opaque key for an exact template version, field and unit")
+    key: str = Field(description="Opaque key for the template field and frozen measurement context")
     field_key: str
     template_name: str
     template_version: int
     value: str = Field(description="Persisted numeric value from the source lab report")
+    observed_on: date = Field(description="Frozen study or specimen collection date")
 
 
 class WorkspaceLabValue(BaseModel):
@@ -115,7 +118,9 @@ class WorkspaceLabValue(BaseModel):
     value: str
     unit: str | None
     finalized_at: datetime | None
-    abnormal: bool
+    abnormal: bool | None
+    evaluation_status: LabEvaluationStatus = "unknown"
+    interpretation: LabInterpretation | None = None
     comparison: WorkspaceLabComparison | None = None
 
 

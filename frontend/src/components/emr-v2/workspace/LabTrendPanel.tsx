@@ -16,10 +16,10 @@ interface TrendRow {
 
 function getTrends(visits: LabVisit[]) {
   const groups = new Map<string, TrendRow[]>();
-  for (const { id, date, values } of visits) {
-    if (!date) continue;
+  for (const { id, values } of visits) {
     for (const { instance_id, name, unit, comparison } of values) {
-      if (!comparison?.key || !comparison.value.trim() || !unit?.trim()) continue;
+      const date = comparison?.observed_on;
+      if (!date || !comparison?.key || !comparison.value.trim() || !unit?.trim()) continue;
       const row = { visitId: id, date, reportId: instance_id, name, unit, comparison };
       const group = groups.get(comparison.key);
       if (group) group.push(row);
@@ -28,7 +28,8 @@ function getTrends(visits: LabVisit[]) {
   }
 
   return [...groups.entries()]
-    .filter(([, rows]) => new Set(rows.map(row => row.visitId)).size >= 2)
+    .filter(([, rows]) => new Set(rows.map(row => row.visitId)).size >= 2
+      && new Set(rows.map(row => row.date)).size === rows.length)
     .map(([key, rows]) => ({ key, rows: rows.sort((first, second) => (
       first.date.localeCompare(second.date) || first.visitId - second.visitId || first.reportId - second.reportId
     )) }));

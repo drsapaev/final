@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { getWorkspaceHistoryDocument, type EMRWorkspaceData } from '@/api/emrWorkspace';
+import { getEMRWorkspace, getWorkspaceHistoryDocument, type EMRWorkspaceData } from '@/api/emrWorkspace';
 import { CardiologySection } from '../sections/specialty/CardiologySection';
 import { DocumentPreview } from '../workspace/DocumentPreview';
 import { WorkspaceSidePanel } from '../workspace/VisitHistory';
@@ -136,5 +136,39 @@ describe('Adult TTE clinical read surfaces', () => {
     expect(await screen.findByText(/echo_tte_lavi 31 mL\/m²/)).toBeVisible();
     expect(screen.getByText('2026-09-03')).toBeVisible();
     expect(vi.mocked(getWorkspaceHistoryDocument).mock.lastCall).toEqual([99, 1, 98, 2]);
+  });
+});
+
+describe('Released laboratory visit history', () => {
+  it('keeps a qualified result and its assessment on the loaded page until the workspace refreshes', async () => {
+    const workspace: EMRWorkspaceData = {
+      patient: { id: 1, full_name: 'SYNTHETIC patient', birth_date: null, legacy_allergies: null, legacy_conditions: null },
+      visit: { id: 99, date: '2026-11-20', status: 'open' },
+      clinical_entries: [], allergy_state: 'not_checked', has_more_history: true, history: [],
+    };
+    vi.mocked(getEMRWorkspace).mockResolvedValueOnce({
+      ...workspace,
+      has_more_history: false,
+      history: [{
+        id: 101, visit_id: 98, version: 1, status: 'signed', visit_date: '2026-09-05', signed_at: null,
+        complaints: '', diagnosis: '', treatment: '', recommendations: '', vitals: {}, echo: {},
+        laboratory: [{
+          instance_id: 301, name: 'SYNTHETIC test', value: '<5', unit: 'mmol/L',
+          finalized_at: '2026-11-21T03:00:00Z', abnormal: null,
+          evaluation_status: 'not_evaluated', interpretation: null, comparison: null,
+        }],
+      }],
+    });
+    const props = { status: 'ready' as const, readOnly: true, reload: vi.fn(), followUp: {}, onFollowUpChange: vi.fn() };
+    const { rerender } = render(<WorkspaceSidePanel {...props} workspace={workspace} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'emr_workspace.more_history' }));
+    fireEvent.click(await screen.findByText('emr_workspace.previous_labs'));
+    expect(screen.getByText(/SYNTHETIC test <5 mmol\/L · workbench\.result_not_evaluated/)).toBeVisible();
+    expect(screen.queryByText(/workbench\.result_normal/)).not.toBeInTheDocument();
+
+    rerender(<WorkspaceSidePanel {...props} workspace={{ ...workspace }} />);
+    expect(screen.queryByText(/SYNTHETIC test <5/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'emr_workspace.more_history' })).toBeEnabled();
   });
 });
