@@ -74,10 +74,13 @@ def telegram_pg():
             # The metadata fixture already has this column. Install the
             # actual migration and epoch trigger before any Telegram seed.
             conn.exec_driver_sql(f"ALTER TABLE {links} DROP COLUMN patient_link_epoch")
-            path = Path(__file__).resolve().parents[2] / "alembic/versions/0101_telegram_patient_link_epoch.py"
-            migration = _module(path)
-            migration.op = Operations(MigrationContext.configure(conn, opts={"version_table_schema": schema_name}))
-            migration.upgrade()
+            versions = Path(__file__).resolve().parents[2] / "alembic/versions"
+            operations = Operations(MigrationContext.configure(conn, opts={"version_table_schema": schema_name}))
+            # The scoped finance trigger also participates in owner invalidation.
+            for revision in ("0101_telegram_patient_link_epoch", "0141_confirmation_financial_trigger"):
+                migration = _module(versions / f"{revision}.py")
+                migration.op = operations
+                migration.upgrade()
             conn.exec_driver_sql(f"ALTER TABLE {links} ENABLE ROW LEVEL SECURITY")
             conn.exec_driver_sql(f"ALTER TABLE {links} FORCE ROW LEVEL SECURITY")
             conn.exec_driver_sql(f"GRANT SELECT, UPDATE (id) ON {links} TO {role}")

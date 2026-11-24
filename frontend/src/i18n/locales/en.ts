@@ -1549,6 +1549,7 @@ const en = {
     derma_panel_patients_search_placeholder: 'Name, phone, or ID',
     derma_panel_patients_search_minimum: 'Enter at least 2 characters',
     derma_panel_patients_search_empty: 'No patients found',
+    derma_panel_patients_search_load_more_failed: 'Failed to load the next results page — only the matches already loaded are shown. Try again.',
     derma_panel_patients_search_error: 'Search failed. Please try again.',
     derma_panel_patients_search_results: 'Patient search results',
     derma_panel_patients_select: 'Select',

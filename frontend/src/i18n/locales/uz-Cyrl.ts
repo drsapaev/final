@@ -1560,6 +1560,7 @@ const uzCyrl = {
     derma_panel_patients_search_placeholder: 'Ф.И.Ш., телефон ёки ID',
     derma_panel_patients_search_minimum: 'Камида 2 та белги киритинг',
     derma_panel_patients_search_empty: 'Беморлар топилмади',
+    derma_panel_patients_search_load_more_failed: 'Натижаларнинг кейинги саҳифасини юклаш амалга ошмади — фақат юкланган мосликлар кўрсатилган. Қайтадан уриниб кўринг.',
     derma_panel_patients_search_error: 'Қидирув бажарилмади. Қайта уриниб кўринг.',
     derma_panel_patients_search_results: 'Беморларни қидириш натижалари',
     derma_panel_patients_select: 'Танлаш',

@@ -5,6 +5,8 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
+from queue import SimpleQueue
 
 import pytest
 from sqlalchemy import create_engine, event, text
@@ -14,7 +16,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.core.config import settings
+from app.models.encounter import Encounter
 from app.models.patient import Patient
+from app.models.service import Service
 from app.models.telegram_config import TelegramUser
 from app.models.visit import Visit, VisitService
 from app.services.visit_confirmation_service import (
@@ -25,6 +29,10 @@ from app.services.visit_confirmation_service import (
     build_telegram_ticket_start_token,
     build_telegram_visit_action_token,
     consume_telegram_ticket_start_token,
+)
+from tests.integration.test_telegram_visit_concurrency_pg import (
+    _assert_postgres_blocks,
+    telegram_pg as telegram_pg,
 )
 
 
@@ -292,100 +300,108 @@ def test_postgres_login_role_pins_shadow_and_refuses_incomplete_visibility(monke
 @pytest.mark.integration
 @pytest.mark.parametrize("owner_first", [True, False])
 @pytest.mark.parametrize("channel", ["pwa", "telegram"])
-def test_postgres_info_and_owner_change_serialize(owner_first, channel):
-    raw = os.environ.get("DATABASE_URL", "")
-    if not raw or make_url(raw).get_backend_name() != "postgresql" or not (make_url(raw).database or "").startswith("clinic_test"):
-        pytest.skip("requires a fully migrated disposable clinic_test PostgreSQL database")
-    engine = create_engine(raw, connect_args={"options": "-clock_timeout=10000"})
+def test_postgres_info_and_owner_change_serialize(telegram_pg, owner_first, channel):
+    owner, runtime = telegram_pg
+    suffix = uuid.uuid4().hex
+    token = f"synthetic-race-{suffix}"
+    with Session(owner) as setup:
+        patient = Patient(first_name="SYNTHETIC", last_name="RACE")
+        service = Service(
+            code=f"RACE{suffix[:16]}", name="Synthetic consultation", price=Decimal("10.00")
+        )
+        setup.add_all([patient, service])
+        setup.flush()
+        encounter = Encounter(patient_id=patient.id, provenance="new")
+        setup.add(encounter)
+        setup.flush()
+        visit = Visit(
+            patient_id=patient.id,
+            encounter_id=encounter.id,
+            visit_date=date.today() + timedelta(days=7),
+            visit_time="12:00",
+            status="pending_confirmation",
+            confirmation_channel=channel,
+            discount_mode="none",
+            source="desk",
+        )
+        setup.add(visit)
+        setup.flush()
+        setup.add(
+            VisitService(
+                visit_id=visit.id, service_id=service.id, name=service.name,
+                qty=1, price=service.price, currency="UZS",
+            )
+        )
+        setup.flush()
+        setup.refresh(visit)
+        visit.confirmation_token = token
+        visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
+        if channel == "telegram":
+            link = TelegramUser(
+                patient_id=patient.id,
+                chat_id=1_000_000_000_000 + uuid.uuid4().int % 1_000_000_000_000,
+                active=True, blocked=False, notifications_enabled=True, appointment_reminders=True,
+            )
+            setup.add(link)
+            setup.flush()
+            setup.refresh(link)
+            token = build_telegram_visit_action_token(
+                visit_id=visit.id,
+                confirmation_token=visit.confirmation_token,
+                link_id=link.id,
+                chat_id=link.chat_id,
+                patient_id=patient.id,
+                link_epoch=link.patient_link_epoch,
+                visit_context_epoch=visit.confirmation_context_epoch,
+                purpose="view",
+            )
+        patient_id, visit_id = patient.id, visit.id
+        setup.commit()
+
+    at_patient_lock = threading.Event()
+    proceed = threading.Event()
+    reader_pid: SimpleQueue[int] = SimpleQueue()
+    writer_pid: SimpleQueue[int] = SimpleQueue()
+    hook = "before_cursor_execute" if owner_first else "after_cursor_execute"
+
+    def pause_at_patient_lock(_conn, _cursor, statement, _parameters, _context, _executemany):
+        if ".lock_confirmation_patient(" in statement:
+            at_patient_lock.set()
+            assert proceed.wait(8)
+
+    def reader():
+        with Session(runtime) as db:
+            reader_pid.put(db.scalar(text("SELECT pg_backend_pid()")))
+            try:
+                result = VisitConfirmationService(db).get_visit_info(token)
+                db.commit()
+                return result["visit_id"]
+            except VisitConfirmationDomainError as exc:
+                db.rollback()
+                return exc.status_code
+
+    def change_owner():
+        with owner.begin() as conn:
+            writer_pid.put(conn.scalar(text("SELECT pg_backend_pid()")))
+            conn.execute(text("UPDATE patients SET is_deleted=true WHERE id=:id"), {"id": patient_id})
+
+    event.listen(runtime, hook, pause_at_patient_lock)
     try:
-        with engine.begin() as conn:
-            if not conn.execute(text("SELECT EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='trg_patient_owner_confirmation_context' AND NOT tgisinternal)")).scalar_one():
-                pytest.skip("requires 0116 migrated database")
-        token = "synthetic-race-" + uuid.uuid4().hex
-        with Session(engine) as setup:
-            patient = Patient(first_name="SYNTHETIC", last_name="RACE")
-            setup.add(patient)
-            setup.flush()
-            visit = Visit(patient_id=patient.id, status="pending_confirmation", visit_date=date.today() + timedelta(days=7), visit_time="12:00", confirmation_channel=channel)
-            setup.add(visit)
-            setup.flush()
-            visit.confirmation_token = token
-            visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
-            link_id = None
-            if channel == "telegram":
-                setup.flush()
-                setup.refresh(visit)
-                link = TelegramUser(patient_id=patient.id, chat_id=1_000_000_000_000 + uuid.uuid4().int % 1_000_000_000_000,
-                                    active=True, blocked=False, notifications_enabled=True, appointment_reminders=True)
-                setup.add(link)
-                setup.flush()
-                setup.refresh(link)
-                token = build_telegram_visit_action_token(
-                    visit_id=visit.id, confirmation_token=visit.confirmation_token,
-                    link_id=link.id, chat_id=link.chat_id, patient_id=patient.id,
-                    link_epoch=link.patient_link_epoch, visit_context_epoch=visit.confirmation_context_epoch,
-                    purpose="view",
-                )
-                link_id = link.id
-            setup.commit()
-            patient_id, visit_id = patient.id, visit.id
-
-        at_patient_lock = threading.Event()
-        proceed = threading.Event()
-
-        @event.listens_for(engine, "before_cursor_execute")
-        def pause_before(conn, cursor, statement, parameters, context, executemany):
-            if owner_first and threading.current_thread().name.startswith("confirmation-reader") and "FROM patients" in statement and "FOR UPDATE" in statement:
-                at_patient_lock.set()
-                assert proceed.wait(10)
-
-        @event.listens_for(engine, "after_cursor_execute")
-        def pause_after(conn, cursor, statement, parameters, context, executemany):
-            if not owner_first and threading.current_thread().name.startswith("confirmation-reader") and "FROM patients" in statement and "FOR UPDATE" in statement:
-                at_patient_lock.set()
-                assert proceed.wait(10)
-
-        def reader():
-            with Session(engine) as db:
-                try:
-                    result = VisitConfirmationService(db).get_visit_info(token)
-                    db.commit()
-                    return result["visit_id"]
-                except VisitConfirmationDomainError as exc:
-                    db.rollback()
-                    return exc.status_code
-
-        try:
-            with ThreadPoolExecutor(max_workers=1, thread_name_prefix="confirmation-reader") as pool:
-                future = pool.submit(reader)
-                assert at_patient_lock.wait(10)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            read_result = pool.submit(reader)
+            try:
+                assert at_patient_lock.wait(5)
                 if owner_first:
-                    with engine.begin() as owner:
-                        owner.execute(text("UPDATE patients SET is_deleted=true WHERE id=:id"), {"id": patient_id})
-                    proceed.set()
-                    assert future.result(timeout=10) == 404
+                    change_owner()
                 else:
-                    owner_started = threading.Event()
-
-                    def change_owner():
-                        with engine.begin() as owner:
-                            owner_started.set()
-                            owner.execute(text("UPDATE patients SET is_deleted=true WHERE id=:id"), {"id": patient_id})
-
-                    with ThreadPoolExecutor(max_workers=1) as updater:
-                        update_future = updater.submit(change_owner)
-                        assert owner_started.wait(10)
-                        proceed.set()
-                        assert future.result(timeout=10) == visit_id
-                        update_future.result(timeout=10)
-        finally:
-            proceed.set()
-            event.remove(engine, "before_cursor_execute", pause_before)
-            event.remove(engine, "after_cursor_execute", pause_after)
-            with engine.begin() as cleanup:
-                if link_id:
-                    cleanup.execute(text("DELETE FROM telegram_users WHERE id=:id"), {"id": link_id})
-                cleanup.execute(text("DELETE FROM visits WHERE id=:id"), {"id": visit_id})
-                cleanup.execute(text("DELETE FROM patients WHERE id=:id"), {"id": patient_id})
+                    change_result = pool.submit(change_owner)
+                    _assert_postgres_blocks(
+                        owner, waiter_pid=writer_pid.get(timeout=5), blocker_pid=reader_pid.get(timeout=5)
+                    )
+            finally:
+                proceed.set()
+            assert read_result.result(timeout=10) == (404 if owner_first else visit_id)
+            if not owner_first:
+                change_result.result(timeout=10)
     finally:
-        engine.dispose()
+        event.remove(runtime, hook, pause_at_patient_lock)
