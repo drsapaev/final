@@ -10,6 +10,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine, make_url
+from sqlalchemy.exc import IntegrityError
 from tests._pg_admin_guard import is_local_admin_dsn
 from tests.integration.test_encounter_migration_pg import _migration
 
@@ -779,3 +780,99 @@ def test_payment_evidence_rejects_assumable_destructive_grants(
         connection.exec_driver_sql(f"REVOKE {scope.inherited} FROM {scope.gateway}")
         _migrate(scope, connection)
         assert not _has(connection, scope, scope.gateway, "payment_transactions", privilege)
+
+
+@pytest.mark.parametrize("relation", ["payment_webhooks", "payment_transactions"])
+def test_payment_evidence_keeps_original_identity_and_amount(
+    payment_evidence_scope, monkeypatch, relation
+):
+    scope = payment_evidence_scope
+    migration = _migration("0165_payment_evidence_identity.py")
+    monkeypatch.setattr(migration, "_GATEWAY_ROLES", (scope.gateway,))
+    identity_scope = replace(scope, migration=migration)
+    table = scope.qualified(relation)
+    original = {
+        "id": 1,
+        "provider": "synthetic_provider",
+        "transaction_id": "equipment_test_receipt",
+        "amount": 1100,
+        "currency": "UZS",
+    }
+    proposed = {
+        "id": 7,
+        "provider": "synthetic_archive",
+        "transaction_id": "equipment_test_revision",
+        "amount": 1200,
+        "currency": "USD",
+    }
+    if relation == "payment_webhooks":
+        original["webhook_id"] = "synthetic_original_event"
+        proposed["webhook_id"] = "synthetic_other_event"
+    columns = ", ".join(original)
+    placeholders = ", ".join(f":{column}" for column in original)
+    values = text(f"INSERT INTO {table} ({columns}, status) VALUES ({placeholders}, 'pending')")
+    by_identity = text(f"SELECT {columns}, status FROM {table} WHERE id = 1 FOR UPDATE")
+
+    with scope.engine.begin() as connection:
+        for name in ("payment_webhooks", "payment_transactions"):
+            evidence = scope.qualified(name)
+            webhook_id_type = "text" if name == "payment_webhooks" else "integer"
+            connection.exec_driver_sql(f"""
+                ALTER TABLE {evidence}
+                ADD COLUMN provider text, ADD COLUMN transaction_id text,
+                ADD COLUMN amount integer, ADD COLUMN currency text,
+                ADD COLUMN webhook_id {webhook_id_type}
+            """)
+        schema = connection.dialect.identifier_preparer.quote_schema(scope.schema)
+        connection.exec_driver_sql(
+            f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} "
+            f"GRANT EXECUTE ON FUNCTIONS TO {scope.gateway}"
+        )
+        connection.execute(values, original)
+        _migrate(scope, connection)
+        _migrate(identity_scope, connection)
+        assert not connection.scalar(
+            text("SELECT pg_catalog.has_function_privilege(:role, :function, 'EXECUTE')"),
+            {
+                "role": scope.gateway,
+                "function": f"{schema}.reject_payment_evidence_identity_change()",
+            },
+        )
+
+        connection.exec_driver_sql(f"SET LOCAL ROLE {scope.gateway}")
+        locked = dict(connection.execute(by_identity).mappings().one())
+        assert locked == {**original, "status": "pending"}
+        followup = {**original, "id": 2, "transaction_id": "equipment_test_followup"}
+        if "webhook_id" in followup:
+            followup["webhook_id"] = "synthetic_followup_event"
+        connection.execute(values, followup)
+        connection.execute(
+            text(f"UPDATE {table} SET status = 'processed', amount = amount WHERE id = 1")
+        )
+        if relation == "payment_transactions":
+            connection.execute(text(f"UPDATE {table} SET webhook_id = 2 WHERE id = 1"))
+            assert connection.scalar(
+                text(f"SELECT webhook_id FROM {table} WHERE id = 1")
+            ) == 2
+        for column, value in proposed.items():
+            with (
+                pytest.raises(IntegrityError, match="Payment evidence identity and amount"),
+                connection.begin_nested(),
+            ):
+                connection.execute(
+                    text(f"UPDATE {table} SET {column} = :value, status = 'corrected' WHERE id = 1"),
+                    {"value": value},
+                )
+        assert dict(connection.execute(by_identity).mappings().one()) == {
+            **original,
+            "status": "processed",
+        }
+
+    with scope.engine.begin() as connection:
+        _migrate(identity_scope, connection, downgrade=True)
+        assert not _has(connection, scope, scope.gateway, relation, "DELETE")
+        _migrate(identity_scope, connection)
+        assert dict(connection.execute(by_identity).mappings().one()) == {
+            **original,
+            "status": "processed",
+        }
