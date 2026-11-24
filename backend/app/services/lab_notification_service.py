@@ -3,13 +3,22 @@ Lab Results Auto-Notification Service
 Сервис автоматических уведомлений о готовности анализов
 """
 import logging
+import math
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
-from app.models.lab import LabOrder, LabReportInstance, LabResult
+from app.models.lab import (
+    FINAL_INSTANCE_STATUSES,
+    LabOrder,
+    LabReportInstance,
+    LabReportValue,
+    LabResult,
+)
 from app.models.notification import (
     NotificationDelivery,
     NotificationEvent,
@@ -69,10 +78,11 @@ class LabNotificationService:
         event_type: str,
         recipient_id: int,
         entity_id: int,
-        expected_value: float | None = None,
+        expected_value: float | str | None = None,
+        source: LabReportInstance | None = None,
     ) -> bool:
         snapshots = (
-            self.db.query(NotificationEvent.payload_snapshot)
+            self.db.query(NotificationEvent.payload_snapshot, NotificationEvent.created_at)
             .select_from(NotificationEvent)
             .join(
                 NotificationDelivery,
@@ -91,10 +101,22 @@ class LabNotificationService:
         )
         if expected_value is None:
             return bool(snapshots)
-        return any(
-            ((snapshot or {}).get("metadata") or {}).get("value") == expected_value
-            for (snapshot,) in snapshots
-        )
+        for snapshot, event_at in snapshots:
+            metadata = (snapshot or {}).get("metadata") or {}
+            if source is None:
+                if metadata.get("value") == expected_value:
+                    return True
+                continue
+            if metadata.get("report_instance_id") == source.id:
+                return True
+            if (
+                "report_instance_id" not in metadata
+                and metadata.get("value") == expected_value
+                and _as_aware_utc(event_at) >= _as_aware_utc(source.finalized_at)
+            ):
+                # Adopt an existing delivery for this release during rollout.
+                return True
+        return False
 
     def _lab_sms_delivery_exists(self, *, patient_id: int, order_id: int) -> bool:
         return (
@@ -303,44 +325,57 @@ class LabNotificationService:
             yesterday = datetime.now(UTC) - timedelta(hours=24)
 
             recent_results = (
-                self.db.query(LabResult)
+                self.db.query(LabResult, LabReportInstance, LabReportValue)
                 .outerjoin(
                     LabReportInstance, LabReportInstance.id == LabResult.source_instance_id,
                 )
+                .outerjoin(
+                    LabReportValue,
+                    and_(
+                        LabReportValue.instance_id == LabReportInstance.id,
+                        LabReportValue.field_key == LabResult.test_code,
+                    ),
+                )
                 .filter(
-                    LabResult.created_at >= yesterday,
-                    LabReportInstance.managed_release.is_not(True),
+                    LabResult.value.is_not(None),
+                    or_(
+                        and_(
+                            LabResult.source_instance_id.is_(None),
+                            LabResult.source_root_instance_id.is_(None),
+                            LabResult.created_at >= yesterday,
+                        ),
+                        and_(
+                            LabReportInstance.managed_release.is_(False),
+                            LabReportInstance.status.in_(FINAL_INSTANCE_STATUSES),
+                            LabReportInstance.finalized_at >= yesterday,
+                        ),
+                    ),
                 )
                 .all()
             )
 
             critical_found = []
 
-            for result in recent_results:
-                # Проверяем на критические значения
-                test_name = result.test_name.lower() if result.test_name else ""
-
-                for marker, thresholds in self.CRITICAL_VALUES.items():
-                    if marker in test_name:
-                        try:
-                            value = float(result.value)
-                            if value < thresholds["low"] or value > thresholds["high"]:
-                                order = self.db.query(LabOrder).filter(LabOrder.id == result.order_id).first()
-                                patient_id = order.patient_id if order else None
-                                critical_found.append({
-                                    "result_id": result.id,
-                                    "patient_id": patient_id,
-                                    "test_name": result.test_name,
-                                    "value": value,
-                                    "unit": thresholds["unit"],
-                                    "is_low": value < thresholds["low"],
-                                    "is_high": value > thresholds["high"],
-                                })
-
-                                # Уведомляем врача
-                                await self._notify_doctor_critical_value(result, value, thresholds)
-                        except (ValueError, TypeError):
-                            pass
+            for result, source, report_value in recent_results:
+                measurements = self._critical_measurements(result, source, report_value)
+                if not measurements:
+                    continue
+                order = self.db.get(LabOrder, result.order_id)
+                if source is not None and not self._source_context_matches(result, source, order):
+                    continue
+                for value, thresholds, direction in measurements:
+                    critical_found.append({
+                        "result_id": result.id,
+                        "patient_id": source.patient_id if source else (order.patient_id if order else None),
+                        "test_name": result.test_name,
+                        "value": value,
+                        "unit": thresholds["unit"],
+                        "is_low": direction == "low",
+                        "is_high": direction == "high",
+                    })
+                    await self._notify_doctor_critical_value(
+                        result, value, thresholds, source=source,
+                    )
 
             self.db.commit()
 
@@ -350,25 +385,170 @@ class LabNotificationService:
                 "critical_results": critical_found,
             }
 
-        except Exception as e:
-            logger.error(f"Error checking critical values: {e}")
-            return {"error": str(e)}
+        except Exception as exc:
+            self.db.rollback()
+            logger.error("Error checking critical values: %s", type(exc).__name__)
+            return {"error": "Critical value check failed"}
+
+    def _critical_measurements(
+        self,
+        result: LabResult,
+        source: LabReportInstance | None,
+        report_value: LabReportValue | None,
+    ) -> list[tuple[float | str, dict[str, Any], str | None]]:
+        if source is None:
+            if result.source_instance_id is not None or result.source_root_instance_id is not None:
+                return []
+            return self._historical_measurements(result)
+        if (
+            source.id != result.source_instance_id
+            or source.order_id != result.order_id
+            or result.source_root_instance_id is None
+            or report_value is None
+        ):
+            return []
+
+        snapshot = report_value.evaluation_snapshot
+        payload = report_value.result_payload
+        if snapshot is None and payload is None:
+            # Published before typed snapshots existed. Match the exact source
+            # value before reusing the historical scanner.
+            if self._matches_source_value(result, report_value):
+                return self._historical_measurements(result)
+            return []
+        if not isinstance(snapshot, dict) or not isinstance(payload, dict):
+            return []
+        if (
+            snapshot.get("template_version_id") != source.template_version_id
+            or snapshot.get("visible") is not True
+            or snapshot.get("status") != "evaluated"
+            or snapshot.get("interpretation") != "critical"
+            or (snapshot.get("unit") or None) != result.unit
+            or (snapshot.get("unit_code") and not snapshot.get("unit"))
+            or not self._matches_source_value(result, report_value)
+        ):
+            return []
+
+        if payload.get("kind") == "numeric" and report_value.value_numeric is not None:
+            value = float(report_value.value_numeric)
+        elif payload.get("kind") == "coded_qualitative" and payload.get("qualitative_code") in (
+            "positive", "negative", "indeterminate",
+        ):
+            value = payload["qualitative_code"]
+        else:
+            return []
+        applied_thresholds = snapshot.get("thresholds") or {}
+        if not isinstance(applied_thresholds, dict):
+            return []
+        flag_meta = report_value.resolved_flag_meta
+        direction = flag_meta.get("direction") if isinstance(flag_meta, dict) else None
+        thresholds = {
+            "unit": snapshot.get("unit") or "",
+            "low": applied_thresholds.get("critical_low"),
+            "high": applied_thresholds.get("critical_high"),
+            "analyte_code": snapshot.get("analyte_code"),
+            "unit_code": snapshot.get("unit_code"),
+        }
+        return [(value, thresholds, direction)]
+
+    @staticmethod
+    def _matches_source_value(result: LabResult, report_value: LabReportValue) -> bool:
+        if report_value.value_numeric is None:
+            return bool(result.value and result.value == report_value.value_text)
+        try:
+            projected = Decimal(result.value)
+        except (InvalidOperation, TypeError):
+            return False
+        return (
+            projected.is_finite()
+            and report_value.value_numeric.is_finite()
+            and projected == report_value.value_numeric
+        )
+
+    def _historical_measurements(
+        self, result: LabResult,
+    ) -> list[tuple[float, dict[str, Any], str]]:
+        try:
+            value = float(result.value)
+        except (ValueError, TypeError):
+            return []
+        if not math.isfinite(value):
+            return []
+        test_name = (result.test_name or "").lower()
+        measurements = []
+        for marker, thresholds in self.CRITICAL_VALUES.items():
+            if marker not in test_name:
+                continue
+            if value < thresholds["low"]:
+                measurements.append((value, thresholds, "low"))
+            elif value > thresholds["high"]:
+                measurements.append((value, thresholds, "high"))
+        return measurements
+
+    def _source_context_matches(
+        self, result: LabResult, source: LabReportInstance, order: LabOrder | None,
+    ) -> bool:
+        if order is None or (
+            order.patient_id is not None and order.patient_id != source.patient_id
+        ):
+            return False
+        if order.visit_id and source.visit_id and order.visit_id != source.visit_id:
+            return False
+        visit_id = order.visit_id or source.visit_id
+        if visit_id is not None:
+            visit = self.db.get(Visit, visit_id)
+            if visit is None or visit.patient_id != source.patient_id:
+                return False
+
+        from app.services.lab_reporting import (
+            LabReportingDomainError,
+            LabReportingService,
+        )
+
+        try:
+            root_id, _ = LabReportingService(self.db)._resolve_chain_root(source)
+        except LabReportingDomainError:
+            return False
+        return root_id == result.source_root_instance_id
+
+    def _lock_projected_release(self, result: LabResult, source: LabReportInstance) -> bool:
+        # A correction can replace the projection after the scan. Serialize
+        # delivery with its projection update and reject a stale scan.
+        return self.db.query(LabResult.id).filter(
+            LabResult.id == result.id,
+            LabResult.source_instance_id == source.id,
+            LabResult.value == result.value,
+            LabResult.unit == result.unit,
+        ).with_for_update(of=LabResult).first() is not None
+
+    def _delivery_visit(self, visit_id: int, *, lock: bool) -> Visit | None:
+        query = self.db.query(Visit).filter(Visit.id == visit_id)
+        if lock:
+            query = query.with_for_update(read=True, of=Visit).populate_existing()
+        return query.first()
 
     async def _notify_doctor_critical_value(
         self,
         result: LabResult,
-        value: float,
+        value: float | str,
         thresholds: dict,
+        *,
+        source: LabReportInstance | None = None,
     ):
         """Уведомляет врача о критическом значении"""
         order = self.db.query(LabOrder).filter(LabOrder.id == result.order_id).first()
         if not order:
             return
+        if source is not None and not self._lock_projected_release(result, source):
+            return
 
         visit = None
-        if order.visit_id:
-            visit = self.db.query(Visit).filter(Visit.id == order.visit_id).first()
+        visit_id = order.visit_id or (source.visit_id if source else None)
+        if visit_id:
+            visit = self._delivery_visit(visit_id, lock=source is not None)
         if not visit or not visit.doctor_id:
+            return
+        if source is not None and visit.patient_id != source.patient_id:
             return
 
         doctor = self.db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
@@ -384,10 +564,11 @@ class LabNotificationService:
             )
             return
 
+        patient_id = source.patient_id if source else order.patient_id
         metadata = {
             "result_id": result.id,
             "order_id": result.order_id,
-            "patient_id": order.patient_id,
+            "patient_id": patient_id,
             "test_name": result.test_name,
             "value": value,
             "unit": thresholds.get("unit", ""),
@@ -395,11 +576,20 @@ class LabNotificationService:
             "critical_high": thresholds["high"],
             "is_critical": True,
         }
+        if source is not None:
+            metadata.update({
+                "report_instance_id": source.id,
+                "analyte_code": thresholds.get("analyte_code"),
+                "unit_code": thresholds.get("unit_code"),
+                "value_display": result.value,
+            })
+        display_value = metadata.get("value_display", value)
         canonical_recorded = self._lab_inbox_delivery_exists(
             event_type="lab_critical_result",
             recipient_id=doctor_user.id,
             entity_id=result.id,
             expected_value=value,
+            source=source,
         )
         newly_recorded = False
         if canonical_recorded:
@@ -413,7 +603,7 @@ class LabNotificationService:
                 recipient=doctor_user,
                 event_type="lab_critical_result",
                 title="Критический результат анализа",
-                message=f"{result.test_name}: {value} {thresholds.get('unit', '')} у пациента #{order.patient_id}.",
+                message=f"{result.test_name}: {display_value} {thresholds.get('unit', '')} у пациента #{patient_id}.",
                 metadata=metadata,
             )
             newly_recorded = canonical_recorded
@@ -428,11 +618,20 @@ class LabNotificationService:
             )
             return
 
+        # The canonical inbox sender commits its transaction. Reacquire the
+        # projection before sending the companion event.
+        if source is not None:
+            if not self._lock_projected_release(result, source):
+                return
+            visit = self._delivery_visit(visit_id, lock=True)
+            if not visit or visit.doctor_id != doctor.id or visit.patient_id != source.patient_id:
+                return
         finding_recorded = self._lab_inbox_delivery_exists(
             event_type="lab_critical_finding",
             recipient_id=doctor_user.id,
             entity_id=result.id,
             expected_value=value,
+            source=source,
         )
         if not finding_recorded:
             finding_recorded = await notification_sender_service.send_lab_event_notification(
@@ -440,7 +639,7 @@ class LabNotificationService:
                 recipient=doctor_user,
                 event_type="lab_critical_finding",
                 title="Критическая находка в исследовании",
-                message=f"В анализе {result.test_name} у пациента #{order.patient_id} обнаружена критическая находка.",
+                message=f"В анализе {result.test_name} у пациента #{patient_id} обнаружена критическая находка.",
                 metadata=metadata,
             )
             newly_recorded = newly_recorded or finding_recorded
@@ -497,5 +696,9 @@ async def run_lab_notifications(db: Session) -> dict[str, Any]:
         "timestamp": datetime.now(UTC).isoformat(),
     }
 
-    logger.info(f"Lab notifications run completed: {results}")
+    logger.info(
+        "Lab notifications run completed: %s ready, %s critical found",
+        results["ready_results"].get("notifications_sent", 0),
+        results["critical_values"].get("critical_found", 0),
+    )
     return results
