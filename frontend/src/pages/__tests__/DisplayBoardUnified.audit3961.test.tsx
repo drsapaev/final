@@ -64,9 +64,10 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
         ...settings,
       },
     });
-    let wsMessageHandler: ((data: unknown, reply?: DisplayTestReply) => void) | null = null;
+    let wsMessageHandler: ((data: unknown, reply?: DisplayTestReply, requestSnapshot?: () => boolean) => void) | null = null;
+    const requestSnapshot = vi.fn(() => true);
     wsMock.openDisplayBoardWS.mockImplementation(
-      (_boardId: string, onMessage: (data: unknown, reply?: DisplayTestReply) => void, onConnect?: () => void) => {
+      (_boardId: string, onMessage: (data: unknown, reply?: DisplayTestReply, requestSnapshot?: () => boolean) => void, onConnect?: () => void) => {
         wsMessageHandler = onMessage;
         onConnect?.();
         return vi.fn();
@@ -84,11 +85,12 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     await waitFor(() => {
       expect(apiMock.api.get).toHaveBeenCalled();
     });
-    const push = (msg: unknown, reply?: DisplayTestReply) => act(() => { wsMessageHandler!(msg, reply); });
+    const push = (msg: unknown, reply?: DisplayTestReply) => act(() => { wsMessageHandler!(msg, reply, requestSnapshot); });
     if (initialSnapshot) push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
     return {
       view,
       push,
+      requestSnapshot,
     };
   };
 
@@ -175,7 +177,7 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
     vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'ru-RU' }], speak, cancel: vi.fn() });
     vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
-    const { push } = await renderBoard({}, {
+    const { push, requestSnapshot } = await renderBoard({}, {
       sound_enabled: true, voice_announcements: true, voice_language: 'ru', volume_level: 50,
     }, false);
     const snapshotStarted = new Date(Date.now() - 1000).toISOString();
@@ -189,11 +191,121 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     push({ type: 'initial_state', data: {
       queue_entries: [], current_call: null, last_update: snapshotStarted,
     } });
+    expect(screen.queryByText(/№\s*7/)).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(1);
+    push({ type: 'initial_state', data: {
+      queue_entries: [], current_call: call, last_update: new Date(Date.now()).toISOString(),
+    } });
     expect(screen.getByText(/№\s*7/)).toBeInTheDocument();
     await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
     expect(speak).toHaveBeenCalledWith(expect.objectContaining({
       text: expect.stringMatching(/7.*505/), volume: 0.5,
     }));
+  });
+
+  it.each(['room-change', 'service-start'])('rechecks a snapshot racing a %s event before showing or voicing it', async (kind) => {
+    const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'ru-RU' }], speak, cancel: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+    const { push, requestSnapshot } = await renderBoard({}, {
+      sound_enabled: true, voice_announcements: true, voice_language: 'ru', volume_level: 50,
+    }, false);
+    const now = Date.now();
+    const call = { event_id: 'synthetic-race', issued_at: new Date(now - 2000).toISOString(),
+      queue_id: 1, queue_entry_id: 8, queue_number: 8, cabinet: '506', expires_at: new Date(now + 10000).toISOString() };
+    push({ type: 'patient_call', data: call });
+    push({ type: 'queue_update', data: { queue_id: 1, cabinet: '507', queue_entries: [
+      { id: 8, queue_id: 1, number: 8, status: kind === 'service-start' ? 'in_progress' : 'called', cabinet: '507' },
+    ] } });
+    push({ type: 'initial_state', data: { last_update: new Date(now - 1000).toISOString(), current_call: call,
+      queue_entries: [{ id: 8, queue_id: 1, number: 8, status: 'called', cabinet: '506' }] } });
+    expect(screen.queryByText(/№\s*8/)).not.toBeInTheDocument();
+    expect(speak).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(1);
+    push({ type: 'initial_state', data: {
+      last_update: new Date(Date.now()).toISOString(),
+      current_call: kind === 'room-change' ? { ...call, cabinet: '507' } : null,
+      queue_entries: kind === 'room-change' ? [{ id: 8, queue_id: 1, number: 8, status: 'called', cabinet: '507' }] : [],
+    } });
+    if (kind === 'room-change') {
+      expect(screen.getByText(/№\s*8/)).toBeInTheDocument();
+      expect(screen.getAllByText('🚪 507')).not.toHaveLength(0);
+      await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+      expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringMatching(/8.*507/) }));
+    } else {
+      expect(screen.queryByText(/№\s*8/)).not.toBeInTheDocument();
+      expect(speak).not.toHaveBeenCalled();
+    }
+  });
+
+  it('backs off repeated ambiguous snapshots and shows no rows before the first confirmed snapshot', async () => {
+    const { push, requestSnapshot, view } = await renderBoard({}, {}, false);
+    const update = { type: 'queue_update', data: { queue_id: 1, queue_entries: [
+      { id: 9, queue_id: 1, number: 9, status: 'waiting' },
+    ] } };
+    push(update);
+    expect(view.container.querySelectorAll('.displayboard-queue-card')).toHaveLength(0);
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(1);
+
+    push(update);
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(2);
+    push({ type: 'initial_state', data: { current_call: null, queue_entries: [
+      { id: 9, queue_id: 1, number: 9, status: 'waiting' },
+    ] } });
+    expect(view.container.querySelectorAll('.displayboard-queue-card')).toHaveLength(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a failed snapshot request and cancels its timer on unmount', async () => {
+    const { push, requestSnapshot, view } = await renderBoard({}, {}, false);
+    requestSnapshot.mockReturnValueOnce(false).mockReturnValue(true);
+    push({ type: 'queue_update', data: { queue_id: 1, queue_entries: [] } });
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('dbu-snapshot-error')).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(2);
+    view.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it('reconnects when the requested snapshot does not arrive and recovers after a clean response', async () => {
+    const { push, requestSnapshot } = await renderBoard({}, {}, false);
+    push({ type: 'queue_update', data: { queue_id: 1, queue_entries: [] } });
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(screen.getByTestId('dbu-snapshot-error')).toBeInTheDocument();
+    expect(wsMock.openDisplayBoardWS).toHaveBeenCalledTimes(2);
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
+    expect(screen.queryByTestId('dbu-snapshot-error')).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps failed snapshot retries capped rather than spinning', async () => {
+    const { push, requestSnapshot } = await renderBoard({}, {}, false);
+    requestSnapshot.mockReturnValue(false);
+    push({ type: 'queue_update', data: { queue_id: 1, queue_entries: [] } });
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(25500); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(6);
+    await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(6);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(7);
   });
 
   it('announces a live call once the selected audio settings finish loading', async () => {
@@ -541,7 +653,7 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
   // DISPLAYERROR-FE-001: a backend failure snapshot is a visible error,
   // never a live-looking empty board; last good rows are kept.
   it('shows a visible error banner on an error snapshot and keeps last good rows', async () => {
-    const { push } = await renderBoard();
+    const { push, requestSnapshot } = await renderBoard();
 
     push({
       type: 'initial_state',
@@ -564,7 +676,9 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     // Last good rows are retained, not wiped into a fake empty board.
     expect(screen.getByText('7')).toBeInTheDocument();
 
-    // A successful snapshot clears the error banner (positive control).
+    // A successful requested snapshot clears the error banner (positive control).
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(1);
     push({
       type: 'initial_state',
       data: { queue_entries: [], current_call: null, announcements: [] },

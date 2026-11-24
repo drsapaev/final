@@ -6,9 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // until a full remount/reload. Manual close (code 1000 / close()) still
 // stops the retry loop.
 
-const wsMock = vi.hoisted(() => ({
-  openDisplayBoardWS: vi.fn(),
-}));
 vi.mock('../../utils/logger', () => ({
   default: { log: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -135,6 +132,26 @@ describe('openDisplayBoardWS reconnect policy (DISPLAYWS-FE-004)', () => {
 
     expect(tokenProvider).toHaveBeenCalledTimes(2);
     expect(FakeWebSocket.instances[1].protocols).toEqual(['bearer.device-token-two']);
+  });
+
+  it('requests a fresh snapshot only on the socket that delivered the message', () => {
+    let requestSnapshot: (() => boolean) | undefined;
+    openDisplayBoardWS('main_board', (_data, _reply, request) => { requestSnapshot = request; }, () => {}, () => {});
+    const first = FakeWebSocket.instances[0];
+    first.simulateOpen();
+    first.onmessage?.({ data: JSON.stringify({ type: 'initial_state', data: {} }) });
+    const staleRequest = requestSnapshot!;
+    expect(staleRequest()).toBe(true);
+    expect(first.sent).toContain(JSON.stringify({ type: 'request_update' }));
+
+    first.simulateAbnormalClose();
+    vi.advanceTimersByTime(3500);
+    const second = FakeWebSocket.instances[1];
+    second.simulateOpen();
+    expect(staleRequest()).toBe(false);
+    second.onmessage?.({ data: JSON.stringify({ type: 'initial_state', data: {} }) });
+    expect(requestSnapshot!()).toBe(true);
+    expect(second.sent).toContain(JSON.stringify({ type: 'request_update' }));
   });
 
   it('waits for provisioning after a missing or revoked device session', async () => {

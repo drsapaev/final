@@ -17,7 +17,7 @@ import {
   EyeOff } from
 'lucide-react';
 import { api } from '../api/client';
-import { openDisplayBoardWS, type DisplayTestAudioStatus, type DisplayTestReply } from '../api/ws';
+import { openDisplayBoardWS, type DisplaySnapshotRequest, type DisplayTestAudioStatus, type DisplayTestReply } from '../api/ws';
 import {
   exchangeDisplayDeviceSession,
   exchangeDisplayDeviceCredential,
@@ -343,6 +343,20 @@ export default function DisplayBoardUnified({
   const stateRequestRef = useRef(0);
   const invalidateBoardStateRequests = useCallback(() => { stateRequestRef.current++; }, []);
   const snapshotReadyRef = useRef(false);
+  const snapshotDirtyRef = useRef(false);
+  const snapshotResyncRef = useRef(false);
+  const snapshotRetryCountRef = useRef(0);
+  const snapshotRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearSnapshotRetryTimer = useCallback(() => {
+    if (snapshotRetryTimerRef.current !== null) clearTimeout(snapshotRetryTimerRef.current);
+    snapshotRetryTimerRef.current = null;
+  }, []);
+  const resetSnapshotResync = useCallback(() => {
+    clearSnapshotRetryTimer();
+    snapshotDirtyRef.current = false;
+    snapshotResyncRef.current = false;
+    snapshotRetryCountRef.current = 0;
+  }, [clearSnapshotRetryTimer]);
   const currentCallRef = useRef<CurrentCall | null>(null);
   const liveAudioCallRef = useRef<CurrentCall | null>(null);
   const pendingLiveAudioRef = useRef<CurrentCall | null>(null);
@@ -490,6 +504,7 @@ export default function DisplayBoardUnified({
   // WebSocket подключение (новое)
   const connectWebSocket = () => {
     try {
+      resetSnapshotResync();
       snapshotReadyRef.current = false;
       setSnapshotReady(false);
       setConnected(false);
@@ -532,6 +547,7 @@ export default function DisplayBoardUnified({
         handleWebSocketMessage,
         () => setConnected(true),
         () => {
+          resetSnapshotResync();
           setConnected(false);
           snapshotReadyRef.current = false;
           setSnapshotReady(false);
@@ -599,6 +615,33 @@ export default function DisplayBoardUnified({
     setDisplayTest(null);
   }
 
+  function scheduleSnapshotResync(requestSnapshot?: DisplaySnapshotRequest) {
+    if (snapshotRetryTimerRef.current !== null) return;
+    const delay = Math.min(500 * 2 ** Math.min(snapshotRetryCountRef.current, 5), 10000);
+    snapshotRetryCountRef.current++;
+    snapshotRetryTimerRef.current = setTimeout(() => {
+      snapshotRetryTimerRef.current = null;
+      // Events received before this request are covered by the next snapshot.
+      snapshotDirtyRef.current = false;
+      snapshotResyncRef.current = true;
+      if (!requestSnapshot?.()) {
+        snapshotResyncRef.current = false;
+        snapshotDirtyRef.current = true;
+        setSnapshotError(t('misc.dbu_err_load'));
+        scheduleSnapshotResync(requestSnapshot);
+        return;
+      }
+      snapshotRetryTimerRef.current = setTimeout(() => {
+        snapshotRetryTimerRef.current = null;
+        snapshotResyncRef.current = false;
+        setSnapshotError(t('misc.dbu_err_load'));
+        // Without a request ID a late response cannot be distinguished from
+        // a later snapshot. Reconnect instead of overlapping requests.
+        connectWebSocketRef.current();
+      }, 10000);
+    }, delay);
+  }
+
   function playPendingLiveCall() {
     const pending = pendingLiveAudioRef.current;
     if (!pending || !snapshotReadyRef.current || !audioProfileRef.current) return;
@@ -613,13 +656,21 @@ export default function DisplayBoardUnified({
     });
   }
 
-  const handleWebSocketMessage = (messageRaw: unknown, replyToTest?: DisplayTestReply) => {
+  const handleWebSocketMessage = (messageRaw: unknown, replyToTest?: DisplayTestReply, requestSnapshot?: DisplaySnapshotRequest) => {
     if (!messageRaw || typeof messageRaw !== 'object') return;
     const message = messageRaw as WSMessage;
     const data = message.data ?? {};
+    if (!snapshotReadyRef.current && ['patient_call', 'queue_update', 'call_completed'].includes(message.type)) {
+      snapshotDirtyRef.current = true;
+    }
 
     switch (message.type) {
       case 'initial_state': {
+        const wasResync = snapshotResyncRef.current;
+        if (wasResync) {
+          clearSnapshotRetryTimer();
+          snapshotResyncRef.current = false;
+        }
         const snapshotError = typeof data.error === 'string' ? data.error.trim() : '';
         if (snapshotError || !Array.isArray(data.queue_entries)) {
           snapshotReadyRef.current = false;
@@ -627,13 +678,22 @@ export default function DisplayBoardUnified({
           setSnapshotError(snapshotError || t('misc.dbu_err_load'));
           dismissTest();
           stopBoardAudio();
+          snapshotDirtyRef.current = true;
+          scheduleSnapshotResync(requestSnapshot);
           break;
         }
+        if (snapshotDirtyRef.current) {
+          // A concurrent event and this snapshot cannot be ordered safely.
+          // Keep the display unavailable until a clean snapshot is confirmed.
+          scheduleSnapshotResync(requestSnapshot);
+          break;
+        }
+        snapshotRetryCountRef.current = 0;
         const call = data.current_call;
         const deadline = call ? eventDeadline(call.expires_at, 30) : Number.NaN;
         const displayed = currentCallRef.current;
         // A live invitation may arrive while the server is making the snapshot.
-        if (!displayed?.issued_at || typeof data.last_update !== 'string' || displayed.issued_at <= data.last_update) {
+        if (wasResync || !displayed?.issued_at || typeof data.last_update !== 'string' || displayed.issued_at <= data.last_update) {
           showCall(call && deadline > Date.now() ? call : null, deadline);
         }
         if (call?.issued_at && call.event_id) {
@@ -1076,6 +1136,7 @@ export default function DisplayBoardUnified({
 
     return () => {
       invalidateBoardStateRequests();
+      resetSnapshotResync();
       if (tb) clearInterval(tb);
       if (tw) clearInterval(tw);
       clearInterval(clock);
@@ -1096,7 +1157,7 @@ export default function DisplayBoardUnified({
         }
       }
     };
-  }, [isBoardView, qs.department, qs.d, refreshMs, currentBoardId, invalidateBoardStateRequests]);
+  }, [isBoardView, qs.department, qs.d, refreshMs, currentBoardId, invalidateBoardStateRequests, resetSnapshotResync]);
 
   // Online/offline (старое)
   useEffect(() => {
@@ -1486,7 +1547,7 @@ export default function DisplayBoardUnified({
 
       {/* Очередь */}
       <div className="displayboard-queue-grid">
-        {queueData.slice(0, boardSettings.displayCount).map((entry, entryIndex) =>
+        {(hasSnapshot ? queueData : []).slice(0, boardSettings.displayCount).map((entry, entryIndex) =>
         <div
           key={resolveBoardEntryKey(entry, entryIndex)}
           className="displayboard-queue-card"

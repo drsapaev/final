@@ -56,10 +56,11 @@ export type DisplayTestReply = (result: {
   status: 'displayed' | 'busy';
   audio_status?: DisplayTestAudioStatus;
 }) => void;
+export type DisplaySnapshotRequest = () => boolean;
 
 export function openDisplayBoardWS(
   boardId: string,
-  onMessage: (data: unknown, replyToTest?: DisplayTestReply) => void,
+  onMessage: (data: unknown, replyToTest?: DisplayTestReply, requestSnapshot?: DisplaySnapshotRequest) => void,
   onConnect: () => void,
   onDisconnect: () => void,
   tokenProvider?: () => Promise<string | null>,
@@ -165,6 +166,15 @@ export function openDisplayBoardWS(
               } catch {
                 logger.warn('Display test acknowledgment could not be sent');
               }
+            }
+          }, () => {
+            if (closed || socket !== ws || socket.readyState !== WebSocket.OPEN) return false;
+            try {
+              socket.send(JSON.stringify({ type: 'request_update' }));
+              return true;
+            } catch {
+              logger.warn('Display snapshot request could not be sent');
+              return false;
             }
           });
         } catch (e) {

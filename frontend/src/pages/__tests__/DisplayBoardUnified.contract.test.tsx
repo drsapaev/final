@@ -158,6 +158,8 @@ describe('DisplayBoardUnified row distinctness (RQ-24.a.2)', () => {
   it('attaches queue-level owner/specialty/cabinet from queue_update to rows', async () => {
     const { push } = await renderBoard();
 
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
+
     push({
       type: 'queue_update',
       data: {
