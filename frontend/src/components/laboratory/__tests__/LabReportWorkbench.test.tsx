@@ -1697,6 +1697,64 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
     });
   });
 
+  it.each(['historical_allocation_unknown', 'specimen_order_ambiguous'])(
+    'blocks report creation and template prefill for %s when no exact assignment is available',
+    (holdReason) => {
+      const first = renderAddBlank({
+        activeInstance: null,
+        selectedAppointment: {
+          patient_id: 444,
+          visit_id: 728,
+          hold_reason: holdReason,
+          service_codes: ['CBC'],
+          service_details: [{ id: 28, visit_service_id: null, name: 'SYNTHETIC held service' }],
+        },
+        templateResolution: { ...resolution, default_template: resolution.allowed_templates[0] },
+      });
+      const create = screen.getByRole('button', { name: 'Создать отчёт' });
+      expect(create).toBeDisabled();
+      expect(screen.getByRole('combobox', { name: 'Допустимый отчёт' })).toHaveValue('');
+      fireEvent.click(create);
+      expect(mockedApi.createInstance).not.toHaveBeenCalled();
+      first.unmount();
+
+      renderAddBlank({
+        selectedAppointment: {
+          patient_id: 444,
+          visit_id: 728,
+          hold_reason: holdReason,
+          service_details: [{ id: 28, visit_service_id: null, name: 'SYNTHETIC held service' }],
+        },
+      });
+      expect(screen.getByRole('button', { name: /Добавить бланк/ })).toBeDisabled();
+    },
+  );
+
+  it('lets a mixed held row create a report for the selected exact assignment', async () => {
+    mockedApi.createInstance.mockResolvedValue({ ...openInstance, id: 92 });
+    renderAddBlank({
+      selectedAppointment: {
+        patient_id: 444,
+        visit_id: 728,
+        order_id: 39,
+        hold_reason: 'historical_allocation_unknown',
+        service_details: [
+          { id: 28, visit_service_id: null, name: 'SYNTHETIC held service' },
+          { id: 29, visit_service_id: 544, name: 'SYNTHETIC new service' },
+        ],
+      },
+    });
+    const addBlank = screen.getByRole('button', { name: /Добавить бланк/ });
+    expect(addBlank).toBeDisabled();
+    expect(screen.queryByRole('checkbox', { name: 'SYNTHETIC held service' })).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'SYNTHETIC new service' }));
+    fireEvent.click(addBlank);
+    await waitFor(() => expect(mockedApi.createInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ order_id: 39, visit_service_ids: [544] }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
+    ));
+  });
+
   it('reconciles the committed blank in the background when the parent rejects a late create result (review round 8)', async () => {
     // PR 3351 (review round 8, P1): серверный бланк уже создан — потеря
     // ответа при смене контекста заставляла оператора повторять CREATE и

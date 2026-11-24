@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../ui/macos';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
 import { useLabReporting } from '../../hooks/useLabReporting';
@@ -226,13 +226,19 @@ export default function LabReportWorkbench({
   // чтобы переключение на новый бланк не потеряло черновик.
   const [addBlankTemplateId, setAddBlankTemplateId] = useState<string>('');
   const [assignedServices, setAssignedServices] = useState<number[]>([]);
-  const serviceAssignments = (selectedAppointment?.service_details as Array<{
-    visit_service_id?: number;
-    name?: string;
-    code?: string;
-  }> | undefined)?.flatMap((item) => typeof item.visit_service_id === 'number'
-    ? [{ id: item.visit_service_id, label: item.name || item.code || String(item.visit_service_id) }]
-    : []) ?? [];
+  const serviceDetails = selectedAppointment?.service_details;
+  const serviceAssignments = useMemo(() => Array.isArray(serviceDetails)
+    ? serviceDetails.flatMap((item: { visit_service_id?: number | null; name?: string; code?: string }) => {
+      const id = item.visit_service_id;
+      return typeof id === 'number' && Number.isSafeInteger(id) && id > 0
+        ? [{ id, label: item.name || item.code || String(id) }]
+        : [];
+    })
+    : [], [serviceDetails]);
+  const selectedVisitServiceIds = useMemo(
+    () => assignedServices.filter((id) => serviceAssignments.some((item) => item.id === id)),
+    [assignedServices, serviceAssignments],
+  );
   const allowedTemplates = ((templateResolution?.allowed_templates ?? []) as Array<Record<string, unknown>>);
   const addBlankTemplateIdValue = addBlankTemplateId || String(allowedTemplates[0]?.id ?? '');
 
@@ -292,7 +298,14 @@ export default function LabReportWorkbench({
     templateResolution: templateResolution as never,
     activeInstance: activeInstance as never,
   });
-  const requiresAssignment = serviceAssignments.length > 0 && !escapeHatchActive;
+  const holdReason = selectedAppointment?.hold_reason;
+  const allocationHold = holdReason === 'historical_allocation_unknown' || holdReason === 'specimen_order_ambiguous';
+  const useUnassignedTemplate = escapeHatchActive && !allocationHold;
+  const requiresAssignment = allocationHold || (serviceAssignments.length > 0 && !useUnassignedTemplate);
+  const missingAssignment = requiresAssignment && selectedVisitServiceIds.length === 0;
+  const allocationUnavailable = allocationHold && serviceAssignments.length === 0;
+  const availableTemplateOptions = allocationHold ? resolvedTemplates : effectiveTemplateOptions;
+  const templateHasBlockingGap = allocationHold ? resolvedTemplates.length === 0 : resolutionHasBlockingGap;
   useLayoutEffect(() => {
     setAssignedServices([]);
   }, [selectedAppointment?.patient_id, selectedAppointment?.visit_id, selectedAppointment?.order_id]);
@@ -433,7 +446,7 @@ export default function LabReportWorkbench({
   ]);
 
   const handleCreateInstance = useCallback(async (templateIdOverride: string | number | null = null, options: Record<string, unknown> = {}) => {
-    if (instanceTransitionPending || (requiresAssignment && assignedServices.length === 0)) return;
+    if (instanceTransitionPending || missingAssignment) return;
     const operation = captureOperationContext();
     const expectedInstanceId = (activeInstance?.id as string | number | null | undefined) ?? null;
     const templateId = templateIdOverride || selectedTemplateId;
@@ -441,7 +454,7 @@ export default function LabReportWorkbench({
       notify?.('error', t('errors.select_patient_template'));
       return;
     }
-    if (resolutionHasBlockingGap) {
+    if (templateHasBlockingGap || (allocationHold && !availableTemplateOptions.some((option) => String(option.id) === String(templateId)))) {
       notify?.('error', t('errors.no_template_for_services'));
       return;
     }
@@ -454,11 +467,11 @@ export default function LabReportWorkbench({
         visit_id: (templateResolution?.visit_id as string | number) || (selectedAppointment.visit_id as string | number) || null,
         template_id: Number(templateId),
         ...(selectedAppointment.order_id != null ? { order_id: selectedAppointment.order_id } : {}),
-        ...(requiresAssignment ? { visit_service_ids: [...assignedServices].sort((left, right) => left - right) } : {}),
+        ...(requiresAssignment ? { visit_service_ids: [...selectedVisitServiceIds].sort((left, right) => left - right) } : {}),
         // WF-11 fix: при escape hatch не передаём service_codes —
         // бланк создаётся без привязки к услугам визита.
-        service_codes: escapeHatchActive ? [] : ((templateResolution?.service_codes as string[]) || (selectedAppointment.service_codes as string[]) || []),
-        service_items: escapeHatchActive ? [] : ((selectedAppointment.service_details as Array<Record<string, unknown>>) || []).map((item: Record<string, unknown>) => ({
+        service_codes: useUnassignedTemplate ? [] : ((templateResolution?.service_codes as string[]) || (selectedAppointment.service_codes as string[]) || []),
+        service_items: useUnassignedTemplate ? [] : ((selectedAppointment.service_details as Array<Record<string, unknown>>) || []).map((item: Record<string, unknown>) => ({
           service_id: item.id || null,
           code: item.code || null,
           name: item.name || null
@@ -526,21 +539,24 @@ export default function LabReportWorkbench({
     }
   }, [
     activeInstance,
-    assignedServices,
+    allocationHold,
+    availableTemplateOptions,
     captureOperationContext,
     isOperationCurrent,
     instanceTransitionPending,
     labReportingApi,
+    missingAssignment,
     notify,
     onInstanceChange,
     onRefreshHistory,
     onRefreshRecentReports,
     onQueueChanged,
     requiresAssignment,
-    resolutionHasBlockingGap,
-    escapeHatchActive,
+    templateHasBlockingGap,
+    useUnassignedTemplate,
     selectedAppointment,
     selectedTemplateId,
+    selectedVisitServiceIds,
     setBusyAction,
     setSaving,
     t,
@@ -1426,7 +1442,9 @@ export default function LabReportWorkbench({
     }
   }
 
-  const assignmentPicker = requiresAssignment && (
+  const assignmentPicker = allocationUnavailable ? (
+    <Alert severity="warning">{t(`labWorkspace.hold_${holdReason}`)}</Alert>
+  ) : requiresAssignment && (
     <fieldset className="lab-visit-assignment">
       <legend>{t('workbench.visit_service_assignment')}</legend>
       {serviceAssignments.map((service) => (
@@ -1486,7 +1504,7 @@ export default function LabReportWorkbench({
               {templateResolutionLoading && (
                 <Alert severity="info">{t('workbench.resolving_templates')}</Alert>
               )}
-              {!templateResolutionLoading && Boolean(templateResolution?.default_template) && (
+              {!allocationUnavailable && !templateResolutionLoading && Boolean(templateResolution?.default_template) && (
                 <Alert severity="info">
                   {t('workbench.recommended_report')}: <strong>{String(((templateResolution as Record<string, unknown> | null)?.default_template as Record<string, unknown> | undefined)?.name ?? '')}</strong>
                 </Alert>
@@ -1496,12 +1514,12 @@ export default function LabReportWorkbench({
                   {t('workbench.unmapped_services')}: {(templateResolution?.unmapped_service_codes as string[]).join(', ')}
                 </Alert>
               )}
-              {!templateResolutionLoading && resolutionHasBlockingGap && (
+              {!allocationUnavailable && !templateResolutionLoading && templateHasBlockingGap && (
                 <Alert severity="error">
                   {t('workbench.no_template_found')}
                   <br />
-                  {t('workbench.no_template_hint')} {t('workbench.no_template_escape')}
-                  <div style={{ marginTop: 'var(--mac-spacing-2)' }}>
+                  {t('workbench.no_template_hint')} {!allocationHold && t('workbench.no_template_escape')}
+                  {!allocationHold && <div style={{ marginTop: 'var(--mac-spacing-2)' }}>
                     <Button
                       size="small"
                       variant="outline"
@@ -1510,17 +1528,17 @@ export default function LabReportWorkbench({
                     >
                       {t('workbench.show_all_templates')}
                     </Button>
-                  </div>
+                  </div>}
                 </Alert>
               )}
               {/* WF-11 fix: warning когда escape hatch активен */}
-              {!templateResolutionLoading && escapeHatchActive && (
+              {!templateResolutionLoading && useUnassignedTemplate && (
                 <Alert severity="warning">
                   Создание отчёта без привязки к услугам визита. Убедитесь,
                   что выбрали правильный шаблон — проверка соответствия отключена.
                 </Alert>
               )}
-              {!templateResolutionLoading && singleAllowedTemplate && !resolutionHasBlockingGap && (
+              {!allocationUnavailable && !templateResolutionLoading && singleAllowedTemplate && !templateHasBlockingGap && (
                 <Alert severity="info">
                   {t('workbench.single_template_found')} <strong>{String(singleAllowedTemplate.name ?? '')}</strong>. {t('workbench.click_create_to_open')}
                 </Alert>
@@ -1528,15 +1546,15 @@ export default function LabReportWorkbench({
               {assignmentPicker}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--mac-spacing-3)', alignItems: 'end' }}>
                 <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
-                  <span>{serviceContextPresent && !escapeHatchActive ? 'Допустимый отчёт' : 'Шаблон отчёта'}</span>
+                  <span>{serviceContextPresent && !useUnassignedTemplate ? 'Допустимый отчёт' : 'Шаблон отчёта'}</span>
                   <select
                     className="macos-input"
-                    value={selectedTemplateId}
+                    value={allocationUnavailable ? '' : selectedTemplateId}
                     onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedTemplateId(event.target.value)}
-                    disabled={instanceTransitionPending || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive)}
+                    disabled={instanceTransitionPending || templateResolutionLoading || templateHasBlockingGap || allocationUnavailable}
                   >
                     <option value="">Выберите шаблон</option>
-                    {effectiveTemplateOptions.map((template) => (
+                    {availableTemplateOptions.map((template) => (
                       <option key={template.id} value={template.id}>
                         {String(template.name ?? '')} ({String(template.family ?? '')})
                       </option>
@@ -1546,8 +1564,7 @@ export default function LabReportWorkbench({
                 <Button
                   variant="primary"
                   onClick={() => handleCreateInstance()}
-                  disabled={saving || instanceTransitionPending || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId
-                    || (requiresAssignment && assignedServices.length === 0)}
+                  disabled={saving || instanceTransitionPending || templateResolutionLoading || templateHasBlockingGap || !selectedTemplateId || missingAssignment}
                 >
                   <FolderPlus size={16} aria-hidden="true" />
                   {busyAction === 'create' ? t('workbench.creating_report') : t('workbench.create_report')}
@@ -1619,7 +1636,7 @@ export default function LabReportWorkbench({
                         aria-label="Шаблон дополнительного бланка"
                         value={addBlankTemplateIdValue}
                         onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAddBlankTemplateId(event.target.value)}
-                        disabled={instanceTransitionPending}
+                        disabled={instanceTransitionPending || allocationUnavailable}
                       >
                         {allowedTemplates.map((template) => (
                           <option key={String(template.id)} value={String(template.id)}>
@@ -1632,7 +1649,7 @@ export default function LabReportWorkbench({
                         variant="outline"
                         size="small"
                         disabled={saving || isDirty || instanceTransitionPending || busyAction === 'create' || !addBlankTemplateIdValue
-                          || (requiresAssignment && assignedServices.length === 0)}
+                          || missingAssignment}
                         title={isDirty ? 'Сначала сохраните несохранённые изменения черновика' : undefined}
                         onClick={() => handleCreateInstance(addBlankTemplateIdValue)}
                       >
