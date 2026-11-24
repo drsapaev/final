@@ -575,19 +575,6 @@ class Mutation:
                     # SSOT: атомарная бронь слота (как в canonical endpoint) —
                     # врач уже залочен выше; eligibility читает свежую строку
                     ensure_doctor_eligible_for_appointment(db, input.doctor_id)
-                    if input.appointment_time and (
-                        appointment_crud.is_time_slot_occupied(
-                            db,
-                            doctor_id=input.doctor_id,
-                            appointment_date=input.appointment_date,
-                            appointment_time=input.appointment_time,
-                        )
-                    ):
-                        return AppointmentMutationResponse(
-                            success=False,
-                            message="Это время уже занято у выбранного врача",
-                            errors=["SLOT_OCCUPIED"],
-                        )
 
                 # Создаем запись (SSOT: crud create_appointment)
                 appointment_data = {
@@ -601,6 +588,7 @@ class Mutation:
                     "payment_type": None,
                     "payment_amount": None,
                 }
+                duration_minutes_snapshot: int | None = None
                 if input.service_ids is not None:
                     from app.services.appointment_duration_snapshot import (
                         InvalidServiceSelection,
@@ -620,8 +608,26 @@ class Mutation:
                             errors=["SERVICES_INVALID"],
                         )
                     appointment_data["services"] = list(selection.names)
+                    duration_minutes_snapshot = selection.duration_minutes_snapshot
                     appointment_data["duration_minutes_snapshot"] = (
-                        selection.duration_minutes_snapshot
+                        duration_minutes_snapshot
+                    )
+
+                if (
+                    input.doctor_id
+                    and input.appointment_time
+                    and appointment_crud.is_time_slot_occupied(
+                        db,
+                        doctor_id=input.doctor_id,
+                        appointment_date=input.appointment_date,
+                        appointment_time=input.appointment_time,
+                        duration_minutes_snapshot=duration_minutes_snapshot,
+                    )
+                ):
+                    return AppointmentMutationResponse(
+                        success=False,
+                        message="Это время уже занято у выбранного врача",
+                        errors=["SLOT_OCCUPIED"],
                     )
 
                 appointment = crud_create_appointment(

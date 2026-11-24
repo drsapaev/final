@@ -121,9 +121,12 @@ export const useRegistrarWizard = ({
 
   // ── Completion flow (verbatim port of onComplete) ─────────────────────────
   const handleWizardComplete = useCallback(async (wizardData: unknown) => {
-    logger.info('AppointmentWizardV2 completed successfully:', wizardData);
     const wasEditMode = state.editMode;
     const wizardDataObj = (wizardData && typeof wizardData === 'object' ? wizardData : {}) as Record<string, unknown>;
+    logger.info('AppointmentWizardV2 completion', {
+      editMode: wasEditMode,
+      success: wizardDataObj.success === true,
+    });
     const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0) &&
       wizardDataObj.payment_dialog_deferred !== true
       ? buildPostWizardPaymentRow(wizardDataObj)

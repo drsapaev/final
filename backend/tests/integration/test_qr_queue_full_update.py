@@ -236,6 +236,11 @@ def test_doctor_cannot_update_other_doctor_online_entry(
 
 @pytest.mark.integration
 @pytest.mark.usefixtures("migrated_visit_confirmation_context")
+@pytest.mark.parametrize(
+    ("birth_date_update", "expected_birth_date"),
+    [({}, date(1990, 6, 21)), ({"birth_date": "1991-07-12"}, date(1991, 7, 12))],
+    ids=["legacy-year-only", "explicit-full-date"],
+)
 def test_full_update_all_free_without_visit_id_does_not_reuse_unrelated_visit(
     client,
     db_session,
@@ -244,7 +249,10 @@ def test_full_update_all_free_without_visit_id_does_not_reuse_unrelated_visit(
     test_patient,
     test_doctor,
     test_service,
+    birth_date_update,
+    expected_birth_date,
 ):
+    test_patient.birth_date = date(1990, 6, 21)
     unrelated_visit = Visit(
         patient_id=test_patient.id,
         doctor_id=test_doctor.id,
@@ -289,6 +297,7 @@ def test_full_update_all_free_without_visit_id_does_not_reuse_unrelated_visit(
                 "patient_name": test_patient.short_name(),
                 "phone": test_patient.phone,
                 "birth_year": 1990,
+                **birth_date_update,
                 "address": test_patient.address,
             },
             "visit_type": "paid",
@@ -301,6 +310,9 @@ def test_full_update_all_free_without_visit_id_does_not_reuse_unrelated_visit(
     assert response.status_code == 200, response.text
 
     db_session.refresh(entry)
+    db_session.refresh(test_patient)
+    assert test_patient.birth_date == expected_birth_date
+    assert entry.birth_year == expected_birth_date.year
     db_session.refresh(unrelated_visit)
     assert entry.visit_id is not None
     assert entry.visit_id != unrelated_visit.id

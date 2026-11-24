@@ -18,9 +18,10 @@
       const search = controls?.querySelector('input[type="search"]');
       const select = controls?.querySelector('select');
       const reset = controls?.querySelector('[data-catalog-reset]');
-      const count = this.querySelector('[data-catalog-count]');
+      const status = controls?.querySelector('[data-catalog-result-label], [data-catalog-count]');
+      const resultLabel = status?.dataset.catalogResultLabel;
       const empty = this.querySelector('[data-catalog-empty]');
-      if (!controls || !search || !reset || !count || !empty) return;
+      if (!controls || !search || !reset || !status || !empty) return;
 
       const rows = Array.from(this.querySelectorAll('[data-catalog-item]'), (element) => {
         const name = element.querySelector('.public-site__list-title')?.textContent ?? '';
@@ -44,12 +45,12 @@
 
         empty.hidden = visibleCount !== 0;
         clearTimeout(announcementTimer);
-        const nextCount = String(visibleCount);
-        if (count.textContent === nextCount) return;
+        const nextStatus = resultLabel ? `${resultLabel} ${visibleCount}` : String(visibleCount);
+        if (status.textContent === nextStatus) return;
         if (announceImmediately) {
-          count.textContent = nextCount;
+          status.textContent = nextStatus;
         } else {
-          announcementTimer = setTimeout(() => { count.textContent = nextCount; }, 160);
+          announcementTimer = setTimeout(() => { status.textContent = nextStatus; }, 160);
         }
       }
 

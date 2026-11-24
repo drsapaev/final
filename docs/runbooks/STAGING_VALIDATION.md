@@ -68,6 +68,19 @@ build the frontend with `VITE_SENTRY_ENV=staging` and
 and `APP_VERSION=<full SHA>`. Pass both values through the supported build
 or runtime path.
 
+For a Compose build, set `APP_VERSION` to the verified checkout SHA before
+building the frontend. Compose passes it as `VITE_APP_VERSION` to the builder
+and as `APP_VERSION` to the backend and worker. Set
+`VERCEL_GIT_COMMIT_SHA` to the same SHA for the service worker and artifact
+source check.
+
+The GitHub staging frontend artifact workflow takes the dedicated frontend DSN
+from `staging-integrations`. It verifies the destination and checks the
+compiled release before publishing the artifact. Use an artifact from the
+exact release with these checks. Pulling an existing artifact into Compose
+keeps the Sentry release and destination that were compiled into it. The
+browser canary and Sentry project readback are still required.
+
 ### Mini App pre-merge preflight and live acceptance
 
 Use the manual **Mini App PR staging preflight** as a credential-free check
@@ -825,6 +838,24 @@ Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '•••567',
   browser surface, add it to `MEDICAL_PII_KEYS` in
   `frontend/src/services/sentry.ts`. The two lists are intentionally
   separate (frontend covers auth tokens + payment fields per BS-57).
+
+### Public-site analytics through Nginx
+
+Before enabling collection behind an Nginx config from this repo, run
+`bash scripts/smoke_test_public_site_analytics_proxy.sh` from the release
+checkout. Use an isolated Linux or WSL Docker environment with the
+`nginx:1.27-alpine` image already available.
+
+The probe checks successful forwarding and a controlled upstream failure
+using synthetic requests. The collector's normal, trailing slash, and
+encoded paths stay out of inherited access and error logs. The proxy
+preserves the 502 response. Nearby API routes still produce their ordinary
+access and upstream error entries.
+
+The Nginx error-log exclusion applies after the collector location is
+matched. Validate request parsing errors and external ingress separately.
+The clinic's Windows production API uses Cloudflare Tunnel, so its HTTP
+logging and monitoring settings require their own evidence.
 
 ---
 

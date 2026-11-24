@@ -512,12 +512,12 @@ async def reschedule_appointment(
         if not patient:
             raise HTTPException(status_code=404, detail="Профиль пациента не найден")
 
-        # Проверяем принадлежность записи пациенту
-        appointment = crud_appointment.get_appointment(
-            db, appointment_id=request.appointment_id
+        # Staff can change the doctor while a patient is rescheduling. Read
+        # the owned row under lock before choosing the doctor and duration.
+        appointment = crud_appointment.appointment.get_for_slot_change(
+            db, appointment_id=request.appointment_id, patient_id=patient.id
         )
-
-        if not appointment or appointment.patient_id != patient.id:
+        if not appointment:
             raise HTTPException(status_code=404, detail="Запись не найдена")
 
         # Проверяем возможность переноса
@@ -537,14 +537,8 @@ async def reschedule_appointment(
                 hour=int(time_parts[0]), minute=int(time_parts[1])
             )
 
-        # Atomic slot reservation (audit P0, PR-0b): this endpoint previously
-        # wrote the new date/time with no occupancy check and no per-doctor
-        # lock, so a mobile patient could land on an already-booked slot and
-        # concurrent reschedules could double-book. Ordering follows the
-        # documented writer contract (app/services/appointment_slot_guard.py):
-        # the FOR UPDATE lock is taken BEFORE the occupancy pre-check. The
-        # doctor is fixed here (no reassignment), so no eligibility check —
-        # same rule as PUT /appointments/{id}.
+        # Lock the current doctor before checking occupancy. A mobile move
+        # retains that doctor and the stored duration snapshot.
         if appointment.doctor_id:
             lock_doctor_for_slot_reservation(db, appointment.doctor_id)
             if crud_appointment.appointment.is_time_slot_occupied(
@@ -553,6 +547,7 @@ async def reschedule_appointment(
                 appointment_date=new_datetime.date(),
                 appointment_time=new_datetime.strftime("%H:%M"),
                 exclude_appointment_id=appointment.id,
+                duration_minutes_snapshot=appointment.duration_minutes_snapshot,
             ):
                 raise HTTPException(
                     status_code=409,

@@ -60,10 +60,11 @@ describe('publicBooking API adapter', () => {
       expected_settings_version: 3,
     };
 
-    await createPatientPublicBookingRequest(body, 'key-once');
+    await createPatientPublicBookingRequest(body, 'key-once', 7);
 
     expect(mockedApi.post).toHaveBeenCalledWith('/patients/booking-requests', body, {
       headers: { 'Idempotency-Key': 'key-once' },
+      expectedAuthSessionGeneration: 7,
     });
     expect(body).not.toHaveProperty('patient_id');
   });
@@ -85,11 +86,12 @@ describe('publicBooking API adapter', () => {
       expected_settings_version: 3,
     };
 
-    await expect(createPatientConfirmedPublicBookingAppointment(body, 'confirmed-key'))
+    await expect(createPatientConfirmedPublicBookingAppointment(body, 'confirmed-key', 7))
       .resolves.toEqual(result);
 
     expect(mockedApi.post).toHaveBeenCalledWith('/patients/public-booking/appointments', body, {
       headers: { 'Idempotency-Key': 'confirmed-key' },
+      expectedAuthSessionGeneration: 7,
     });
     expect(body).not.toHaveProperty('patient_id');
   });
@@ -126,12 +128,12 @@ describe('publicBooking API adapter', () => {
       expected_settings_version: 7,
     };
 
-    await resubmitPatientPublicBookingRequest('request/1', body, 'resubmit-key');
+    await resubmitPatientPublicBookingRequest('request/1', body, 'resubmit-key', 7);
 
     expect(mockedApi.post).toHaveBeenCalledWith(
       '/patients/booking-requests/request%2F1/resubmit',
       body,
-      { headers: { 'Idempotency-Key': 'resubmit-key' } },
+      { headers: { 'Idempotency-Key': 'resubmit-key' }, expectedAuthSessionGeneration: 7 },
     );
   });
 

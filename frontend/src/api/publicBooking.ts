@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios';
-import { api } from './client';
+import { api, type AuthSessionRequestConfig } from './client';
 import type {
   AppointmentDto,
   PublicBookingAvailabilityDto,
@@ -98,15 +98,23 @@ export async function withdrawPatientPublicBookingRequest(
   return response.data;
 }
 
+function bookingMutationConfig(idempotencyKey: string, sessionGeneration: number): AuthSessionRequestConfig {
+  return {
+    headers: { 'Idempotency-Key': idempotencyKey },
+    expectedAuthSessionGeneration: sessionGeneration,
+  };
+}
+
 export async function resubmitPatientPublicBookingRequest(
   requestId: string,
   body: PublicBookingRequestResubmitBody,
   idempotencyKey: string,
+  sessionGeneration: number,
 ): Promise<PatientPublicBookingRequest> {
   const response = await api.post<PatientPublicBookingRequest>(
     `${patientRequestsPath}/${encodeURIComponent(requestId)}/resubmit`,
     body,
-    { headers: { 'Idempotency-Key': idempotencyKey } },
+    bookingMutationConfig(idempotencyKey, sessionGeneration),
   );
   return response.data;
 }
@@ -193,11 +201,12 @@ export async function getPublicBookingAvailability(input: {
 export async function createPatientPublicBookingRequest(
   body: PublicBookingRequestBody,
   idempotencyKey: string,
+  sessionGeneration: number,
 ): Promise<PublicBookingRequestResult> {
   const response = await api.post<PublicBookingRequestResult>(
     patientRequestsPath,
     body,
-    { headers: { 'Idempotency-Key': idempotencyKey } },
+    bookingMutationConfig(idempotencyKey, sessionGeneration),
   );
   return response.data;
 }
@@ -205,11 +214,12 @@ export async function createPatientPublicBookingRequest(
 export async function createPatientConfirmedPublicBookingAppointment(
   body: PublicBookingRequestBody,
   idempotencyKey: string,
+  sessionGeneration: number,
 ): Promise<PatientConfirmedPublicBookingResult> {
   const response = await api.post<PatientConfirmedPublicBookingResult>(
     patientAppointmentsPath,
     body,
-    { headers: { 'Idempotency-Key': idempotencyKey } },
+    bookingMutationConfig(idempotencyKey, sessionGeneration),
   );
   return response.data;
 }
@@ -279,6 +289,10 @@ export function getPublicBookingErrorCode(error: unknown): string | null {
     if (detail.reason === 'patient_profile_required') return detail.reason;
   }
   return null;
+}
+
+export function isPublicBookingRateLimited(error: unknown): boolean {
+  return isAxiosError(error) && error.response?.status === 429;
 }
 
 export function isUnknownPublicBookingOutcome(error: unknown): boolean {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Staging smoke test — runs all validation checks from
-# docs/runbooks/STAGING_VALIDATION.md in one command.
+# Staging smoke test — runs the automated subset of the checks in
+# docs/runbooks/STAGING_VALIDATION.md.
 #
 # Usage:
 #   bash scripts/smoke_test_staging.sh
@@ -10,9 +10,8 @@
 #   1 = at least one check failed
 #
 # Honesty contract:
-#   Each check runs its substantive command as the LAST statement of a
-#   subshell, so the check's exit status is the test's own exit status —
-#   a failing test can never be masked by a subsequent `cd` or `return 0`.
+#   Each check puts its substantive command last or explicitly propagates
+#   failure before printing coverage notes.
 #   Check functions return: 0 = pass, 1 = fail, 2 = skipped (missing
 #   prerequisite such as SENTRY_DSN / DATABASE_URL / optional dependency).
 #   Skipped checks are counted and listed in the summary so incomplete
@@ -86,8 +85,9 @@ sentry_backend_check() {
     fi
     (
         cd backend || exit 1
-        python -c "
-import os
+        local event_id
+        event_id=$(python -c "
+import sys
 import sentry_sdk
 from app.core.sentry import init_sentry
 init_sentry()
@@ -96,17 +96,15 @@ try:
 except RuntimeError as e:
     event_id = sentry_sdk.capture_exception(e)
 if not event_id:
-    print('    ERROR: event was not captured (Sentry client disabled?)')
+    print('    ERROR: event was not captured (Sentry client disabled?)', file=sys.stderr)
     raise SystemExit(1)
-print(f'    Backend event id: {event_id}')
-client = sentry_sdk.get_client()
-client.flush(timeout=15)
-print('    Transport flushed — event handed to Sentry ingest.')
-print('    Cross-check delivery in the Sentry dashboard (Issues), then resolve the smoke issue.')
-" 2>&1
-        echo "    NOTE: proves submission from this host + transport flush."
-        echo "    Dashboard delivery and frontend event smoke are manual"
-        echo "    (runbook Check 1 / SENTRY_SETUP.md §9)."
+sentry_sdk.get_client().flush(timeout=15)
+print(event_id)
+") || exit 1
+        printf '    Backend event id: %s\n' "$event_id"
+        echo "    SDK capture returned an event ID and the flush call returned."
+        echo "    Verify this exact event ID in the staging backend project."
+        echo "    Hosted readback and frontend smoke are covered in STAGING_VALIDATION.md."
     )
 }
 
@@ -359,6 +357,6 @@ if [ $SKIP -gt 0 ]; then
     exit 0
 fi
 
-echo -e "${GREEN}✓ All checks passed. System is ready for production deploy.${NC}"
-echo -e "See docs/runbooks/STAGING_VALIDATION.md for the full checklist."
+echo -e "${GREEN}✓ All automated checks passed.${NC}"
+echo -e "Complete the remaining checks in docs/runbooks/STAGING_VALIDATION.md before a production deploy."
 exit 0

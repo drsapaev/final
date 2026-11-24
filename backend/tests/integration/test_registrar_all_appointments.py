@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -377,6 +377,15 @@ class TestRegistrarAllAppointments:
         assert unrelated_row["payment_type"] is None
         assert db_session.get(Payment, payment.id).status == "paid"
 
+    @pytest.mark.parametrize(
+        ("linked", "card_birth_date", "expected_year", "expected_address"),
+        [
+            (True, date(1990, 7, 16), 1990, "Synthetic linked card address"),
+            (True, None, 1985, "Synthetic linked card address"),
+            (False, date(1990, 7, 16), 1985, "Synthetic intake snapshot address"),
+        ],
+        ids=["linked-card", "linked-year-only-intake", "unlinked-intake"],
+    )
     def test_today_queues_serializes_queue_time_and_created_at(
         self,
         client,
@@ -386,7 +395,15 @@ class TestRegistrarAllAppointments:
         cardio_user,
         test_patient,
         test_doctor,
+        linked,
+        card_birth_date,
+        expected_year,
+        expected_address,
     ):
+        # Deliberately disagree with the intake snapshot. An unlinked entry
+        # must not inherit card details even when its name and phone match.
+        test_patient.birth_date = card_birth_date
+        test_patient.address = "Synthetic linked card address"
         queue = DailyQueue(
             day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
@@ -403,11 +420,11 @@ class TestRegistrarAllAppointments:
         entry = OnlineQueueEntry(
             queue_id=queue.id,
             number=1,
-            patient_id=test_patient.id,
+            patient_id=test_patient.id if linked else None,
             patient_name=test_patient.short_name(),
             phone=test_patient.phone,
             birth_year=1985,
-            address="Clinic Street 1",
+            address="Synthetic intake snapshot address",
             visit_id=None,
             source="desk",
             status="waiting",
@@ -466,8 +483,8 @@ class TestRegistrarAllAppointments:
         assert found_entry["timezone"] == "Asia/Tashkent"
         assert found_entry["patient_name"] == test_patient.short_name()
         assert found_entry["phone"] == test_patient.phone
-        assert found_entry["patient_birth_year"] == 1985
-        assert found_entry["address"] == "Clinic Street 1"
+        assert found_entry["patient_birth_year"] == expected_year
+        assert found_entry["address"] == expected_address
         assert "patient_gender" in found_entry
         assert found_entry["patient_gender"] is None
 

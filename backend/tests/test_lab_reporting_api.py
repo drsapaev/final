@@ -1658,11 +1658,15 @@ def test_registrar_lab_queue_page_bounds_enrichment_after_global_dedup(monkeypat
     assert enriched_ids == [3, 4]
     assert metadata_indexes == [3, 1]
     assert result == [
-        {"specialty": "lab", "queue_number": 1, "entries": [{"id": 3}]},
+        {
+            "specialty": "lab",
+            "queue_number": 1,
+            "entries": [{"id": 3, "queue_cabinet": None}],
+        },
         {
             "specialty": "laboratory",
             "queue_number": 2,
-            "entries": [{"id": 4}],
+            "entries": [{"id": 4, "queue_cabinet": None}],
         },
     ]
 

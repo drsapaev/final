@@ -409,3 +409,11 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
     ]);
   });
 });
+
+it('carries per-ticket cabinet without borrowing the specialty bucket cabinet', () => {
+  const queue = { ...baseQueue, cabinet: '999' };
+  const row = adaptQueueEntry({ id: 17, number: 1, queue_cabinet: '205' }, queue, baseData, '2026-08-29', FALLBACK);
+  expect(row).toMatchObject({ queue_number: 1, queue_cabinet: '205', queue_numbers: [{ number: 1, queue_cabinet: '205' }] });
+  const unresolved = adaptQueueEntry({ id: 18, number: 1 }, queue, baseData, '2026-08-29', FALLBACK);
+  expect(unresolved?.queue_cabinet).toBeNull();
+});

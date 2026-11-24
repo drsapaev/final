@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getAuthSessionGeneration } from '../api/client';
 import {
   createPublicBookingIdempotencyKey,
   createPatientConfirmedPublicBookingAppointment,
@@ -12,6 +13,7 @@ import {
   getPublicBookingPath,
   hasPublicBookingResubmitHandoff,
   getPublicBookingResubmitHandoffLocale,
+  isPublicBookingRateLimited,
   isUnknownPublicBookingOutcome,
   PUBLIC_BOOKING_SELECTION_TTL_MS,
   savePublicBookingSelection,
@@ -23,6 +25,7 @@ import {
   type PublicBookingRequestBody,
   type PublicBookingRequestResubmitBody,
 } from '../api/publicBooking';
+import { useDocumentLanguage } from '../hooks/useDocumentLanguage';
 import { getVitePublicSiteAnalyticsEndpoint, PublicSiteAnalytics } from '../publicSiteAnalytics';
 import { getState } from '../stores/auth';
 
@@ -73,6 +76,7 @@ type Copy = {
   activeAppointmentLimit: string;
   profileRequired: string;
   requestUnknown: string;
+  recoverySessionChanged: string;
   requestFailed: string;
   retrySame: string;
   resubmitContextExpired: string;
@@ -129,6 +133,7 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     activeAppointmentLimit: 'У вас уже есть 5 активных записей на будущие даты. Свяжитесь с регистратором, если нужна помощь.',
     profileRequired: 'Для онлайн-заявки нужна собственная карточка пациента в клинике. Обратитесь к регистратору, чтобы проверить или активировать её.',
     requestUnknown: 'Не удалось подтвердить результат отправки. Чтобы избежать дубликата, повтор можно выполнить только для той же заявки.',
+    recoverySessionChanged: 'Сессия изменилась. Чтобы проверить результат, войдите в тот же личный кабинет.',
     requestFailed: 'Не удалось безопасно проверить заявку. Не отправляйте её повторно; свяжитесь с регистратором.',
     retrySame: 'Повторить ту же отправку',
     resubmitContextExpired: 'Данные для изменения прежней заявки устарели или потеряны. Откройте её в личном кабинете и начните выбор времени заново.',
@@ -183,6 +188,7 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     activeAppointmentLimit: 'Sizda kelajak sanalar uchun 5 ta faol qabul yozuvi bor. Yordam uchun registrator bilan bog‘laning.',
     profileRequired: 'Onlayn so‘rov uchun klinikada o‘zingizning bemor kartangiz bo‘lishi kerak. Uni tekshirish yoki faollashtirish uchun registratorga murojaat qiling.',
     requestUnknown: 'Yuborish natijasini tasdiqlab bo‘lmadi. Takroriy so‘rovni oldini olish uchun faqat ayni so‘rovni qayta tekshirish mumkin.',
+    recoverySessionChanged: 'Seans o‘zgardi. Natijani tekshirish uchun avvalgi shaxsiy kabinetingizga kiring.',
     requestFailed: 'So‘rovni xavfsiz tekshirib bo‘lmadi. Uni qayta yubormang; registrator bilan bog‘laning.',
     retrySame: 'Ayni yuborishni takrorlash',
     resubmitContextExpired: 'Avvalgi so‘rovni o‘zgartirish ma’lumotlari eskirgan yoki yo‘qolgan. Bemor kabinetida so‘rovni ochib, vaqt tanlashni qaytadan boshlang.',
@@ -240,6 +246,9 @@ type PatientBookingAttempt =
     body: PublicBookingRequestResubmitBody;
     key: string;
   };
+
+type PatientBookingDelivery = PatientBookingAttempt & { sessionGeneration: number };
+type PatientBookingRecovery = { attempt: PatientBookingDelivery; rateLimited: boolean } | 'session-changed';
 
 function supportsPublicBookingMode(mode: unknown): mode is 'registrar_request' | 'confirmed_appointment' {
   return mode === 'registrar_request' || mode === 'confirmed_appointment';
@@ -306,7 +315,9 @@ export default function PatientBookingPage() {
   const routeResubmitContext = getPatientBookingResubmitContext(location.state);
   const hasRouteResubmitState = hasPatientBookingResubmitState(location.state);
   const locale: PublicBookingLocale = location.pathname.startsWith('/ru/') ? 'ru' : 'uz-Latn';
+  const alternateLocale = locale === 'ru' ? 'uz-Latn' : 'ru';
   const copy = COPY[locale];
+  useDocumentLanguage(locale);
   const [resume, setResume] = useState<ReturnType<typeof takePendingPublicBookingResume>>(null);
   const [resumeLoaded, setResumeLoaded] = useState(false);
   const resumedResubmitContext = resume?.kind === 'selection' && resume.selection.resubmit
@@ -332,8 +343,7 @@ export default function PatientBookingPage() {
   const [completionMessage, setCompletionMessage] = useState('');
   const [needsPolicyReview, setNeedsPolicyReview] = useState(false);
   const [policyAcknowledgedVersion, setPolicyAcknowledgedVersion] = useState<number | null>(null);
-  const [unknownOutcome, setUnknownOutcome] = useState(false);
-  const attemptRef = useRef<PatientBookingAttempt | null>(null);
+  const [recovery, setRecovery] = useState<PatientBookingRecovery | null>(null);
   const resumeConsumed = useRef(false);
   const availabilityRequestGeneration = useRef(0);
   const selectedTimeRef = useRef(time);
@@ -479,7 +489,7 @@ export default function PatientBookingPage() {
 
   const patient = isPatientSession();
   const otherRoleSignedIn = Boolean(getState().token) && !patient;
-  const formLocked = completed || unknownOutcome || submitting;
+  const formLocked = completed || recovery !== null || submitting;
   const slots = availability?.slots.map(displayTime).filter((slot): slot is string => Boolean(slot)) ?? [];
 
   const saveSelectionAndNavigate = (path: string) => {
@@ -516,19 +526,31 @@ export default function PatientBookingPage() {
     }
   };
 
-  const sendAttempt = async (attempt: PatientBookingAttempt) => {
+  const sendAttempt = async (attempt: PatientBookingDelivery) => {
+    const { key, sessionGeneration } = attempt;
+    const sessionIsCurrent = () => isPatientSession()
+      && getAuthSessionGeneration() === sessionGeneration;
+    if (!sessionIsCurrent()) {
+      if (recovery) setRecovery('session-changed');
+      else setError(copy.recoverySessionChanged);
+      return;
+    }
+
     setSubmitting(true);
     setError('');
     try {
       if (attempt.kind === 'resubmit') {
-        await resubmitPatientPublicBookingRequest(attempt.requestId, attempt.body, attempt.key);
+        await resubmitPatientPublicBookingRequest(attempt.requestId, attempt.body, key, sessionGeneration);
       } else if (attempt.kind === 'confirmed') {
-        await createPatientConfirmedPublicBookingAppointment(attempt.body, attempt.key);
+        await createPatientConfirmedPublicBookingAppointment(attempt.body, key, sessionGeneration);
       } else {
-        await createPatientPublicBookingRequest(attempt.body, attempt.key);
+        await createPatientPublicBookingRequest(attempt.body, key, sessionGeneration);
       }
-      attemptRef.current = null;
-      setUnknownOutcome(false);
+      if (!sessionIsCurrent()) {
+        setRecovery('session-changed');
+        return;
+      }
+      setRecovery(null);
       setCompleted(true);
       const isConfirmedAppointment = attempt.kind === 'confirmed';
       setCompletedAsAppointment(isConfirmedAppointment);
@@ -538,13 +560,14 @@ export default function PatientBookingPage() {
       setCompletionMessage(successMessage);
       setNotice(successMessage);
     } catch (requestError) {
-      if (isUnknownPublicBookingOutcome(requestError)) {
-        attemptRef.current = attempt;
-        setUnknownOutcome(true);
-        setError(attempt.kind === 'confirmed' ? copy.appointmentUnknown : copy.requestUnknown);
+      // A throttled replay cannot tell us whether the original write committed.
+      const rateLimited = recovery !== null && isPublicBookingRateLimited(requestError);
+      if (!sessionIsCurrent()) {
+        setRecovery('session-changed');
+      } else if (rateLimited || isUnknownPublicBookingOutcome(requestError)) {
+        setRecovery({ attempt, rateLimited });
       } else {
-        attemptRef.current = null;
-        setUnknownOutcome(false);
+        setRecovery(null);
         const code = getPublicBookingErrorCode(requestError);
         setError(getErrorMessage(code, copy));
         if (code === 'booking_settings_version_conflict' || code === 'booking_mode_changed') {
@@ -585,16 +608,13 @@ export default function PatientBookingPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (formLocked) return;
     setError('');
     if (hasResubmitNavigationState
       && (!resubmitContext
         || (hasPublicBookingResubmitHandoff(location.state)
           && !getPatientBookingResubmitContext(location.state)))) {
       setError(copy.resubmitContextExpired);
-      return;
-    }
-    if (unknownOutcome && attemptRef.current) {
-      await sendAttempt(attemptRef.current);
       return;
     }
     const modeSupportsSubmission = options?.mode === 'registrar_request'
@@ -614,6 +634,7 @@ export default function PatientBookingPage() {
       return;
     }
 
+    const sessionGeneration = getAuthSessionGeneration();
     setSubmitting(true);
     try {
       const freshOptions = await getPublicBookingOptions(locale);
@@ -715,8 +736,7 @@ export default function PatientBookingPage() {
           },
           key,
           };
-      attemptRef.current = attempt;
-      await sendAttempt(attempt);
+      await sendAttempt({ ...attempt, sessionGeneration });
     } catch {
       setError(copy.slotsError);
     } finally {
@@ -790,6 +810,7 @@ export default function PatientBookingPage() {
 
   const selectedService = options?.services.find((service) => service.slug === serviceSlug);
   const selectedDoctor = options?.doctors.find((doctor) => doctor.slug === doctorSlug);
+  const showBookingAvailabilityStatus = !recovery && !completed;
   const showBookingForm = !optionsLoading && bookingConfigurationUsable && options && !completed
     && (!hasResubmitNavigationState || Boolean(resubmitContext && pairIsAllowed));
 
@@ -807,7 +828,8 @@ export default function PatientBookingPage() {
         </a>
         <Link
           className="public-site__language"
-          to={getPublicBookingPath(locale === 'ru' ? 'uz-Latn' : 'ru')}
+          to={getPublicBookingPath(alternateLocale)}
+          lang={alternateLocale}
           state={location.state}
         >
           {copy.switchLanguage}
@@ -815,26 +837,43 @@ export default function PatientBookingPage() {
       </header>
       <main id="main-content" lang={locale} className="public-site__main public-site__section" tabIndex={-1}>
         <h1>{copy.title}</h1>
-        <p className="public-site__muted">
-          {options?.mode === 'confirmed_appointment' && !resubmitContext ? copy.confirmedIntro : copy.intro}
-        </p>
+        {recovery ? (
+          <>
+            <p id="booking-recovery-message" role="alert" className="public-site__empty">
+              {recovery === 'session-changed' ? copy.recoverySessionChanged
+                : recovery.attempt.kind === 'confirmed' ? copy.appointmentUnknown : copy.requestUnknown}
+              {recovery !== 'session-changed' && recovery.rateLimited ? ` ${copy.rateLimited}` : null}
+            </p>
+            {recovery !== 'session-changed' ? (
+              <button type="button" className="public-site__button"
+                aria-describedby="booking-recovery-message" disabled={submitting}
+                onClick={() => { void sendAttempt(recovery.attempt); }}>
+                {submitting ? copy.submitting : copy.retrySame}
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <p className="public-site__muted">
+            {options?.mode === 'confirmed_appointment' && !resubmitContext ? copy.confirmedIntro : copy.intro}
+          </p>
+        )}
 
-        {notice && !(needsPolicyReview && notice === copy.policyChanged)
+        {!recovery && notice && !(needsPolicyReview && notice === copy.policyChanged)
           ? <p role="status" aria-live="polite" className="public-site__empty">{notice}</p>
           : null}
-        {error ? <p role="alert" className="public-site__empty">{error}</p> : null}
+        {showBookingAvailabilityStatus && error ? <p role="alert" className="public-site__empty">{error}</p> : null}
 
-        {optionsLoading || !resumeLoaded ? <p role="status">{copy.loading}</p> : null}
-        {!optionsLoading && !options && error ? (
+        {showBookingAvailabilityStatus && (optionsLoading || !resumeLoaded) ? <p role="status">{copy.loading}</p> : null}
+        {showBookingAvailabilityStatus && !optionsLoading && !options && error ? (
           <button type="button" className="public-site__button public-site__button--primary" onClick={retryOptions}>{copy.retry}</button>
         ) : null}
-        {!optionsLoading && options && !options.available ? (
+        {showBookingAvailabilityStatus && !optionsLoading && options && !options.available ? (
           <section className="public-site__section" aria-labelledby="booking-unavailable-title">
             <h2 id="booking-unavailable-title">{copy.unavailable}</h2>
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
-        {!optionsLoading && options?.available
+        {showBookingAvailabilityStatus && !optionsLoading && options?.available
           && (!supportsPublicBookingMode(options.mode)
             || (Boolean(resubmitContext) && options.mode !== 'registrar_request')) ? (
           <section className="public-site__section" aria-labelledby="booking-mode-title">
@@ -845,21 +884,21 @@ export default function PatientBookingPage() {
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
-        {!optionsLoading && hasResubmitNavigationState && !resubmitContext ? (
+        {showBookingAvailabilityStatus && !optionsLoading && hasResubmitNavigationState && !resubmitContext ? (
           <section className="public-site__section" role="alert">
             <h2>{copy.unavailable}</h2>
             <p>{copy.resubmitContextExpired}</p>
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
-        {!optionsLoading && options?.available && supportsPublicBookingMode(options.mode)
+        {showBookingAvailabilityStatus && !optionsLoading && options?.available && supportsPublicBookingMode(options.mode)
           && !bookingConfigurationUsable ? (
           <section className="public-site__section" aria-labelledby="booking-config-unavailable-title">
             <h2 id="booking-config-unavailable-title">{copy.unavailable}</h2>
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
-        {!optionsLoading && bookingConfigurationUsable && options && resubmitContext && !pairIsAllowed ? (
+        {showBookingAvailabilityStatus && !optionsLoading && bookingConfigurationUsable && options && resubmitContext && !pairIsAllowed ? (
           <section className="public-site__section" role="alert">
             <h2>{copy.unavailable}</h2>
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
@@ -891,7 +930,7 @@ export default function PatientBookingPage() {
                 onChange={(event) => { invalidateAvailabilityRequests(); setDate(event.target.value); setTime(''); setError(''); setNotice(''); }} />
             </label>
             {availabilityLoading ? <p role="status">{copy.loadingSlots}</p> : null}
-            {!availability && !availabilityLoading && serviceSlug && doctorSlug && date ? (
+            {!formLocked && !availability && !availabilityLoading && serviceSlug && doctorSlug && date ? (
               <button type="button" className="public-site__button" onClick={retryAvailability}>{copy.refresh}</button>
             ) : null}
             {availability && !availabilityLoading ? (
@@ -912,7 +951,7 @@ export default function PatientBookingPage() {
               </fieldset>
             ) : null}
             {needsPolicyReview ? (
-              <fieldset className="public-site__section public-site__booking-policy">
+              <fieldset className="public-site__section public-site__booking-policy" disabled={formLocked}>
                 <legend>{copy.policyConfirm}</legend>
                 <p>{copy.policyChanged}</p>
                 <label className="public-site__booking-policy-ack">
@@ -956,11 +995,6 @@ export default function PatientBookingPage() {
                 </button>
               </section>
             )}
-            {unknownOutcome ? (
-              <button type="submit" className="public-site__button" disabled={submitting}>
-                {submitting ? copy.submitting : copy.retrySame}
-              </button>
-            ) : null}
           </form>
         ) : null}
         {completed ? (
