@@ -9,6 +9,7 @@ import { DERMATOLOGY_PANEL_TABS, getDermatologyTabAliases } from './dermatologyT
 import { Button, Card, Badge, AppEmpty } from '../components/ui/macos';
 
 import { useTheme } from '../contexts/ThemeContext';
+import { reportVisitCompletionCall } from '../utils/visitCompletionChoice';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './dermatology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
@@ -1484,7 +1485,11 @@ const DermatologistPanelUnified = () => {
   const runCompletionFlow = async (
     completionContext: typeof currentVisitContext,
     entryId: string | number,
+    callNext: boolean,
   ) => {
+    // The dirty guard may defer this callback while the selection changes.
+    if (!isSameDermatologyVisit(completionContext, currentVisitContextRef.current) ||
+        !canCompleteCurrentVisitRef.current) return;
     try {
       setLoading(true);
       // DOCFLOW-FE-001 (audit 3886): only a confirmed `success: true` DTO
@@ -1532,15 +1537,12 @@ const DermatologistPanelUnified = () => {
       setPrescription(null);
       handleTabChange('queue');
 
-      // Автоматически вызвать следующего пациента по дерматологии
-      try {
-        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DERMATOLOGY);
-        logger.info('[Dermatology] Next dermatology queue entry requested', { succeeded: next?.success === true });
-        if (next?.success) {
-            notify.success(t('derma.derma_panel_next_patient_called', { number: (next as { entry?: { number?: string | number } }).entry?.number ?? '' }));
-        }
-      } catch (error: unknown) {
-        logger.warn('[Dermatology] Next dermatology queue entry request failed', safeErrorMetadata(error));
+      if (callNext) {
+        await reportVisitCompletionCall(
+          () => queueService.callNextWaiting(SPECIALTY_KEYS.DERMATOLOGY),
+          t,
+          'derma.derma_panel_next_patient_called',
+        );
       }
 
     } catch (error: unknown) {
@@ -1563,6 +1565,7 @@ const DermatologistPanelUnified = () => {
     }
 
     // QW-5 (UX audit): confirm before completing the visit
+    let callNext = false;
     const ok = await confirm({
       title: t('derma.complete_visit_title'),
       message: t('derma.complete_visit_message'),
@@ -1570,6 +1573,10 @@ const DermatologistPanelUnified = () => {
       confirmLabel: t('derma.complete_visit_confirm'),
       cancelLabel: t('derma.cancel'),
       intent: 'primary',
+      confirmationOption: {
+        label: t('misc.visit_completion_call_next_option'),
+        onConfirm: (checked: boolean) => { callNext = checked; },
+      },
     });
     if (!ok) {
       return;
@@ -1585,7 +1592,7 @@ const DermatologistPanelUnified = () => {
       ? []
       : [`emr-visit-${completionContext.visitId}`];
     const started = guardTransition(() => {
-      void runCompletionFlow(completionContext, entryId);
+      void runCompletionFlow(completionContext, entryId, callNext);
     }, { sourceIds: emrSourceIds, intentPolicy: 'leave' });
     if (!started) {
       // Dirty EMR: the shared Save/Discard dialog now owns the completion.
