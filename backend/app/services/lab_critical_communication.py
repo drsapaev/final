@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, case, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.core.config import settings
 from app.models.clinic import Doctor
@@ -267,6 +267,33 @@ def _reconcile_doctor_assignments(db: Session, *, limit: int) -> None:
         .correlate(LabReportInstance)
         .scalar_subquery()
     )
+    escalation_event = aliased(LabCriticalCommunicationEvent)
+    latest_escalation = (
+        select(func.max(escalation_event.id))
+        .where(
+            escalation_event.communication_id == LabCriticalCommunication.id,
+            escalation_event.event_type == "escalated",
+        )
+        .correlate(LabCriticalCommunication)
+        .scalar_subquery()
+    )
+    escalation_notified = (
+        select(LabCriticalCommunicationEvent.id)
+        .where(
+            LabCriticalCommunicationEvent.communication_id == LabCriticalCommunication.id,
+            LabCriticalCommunicationEvent.event_type == "escalation_notified",
+            LabCriticalCommunicationEvent.id > latest_escalation,
+        )
+        .correlate(LabCriticalCommunication)
+        .exists()
+    )
+    escalated_ready = and_(
+        LabCriticalCommunication.state == "escalated",
+        or_(
+            _configured_operations_admin_id() is None,
+            and_(LabCriticalCommunication.next_attempt_at.is_(None), escalation_notified),
+        ),
+    )
     candidates = (
         select(LabCriticalCommunication)
         .join(
@@ -274,7 +301,10 @@ def _reconcile_doctor_assignments(db: Session, *, limit: int) -> None:
             LabReportInstance.id == LabCriticalCommunication.report_instance_id,
         )
         .where(
-            LabCriticalCommunication.state.in_(("needs_assignment", "inbox_recorded")),
+            or_(
+                LabCriticalCommunication.state.in_(("needs_assignment", "inbox_recorded")),
+                escalated_ready,
+            ),
             LabCriticalCommunication.recipient_user_id.is_distinct_from(current_owner),
         )
         .order_by(LabCriticalCommunication.id)
@@ -442,4 +472,6 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
         else:
             _event(db, task.id, "delivery_failed", channel="in_app_inbox")
         db.commit()
+        if delivered and delivery_state == "escalated":
+            _reconcile_doctor_assignments(db, limit=limit)
     return recorded

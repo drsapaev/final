@@ -617,6 +617,105 @@ def test_critical_route_rejects_ineligible_configured_admin(
 
 
 @pytest.mark.unit
+def test_escalation_is_delivered_before_a_changed_doctor_is_notified(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctors = [synthetic_user(db_session, "Doctor") for _ in range(2)]
+    profiles = [Doctor(user_id=user.id, specialty="cardiology", active=True) for user in doctors]
+    db_session.add_all(profiles)
+    db_session.flush()
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    test_visit.doctor_id = profiles[0].id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    escalate(db_session, task.id, actor_user_id=admin.id)
+    test_visit.doctor_id = profiles[1].id
+    db_session.commit()
+
+    sender = AsyncMock(side_effect=[False, True, True])
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == "escalated" and task.recipient_user_id == doctors[0].id
+    task.next_attempt_at = datetime.now(UTC)
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 2
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == "inbox_recorded" and task.recipient_user_id == doctors[1].id
+    assert [call.kwargs["recipient"].id for call in sender.await_args_list] == [
+        admin.id, admin.id, doctors[1].id,
+    ]
+    assert [call.kwargs["entity_type"] for call in sender.await_args_list] == [
+        "lab_critical_escalation", "lab_critical_escalation", "lab_critical_communication",
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("change", ["replaced", "assigned", "removed"])
+def test_escalated_critical_task_follows_changed_visit_doctor(
+    db_session, test_patient, test_visit, monkeypatch, change,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctors = [synthetic_user(db_session, "Doctor") for _ in range(2)]
+    profiles = [Doctor(user_id=user.id, specialty="cardiology", active=True) for user in doctors]
+    db_session.add_all(profiles)
+    db_session.flush()
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    test_visit.doctor_id = None if change == "assigned" else profiles[0].id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    escalate(db_session, task.id, actor_user_id=admin.id)
+
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 1
+    assert sender.await_args.kwargs["entity_type"] == "lab_critical_escalation"
+    assert task.state == "escalated"
+
+    test_visit.doctor_id = None if change == "removed" else profiles[1].id
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.acknowledged_at is None
+    if change == "removed":
+        assert task.state == "needs_assignment" and task.recipient_user_id is None
+        assert sender.await_args.kwargs["recipient"].id == admin.id
+        assert sender.await_args.kwargs["entity_type"] == "lab_critical_assignment"
+    else:
+        assert task.state == "inbox_recorded" and task.recipient_user_id == doctors[1].id
+        assert sender.await_args.kwargs["recipient"].id == doctors[1].id
+        with pytest.raises(LabReportingDomainError):
+            acknowledge(db_session, task.id, actor_user_id=doctors[0].id)
+        db_session.rollback()
+        assert acknowledge(db_session, task.id, actor_user_id=doctors[1].id).state == "acknowledged"
+
+    events = list(db_session.scalars(
+        select(LabCriticalCommunicationEvent.event_type)
+        .where(LabCriticalCommunicationEvent.communication_id == task.id)
+        .order_by(LabCriticalCommunicationEvent.id)
+    ))
+    assert events.count("escalated") == 1
+    assert events.count("escalation_notified") == 1
+    assert events.count("needs_assignment" if change == "removed" else "assigned") == 1
+
+
+@pytest.mark.unit
 def test_recorded_critical_task_follows_current_doctor(
     db_session,
     test_patient,
