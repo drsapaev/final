@@ -162,6 +162,26 @@ def test_transfer_uses_the_signed_source_and_rx_uses_the_exact_saved_revision(
         client.get(prior_root, headers=auth_headers).json()["row_version"]
         == signed["row_version"]
     )
+    amended_response = client.post(
+        f"{prior_root}/amend",
+        headers=auth_headers,
+        json={
+            "data": {**original, "recommendations": "SYNTHETIC updated previous plan"},
+            "reason": "SYNTHETIC correction to the previous plan",
+            "row_version": signed["row_version"],
+        },
+    )
+    assert amended_response.status_code == 200, amended_response.text
+    amended = amended_response.json()
+    history = f"{root}/workspace/history/{prior.id}"
+    original_version = client.get(f"{history}/{signed['version']}", headers=auth_headers)
+    assert original_version.status_code == 200, original_version.text
+    assert original_version.json()["status"] == "signed"
+    assert original_version.json()["recommendations"] == original["recommendations"]
+    amended_version = client.get(f"{history}/{amended['version']}", headers=auth_headers)
+    assert amended_version.status_code == 200, amended_version.text
+    assert amended_version.json()["status"] == "amended"
+    assert amended_version.json()["recommendations"] == "SYNTHETIC updated previous plan"
 
 
 def test_lab_review_belongs_to_the_exact_report_version_and_order(

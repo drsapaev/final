@@ -226,6 +226,7 @@ class EMRWorkspaceService:
         if revision is None or revision.change_type not in {"signed", "amended"}:
             raise WorkspaceError(404, "HISTORY_DOCUMENT_NOT_FOUND")
         summary = summarize_history(record, source, revision.data, revision.version)
+        summary.status = revision.change_type
         return WorkspaceHistoryDocument(**summary.model_dump(), data=revision.data)
 
     def update(
