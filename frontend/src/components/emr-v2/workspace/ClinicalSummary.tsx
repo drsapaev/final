@@ -96,7 +96,7 @@ export function ClinicalSummary({
   }
 
   function edit(kind: FactKind, current?: ClinicalEntry) {
-    if (readOnly || writeInFlight.current) return;
+    if (readOnly || writeInFlight.current || conflict) return;
     clearEditor();
     setEditor({ id: current?.entry_id ?? crypto.randomUUID(), kind, current });
   }
@@ -166,7 +166,8 @@ export function ClinicalSummary({
       <li key={entry.entry_id} className="emr-workspace-entry">
         <EntryText entry={entry} />
         <div className="emr-workspace-controls">
-          {!readOnly && <Button type="button" size="small" variant="outline" onClick={() => edit(entry.clinical_details.kind, entry)}>
+          {!readOnly && <Button type="button" size="small" variant="outline" disabled={Boolean(conflict)}
+            onClick={() => edit(entry.clinical_details.kind, entry)}>
             {t('emr_workspace.edit')}
           </Button>}
           {entry.version > 1 && <Button type="button" size="small" variant="ghost" onClick={() => void viewHistory(entry.entry_id)}>
@@ -205,7 +206,7 @@ export function ClinicalSummary({
           <section key={kind} className="emr-workspace-group">
             <div className="emr-workspace-line">
               <h4>{t(`emr_workspace.${kind}`)}</h4>
-              {!readOnly && <Button type="button" variant="ghost" size="small"
+              {!readOnly && <Button type="button" variant="ghost" size="small" disabled={Boolean(conflict)}
                 aria-label={t('emr_workspace.add_for', { category: t(`emr_workspace.${kind}`) })}
                 onClick={() => edit(kind)}>{t('emr_workspace.add')}</Button>}
             </div>
@@ -217,7 +218,8 @@ export function ClinicalSummary({
             {kind === 'allergy' && (
               <>
                 {priorCheck && <ul className="emr-workspace-list">{renderEntry(priorCheck)}</ul>}
-                {!readOnly && !priorCheck && <Button type="button" size="small" onClick={() => edit('allergy_check')}>
+                {!readOnly && !priorCheck && <Button type="button" size="small" disabled={Boolean(conflict)}
+                  onClick={() => edit('allergy_check')}>
                   {t('emr_workspace.allergy_check')}
                 </Button>}
               </>

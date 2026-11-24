@@ -47,7 +47,7 @@ it('preserves a conflicting draft and submits it against the displayed revision 
     .mockRejectedValueOnce(new Error('Synthetic transport error'))
     .mockResolvedValueOnce([latest, entry]);
   const reload = vi.fn();
-  render(<ClinicalSummary workspace={workspace} readOnly={false} reload={reload} />);
+  const { rerender } = render(<ClinicalSummary workspace={workspace} readOnly={false} reload={reload} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Edit', exact: true }));
   const dose = screen.getByRole('textbox', { name: 'Dose', exact: true });
@@ -67,6 +67,14 @@ it('preserves a conflicting draft and submits it against the displayed revision 
   expect(screen.getByText('SYNTHETIC updated medication')).toBeInTheDocument();
   expect(dose).toHaveValue('3');
   expect(getClinicalHistory).toHaveBeenLastCalledWith(501, 101, entry.entry_id);
+  expect(save).toBeDisabled();
+
+  rerender(<ClinicalSummary workspace={{ ...workspace, clinical_entries: [latest] }} readOnly={false} reload={reload} />);
+  const edit = screen.getByRole('button', { name: 'Edit', exact: true });
+  expect(edit).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Add entry for Current therapy' })).toBeDisabled();
+  fireEvent.click(edit);
+  expect(dose).toHaveValue('3');
   expect(save).toBeDisabled();
 
   const form = dose.closest('form')!;

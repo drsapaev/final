@@ -28,27 +28,38 @@ export function DocumentPreview({
   signedAt?: string | null; signedBy?: number | null; status?: string; dirty: boolean; onClose: () => void;
 }) {
   const { t, language } = useTranslation();
-  const [amendment, setAmendment] = useState<string>();
+  const [amendment, setAmendment] = useState<{ key: string; summary: string | null }>();
+  const [amendmentRetry, setAmendmentRetry] = useState(0);
   const [printFailed, setPrintFailed] = useState(false);
   const previewRef = useRef<HTMLElement>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  const signed = status === 'signed' || status === 'amended';
+  const amended = status === 'amended';
+  const signed = status === 'signed' || amended;
+  const amendmentKey = amended && version ? `${visitId}:${version}:${amendmentRetry}` : null;
+  const currentAmendment = amendment?.key === amendmentKey ? amendment : undefined;
+  const canPrint = !amended || Boolean(currentAmendment?.summary);
   const dateFormat = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' });
 
   useEffect(() => {
-    if (status !== 'amended' || !version) return;
+    if (!amendmentKey || !version) return;
     const controller = new AbortController();
-    void apiClient.get<{ change_summary?: string; version: number }>(`/v2/emr/${visitId}/version/${version}`, {
+    void apiClient.get<{ change_summary?: string; change_type: string; version: number }>(`/v2/emr/${visitId}/version/${version}`, {
       signal: controller.signal, silent: true,
     }).then(response => {
-      if (!controller.signal.aborted && response.data.version === version) setAmendment(response.data.change_summary);
-    }).catch(() => {});
+      if (controller.signal.aborted) return;
+      const revision = response.data;
+      const summary = revision.version === version && revision.change_type === 'amended'
+        ? revision.change_summary?.trim() || null : null;
+      setAmendment({ key: amendmentKey, summary });
+    }).catch(() => {
+      if (!controller.signal.aborted) setAmendment({ key: amendmentKey, summary: null });
+    });
     return () => controller.abort();
-  }, [visitId, status, version]);
+  }, [amendmentKey, visitId, version]);
   useEffect(() => () => frameRef.current?.remove(), []);
 
   function printPreview() {
-    if (!previewRef.current) return;
+    if (!canPrint || !previewRef.current) return;
     setPrintFailed(false);
     frameRef.current?.remove();
     const frame = window.document.createElement('iframe');
@@ -99,7 +110,7 @@ export function DocumentPreview({
   return (
     <Modal isOpen onClose={onClose} size="large" title={t('emr_workspace.preview')} actions={<>
       <Button type="button" variant="ghost" onClick={onClose}>{t('misc.cancel')}</Button>
-      <Button type="button" onClick={printPreview}>{t('emr_workspace.print')}</Button>
+      <Button type="button" disabled={!canPrint} onClick={printPreview}>{t('emr_workspace.print')}</Button>
     </>}>
         <article className="emr-workspace-print" data-emr-print ref={previewRef}>
           <header>
@@ -112,7 +123,8 @@ export function DocumentPreview({
               ? 'emr_workspace.draft_preview' : 'emr_workspace.unconfirmed_preview')}</strong></p>}
             {signed && signedAt && <p>{t('emr_workspace.signature_time', { date: dateFormat.format(new Date(signedAt)) })}
               {signedBy ? ` · №${signedBy}` : ''}</p>}
-            {amendment && <p><strong>{t('emr_workspace.amendment_reason')}</strong> {amendment}</p>}
+            {amended && <p><strong>{t('misc.visit_emr_status_amended')}</strong></p>}
+            {currentAmendment?.summary && <p><strong>{t('emr_workspace.amendment_reason')}</strong> {currentAmendment.summary}</p>}
           </header>
           {followUp.mode && <p>{t('emr_workspace.visit_type')}. {t(`emr_workspace.${followUp.mode}`)}</p>}
           {hasVitals && <section>
@@ -168,6 +180,14 @@ export function DocumentPreview({
             <p className="emr-workspace-document-text">{ecgConclusion}</p>
           </section>}
         </article>
+        {amended && !canPrint && (amendmentKey && !currentAmendment
+          ? <p role="status">{t('emr_workspace.loading')}</p>
+          : <div role="alert">
+            <p>{t('emr_workspace.load_error')}</p>
+            {amendmentKey && <Button type="button" variant="outline" onClick={() => setAmendmentRetry(count => count + 1)}>
+              {t('emr_workspace.retry')}
+            </Button>}
+          </div>)}
         {printFailed && <p role="alert">{t('emr_workspace.print_error')}</p>}
     </Modal>
   );
