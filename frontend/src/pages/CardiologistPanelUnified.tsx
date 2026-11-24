@@ -1,4 +1,4 @@
-import { createElement, lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
@@ -2065,10 +2065,10 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const [focusStudy, setFocusStudy] = useState<'ecg' | 'echo'>();
 
   const cardiologyQueuePanel = activeTab === 'queue'
-    ? createElement(CardiologyQueueTab, {
-      onStartVisit: handleDoctorQueueStartVisit,
-      onOpenVisit: (entry, completed) => { void handleDoctorQueueOpenVisit(entry, completed); },
-    })
+    ? (<CardiologyQueueTab
+        onStartVisit={handleDoctorQueueStartVisit}
+        onOpenVisit={(entry, completed) => { void handleDoctorQueueOpenVisit(entry, completed); }}
+      /> as React.ReactElement)
     : null;
 
   const tabLoadingFallback = (
