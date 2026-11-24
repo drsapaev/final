@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, Phone, Search, User } from 'lucide-react';
 import type { Patient } from '../../types/domain/clinic';
 import { searchPatients } from '../../api/patients';
@@ -55,9 +55,12 @@ function birthLabel(patient: DermatologyPatientRecord): string {
   return patient.patient_birth_year ? String(patient.patient_birth_year) : patient.birth_date || '';
 }
 
+/** DERMAPAT-FE-002: server page size for patient search (matches the
+ * backend limit default; a full page means more results may exist). */
+const SEARCH_PAGE_SIZE = 100;
+
 interface DermaPatientsTabProps {
-  selectedPatient: DermatologyPatientRecord | null;
-  onSelectPatient: (patient: DermatologyPatientRecord | null) => void;
+  selectedPatient: DermatologyPatientRecord | null;  onSelectPatient: (patient: DermatologyPatientRecord | null) => void;
   appointments: DermatologyAppointmentHistoryItem[];
   skinExaminations: DermatologySkinExamination[];
   cosmeticProcedures: DermatologyCosmeticProcedure[];
@@ -67,6 +70,10 @@ interface DermaPatientsTabProps {
   hasMoreProcedures: boolean;
   loadingMoreExaminations: boolean;
   loadingMoreProcedures: boolean;
+  /** DERMAHIST-FE-002: surfaced failed-page states (optional with a
+   * false default — callers predating the fix stay valid). */
+  loadMoreExaminationsError?: boolean;
+  loadMoreProceduresError?: boolean;
   onLoadMoreExaminations: () => void;
   onLoadMoreProcedures: () => void;
   historyLoading: boolean;
@@ -86,6 +93,8 @@ export function DermaPatientsTab({
   hasMoreProcedures,
   loadingMoreExaminations,
   loadingMoreProcedures,
+  loadMoreExaminationsError = false,
+  loadMoreProceduresError = false,
   onLoadMoreExaminations,
   onLoadMoreProcedures,
   historyLoading,
@@ -98,6 +107,13 @@ export function DermaPatientsTab({
   const [resultsFor, setResultsFor] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchErrorFor, setSearchErrorFor] = useState('');
+  // DERMAPAT-FE-002: the search is server-paginated — the first page is
+  // truncated at the explicit server page size and a Load more control
+  // fetches the next page (skip = loaded count), so matches beyond the
+  // first page stay selectable and the truncation is never silent.
+  const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [loadingMoreResults, setLoadingMoreResults] = useState(false);
+  const [loadMoreErrorFor, setLoadMoreErrorFor] = useState('');
   const normalizedQuery = query.trim();
   const selectedId = patientId(selectedPatient);
   const searchError = Boolean(normalizedQuery && searchErrorFor === normalizedQuery);
@@ -113,23 +129,28 @@ export function DermaPatientsTab({
       setResultsFor(normalizedQuery);
       setSearching(false);
       setSearchErrorFor('');
+      setHasMoreResults(false);
+      setLoadMoreErrorFor('');
       return () => { active = false; };
     }
 
     const timeout = window.setTimeout(() => {
       setSearching(true);
       setSearchErrorFor('');
-      void searchPatients(normalizedQuery)
+      void searchPatients(normalizedQuery, { limit: SEARCH_PAGE_SIZE })
         .then((patients) => {
           if (!active) return;
           setResults(patients);
           setResultsFor(normalizedQuery);
+          setHasMoreResults(patients.length >= SEARCH_PAGE_SIZE);
+          setLoadMoreErrorFor('');
         })
         .catch(() => {
           if (!active) return;
           setResults([]);
           setResultsFor(normalizedQuery);
           setSearchErrorFor(normalizedQuery);
+          setHasMoreResults(false);
         })
         .finally(() => {
           if (active) setSearching(false);
@@ -141,6 +162,28 @@ export function DermaPatientsTab({
       window.clearTimeout(timeout);
     };
   }, [normalizedQuery]);
+
+  const loadMoreResults = useCallback(() => {
+    if (
+      searching || loadingMoreResults
+      || resultsFor !== normalizedQuery || normalizedQuery.length < 2
+      || !hasMoreResults
+    ) return;
+    setLoadingMoreResults(true);
+    void searchPatients(normalizedQuery, { skip: results.length, limit: SEARCH_PAGE_SIZE })
+      .then((page) => {
+        setResults((current) => {
+          const seen = new Set(current.map((p) => String(p.id)));
+          return [...current, ...page.filter((p) => !seen.has(String(p.id)))];
+        });
+        setHasMoreResults(page.length >= SEARCH_PAGE_SIZE);
+        setLoadMoreErrorFor('');
+      })
+      .catch(() => {
+        setLoadMoreErrorFor(normalizedQuery);
+      })
+      .finally(() => setLoadingMoreResults(false));
+  }, [searching, loadingMoreResults, resultsFor, normalizedQuery, hasMoreResults, results.length]);
 
   return (
     <div className="derma-flex-col-24">
@@ -225,6 +268,24 @@ export function DermaPatientsTab({
             })}
           </div>
         )}
+
+        {loadMoreErrorFor === normalizedQuery && normalizedQuery.length >= 2 && (
+          <p role="alert" className="derma-p-14-secondary derma-text-danger">
+            {t('derma.derma_panel_patients_search_load_more_failed')}
+          </p>
+        )}
+        {visibleResults.length > 0 && hasMoreResults && (
+          <button
+            type="button"
+            className="derma-history-load-more"
+            onClick={loadMoreResults}
+            disabled={loadingMoreResults}
+          >
+            {loadingMoreResults
+              ? t('derma.derma_gallery_loading')
+              : t('derma.derma_gallery_load_more')}
+          </button>
+        )}
       </Card>
 
       {selectedPatient && selectedId && (
@@ -266,6 +327,8 @@ export function DermaPatientsTab({
               hasMoreProcedures={hasMoreProcedures}
               loadingMoreExaminations={loadingMoreExaminations}
               loadingMoreProcedures={loadingMoreProcedures}
+              loadMoreExaminationsError={loadMoreExaminationsError}
+              loadMoreProceduresError={loadMoreProceduresError}
               onLoadMoreExaminations={onLoadMoreExaminations}
               onLoadMoreProcedures={onLoadMoreProcedures}
             />

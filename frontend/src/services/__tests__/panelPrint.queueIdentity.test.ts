@@ -42,7 +42,7 @@ vi.mock('../../api/ticketPrintSettings', async () => {
   };
 });
 
-import { buildPanelTicketPayload } from '../panelPrint';
+import { buildPanelTicketPayload, resolvePanelTicketPayloads } from '../panelPrint';
 
 describe('QUEUEPRINT-FE-003 — ticket identity is never fabricated from unrelated IDs', () => {
   beforeEach(() => {
@@ -103,4 +103,41 @@ describe('QUEUEPRINT-FE-003 — ticket identity is never fabricated from unrelat
     });
     expect(payload.queue_number).toBe('В-25');
   });
+});
+
+it('does not print zero or nested cabinet/status as an issued ticket', () => {
+  expect(buildPanelTicketPayload({ visit_id: 42, queue_number: 0 })).toMatchObject({ queue_number: 'В-42' });
+  expect(() => buildPanelTicketPayload({ queue_numbers: [{ number: null, cabinet: '205', status: 'waiting' }] })).toThrow();
+  expect(buildPanelTicketPayload({ queue_number: '0', number: 1, queue_cabinet: '205' })).toMatchObject({
+    queue_number: '1', cabinet: '205',
+  });
+});
+
+it('does not use the aggregate cabinet or ticket for a different child', () => {
+  const row = {
+    queue_number: 1,
+    queue_cabinet: '205',
+    queue_numbers: [
+      { number: 1, queue_cabinet: '205', visit_id: 21 },
+      { number: 2, visit_id: 22 },
+    ],
+  };
+  const [, second] = resolvePanelTicketPayloads(row);
+  expect(second).toMatchObject({ queue_number: '2', cabinet: null });
+  row.queue_numbers[1].number = 0;
+  expect(resolvePanelTicketPayloads(row)[1].queue_number).toBe('В-22');
+});
+
+it('an unnumbered visit without a stable visit id cannot stop the other departments from printing', () => {
+  const payloads = resolvePanelTicketPayloads({
+    queue_numbers: [
+      { number: 0, queue_tag: 'procedures' },
+      { number: 0, queue_tag: 'ecg', visit_id: 21 },
+      { number: 1, queue_tag: 'ecg', visit_id: 21, queue_cabinet: '23' },
+      { number: 1, queue_tag: 'lab', queue_cabinet: '42' },
+    ],
+  });
+  expect(payloads.map(({ queue_number, cabinet }) => [queue_number, cabinet])).toEqual([
+    ['1', '23'], ['1', '42'],
+  ]);
 });

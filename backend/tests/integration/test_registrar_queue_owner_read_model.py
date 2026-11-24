@@ -1,5 +1,6 @@
 """Per-row ownership contract for the registrar's specialty-grouped worklist."""
 
+from datetime import date
 from types import SimpleNamespace
 
 from app.api.v1.endpoints.registrar_integration._queue_ops import (
@@ -31,8 +32,9 @@ def test_today_queues_exposes_actual_owner_for_each_entry(
     )
     db_session.add(second_user)
     db_session.flush()
+    test_doctor.cabinet = "205"
     second_doctor = Doctor(
-        user_id=second_user.id, specialty=test_doctor.specialty, active=True
+        user_id=second_user.id, specialty=test_doctor.specialty, active=True, cabinet="306"
     )
     db_session.add(second_doctor)
 
@@ -47,6 +49,7 @@ def test_today_queues_exposes_actual_owner_for_each_entry(
         code="test_registrar_owner_ecg",
         queue_tag="ecg",
         display_name="ЭКГ",
+        default_cabinet="407",
         active=True,
     )
     db_session.add_all([ecg_service, resource])
@@ -65,6 +68,10 @@ def test_today_queues_exposes_actual_owner_for_each_entry(
     db_session.flush()
 
     patients = [Patient(first_name="Тест", last_name=f"Пациент{i}") for i in range(10)]
+    patients[0].birth_date = date(1990, 5, 16)
+    patients[0].address = "SYNTHETIC-A address"
+    patients[1].birth_date = date(1989, 7, 11)
+    patients[1].address = "SYNTHETIC-B address"
     db_session.add_all(patients)
     db_session.flush()
 
@@ -215,6 +222,16 @@ def test_today_queues_exposes_actual_owner_for_each_entry(
         test_doctor.id,
         doctor_queue_a.id,
     )
+    for entry, cabinet in zip(entries, ("205", "306", "407"), strict=True):
+        row = rows[("online_queue", entry.id)]
+        assert row["queue_cabinet"] == cabinet
+        assert row["number"] == row["queue_position"] == 1
+    for entry, year, address in zip(
+        entries, (1990, 1989, None), ("SYNTHETIC-A address", "SYNTHETIC-B address", None), strict=True
+    ):
+        row = rows[("online_queue", entry.id)]
+        assert row["patient_birth_year"] == year
+        assert row["address"] == address
     assert rows[("online_queue", entries[0].id)]["visit_id"] == linked_visit.id
     assert ("visit", linked_visit.id) not in rows
     assert owner("online_queue", entries[1].id) == (

@@ -931,6 +931,11 @@ class PublicBookingRequestService:
             id=request.id,
             service_slug=request.service.slug,
             doctor_slug=request.doctor.slug,
+            service_name_ru=(request.service.name or "").strip() or None,
+            service_name_uz=(request.service.name_uz or "").strip() or None,
+            doctor_display_name=(
+                (getattr(request.doctor.user, "full_name", None) or "").strip() or None
+            ),
             appointment_date=request.appointment_date,
             appointment_time=request.appointment_time,
             appointment_id=request.appointment_id,

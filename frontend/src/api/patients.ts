@@ -124,10 +124,13 @@ export async function searchPatientsByPhone(phone: string): Promise<Patient[]> {
  * @param query - Минимум 2 символа
  * @returns {Promise<Patient[]>} Массив найденных пациентов (домен)
  */
-export async function searchPatients(query: string): Promise<Patient[]> {
+export async function searchPatients(
+  query: string,
+  options?: { skip?: number; limit?: number },
+): Promise<Patient[]> {
   if (!query || query.length < 2) return [];
   const response = await api.get<unknown>('/patients/', {
-    params: { q: query },
+    params: { q: query, ...options },
   });
   return mapPatientDtos(response.data);
 }
