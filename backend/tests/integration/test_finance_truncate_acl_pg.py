@@ -10,6 +10,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine, make_url
+
 from tests._pg_admin_guard import is_local_admin_dsn
 from tests.integration.test_encounter_migration_pg import _migration
 
@@ -438,3 +439,128 @@ def test_metadata_acl_rejects_reachable_column_write(finance_metadata_scope):
     with scope.engine.connect() as connection:
         assert _has(connection, scope, scope.gateway, "user_audit_logs", "TRUNCATE")
         assert _has(connection, scope, scope.gateway, "alembic_version", "UPDATE")
+
+
+@pytest.fixture
+def service_catalog_audit_scope(finance_scope, monkeypatch):
+    migration = _migration("0160_service_catalog_audit_acl.py")
+    scope = replace(finance_scope, migration=migration)
+    monkeypatch.setattr(migration, "_GATEWAY_ROLES", (scope.gateway,))
+    catalog = scope.qualified("services")
+    audit = scope.qualified("service_audit_logs")
+    with scope.engine.begin() as connection:
+        connection.exec_driver_sql(
+            f"CREATE TABLE {catalog} (id integer PRIMARY KEY, price integer, active boolean)"
+        )
+        connection.exec_driver_sql(
+            f"ALTER TABLE {audit} ADD COLUMN service_id integer REFERENCES "
+            f"{catalog} (id) ON DELETE CASCADE, ADD COLUMN action text"
+        )
+        connection.exec_driver_sql(f"INSERT INTO {catalog} VALUES (1, 200, true)")
+        connection.exec_driver_sql(
+            f"INSERT INTO {audit} (id, service_id, action) VALUES (1, 1, 'create')"
+        )
+        connection.exec_driver_sql(
+            f"GRANT ALL PRIVILEGES ON TABLE {catalog}, {audit} "
+            f"TO {scope.gateway}, {scope.maintainer}"
+        )
+        connection.exec_driver_sql(
+            f"GRANT DELETE, TRUNCATE, TRIGGER ON TABLE {catalog}, {audit} TO PUBLIC"
+        )
+        connection.exec_driver_sql(f"GRANT UPDATE ON TABLE {audit} TO PUBLIC")
+        connection.exec_driver_sql(f"GRANT UPDATE (action) ON TABLE {audit} TO PUBLIC")
+        for table in (catalog, audit):
+            connection.exec_driver_sql(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+            connection.exec_driver_sql(
+                f"CREATE POLICY synthetic_writer ON {table} TO {scope.gateway} "
+                "USING (true) WITH CHECK (true)"
+            )
+    return scope
+
+
+def test_service_audit_acl_preserves_catalogue_writer_and_audit_history(
+    service_catalog_audit_scope,
+):
+    scope = service_catalog_audit_scope
+    catalog = scope.qualified("services")
+    audit = scope.qualified("service_audit_logs")
+    denied = {
+        "services": ("DELETE", "TRUNCATE", "TRIGGER"),
+        "service_audit_logs": ("UPDATE", "DELETE", "TRUNCATE", "TRIGGER"),
+    }
+    with scope.engine.begin() as connection:
+        for table, privileges in denied.items():
+            for privilege in privileges:
+                assert _has(connection, scope, scope.inherited, table, privilege)
+
+        _migrate(scope, connection)
+        _migrate(scope, connection, downgrade=True)
+        _migrate(scope, connection)
+
+        for table, privileges in denied.items():
+            for privilege in privileges:
+                assert not _has(connection, scope, scope.gateway, table, privilege)
+                assert not _has(connection, scope, scope.inherited, table, privilege)
+                assert _has(connection, scope, scope.maintainer, table, privilege)
+            assert connection.scalar(
+                text("""
+                    SELECT relrowsecurity FROM pg_catalog.pg_class
+                    WHERE oid = CAST(:relation AS regclass)
+                """),
+                {"relation": scope.qualified(table)},
+            )
+        for role in (scope.gateway, scope.inherited):
+            assert not connection.scalar(
+                text("""
+                    SELECT pg_catalog.has_any_column_privilege(
+                        :role, :relation, 'UPDATE'
+                    )
+                """),
+                {"role": role, "relation": audit},
+            )
+        assert _has(connection, scope, scope.gateway, "services", "INSERT")
+        assert _has(connection, scope, scope.gateway, "unrelated_inventory", "TRUNCATE")
+        connection.exec_driver_sql(f"SET LOCAL ROLE {scope.gateway}")
+        connection.exec_driver_sql(
+            f"UPDATE {catalog} SET price = 150, active = false WHERE id = 1"
+        )
+        connection.exec_driver_sql(
+            f"INSERT INTO {audit} (id, service_id, action) VALUES (2, 1, 'deactivate')"
+        )
+        assert connection.exec_driver_sql(
+            f"SELECT s.price, s.active, a.action FROM {catalog} AS s "
+            f"JOIN {audit} AS a ON a.service_id = s.id ORDER BY a.id"
+        ).all() == [(150, False, "create"), (150, False, "deactivate")]
+
+
+@pytest.mark.parametrize("remaining_grant", ["DELETE", "UPDATE (action)"])
+def test_service_audit_acl_rolls_back_on_remaining_write_privileges(
+    service_catalog_audit_scope,
+    remaining_grant,
+):
+    scope = service_catalog_audit_scope
+    catalog = scope.qualified("services")
+    audit = scope.qualified("service_audit_logs")
+    with scope.engine.begin() as connection:
+        target = catalog if remaining_grant == "DELETE" else audit
+        connection.exec_driver_sql(
+            f"GRANT {remaining_grant} ON TABLE {target} TO {scope.inherited}"
+        )
+        membership_options = (
+            "WITH INHERIT FALSE, SET TRUE"
+            if connection.dialect.server_version_info >= (16,)
+            else ""
+        )
+        connection.exec_driver_sql(
+            f"GRANT {scope.inherited} TO {scope.gateway} {membership_options}"
+        )
+
+    with (
+        pytest.raises(RuntimeError, match="Remaining service audit write privileges"),
+        scope.engine.begin() as connection,
+    ):
+        _migrate(scope, connection)
+
+    with scope.engine.connect() as connection:
+        assert _has(connection, scope, scope.gateway, "services", "TRUNCATE")
+        assert _has(connection, scope, scope.gateway, "service_audit_logs", "UPDATE")
