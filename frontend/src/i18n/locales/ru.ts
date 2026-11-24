@@ -1631,6 +1631,7 @@ const ru = {
     derma_panel_patients_search_placeholder: 'ФИО, телефон или ID',
     derma_panel_patients_search_minimum: 'Введите не менее 2 символов',
     derma_panel_patients_search_empty: 'Пациенты не найдены',
+    derma_panel_patients_search_load_more_failed: 'Не удалось загрузить следующую страницу результатов — показаны только уже загруженные совпадения. Попробуйте ещё раз.',
     derma_panel_patients_search_error: 'Не удалось выполнить поиск. Повторите попытку.',
     derma_panel_patients_search_results: 'Результаты поиска пациентов',
     derma_panel_patients_select: 'Выбрать',
