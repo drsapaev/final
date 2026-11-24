@@ -50,7 +50,10 @@ from app.services.emr_v2_service import (
     emr_v2_service,
     get_emr_audit_change_metadata,
 )
-from app.services.emr_workspace_service import WorkspaceError, prepare_workspace_document
+from app.services.emr_workspace_service import (
+    WorkspaceError,
+    prepare_workspace_document,
+)
 from app.services.reason_codes import ReasonCode
 from app.services.section_templates_service import DoctorSectionTemplatesService
 
@@ -527,6 +530,7 @@ async def save_emr(
             row_version=payload.row_version,
             client_session_id=payload.client_session_id,
             is_draft=payload.is_draft,
+            expected_patient_id=payload.expected_patient_id,
         )
         log_critical_change(
             db=db,

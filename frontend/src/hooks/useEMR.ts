@@ -14,7 +14,7 @@ import { apiClient } from '../api/client';
 import logger from '../utils/logger';
 import { buildInitialEMRData, normalizeEMRData } from '../utils/emrSpecialty';
 import { getState as getAuthState } from '../stores/auth';
-import type { EMRApiError, EMRHttpStatus } from '../types/domain/emr';
+import type { EMRApiError } from '../types/domain/emr';
 
 let fallbackSessionCounter = 0;
 
@@ -74,9 +74,21 @@ export function invalidateEMRCache(visitId: string | number) {
     }
 }
 
-const isAccessDeniedStatus = (status: EMRHttpStatus | undefined) => status === 401 || status === 403;
+const PATIENT_CONTEXT_CHANGED = 'PATIENT_CONTEXT_CHANGED';
+
+const isPatientContextMismatch = (error?: EMRApiError): boolean => {
+    const detail = error?.response?.data?.detail;
+    return error?.response?.status === 409 && typeof detail === 'object'
+        && detail !== null && 'code' in detail && detail.code === PATIENT_CONTEXT_CHANGED;
+};
+
+const isAccessDenied = (error: EMRApiError): boolean => {
+    const status = error.response?.status;
+    return status === 401 || status === 403 || isPatientContextMismatch(error);
+};
 
 const getAccessDeniedMessage = (error?: EMRApiError): string => {
+    if (isPatientContextMismatch(error)) return PATIENT_CONTEXT_CHANGED;
     const detail = error?.response?.data?.detail;
     if (typeof detail === 'string' && detail) return detail;
     if (typeof detail === 'object' && detail?.message) return detail.message;
@@ -112,12 +124,25 @@ const isEmrRecord = (value: unknown): value is Record<string, unknown> =>
  * @param {string} options.specialty - Canonical specialty for this EMR flow
  * @returns {Object} EMR state and actions
  */
-export function useEMR(visitId: number | string | null, { autoLoad = true, specialty = 'general' }: { autoLoad?: boolean; specialty?: string } = {}) {
+export function useEMR(
+    visitId: number | string | null,
+    { autoLoad = true, specialty = 'general', patientId }: {
+        autoLoad?: boolean; specialty?: string; patientId?: string | number | null;
+    } = {},
+) {
+    const selectedPatientId = Number(patientId);
+    const expectedPatientId = Number.isSafeInteger(selectedPatientId) && selectedPatientId > 0 ? selectedPatientId : null;
     const [state, dispatch] = useReducer(emrReducer, initialState);
     const clientSessionId = useRef(generateSessionId());
     const isMountedRef = useRef(true);
     const writeAccessDeniedRef = useRef(false);
     const [writeAccessDenied, setWriteAccessDenied] = useState(false);
+    const patientContextChangedRef = useRef(false);
+    const [patientContextChanged, setPatientContextChanged] = useState(false);
+    const clearPatientContextChanged = useCallback(() => {
+        patientContextChangedRef.current = false;
+        setPatientContextChanged(false);
+    }, []);
     // RETRO-4007-01 (post-merge re-review of 4007): the server finalized the
     // record (a structured FINALIZED_STATE 409 or a legacy signed HTTP 400)
     // while the LOCAL editor still held the in_progress draft. The local
@@ -163,6 +188,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     // overwrite the new visit's clinical state.
     const visitEpochRef = useRef(0);
     const visitIdentityRef = useRef<number | string | null>(visitId);
+    const patientIdentityRef = useRef(expectedPatientId);
     const draftSaveEpochRef = useRef<number | null>(null);
     // An edit can be queued in React before stateRef reflects it. A refresh
     // must yield to those edits and to writes started while its GET is pending.
@@ -176,31 +202,48 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     }, []);
 
     useEffect(() => {
-        if (visitIdentityRef.current !== visitId) {
+        if (visitIdentityRef.current !== visitId || patientIdentityRef.current !== expectedPatientId) {
             visitIdentityRef.current = visitId;
+            patientIdentityRef.current = expectedPatientId;
             visitEpochRef.current += 1;
             writeAccessDeniedRef.current = false;
             setWriteAccessDenied(false);
+            clearPatientContextChanged();
             clearServerFinalized();
             // Hard reset: no data, no dirty flag, no history, no conflict of
             // the previous visit may survive into the new visit's editor.
             dispatch(emrActions.contextReset());
         }
-    }, [visitId, clearServerFinalized]);
+    }, [visitId, expectedPatientId, clearPatientContextChanged, clearServerFinalized]);
 
     useEffect(() => {
-        writeAccessDeniedRef.current = false;
-        setWriteAccessDenied(false);
+        if (!patientContextChangedRef.current) {
+            writeAccessDeniedRef.current = false;
+            setWriteAccessDenied(false);
+        }
         clearServerFinalized();
     }, [specialty, clearServerFinalized]);
 
     // EMRCACHE-FE-001: principal-scoped cache key (cleared on principal swap)
     syncCachePrincipal();
     const cachePrincipal = emrCachePrincipal;
-    const cacheKey = `${cachePrincipal ?? 'anonymous'}:${visitId || ''}:${specialty}`;
+    const cacheKey = `${cachePrincipal ?? 'anonymous'}:${visitId || ''}:${expectedPatientId ?? ''}:${specialty}`;
     const canUseCache = cachePrincipal !== null;
 
+    const handlePatientContextChanged = useCallback(() => {
+        if (visitId !== null) invalidateEMRCache(visitId);
+        visitEpochRef.current += 1;
+        writeAccessDeniedRef.current = true;
+        setWriteAccessDenied(true);
+        patientContextChangedRef.current = true;
+        setPatientContextChanged(true);
+        clearServerFinalized();
+        dispatch(emrActions.contextReset());
+        return { accessDenied: true, status: 409, message: PATIENT_CONTEXT_CHANGED };
+    }, [visitId, clearServerFinalized]);
+
     const handleAccessDenied = useCallback((operation: string, error: EMRApiError) => {
+        if (isPatientContextMismatch(error)) return handlePatientContextChanged();
         const status = error?.response?.status;
         const message = getAccessDeniedMessage(error);
         logger.warn(`[FIX:EMR${status}] ${operation} blocked by access control`, {
@@ -217,7 +260,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             status,
             message
         };
-    }, [specialty, visitId]);
+    }, [handlePatientContextChanged, specialty, visitId]);
 
     // =========================================================================
     // LOAD EMR
@@ -236,12 +279,26 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         const generation = documentGenerationRef.current;
         const stillCurrentSnapshot = () => stillCurrentVisit() && documentGenerationRef.current === generation;
         const applySnapshot = <T,>(result: T) => {
+            if (result && typeof result === 'object' && 'message' in result
+                && result.message === PATIENT_CONTEXT_CHANGED && stillCurrentVisit()) {
+                return handlePatientContextChanged();
+            }
             if (!isEmrRecord(result)) return result;
             if (!stillCurrentSnapshot()) {
                 return { stale: true };
             }
+            if (patientContextChangedRef.current && (
+                !(Number(result.id) > 0 && Number(result.row_version) > 0)
+                || String(result.visit_id) !== String(visitId)
+            )) {
+                return { accessDenied: true, status: 409, message: PATIENT_CONTEXT_CHANGED };
+            }
+            if (expectedPatientId !== null && result.id && Number(result.patient_id) !== expectedPatientId) {
+                return handlePatientContextChanged();
+            }
             writeAccessDeniedRef.current = false;
             setWriteAccessDenied(false);
+            clearPatientContextChanged();
             clearServerFinalized();
             dispatch(emrActions.load(result));
             return result;
@@ -250,7 +307,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         // bypassed entirely (no reads, no writes) — anonymous state must
         // never serve or persist clinical records.
         const cachedEntry = canUseCache ? emrCache.get(cacheKey) : undefined;
-        if (!forceRefresh && cachedEntry?.data) {
+        if (!forceRefresh && !writeAccessDeniedRef.current && cachedEntry?.data) {
             if (stillCurrentVisit()) {
                 dispatch(emrActions.load(cachedEntry.data));
             }
@@ -302,7 +359,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             } catch (error) {
                 const apiError = toEMRApiError(error);
                 if (emrCache.get(cacheKey) === pendingEntry) emrCache.delete(cacheKey);
-                if (isAccessDeniedStatus(apiError?.response?.status)) {
+                if (isAccessDenied(apiError)) {
                     // RETRO-3930-01 (post-merge review of PR 3930): a 403 that
                     // belongs to a PREVIOUS visit must not lock or error the
                     // current visit's editor — guard the denial with the
@@ -353,7 +410,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 });
             }
         }
-    }, [cacheKey, cachePrincipal, canUseCache, handleAccessDenied, specialty, visitId, clearServerFinalized]);
+    }, [cacheKey, cachePrincipal, canUseCache, clearPatientContextChanged, clearServerFinalized, expectedPatientId, handleAccessDenied, handlePatientContextChanged, specialty, visitId]);
 
     // =========================================================================
     // SAVE EMR
@@ -361,7 +418,8 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     const saveEMR = useCallback(async (options: Record<string, unknown> = {}) => {
         const { isDraft = true, force = false } = options;
         const epoch = visitEpochRef.current;
-        if (visitIdentityRef.current !== visitId || draftSaveEpochRef.current === epoch) return null;
+        if (visitIdentityRef.current !== visitId || patientIdentityRef.current !== expectedPatientId
+            || draftSaveEpochRef.current === epoch) return null;
 
         if (writeAccessDeniedRef.current) {
             logger.info('[FIX:EMR403] saveEMR skipped because access was already denied', {
@@ -378,7 +436,8 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         draftSaveEpochRef.current = epoch;
         documentGenerationRef.current += 1;
         dispatch(emrActions.saveStart());
-        const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch;
+        const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch
+            && getCachePrincipal() === cachePrincipal;
 
         try {
             const payload = {
@@ -388,12 +447,13 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 row_version: force ? 0 : stateRef.current.rowVersion, // 0 = skip lock check
                 client_session_id: clientSessionId.current,
                 is_draft: isDraft,
+                ...(expectedPatientId !== null && { expected_patient_id: expectedPatientId }),
             };
 
             const response = await apiClient.post(`/v2/emr/${visitId}`, payload);
             // EMRCACHE-FE-002: refresh the cache with the authoritative
             // server record so a remount shows the saved content/version.
-            if (canUseCache) {
+            if (canUseCache && stillCurrentVisit()) {
                 emrCache.set(cacheKey, {
                     data: { ...response.data, data: normalizeEMRData(response.data?.data, specialty) },
                     promise: null,
@@ -402,10 +462,10 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             if (stillCurrentVisit()) {
                 dispatch(emrActions.saveSuccess(response.data));
             }
-            return visitEpochRef.current === epoch ? response.data : null;
+            return stillCurrentVisit() ? response.data : null;
         } catch (error) {
             const apiError = toEMRApiError(error);
-            if (isAccessDeniedStatus(apiError?.response?.status)) {
+            if (isAccessDenied(apiError)) {
                 // RETRO-3930-01: a late denial of a previous visit must not
                 // lock the current visit's editor.
                 if (!stillCurrentVisit()) {
@@ -487,13 +547,14 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         } finally {
             if (draftSaveEpochRef.current === epoch) draftSaveEpochRef.current = null;
         }
-    }, [handleAccessDenied, specialty, visitId, markServerFinalized]);
+    }, [cacheKey, cachePrincipal, canUseCache, expectedPatientId, handleAccessDenied, specialty, visitId, markServerFinalized]);
 
     // =========================================================================
     // SIGN EMR
     // =========================================================================
     const signEMR = useCallback(async (options: { rowVersion?: number; data?: Record<string, unknown> } = {}) => {
-        if (visitIdentityRef.current !== visitId || draftSaveEpochRef.current === visitEpochRef.current) return null;
+        if (visitIdentityRef.current !== visitId || patientIdentityRef.current !== expectedPatientId
+            || draftSaveEpochRef.current === visitEpochRef.current) return null;
         if (writeAccessDeniedRef.current) {
             logger.info('[FIX:EMR403] signEMR skipped because access was already denied', {
                 visitId,
@@ -509,7 +570,8 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         documentGenerationRef.current += 1;
         dispatch(emrActions.saveStart());
         const epoch = visitEpochRef.current;
-        const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch;
+        const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch
+            && getCachePrincipal() === cachePrincipal;
 
         try {
             const payload = {
@@ -520,7 +582,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
 
             const response = await apiClient.post(`/v2/emr/${visitId}/sign`, payload);
             // EMRCACHE-FE-002: keep the cache in sync with the signed record.
-            if (canUseCache) {
+            if (canUseCache && stillCurrentVisit()) {
                 emrCache.set(cacheKey, {
                     data: { ...response.data, data: normalizeEMRData(response.data?.data, specialty) },
                     promise: null,
@@ -529,10 +591,10 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             if (stillCurrentVisit()) {
                 dispatch(emrActions.saveSuccess(response.data));
             }
-            return response.data;
+            return stillCurrentVisit() ? response.data : null;
         } catch (error) {
             const apiError = toEMRApiError(error);
-            if (isAccessDeniedStatus(apiError?.response?.status)) {
+            if (isAccessDenied(apiError)) {
                 // RETRO-3930-01: guard the sign denial with the request
                 // identity — a previous visit's late 403 must not lock the
                 // current editor.
@@ -588,13 +650,14 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             dispatch(emrActions.saveError(apiError.message || 'Ошибка подписания'));
             throw error;
         }
-    }, [handleAccessDenied, specialty, visitId, markServerFinalized]);
+    }, [cacheKey, cachePrincipal, canUseCache, expectedPatientId, handleAccessDenied, specialty, visitId, markServerFinalized]);
 
     // =========================================================================
     // AMEND EMR
     // =========================================================================
     const amendEMR = useCallback(async (reason: string, options: { data?: Record<string, unknown> } = {}) => {
-        if (visitIdentityRef.current !== visitId || draftSaveEpochRef.current === visitEpochRef.current) return null;
+        if (visitIdentityRef.current !== visitId || patientIdentityRef.current !== expectedPatientId
+            || draftSaveEpochRef.current === visitEpochRef.current) return null;
         if (!reason || reason.trim().length < 10) {
             const error = 'Причина поправки должна быть не менее 10 символов';
             dispatch(emrActions.saveError(error));
@@ -616,7 +679,8 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         documentGenerationRef.current += 1;
         dispatch(emrActions.saveStart());
         const epoch = visitEpochRef.current;
-        const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch;
+        const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch
+            && getCachePrincipal() === cachePrincipal;
 
         try {
             const payload = {
@@ -628,7 +692,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
 
             const response = await apiClient.post(`/v2/emr/${visitId}/amend`, payload);
             // EMRCACHE-FE-002: keep the cache in sync with the amended record.
-            if (canUseCache) {
+            if (canUseCache && stillCurrentVisit()) {
                 emrCache.set(cacheKey, {
                     data: { ...response.data, data: normalizeEMRData(response.data?.data, specialty) },
                     promise: null,
@@ -640,10 +704,10 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 clearServerFinalized();
                 dispatch(emrActions.load({ ...response.data, data: normalizeEMRData(response.data?.data, specialty) }));
             }
-            return response.data;
+            return stillCurrentVisit() ? response.data : null;
         } catch (error) {
             const apiError = toEMRApiError(error);
-            if (isAccessDeniedStatus(apiError?.response?.status)) {
+            if (isAccessDenied(apiError)) {
                 // RETRO-3930-01: guard the amend denial with the request
                 // identity as well.
                 if (!stillCurrentVisit()) {
@@ -670,7 +734,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             dispatch(emrActions.saveError(apiError.message || 'Ошибка внесения поправки'));
             throw error;
         }
-    }, [handleAccessDenied, specialty, visitId, clearServerFinalized]);
+    }, [cacheKey, cachePrincipal, canUseCache, expectedPatientId, handleAccessDenied, specialty, visitId, clearServerFinalized]);
 
     // =========================================================================
     // CONFLICT RESOLUTION
@@ -736,6 +800,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         conflict: state.conflict,
         error: state.error,
         accessDenied: writeAccessDenied,
+        patientContextChanged,
         // RETRO-4007-01: the record was finalized (signed/amended) on the
         // server while the local editor still held the stale in_progress
         // draft — the amendment affordance must open for this window

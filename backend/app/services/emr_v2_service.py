@@ -76,6 +76,10 @@ class EMRNotFoundException(Exception):
     pass
 
 
+class EMRPatientContextMismatch(Exception):
+    """The stored chart and its visit refer to different patients."""
+
+
 class EMRSignedError(Exception):
     """Raised when trying to edit signed EMR without amendment"""
 
@@ -109,19 +113,45 @@ class EMRV2Service:
         )
 
     def get_by_visit(
-        self, db: Session, visit_id: int, *, for_update: bool = False
+        self, db: Session, visit_id: int, *, for_update: bool = False,
+        expected_patient_id: int | None = None,
     ) -> EMRRecord | None:
         """Get EMR by visit ID (primary lookup)"""
-        query = db.query(EMRRecord).filter(
-            EMRRecord.visit_id == visit_id,
-            EMRRecord.is_active == True,
-        )
         if for_update:
             # Match the prescription writer's Visit → EMR lock order. The
             # visit lock also serializes writers before the first EMR exists.
-            db.query(Visit.id).filter(Visit.id == visit_id).with_for_update().first()
-            query = query.populate_existing().with_for_update()
-        return query.first()
+            visit = (
+                db.query(Visit.patient_id)
+                .filter(Visit.id == visit_id)
+                .with_for_update(of=Visit)
+                .one_or_none()
+            )
+            if visit is not None and expected_patient_id not in (None, visit.patient_id):
+                raise EMRPatientContextMismatch
+            record = (
+                db.query(EMRRecord)
+                .filter(EMRRecord.visit_id == visit_id, EMRRecord.is_active.is_(True))
+                .populate_existing()
+                .with_for_update(of=EMRRecord)
+                .one_or_none()
+            )
+            if record is not None and (visit is None or record.patient_id != visit.patient_id):
+                raise EMRPatientContextMismatch
+            return record
+
+        match = (
+            db.query(EMRRecord, Visit.patient_id)
+            .join(Visit, Visit.id == EMRRecord.visit_id)
+            .filter(EMRRecord.visit_id == visit_id, EMRRecord.is_active.is_(True))
+            .populate_existing()
+            .one_or_none()
+        )
+        if match is None:
+            return None
+        record, visit_patient_id = match
+        if record.patient_id != visit_patient_id:
+            raise EMRPatientContextMismatch
+        return record
 
     def get_by_patient(
         self, db: Session, patient_id: int, limit: int = 100
@@ -129,8 +159,10 @@ class EMRV2Service:
         """Get all EMRs for a patient"""
         return (
             db.query(EMRRecord)
+            .join(Visit, Visit.id == EMRRecord.visit_id)
             .filter(
                 EMRRecord.patient_id == patient_id,
+                EMRRecord.patient_id == Visit.patient_id,
                 EMRRecord.is_active == True,
             )
             .order_by(desc(EMRRecord.created_at))
@@ -176,6 +208,8 @@ class EMRV2Service:
         row_version: int = 0,
         client_session_id: str | None = None,
         is_draft: bool = True,
+        *,
+        expected_patient_id: int | None = None,
     ) -> EMRRecord:
         """
         Save EMR with versioning and optimistic locking.
@@ -195,7 +229,9 @@ class EMRV2Service:
             ConcurrencyError: If row_version mismatch and different user
         """
         normalized_data = self._normalize_data(data)
-        existing = self.get_by_visit(db, visit_id, for_update=True)
+        existing = self.get_by_visit(
+            db, visit_id, for_update=True, expected_patient_id=expected_patient_id
+        )
 
         if existing:
             return self._update_emr(
@@ -230,8 +266,8 @@ class EMRV2Service:
         normalized_data = self._normalize_data(data)
 
         # Get patient_id from visit
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
-        if not visit:
+        patient_id = db.query(Visit.patient_id).filter(Visit.id == visit_id).scalar()
+        if patient_id is None:
             raise ValueError(f"Visit {visit_id} not found")
 
         # Extract materialized fields
@@ -239,7 +275,7 @@ class EMRV2Service:
 
         # Create EMR
         emr = EMRRecord(
-            patient_id=visit.patient_id,
+            patient_id=patient_id,
             visit_id=visit_id,
             version=1,
             data=normalized_data,

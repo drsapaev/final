@@ -30,14 +30,21 @@ from sqlalchemy import event
 from sqlalchemy.dialects import postgresql
 
 from app.core.security import get_password_hash
+from app.models.appointment import Appointment
 from app.models.audit import AuditLog
 from app.models.clinic import Doctor
-from app.models.emr_v2 import EMRAuditLog
+from app.models.emr_v2 import EMRAuditLog, EMRRecord, EMRRevision
+from app.models.enums import AppointmentStatus
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
-from app.services.emr_v2_service import ConcurrencyError, EMRSignedError, emr_v2_service
+from app.services.emr_v2_service import (
+    ConcurrencyError,
+    EMRPatientContextMismatch,
+    EMRSignedError,
+    emr_v2_service,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -677,6 +684,124 @@ def test_inactive_emr_account_cannot_use_canonical_or_mobile_route(client, db_se
     current = emr_v2_service.get_by_visit(db_session, visit_id)
     assert current.row_version == saved.json()["row_version"]
     assert current.data["notes"] == "SYNTHETIC-ORIGINAL"
+
+
+def test_inconsistent_stored_patient_context_denies_chart_reads_and_writes(client, db_session):
+    visit, user = _mk_visit(db_session, "context_guard")
+    unrelated_visit, _ = _mk_visit(db_session, "context_guard_other")
+    visit_id, original_patient_id = visit.id, visit.patient_id
+    current_patient_id = unrelated_visit.patient_id
+    appointment = Appointment(
+        patient_id=original_patient_id, doctor_id=visit.doctor_id,
+        appointment_date=visit.visit_date, appointment_time=visit.visit_time,
+        status=AppointmentStatus.IN_VISIT,
+    )
+    db_session.add(appointment)
+    db_session.commit()
+    appointment_id = appointment.id
+    headers = _login(client, user.username)
+    route = f"/api/v1/v2/emr/{visit_id}"
+    assert client.get(route, headers=headers).status_code == 404
+    saved = _save(client, headers, visit_id, {"notes": "SYNTHETIC-DRAFT"}, 0, "context")
+    assert saved.status_code == 200, saved.text
+    updated = _save(
+        client, headers, visit_id, {"complaints": "SYNTHETIC-CURRENT", "specialty": "general"},
+        saved.json()["row_version"], "context", draft=False,
+    )
+    assert updated.status_code == 200, updated.text
+    snapshot = updated.json()
+    record_id = snapshot["id"]
+    mobile_route = f"/api/v1/emr/{visit_id}"
+    read_routes = (
+        route, mobile_route, f"{route}/history", f"{route}/version/2", f"{route}/diff?v1=1&v2=2",
+        f"/api/v1/appointments/{appointment_id}/emr",
+    )
+    for read_route in read_routes:
+        result = client.get(read_route, headers=headers)
+        assert result.status_code == 200, result.text
+    suggestions_route = "/api/v1/v2/emr/doctor-history"
+    suggestions = {"doctor_id": user.id, "field_name": "complaints", "specialty": "general"}
+    assert client.get(suggestions_route, params=suggestions, headers=headers).json()["total"] == 1
+
+    def audit_counts():
+        return (
+            db_session.query(EMRAuditLog).filter_by(emr_id=record_id).count(),
+            db_session.query(AuditLog).filter_by(event_type="DOCTOR_OPEN_EMR").count(),
+            db_session.query(UserAuditLog).count(),
+        )
+
+    before_audit = audit_counts()
+    # Introduce an inconsistent stored pair while leaving the ORM's Visit cached.
+    db_session.refresh(visit)
+    db_session.execute(
+        Visit.__table__.update().where(Visit.id == visit_id).values(patient_id=current_patient_id)
+    )
+    db_session.execute(
+        Appointment.__table__.update()
+        .where(Appointment.id == appointment_id).values(patient_id=current_patient_id)
+    )
+    db_session.expire(appointment)
+    assert visit.patient_id == original_patient_id
+
+    for read_route in read_routes:
+        denied = client.get(read_route, headers=headers)
+        assert denied.status_code == 409, denied.text
+        assert denied.json() == {"detail": {"code": "PATIENT_CONTEXT_CHANGED"}}
+    for patient_id in (original_patient_id, current_patient_id):
+        listed = client.get(f"/api/v1/v2/emr/patient/{patient_id}", headers=headers)
+        assert listed.status_code == 200, listed.text
+        assert listed.json() == []
+    assert client.get(suggestions_route, params=suggestions, headers=headers).json()["total"] == 0
+
+    payload = {
+        "data": snapshot["data"], "row_version": snapshot["row_version"],
+        "client_session_id": "context",
+    }
+    for write_route in (route, mobile_route, f"{route}/sign", f"{route}/amend", f"{route}/restore"):
+        body = dict(payload)
+        if write_route.endswith("/amend"):
+            body["reason"] = "SYNTHETIC amendment reason"
+        if write_route.endswith("/restore"):
+            body = {
+                "target_version": 1, "row_version": snapshot["row_version"],
+                "reason": "SYNTHETIC restore reason",
+            }
+        denied = client.post(write_route, headers=headers, json=body)
+        assert denied.status_code == 409, denied.text
+        assert denied.json() == {"detail": {"code": "PATIENT_CONTEXT_CHANGED"}}
+
+    with pytest.raises(EMRPatientContextMismatch):
+        emr_v2_service.save(db_session, visit_id, snapshot["data"], user.id, row_version=0)
+    record = db_session.query(EMRRecord).filter_by(visit_id=visit_id).one()
+    assert record.patient_id == original_patient_id
+    assert record.row_version == snapshot["row_version"]
+    assert record.data == snapshot["data"]
+    assert record.signed_at is None
+    assert db_session.query(EMRRevision).filter_by(emr_id=record_id).count() == 2
+    assert audit_counts() == before_audit
+
+
+def test_first_save_requires_the_selected_patient_when_supplied(client, db_session):
+    visit, user = _mk_visit(db_session, "first_save_context")
+    destination, _ = _mk_visit(db_session, "first_save_context_other")
+    visit_id, selected_patient_id = visit.id, visit.patient_id
+    current_patient_id = destination.patient_id
+    headers = _login(client, user.username)
+    db_session.execute(
+        Visit.__table__.update().where(Visit.id == visit_id).values(patient_id=current_patient_id)
+    )
+
+    route = f"/api/v1/v2/emr/{visit_id}"
+    payload = {"data": {"notes": "SYNTHETIC-DRAFT"}, "expected_patient_id": selected_patient_id}
+    denied = client.post(route, headers=headers, json=payload)
+    assert denied.status_code == 409, denied.text
+    assert denied.json() == {"detail": {"code": "PATIENT_CONTEXT_CHANGED"}}
+    assert db_session.query(EMRRecord).filter_by(visit_id=visit_id).count() == 0
+    assert db_session.query(EMRAuditLog).filter_by(visit_id=visit_id).count() == 0
+
+    confirmed = client.post(route, headers=headers, json={**payload, "expected_patient_id": current_patient_id})
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["patient_id"] == current_patient_id
 
 
 def test_cross_session_stale_write_still_conflicts(client, db_session):

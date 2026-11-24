@@ -50,9 +50,9 @@ const serverEmr = (visitId: number, overrides: Record<string, unknown> = {}) => 
     ...overrides,
 });
 
-async function renderLoadedHook(visitId: number) {
+async function renderLoadedHook(visitId: number, patientId?: string | number) {
     apiClientMock.get.mockResolvedValueOnce({ status: 200, data: serverEmr(visitId) });
-    const utils = renderHook((props: { visitId: number }) => useEMR(props.visitId, { specialty: 'therapy' }), {
+    const utils = renderHook((props: { visitId: number }) => useEMR(props.visitId, { specialty: 'therapy', patientId }), {
         initialProps: { visitId },
     });
     await waitFor(() => {
@@ -60,6 +60,82 @@ async function renderLoadedHook(visitId: number) {
     });
     return utils;
 }
+
+describe('stored patient context changes', () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+        authState.profile = { id: 1 };
+    });
+
+    it.each(['load', 'save', 'sign', 'amend'] as const)('blocks clinical actions after a %s denial', async (operation) => {
+        const visitId = 820 + ['load', 'save', 'sign', 'amend'].indexOf(operation);
+        const utils = await renderLoadedHook(visitId);
+        const mismatch = { response: { status: 409, data: { detail: { code: 'PATIENT_CONTEXT_CHANGED' } } } };
+        const request = operation === 'load' ? apiClientMock.get : apiClientMock.post;
+        request.mockRejectedValueOnce(mismatch);
+
+        await act(async () => {
+            const hook = utils.result.current;
+            const attempt = {
+                load: () => hook.reloadFromServer(), save: () => hook.saveEMR(),
+                sign: () => hook.signEMR(), amend: () => hook.amendEMR('Synthetic amendment'),
+            }[operation];
+            expect(await attempt()).toMatchObject({ accessDenied: true, status: 409 });
+        });
+
+        expect(utils.result.current).toMatchObject({
+            accessDenied: true, patientContextChanged: true, emr: null, data: {}, conflict: null,
+        });
+        const postCalls = apiClientMock.post.mock.calls.length;
+        await act(async () => {
+            const hook = utils.result.current;
+            expect(await hook.saveEMR()).toMatchObject({ accessDenied: true });
+            expect(await hook.signEMR()).toMatchObject({ accessDenied: true });
+            expect(await hook.amendEMR('Synthetic amendment')).toMatchObject({ accessDenied: true });
+        });
+        expect(apiClientMock.post).toHaveBeenCalledTimes(postCalls);
+
+        apiClientMock.get.mockResolvedValueOnce({ status: 200, data: serverEmr(visitId) });
+        await act(async () => { await utils.result.current.reloadFromServer(); });
+        expect(utils.result.current).toMatchObject({
+            accessDenied: false, patientContextChanged: false, emr: { visit_id: visitId },
+        });
+    });
+
+    it('ignores an earlier write response after a patient context denial', async () => {
+        const visitId = 831;
+        const utils = await renderLoadedHook(visitId);
+        let respond!: (reply: { data: ReturnType<typeof serverEmr> }) => void;
+        apiClientMock.post.mockImplementationOnce(() => new Promise((resolve) => { respond = resolve; }));
+        const sign = utils.result.current.signEMR;
+        let pendingSign: ReturnType<typeof sign>;
+        act(() => { pendingSign = sign(); });
+
+        apiClientMock.get.mockRejectedValueOnce({
+            response: { status: 409, data: { detail: { code: 'PATIENT_CONTEXT_CHANGED' } } },
+        });
+        await act(async () => { await utils.result.current.reloadFromServer(); });
+        await act(async () => {
+            respond({ data: serverEmr(visitId, { status: 'signed' }) });
+            expect(await pendingSign).toBeNull();
+        });
+        expect(utils.result.current).toMatchObject({ patientContextChanged: true, emr: null });
+        apiClientMock.get.mockResolvedValueOnce({ status: 404 });
+        await act(async () => { await utils.result.current.reloadFromServer(); });
+        expect(utils.result.current).toMatchObject({ patientContextChanged: true, emr: null });
+    });
+
+    it('identifies the selected patient in the canonical save request', async () => {
+        const visitId = 832;
+        const utils = await renderLoadedHook(visitId, '2');
+        apiClientMock.post.mockResolvedValueOnce({ data: serverEmr(visitId) });
+        await act(async () => { await utils.result.current.saveEMR(); });
+        expect(apiClientMock.post).toHaveBeenCalledWith(`/v2/emr/${visitId}`, {
+            data: expect.objectContaining({ complaints: `visit-${visitId} text` }),
+            row_version: 5, client_session_id: expect.any(String), is_draft: true, expected_patient_id: 2,
+        });
+    });
+});
 
 describe('EMRCTX-FE-001: visit switch hard-resets and drops late resolutions', () => {
     beforeEach(() => {
