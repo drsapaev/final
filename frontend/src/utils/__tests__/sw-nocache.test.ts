@@ -204,6 +204,111 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     expect(stubs.caches.match).toHaveBeenCalledWith('/offline.html');
   });
 
+  describe('public catalog offline locale', () => {
+    it('precaches the Uzbek offline document', () => {
+      const sw = compileSW(vi.fn(), makeCacheStubs().caches);
+      expect(sw.staticFiles).toContain('/offline-uz.html');
+    });
+
+    it.each([
+      '/',
+      '/services',
+      '/services/synthetic-service',
+      '/doctors',
+      '/doctors/synthetic-profile/',
+      '/prices',
+      '/contacts',
+    ])('serves the Uzbek offline document for a navigation to %s', async (pathname) => {
+      const { caches } = makeCacheStubs();
+      caches.match.mockImplementation(async (key: unknown) => {
+        if (key === '/offline-uz.html') return new Response('UZBEK_OFFLINE');
+        if (key === '/offline.html') return new Response('RUSSIAN_OFFLINE');
+        return new Response('STALE_PUBLIC_PAGE');
+      });
+      const sw = compileSW(vi.fn().mockRejectedValue(new Error('offline')), caches);
+
+      const response = await sw.handleRequest({
+        url: `https://clinic.test${pathname}`,
+        method: 'GET',
+        mode: 'navigate',
+        headers: new Headers(),
+      });
+
+      expect(await response.text()).toBe('UZBEK_OFFLINE');
+      expect(caches.match).toHaveBeenCalledExactlyOnceWith('/offline-uz.html');
+    });
+
+    it.each([
+      ['/ru/services/synthetic-service', 'navigate'],
+      ['/doctor', 'navigate'],
+      ['/booking', 'navigate'],
+      ['/ru/booking', 'navigate'],
+      ['/prices/private', 'navigate'],
+      ['/services/synthetic-service/extra', 'navigate'],
+      ['/sitemap.xml', 'navigate'],
+      ['/services/synthetic-service', 'cors'],
+      ['/api/v1/public-site/services', 'cors'],
+    ])('keeps the existing offline document for %s in mode %s', async (pathname, mode) => {
+      const { caches } = makeCacheStubs();
+      caches.match.mockImplementation(async (key: unknown) =>
+        key === '/offline.html' ? new Response('RUSSIAN_OFFLINE') : undefined);
+      const sw = compileSW(vi.fn().mockRejectedValue(new Error('offline')), caches);
+
+      const response = await sw.handleRequest({
+        url: `https://clinic.test${pathname}`,
+        method: 'GET',
+        mode,
+        headers: new Headers({ accept: 'text/html' }),
+      });
+
+      expect(await response.text()).toBe('RUSSIAN_OFFLINE');
+      expect(caches.match).not.toHaveBeenCalledWith('/offline-uz.html');
+    });
+
+    it('uses the Uzbek document in the outer handler after a failed first cache lookup', async () => {
+      const { caches } = makeCacheStubs();
+      caches.match
+        .mockRejectedValueOnce(new Error('Cache Storage temporarily unavailable'))
+        .mockImplementation(async (key: unknown) =>
+          new Response(key === '/offline-uz.html' ? 'UZBEK_OFFLINE' : 'RUSSIAN_OFFLINE'));
+      const sw = compileSW(vi.fn().mockRejectedValue(new Error('offline')), caches);
+
+      const response = await sw.handleRequest({
+        url: 'https://clinic.test/services/synthetic-service',
+        method: 'GET',
+        mode: 'navigate',
+        headers: new Headers(),
+      });
+
+      expect(await response.text()).toBe('UZBEK_OFFLINE');
+      expect(caches.match).toHaveBeenNthCalledWith(1, '/offline-uz.html');
+      expect(caches.match).toHaveBeenNthCalledWith(2, '/offline-uz.html');
+    });
+
+    it('returns a localized 503 when the Uzbek offline document is unavailable', async () => {
+      const { caches } = makeCacheStubs();
+      caches.match.mockImplementation(async (key: unknown) => {
+        if (key === '/offline-uz.html') return undefined;
+        if (key === '/offline.html') return new Response('RUSSIAN_OFFLINE');
+        return new Response('STALE_PUBLIC_PAGE');
+      });
+      const sw = compileSW(vi.fn().mockRejectedValue(new Error('offline')), caches);
+      const request = {
+        url: 'https://clinic.test/doctors/synthetic-profile',
+        method: 'GET',
+        mode: 'navigate',
+        headers: new Headers(),
+      };
+
+      const response = await sw.handleRequest(request);
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Content-Type')).toMatch(/^text\/plain\b/i);
+      expect(await response.text()).toContain('Internetga ulanish yo‘q');
+      expect(caches.match).not.toHaveBeenCalledWith(request);
+    });
+  });
+
   it('background sync never fetches or caches the user profile (auth/me)', async () => {
     const { put, caches } = makeCacheStubs();
     const fetchedUrls: string[] = [];
@@ -369,17 +474,20 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     expect(stubs.caches.match).not.toHaveBeenCalled();
   });
 
-  it('honors no-store while pre-caching installation assets', async () => {
+  it.each(['resolves', 'rejects'])('honors install no-store when body cancellation %s', async (outcome) => {
     const stubs = makeCacheStubs();
     const remove = vi.fn(async () => true);
     stubs.caches.keys = vi.fn(async () => ['clinic-static-current']);
     stubs.caches.open = vi.fn(async () => ({ delete: remove, put: stubs.put }));
-    const sw = compileSW(vi.fn(async (url: string) => new Response('data', {
-      headers: url === '/dashboard' ? { 'Cache-Control': 'no-store' } : {},
-    })), stubs.caches);
+    const cancel = vi.fn();
+    if (outcome === 'rejects') cancel.mockRejectedValue(new Error('cancellation failed'));
+    const sw = compileSW(vi.fn(async (url: string) => url === '/dashboard'
+      ? new Response(new ReadableStream({ cancel }), { headers: { 'Cache-Control': 'no-store' } })
+      : new Response('data')), stubs.caches);
     let install: Promise<unknown> | undefined;
     sw.handlers.get('install')?.({ waitUntil: (promise) => { install = promise; } });
     await install;
+    expect(cancel).toHaveBeenCalledOnce();
     expect(stubs.put.mock.calls.map(([url]) => url)).not.toContain('/dashboard');
     expect(stubs.put.mock.calls.map(([url]) => url)).toContain('/offline.html');
     expect(remove).toHaveBeenCalledWith('/dashboard', { ignoreVary: true });

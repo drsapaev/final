@@ -37,10 +37,8 @@ COPY index.html /app/index.html
 COPY vite.config.ts /app/vite.config.ts
 COPY sw.template.js /app/sw.template.js
 
-# The release-verification path opts into an exact Git revision. Other
-# staging builds may still omit VITE_APP_VERSION; they cannot prove receipt
-# for a particular revision.
-RUN if [ -n "$VITE_APP_VERSION" ]; then \
+# An explicit build SHA requires the same full revision for the Sentry release.
+RUN if [ -n "$VERCEL_GIT_COMMIT_SHA" ]; then \
         printf '%s\n' "$VITE_APP_VERSION" | grep -Eq '^[0-9a-f]{40}$' \
         && test "$VITE_APP_VERSION" = "$VERCEL_GIT_COMMIT_SHA" || exit 1; \
     fi; npm run build

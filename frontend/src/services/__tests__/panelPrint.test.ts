@@ -220,3 +220,8 @@ describe('desk/lab visits without queue machinery (#3006 incident follow-up)', (
     );
   });
 });
+
+it('uses a Russian display label rather than the internal Cardio alias on a printed ticket', async () => {
+  const [payload] = resolvePanelTicketPayloads({ queue_numbers: [{ number: 1, queue_name: 'Cardio', queue_tag: 'cardiology_common' }] });
+  expect(payload.specialty_name).toBe('Кардиология');
+});

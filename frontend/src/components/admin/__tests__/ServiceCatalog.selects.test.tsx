@@ -70,7 +70,7 @@ const openAddServiceForm = async (user: ReturnType<typeof userEvent.setup>) => {
   });
 
   // The header and the empty state both render an add button — click the first one.
-  const addButtons = screen.getAllByRole('button', { name: 'Добавить услугу' });
+  const addButtons = await screen.findAllByRole('button', { name: 'Добавить услугу' });
   await user.click(addButtons[0]);
 
   await waitFor(() => {

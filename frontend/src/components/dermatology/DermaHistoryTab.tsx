@@ -20,8 +20,50 @@ interface DermaHistoryTabProps {
   hasMoreProcedures?: boolean;
   loadingMoreExaminations?: boolean;
   loadingMoreProcedures?: boolean;
+  /** DERMAHIST-FE-002: a rejected load-more request is surfaced with a
+   * visible alert next to the still-enabled retry button instead of a
+   * silent re-enable. */
+  loadMoreExaminationsError?: boolean;
+  loadMoreProceduresError?: boolean;
   onLoadMoreExaminations?: () => void;
   onLoadMoreProcedures?: () => void;
+}
+
+/** DERMAHIST-FE-004: a read-only native disclosure behind each history
+ * card — exposes exactly the record's own detail findings (backend SSOT,
+ * nothing persisted client-side), the emr/legacy source label and the
+ * visit identity. Native <details>/<summary> is keyboard-operable by
+ * specification. Cards without detail fields stay compact (no toggle). */
+function HistoryDetailsDisclosure({ rows, source, visitId }: {
+  rows: Array<{ label: string; value: string }>;
+  source?: 'emr' | 'legacy';
+  visitId?: number | null;
+}) {
+  const { t: rawT } = useTranslation();
+  const t = rawT as (key: string, options?: Record<string, unknown>) => string;
+  if (rows.length === 0) return null;
+  return (
+    <details className="derma-history-details">
+      <summary className="derma-p-14-secondary">
+        {t('derma.derma_history_details_summary')}
+      </summary>
+      {rows.map((row) => (
+        <p key={row.label} className="derma-p-14-secondary">
+          {t(row.label)}: {row.value}
+        </p>
+      ))}
+      {source && (
+        <p className="derma-p-14-secondary">
+          {t(`derma.derma_history_source_${source}`)}
+        </p>
+      )}
+      {visitId != null && (
+        <p className="derma-p-14-secondary">
+          {t('derma.derma_history_field_visit')}: {visitId}
+        </p>
+      )}
+    </details>
+  );
 }
 
 export function DermaHistoryTab({
@@ -34,6 +76,8 @@ export function DermaHistoryTab({
   hasMoreProcedures = false,
   loadingMoreExaminations = false,
   loadingMoreProcedures = false,
+  loadMoreExaminationsError = false,
+  loadMoreProceduresError = false,
   onLoadMoreExaminations,
   onLoadMoreProcedures,
 }: DermaHistoryTabProps) {
@@ -97,9 +141,25 @@ export function DermaHistoryTab({
                       {exam.localization && (
                         <p className="derma-p-14-secondary">{exam.localization}</p>
                       )}
+                      <HistoryDetailsDisclosure
+                      rows={([
+                        ['derma.derma_history_field_lesions', exam.lesions],
+                        ['derma.derma_history_field_distribution', exam.distribution],
+                        ['derma.derma_history_field_symptoms', exam.symptoms],
+                        ['derma.derma_history_field_treatment_plan', exam.treatment_plan],
+                      ] as Array<[string, string | null | undefined]>)
+                        .filter((row): row is [string, string] => Boolean(row[1]))
+                        .map(([label, value]) => ({ label, value }))}
+                      source={exam.source}
+                      visitId={exam.visit_id} />
                     </article>
                   ))}
                 </div>
+                {loadMoreExaminationsError && (
+                  <p role="alert" className="derma-p-14-secondary derma-text-danger">
+                    {t('derma.derma_panel_patient_history_load_more_failed')}
+                  </p>
+                )}
                 {hasMoreExaminations && (
                   <button
                     type="button"
@@ -137,9 +197,24 @@ export function DermaHistoryTab({
                           {[procedure.procedure_type, procedure.area_treated].filter(Boolean).join(' · ')}
                         </p>
                       )}
+                      <HistoryDetailsDisclosure
+                      rows={([
+                        ['derma.derma_history_field_products_used', procedure.products_used],
+                        ['derma.derma_history_field_results', procedure.results],
+                        ['derma.derma_history_field_follow_up', procedure.follow_up],
+                      ] as Array<[string, string | null | undefined]>)
+                        .filter((row): row is [string, string] => Boolean(row[1]))
+                        .map(([label, value]) => ({ label, value }))}
+                      source={procedure.source}
+                      visitId={procedure.visit_id} />
                     </article>
                   ))}
                 </div>
+                {loadMoreProceduresError && (
+                  <p role="alert" className="derma-p-14-secondary derma-text-danger">
+                    {t('derma.derma_panel_patient_history_load_more_failed')}
+                  </p>
+                )}
                 {hasMoreProcedures && (
                   <button
                     type="button"
