@@ -26,11 +26,50 @@ export default function ReportWorkflowPanel({
   const holds = (report.release_holds as string[] | undefined) || [];
   const events = (report.workflow_events as LabWorkflowEvent[] | undefined) || [];
   const qc = events.filter((event) => event.kind === 'qc_recorded').at(-1)?.evidence?.qc;
+  const canReturnToDraft = hasLabReportAction(report, 'return_to_draft');
+  const canRecordQc = hasLabReportAction(report, 'record_qc');
+  const canEdit = hasLabReportAction(report, 'edit');
+  const inReview = report.status === 'IN_REVIEW' || report.status === 'REVIEWED';
+  const returnStep = canReturnToDraft ? 'return_to_draft' : 'request_return_to_draft';
+  const nextSteps = [...new Set(holds.map((hold) => {
+    switch (hold) {
+      case 'published_template_required':
+        return 'check_template';
+      case 'specimen_required':
+        return inReview ? returnStep : 'check_specimen_link';
+      case 'specimen_not_accepted':
+        return 'check_specimen_status';
+      case 'specimen_context_ambiguous':
+        return 'check_specimen_material';
+      case 'specimen_result_mismatch':
+        if (inReview) return returnStep;
+        return canEdit ? 'match_measurement' : 'request_measurement_check';
+      case 'qc_missing':
+      case 'qc_rejected':
+        if (inReview) return returnStep;
+        if (!canRecordQc) return 'request_qc';
+        return hold === 'qc_missing' ? 'record_qc' : 'review_qc';
+      case 'review_evidence_changed':
+        return returnStep;
+      default:
+        return null;
+    }
+  }))].filter((step) => step !== null);
+  const guidanceLabels = {
+    specimens: t('labWorkspace.specimens'),
+    recordQc: t('workbench.workflow_record_qc'),
+    returnToDraft: t('workbench.workflow_return_to_draft'),
+  };
+
   return (
     <div className="lab-workflow-panel">
       {holds.length > 0 && <Alert severity="warning">
         <strong>{t('workbench.workflow_holds')}</strong>
         <ul>{holds.map((hold) => <li key={hold}>{t(`workbench.workflow_hold_${hold}`, { defaultValue: t('workbench.workflow_hold_unknown') })}</li>)}</ul>
+        {nextSteps.length > 0 && <>
+          <strong>{t('workbench.workflow_next_steps')}</strong>
+          <ul>{nextSteps.map((step) => <li key={step}>{t(`workbench.workflow_next_${step}`, guidanceLabels)}</li>)}</ul>
+        </>}
       </Alert>}
       {qc && <p>{t('workbench.workflow_qc_outcome')} · {t(`workbench.workflow_qc_${qc.status}`)}</p>}
       <div className="lab-save-status-line">
@@ -40,10 +79,10 @@ export default function ReportWorkflowPanel({
         {hasLabReportAction(report, 'review') && (
           <Button disabled={disabled || holds.length > 0} onClick={() => onReview('review')}>{t('workbench.workflow_review')}</Button>
         )}
-        {hasLabReportAction(report, 'return_to_draft') && (
+        {canReturnToDraft && (
           <Button variant="outline" disabled={disabled} onClick={() => onPrompt('return_to_draft')}>{t('workbench.workflow_return_to_draft')}</Button>
         )}
-        {hasLabReportAction(report, 'record_qc') && (
+        {canRecordQc && (
           <Button variant="outline" disabled={disabled} onClick={() => onPrompt('record_qc')}>{t('workbench.workflow_record_qc')}</Button>
         )}
       </div>
