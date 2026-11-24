@@ -110,7 +110,7 @@ async function settle() {
   });
 }
 
-describe('VisitTab cancel is atomic with the cardiology leave guard', () => {
+describe('VisitTab back-to-queue is atomic with the cardiology leave guard', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     emrControl.dirty = true;
@@ -121,7 +121,7 @@ describe('VisitTab cancel is atomic with the cardiology leave guard', () => {
   it('Stay keeps the visit mounted and does not invalidate pending work', async () => {
     renderVisit();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Отменить' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Вернуться в очередь' }));
     const dialog = await screen.findByRole('dialog');
     expect(screen.getByTestId('dirty-emr')).toBeInTheDocument();
     expect(screen.getByTestId('active-tab')).toHaveTextContent('visit');
@@ -141,7 +141,7 @@ describe('VisitTab cancel is atomic with the cardiology leave guard', () => {
   it('Discard suppresses the autosave before clearing the visit and switching once', async () => {
     renderVisit();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Отменить' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Вернуться в очередь' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Выйти без сохранения' }));
 
@@ -158,7 +158,7 @@ describe('VisitTab cancel is atomic with the cardiology leave guard', () => {
     emrControl.saveEMR.mockRejectedValueOnce(new Error('409 version conflict'));
     renderVisit();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Отменить' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Вернуться в очередь' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить и перейти' }));
     await settle();
@@ -171,10 +171,10 @@ describe('VisitTab cancel is atomic with the cardiology leave guard', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('an acknowledged save commits the cancel side effects only after the save', async () => {
+  it('an acknowledged save commits the navigation side effects only after the save', async () => {
     renderVisit();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Отменить' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Вернуться в очередь' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить и перейти' }));
 
