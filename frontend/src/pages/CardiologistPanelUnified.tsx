@@ -1,5 +1,5 @@
 import { createElement, lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 // P-016 (UX audit): persist cardiologist settings (ldlThreshold) in
@@ -119,7 +119,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   // Всегда вызываем хуки первыми
   const { isDark, getColor, getSpacing, getFontSize } = useTheme();
   const location = useLocation();
-  // P-009: navigate removed — useDoctorPanelState handles tab URL sync
+  const navigate = useNavigate();
 
   // P-009 fix: use shared useDoctorPanelState hook for tab/URL/patient state.
   const {
@@ -166,7 +166,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     icd10: '',
     notes: ''
   });
-  const [loading, setLoading] = useState(false);
+  const [pendingVisitActions, setPendingVisitActions] = useState(0);
   // QW-01 (UX audit): removed swallowed setMessage — all calls now route through `notify`
   // (the shared adapter in services/notify.js) so users actually see error/success/warning
   // feedback. The `message` destructure was dropped, which silently discarded every
@@ -1162,7 +1162,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
 
     try {
-      setLoading(true);
+      setPendingVisitActions(count => count + 1);
       const token = tokenManager.getAccessToken();
       const response = await fetch(`${API_V1_BASE}/doctor/queue/${row?.doctor_queue_entry_id || row?.id}/cancel`, {
         method: 'POST',
@@ -1183,7 +1183,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       logger.error('[Cardiology] Ошибка отмены записи:', error);
       notify.error(getErrorMessage(error) || tI18n('cardio.cardio_panel_appointment_cancel_failed'));
     } finally {
-      setLoading(false);
+      setPendingVisitActions(count => count - 1);
     }
   };
 
@@ -1378,6 +1378,15 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       return;
     }
 
+    // A transport-level failure also belongs to the initiating visit.
+    const completionStillOwned = (): boolean => {
+      const live = selectedPatientRef.current;
+      return (
+        String(resolveDoctorQueueEntryId(live)) === String(completionIdentity.queueEntryId) &&
+        String(live?.patient?.id ?? live?.patient_id ?? live?.id ?? null) === String(completionIdentity.patientId)
+      );
+    };
+
     const complaint = emrTextValue(savedEMRData.complaints);
     const diagnosis = emrTextValue(savedEMRData.diagnosis);
     const legacyDiagnosis = savedEMRData.diagnosis && typeof savedEMRData.diagnosis === 'object'
@@ -1467,7 +1476,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
 
     try {
-      setLoading(true);
+      setPendingVisitActions(count => count + 1);
 
       const visitPayload = {
         patient_id: completionIdentity.patientId,
@@ -1483,18 +1492,6 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       // branch additionally reconciles the visible queue with the canonical
       // server snapshot instead of blindly retrying.
       const completionAck = await queueService.completeVisit(completionIdentity.queueEntryId, visitPayload);
-      if (completionAck?.success !== true) {
-        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
-        notify.error(
-          (typeof ackMessage === 'string' && ackMessage) || tI18n('cardio.cardio_panel_action_failed')
-        );
-        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
-          // Ambiguous outcome — refresh the visible queue from the server.
-          void loadMacOSCardiologyAppointments(true);
-        }
-        return;
-      }
-
       // DOCFLOW-FE-004 (post-merge review of PR 3902, P1): the completion
       // POST is itself an async boundary — the selection may have moved to
       // another patient while the request was in flight (row click, deep
@@ -1511,15 +1508,41 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         logger.warn('[Cardiology] Stale completion response ignored for a changed selection — the newer patient\'s state is preserved');
         return;
       }
+
+      if (completionAck?.success !== true) {
+        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
+        notify.error(
+          (typeof ackMessage === 'string' && ackMessage) || tI18n('cardio.cardio_panel_action_failed')
+        );
+        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
+          // Ambiguous outcome — refresh the visible queue from the server.
+          void loadMacOSCardiologyAppointments(true);
+        }
+        return;
+      }
       notify.success(tI18n('cardio.visit_completed'));
 
-      // Очищаем форму и возвращаемся в очередь
-      // RETRO-3963-01: completion deselect is an authoritative selection
-      // change — invalidate in-flight navigation tickets.
+      // Confirmed completion is an authoritative transition: clear the
+      // completed clinical context and synchronize BOTH the tab and URL.
+      // A bare setActiveTab('queue') left ?tab=visit in the URL, and the
+      // panel's URL-sync effect reopened an empty visit (CI regression).
+      // Do not route an unconfirmed/stale ACK through this branch.
       navigationEpochRef.current += 1;
       setSelectedPatient(null);
       setSelectedServices([]);
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
+      const completedTabParams = new URLSearchParams(location.search);
+      completedTabParams.set('tab', 'queue');
+      // Remove completed visit deep-link anchors. Otherwise the panel's
+      // patientIdFromUrl / visitIdFromUrl hydration effect can re-select
+      // the just-completed patient after the authoritative deselection.
+      completedTabParams.delete('patientId');
+      completedTabParams.delete('visitId');
+      completedTabParams.delete('visit_id');
+      navigate(
+        { pathname: location.pathname, search: completedTabParams.toString() },
+        { replace: true },
+      );
       setActiveTab('queue');
 
       if (callNext) {
@@ -1531,9 +1554,16 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       }
 
     } catch (error: unknown) {
+      // The request may have failed after selecting a DIFFERENT patient.
+      // A's network failure must not toast over B's clinical workspace.
+      if (!completionStillOwned()) {
+        logger.warn('[Cardiology] Stale completion network failure ignored for a changed selection');
+        return;
+      }
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_action_failed')));
     } finally {
-      setLoading(false);
+      // Release this operation even when the selection changed in flight.
+      setPendingVisitActions(count => count - 1);
     }
   };
 
@@ -2127,7 +2157,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                   status?: string | null;
                 } | null}
                 emr={emr}
-                loading={loading}
+                loading={pendingVisitActions > 0}
                 onCancel={() => {
                   // RETRO-3971-04 residual: let the shared EMR leave guard
                   // resolve Save/Discard/Stay before invalidating async work
