@@ -1,7 +1,8 @@
 # Monitoring and Observability Dependencies
 
 # Error Tracking
-sentry-sdk[fastapi]>=2.71.0
+# The backend Sentry integration uses the SDK 2.x privacy and scope APIs.
+sentry-sdk[fastapi]>=2.71.0,<3
 
 # Metrics
 prometheus-client>=0.26.0

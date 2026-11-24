@@ -441,7 +441,7 @@ If you decide to stop using Sentry:
 | `backend/app/core/sentry.py` | Sentry init for FastAPI + PII scrubbing + integrations |
 | `backend/app/main.py` | Calls `init_backend_sentry()` after logging setup |
 | `backend/app/core/pii_masker.py` | PII scrubbing for Python logging (3rd layer) |
-| `backend/requirements-monitoring.txt` | `sentry-sdk[fastapi]>=2.61.1` |
+| `backend/requirements-monitoring.txt` | `sentry-sdk[fastapi]>=2.71.0,<3` |
 | `frontend/package.json` | `@sentry/react@^8.47.0` |
 | `frontend/.env.example` | Documents all Sentry env vars |
 | `backend/.env.example` | Documents all Sentry env vars |
