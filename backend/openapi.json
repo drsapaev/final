@@ -92125,6 +92125,19 @@
             "description": "Current row version for optimistic locking",
             "default": 0
           },
+          "expected_patient_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Patient Id",
+            "description": "Patient ID currently selected in the editor"
+          },
           "client_session_id": {
             "anyOf": [
               {
@@ -97201,6 +97214,16 @@
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Expected Row Version"
+          },
+          "reviewed_text": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewedPrescriptionText"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -118779,6 +118802,47 @@
         "title": "RestoreToNextRequest",
         "description": "Запрос на восстановление пациента следующим в очереди"
       },
+      "ReviewedPrescriptionText": {
+        "properties": {
+          "expected_token": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Expected Token"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "doctor_notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_token",
+          "instructions",
+          "doctor_notes"
+        ],
+        "title": "ReviewedPrescriptionText"
+      },
       "RoleCreate": {
         "properties": {
           "name": {
@@ -131576,6 +131640,39 @@
           "is_draft": {
             "type": "boolean",
             "title": "Is Draft"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "doctor_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Notes"
+          },
+          "review_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Token"
           }
         },
         "type": "object",
