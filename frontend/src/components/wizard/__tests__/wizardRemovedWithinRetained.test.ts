@@ -17,6 +17,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildCartQuoteRequest,
+  buildEditDeltaTargetItems,
   buildEditOriginalServiceIdentity,
   detectRemovedServicesWithinRetainedEntries,
   describeRemovedWithinRetainedRows,
@@ -166,4 +168,23 @@ describe('describeRemovedWithinRetainedRows (REG-FE-084 message)', () => {
     expect(message).toContain('недоступно');
     expect(message).toContain('Отмените запись целиком');
   });
+});
+
+it('quotes the same explicit zero target that edit-delta uses to save a retained ticket', () => {
+  const cart = [{ service_id: 2, original_queue_id: 42, quantity: 1 }];
+  const result = buildEditDeltaTargetItems(cart, servicesData, identityOf(initialDataTwoServices));
+
+  expect(result.unroutable).toEqual([]);
+  expect(result.items).toEqual([
+    { service_id: 1, quantity: 0, specialist_id: null, queue_entry_id: 42 },
+  ]);
+  const quote = buildCartQuoteRequest({ items: cart }, {
+    pricingMode: 'edit_delta',
+    itemsOverride: result.items,
+    patientId: 1,
+    targetDate: '2026-11-23',
+    preferredEntryIds: [42],
+  });
+  expect(quote?.items).toEqual([{ service_id: 1, quantity: 0, queue_entry_id: 42 }]);
+  expect(buildCartQuoteRequest({ items: [{ service_id: 1, quantity: 0 }] })?.items[0].quantity).toBe(1);
 });

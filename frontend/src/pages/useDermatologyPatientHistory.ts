@@ -71,6 +71,11 @@ interface PatientHistorySnapshot {
   loading: boolean;
   loadingMoreExaminations: boolean;
   loadingMoreProcedures: boolean;
+  /** DERMAHIST-FE-002: a rejected load-more request must be visible to
+   * the clinician, not just logged — the failed-page state is surfaced
+   * to the UI and cleared on a successful retry or reload. */
+  loadMoreExaminationsError: boolean;
+  loadMoreProceduresError: boolean;
   error: boolean;
 }
 
@@ -86,6 +91,8 @@ const emptySnapshot: PatientHistorySnapshot = {
   loading: false,
   loadingMoreExaminations: false,
   loadingMoreProcedures: false,
+  loadMoreExaminationsError: false,
+  loadMoreProceduresError: false,
   error: false,
 };
 
@@ -214,6 +221,7 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
               skinExaminationsTotal: page.total,
               skinExaminationsNextPage: nextPage + 1,
               loadingMoreExaminations: false,
+              loadMoreExaminationsError: false,
             }
             : current
         ));
@@ -222,7 +230,7 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
         logger.warn('[DermaHistory] failed to load more examinations', { patientId });
         setSnapshot((current) => (
           current.patientId === patientId
-            ? { ...current, loadingMoreExaminations: false }
+            ? { ...current, loadingMoreExaminations: false, loadMoreExaminationsError: true }
             : current
         ));
       });
@@ -248,6 +256,7 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
               cosmeticProceduresTotal: page.total,
               cosmeticProceduresNextPage: nextPage + 1,
               loadingMoreProcedures: false,
+              loadMoreProceduresError: false,
             }
             : current
         ));
@@ -256,7 +265,7 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
         logger.warn('[DermaHistory] failed to load more procedures', { patientId });
         setSnapshot((current) => (
           current.patientId === patientId
-            ? { ...current, loadingMoreProcedures: false }
+            ? { ...current, loadingMoreProcedures: false, loadMoreProceduresError: true }
             : current
         ));
       });
@@ -277,6 +286,8 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
       && snapshot.cosmeticProcedures.length < snapshot.cosmeticProceduresTotal,
     loadingMoreExaminations: isCurrentPatient && snapshot.loadingMoreExaminations,
     loadingMoreProcedures: isCurrentPatient && snapshot.loadingMoreProcedures,
+    loadMoreExaminationsError: isCurrentPatient && snapshot.loadMoreExaminationsError,
+    loadMoreProceduresError: isCurrentPatient && snapshot.loadMoreProceduresError,
     loadMoreExaminations,
     loadMoreProcedures,
     loading: Boolean(normalizedPatientId) && (!isCurrentPatient || snapshot.loading),

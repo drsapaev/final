@@ -3434,7 +3434,7 @@ export type paths = {
         put?: never;
         /**
          * Restore Entry To Next
-         * @description Восстанавливает пациента no_show как следующего в очереди
+         * @description Возвращает пациента в очередь с действующим приоритетом восстановления
          *     Устанавливает priority=1 для приоритетной обработки
          */
         post: operations["restore_entry_to_next_api_v1_queue_entry__entry_id__restore_next_post"];

@@ -6,9 +6,8 @@ in ``crud_appointment.reschedule_appointment``), so a mobile patient could
 land on an already-booked slot and two concurrent reschedules could
 double-book. Ordering follows the documented writer contract in
 ``app/services/appointment_slot_guard.py``: the FOR UPDATE doctor lock is
-taken BEFORE the occupancy pre-check. The doctor is fixed on this endpoint
-(no reassignment), so no eligibility check - same rule as PUT
-/appointments/{id}.
+taken BEFORE the occupancy pre-check. The appointment row is locked first
+so a concurrent staff reassignment cannot change the doctor being checked.
 """
 
 from datetime import date, timedelta
@@ -148,3 +147,55 @@ def test_reschedule_onto_own_current_slot_passes(
     )
     assert response.status_code == 200, response.text
     assert response.json()["success"] is True
+
+
+@pytest.mark.parametrize(
+    (
+        "new_time",
+        "moving_minutes",
+        "existing_minutes",
+        "existing_status",
+        "expected_status",
+    ),
+    [
+        pytest.param("13:45", 30, 45, "scheduled", 409, id="overlap-before"),
+        pytest.param("14:15", 30, 45, "scheduled", 409, id="overlap-after"),
+        pytest.param("13:30", 30, 45, "scheduled", 200, id="adjacent-before"),
+        pytest.param("14:45", 30, 45, "scheduled", 200, id="adjacent-after"),
+        pytest.param("13:45", 30, None, "scheduled", 200, id="unknown-existing"),
+        pytest.param("14:15", None, 45, "scheduled", 200, id="unknown-moving"),
+        pytest.param("14:15", 30, 45, "cancelled", 200, id="cancelled-existing"),
+    ],
+)
+def test_reschedule_checks_stored_intervals(
+    client: TestClient,
+    reschedule_setup,
+    patient_headers,
+    db_session,
+    new_time,
+    moving_minutes,
+    existing_minutes,
+    existing_status,
+    expected_status,
+):
+    apt = reschedule_setup["apt"]
+    other = reschedule_setup["other"]
+    apt.duration_minutes_snapshot = moving_minutes
+    other.duration_minutes_snapshot = existing_minutes
+    other.status = existing_status
+    db_session.commit()
+
+    response = client.post(
+        RESCHEDULE_URL,
+        headers=patient_headers,
+        json={
+            "appointment_id": apt.id,
+            "new_date": reschedule_setup["base_day"].isoformat(),
+            "new_time": new_time,
+        },
+    )
+
+    assert response.status_code == expected_status, response.text
+    db_session.refresh(apt)
+    assert apt.appointment_time == (new_time if expected_status == 200 else "10:00")
+    assert apt.duration_minutes_snapshot == moving_minutes

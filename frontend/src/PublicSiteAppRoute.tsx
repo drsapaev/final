@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getApiOrigin } from './api/runtime';
+import { useDocumentLanguage } from './hooks/useDocumentLanguage';
+import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { getVitePublicSiteAnalyticsEndpoint } from './publicSiteAnalytics';
 import { createPublicSiteApi } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
@@ -22,33 +24,20 @@ export default function PublicSiteAppRoute() {
     ? PUBLIC_SITE_ERROR_TITLES[route.locale]
     : getPublicSitePageMetadata(route, state.status === 'ready' ? state.data : undefined).title);
 
+  useDocumentLanguage(locale);
+
   useLayoutEffect(() => {
     if (!locale) return undefined;
 
     const root = document.documentElement;
-    const previousLanguage = root.getAttribute('lang');
-    root.lang = locale;
     root.classList.add('public-site-document');
 
     return () => {
       root.classList.remove('public-site-document');
-      if (root.lang !== locale) return;
-      if (previousLanguage === null) root.removeAttribute('lang');
-      else root.lang = previousLanguage;
     };
   }, [locale]);
 
-  useLayoutEffect(() => {
-    if (!title) return undefined;
-
-    const previousTitle = document.title;
-    document.title = title;
-    const appliedTitle = document.title;
-
-    return () => {
-      if (document.title === appliedTitle) document.title = previousTitle;
-    };
-  }, [title]);
+  useDocumentTitle(title);
 
   useEffect(() => {
     const route = resolvePublicSiteRoute(pathname);

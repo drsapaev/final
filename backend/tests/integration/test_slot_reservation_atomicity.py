@@ -15,6 +15,7 @@ P2b — /mobile/doctors applies the incomplete-profile ("general" sentinel)
       predicate IN THE DATABASE QUERY before pagination, so eligible
       doctors are no longer crowded out by the crud row cap.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -93,7 +94,9 @@ def _make_admin(db_session) -> User:
     return user
 
 
-def _make_doctor(db_session, *, specialty: str = "cardiology", user: User | None = None) -> Doctor:
+def _make_doctor(
+    db_session, *, specialty: str = "cardiology", user: User | None = None
+) -> Doctor:
     if user is None:
         s = _s()
         user = User(
@@ -176,7 +179,9 @@ def test_lock_helper_resolves_doctor_row(db_session):
     assert locked.id == doctor.id
 
 
-def test_mobile_book_takes_slot_lock_before_occupancy_check(client, db_session, monkeypatch):
+def test_mobile_book_takes_slot_lock_before_occupancy_check(
+    client, db_session, monkeypatch
+):
     """The mobile booking writer must take the per-doctor lock."""
     from app.api.v1.endpoints import mobile_api
 
@@ -204,7 +209,9 @@ def test_mobile_book_takes_slot_lock_before_occupancy_check(client, db_session, 
     assert calls == [doctor.id], "mobile book must take the per-doctor slot lock"
 
 
-def test_web_create_takes_slot_lock_before_occupancy_check(client, db_session, monkeypatch):
+def test_web_create_takes_slot_lock_before_occupancy_check(
+    client, db_session, monkeypatch
+):
     """The web create writer must take the per-doctor lock."""
     from app.api.v1.endpoints import appointments as appointments_module
 
@@ -271,6 +278,106 @@ def test_web_update_takes_slot_lock_on_reschedule(client, db_session, monkeypatc
     assert calls == [doctor.id], "web reschedule must lock the resolved doctor"
 
 
+def test_web_update_rechecks_extension_and_reactivation(client, db_session):
+    from app.models.service import Service
+
+    doctor = _make_doctor(db_session)
+    patient = _make_patient_row(db_session, _make_patient(db_session))
+    admin = _make_admin(db_session)
+    visit_day = date.today() + timedelta(days=5)
+    appointment = Appointment(
+        patient_id=patient.id,
+        doctor_id=doctor.id,
+        appointment_date=visit_day,
+        appointment_time="09:00",
+        duration_minutes_snapshot=20,
+        status="scheduled",
+    )
+    blocked = Appointment(
+        patient_id=patient.id,
+        doctor_id=doctor.id,
+        appointment_date=visit_day,
+        appointment_time="09:20",
+        duration_minutes_snapshot=40,
+        status="scheduled",
+    )
+    longer = Service(
+        name="SYNTHETIC longer consultation",
+        active=True,
+        doctor_id=doctor.id,
+        duration_minutes=40,
+    )
+    db_session.add_all([appointment, blocked, longer])
+    db_session.commit()
+
+    path = f"/api/v1/appointments/{appointment.id}"
+    headers = _token_for(admin)
+    refused = client.put(path, headers=headers, json={"service_ids": [longer.id]})
+    assert refused.status_code == 400, refused.text
+    assert refused.json()["detail"] == "Это время уже занято у выбранного врача"
+    db_session.refresh(appointment)
+    assert appointment.duration_minutes_snapshot == 20
+
+    appointment.status = "CANCELLED"
+    appointment.duration_minutes_snapshot = 40
+    db_session.commit()
+    refused = client.put(path, headers=headers, json={"status": "scheduled"})
+    assert refused.status_code == 400, refused.text
+    db_session.refresh(appointment)
+    assert appointment.status == "CANCELLED"
+
+    reopened = client.put(
+        path,
+        headers=headers,
+        json={"status": "scheduled", "appointment_time": "10:00"},
+    )
+    assert reopened.status_code == 200, reopened.text
+    db_session.refresh(appointment)
+    assert appointment.appointment_time == "10:00"
+    assert appointment.duration_minutes_snapshot == 40
+
+
+def test_known_slot_conflict_includes_neighbouring_dates(db_session):
+    from app.crud.appointment import appointment as appointment_crud
+
+    doctor = _make_doctor(db_session)
+    patient = _make_patient_row(db_session, _make_patient(db_session))
+    visit_day = date.today() + timedelta(days=5)
+    previous_day = visit_day - timedelta(days=1)
+    db_session.add(
+        Appointment(
+            patient_id=patient.id,
+            doctor_id=doctor.id,
+            appointment_date=previous_day,
+            appointment_time="23:45:30",
+            duration_minutes_snapshot=40,
+            status="scheduled",
+        )
+    )
+    db_session.commit()
+
+    assert appointment_crud.is_time_slot_occupied(
+        db_session,
+        doctor_id=doctor.id,
+        appointment_date=visit_day,
+        appointment_time="00:25",
+        duration_minutes_snapshot=20,
+    )
+    assert not appointment_crud.is_time_slot_occupied(
+        db_session,
+        doctor_id=doctor.id,
+        appointment_date=visit_day,
+        appointment_time="00:25:30",
+        duration_minutes_snapshot=20,
+    )
+    assert not appointment_crud.is_time_slot_occupied(
+        db_session,
+        doctor_id=doctor.id,
+        appointment_date=visit_day,
+        appointment_time="00:24",
+    )
+
+
 def test_v2_service_writers_take_slot_lock(db_session, monkeypatch):
     """The (currently unmounted) v2 service writer keeps the lock wired —
     tested by direct invocation since the router is not mounted. Only the
@@ -311,13 +418,20 @@ def test_telegram_confirm_wires_slot_lock():
     """The telegram confirm writer imports and calls the lock before its
     occupancy check (source-level check: the flow needs a full Mini App
     session; repo precedent: test_pr34 source assertions)."""
-    import re
-
-    source = open("app/api/v1/endpoints/telegram_webhook/_routes.py", encoding="utf-8").read()
-    assert "from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation" in source
-    lock_pos = source.find("lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)")
+    source = open(
+        "app/api/v1/endpoints/telegram_webhook/_routes.py", encoding="utf-8"
+    ).read()
+    assert (
+        "from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation"
+        in source
+    )
+    lock_pos = source.find(
+        "lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)"
+    )
     check_pos = source.find("slot_occupied = appointment_crud.is_time_slot_occupied(")
-    assert 0 < lock_pos < check_pos, "telegram confirm must lock BEFORE the occupancy check"
+    assert (
+        0 < lock_pos < check_pos
+    ), "telegram confirm must lock BEFORE the occupancy check"
 
 
 # ---------------------------------------------------------------------------
@@ -327,9 +441,7 @@ def test_telegram_confirm_wires_slot_lock():
 
 def test_reconciliation_finder_finds_only_active_userless(db_session):
     mod = _load_reconcile_module()
-    find_active_doctor_linkage_violations = (
-        mod.find_active_doctor_linkage_violations
-    )
+    find_active_doctor_linkage_violations = mod.find_active_doctor_linkage_violations
 
     target = Doctor(user_id=None, specialty="dermatology", active=True)
     inactive_userless = Doctor(user_id=None, specialty="cardiology", active=False)
@@ -340,9 +452,9 @@ def test_reconciliation_finder_finds_only_active_userless(db_session):
 
     violations = find_active_doctor_linkage_violations(db_session)
     reasons = {row.id: reason for row, reason in violations}
-    assert reasons.get(target.id) == "userless", (
-        "active userless row must be inventoried"
-    )
+    assert (
+        reasons.get(target.id) == "userless"
+    ), "active userless row must be inventoried"
     assert linked.id not in reasons
     assert inactive_userless.id not in reasons
 
@@ -352,9 +464,7 @@ def test_reconciliation_finder_flags_ghost_owners(db_session):
     was deactivated before lifecycle mirroring existed — must be
     inventoried too, not just userless rows."""
     mod = _load_reconcile_module()
-    find_active_doctor_linkage_violations = (
-        mod.find_active_doctor_linkage_violations
-    )
+    find_active_doctor_linkage_violations = mod.find_active_doctor_linkage_violations
 
     inactive_owner = _make_patient(db_session)  # active user, non-doctor role
     ghost_inactive = Doctor(
@@ -386,9 +496,7 @@ def test_reconciliation_finder_flags_ghost_owners(db_session):
 def test_reconciliation_inventory_shape(db_session):
     mod = _load_reconcile_module()
     build_inventory = mod.build_inventory
-    find_active_doctor_linkage_violations = (
-        mod.find_active_doctor_linkage_violations
-    )
+    find_active_doctor_linkage_violations = mod.find_active_doctor_linkage_violations
 
     db_session.add(Doctor(user_id=None, specialty="cardiology", active=True))
     db_session.commit()
@@ -448,7 +556,9 @@ def test_get_doctors_eligible_only_filters_before_cap(db_session):
         db_session, skip=0, limit=2, active_only=True, eligible_only=True
     )
     assert len(rows) == 2, "limit applies to the ELIGIBLE set"
-    assert all(r.specialty != "general" for r in rows), "sentinel must be filtered in SQL"
+    assert all(
+        r.specialty != "general" for r in rows
+    ), "sentinel must be filtered in SQL"
     assert {r.id for r in rows} <= {real_a.id, real_b.id, real_c.id}
 
 
@@ -463,9 +573,9 @@ def test_get_doctors_by_specialty_eligible_only_hides_sentinel(db_session):
     sentinel_is_real_specialty = crud_clinic.get_doctors_by_specialty(
         db_session, "general", eligible_only=True
     )
-    assert sentinel_is_real_specialty == [], (
-        "the incomplete sentinel must not surface as a bookable specialty"
-    )
+    assert (
+        sentinel_is_real_specialty == []
+    ), "the incomplete sentinel must not surface as a bookable specialty"
     without_guard = crud_clinic.get_doctors_by_specialty(
         db_session, "general", eligible_only=False
     )
@@ -485,11 +595,11 @@ def test_mobile_doctors_eligible_doctors_not_crowded_out_by_cap(client, db_sessi
     sentinels_inside_cap = 5
 
     rows = []
-    for i in range(50):
+    for _ in range(50):
         rows.append(Doctor(user_id=None, specialty="cardiology", active=True))
-    for i in range(sentinels_inside_cap):
+    for _ in range(sentinels_inside_cap):
         rows.append(Doctor(user_id=None, specialty="general", active=True))
-    for i in range(real_total - 50):
+    for _ in range(real_total - 50):
         rows.append(Doctor(user_id=None, specialty="dermatology", active=True))
     db_session.add_all(rows)
     db_session.commit()
@@ -530,11 +640,9 @@ def test_blank_specialty_treated_as_incomplete_everywhere(db_session):
     db_session.add_all([blank, whitespace, real])
     db_session.commit()
 
-    rows = crud_clinic.get_doctors(
-        db_session, active_only=True, eligible_only=True
-    )
+    rows = crud_clinic.get_doctors(db_session, active_only=True, eligible_only=True)
     ids = {r.id for r in rows}
     assert real.id in ids
-    assert blank.id not in ids and whitespace.id not in ids, (
-        "blank-specialty rows must be excluded by the SQL predicate"
-    )
+    assert (
+        blank.id not in ids and whitespace.id not in ids
+    ), "blank-specialty rows must be excluded by the SQL predicate"

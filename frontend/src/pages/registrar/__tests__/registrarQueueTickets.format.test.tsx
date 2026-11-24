@@ -128,3 +128,15 @@ describe('RecordPreview — REG-FE-083 rendered queue field', () => {
     expect(screen.getByText('№9 — Кардиология')).toBeTruthy();
   });
 });
+
+it('does not describe the zero placeholder as issued ticket #0', () => {
+  expect(formatPreviewQueueTickets([{ number: 0, queue_name: 'ЭКГ' }], 'без номера'))
+    .toBe('ЭКГ (без номера)');
+});
+
+it('shows the patient address in the row preview without horizontal scrolling', () => {
+  render(<RecordPreview isOpen row={{ id: 42, address: 'SYNTHETIC address' } as unknown as Appointment}
+    onClose={vi.fn()} onEdit={vi.fn()} tI18n={tI18n} />);
+  expect(screen.getByText('misc.eat_address')).toBeVisible();
+  expect(screen.getByText('SYNTHETIC address')).toBeVisible();
+});

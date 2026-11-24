@@ -18,9 +18,65 @@ interface VisitTimelineAppointment {
 }
 
 interface VisitTimelineRecord {
+  /** DERMATIMELINE-FE-001: canonical backend fields (snake_case, per
+   * backend/app/schemas/emr.py) — the parent feeds the raw status
+   * payload and normalizes its own state to `is_draft`. */
+  is_draft?: boolean | null;
+  saved_at?: string | null;
+  /** Legacy camelCase aliases, still accepted for older callers. */
   isDraft?: boolean;
   savedAt?: string;
 }
+
+/** DERMATIMELINE-FE-001: typed adapter at the component boundary — the
+ * draft state comes from explicit `=== true` comparisons of the
+ * canonical (or legacy alias) field, never from a truthiness fallback on
+ * a wrong-cased field, so a true draft is no longer rendered as
+ * completed. */
+const normalizeTimelineRecord = (record: VisitTimelineRecord | null | undefined) => ({
+  isDraft: record?.is_draft === true || record?.isDraft === true,
+  savedAt: record?.saved_at ?? record?.savedAt ?? undefined,
+});
+
+// DERMATIMELINE-FE-002: queue-only visits feed the timeline the raw
+// queue-entry status (the parent assigns row.status into
+// currentAppointment.status, and for a visit without an appointment id
+// the canonical status refresh touches only the EMR state). The
+// appointment pipeline knows nothing about queue statuses, so an ACTIVE
+// queue-only visit rendered 0% progress and an "Unknown" stage. The
+// canonical SSOT queue state machine (types/state-machines/queue.ts:
+// waiting → called → in_service → in_cabinet → served → completed) is
+// projected onto the appointment stage it represents, with an explicit
+// source-kind split: a queue source projects onto its canonical stage;
+// unknown sources stay unknown instead of claiming a false 0% of the
+// patient workflow.
+const QUEUE_STAGE_PROJECTION: Record<string, string> = {
+  waiting: APPOINTMENT_STATUS.PENDING,
+  called: APPOINTMENT_STATUS.IN_VISIT,
+  in_service: APPOINTMENT_STATUS.IN_VISIT,
+  in_cabinet: APPOINTMENT_STATUS.IN_VISIT,
+  served: APPOINTMENT_STATUS.COMPLETED,
+  skipped: APPOINTMENT_STATUS.NO_SHOW,
+  cancelled: APPOINTMENT_STATUS.CANCELLED,
+};
+
+type VisitStageSource = 'appointment' | 'queue' | 'unknown';
+interface VisitStage {
+  sourceKind: VisitStageSource;
+  stage?: string;
+}
+
+const normalizeVisitStage = (status?: string): VisitStage => {
+  if (!status) return { sourceKind: 'unknown' };
+  if ((Object.values(APPOINTMENT_STATUS) as string[]).includes(status)) {
+    return { sourceKind: 'appointment', stage: status };
+  }
+  const projected = QUEUE_STAGE_PROJECTION[status];
+  if (projected) {
+    return { sourceKind: 'queue', stage: projected };
+  }
+  return { sourceKind: 'unknown' };
+};
 
 interface VisitTimelineProps {
   appointment?: VisitTimelineAppointment | null;
@@ -39,6 +95,14 @@ interface TimelineStep {
 
 const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
+  // DERMATIMELINE-FE-001: normalize both records once through the typed
+  // adapter before any status/next-step decision.
+  const emrState = normalizeTimelineRecord(emr);
+  const prescriptionState = normalizeTimelineRecord(prescription);
+  // DERMATIMELINE-FE-002: normalize the visit stage once (with its
+  // source-kind) and drive every step/progress/label decision from it.
+  const visitStage = normalizeVisitStage(appointment?.status);
+  const stage = visitStage.stage;
   const timelineSteps = [
     {
       id: 'appointment',
@@ -53,10 +117,10 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
       title: t('final.timeline_payment'),
       description: t('misc.vt_ozhidanie_oplaty_zapisi'),
       icon: CreditCard,
-      status: appointment?.status === APPOINTMENT_STATUS.PENDING ? 'current' : 
-              appointment?.status === APPOINTMENT_STATUS.PAID || 
-              appointment?.status === APPOINTMENT_STATUS.IN_VISIT || 
-              appointment?.status === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending',
+      status: stage === APPOINTMENT_STATUS.PENDING ? 'current' :
+              stage === APPOINTMENT_STATUS.PAID ||
+              stage === APPOINTMENT_STATUS.IN_VISIT ||
+              stage === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending',
       completedAt: appointment?.paid_at
     },
     {
@@ -64,8 +128,8 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
       title: t('final.timeline_doctor_visit'),
       description: t('misc.vt_nachalo_priema'),
       icon: User,
-      status: appointment?.status === APPOINTMENT_STATUS.IN_VISIT ? 'current' :
-              appointment?.status === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending',
+      status: stage === APPOINTMENT_STATUS.IN_VISIT ? 'current' :
+              stage === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending',
       completedAt: appointment?.visit_started_at
     },
     {
@@ -73,18 +137,16 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
       title: t('final.timeline_emr'),
       description: t('misc.vt_elektronnaya_meditsinskaya_k'),
       icon: FileText,
-      status: emr && !emr.isDraft ? 'completed' :
-              emr && emr.isDraft ? 'current' : 'pending',
-      completedAt: emr?.savedAt
+      status: emr ? (emrState.isDraft ? 'current' : 'completed') : 'pending',
+      completedAt: emrState.savedAt
     },
     {
       id: 'prescription',
       title: t('final.timeline_prescription'),
       description: t('misc.vt_naznachenie_preparatov'),
       icon: Pill,
-      status: prescription && !prescription.isDraft ? 'completed' :
-              prescription && prescription.isDraft ? 'current' : 'pending',
-      completedAt: prescription?.savedAt
+      status: prescription ? (prescriptionState.isDraft ? 'current' : 'completed') : 'pending',
+      completedAt: prescriptionState.savedAt
     }
   ];
 
@@ -116,14 +178,16 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
     }
   };
 
-  const progress = getProgress(appointment?.status ?? '');
+  const progress = getProgress(stage ?? '');
 
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold">{t('misc.vt_progress_vizita')}</h3>
         <div className="flex items-center gap-2">
-          <div className="text-sm text-gray-600">{Math.round(progress)}%</div>
+          <div className="text-sm text-gray-600">
+            {visitStage.sourceKind === 'unknown' ? '—' : `${Math.round(progress)}%`}
+          </div>
           <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
             <div 
               className="h-full bg-blue-500 transition-all duration-300"
@@ -182,30 +246,30 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
           <div>
             <div className="font-medium">{t('misc.vt_tekuschiy_status')}</div>
             <div className="text-sm text-gray-600">
-              {STATUS_LABELS[appointment?.status as keyof typeof STATUS_LABELS] || t('misc.vt_neizvestno')}
+              {stage ? STATUS_LABELS[stage as keyof typeof STATUS_LABELS] || t('misc.vt_neizvestno') : t('misc.vt_neizvestno')}
             </div>
           </div>
-          <Badge variant={STATUS_COLORS[appointment?.status as keyof typeof STATUS_COLORS] as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
-            {STATUS_LABELS[appointment?.status as keyof typeof STATUS_LABELS]}
+          <Badge variant={stage ? STATUS_COLORS[stage as keyof typeof STATUS_COLORS] as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline" : 'default' as never}>
+            {stage ? STATUS_LABELS[stage as keyof typeof STATUS_LABELS] || t('misc.vt_neizvestno') : t('misc.vt_neizvestno')}
           </Badge>
         </div>
       </div>
 
       {/* Следующий шаг */}
-      {appointment?.status !== APPOINTMENT_STATUS.COMPLETED && (
+      {stage !== undefined && stage !== APPOINTMENT_STATUS.COMPLETED && (
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <AlertCircle className="w-4 h-4 text-blue-600" />
             <div className="font-medium text-blue-900">{t('misc.vt_sleduyuschiy_shag')}</div>
           </div>
           <div className="text-sm text-blue-700">
-            {appointment?.status === APPOINTMENT_STATUS.PENDING && 
+            {stage === APPOINTMENT_STATUS.PENDING &&
               t('misc.vt_ozhidaetsya_oplata_zapisi_dl')}
-            {appointment?.status === APPOINTMENT_STATUS.PAID && 
+            {stage === APPOINTMENT_STATUS.PAID &&
               t('misc.vt_mozhno_nachat_priem_u_vracha')}
-            {appointment?.status === APPOINTMENT_STATUS.IN_VISIT && 
+            {stage === APPOINTMENT_STATUS.IN_VISIT &&
               (!emr ? t('misc.vt_sozdayte_emk_dlya_zapisi_pri') :
-               emr.isDraft ? t('misc.vt_sohranite_emk_dlya_zavershen') :
+               emrState.isDraft ? t('misc.vt_sohranite_emk_dlya_zavershen') :
                !prescription ? t('misc.vt_oformite_retsept_optsionalno') :
                t('misc.vt_priem_gotov_k_zaversheniyu'))}
           </div>
