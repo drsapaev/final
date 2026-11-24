@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
 
+from app.core.config import settings
 from app.models.audit import AuditLog
 from app.models.clinic import Doctor
 from app.models.lab import LabOrder, LabReportInstance, LabReportValue
@@ -23,6 +24,7 @@ from app.services.authentication_service import authentication_service
 from app.services.lab_critical_communication import (
     acknowledge,
     dispatch_pending,
+    escalate,
     record_released_report,
 )
 from app.services.lab_import import process_import_batch
@@ -468,6 +470,105 @@ def test_critical_communication_inbox_is_separate_from_acknowledgment(
         "inbox_recorded",
         "acknowledged",
     ]
+
+
+@pytest.mark.unit
+def test_critical_admin_route_retries_and_never_replaces_clinical_acknowledgment(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    admin = synthetic_user(db_session, "Admin")
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    test_visit.doctor_id = None
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    assert task.state == "needs_assignment"
+    assert task.recipient_user_id is None
+    db_session.commit()
+
+    sender = AsyncMock(side_effect=[False, True, True, True])
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 0
+    assert sender.await_count == 1
+    assert task.next_attempt_at is not None
+    task.next_attempt_at = datetime.now(UTC)
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == "needs_assignment"
+    assert task.inbox_recorded_at is None
+    assert task.acknowledged_at is None
+    for attempt in sender.await_args_list:
+        sent = attempt.kwargs
+        assert sent["recipient"].id == admin.id
+        assert sent["entity_type"] == "lab_critical_assignment"
+        assert sent["entity_id"] == task.id
+        assert sent["metadata"] == {"communication_id": task.id}
+        assert sent["deep_link"] == f"/lab?tab=operations&communication_id={task.id}"
+
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    assert task.state == "inbox_recorded"
+    assert task.recipient_user_id == doctor.id
+    assert sender.await_args.kwargs["recipient"].id == doctor.id
+
+    escalate(db_session, task.id, actor_user_id=admin.id)
+    assert run(dispatch_pending(db_session)) == 1
+    assert task.state == "escalated"
+    assert task.recipient_user_id == doctor.id
+    assert sender.await_args.kwargs["recipient"].id == admin.id
+    assert sender.await_args.kwargs["entity_type"] == "lab_critical_escalation"
+    escalate(db_session, task.id, actor_user_id=admin.id)
+    assert run(dispatch_pending(db_session)) == 0
+    with pytest.raises(LabReportingDomainError):
+        acknowledge(db_session, task.id, actor_user_id=admin.id)
+    db_session.rollback()
+    assert acknowledge(db_session, task.id, actor_user_id=doctor.id).state == "acknowledged"
+    events = list(db_session.scalars(
+        select(LabCriticalCommunicationEvent.event_type)
+        .where(LabCriticalCommunicationEvent.communication_id == task.id)
+        .order_by(LabCriticalCommunicationEvent.id)
+    ))
+    assert events.count("assignment_notified") == events.count("escalation_notified") == 1
+    assert events.count("inbox_recorded") == events.count("acknowledged") == 1
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("role", "is_active"), [("Doctor", True), ("Admin", False)])
+def test_critical_route_rejects_ineligible_configured_admin(
+    db_session, test_patient, test_visit, monkeypatch, role, is_active,
+):
+    configured_user = synthetic_user(db_session, role)
+    configured_user.is_active = is_active
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", configured_user.id)
+    test_visit.doctor_id = None
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == "needs_assignment"
+    assert task.attempts == 0
+    assert task.next_attempt_at is not None
+    sender.assert_not_awaited()
 
 
 @pytest.mark.unit

@@ -515,6 +515,35 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     await installApiMocks(page);
   });
 
+  test('opens an exact critical task even when it is outside the current open list', async ({ page }) => {
+    const task = { state: 'needs_assignment', attempts: 1, available_actions: [],
+      created_at: '2026-09-26T08:00:00Z', acknowledged_at: null };
+    await page.route('**/api/v1/lab/critical-communications**', route => {
+      const params = new URL(route.request().url()).searchParams;
+      const beforeId = params.get('before_id');
+      if (beforeId !== null) {
+        expect(['9', '10']).toContain(beforeId);
+        expect(params.get('limit')).toBe('1');
+        expect(params.get('open_only')).toBe('false');
+        return json(route, [{ ...task, id: 8, report_instance_id: 42 }]);
+      }
+      return json(route, [{ ...task, id: 100, report_instance_id: 69 }]);
+    });
+
+    await page.goto('/lab?tab=operations&communication_id=8');
+    const operations = page.locator('#lab-panel-tabpanel-operations');
+    const rows = operations.getByRole('listitem');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText(/#42\b/);
+    await expect(rows.first()).toHaveAttribute('aria-current', 'true');
+    await expect(rows.nth(1)).toContainText(/#69\b/);
+
+    await page.goto('/lab?tab=operations&communication_id=9');
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText(/#69\b/);
+    await expect(operations.locator('[aria-current]')).toHaveCount(0);
+  });
+
   for (const labels of [
     {
       language: 'uz-Cyrl',

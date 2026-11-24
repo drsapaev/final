@@ -164,11 +164,14 @@ def released_result(db_session, test_patient, test_visit):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("test_name", [
+    "SYNTHETIC-Глюкоза крови", "SYNTHETIC-Қондаги глюкоза", "SYNTHETIC-Qon glyukozasi",
+])
 async def test_scheduler_uses_frozen_exact_release_without_reading_display_name(
-    db_session, released_result, monkeypatch,
+    db_session, released_result, monkeypatch, test_name,
 ):
-    projected, old = released_result(interpretation="normal", amount="13")
-    _, source = released_result(previous=old, amount="13", projection=projected)
+    projected, old = released_result(interpretation="normal", amount="13", test_name=test_name)
+    _, source = released_result(previous=old, amount="13", projection=projected, test_name=test_name)
     sender = AsyncMock(return_value=True)
     monkeypatch.setattr(mod.notification_sender_service, "send_lab_event_notification", sender)
 

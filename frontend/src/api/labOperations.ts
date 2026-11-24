@@ -66,6 +66,12 @@ export const labOperationsApi = {
     const query = visitId ? `?visit_id=${visitId}` : '';
     return requestLab(`/lab/critical-communications${query}`, { signal }) as Promise<LabCriticalTask[]>;
   },
+  async getCriticalTask(id: number, signal: AbortSignal) {
+    const rows = await requestLab(
+      `/lab/critical-communications?before_id=${id + 1}&limit=1&open_only=false`, { signal },
+    ) as LabCriticalTask[];
+    return rows[0]?.id === id ? rows[0] : null;
+  },
   updateCritical(id: number, action: 'acknowledge' | 'assign' | 'escalate') {
     return requestLab(`/lab/critical-communications/${id}/${action}`, { method: 'POST' }) as Promise<LabCriticalTask>;
   },

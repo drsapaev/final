@@ -58,7 +58,7 @@ function prepareManualEntries(rows: ManualRow[], previousMessageIds: ReadonlyMap
   return { entries, messageIds };
 }
 
-function CriticalDesk({ labels }: { labels: Labels }) {
+function CriticalDesk({ labels, communicationId }: { labels: Labels; communicationId: number | null }) {
   const [rows, setRows] = useState<LabCriticalTask[]>([]);
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState(false);
@@ -66,16 +66,19 @@ function CriticalDesk({ labels }: { labels: Labels }) {
 
   useEffect(() => {
     const request = new AbortController();
-    void labOperationsApi.listCritical(undefined, request.signal).then((result) => {
+    const focusedTask = communicationId == null
+      ? Promise.resolve(null)
+      : labOperationsApi.getCriticalTask(communicationId, request.signal);
+    void Promise.all([labOperationsApi.listCritical(undefined, request.signal), focusedTask]).then(([openTasks, focused]) => {
       if (!request.signal.aborted) {
-        setRows(result);
+        setRows(focused ? [focused, ...openTasks.filter(row => row.id !== focused.id)] : openTasks);
         setError(false);
       }
     }).catch(() => {
       if (!request.signal.aborted) setError(true);
     });
     return () => request.abort();
-  }, [refresh]);
+  }, [refresh, communicationId]);
 
   async function update(id: number, action: 'assign' | 'escalate') {
     setBusy(true);
@@ -98,7 +101,7 @@ function CriticalDesk({ labels }: { labels: Labels }) {
       {rows.length > 0 && (
         <ul className="lab-operations__results">
           {rows.map((row) => (
-            <li key={row.id}>
+            <li key={row.id} aria-current={row.id === communicationId ? 'true' : undefined}>
               <strong>{labels.report} #{row.report_instance_id}</strong>
               <span>{labels[row.state]}</span>
               <span>{labels.attempts} {row.attempts}</span>
@@ -179,13 +182,19 @@ function MetricsDesk({ labels }: { labels: Labels }) {
 interface LabOperationsWorkbenchProps {
   orderId: number | null;
   reportId: number | null;
+  communicationId?: number | null;
   onQueueChanged: () => Promise<void>;
 }
 
-export default function LabOperationsWorkbench({ reportId, onQueueChanged }: LabOperationsWorkbenchProps) {
+export default function LabOperationsWorkbench({ reportId, communicationId = null, onQueueChanged }: LabOperationsWorkbenchProps) {
   const { language } = useTranslation();
   const labels = getLabOperationsLabels(language);
-  const [tab, setTab] = useState<LabImportSource | 'critical' | 'metrics'>('manual');
+  const [selection, setSelection] = useState<{
+    mode: LabImportSource | 'critical' | 'metrics';
+    communicationId: number | null;
+  }>({ mode: 'manual', communicationId: null });
+  const tab = communicationId != null && communicationId !== selection.communicationId
+    ? 'critical' : selection.mode;
   const modes = tokenManager.getUserData()?.role === 'Admin'
     ? (['manual', 'csv', 'critical', 'metrics'] as const)
     : (['manual', 'csv', 'critical'] as const);
@@ -291,12 +300,14 @@ export default function LabOperationsWorkbench({ reportId, onQueueChanged }: Lab
       <div className="lab-operations__actions">
         {modes.map((mode) => (
           <Button key={mode} variant={tab === mode ? 'primary' : 'outline'} aria-pressed={tab === mode}
-            disabled={busy} onClick={() => { clearPreview(); setTab(mode); }}>
+            disabled={busy} onClick={() => { clearPreview(); setSelection({ mode, communicationId }); }}>
             {labels[mode]}
           </Button>
         ))}
       </div>
-      {tab === 'critical' && <CriticalDesk labels={labels} />}
+      {tab === 'critical' && (
+        <CriticalDesk key={communicationId ?? 'list'} labels={labels} communicationId={communicationId} />
+      )}
       {tab === 'metrics' && <MetricsDesk labels={labels} />}
       {(tab === 'manual' || tab === 'csv') && (
         <form onSubmit={(event) => void preview(event)} aria-busy={busy}>

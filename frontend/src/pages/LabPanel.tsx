@@ -215,6 +215,7 @@ export default function LabPanel() {
   const location = useLocation();
   const navigate = useNavigate();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const communicationId = getPositiveId(searchParams.get('communication_id'));
   const instanceParam = searchParams.get('instance');
   const parsedInstanceParam = instanceParam == null ? null : Number.parseInt(instanceParam, 10);
   const instanceParamId = parsedInstanceParam != null && !Number.isNaN(parsedInstanceParam)
@@ -2077,7 +2078,12 @@ export default function LabPanel() {
         hidden={activeTab !== 'operations'}
       >
         {(operationsOpened || activeTab === 'operations') && (
-          <LabOperationsWorkbench orderId={selectedOrderId} reportId={selectedReportId} onQueueChanged={loadLabAppointments} />
+          <LabOperationsWorkbench
+            orderId={selectedOrderId}
+            reportId={selectedReportId}
+            communicationId={communicationId}
+            onQueueChanged={loadLabAppointments}
+          />
         )}
       </section>
 
