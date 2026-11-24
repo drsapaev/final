@@ -312,6 +312,31 @@ async def test_scheduler_does_not_apply_historical_threshold_to_a_different_or_m
     sender.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+async def test_scheduler_distinguishes_missing_and_dimensionless_inr_units(
+    db_session, released_result, monkeypatch,
+):
+    linked, _ = released_result(
+        evaluation=None, test_name="SYNTHETIC-inr", amount="7", projected_unit=None,
+    )
+    missing_unit = LabResult(
+        order_id=linked.order_id, test_name="SYNTHETIC-inr", value="7", unit=None,
+    )
+    dimensionless = LabResult(
+        order_id=linked.order_id, test_name="SYNTHETIC-inr", value="7", unit="",
+    )
+    db_session.add_all([missing_unit, dimensionless])
+    db_session.flush()
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(mod.notification_sender_service, "send_lab_event_notification", sender)
+
+    outcome = await mod.LabNotificationService(db_session).check_critical_values()
+
+    assert outcome["checked"] == 3
+    assert outcome["critical_found"] == 1
+    assert outcome["critical_results"][0]["result_id"] == dimensionless.id
+
+
 @pytest.fixture
 def add_prior_critical_deliveries(db_session, cardio_user):
     old_time = datetime.now(UTC) - timedelta(minutes=2)

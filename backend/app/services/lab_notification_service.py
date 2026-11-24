@@ -490,6 +490,8 @@ class LabNotificationService:
     def _historical_measurements(
         self, result: LabResult,
     ) -> list[tuple[float, dict[str, Any], str]]:
+        if result.unit is None:
+            return []
         try:
             value = float(result.value)
         except (ValueError, TypeError):
