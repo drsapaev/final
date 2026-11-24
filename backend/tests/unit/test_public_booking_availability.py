@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, time, timedelta
 from enum import StrEnum
 
 import pytest
@@ -143,6 +143,78 @@ def test_other_date_appointments_do_not_affect_the_target_day():
         status="scheduled",
     )
     assert len(starts(appointments=(appointment,))) == 6
+
+
+@pytest.mark.parametrize(
+    ("appointment_time", "expected"),
+    [("23:50:00", ["00:40", "01:00"]), ("23:50:30", ["01:00"])],
+)
+def test_previous_day_overlap_blocks_only_the_tail_after_midnight(
+    appointment_time, expected
+):
+    appointment = ExistingAppointment(
+        appointment_date=MONDAY - timedelta(days=1),
+        appointment_time=appointment_time,
+        duration_minutes_snapshot=50,
+        status="scheduled",
+    )
+
+    assert (
+        starts(
+            shift=DoctorShift(time(0), time(1, 20)),
+            appointments=(appointment,),
+        )
+        == expected
+    )
+
+
+@pytest.mark.parametrize(
+    ("appointment_time", "duration", "status"),
+    [
+        ("23:40", 20, "scheduled"),
+        ("23:50", None, "scheduled"),
+        ("invalid", 50, "scheduled"),
+        ("23:50", 481, "scheduled"),
+        ("23:50", 50, "cancelled"),
+    ],
+)
+def test_previous_day_without_a_known_blocking_tail_leaves_slots_open(
+    appointment_time: str,
+    duration: int | None,
+    status: str,
+):
+    appointment = ExistingAppointment(
+        appointment_date=MONDAY - timedelta(days=1),
+        appointment_time=appointment_time,
+        duration_minutes_snapshot=duration,
+        status=status,
+    )
+
+    assert starts(
+        shift=DoctorShift(time(0), time(1)),
+        appointments=(appointment,),
+    ) == ["00:00", "00:20", "00:40"]
+
+
+def test_appointment_that_ends_after_target_date_still_closes_target_date():
+    appointment = ExistingAppointment(
+        appointment_date=MONDAY,
+        appointment_time="23:50",
+        duration_minutes_snapshot=50,
+        status="scheduled",
+    )
+
+    assert starts(appointments=(appointment,)) == []
+
+
+def test_first_representable_date_needs_no_previous_date():
+    calendar = BookingCalendar(confirmed_years=frozenset({date.min.year}))
+
+    assert starts(
+        shift=DoctorShift(time(0), time(1)),
+        calendar=calendar,
+        target_date=date.min,
+    ) == ["00:00", "00:20", "00:40"]
 
 
 def test_unconfirmed_year_stays_closed_even_with_working_override():
