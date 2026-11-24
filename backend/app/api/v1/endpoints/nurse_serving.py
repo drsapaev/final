@@ -32,7 +32,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_active_roles
@@ -51,6 +51,7 @@ from app.schemas.nurse_serving import (
     NurseServingStationResponse,
     NurseServingWorkplaceListResponse,
 )
+from app.services.display_websocket import schedule_display_queue_refresh
 from app.services.nurse_serving_api_service import (
     NurseServingApiDomainError,
     NurseServingApiService,
@@ -342,6 +343,7 @@ def start_serving(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_active_roles("Nurse")),
     audit_context: dict[str, Any] = Depends(audit_log_dependency),
+    background_tasks: BackgroundTasks = None,
 ):
     """Start serving the called patient (called -> in_progress).
 
@@ -353,7 +355,7 @@ def start_serving(
     visit transitions to ``in_progress`` (the doctor-surface BUG-3
     lesson). NOTHING closes the visit here.
     """
-    return _run(
+    result = _run(
         lambda: _service(db).start_entry(
             current_user.id,
             queue_resource_id,
@@ -362,6 +364,8 @@ def start_serving(
             audit_context=audit_context,
         )
     )
+    schedule_display_queue_refresh(background_tasks, entry_id)
+    return result
 
 
 @router.post(
@@ -451,6 +455,7 @@ def complete_service_execution(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_active_roles("Nurse")),
     audit_context: dict[str, Any] = Depends(audit_log_dependency),
+    background_tasks: BackgroundTasks = None,
 ):
     """Complete an in_progress attempt (performed_by = the ACTUAL nurse).
 
@@ -464,7 +469,7 @@ def complete_service_execution(
     Same-nurse repeat = 200 no-op; a different actor on a terminal
     attempt = 409.
     """
-    return _run(
+    result = _run(
         lambda: _service(db).complete_execution(
             current_user.id,
             execution_id,
@@ -472,6 +477,9 @@ def complete_service_execution(
             audit_context=audit_context,
         )
     )
+    if result.get("entry_served") and result.get("queue_entry_id") is not None:
+        schedule_display_queue_refresh(background_tasks, result["queue_entry_id"])
+    return result
 
 
 @router.post(
@@ -543,6 +551,7 @@ def mark_entry_no_show(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_active_roles("Nurse")),
     audit_context: dict[str, Any] = Depends(audit_log_dependency),
+    background_tasks: BackgroundTasks = None,
 ):
     """Mark the patient as no-show (queue-level only).
 
@@ -552,7 +561,7 @@ def mark_entry_no_show(
     continues. The mutation is committed with an actor-attributed
     UserAuditLog row.
     """
-    return _run(
+    result = _run(
         lambda: _service(db).mark_entry_no_show(
             current_user.id,
             queue_resource_id,
@@ -561,6 +570,8 @@ def mark_entry_no_show(
             audit_context=audit_context,
         )
     )
+    schedule_display_queue_refresh(background_tasks, entry_id)
+    return result
 
 
 @router.post(
@@ -589,6 +600,7 @@ def mark_entry_incomplete(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_active_roles("Nurse")),
     audit_context: dict[str, Any] = Depends(audit_log_dependency),
+    background_tasks: BackgroundTasks = None,
 ):
     """Terminate the entry-level serving with a mandatory reason.
 
@@ -597,7 +609,7 @@ def mark_entry_incomplete(
     closed (the §5 forbidden list); entry-level terminal states are
     queue facts.
     """
-    return _run(
+    result = _run(
         lambda: _service(db).mark_entry_incomplete(
             current_user.id,
             queue_resource_id,
@@ -607,3 +619,5 @@ def mark_entry_incomplete(
             audit_context=audit_context,
         )
     )
+    schedule_display_queue_refresh(background_tasks, entry_id)
+    return result

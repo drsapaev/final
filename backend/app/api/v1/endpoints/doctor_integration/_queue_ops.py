@@ -5,6 +5,8 @@ Split from doctor_integration.py (1900 LOC god file → modular).
 
 from __future__ import annotations
 
+from fastapi import BackgroundTasks
+
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     DOCTOR_QUEUE_ALLOWED_TAGS,
@@ -29,11 +31,16 @@ from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
     move_paired_appointment_to_day,
 )
+from app.models.enums import (
+    AppointmentStatus,
+    can_transition_status,
+    normalize_appointment_status,
+)
 from app.schemas.doctor_queue import (
     DoctorQueueStartVisitResponse,
     DoctorQueueTodayResponse,
 )
-from app.models.enums import AppointmentStatus, can_transition_status, normalize_appointment_status
+from app.services.display_websocket import schedule_display_queue_refresh
 from app.services.emr_completion_policy import (
     EMR_REQUIRED_DETAIL,
     requires_saved_emr,
@@ -742,6 +749,7 @@ def start_patient_visit(
             "Lab",
         )
     ),
+    background_tasks: BackgroundTasks = None,
 ):
     """
     Начать прием пациента (статус в процессе)
@@ -873,6 +881,7 @@ def start_patient_visit(
         visit.updated_at = changed_at
 
         db.commit()
+        schedule_display_queue_refresh(background_tasks, entry_id)
 
         return {
             "success": True,

@@ -1276,6 +1276,36 @@ def get_display_manager() -> DisplayWebSocketManager:
     return display_manager
 
 
+async def broadcast_display_queue_state_for_entry(entry_id: int) -> None:
+    """Refresh displays from committed state without retaining the request session."""
+    db = None
+    try:
+        db = SessionLocal()
+        entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        if entry is not None and entry.queue is not None:
+            await get_display_manager().broadcast_daily_queue_state(
+                entry.queue, event_type="queue.updated"
+            )
+    except Exception as exc:
+        # Notification failures must not turn a committed clinical action
+        # into a failed request or leak patient data in the log.
+        logger.warning("Display queue refresh failed: %s", type(exc).__name__)
+    finally:
+        if db is not None:
+            with suppress(Exception):
+                db.close()
+
+
+def schedule_display_queue_refresh(background_tasks: Any, entry_id: int) -> None:
+    """Schedule a best-effort refresh on the server event loop after response."""
+    if background_tasks is None:
+        return
+    try:
+        background_tasks.add_task(broadcast_display_queue_state_for_entry, entry_id)
+    except Exception as exc:
+        logger.warning("Display queue refresh could not be scheduled: %s", type(exc).__name__)
+
+
 def dispatch_async(coro) -> None:
     """
     Safely dispatch an async coroutine from sync or async contexts.

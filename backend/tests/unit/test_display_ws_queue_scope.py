@@ -140,6 +140,45 @@ def _synthetic_entry(entry_id: int, number: int, status: str) -> SimpleNamespace
 
 
 @pytest.mark.asyncio
+async def test_post_commit_refresh_broadcasts_current_entry_state(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from app.services import display_websocket
+
+    queue = _synthetic_queue(101)
+    entry = _synthetic_entry(9001, 7, "in_progress")
+    entry.queue = queue
+    session = _FakeSession({OnlineQueueEntry: _FakeQuery(result_all=[entry], result_first=entry)})
+    monkeypatch.setattr(display_websocket, "SessionLocal", lambda: session)
+    manager = DisplayWebSocketManager(pubsub=_FakePubSubBridge())
+    manager._queue_update_board_ids = lambda: ["main_board"]
+    manager._resolve_name_format = lambda _ids: "none"
+    manager.broadcast_to_board = AsyncMock(return_value="delivered_local")
+    monkeypatch.setattr(display_websocket, "get_display_manager", lambda: manager)
+
+    await display_websocket.broadcast_display_queue_state_for_entry(entry.id)
+
+    manager.broadcast_to_board.assert_awaited_once()
+    board, message = manager.broadcast_to_board.await_args.args
+    assert board == "main_board"
+    assert message["event_type"] == "queue.updated"
+    assert message["data"]["queue_id"] == queue.id
+    assert message["data"]["queue_entries"][0]["id"] == entry.id
+    assert message["data"]["queue_entries"][0]["status"] == "in_progress"
+
+
+@pytest.mark.asyncio
+async def test_post_commit_refresh_failure_does_not_propagate(monkeypatch):
+    from app.services import display_websocket
+
+    def unavailable():
+        raise RuntimeError("SYNTHETIC unavailable")
+
+    monkeypatch.setattr(display_websocket, "SessionLocal", unavailable)
+    await display_websocket.broadcast_display_queue_state_for_entry(9001)
+
+
+@pytest.mark.asyncio
 async def test_broadcast_daily_queue_state_carries_queue_scope(monkeypatch):
     """queue_update envelope + every entry must carry the owning queue id."""
     queue = _synthetic_queue(101)

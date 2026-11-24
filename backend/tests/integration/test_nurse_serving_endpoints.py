@@ -156,6 +156,52 @@ def test_call_next_broadcasts_the_nurses_assigned_station(
     assert kwargs["preserve_cabinet"] is True
 
 
+@pytest.mark.parametrize(
+    ("action", "body", "expected_status"),
+    [
+        ("start", {}, "in_progress"),
+        ("no-show", {}, "no_show"),
+        ("incomplete", {"reason": "SYNTHETIC reason"}, "incomplete"),
+    ],
+)
+def test_serving_transition_refreshes_display_after_commit(
+    client: TestClient, db_session: Session, monkeypatch, action, body, expected_status
+) -> None:
+    from app.services import display_websocket
+
+    nurse = _user(db_session, "synthetic_display_transition", "Nurse")
+    resource = _resource(db_session, "synthetic_transition")
+    _assignment(db_session, nurse, resource)
+    queue = _queue(db_session, resource)
+    patient = _patient(db_session, "SYNTHETIC-Display-Transition")
+    entry = _entry(db_session, queue, 51, patient)
+    entry.status = "called"
+    db_session.commit()
+    observed = []
+
+    async def record_refresh(entry_id):
+        current = db_session.get(OnlineQueueEntry, entry_id)
+        db_session.refresh(current)
+        observed.append((entry_id, current.status))
+
+    monkeypatch.setattr(display_websocket, "broadcast_display_queue_state_for_entry", record_refresh)
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/{action}",
+        headers=_headers(db_session, nurse), json=body,
+    )
+    assert response.status_code == 200, response.text
+    assert observed == [(entry.id, expected_status)]
+
+    # A denied transition must never emit a misleading update.
+    if action != "start":
+        denied = client.post(
+            f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/start",
+            headers=_headers(db_session, nurse),
+        )
+        assert denied.status_code == 400
+        assert observed == [(entry.id, expected_status)]
+
+
 # ----------------------------------------------------------------------------
 # auth matrix (the fail-closed contract)
 # ----------------------------------------------------------------------------
@@ -227,8 +273,18 @@ def test_no_assignment_is_403_even_for_superuser(
 
 
 def test_full_serving_flow_with_last_completer_flip(
-    client: TestClient, db_session: Session
+    client: TestClient, db_session: Session, monkeypatch
 ) -> None:
+    from app.services import display_websocket
+
+    observed = []
+
+    async def record_refresh(entry_id):
+        current = db_session.get(OnlineQueueEntry, entry_id)
+        db_session.refresh(current)
+        observed.append((entry_id, current.status))
+
+    monkeypatch.setattr(display_websocket, "broadcast_display_queue_state_for_entry", record_refresh)
     nurse = _user(db_session, "n23_ep_flow_nurse", "Nurse")
     resource = _resource(db_session)
     _assignment(db_session, nurse, resource)
@@ -377,6 +433,7 @@ def test_full_serving_flow_with_last_completer_flip(
     assert entry.status == "served"
     assert entry.served_by_user_id == nurse.id
     assert entry.served_at is not None
+    assert observed == [(entry.id, "in_progress"), (entry.id, "served")]
 
     # The visit itself stays open for the doctor lifecycle (the §5
     # forbidden list: one performed procedure never closes the visit).
