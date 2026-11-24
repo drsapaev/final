@@ -62,8 +62,7 @@ function emrWithEcho(ef: string, conclusion: string, rowVersion = 3) {
   };
 }
 
-/** The EF input on a blank/unhydrated form is addressable by its ru placeholder. */
-const efInput = () => screen.getByPlaceholderText('Норма: 55-75%');
+const efInput = () => screen.getByRole('textbox', { name: 'ФВ' });
 
 beforeEach(() => {
   apiMocks.get.mockReset();

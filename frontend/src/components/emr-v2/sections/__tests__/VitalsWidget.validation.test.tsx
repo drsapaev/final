@@ -22,7 +22,7 @@ import i18n from '@/i18n';
 
 import VitalsWidget from '../VitalsWidget';
 
-function renderVitals(vitals: Record<string, string>, collapseAdditional = false) {
+function renderVitals(vitals: Record<string, unknown>, collapseAdditional = false) {
   const onChange = vi.fn();
   const utils = render(
     <ThemeProvider>
@@ -33,6 +33,7 @@ function renderVitals(vitals: Record<string, string>, collapseAdditional = false
 }
 
 const fieldByName = (name: string) => screen.getByRole('spinbutton', { name });
+const decimalFieldByName = (name: string) => screen.getByRole('textbox', { name });
 
 describe('EMRVITAL-FE-001: BMI integrity', () => {
   it('never renders an Infinity BMI for height "0" and flags the field invalid', () => {
@@ -118,12 +119,12 @@ describe('Localized native vital labels', () => {
   });
 
   it.each([
-    ['ru', 'АД сист.', 'АД диаст.', 'Пульс'],
-    ['uz-Latn', 'Sistolik QB', 'Diastolik QB', 'Puls'],
-    ['uz-Cyrl', 'Систолик ҚБ', 'Диастолик ҚБ', 'Пульс'],
-    ['en', 'Systolic BP', 'Diastolic BP', 'Pulse'],
-    ['kk', 'Систолалық ҚҚ', 'Диастолалық ҚҚ', 'Пульс'],
-  ])('names core fields from their visible labels in %s', async (locale, systolic, diastolic, pulse) => {
+    ['ru', 'АД сист.', 'АД диаст.', 'Пульс', 'Частота дыхания', 'дых./мин', 'Температура'],
+    ['uz-Latn', 'Sistolik QB', 'Diastolik QB', 'Puls', 'Nafas olish tezligi', 'nafas/daq', 'Harorat'],
+    ['uz-Cyrl', 'Систолик ҚБ', 'Диастолик ҚБ', 'Пульс', 'Нафас олиш тезлиги', 'нафас/дақ', 'Ҳарорат'],
+    ['en', 'Systolic BP', 'Diastolic BP', 'Pulse', 'Respiratory rate', 'breaths/min', 'Temperature'],
+    ['kk', 'Систолалық ҚҚ', 'Диастолалық ҚҚ', 'Пульс', 'Тыныс алу жиілігі', 'рет/мин', 'Дене қызуы'],
+  ])('names core fields from their visible labels in %s', async (locale, systolic, diastolic, pulse, breathing, rateUnit, temperature) => {
     await i18n.changeLanguage(locale);
     renderVitals({}, true);
 
@@ -132,6 +133,8 @@ describe('Localized native vital labels', () => {
     expect(fieldByName(pulse)).toBe(screen.getByLabelText(pulse));
     expect(fieldByName(pulse)).not.toHaveAttribute('aria-label');
     expect(fieldByName('SpO₂')).toHaveAccessibleDescription('%');
+    expect(decimalFieldByName(breathing)).toHaveAccessibleDescription(rateUnit);
+    expect(decimalFieldByName(temperature)).toHaveAccessibleDescription('°C');
   });
 
   it.each([
@@ -158,12 +161,43 @@ describe('Localized native vital labels', () => {
     expect(fieldByName('Вес')).toHaveAccessibleDescription('кг');
   });
 
+  it('leaves respiratory rate and temperature optional and blank on older visits', () => {
+    renderVitals({ blood_pressure: { systolic: 121, diastolic: 78 }, pulse: '68' }, true);
+
+    expect(fieldByName('АД сист.')).toHaveValue(121);
+    expect(fieldByName('АД диаст.')).toHaveValue(78);
+    expect(decimalFieldByName('Частота дыхания')).toHaveValue('');
+    expect(decimalFieldByName('Частота дыхания')).not.toBeRequired();
+    expect(decimalFieldByName('Температура')).toHaveValue('');
+    expect(decimalFieldByName('Температура')).not.toBeRequired();
+  });
+
+  it('reads comma decimals and submits changes without rewriting other measurements', () => {
+    const previous = { respiratory_rate: 17, temperature: '36,5', pulse: '68', measured_at: '2026-01-16' };
+    const { onChange } = renderVitals(previous, true);
+
+    expect(decimalFieldByName('Частота дыхания')).toHaveValue('17');
+    expect(decimalFieldByName('Температура')).toHaveValue('36,5');
+
+    fireEvent.change(decimalFieldByName('Частота дыхания'), { target: { value: '18' } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...previous, respiratory_rate: '18' });
+
+    fireEvent.change(decimalFieldByName('Температура'), { target: { value: '37.2' } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...previous, temperature: '37.2' });
+
+    fireEvent.change(decimalFieldByName('Температура'), { target: { value: '36,6' } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...previous, temperature: '36,6' });
+
+    fireEvent.change(decimalFieldByName('Температура'), { target: { value: '36,,6' } });
+    expect(onChange).toHaveBeenCalledTimes(3);
+  });
+
   it('binds each label to a unique control when widgets coexist', () => {
     render(<ThemeProvider><VitalsWidget /><VitalsWidget /></ThemeProvider>);
 
-    const controls = screen.getAllByRole('spinbutton');
+    const controls = [...screen.getAllByRole('spinbutton'), ...screen.getAllByRole('textbox')];
     const ids = controls.map(control => control.id);
-    expect(ids).toHaveLength(12);
+    expect(ids).toHaveLength(16);
     expect(ids).not.toContain('');
     expect(new Set(ids).size).toBe(ids.length);
     expect(screen.getAllByLabelText('Пульс')).toEqual(screen.getAllByRole('spinbutton', { name: 'Пульс' }));

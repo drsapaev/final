@@ -34,6 +34,12 @@ const parseVital = (raw: unknown): number | null => {
     return Number.isFinite(n) ? n : null;
 };
 
+const numericInputValue = (raw: unknown): string =>
+    typeof raw === 'number' || typeof raw === 'string' ? String(raw).trim() : '';
+
+// Chromium can silently drop the comma typed into a native number input.
+const DECIMAL_ENTRY = /^-?\d*(?:[.,]\d*)?$/;
+
 const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled, collapseAdditional = false }: {
   vitals?: Record<string, unknown>; onChange?: (v: Record<string, any>) => void;
   onFieldTouch?: (field: string) => void; disabled?: boolean; collapseAdditional?: boolean;
@@ -49,6 +55,10 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
     const handleChange = (field: string, value: string) => {
         onChange?.({ ...vitalsRaw, [field]: value });
         onFieldTouch?.(`vitals.${field}`);
+    };
+    const handleDecimalChange = (field: 'respiratory_rate' | 'temperature', value: string) => {
+        const entry = value.trim();
+        if (DECIMAL_ENTRY.test(entry)) handleChange(field, entry);
     };
 
     // EMRVITAL-FE-001: parse through Number() (never parseInt-with-||0 for the
@@ -169,6 +179,24 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                         {isBPCritical ? t('misc.vw_kriz') : t('misc.vw_ad')}
                     </div>
                 )}
+            </div>
+            <div className="emr-vitals__row emr-vitals__row--measurements">
+                <div className="emr-vitals__field">
+                    <label htmlFor={`${id}-respiratory-rate`}>{t('emr_workspace.respiratory_rate')}</label>
+                    <Input id={`${id}-respiratory-rate`} type="text" inputMode="decimal"
+                        aria-describedby={`${id}-respiratory-rate-unit`} value={numericInputValue(vitals.respiratory_rate)}
+                        onChange={event => handleDecimalChange('respiratory_rate', event.target.value)} disabled={disabled} />
+                    <span id={`${id}-respiratory-rate-unit`} className="emr-vitals__unit">
+                        {t('emr_workspace.respiratory_rate_unit')}
+                    </span>
+                </div>
+                <div className="emr-vitals__field">
+                    <label htmlFor={`${id}-temperature`}>{t('emr_workspace.temperature')}</label>
+                    <Input id={`${id}-temperature`} type="text" inputMode="decimal"
+                        aria-describedby={`${id}-temperature-unit`} value={numericInputValue(vitals.temperature)}
+                        onChange={event => handleDecimalChange('temperature', event.target.value)} disabled={disabled} />
+                    <span id={`${id}-temperature-unit`} className="emr-vitals__unit">°C</span>
+                </div>
             </div>
             {collapseAdditional ? <details><summary>{t('emr_workspace.more_vitals')}</summary>{additional}</details> : additional}
         </div>

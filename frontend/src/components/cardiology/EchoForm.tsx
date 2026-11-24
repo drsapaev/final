@@ -28,7 +28,14 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
 import type { HttpApiError } from '../../types/errors';
-import { echoMeasurementFacts, normalizeEchoForEditor } from '../../utils/echoMeasurements';
+import {
+  ADULT_TTE_EF_METHODS,
+  ADULT_TTE_MEASUREMENT_KEYS,
+  ADULT_TTE_MEASUREMENTS,
+  normalizeEchoForEditor,
+  parseAdultTteMeasurement,
+  type AdultTteMeasurementKey,
+} from '../../utils/echoMeasurements';
 import { invalidateEMRCache } from '../../hooks/useEMR';
 
 // === Domain types ===
@@ -70,6 +77,14 @@ export interface EchoData {
     recorded_at?: string;
     source_visit_id?: string | number | null;
     definition_version?: number;
+  };
+  adult_tte?: {
+    version?: number;
+    measurements?: Partial<Record<AdultTteMeasurementKey, { value: string | number; unit: string }>>;
+    ef_method?: string;
+    measured_at?: string;
+    recorded_at?: string;
+    source_visit_id?: string | number;
   };
   [key: string]: unknown;
 }
@@ -166,15 +181,13 @@ function deepMerge(base: Record<string, unknown>, incoming: Record<string, unkno
   return result;
 }
 
-function getNestedValue(source: unknown, path: string): string {
-  if (!source || !path) return '';
-  const result = String(path).split('.').reduce<unknown>((acc, key) => {
+function getNestedValue(source: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((acc, key) => {
     if (acc && typeof acc === 'object') {
       return (acc as Record<string, unknown>)[key];
     }
     return undefined;
   }, source);
-  return result == null ? '' : String(result);
 }
 
 function setNestedValue(source: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
@@ -193,6 +206,25 @@ function setNestedValue(source: Record<string, unknown>, path: string, value: un
 function getStoredEcho(emr: Record<string, unknown> | null): unknown {
   const data = emr?.data as Record<string, unknown> | undefined;
   return (data?.specialty_data as Record<string, unknown> | undefined)?.echo ?? null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function isAdultTtePath(path: string) {
+  return path.startsWith('adult_tte.');
+}
+
+function isLegacyMeasurementPath(path: string) {
+  return /^(leftVentricle|rightVentricle|atria|valves|measurement_metadata)\./.test(path) ||
+    path === 'additional.pericardium' || path === 'additional.aorta';
+}
+
+function containsEnteredValue(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (typeof value === 'number') return Number.isFinite(value);
+  return Object.values(asRecord(value)).some(containsEnteredValue);
 }
 
 function echoSnapshot(value: unknown): string {
@@ -226,22 +258,61 @@ async function loadExistingEmrDraft(visitId: string | number | null | undefined)
   }
 }
 
-function buildEchoEmrPayload(existingEmr: Record<string, unknown> | null, echoData: EchoData, visitId: string | number) {
+function buildEchoEmrPayload(
+  existingEmr: Record<string, unknown> | null,
+  echoData: EchoData,
+  visitId: string | number,
+  changes: ReadonlySet<string>,
+) {
   const currentData = (existingEmr?.data as Record<string, unknown>) || {};
-  const metadata = {
-    ...echoData.measurement_metadata,
-    recorded_at: new Date().toISOString(),
-    source_visit_id: visitId,
-  };
-  // A saved Echo can already declare a definition or predate versioning.
-  if (getStoredEcho(existingEmr) === null) metadata.definition_version ??= 1;
+  const existingEcho = asRecord(getStoredEcho(existingEmr));
+  let echo = { ...existingEcho };
+  const recordedAt = new Date().toISOString();
+
+  for (const path of changes) {
+    if (!isAdultTtePath(path)) echo = setNestedValue(echo, path, getNestedValue(echoData, path));
+  }
+  // An adult TTE submission alone must leave the original measurements and metadata intact.
+  if ([...changes].some(isLegacyMeasurementPath)) {
+    const metadata = asRecord(echo.measurement_metadata);
+    if (!Object.keys(existingEcho).some(key => key !== 'adult_tte')) metadata.definition_version ??= 1;
+    echo.measurement_metadata = { ...metadata, recorded_at: recordedAt, source_visit_id: visitId };
+  }
+
+  if ([...changes].some(isAdultTtePath)) {
+    const original = asRecord(existingEcho.adult_tte);
+    const measurements = { ...asRecord(original.measurements) };
+    for (const key of ADULT_TTE_MEASUREMENT_KEYS) {
+      if (!changes.has(`adult_tte.measurements.${key}`)) continue;
+      const value = parseAdultTteMeasurement(echoData.adult_tte?.measurements?.[key]?.value);
+      if (value === null) delete measurements[key];
+      else measurements[key] = { value, unit: ADULT_TTE_MEASUREMENTS[key].unit };
+    }
+
+    const adultTte: Record<string, unknown> = { ...original, version: 2, measurements };
+    if (changes.has('adult_tte.ef_method')) {
+      const method = ADULT_TTE_EF_METHODS.find(code => code === echoData.adult_tte?.ef_method);
+      if (method) adultTte.ef_method = method;
+      else delete adultTte.ef_method;
+    }
+    if (changes.has('adult_tte.measured_at')) {
+      if (echoData.adult_tte?.measured_at) adultTte.measured_at = echoData.adult_tte.measured_at;
+      else delete adultTte.measured_at;
+    }
+    if (Object.keys(measurements).length > 0 || adultTte.ef_method || adultTte.measured_at) {
+      echo.adult_tte = { ...adultTte, recorded_at: recordedAt, source_visit_id: visitId };
+    } else if (existingEcho.adult_tte) {
+      echo.adult_tte = adultTte;
+    }
+  }
+
   return {
     data: {
       ...currentData,
       specialty: currentData.specialty || 'cardiology',
       specialty_data: {
         ...((currentData.specialty_data as Record<string, unknown>) || {}),
-        echo: { ...echoData, measurement_metadata: metadata }
+        echo,
       }
     },
     row_version: existingEmr?.row_version ?? 0,
@@ -393,8 +464,22 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     }));
   };
 
+  const adultTte = echoData.adult_tte;
+  const unsupportedAdultTte = adultTte?.version !== undefined && adultTte?.version !== 2;
+  const adultTteSaveBlocked = unsupportedAdultTte && [...draftTouchedRef.current.keys()].some(isAdultTtePath);
+  const adultTteInvalidKeys = ADULT_TTE_MEASUREMENT_KEYS.filter(key => {
+    const value = adultTte?.measurements?.[key]?.value;
+    return draftTouchedRef.current.has(`adult_tte.measurements.${key}`) &&
+      typeof value === 'string' && value.trim() !== '' && parseAdultTteMeasurement(value) === null;
+  });
+  const hasLegacyMeasurements = [
+    echoData.leftVentricle, echoData.rightVentricle, echoData.atria, echoData.valves,
+    echoData.additional?.pericardium, echoData.additional?.aorta,
+    echoData.measurement_metadata?.ef_method, echoData.measurement_metadata?.measured_at,
+  ].some(containsEnteredValue) || [...draftTouchedRef.current.keys()].some(isLegacyMeasurementPath);
+
   const handleSave = async () => {
-    if (readOnly || loading || saveConflict) return;
+    if (readOnly || loading || saveConflict || adultTteSaveBlocked || adultTteInvalidKeys.length > 0) return;
     const epoch = formEpochRef.current;
     // RETRO-3941-03: snapshot the edit counter at submission start. If the
     // doctor edits while the GET/POST is in flight, the request persists
@@ -402,6 +487,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     const editEpochAtSubmit = editEpochRef.current;
     const dirtyAtSubmit = dirtyRef.current;
     const submittedEcho = echoDataRef.current;
+    const submittedPaths = new Set(draftTouchedRef.current.keys());
     try {
       setLoading(true);
       setError('');
@@ -442,17 +528,15 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         return;
       }
 
-      // ECHO-FE-001: pristine form + existing echo subtree → nothing to
-      // change; skip the POST instead of writing an identical (or blank)
-      // new revision of the EMR.
-      if (!dirtyAtSubmit && existingEcho !== null) {
+      // A pristine form does not author a new Echo revision.
+      if (!dirtyAtSubmit) {
         setInfo(t(editEpochRef.current === editEpochAtSubmit
           ? 'cardio.cardio_echo_no_changes'
           : 'cardio.cardio_echo_draft_preserved'));
         return;
       }
 
-      const payload = buildEchoEmrPayload(existingEmr, submittedEcho, visitId);
+      const payload = buildEchoEmrPayload(existingEmr, submittedEcho, visitId, submittedPaths);
       const response = await api.post(`/v2/emr/${visitId}`, payload);
 
       if (epoch !== formEpochRef.current) return; // visit switched mid-save
@@ -494,7 +578,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   const renderSection = (
     title: string,
     section: keyof typeof expandedSections,
-    fields: Array<{ key: string; label: string; placeholder: string }>,
+    fields: Array<{ key: string; label: string; placeholder?: string }>,
     expanded: boolean
   ) =>
   <div style={{ marginBottom: 24 }}>
@@ -540,7 +624,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
                     id={fieldId}
                     readOnly={readOnly}
                     inputMode={section === 'additional' ? 'text' : 'decimal'}
-                    value={getNestedValue(echoData[section], field.key)}
+                    value={String(getNestedValue(echoData[section], field.key) ?? '')}
                     onChange={event => handleChange(section, field.key, event.target.value)}
                     placeholder={field.placeholder}
                   />
@@ -551,6 +635,31 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         </div>
     }
     </div>;
+
+  const renderAdultTteMeasurements = (group: 'core' | 'extended') => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 16 }}>
+      {ADULT_TTE_MEASUREMENT_KEYS.filter(key => ADULT_TTE_MEASUREMENTS[key].group === group).map(key => {
+        const { unit } = ADULT_TTE_MEASUREMENTS[key];
+        const id = `${fieldIdPrefix}-adult-tte-${key}`;
+        const measurement = adultTte?.measurements?.[key];
+        const invalid = adultTteInvalidKeys.includes(key);
+        return (
+          <div key={key}>
+            <label htmlFor={id}>{t(`emr_workspace.echo_tte_${key}`)} ({unit})</label>
+            <Input
+              id={id}
+              readOnly={readOnly}
+              inputMode="decimal"
+              value={measurement?.unit === unit ? measurement.value : ''}
+              aria-invalid={invalid}
+              aria-describedby={invalid ? `${fieldIdPrefix}-invalid-tte` : undefined}
+              onChange={event => handleChange('adult_tte', `measurements.${key}`, { value: event.target.value, unit })}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
 
 
   return (
@@ -570,7 +679,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={readOnly || loading || hydrating || hydrationFailed || saveConflict}>
+              disabled={readOnly || loading || hydrating || hydrationFailed || saveConflict || adultTteSaveBlocked || adultTteInvalidKeys.length > 0}>
               
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
               {hydrating ? t('cardio.cardio_echo_loading_existing') : t('cardio.cardio_echo_save_button')}
@@ -625,17 +734,66 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           </Alert>
         }
 
+        <section aria-labelledby={`${fieldIdPrefix}-adult-tte-title`}>
+          <h3 id={`${fieldIdPrefix}-adult-tte-title`}>{t('emr_workspace.echo_tte_reporting')}</h3>
+          {unsupportedAdultTte ? (
+            <p>{t('emr_workspace.echo_tte_unsupported_version')}</p>
+          ) : <>
+            {renderAdultTteMeasurements('core')}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 16, marginTop: 16 }}>
+              <div>
+                <label htmlFor={`${fieldIdPrefix}-adult-tte-method`}>{t('emr_workspace.echo_tte_ef_method')}</label>
+                <select
+                  id={`${fieldIdPrefix}-adult-tte-method`}
+                  disabled={readOnly}
+                  value={adultTte?.ef_method ?? ''}
+                  onChange={event => handleChange('adult_tte', 'ef_method', event.target.value)}
+                  style={{ width: '100%', minHeight: 36, border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-md)', color: 'var(--mac-text-primary)', background: 'var(--mac-bg-primary)' }}
+                >
+                  <option value="">{t('emr_workspace.unknown_method')}</option>
+                  {ADULT_TTE_EF_METHODS.map(method => (
+                    <option key={method} value={method}>{t(`emr_workspace.echo_method_${method}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor={`${fieldIdPrefix}-adult-tte-date`}>{t('emr_workspace.echo_tte_study_date')}</label>
+                <Input
+                  id={`${fieldIdPrefix}-adult-tte-date`}
+                  type="date"
+                  readOnly={readOnly}
+                  value={adultTte?.measured_at ?? ''}
+                  onChange={event => handleChange('adult_tte', 'measured_at', event.target.value)}
+                />
+              </div>
+            </div>
+            <details style={{ marginTop: 16 }}>
+              <summary>{t('emr_workspace.echo_tte_extended')}</summary>
+              {renderAdultTteMeasurements('extended')}
+            </details>
+            {adultTte?.recorded_at && (
+              <p>{t('emr_workspace.measurement_recorded', { date: new Date(adultTte.recorded_at).toLocaleString() })}</p>
+            )}
+            {adultTteInvalidKeys.length > 0 && (
+              <p role="alert" id={`${fieldIdPrefix}-invalid-tte`}>{t('emr_workspace.echo_tte_number_error')}</p>
+            )}
+          </>}
+        </section>
+
+        {(hasLegacyMeasurements || hydrating || hydrationFailed) && (
+        <details open={hasLegacyMeasurements || hydrationFailed} style={{ marginTop: 24 }}>
+          <summary>{t('emr_workspace.echo_legacy_measurements')}</summary>
         {/* Левый желудочек */}
         {renderSection(
           t('cardio.cardio_echo_section_left_ventricle'),
           'leftVentricle',
           [
-          { key: 'edd', label: t('cardio.cardio_echo_field_edd'), placeholder: t('cardio.cardio_echo_ph_edd') },
-          { key: 'esd', label: t('cardio.cardio_echo_field_esd'), placeholder: t('cardio.cardio_echo_ph_esd') },
-          { key: 'ef', label: t('cardio.cardio_echo_field_ef'), placeholder: t('cardio.cardio_echo_ph_ef') },
-          { key: 'fs', label: t('cardio.cardio_echo_field_fs'), placeholder: t('cardio.cardio_echo_ph_fs') },
-          { key: 'ivs', label: t('cardio.cardio_echo_field_ivs'), placeholder: t('cardio.cardio_echo_ph_ivs') },
-          { key: 'pw', label: t('cardio.cardio_echo_field_pw'), placeholder: t('cardio.cardio_echo_ph_pw') }],
+          { key: 'edd', label: t('cardio.cardio_echo_field_edd') },
+          { key: 'esd', label: t('cardio.cardio_echo_field_esd') },
+          { key: 'ef', label: t('cardio.cardio_echo_field_ef') },
+          { key: 'fs', label: t('cardio.cardio_echo_field_fs') },
+          { key: 'ivs', label: t('cardio.cardio_echo_field_ivs') },
+          { key: 'pw', label: t('cardio.cardio_echo_field_pw') }],
 
           expandedSections.leftVentricle
         )}
@@ -645,8 +803,8 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           t('cardio.cardio_echo_section_right_ventricle'),
           'rightVentricle',
           [
-          { key: 'rvdd', label: t('cardio.cardio_echo_field_rvdd'), placeholder: t('cardio.cardio_echo_ph_rvdd') },
-          { key: 'rvot', label: t('cardio.cardio_echo_field_rvot'), placeholder: t('cardio.cardio_echo_ph_rvot') }],
+          { key: 'rvdd', label: t('cardio.cardio_echo_field_rvdd') },
+          { key: 'rvot', label: t('cardio.cardio_echo_field_rvot') }],
 
           expandedSections.rightVentricle
         )}
@@ -656,8 +814,8 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           t('cardio.cardio_echo_section_atria'),
           'atria',
           [
-          { key: 'la', label: t('cardio.cardio_echo_field_la'), placeholder: t('cardio.cardio_echo_ph_la') },
-          { key: 'ra', label: t('cardio.cardio_echo_field_ra'), placeholder: t('cardio.cardio_echo_ph_ra') }],
+          { key: 'la', label: t('cardio.cardio_echo_field_la') },
+          { key: 'ra', label: t('cardio.cardio_echo_field_ra') }],
 
           expandedSections.atria
         )}
@@ -667,10 +825,10 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           t('cardio.cardio_echo_section_valves'),
           'valves',
           [
-          { key: 'mitral.e', label: t('cardio.cardio_echo_field_mitral_e'), placeholder: t('cardio.cardio_echo_ph_mitral_e') },
-          { key: 'mitral.a', label: t('cardio.cardio_echo_field_mitral_a'), placeholder: t('cardio.cardio_echo_ph_mitral_a') },
-          { key: 'aortic.peak_velocity', label: t('cardio.cardio_echo_field_aortic'), placeholder: t('cardio.cardio_echo_ph_aortic') },
-          { key: 'tricuspid.e', label: t('cardio.cardio_echo_field_tricuspid_e'), placeholder: t('cardio.cardio_echo_ph_tricuspid_e') }],
+          { key: 'mitral.e', label: t('cardio.cardio_echo_field_mitral_e') },
+          { key: 'mitral.a', label: t('cardio.cardio_echo_field_mitral_a') },
+          { key: 'aortic.peak_velocity', label: t('cardio.cardio_echo_field_aortic') },
+          { key: 'tricuspid.e', label: t('cardio.cardio_echo_field_tricuspid_e') }],
 
           expandedSections.valves
         )}
@@ -686,22 +844,6 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           expandedSections.additional
         )}
 
-        {/* Комментарии */}
-        <div style={{ marginTop: 24 }}>
-          <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
-            <label htmlFor={`${fieldIdPrefix}-comments`}>{t('cardio.cardio_echo_comments_title')}</label>
-          </Typography>
-          <Textarea
-            id={`${fieldIdPrefix}-comments`}
-            value={echoData.additional.comments}
-            readOnly={readOnly}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('additional', 'comments', e.target.value)}
-            placeholder={t('cardio.cardio_echo_ph_comments')}
-            rows={4} />
-          
-        </div>
-
-        {/* Заключение */}
         <label htmlFor={`${fieldIdPrefix}-ef-method`}>{t('emr_workspace.ef_method')}</label>
         <Input id={`${fieldIdPrefix}-ef-method`}
           value={echoData.measurement_metadata?.ef_method ?? ''} maxLength={120} readOnly={readOnly}
@@ -710,11 +852,28 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         <Input id={`${fieldIdPrefix}-measurement-date`} type="date" readOnly={readOnly}
           value={echoData.measurement_metadata?.measured_at ?? ''}
           onChange={event => handleChange('measurement_metadata', 'measured_at', event.target.value)} />
-        {echoMeasurementFacts(echoData).find(fact => fact.key === 'ef')?.recordedAt && (
+        {echoData.measurement_metadata?.recorded_at && (
           <p>{t('emr_workspace.measurement_recorded', {
-            date: new Date(echoData.measurement_metadata?.recorded_at ?? '').toLocaleString(),
+            date: new Date(echoData.measurement_metadata.recorded_at).toLocaleString(),
           })}</p>
         )}
+        </details>
+        )}
+
+        <div style={{ marginTop: 24 }}>
+          <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
+            <label htmlFor={`${fieldIdPrefix}-comments`}>{t('cardio.cardio_echo_comments_title')}</label>
+          </Typography>
+          <Textarea
+            id={`${fieldIdPrefix}-comments`}
+            value={echoData.additional?.comments ?? ''}
+            readOnly={readOnly}
+            onChange={event => handleChange('additional', 'comments', event.target.value)}
+            placeholder={t('cardio.cardio_echo_ph_comments')}
+            rows={4}
+          />
+        </div>
+
         <div style={{ marginTop: 24 }}>
           <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
             <label htmlFor={`${fieldIdPrefix}-conclusion`}>{t('cardio.cardio_echo_conclusion_title')}</label>

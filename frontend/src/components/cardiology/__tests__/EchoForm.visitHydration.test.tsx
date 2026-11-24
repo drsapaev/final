@@ -280,6 +280,102 @@ describe('Echo save checks the loaded revision of the Echo section', () => {
   });
 });
 
+describe('Adult transthoracic echocardiography definition', () => {
+  it('captures explicitly entered decimal values, measurement units, date and method in a fresh cardiology draft', async () => {
+    const empty = { row_version: 3, data: { specialty: 'cardiology', specialty_data: { echo: {} } } };
+    apiMocks.get.mockResolvedValue({ data: empty });
+    apiMocks.post.mockResolvedValueOnce({ status: 200 });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    const save = await screen.findByRole('button', { name: 'Сохранить' });
+    const ef = screen.getByRole('textbox', { name: 'Фракция выброса ЛЖ (%)' });
+    expect(screen.queryByText('Ранее сохранённые измерения')).toBeNull();
+    fireEvent.change(ef, { target: { value: '58,5' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Конечный диастолический объём ЛЖ (mL)' }), { target: { value: '114' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Метод определения ФВ ЛЖ' }), { target: { value: 'biplane_simpson_2d' } });
+    fireEvent.change(screen.getByLabelText('Дата трансторакального исследования'), { target: { value: '2026-11-23' } });
+    fireEvent.click(screen.getByText('Расширенные измерения'));
+    fireEvent.change(screen.getByLabelText('TAPSE (M-режим) (cm)'), { target: { value: '2,15' } });
+
+    await act(async () => { fireEvent.click(save); });
+    expect(apiMocks.post).toHaveBeenCalledTimes(1);
+    const [, payload] = apiMocks.post.mock.calls[0];
+    expect(payload.row_version).toBe(3);
+    expect(payload.data.specialty_data.echo).toEqual({
+      adult_tte: {
+        version: 2,
+        measurements: {
+          lvef: { value: 58.5, unit: '%' },
+          lvedv: { value: 114, unit: 'mL' },
+          tapse: { value: 2.15, unit: 'cm' },
+        },
+        ef_method: 'biplane_simpson_2d',
+        measured_at: '2026-11-23',
+        recorded_at: expect.any(String),
+        source_visit_id: 11,
+      },
+    });
+  });
+
+  it('keeps prior measurements intact and authors a new one without guessing a method', async () => {
+    const stored = emrWithEcho('58', 'SYNTHETIC-result', 7);
+    const legacyEcho = {
+      ...stored.data.specialty_data.echo,
+      measurement_metadata: { definition_version: 1, ef_method: 'SYNTHETIC-method', measured_at: '2025-10-12' },
+    };
+    stored.data.specialty_data.echo = legacyEcho;
+    apiMocks.get.mockResolvedValue({ data: stored });
+    apiMocks.post.mockResolvedValueOnce({ status: 200 });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    const save = await screen.findByRole('button', { name: 'Сохранить' });
+    expect(screen.getByRole('textbox', { name: 'ФВ' })).toHaveValue('58');
+    const ef = screen.getByRole('textbox', { name: 'Фракция выброса ЛЖ (%)' });
+    expect(ef).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Метод определения ФВ ЛЖ' })).toHaveValue('');
+    fireEvent.change(ef, { target: { value: '63' } });
+
+    await act(async () => { fireEvent.click(save); });
+    const [, payload] = apiMocks.post.mock.calls[0];
+    expect(payload.data.specialty_data.echo).toEqual({
+      ...legacyEcho,
+      adult_tte: {
+        version: 2,
+        measurements: { lvef: { value: 63, unit: '%' } },
+        recorded_at: expect.any(String),
+        source_visit_id: 11,
+      },
+    });
+  });
+
+  it('never saves invalid input and clears only the selected structured fact', async () => {
+    const adultTte = {
+      version: 2,
+      measurements: { lvef: { value: 63, unit: '%' }, lavi: { value: 36, unit: 'mL/m²' } },
+      ef_method: 'visual_estimate',
+    };
+    const stored = { row_version: 7, data: { specialty_data: { echo: { adult_tte: adultTte } } } };
+    apiMocks.get.mockResolvedValue({ data: stored });
+    apiMocks.post.mockResolvedValueOnce({ status: 200 });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    const ef = await screen.findByDisplayValue('63');
+    const save = screen.getByRole('button', { name: 'Сохранить' });
+    fireEvent.change(ef, { target: { value: '63%' } });
+    expect(ef).toHaveAttribute('aria-invalid', 'true');
+    expect(save).toBeDisabled();
+    expect(apiMocks.post).not.toHaveBeenCalled();
+
+    fireEvent.change(ef, { target: { value: '' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Метод определения ФВ ЛЖ' }), { target: { value: '' } });
+    await act(async () => { fireEvent.click(save); });
+    const [, payload] = apiMocks.post.mock.calls[0];
+    expect(payload.data.specialty_data.echo.adult_tte).toEqual({
+      version: 2,
+      measurements: { lavi: { value: 36, unit: 'mL/m²' } },
+      recorded_at: expect.any(String),
+      source_visit_id: 11,
+    });
+  });
+});
+
 describe('ECHO-FE-001: visit switch isolation', () => {
   it('resets the form and drops a late hydration from the previous visit', async () => {
     // Visit A hydration hangs.

@@ -9,6 +9,62 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+export const ADULT_TTE_MEASUREMENTS = {
+  lvef: { unit: '%', group: 'core' },
+  lvedv: { unit: 'mL', group: 'core' },
+  lvesv: { unit: 'mL', group: 'core' },
+  lavi: { unit: 'mL/m²', group: 'core' },
+  lvedd: { unit: 'cm', group: 'extended' },
+  lvesd: { unit: 'cm', group: 'extended' },
+  ivsd: { unit: 'cm', group: 'extended' },
+  pwd: { unit: 'cm', group: 'extended' },
+  lvedvi: { unit: 'mL/m²', group: 'extended' },
+  lvesvi: { unit: 'mL/m²', group: 'extended' },
+  rv_basal_diameter: { unit: 'cm', group: 'extended' },
+  tapse: { unit: 'cm', group: 'extended' },
+  rv_s_prime: { unit: 'cm/s', group: 'extended' },
+  rv_fac: { unit: '%', group: 'extended' },
+  aov_vmax: { unit: 'm/s', group: 'extended' },
+  aov_mean_gradient: { unit: 'mmHg', group: 'extended' },
+  ava_continuity: { unit: 'cm²', group: 'extended' },
+} as const;
+
+export type AdultTteMeasurementKey = keyof typeof ADULT_TTE_MEASUREMENTS;
+export const ADULT_TTE_MEASUREMENT_KEYS = Object.keys(ADULT_TTE_MEASUREMENTS) as AdultTteMeasurementKey[];
+export const ADULT_TTE_EF_METHODS = [
+  'biplane_simpson_2d', 'volumetric_3d', 'visual_estimate', 'linear_2d', 'other',
+] as const;
+export type AdultTteEfMethod = typeof ADULT_TTE_EF_METHODS[number];
+
+export function parseAdultTteMeasurement(value: unknown): number | null {
+  if (typeof value === 'string' && /^(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(value.trim())) {
+    value = Number(value.trim().replace(',', '.'));
+  }
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/** Read only explicitly entered values in the adult TTE definition. */
+export function echoAdultTteFacts(source: unknown) {
+  const adultTte = record(record(source).adult_tte);
+  if (adultTte.version !== 2) return [];
+  const measurements = record(adultTte.measurements);
+  const method = ADULT_TTE_EF_METHODS.find(code => code === adultTte.ef_method) ?? null;
+  const sourceVisitId = adultTte.source_visit_id;
+
+  return ADULT_TTE_MEASUREMENT_KEYS.flatMap(key => {
+    const fact = record(measurements[key]);
+    const { unit } = ADULT_TTE_MEASUREMENTS[key];
+    if (typeof fact.value !== 'number' || parseAdultTteMeasurement(fact.value) === null || fact.unit !== unit) return [];
+    return [{
+      key, value: fact.value, unit, methodCode: key === 'lvef' ? method : null,
+      measuredAt: text(adultTte.measured_at) || null,
+      recordedAt: text(adultTte.recorded_at) || null,
+      sourceVisitId: typeof sourceVisitId === 'string' || typeof sourceVisitId === 'number' ? sourceVisitId : null,
+      definitionVersion: 2 as const,
+    }];
+  });
+}
+
 /** The nested value wins even when a physician explicitly cleared it. */
 export function selectEchoMeasurements(source: unknown) {
   const echo = record(source);

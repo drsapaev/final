@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '@/api/client';
 import type { EMRWorkspaceData, FollowUp } from '@/api/emrWorkspace';
 import { useTranslation } from '@/i18n/useTranslation';
-import { echoMeasurementFacts, selectEchoMeasurements } from '@/utils/echoMeasurements';
+import { echoAdultTteFacts, echoMeasurementFacts, selectEchoMeasurements } from '@/utils/echoMeasurements';
 import { Button, Modal } from '../../ui/macos';
 import { emrTextValue, emrTreatmentText } from '../emrCompletion';
+import { AdultTteSummary } from './AdultTteSummary';
 
 const noteFields = [
   'complaints', 'anamnesis_morbi', 'anamnesis_vitae', 'examination', 'diagnosis',
@@ -98,10 +99,12 @@ export function DocumentPreview({
   const bloodPressure = asRecord(vitals.blood_pressure);
   const systolic = present(vitals.systolic ?? bloodPressure.systolic);
   const diastolic = present(vitals.diastolic ?? bloodPressure.diastolic);
-  const hasVitals = Object.values(vitals).some(value => present(value)) || Boolean(systolic || diastolic);
+  const hasVitals = [systolic, diastolic, vitals.pulse, vitals.spo2, vitals.respiratory_rate, vitals.temperature,
+    vitals.height, vitals.weight].some(present);
   const specialty = asRecord(data.specialty_data);
   const echo = selectEchoMeasurements(specialty.echo);
   const echoFacts = echoMeasurementFacts(specialty.echo);
+  const adultTteFacts = echoAdultTteFacts(specialty.echo);
   const ecgConclusion = present(asRecord(specialty.ecg).interpretation);
   const followUp = asRecord(data.follow_up) as FollowUp;
   const medicationData = asRecord(data.medications).list ?? data.medications;
@@ -131,10 +134,11 @@ export function DocumentPreview({
             <h3>{t('emr_workspace.today_vitals')}</h3>
             {(systolic || diastolic) && <p>{t('emr_workspace.pressure_value', { value: `${systolic || '—'}/${diastolic || '—'}` })}</p>}
             {present(vitals.pulse) && <p>{t('emr_workspace.pulse_value', { value: vitals.pulse })}</p>}
+            {present(vitals.spo2) && <p>SpO₂ {String(vitals.spo2)}%</p>}
+            {present(vitals.respiratory_rate) && <p>{t('emr_workspace.respiratory_rate_value', { value: vitals.respiratory_rate })}</p>}
+            {present(vitals.temperature) && <p>{t('emr_workspace.temperature_value', { value: vitals.temperature })}</p>}
             {present(vitals.weight) && <p>{t('emr_workspace.weight_value', { value: vitals.weight })}</p>}
             {present(vitals.height) && <p>{t('emr_workspace.height_value', { value: vitals.height })}</p>}
-            {present(vitals.spo2) && <p>SpO₂ {String(vitals.spo2)}%</p>}
-            {present(vitals.temperature) && <p>{t('emr_workspace.temperature_value', { value: vitals.temperature })}</p>}
           </section>}
           {noteFields.map(field => {
             const content = field === 'treatment' ? emrTreatmentText(data) : emrTextValue(data[field]);
@@ -166,8 +170,11 @@ export function DocumentPreview({
               ].map(present).filter(Boolean).join(' · ')}</li>
             ))}</ul>
           </section>}
-          {(echoFacts.length > 0 || echo.conclusion) && <section>
+          {(adultTteFacts.length > 0 || echoFacts.length > 0 || echo.conclusion) && <section>
             <h3>{t('misc.cs_tab_echo')}</h3>
+            <AdultTteSummary facts={adultTteFacts} />
+            {adultTteFacts.length > 0 && echoFacts.length > 0 &&
+              <p><strong>{t('emr_workspace.echo_legacy_measurements')}</strong></p>}
             {echoFacts.map(fact => <p key={fact.key}>
               {t(`emr_workspace.echo_${fact.key}`)} {new Intl.NumberFormat(language).format(fact.value)} {fact.unit}
               {fact.method && ` · ${fact.method}`}

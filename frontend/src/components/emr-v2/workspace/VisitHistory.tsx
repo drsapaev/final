@@ -4,7 +4,7 @@ import {
   type EMRWorkspaceData, type FollowUp, type HistoryDocument, type HistorySummary, type TransferField,
 } from '@/api/emrWorkspace';
 import { useTranslation } from '@/i18n/useTranslation';
-import { echoMeasurementFacts } from '@/utils/echoMeasurements';
+import { echoAdultTteFacts, echoMeasurementFacts } from '@/utils/echoMeasurements';
 import { useLabReporting } from '@/hooks/useLabReporting';
 import { Button, Input, Textarea } from '../../ui/macos';
 import { ClinicalSummary } from './ClinicalSummary';
@@ -75,25 +75,39 @@ function measurements({ vitals, echo }: Pick<HistorySummary, 'vitals' | 'echo'>)
     ? vitals.blood_pressure as Record<string, unknown> : {};
   const systolic = measurement(vitals.systolic ?? pressure.systolic);
   const diastolic = measurement(vitals.diastolic ?? pressure.diastolic);
-  const ef = echoMeasurementFacts(echo).find(fact => fact.key === 'ef');
+  const legacyEf = echoMeasurementFacts(echo).find(fact => fact.key === 'ef');
+  const adultTteEf = echoAdultTteFacts(echo).find(fact => fact.key === 'lvef');
   return {
     pressure: systolic || diastolic ? `${systolic || '—'}/${diastolic || '—'}` : '',
     pulse: measurement(vitals.pulse),
+    spo2: measurement(vitals.spo2),
+    respiratoryRate: measurement(vitals.respiratory_rate),
+    temperature: measurement(vitals.temperature),
     weight: measurement(vitals.weight),
-    ef,
+    legacyEf,
+    adultTteEf,
   };
 }
 
 function MeasurementValues({ values }: { values: ReturnType<typeof measurements> }) {
   const { t, language } = useTranslation();
+  const { legacyEf, adultTteEf } = values;
   return <>
     {values.pressure && <span>{t('emr_workspace.pressure_value', { value: values.pressure })}</span>}
     {values.pulse && <span>{t('emr_workspace.pulse_value', { value: values.pulse })}</span>}
+    {values.spo2 && <span>SpO₂ {values.spo2}%</span>}
+    {values.respiratoryRate && <span>{t('emr_workspace.respiratory_rate_value', { value: values.respiratoryRate })}</span>}
+    {values.temperature && <span>{t('emr_workspace.temperature_value', { value: values.temperature })}</span>}
     {values.weight && <span>{t('emr_workspace.weight_value', { value: values.weight })}</span>}
-    {values.ef && <span>{t('emr_workspace.ef_value', {
-      value: new Intl.NumberFormat(language).format(values.ef.value),
-      method: values.ef.method || t('emr_workspace.unknown_method'),
-    })}{values.ef.measuredAt && ` · ${values.ef.measuredAt}`}</span>}
+    {legacyEf && <span>{t('emr_workspace.echo_legacy_measurements')} · {t('emr_workspace.ef_value', {
+      value: new Intl.NumberFormat(language).format(legacyEf.value),
+      method: legacyEf.method || t('emr_workspace.unknown_method'),
+    })}{legacyEf.measuredAt && ` · ${legacyEf.measuredAt}`}</span>}
+    {adultTteEf && <span>{t('emr_workspace.echo_tte_reporting')} · {t('emr_workspace.echo_tte_lvef')} {
+      new Intl.NumberFormat(language, { maximumSignificantDigits: 15 }).format(adultTteEf.value)
+    } {adultTteEf.unit} · {adultTteEf.methodCode
+      ? t(`emr_workspace.echo_method_${adultTteEf.methodCode}`) : t('emr_workspace.unknown_method')
+    }{adultTteEf.measuredAt && ` · ${adultTteEf.measuredAt}`}</span>}
   </>;
 }
 

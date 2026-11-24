@@ -140,6 +140,58 @@ def test_longitudinal_write_refreshes_visit_context_under_lock(
     assert db_session.query(PatientClinicalRevision).filter_by(entry_id=entry_id).count() == 0
 
 
+def test_measurement_definitions_survive_save_sign_and_history(
+    client, db_session, cardio_auth_headers, test_visit,
+):
+    prior = Visit(
+        patient_id=test_visit.patient_id,
+        doctor_id=test_visit.doctor_id,
+        visit_date=test_visit.visit_date,
+    )
+    db_session.add(prior)
+    db_session.flush()
+    vitals = {"temperature": "36,7", "respiratory_rate": "17"}
+    echo = {
+        "leftVentricle": {"edd": "47", "ef": "55"},
+        "measurement_metadata": {"definition_version": 1},
+        "adult_tte": {
+            "version": 2,
+            "measurements": {
+                "lvef": {"value": 57.5, "unit": "%"},
+                "lavi": {"value": 29, "unit": "mL/m²"},
+            },
+            "ef_method": "biplane_simpson_2d",
+            "source_visit_id": prior.id,
+        },
+    }
+    data = {"specialty": "cardiology", "vitals": vitals, "specialty_data": {"echo": echo}}
+    prior_path = emr_path(prior.id)
+    saved = client.post(prior_path, headers=cardio_auth_headers, json={"data": data})
+    assert saved.status_code == 200, saved.text
+    saved_document = saved.json()
+    signed = client.post(
+        f"{prior_path}/sign",
+        headers=cardio_auth_headers,
+        json={"data": saved_document["data"], "row_version": saved_document["row_version"]},
+    )
+    assert signed.status_code == 200, signed.text
+    version = signed.json()["version"]
+
+    workspace_path = f"{emr_path(test_visit.id)}/workspace"
+    workspace = client.get(workspace_path, headers=cardio_auth_headers)
+    assert workspace.status_code == 200, workspace.text
+    history = next(item for item in workspace.json()["history"] if item["visit_id"] == prior.id)
+    assert history["echo"] == echo
+    assert {key: history["vitals"][key] for key in vitals} == vitals
+
+    historical_document = client.get(
+        f"{workspace_path}/history/{prior.id}/{version}", headers=cardio_auth_headers,
+    )
+    assert historical_document.status_code == 200, historical_document.text
+    assert historical_document.json()["echo"] == echo
+    assert historical_document.json()["data"]["specialty_data"]["echo"] == echo
+
+
 def test_transfer_uses_the_signed_source_and_rx_uses_the_exact_saved_revision(
     client,
     db_session,
