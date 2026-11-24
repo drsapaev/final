@@ -35,6 +35,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { startTransition } from 'react';
 import type { RefObject } from 'react';
+import { isCancel } from 'axios';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -234,6 +235,12 @@ export const useRegistrarWorklistData = ({
   const autoRefreshCooldownLoggedRef = useRef(false);
   // UX Audit R-4.1: track last WebSocket update timestamp to skip redundant interval refresh.
   const lastQueueUpdatedRef = useRef(0);
+  // REGDATA-FE-001 (group99): the delayed critical-action refresh timer must
+  // never fire after the effect that scheduled it has been torn down — a
+  // late-starting stale closure would acquire the newest requestSeqRef id and
+  // override the newer selected date's rows. Cleared on re-schedule, on
+  // effect cleanup (calendar-date switch) and on unmount.
+  const queueUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Filter inputs for the no-op filters-changed logger (kept for log parity).
   const searchQuery = searchParams.get('q')?.toLowerCase() ?? '';
@@ -401,6 +408,8 @@ export const useRegistrarWorklistData = ({
         return 'empty';
       }
     } catch (error: unknown) {
+      if (isCancel(error)) return 'superseded';
+
       if ((error as HttpApiError)?.response?.status === 429) {
         // REG-FE-020 (audit ledger 3803): cooldown принадлежит авторитетному
         // запросу — сменённый 429 не должен замораживать auto-refresh после
@@ -424,13 +433,13 @@ export const useRegistrarWorklistData = ({
 
       // Handle axios errors
       if ((error as HttpApiError)?.response?.status === 401) {
-        // Токен недействителен
-        logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
-        sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
-        // QW-03 fix: show error state instead of demo data.
+        // The API client owns session invalidation. A worklist request id
+        // cannot establish that the currently stored token belongs to it.
         if (isSuperseded()) {
           return 'superseded';
         }
+        logger.warn('Сервер отклонил запрос списка регистратуры (401)');
+        // QW-03 fix: show error state instead of demo data.
         startTransition(() => {
           dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
         });
@@ -510,7 +519,13 @@ export const useRegistrarWorklistData = ({
         logger.info('[RegistrarPanel] Детали события:', detail);
         // Увеличиваем задержку для гарантии сохранения данных в БД (особенно для новых записей)
         const delay = action === 'entryAdded' || action === 'refreshAll' ? 500 : 300;
-        setTimeout(() => {
+        // REGDATA-FE-001: a newer event supersedes the older delayed reload —
+        // clear any pending timer before scheduling the new one.
+        if (queueUpdateTimerRef.current !== null) {
+          clearTimeout(queueUpdateTimerRef.current);
+        }
+        queueUpdateTimerRef.current = setTimeout(() => {
+          queueUpdateTimerRef.current = null;
           logger.info('[RegistrarPanel] Выполняем обновление после задержки:', delay, 'ms');
           loadAppointments({ source: `queue_update_${action}`, silent: false });
         }, delay);
@@ -523,6 +538,14 @@ export const useRegistrarWorklistData = ({
 
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
+      // REGDATA-FE-001: a pending delayed refresh must not fire after the
+      // effect that scheduled it is torn down (calendar-date switch/unmount) —
+      // the stale closure would start an obsolete-date fetch that acquires
+      // the newest requestSeqRef id.
+      if (queueUpdateTimerRef.current !== null) {
+        clearTimeout(queueUpdateTimerRef.current);
+        queueUpdateTimerRef.current = null;
+      }
     };
   }, [loadAppointments]);
 
