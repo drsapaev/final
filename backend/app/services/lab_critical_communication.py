@@ -499,7 +499,21 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
     from app.services.notifications import notification_sender_service
 
     _reconcile_doctor_assignments(db, limit=limit)
-    recorded, processed = await _dispatch_escalated_doctors(db, limit=limit)
+    # Reserve capacity for both independent delivery routes. If only one
+    # route has work, the other can use the remainder below. For a one-item
+    # batch, the last persisted attempt/defer provides cross-run alternation.
+    doctor_limit = (limit + 1) // 2
+    if limit == 1:
+        last_dispatch = db.scalar(
+            select(LabCriticalCommunicationEvent.event_type)
+            .where(LabCriticalCommunicationEvent.event_type.in_(
+                ("doctor_attempted", "attempted", "dispatch_deferred"),
+            ))
+            .order_by(LabCriticalCommunicationEvent.id.desc())
+            .limit(1)
+        )
+        doctor_limit = 0 if last_dispatch == "doctor_attempted" else 1
+    recorded, processed = await _dispatch_escalated_doctors(db, limit=doctor_limit)
     for _ in range(limit - processed):
         now = datetime.now(UTC)
         due = LabCriticalCommunication.next_attempt_at <= now
@@ -570,6 +584,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
             delivery_state == "pending" and doctor_id is None
         ):
             _set_task_recipient(db, task, doctor_id)
+            _event(db, task.id, "dispatch_deferred")
             db.commit()
             continue
         if recipient_id is None:
@@ -579,6 +594,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
                 now + timedelta(minutes=30)
                 if _configured_operations_admin_id() is not None else None
             )
+            _event(db, task.id, "dispatch_deferred")
             db.commit()
             continue
 

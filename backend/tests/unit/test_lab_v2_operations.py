@@ -944,6 +944,95 @@ def test_escalated_doctor_delivery_keeps_shared_tenant_admin_disabled(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("limit", [1, 2])
+def test_escalated_doctor_retries_do_not_starve_regular_messages(
+    db_session, test_patient, test_visit, monkeypatch, limit,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", None)
+    tasks = []
+    for _ in range(4):
+        _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+        report.values.append(LabReportValue(
+            field_key="hgb", value_numeric=Decimal("1"),
+            evaluation_snapshot={"interpretation": "critical"},
+        ))
+        tasks.append(record_released_report(db_session, report))
+    db_session.commit()
+    for task in tasks[:2]:
+        escalate(db_session, task.id, actor_user_id=admin.id)
+
+    async def send(**kwargs):
+        return kwargs["entity_id"] in {tasks[2].id, tasks[3].id}
+
+    sender = AsyncMock(side_effect=send)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    for _ in range(4 // limit):
+        before = sender.await_count
+        run(dispatch_pending(db_session, limit=limit))
+        assert sender.await_count - before <= limit
+
+    assert [call.kwargs["entity_id"] for call in sender.await_args_list] == [
+        tasks[0].id, tasks[2].id, tasks[1].id, tasks[3].id,
+    ]
+    assert [task.state for task in tasks] == [
+        "escalated", "escalated", "inbox_recorded", "inbox_recorded",
+    ]
+
+
+@pytest.mark.unit
+def test_single_item_batch_alternates_after_an_unavailable_admin(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    tasks = []
+    for _ in range(2):
+        _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+        report.values.append(LabReportValue(
+            field_key="hgb", value_numeric=Decimal("1"),
+            evaluation_snapshot={"interpretation": "critical"},
+        ))
+        tasks.append(record_released_report(db_session, report))
+    db_session.commit()
+    for task in tasks:
+        escalate(db_session, task.id, actor_user_id=admin.id)
+    admin.is_active = False
+    db_session.commit()
+    sender = AsyncMock(return_value=False)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+
+    assert run(dispatch_pending(db_session, limit=1)) == 0
+    assert run(dispatch_pending(db_session, limit=1)) == 0
+    assert sender.await_count == 1
+    assert run(dispatch_pending(db_session, limit=1)) == 0
+    assert [call.kwargs["entity_id"] for call in sender.await_args_list] == [
+        tasks[0].id, tasks[1].id,
+    ]
+    assert db_session.scalar(
+        select(LabCriticalCommunicationEvent.id).where(
+            LabCriticalCommunicationEvent.communication_id == tasks[0].id,
+            LabCriticalCommunicationEvent.event_type == "dispatch_deferred",
+        )
+    ) is not None
+
+
+@pytest.mark.unit
 def test_escalated_doctor_retries_do_not_starve_unattempted_tasks(
     db_session, test_patient, test_visit, monkeypatch,
 ):
