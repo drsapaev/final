@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Card, CardContent, CardHeader } from '../components/ui/macos';
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
@@ -369,6 +369,9 @@ export default function LabPanel() {
   // неудача оставляет предупреждение ОТКРЫТЫМ с явной ошибкой.
   const [sessionExtending, setSessionExtending] = useState(false);
   const [sessionExtendError, setSessionExtendError] = useState<string | null>(null);
+  const sessionDialogRef = useRef<HTMLDialogElement>(null);
+  const sessionDialogTitleRef = useRef<HTMLHeadingElement>(null);
+  const sessionDialogDescriptionId = useId();
 
   // PR 3351 (review round 9, P2): «Продлить сессию» — реальная операция
   // обновления, а не декоративное сокрытие предупреждения. Прежняя кнопка
@@ -891,6 +894,23 @@ export default function LabPanel() {
     // новый JWT уже действует, сообщение лгало бы пользователю.
     onSessionRecovered: () => setSessionWarning(null),
   });
+  const sessionDialogOpen = sessionWarning !== null || sessionRedirectPending;
+  useLayoutEffect(() => {
+    const dialog = sessionDialogRef.current;
+    if (!sessionDialogOpen || !dialog) return;
+    dialog.showModal();
+    return () => dialog.close();
+  }, [sessionDialogOpen]);
+
+  useLayoutEffect(() => {
+    const dialog = sessionDialogRef.current;
+    if (!sessionDialogOpen || !dialog) return;
+    if (sessionRedirectPending) {
+      sessionDialogTitleRef.current?.focus({ preventScroll: true });
+    } else if (!dialog.contains(document.activeElement)) {
+      dialog.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+    }
+  }, [sessionDialogOpen, sessionRedirectPending, sessionExtending]);
   // Контракт блокирующих операций (PR 3351, review round 7/8 — split-уровни):
   // - report/template операции (draft save, CREATE, finalize, revise, print,
   //   autosave, шаблонные create/save/clone/archive) блокируют и КОНТЕКСТНЫЕ
@@ -939,7 +959,7 @@ export default function LabPanel() {
       clearActiveInstance();
       switchTab('queue');
     }, { sourceIds: ['report'] }),
-    disabled: isDialogOpen,
+    disabled: isDialogOpen || sessionDialogOpen,
   });
 
   const loadTemplates = useCallback(async (preferredTemplateId: string | number | null = null) => {
@@ -2016,34 +2036,51 @@ export default function LabPanel() {
 
               {/* PR5: единый dirty-guard диалог */}
         {guardDialog}
-        {/* H-1 fix: session timeout warning dialog */}
-        {sessionWarning && (
-          <div
-            role="alertdialog"
-            aria-label={t('misc.lp_preduprezhdenie_ob_istecheni')}
-            className="lab-session-warning-overlay"
-          >
-            <div className="lab-session-warning-dialog">
-              <h3 className="lab-session-warning-title">
-                Сессия скоро истечёт
-              </h3>
-              <p className="lab-session-warning-text">
-                Ваша сессия истекает. Несохранённые данные могут быть потеряны.
-                Сохраните текущий отчёт или продлите сессию.
-              </p>
-              {/* PR 3351 (review round 9, P2): явная ошибка неудачного
-                  продления — предупреждение НЕ закрывается, действие не
-                  «притворяется» успешным. */}
+        {/* Keep the modal open through the warning → deferred redirect so
+            the browser restores focus to the original control on recovery. */}
+        <dialog
+          ref={sessionDialogRef}
+          role="alertdialog"
+          aria-modal="true"
+          aria-label={t(sessionRedirectPending ? 'misc.lp_perehod_posle_zaversheniya' : 'misc.lp_preduprezhdenie_ob_istecheni')}
+          aria-describedby={sessionDialogDescriptionId}
+          className="lab-session-warning-dialog"
+          onCancel={(event) => event.preventDefault()}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key !== 'Tab') return;
+            const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+            const first = buttons.item(0);
+            const last = buttons.item(buttons.length - 1);
+            const edge = event.shiftKey ? first : last;
+            if (edge && edge !== document.activeElement) return;
+            event.preventDefault();
+            (event.shiftKey ? last : first)?.focus();
+          }}
+        >
+          <h3 ref={sessionDialogTitleRef} tabIndex={sessionRedirectPending ? -1 : undefined} className="lab-session-warning-title">
+            {sessionRedirectPending ? t('misc.lp_sessiya_istekla_zavershenie') : 'Сессия скоро истечёт'}
+          </h3>
+          <p id={sessionDialogDescriptionId} className="lab-session-warning-text">
+            {sessionRedirectPending
+              ? t('misc.lp_sessiya_istekla_zavershenie_t')
+              : 'Ваша сессия истекает. Несохранённые данные могут быть потеряны. Сохраните текущий отчёт или продлите сессию.'}
+          </p>
+          {sessionRedirectPending ? (
+            <div className="lab-session-redirect-spinner" aria-hidden="true" />
+          ) : (
+            <>
               {sessionExtendError && (
                 <p className="lab-session-warning-text lab-session-extend-error" role="alert">
                   {sessionExtendError}
                 </p>
               )}
               <div className="lab-session-warning-actions">
-                <button onClick={() => setSessionWarning(null)} className="lab-session-warning-btn-later">
+                <button type="button" onClick={() => setSessionWarning(null)} className="lab-session-warning-btn-later">
                   Позже
                 </button>
                 <button
+                  type="button"
                   onClick={() => { void handleExtendSession(); }}
                   disabled={sessionExtending}
                   className="lab-session-warning-btn-extend"
@@ -2051,33 +2088,9 @@ export default function LabPanel() {
                   {sessionExtending ? t('misc.lp_session_extending') : 'Продлить сессию'}
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-        {/* PR 3351 (review round 6, P1): сессия истекла поверх pending-
-            операции — не-dismissable диалог. Hard navigation на /login
-            отложена до завершения последней операции: обрыв документа
-            убивал висящий неидемпотентный POST (clone/finalize/print без
-            Idempotency-Key), ответ терялся, и оператор повторял операцию,
-            создавая дубль. onExpired (redirect) вызывается ровно один раз
-            после снятия последнего pending-источника. */}
-        {sessionRedirectPending && (
-          <div
-            role="alertdialog"
-            aria-label={t('misc.lp_perehod_posle_zaversheniya')}
-            className="lab-session-warning-overlay"
-          >
-            <div className="lab-session-warning-dialog">
-              <h3 className="lab-session-warning-title">
-                {t('misc.lp_sessiya_istekla_zavershenie')}
-              </h3>
-              <p className="lab-session-warning-text">
-                {t('misc.lp_sessiya_istekla_zavershenie_t')}
-              </p>
-              <div className="lab-session-redirect-spinner" aria-hidden="true" />
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </dialog>
     </main>
   );
 }

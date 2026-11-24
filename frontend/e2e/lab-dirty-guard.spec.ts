@@ -2280,6 +2280,16 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.waitForTimeout(700);
     const warning = page.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
     await expect(warning).toBeVisible();
+    await expect(warning).toHaveAccessibleDescription(/Несохранённые данные могут быть потеряны/);
+    const later = warning.getByRole('button', { name: 'Позже' });
+    const extend = warning.getByRole('button', { name: 'Продлить сессию' });
+    await expect(later).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(extend).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(later).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(warning).toBeVisible();
     const refreshTokenBefore = await page.evaluate(() => window.sessionStorage.getItem('auth_token'));
     expect(refreshTokenBefore).toBe(nearExpiryToken);
 
@@ -2298,6 +2308,51 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => refreshPostCount).toBeGreaterThanOrEqual(2);
     await expect(warning).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('auth_token'))).toBe(freshToken);
+  });
+
+  test('session warning hands focus to the deferred redirect and restores the original control after recovery', async ({ page }) => {
+    await page.routeWebSocket('**/*', (socket) => socket.close());
+    await page.clock.install();
+    reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
+      releaseReportInstanceCreateResponse = resolve;
+    });
+
+    try {
+      await page.goto('/lab');
+      await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+      await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+      await page.getByRole('button', { name: 'Добавить бланк' }).click();
+      await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
+      const reportTab = page.getByRole('tab', { name: /Отчёты/ });
+      await reportTab.focus();
+
+      await page.evaluate(() => {
+        const claims = { sub: '7', role: 'Lab', exp: Math.floor((Date.now() + 40_000) / 1000) };
+        const encoded = btoa(JSON.stringify(claims)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+        window.sessionStorage.setItem('auth_token', ['eyJhbGciOiJIUzI1NiJ9', encoded, 'sig'].join('.'));
+      });
+      await page.clock.fastForward(30_000);
+      const warning = page.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
+      await expect(warning.getByRole('button', { name: 'Позже' })).toBeFocused();
+
+      await page.clock.fastForward(30_000);
+      const redirect = page.getByRole('alertdialog', { name: 'Переход после завершения операции' });
+      const heading = redirect.getByRole('heading', { name: 'Сессия истекла: завершаем операцию' });
+      await expect(page.getByRole('alertdialog')).toHaveCount(1);
+      await expect(heading).toBeFocused();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Escape');
+      await expect(heading).toBeFocused();
+      await expect(redirect).toBeVisible();
+
+      await page.evaluate((token) => window.sessionStorage.setItem('auth_token', token), FAKE_TOKEN);
+      await page.clock.fastForward(30_000);
+      await expect(redirect).toHaveCount(0);
+      await expect(reportTab).toBeFocused();
+    } finally {
+      releaseReportInstanceCreateResponse?.();
+    }
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
   });
 
   // PR 3351 (review round 7, P1): report CREATE больше не обходит защиту

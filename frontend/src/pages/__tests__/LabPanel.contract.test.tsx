@@ -505,7 +505,8 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(hookSource).toContain('setRedirectPending(true)');
     expect(hookSource).toContain('onExpiredRef.current();');
     // Не-dismissable диалог «операция завершается, затем переход».
-    expect(labPanelSource).toContain('sessionRedirectPending && (');
+    expect(labPanelSource).toContain('sessionWarning !== null || sessionRedirectPending');
+    expect(labPanelSource).toContain('dialog.showModal();');
     expect(labPanelSource).toContain('lp_sessiya_istekla_zavershenie');
   });
 
