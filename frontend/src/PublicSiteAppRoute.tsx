@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getApiOrigin } from './api/runtime';
 import { useDocumentLanguage } from './hooks/useDocumentLanguage';
+import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { getVitePublicSiteAnalyticsEndpoint } from './publicSiteAnalytics';
 import { createPublicSiteApi } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
@@ -36,17 +37,7 @@ export default function PublicSiteAppRoute() {
     };
   }, [locale]);
 
-  useLayoutEffect(() => {
-    if (!title) return undefined;
-
-    const previousTitle = document.title;
-    document.title = title;
-    const appliedTitle = document.title;
-
-    return () => {
-      if (document.title === appliedTitle) document.title = previousTitle;
-    };
-  }, [title]);
+  useDocumentTitle(title);
 
   useEffect(() => {
     const route = resolvePublicSiteRoute(pathname);
