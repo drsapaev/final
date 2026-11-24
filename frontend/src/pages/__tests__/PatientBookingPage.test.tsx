@@ -129,24 +129,29 @@ describe('PatientBookingPage', () => {
   });
 
   it.each([
-    { path: '/ru/booking', locale: 'ru', serviceLabel: 'Услуга' },
-    { path: '/booking', locale: 'uz-Latn', serviceLabel: 'Xizmat' },
-  ])('sets $locale as the document language on $path and restores the previous language on unmount', async ({
-    path, locale, serviceLabel,
+    { path: '/ru/booking', locale: 'ru', serviceLabel: 'Услуга', title: 'Онлайн-запись' },
+    { path: '/booking', locale: 'uz-Latn', serviceLabel: 'Xizmat', title: 'Onlayn yozilish' },
+  ])('sets the $locale document language and title on $path and restores both on unmount', async ({
+    path, locale, serviceLabel, title,
   }) => {
     const root = document.documentElement;
     const originalLanguage = root.getAttribute('lang');
+    const originalTitle = document.title;
     root.setAttribute('lang', 'en');
+    document.title = 'Clinic OS';
     try {
       const page = renderPage(path);
       try {
         await screen.findByLabelText(serviceLabel);
         expect(root).toHaveAttribute('lang', locale);
+        expect(document.title).toBe(title);
       } finally {
         page.unmount();
       }
       expect(root).toHaveAttribute('lang', 'en');
+      expect(document.title).toBe('Clinic OS');
     } finally {
+      document.title = originalTitle;
       if (originalLanguage === null) root.removeAttribute('lang');
       else root.setAttribute('lang', originalLanguage);
     }
@@ -400,10 +405,12 @@ describe('PatientBookingPage', () => {
 
     const switchLanguage = await screen.findByRole('link', { name: 'O‘zbekcha' });
     expect(document.documentElement).toHaveAttribute('lang', 'ru');
+    expect(document.title).toBe('Онлайн-запись');
     expect(switchLanguage).toHaveAttribute('lang', 'uz-Latn');
     fireEvent.click(switchLanguage);
     const date = await screen.findByLabelText('Sana');
     expect(document.documentElement).toHaveAttribute('lang', 'uz-Latn');
+    expect(document.title).toBe('Onlayn yozilish');
     fireEvent.change(date, { target: { value: todayInTashkent() } });
     fireEvent.click(await screen.findByLabelText('09:00'));
     fireEvent.click(screen.getByRole('button', { name: 'Yangi vaqtni yuborish' }));

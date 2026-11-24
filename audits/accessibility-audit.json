@@ -669,5 +669,26 @@
     },
     "method": "Computed foreground colors were compared against rendered footer background pixels sampled in WebKit with glyph fill and text decoration temporarily hidden. Original inline styles were restored before checking actionability.",
     "limitations": "The run covered a synthetic catalog at one width. It did not exercise native Safari, sequential keyboard reachability of the footer, assistive technology, physical devices or full WCAG conformance."
+  },
+  "vite_catalog_footer_sequential_keyboard": {
+    "date": "2026-11-24",
+    "source_sha": "0bbcc8087ab222cfbbd190c9aeb990d5408923c8",
+    "scope": "Local Vite production build and a synthetic GET-only catalog on loopback. Both locales at 320 CSS px in light and dark mode.",
+    "chromium": {
+      "version": "153.0.8010.12",
+      "input": "Tab",
+      "passed_cases": 4,
+      "checks": "Both Contacts and Staff login links were reached in every case. Each stayed in the viewport with a solid 3 px focus-visible outline."
+    },
+    "windows_webkit": {
+      "version": "26.6",
+      "inputs": [
+        "Tab",
+        "Alt+Tab"
+      ],
+      "passed_cases": 0,
+      "checks": "Neither sequence reached the two links in any of the four catalog cases. The same inputs also skipped both links in a minimal page with standard anchors, a summary, a button and an input."
+    },
+    "limitations": "Native Safari settings, screen reader output, physical devices and WCAG conformance remain unverified. The test exercised the public catalog footer."
   }
 }

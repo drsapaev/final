@@ -2169,7 +2169,11 @@ const AppointmentWizardV2 = ({
       }
 
       const initialPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(initialData));
-      if (editMode && patientId && selectedPatientSex && selectedPatientSex !== initialPatientSex) {
+      const hasEditDeltaRemoval = editMode && !fullUpdateQuoteRoute &&
+        detectRemovedServicesWithinRetainedEntries(editOriginalServiceIdentity, wizardData.cart.items).length > 0;
+      // For a partial removal, edit-delta alone persists demographic edits so
+      // a rejected service change cannot partially save the patient's data.
+      if (editMode && !hasEditDeltaRemoval && patientId && selectedPatientSex && selectedPatientSex !== initialPatientSex) {
         // UX Audit Stage 3 (Wizard issue 5.1): Заменён raw fetch() PUT на updatePatient() из api/patients.
         try {
           await updatePatient(patientId, { sex: selectedPatientSex });
@@ -2208,11 +2212,9 @@ const AppointmentWizardV2 = ({
       const originalQueueIds = editOriginalIdentity.queueIds; // ✅ available throughout handleComplete
       const entryUpdatedAtMap = editOriginalIdentity.entryUpdatedAtMap;
 
-      // REG-FE-084 (follow-up audit 2026-11-02): удаление ОДНОЙ услуги из
-      // СОХРАНЯЕМОЙ записи не поддерживается backend edit-контрактом (нет
-      // per-service remove-команды) — прежний путь молча терял правку и
-      // рапортовал успех. Громкий отказ ДО сабмита; детектор — wizardUtils.
-      if (editMode) {
+      // Legacy full-update and non-queue paths still do not support a
+      // partial removal. Edit-delta prices and saves the explicit zero target.
+      if (editMode && (fullUpdateQuoteRoute || !hasQueueEntries)) {
         const removed = detectRemovedServicesWithinRetainedEntries(
           editOriginalIdentity, wizardData.cart.items);
         if (removed.length > 0) {
