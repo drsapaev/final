@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -15,8 +13,6 @@ from app.models.user import User
 from app.models.visit import VisitService
 from app.services.service_audit_service import ServiceAuditService
 from app.services.service_mapping import normalize_service_code
-
-logger = logging.getLogger(__name__)
 
 
 class ServicesApiRepository:
@@ -202,16 +198,9 @@ class ServicesApiRepository:
     def log_service_creation(
         self, service: Service, user_id: int | None = None
     ) -> None:
-        try:
-            ServiceAuditService(self.db).log_service_creation(
-                service=service, user_id=user_id
-            )
-        except Exception as exc:
-            logger.warning(
-                "Service audit creation failed after service commit: service_id=%s error=%s",
-                getattr(service, "id", None),
-                exc,
-            )
+        ServiceAuditService(self.db).log_service_creation(
+            service=service, user_id=user_id, commit=False
+        )
 
     def log_service_update(
         self,
@@ -221,29 +210,15 @@ class ServicesApiRepository:
         new_service: Service,
         user_id: int | None = None,
         comment: str | None = None,
-        commit: bool = True,
     ) -> None:
-        try:
-            ServiceAuditService(self.db).log_service_update(
-                service_id=service_id,
-                old_service=old_service,
-                new_service=new_service,
-                user_id=user_id,
-                comment=comment,
-                commit=commit,
-            )
-        except Exception as exc:
-            if not commit:
-                # RQ-17 round-3 P2: в batch-режиме audit-строка — часть
-                # атомарной транзакции batch'а; молча проглоченный сбой
-                # здесь оставил бы batch без audit-следа при успешном
-                # коммите. Владелец транзакции обязан увидеть сбой.
-                raise
-            logger.warning(
-                "Service audit update failed after service commit: service_id=%s error=%s",
-                service_id,
-                exc,
-            )
+        ServiceAuditService(self.db).log_service_update(
+            service_id=service_id,
+            old_service=old_service,
+            new_service=new_service,
+            user_id=user_id,
+            comment=comment,
+            commit=False,
+        )
 
     def add(self, obj) -> None:
         self.db.add(obj)

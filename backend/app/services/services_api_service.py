@@ -169,34 +169,34 @@ class ServicesApiService:
             "department_key": service.department_key,
         }
 
-    def _log_service_creation(
-        self, service: Service, user_id: int | None = None
-    ) -> None:
-        self.repository.log_service_creation(service=service, user_id=user_id)
-
-    def _log_service_update(
+    def _commit_service_with_audit(
         self,
+        service: Service,
         *,
-        service_id: int,
-        old_service: Service,
-        new_service: Service,
+        old_service: Service | None = None,
         user_id: int | None = None,
         comment: str | None = None,
-        commit: bool = True,
     ) -> None:
-        # Codex round-15 P2: user_id -- attribution of the service audit to
-        # the authenticated actor (GraphQL updateServicePrice); None keeps
-        # the legacy behaviour for callers without an actor.
-        # RQ-17 round-3 P2: commit=False -- transaction ownership remains
-        # with the batch writer (one commit for changes + audit rows).
-        self.repository.log_service_update(
-            service_id=service_id,
-            old_service=old_service,
-            new_service=new_service,
-            user_id=user_id,
-            comment=comment,
-            commit=commit,
-        )
+        try:
+            # Read the persisted values (including numeric rounding) while
+            # the writer still owns the row and queue-scope locks.
+            self.db.flush()
+            self.repository.refresh(service)
+            if old_service is None:
+                self.repository.log_service_creation(service=service, user_id=user_id)
+            else:
+                self.repository.log_service_update(
+                    service_id=service.id,
+                    old_service=old_service,
+                    new_service=service,
+                    user_id=user_id,
+                    comment=comment,
+                )
+            self.repository.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        self.repository.refresh(service)
 
     def list_service_categories(self, *, active: bool | None):
         return self.repository.list_service_categories(active=active)
@@ -391,9 +391,7 @@ class ServicesApiService:
             db.flush()
             if create_tag:
                 validate_tag_owner_invariant(db, create_tag, clinic_today(db))
-        self.repository.commit()
-        self.repository.refresh(service)
-        self._log_service_creation(service, user_id=user_id)
+        self._commit_service_with_audit(service, user_id=user_id)
         return service
 
     def update_service(
@@ -523,17 +521,14 @@ class ServicesApiService:
             for tag in affected_tags:
                 validate_tag_owner_invariant(db, tag, today)
 
-        self.repository.commit()
-        self.repository.refresh(service)
-        self._log_service_update(
-            service_id=service.id,
-            old_service=old_service,
-            new_service=service,
-            user_id=user_id,
+        self._commit_service_with_audit(
+            service, old_service=old_service, user_id=user_id
         )
         return service
 
-    def delete_service(self, *, service_id: int) -> dict[str, Any]:
+    def delete_service(
+        self, *, service_id: int, user_id: int | None = None
+    ) -> dict[str, Any]:
         # RQ-17 round-2 (P1-2): row-level serialization и для soft-delete --
         # ретег <-> delete остаётся в той же stale-object категории
         # (пин 14): валидация по фактическому post-lock тегу.
@@ -559,12 +554,10 @@ class ServicesApiService:
             # пост-delete service-set тега: RESOURCE_SURFACE != ∅ при
             # 0 активных doctorless -> reject (пины 8-9)
             validate_tag_owner_invariant(db, service.queue_tag, today)
-        self.repository.commit()
-        self.repository.refresh(service)
-        self._log_service_update(
-            service_id=service.id,
+        self._commit_service_with_audit(
+            service,
             old_service=old_service,
-            new_service=service,
+            user_id=user_id,
             comment=(
                 "Soft delete via service catalog API; "
                 f"visit_service_links={visit_services_count}"
@@ -742,13 +735,12 @@ class ServicesApiService:
             # критической секции, конкурентный writer мог изменить строку
             # до формирования следующего audit snapshot.
             for service in services:
-                self._log_service_update(
+                self.repository.log_service_update(
                     service_id=service.id,
                     old_service=old_snapshots[service.id],
                     new_service=service,
                     user_id=user_id,
                     comment=f"Batch update: {comment}" if comment else "Batch update",
-                    commit=False,
                 )
         except OwnerInvariantViolation:
             db.rollback()

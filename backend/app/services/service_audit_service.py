@@ -87,6 +87,7 @@ class ServiceAuditService:
         user_id: int | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
+        commit: bool = True,
     ) -> ServiceAuditLog:
         """Log service creation."""
         new_values = self._service_to_dict(service)
@@ -98,6 +99,7 @@ class ServiceAuditService:
             new_values=new_values,
             ip_address=ip_address,
             user_agent=user_agent,
+            commit=commit,
         )
 
     def log_service_update(
@@ -220,7 +222,7 @@ class ServiceAuditService:
             "name": service.name,
             "category_id": service.category_id,
             "category_code": service.category_code,
-            "price": float(service.price) if service.price else None,
+            "price": float(service.price) if service.price is not None else None,
             "currency": service.currency,
             "duration_minutes": service.duration_minutes,
             "doctor_id": service.doctor_id,

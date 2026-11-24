@@ -308,7 +308,9 @@ async def create_service(
 ):
     """Delegate service creation to the service layer."""
     try:
-        service = ServicesApiService(db).create_service(service_data=service_data)
+        service = ServicesApiService(db).create_service(
+            service_data=service_data, user_id=current_user.id
+        )
         return _row_to_out(service)
     except OwnerInvariantViolation as exc:
         # RQ-17 §3.1: RESOURCE_SURFACE live + forbidden service-set -> 409
@@ -329,6 +331,7 @@ async def update_service(
         service = ServicesApiService(db).update_service(
             service_id=service_id,
             service_data=service_data,
+            user_id=current_user.id,
         )
         return _row_to_out(service)
     except LookupError as exc:
@@ -349,7 +352,9 @@ async def delete_service(
 ):
     """Delegate service deletion to the service layer."""
     try:
-        return ServicesApiService(db).delete_service(service_id=service_id)
+        return ServicesApiService(db).delete_service(
+            service_id=service_id, user_id=current_user.id
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except OwnerInvariantViolation as exc:

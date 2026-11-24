@@ -961,7 +961,7 @@ class Mutation:
                 try:
                     service = ServicesApiService(db).update_service(
                         service_id=id,
-                        service_data={"price": price},
+                        service_data={"price": price, "updated_at": datetime.now(UTC)},
                         user_id=actor.id,
                     )
                 except LookupError:
@@ -982,10 +982,6 @@ class Mutation:
                         message=str(exc.detail),
                         errors=["VALIDATION_ERROR"],
                     )
-
-                service.updated_at = datetime.now(UTC)
-                db.commit()
-                db.refresh(service)
 
                 return ServiceMutationResponse(
                     success=True,
