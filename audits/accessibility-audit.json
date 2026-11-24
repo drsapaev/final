@@ -643,5 +643,31 @@
       "https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html"
     ],
     "limits": "Candidate locales used separate Chromium and Orca sessions. The protocol confirms the phrases progressed through synthesis. Physical listening, pronunciation, popup clipping, other assistive technologies, native Safari, physical devices and full WCAG conformance remain open."
+  },
+  "vite_footer_accessibility_follow_up": {
+    "audit_date": "2026-11-24",
+    "source_base_sha": "0eae311131203de965e9ec08c54c508425dc48eb",
+    "measurement_checkout_sha": "755ce61ed3690b33f25fa5f933729ef51093b473",
+    "tested_runtime_blobs": {
+      "frontend/src/providers/AppProviders.tsx": "b79d7a68a784b83b139f3f0e220e53ef6c90d311",
+      "frontend/src/publicSiteStyles.css": "b1d30b4d673125756404e49ca853105d98e533d6"
+    },
+    "scope": "Synthetic Vite service catalog in Windows WebKit 26.6 at 320 CSS px. Public Contacts and Staff login footer links on /ru/services and /services in light mode, with /ru/services as the dark-mode control.",
+    "before": {
+      "occlusion_source_sha": "ff8c3703f7e2090c8392b7ed17a89a29551e4260",
+      "occlusion": "With the prompt visible, all twelve sampled points across the two footer links in both locales hit the notification banner.",
+      "contrast_source_sha": "aedaf577b7d2df03b3b42763c5579a99baea5cd5",
+      "default_light_link_contrast_after_dismissal": [4.38, 4.42]
+    },
+    "after": {
+      "notification": "With default browser notification permission, the prompt was absent 5700 to 5710 ms after the page heading was visible in all three route and theme combinations. Both links passed trial clicks in each combination.",
+      "light_link_contrast_default_and_focus": [5.41, 5.46],
+      "light_link_contrast_hover": [5.88, 5.93],
+      "dark_link_contrast_default_ru": [7.35, 7.45],
+      "focus": "Both light-mode links retained a solid 3 px focus-visible outline after keyboard modality and programmatic focus.",
+      "axe": "Three footer-scoped scans returned zero violations. Each scan left three color-contrast nodes incomplete. Painted-pixel contrast checks covered the two links."
+    },
+    "method": "Computed foreground colors were compared against rendered footer background pixels sampled in WebKit with glyph fill and text decoration temporarily hidden. Original inline styles were restored before checking actionability.",
+    "limitations": "The run covered a synthetic catalog at one width. It did not exercise native Safari, sequential keyboard reachability of the footer, assistive technology, physical devices or full WCAG conformance."
   }
 }

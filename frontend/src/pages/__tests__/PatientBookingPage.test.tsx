@@ -128,6 +128,30 @@ describe('PatientBookingPage', () => {
     mockedResubmitRequest.mockResolvedValue({ id: 'request-id', status: 'pending' } as never);
   });
 
+  it.each([
+    { path: '/ru/booking', locale: 'ru', serviceLabel: 'Услуга' },
+    { path: '/booking', locale: 'uz-Latn', serviceLabel: 'Xizmat' },
+  ])('sets $locale as the document language on $path and restores the previous language on unmount', async ({
+    path, locale, serviceLabel,
+  }) => {
+    const root = document.documentElement;
+    const originalLanguage = root.getAttribute('lang');
+    root.setAttribute('lang', 'en');
+    try {
+      const page = renderPage(path);
+      try {
+        await screen.findByLabelText(serviceLabel);
+        expect(root).toHaveAttribute('lang', locale);
+      } finally {
+        page.unmount();
+      }
+      expect(root).toHaveAttribute('lang', 'en');
+    } finally {
+      if (originalLanguage === null) root.removeAttribute('lang');
+      else root.setAttribute('lang', originalLanguage);
+    }
+  });
+
   it('shows only service/doctor pairs approved by the current public policy', async () => {
     renderPage();
     await screen.findByLabelText('Услуга');
@@ -374,8 +398,13 @@ describe('PatientBookingPage', () => {
       },
     });
 
-    fireEvent.click(await screen.findByRole('link', { name: 'O‘zbekcha' }));
-    fireEvent.change(await screen.findByLabelText('Sana'), { target: { value: todayInTashkent() } });
+    const switchLanguage = await screen.findByRole('link', { name: 'O‘zbekcha' });
+    expect(document.documentElement).toHaveAttribute('lang', 'ru');
+    expect(switchLanguage).toHaveAttribute('lang', 'uz-Latn');
+    fireEvent.click(switchLanguage);
+    const date = await screen.findByLabelText('Sana');
+    expect(document.documentElement).toHaveAttribute('lang', 'uz-Latn');
+    fireEvent.change(date, { target: { value: todayInTashkent() } });
     fireEvent.click(await screen.findByLabelText('09:00'));
     fireEvent.click(screen.getByRole('button', { name: 'Yangi vaqtni yuborish' }));
 
