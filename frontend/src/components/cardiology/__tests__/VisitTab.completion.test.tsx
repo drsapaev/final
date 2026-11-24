@@ -49,10 +49,11 @@ describe('VisitTab completion ownership', () => {
 
   it('routes completion through EMRContainer for an active visit', async () => {
     const onComplete = vi.fn();
+    const onBackToQueue = vi.fn();
     render(
       <VisitTab
         selectedPatient={{ visit_id: 17, patient_id: 23, status: 'in_progress' }}
-        onCancel={vi.fn()}
+        onCancel={onBackToQueue}
         onComplete={onComplete}
         onGoToAppointments={vi.fn()}
         getColor={getColor}
@@ -61,6 +62,9 @@ describe('VisitTab completion ownership', () => {
     );
 
     expect(screen.getByTestId('emr-container')).toHaveAttribute('data-read-only', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'cardio.cardio_visit_back_to_queue' }));
+    expect(onBackToQueue).toHaveBeenCalledOnce();
+    expect(onComplete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: completionButtonName }));
     expect(onComplete).toHaveBeenCalledWith({ complaints: 'saved complaint' });
   });

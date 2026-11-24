@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import specialty_variants
+from app.crud.queue_call_order import waiting_call_order
 from app.models.clinic import Doctor
 from app.models.display_config import DisplayBoard
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -273,14 +274,7 @@ class DisplayWebSocketApiRepository:
                 OnlineQueueEntry.queue_id == queue_id,
                 OnlineQueueEntry.status == "waiting",
             )
-            .order_by(
-                OnlineQueueEntry.priority.desc(),
-                func.coalesce(
-                    OnlineQueueEntry.queue_time,
-                    OnlineQueueEntry.created_at,
-                ).asc(),
-                OnlineQueueEntry.id.asc(),
-            )
+            .order_by(*waiting_call_order())
             .first()
         )
 

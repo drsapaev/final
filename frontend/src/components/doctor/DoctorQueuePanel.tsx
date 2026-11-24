@@ -9,6 +9,9 @@ import {
   User,
   Play,
   CheckCircle,
+  CircleHelp,
+  UserX,
+  XCircle,
 
   RefreshCw,
 
@@ -195,7 +198,17 @@ const DoctorQueuePanel = ({
     waiting: { label: t('misc.dqp_ozhidaet'), color: 'warning', icon: Clock },
     called: { label: t('misc.dqp_vyzvan'), color: 'primary', icon: Play },
     in_progress: { label: t('misc.dqp_na_prieme'), color: 'info', icon: Activity },
-    served: { label: t('misc.dqp_prinyat'), color: 'success', icon: CheckCircle }
+    in_service: { label: t('doctor.status_in_service'), color: 'info', icon: Activity },
+    in_cabinet: { label: t('status.in_cabinet'), color: 'info', icon: Activity },
+    diagnostics: { label: t('doctor.status_diagnostics'), color: 'info', icon: Activity },
+    no_show: { label: t('doctor.status_no_show'), color: 'danger', icon: UserX },
+    incomplete: { label: t('doctor.status_incomplete'), color: 'danger', icon: XCircle },
+    cancelled: { label: t('status.cancelled'), color: 'danger', icon: XCircle },
+    completed: { label: t('status.done'), color: 'success', icon: CheckCircle },
+    served: { label: t('misc.dqp_prinyat'), color: 'success', icon: CheckCircle },
+  } as const;
+  const unknownStatus = {
+    label: t('status.unknown'), color: 'secondary', icon: CircleHelp,
   };
 
   // Источники записи
@@ -728,7 +741,9 @@ const DoctorQueuePanel = ({
 
 
           queueEntries.map((entry) => {
-            const status = statusConfig[entry.status as keyof typeof statusConfig] || statusConfig.waiting;
+            const status = Object.prototype.hasOwnProperty.call(statusConfig, entry.status)
+              ? statusConfig[entry.status as keyof typeof statusConfig]
+              : unknownStatus;
             const source = sourceConfig[entry.source as keyof typeof sourceConfig] || sourceConfig.desk;
             const StatusIcon = status.icon;
             const canCall = hasBackendQueueAction(entry, 'call', 'can_call');

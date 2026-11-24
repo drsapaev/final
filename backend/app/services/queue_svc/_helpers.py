@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from app.crud import queue_resource_routing
 from app.crud.clinic import clinic_today
+from app.crud.queue_call_order import waiting_call_order
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase  # noqa: F401
 
@@ -90,14 +91,7 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
             if queue_tag:
                 query = query.filter(DailyQueue.queue_tag == queue_tag)
 
-        entry = query.order_by(
-            OnlineQueueEntry.priority.desc(),
-            func.coalesce(
-                OnlineQueueEntry.queue_time,
-                OnlineQueueEntry.created_at,
-            ).asc(),
-            OnlineQueueEntry.id.asc(),
-        ).first()
+        entry = query.order_by(*waiting_call_order()).first()
         if not entry:
             raise QueueNotFoundError("No waiting queue entry found for staff call")
 
