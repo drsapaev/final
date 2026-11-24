@@ -545,7 +545,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
 
       expect(screen.getByRole('button', { name: labels.save })).toBeEnabled();
       expect(screen.getByRole('button', { name: labels.preview })).toBeEnabled();
-      fireEvent.click(screen.getByRole('button', { name: labels.release, exact: true }));
+      fireEvent.click(screen.getByRole('button', { name: labels.release }));
       const releaseDialog = within(await screen.findByRole('dialog', { name: labels.releaseTitle }));
       expect(releaseDialog.getByText(labels.releaseMessage)).toBeVisible();
       expect(releaseDialog.getByRole('button', { name: labels.cancel })).toBeEnabled();
@@ -557,7 +557,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       renderWithActiveInstance({ activeInstance: finalized });
       expect(screen.getByRole('button', { name: labels.print })).toBeEnabled();
       expect(screen.getByRole('button', { name: labels.notifyPatient })).toBeEnabled();
-      fireEvent.click(screen.getByRole('button', { name: labels.revise, exact: true }));
+      fireEvent.click(screen.getByRole('button', { name: labels.revise }));
       const reviseDialog = within(await screen.findByRole('dialog', { name: labels.reviseTitle }));
       expect(reviseDialog.getByRole('button', { name: labels.reviseConfirm })).toBeDisabled();
       fireEvent.click(reviseDialog.getByRole('button', { name: labels.cancel }));
