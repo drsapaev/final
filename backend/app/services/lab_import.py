@@ -40,11 +40,12 @@ def _digest(row: LabImportRow) -> str:
 
 
 def _duplicate(
-    existing: LabImportReceipt, row: LabImportRow, digest: str
+    existing: LabImportReceipt, row: LabImportRow, digest: str, *, row_index: int
 ) -> LabImportRowOut:
     if existing.payload_digest != digest:
         raise RowRejected("message_conflict")
     return LabImportRowOut(
+        row_index=row_index,
         message_id=row.message_id,
         report_instance_id=row.report_instance_id,
         status="duplicate",
@@ -114,13 +115,14 @@ def _process_row(
     actor_id: int,
     row: LabImportRow,
     *,
+    row_index: int,
     preview: bool,
 ) -> LabImportRowOut:
     digest = _digest(row)
     message_id = str(row.message_id)
     existing = _receipt(db, source, message_id)
     if existing:
-        return _duplicate(existing, row, digest)
+        return _duplicate(existing, row, digest, row_index=row_index)
 
     service = LabReportingService(db)
     try:
@@ -130,7 +132,7 @@ def _process_row(
 
     existing = _receipt(db, source, message_id)
     if existing:
-        return _duplicate(existing, row, digest)
+        return _duplicate(existing, row, digest, row_index=row_index)
     try:
         service._assert_instance_mutable_draft(instance)
     except LabReportingDomainError as exc:
@@ -190,6 +192,7 @@ def _process_row(
         if updated_at.tzinfo is None:
             updated_at = updated_at.replace(tzinfo=UTC)
         return LabImportRowOut(
+            row_index=row_index,
             message_id=row.message_id,
             report_instance_id=instance.id,
             status="ready",
@@ -231,9 +234,10 @@ def _process_row(
         existing = _receipt(db, source, message_id)
         if existing is None:
             raise
-        return _duplicate(existing, row, digest)
+        return _duplicate(existing, row, digest, row_index=row_index)
 
     response = LabImportRowOut(
+        row_index=row_index,
         message_id=row.message_id,
         report_instance_id=saved.id,
         status="saved",
@@ -252,13 +256,22 @@ def process_import_batch(
     preview: bool = False,
 ) -> list[LabImportRowOut]:
     responses = []
-    for row in batch.rows:
+    for row_index, row in enumerate(batch.rows):
         try:
+            if isinstance(row, tuple):
+                raise RowRejected("invalid_row")
             responses.append(
-                _process_row(db, batch.source, actor_id, row, preview=preview)
+                _process_row(
+                    db, batch.source, actor_id, row, row_index=row_index, preview=preview
+                )
             )
         except RowRejected as exc:
             db.rollback()
+            message_id, report_instance_id = (
+                row
+                if isinstance(row, tuple)
+                else (row.message_id, row.report_instance_id)
+            )
             if not preview:
                 log_audit_event(
                     db,
@@ -271,8 +284,9 @@ def process_import_batch(
                 )
             responses.append(
                 LabImportRowOut(
-                    message_id=row.message_id,
-                    report_instance_id=row.report_instance_id,
+                    row_index=row_index,
+                    message_id=message_id,
+                    report_instance_id=report_instance_id,
                     status="error",
                     error_code=exc.code,
                 )
