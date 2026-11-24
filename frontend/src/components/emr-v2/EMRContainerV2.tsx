@@ -334,7 +334,7 @@ export function EMRContainerV2({
     const [isSigning, setIsSigning] = useState(false);
     const signingScopeRef = useRef<object | null>(null);
     const completionScopeRef = useRef({ visitId, patientId, active: true });
-    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSigning;
+    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSigning || accessDenied;
     // EMRAMEND-FE-001 (audit 3886 round 17): the amendment workflow must be
     // REACHABLE on the very records it exists for (signed, and — after round
     // 16 — amended ones eligible for a repeat reasoned correction). The old
@@ -348,7 +348,7 @@ export function EMRContainerV2({
     // container must render the amendment branch for exactly that window
     // (the stale-local draft is preserved; the reasoned amendment is the
     // sanctioned pathway onto the server's signed record).
-    const amendAllowed = (isSigned || isAmended || serverFinalized) && !isReadOnly && !isPreparingCompletion && !completionBusy;
+    const amendAllowed = (isSigned || isAmended || serverFinalized) && !isReadOnly && !isPreparingCompletion && !completionBusy && !accessDenied;
     const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
     const saveActionId = useId();
     const requiresSave = isDirty || !emr?.id || savedEMRStatus === 'draft';
@@ -1019,7 +1019,9 @@ export function EMRContainerV2({
         }
         if (!scope.active) return;
         const refreshed = await loadEMR(true).catch(() => null);
-        if (scope.active && !isRejectedEMRWrite(refreshed)) workspaceState.reload();
+        if (scope.active && !isRejectedEMRWrite(refreshed) && !(refreshed as { stale?: boolean }).stale) {
+            workspaceState.reload();
+        }
     };
 
     // Conflict handlers
@@ -1122,7 +1124,7 @@ export function EMRContainerV2({
                     <Button variant="ghost" size="small" onClick={redo} disabled={!canRedo || editingDisabled} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
                         <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
                     </Button>
-                    <Button variant="ghost" size="small" onClick={() => { void handleToolbarRefresh(); }} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
+                    <Button variant="ghost" size="small" onClick={() => { void handleToolbarRefresh(); }} disabled={isSaving} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
                         <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
                     </Button>
                     <Button type="button" variant="outline" size="small" disabled={!data || accessDenied}

@@ -164,6 +164,9 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     const visitEpochRef = useRef(0);
     const visitIdentityRef = useRef<number | string | null>(visitId);
     const draftSaveEpochRef = useRef<number | null>(null);
+    // An edit can be queued in React before stateRef reflects it. A refresh
+    // must yield to those edits and to writes started while its GET is pending.
+    const documentGenerationRef = useRef(0);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -193,8 +196,9 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
 
     // EMRCACHE-FE-001: principal-scoped cache key (cleared on principal swap)
     syncCachePrincipal();
-    const cacheKey = `${emrCachePrincipal ?? 'anonymous'}:${visitId || ''}:${specialty}`;
-    const canUseCache = emrCachePrincipal !== null;
+    const cachePrincipal = emrCachePrincipal;
+    const cacheKey = `${cachePrincipal ?? 'anonymous'}:${visitId || ''}:${specialty}`;
+    const canUseCache = cachePrincipal !== null;
 
     const handleAccessDenied = useCallback((operation: string, error: EMRApiError) => {
         const status = error?.response?.status;
@@ -224,41 +228,39 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         // the visit generation it was started for — a late resolution of a
         // previous visit (cache promise or GET) is dropped.
         const epoch = visitEpochRef.current;
-        const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch;
+        const stillCurrentVisit = () => isMountedRef.current
+            && visitEpochRef.current === epoch && getCachePrincipal() === cachePrincipal;
+        if (forceRefresh && draftSaveEpochRef.current === epoch) {
+            return { stale: true };
+        }
+        const generation = documentGenerationRef.current;
+        const stillCurrentSnapshot = () => stillCurrentVisit() && documentGenerationRef.current === generation;
+        const applySnapshot = <T,>(result: T) => {
+            if (!isEmrRecord(result)) return result;
+            if (!stillCurrentSnapshot()) {
+                return { stale: true };
+            }
+            writeAccessDeniedRef.current = false;
+            setWriteAccessDenied(false);
+            clearServerFinalized();
+            dispatch(emrActions.load(result));
+            return result;
+        };
         // EMRCACHE-FE-001: without an authenticated principal the cache is
         // bypassed entirely (no reads, no writes) — anonymous state must
         // never serve or persist clinical records.
         const cachedEntry = canUseCache ? emrCache.get(cacheKey) : undefined;
-        if (!forceRefresh) {
-            if (cachedEntry?.data) {
-                if (stillCurrentVisit()) {
-                    dispatch(emrActions.load(cachedEntry.data));
-                }
-                return cachedEntry.data;
+        if (!forceRefresh && cachedEntry?.data) {
+            if (stillCurrentVisit()) {
+                dispatch(emrActions.load(cachedEntry.data));
             }
-
-            if (cachedEntry?.promise) {
-                // audit/phase-final, BS-18: dispatch to this instance when promise resolves.
-                cachedEntry.promise.then((result: unknown) => {
-                    // Codex follow-up 2: validate the shared result — a
-                    // dropped/denied original request resolves with a
-                    // non-record marker that must never be dispatched as a
-                    // loaded EMR.
-                    if (isEmrRecord(result) && !forceRefresh && stillCurrentVisit()) {
-                        dispatch(emrActions.load(result));
-                    }
-                }).catch(() => {});
-                return cachedEntry.promise;
-            }
-        } else if (cachedEntry?.promise) {
-            cachedEntry.promise.then((result: unknown) => {
-                if (isEmrRecord(result) && stillCurrentVisit()) {
-                    dispatch(emrActions.load(result));
-                }
-            }).catch(() => {});
-            return cachedEntry.promise;
+            return cachedEntry.data;
+        }
+        if (cachedEntry?.promise) {
+            return applySnapshot(await cachedEntry.promise);
         }
 
+        const pendingEntry = { data: cachedEntry?.data || null, promise: null as Promise<unknown> | null };
         const loadPromise = (async () => {
             try {
                 const response = await apiClient.get(`/v2/emr/${visitId}`, {
@@ -266,51 +268,41 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
                 });
 
+                const currentEntry = emrCache.get(cacheKey);
+                // Prefer a newer write that has already replaced this GET.
+                if (canUseCache && currentEntry && currentEntry !== pendingEntry) {
+                    return !currentEntry.promise && currentEntry.data ? currentEntry.data : { stale: true };
+                }
                 if (response.status === 404) {
                     logger.info('[FIX:EMR404] EMR not found, initializing empty draft', {
                         visitId,
                         specialty,
                     });
-                    writeAccessDeniedRef.current = false;
-                    setWriteAccessDenied(false);
-                    clearServerFinalized();
-                    const emptyEmr = {
-                        data: buildInitialEMRData(specialty),
-                        version: 1,
-                        row_version: 0,
-                        status: 'draft',
-                    };
                     // EMRCACHE-FE-002 (audit 3886 round 18): a 404 placeholder
                     // is NOT a persisted canonical record — never cache it as
                     // authoritative data. Successful writes now refresh the
                     // cache (see saveEMR/signEMR/amendEMR), so a remount after
                     // a save must show the saved content, not this empty draft.
-                    if (stillCurrentVisit()) {
-                        dispatch(emrActions.load(emptyEmr));
-                    }
-                    return emptyEmr;
+                    return {
+                        data: buildInitialEMRData(specialty),
+                        version: 1,
+                        row_version: 0,
+                        status: 'draft',
+                    };
                 }
 
                 const normalizedEmr = {
                     ...response.data,
                     data: normalizeEMRData(response.data?.data, specialty),
                 };
-                writeAccessDeniedRef.current = false;
-                setWriteAccessDenied(false);
-                // RETRO-4007-01: a canonical server load (the explicit refresh
-                // path) supersedes any stale-local server-finalized window.
-                clearServerFinalized();
-                if (canUseCache) {
+                if (canUseCache && currentEntry === pendingEntry && getCachePrincipal() === cachePrincipal) {
                     emrCache.set(cacheKey, { data: normalizedEmr, promise: null });
-                }
-                if (stillCurrentVisit()) {
-                    dispatch(emrActions.load(normalizedEmr));
                 }
                 return normalizedEmr;
             } catch (error) {
                 const apiError = toEMRApiError(error);
+                if (emrCache.get(cacheKey) === pendingEntry) emrCache.delete(cacheKey);
                 if (isAccessDeniedStatus(apiError?.response?.status)) {
-                    emrCache.delete(cacheKey);
                     // RETRO-3930-01 (post-merge review of PR 3930): a 403 that
                     // belongs to a PREVIOUS visit must not lock or error the
                     // current visit's editor — guard the denial with the
@@ -328,18 +320,14 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                             stale: true,
                         };
                     }
+                    emrCache.delete(cacheKey);
                     return handleAccessDenied('loadEMR', apiError);
                 }
 
                 logger.error('Failed to load EMR:', error);
-                emrCache.delete(cacheKey);
-                // RETRO-3930-01: same guard for late failures of the previous
-                // visit — no stale error state, no stale toast, no rejection
-                // into callers that already moved on to the new visit. The
-                // outcome is an EXPLICIT stale marker (not a fake success) so
-                // continuations like reloadFromServer can distinguish a
-                // dropped load from a completed one.
-                if (!stillCurrentVisit()) {
+                // Ignore recoverable failures after the editor has moved on
+                // to another visit, later edits, or a newer write.
+                if (!stillCurrentSnapshot()) {
                     return { stale: true };
                 }
                 if (isMountedRef.current) {
@@ -349,13 +337,13 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             }
         })();
 
-        emrCache.set(cacheKey, {
-            data: cachedEntry?.data || null,
-            promise: loadPromise,
-        });
+        if (canUseCache) {
+            pendingEntry.promise = loadPromise;
+            emrCache.set(cacheKey, pendingEntry);
+        }
 
         try {
-            return await loadPromise;
+            return applySnapshot(await loadPromise);
         } finally {
             const currentEntry = emrCache.get(cacheKey);
             if (currentEntry?.promise === loadPromise) {
@@ -365,7 +353,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 });
             }
         }
-    }, [cacheKey, handleAccessDenied, specialty, visitId, clearServerFinalized]);
+    }, [cacheKey, cachePrincipal, canUseCache, handleAccessDenied, specialty, visitId, clearServerFinalized]);
 
     // =========================================================================
     // SAVE EMR
@@ -388,6 +376,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         }
 
         draftSaveEpochRef.current = epoch;
+        documentGenerationRef.current += 1;
         dispatch(emrActions.saveStart());
         const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch;
 
@@ -517,6 +506,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             };
         }
 
+        documentGenerationRef.current += 1;
         dispatch(emrActions.saveStart());
         const epoch = visitEpochRef.current;
         const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch;
@@ -623,6 +613,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             };
         }
 
+        documentGenerationRef.current += 1;
         dispatch(emrActions.saveStart());
         const epoch = visitEpochRef.current;
         const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch;
@@ -684,37 +675,22 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     // =========================================================================
     // CONFLICT RESOLUTION
     // =========================================================================
-    const reloadFromServer = useCallback(async () => {
-        const result = await loadEMR(true);
-        if (result?.accessDenied) {
-            return result;
-        }
-        // RETRO-3930-01 follow-up (Codex review on round 22): a load that was
-        // DROPPED because the visit switched mid-reload must not resolve the
-        // CURRENT visit's conflict — the «discard» continuation belongs to
-        // the visit that started it, and dispatching here would clear the
-        // new visit's dirty flag and undo history for edits it never saw.
-        if (!result || (result as { stale?: boolean }).stale) {
-            return result;
-        }
-        // EMRCONFLICT-FE-001 (audit 3886 round 17): this is the explicit
-        // «discard my edits» path. The LOAD above already replaced the whole
-        // reducer state with the canonical server snapshot (fresh history,
-        // clean dirty flag). Resolving as 'discard' keeps that clean state —
-        // the old code unconditionally marked the state dirty, so the
-        // autosave immediately wrote the just-loaded server content back as
-        // a brand-new revision the doctor never asked for.
-        dispatch(emrActions.conflictResolved(null, null, 'discard'));
-    }, [loadEMR]);
+    // The guarded LOAD resolves the conflict together with the discarded
+    // text and history. A separate dispatch could clear newer edits.
+    const reloadFromServer = useCallback(() => loadEMR(true), [loadEMR]);
 
     // =========================================================================
     // FIELD SETTERS
     // =========================================================================
     const setField = useCallback((field: string, value: unknown, source?: Record<string, unknown>) => {
+        if (writeAccessDeniedRef.current) return;
+        documentGenerationRef.current += 1;
         dispatch(emrActions.setField(field, value, source));
     }, []);
 
     const setNestedField = useCallback((path: string, value: unknown) => {
+        if (writeAccessDeniedRef.current) return;
+        documentGenerationRef.current += 1;
         dispatch(emrActions.setNestedField(path, value));
     }, []);
 
@@ -722,10 +698,14 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     // UNDO/REDO
     // =========================================================================
     const undo = useCallback(() => {
+        if (writeAccessDeniedRef.current) return;
+        documentGenerationRef.current += 1;
         dispatch(emrActions.undo());
     }, []);
 
     const redo = useCallback(() => {
+        if (writeAccessDeniedRef.current) return;
+        documentGenerationRef.current += 1;
         dispatch(emrActions.redo());
     }, []);
 
