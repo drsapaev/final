@@ -61,6 +61,21 @@ export interface LabReportOperationContext {
   patientId: string | number | null;
 }
 
+interface ReportTelegramFeedback {
+  reportId: string;
+  patientId: string;
+  operation: LabReportOperationContext;
+  state: 'pending' | 'sent' | 'not_sent' | 'unconfirmed';
+}
+
+const TELEGRAM_FEEDBACK_KEYS = {
+  manual: 'workbench.telegram_delivery_manual',
+  pending: 'workbench.telegram_delivery_pending',
+  sent: 'success.notified',
+  not_sent: 'errors.notify_not_delivered',
+  unconfirmed: 'errors.notify_failed',
+};
+
 interface DraftSaveScope {
   instanceId: string | number;
   patientId: unknown;
@@ -197,6 +212,11 @@ export default function LabReportWorkbench({
   const editSequenceRef = useRef(0);
   const visibleReportRef = useRef(activeInstance);
   visibleReportRef.current = activeInstance;
+  const telegramAttemptRef = useRef<symbol | null>(null);
+  const [telegramFeedback, setTelegramFeedback] = useState<ReportTelegramFeedback | null>(null);
+  useEffect(() => () => {
+    telegramAttemptRef.current = null;
+  }, []);
   const [conflictReport, setConflictReport] = useState<LabReportInstance | null>(null);
   const [loadingConflict, setLoadingConflict] = useState(false);
   const conflictAttemptRef = useRef(0);
@@ -1398,78 +1418,85 @@ export default function LabReportWorkbench({
     }
   }
 
-  // LABN-FE-001/002 (audit 3886 round 10): Notify patient via Telegram —
-  // sends the FINALIZED report-instance PDF to the patient's Telegram chat
-  // via POST /telegram/send-lab-report-instance. The old call posted
-  // {patient_id, instance_id} to /telegram/send-lab-results, a legacy
-  // lab_result-scoped route with query-parameter validation — every call
-  // was rejected 422 before business logic, and the route never implemented
-  // the promised PDF delivery.
-  //
-  // LABN-FE-002: an HTTP 2xx does NOT mean the patient received anything —
-  // the route answers 200 + {success:false} when the patient is not linked
-  // to the bot or disabled lab notifications. Success is asserted ONLY on
-  // an explicit success === true; a false/absent/malformed payload is
-  // surfaced as an honest failure (server-provided, non-PHI reason when
-  // present), never as «отправлено».
-  //
-  // UX-AUDIT-QW1: Добавлен ConfirmDialog. Отправка в Telegram необратима
-  // (нельзя отозвать сообщение). Соответствие Nielsen Heuristic #5
-  // (Error Prevention) и консистентность с handleFinalize/handleRevise,
-  // которые уже используют useConfirm() для необратимых действий.
+  const telegramReportId = String(activeInstance?.id ?? '');
+  const telegramPatientId = String(activeInstance?.patient_id ?? '');
+  const canNotifyPatient = Boolean(telegramReportId && telegramPatientId)
+    && (activeInstance?.status === 'FINALIZED' || activeInstance?.status === 'PRINTED');
+  const telegramFeedbackState = telegramFeedback?.reportId === telegramReportId
+    && telegramFeedback.patientId === telegramPatientId
+    && operationContextsMatch(telegramFeedback.operation, operationContextRef.current)
+    ? telegramFeedback.state
+    : 'manual';
+
   async function handleNotifyPatient() {
-    if (!activeInstance || instanceTransitionPending) return;
+    if (!activeInstance || !canNotifyPatient || saving || instanceTransitionPending || telegramAttemptRef.current) return;
     const operation = captureOperationContext();
-    const patientId = activeInstance.patient_id;
-    const instanceId = activeInstance.id;
-    // STRAT#9: строки мигрированы на t() из labTranslations.
-    const ok = await confirm({
-      title: t('confirm.notify_title'),
-      message: t('confirm.notify_message'),
-      description: t('confirm.notify_description'),
-      confirmLabel: t('confirm.notify_confirm'),
-      cancelLabel: t('confirm.cancel'),
-      intent: 'warning',
-    });
-    if (!ok) return;
-    if (!isOperationCurrent(operation)) return;
-    setSaving(true);
-    setBusyAction('notify');
+    const attempt = Symbol();
+    telegramAttemptRef.current = attempt;
+    const feedbackScope = { reportId: telegramReportId, patientId: telegramPatientId, operation };
+    const stillCurrent = () => telegramAttemptRef.current === attempt
+      && String(visibleReportRef.current?.id ?? '') === feedbackScope.reportId
+      && String(visibleReportRef.current?.patient_id ?? '') === feedbackScope.patientId
+      && operationContextsMatch(operation, operationContextRef.current)
+      && isOperationCurrent(operation);
+    let started = false;
+
     try {
-      const response = await api.post('/telegram/send-lab-report-instance', {
-        patient_id: patientId,
-        report_instance_id: instanceId,
+      const ok = await confirm({
+        title: t('confirm.notify_title'),
+        message: t('confirm.notify_message'),
+        description: t('confirm.notify_description'),
+        confirmLabel: t('confirm.notify_confirm'),
+        cancelLabel: t('confirm.cancel'),
+        intent: 'warning',
       });
-      if (!isOperationCurrent(operation)) return;
-      const payload = (response as { data?: unknown })?.data;
-      const delivered =
-        payload != null &&
-        typeof payload === 'object' &&
-        (payload as { success?: unknown }).success === true;
-      if (delivered) {
+      if (!ok) return;
+      if (!stillCurrent()) return;
+
+      started = true;
+      setSaving(true);
+      setBusyAction('notify');
+      setTelegramFeedback({ ...feedbackScope, state: 'pending' });
+      const response = await api.post('/telegram/send-lab-report-instance', {
+        patient_id: activeInstance.patient_id,
+        report_instance_id: activeInstance.id,
+      });
+      if (!stillCurrent()) return;
+
+      const data: unknown = response?.data;
+      const payload = data && typeof data === 'object'
+        ? data as { success?: unknown; report_instance_id?: unknown; message?: unknown }
+        : undefined;
+      if (payload?.success === true
+        && typeof payload.report_instance_id === 'number'
+        && String(payload.report_instance_id) === feedbackScope.reportId) {
+        setTelegramFeedback({ ...feedbackScope, state: 'sent' });
         notify?.('success', t('success.notified'));
-      } else {
-        // Honest failure: the dispatch attempt resolved, but the patient
-        // did not receive the report (not linked / notifications disabled /
-        // unreadable payload). Show the server's redacted reason when the
-        // shape carries one; never report a false «sent» confirmation.
-        const serverReason =
-          payload != null && typeof payload === 'object'
-            ? (payload as { message?: unknown }).message
-            : undefined;
-        const reason =
-          typeof serverReason === 'string' && serverReason.trim()
-            ? serverReason.trim()
-            : t('errors.notify_not_delivered');
-        notify?.('error', reason);
+        return;
       }
+
+      if (payload?.success === false) {
+        setTelegramFeedback({ ...feedbackScope, state: 'not_sent' });
+        const reason = typeof payload.message === 'string' ? payload.message.trim() : '';
+        notify?.('error', reason || t('errors.notify_not_delivered'));
+        return;
+      }
+
+      setTelegramFeedback({ ...feedbackScope, state: 'unconfirmed' });
+      notify?.('error', t('errors.notify_failed'));
     } catch (error) {
-      if (!isOperationCurrent(operation)) return;
-      const msg = getErrorMessage(error) || 'Не удалось отправить результаты пациенту.';
-      notify?.('error', typeof msg === 'string' ? msg : t('errors.notify_failed'));
+      if (started && stillCurrent()) {
+        setTelegramFeedback({ ...feedbackScope, state: 'unconfirmed' });
+        notify?.('error', getErrorMessage(error) || t('errors.notify_failed'));
+      }
     } finally {
-      setSaving(false);
-      setBusyAction('');
+      if (telegramAttemptRef.current === attempt) {
+        telegramAttemptRef.current = null;
+        if (started) {
+          setSaving(false);
+          setBusyAction((current) => current === 'notify' ? '' : current);
+        }
+      }
     }
   }
 
@@ -1882,8 +1909,7 @@ export default function LabReportWorkbench({
                   canRevise={canRevise}
                   canPrint={canPrint}
                   canPreview={canPreview}
-                  // P1 fix: Notify patient — only for finalized/printed reports.
-                  canNotify={String(activeInstance?.status ?? '') === 'FINALIZED' || String(activeInstance?.status ?? '') === 'PRINTED'}
+                  canNotify={canNotifyPatient}
                   onSaveDraft={handleSaveDraft}
                   onFinalize={handleFinalize}
                   onRevise={() => openWorkflowPrompt('revise')}
@@ -1891,6 +1917,9 @@ export default function LabReportWorkbench({
                   onNotify={handleNotifyPatient}
                   onPreview={handlePreviewPdf}
                 />
+                {canNotifyPatient && (
+                  <small role="status">{t(TELEGRAM_FEEDBACK_KEYS[telegramFeedbackState])}</small>
+                )}
                 {/* WF-10 fix: inline-индикатор missing required fields.
                     Показываем сколько обязательных полей ещё не заполнено,
                     чтобы лаборант понимал, почему Finalize disabled. */}
