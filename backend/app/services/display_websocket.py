@@ -112,7 +112,7 @@ class DisplayWebSocketManager:
                     f"Аутентифицированный WebSocket подключен к табло {board_id} (пользователь: {user.username})"
                 )
             elif device_id is not None:
-                logger.info("Display device connected to board=%s", board_id)
+                logger.info("Display device connected")
             else:
                 logger.info(f"Анонимный WebSocket подключен к табло {board_id}")
 
@@ -918,9 +918,7 @@ class DisplayWebSocketManager:
                 db.close()
 
             await websocket.send_text(json.dumps(current_state, ensure_ascii=False))
-            logger.info(
-                "Sent display state board=%s entries=%s", board_id, len(queue_entries)
-            )
+            logger.info("Sent display state entries=%s", len(queue_entries))
 
         except Exception as e:
             logger.error(f"Ошибка отправки текущего состояния: {e}")
