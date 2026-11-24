@@ -29,3 +29,7 @@
 ## 2026-11-05 - Missing aria-hidden on Decorative SVGs in ARIA components
 **Learning:** When an element communicates a state via ARIA attributes (e.g., a `<button>` with `aria-busy` or a progress bar with `aria-valuenow`), any internal visual SVGs (like loading spinners or progress rings) can create noise for screen readers or inadvertently capture focus on some browsers.
 **Action:** Ensure internal visual SVGs have both `aria-hidden="true"` and `focusable="false"` applied to prevent screen readers from redundantly announcing them and to avoid them capturing focus.
+
+## 2026-11-09 - Hide decorative icons in interactive elements
+**Learning:** When elements like buttons communicate state via ARIA attributes (e.g., `aria-busy="true"`), internal visual SVGs like spinners or decorative icons are redundantly announced by screen readers if not hidden. Also, redundant `title` attributes on icon-only buttons with `aria-label` cause duplicate screen reader announcements.
+**Action:** Always apply both `aria-hidden="true"` and `focusable="false"` to internal visual elements (spinners, carets, decorative icons) when the parent container already communicates the state or action semantically. Remove `title` attributes from icon-only buttons that already have `aria-label`.
