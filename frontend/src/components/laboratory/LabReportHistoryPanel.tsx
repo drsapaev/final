@@ -150,7 +150,7 @@ export default function LabReportHistoryPanel({
                 onClick={() => onOpenInstance(item.id)}
                 // L-L-5 fix: ArrowUp/Down/Home/End для навигации между карточками.
                 onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(e, index)}
-                aria-label={`${t('queue.history_report_number')} ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status ?? '')}`}
+                aria-label={`${t('queue.history_report_number')} ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status ?? '', t)}`}
                 aria-current={isActiveItem ? 'true' : undefined}
                 style={{
                   border: '1px solid var(--mac-border)',
@@ -189,7 +189,7 @@ export default function LabReportHistoryPanel({
                   justifyContent: 'flex-end',
                 }}>
                   <Badge variant={getLabStatusVariant(item.status ?? '')}>
-                    {formatLabStatus(item.status ?? '')}
+                    {formatLabStatus(item.status ?? '', t)}
                   </Badge>
                   <Badge variant={severity.variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
                     {formatSeverityLabel(severity.label)}

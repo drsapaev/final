@@ -89,7 +89,7 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }: Queue
           </div>
         </div>
         <Badge variant={worklist ? worklistStatuses[worklistStatus] ?? 'default' : getLabStatusVariant(appointment.status ?? '')}>
-          {worklist ? t(`labWorkspace.work_${worklistStatus}`) : formatLabStatus(appointment.status ?? '')}
+          {worklist ? t(`labWorkspace.work_${worklistStatus}`) : formatLabStatus(appointment.status ?? '', t)}
         </Badge>
       </div>
 

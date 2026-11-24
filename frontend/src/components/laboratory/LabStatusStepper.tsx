@@ -77,7 +77,7 @@ export default function LabStatusStepper({ status, managed = false }: { status: 
         const isCurrent = index === currentIndex;
         const isFuture = index > currentIndex;
         const isLast = index === visibleSteps.length - 1;
-        const label = t(`workbench.workflow_status_${step.key.toLowerCase()}`, { defaultValue: step.label });
+        const label = t(step.translationKey, { defaultValue: step.label });
 
         // STRAT#6: title-атрибуты через t() для i18n
         const titleSuffix = isCompleted

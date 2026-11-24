@@ -299,11 +299,16 @@ export default function ReportEditor({
                 const comparable = (previousUnit ?? '') === (currentUnit ?? '')
                   && (previousMethod ?? '') === (currentMethod ?? '')
                   && (!previous?.analyte_code || !field.analyte_code || previous.analyte_code === field.analyte_code);
+                const descriptionIds = [
+                  field.required && `${inputId}-required`,
+                  `${inputId}-reference`,
+                  numericFormatInvalid && `${inputId}-error`,
+                ].filter(Boolean).join(' ');
                 const inputProps = {
                   id: inputId,
                   className: 'macos-input',
                   'aria-label': `${t('workbench.result_label')}: ${field.label}`,
-                  'aria-describedby': `${inputId}-reference${numericFormatInvalid ? ` ${inputId}-error` : ''}`,
+                  'aria-describedby': descriptionIds,
                   'data-lab-result-input': '',
                   value: currentValue,
                   onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -316,7 +321,7 @@ export default function ReportEditor({
                   <div key={field.field_key} className="lab-result-row">
                     <div className="lab-result-name">
                       <label htmlFor={inputId}>{field.label}</label>
-                      {field.required && <span className="lab-result-required">{t('content.field_required')}</span>}
+                      {field.required && <span id={`${inputId}-required`} className="lab-result-required">{t('content.field_required')}</span>}
                     </div>
                     <div className="lab-result-input">
                       {field.value_type === 'choice' && choiceOptions.length > 0 ? (

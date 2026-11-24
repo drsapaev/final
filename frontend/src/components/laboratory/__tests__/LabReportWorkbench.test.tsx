@@ -11,6 +11,7 @@ import { peekCreateInstanceIdempotencyKey } from '../createInstanceIdempotency';
 import { labReportingApi } from '@/api/labReporting';
 import { printService } from '@/services/print';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
 
 // The component under test still relies on TS prop types,
 // so the inferred prop types collapse to `never`/`undefined` defaults under
@@ -1664,6 +1665,26 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
       </ThemeProvider>
     );
   }
+
+  it.each([
+    ['uz-Latn', 'Ruxsat etilgan hisobot', 'Hisobot yaratish', 'Qo‘shimcha blank shabloni', 'Blank qo‘shish', 'Qoralama'],
+    ['uz-Cyrl', 'Рухсат этилган ҳисобот', 'Ҳисобот яратиш', 'Қўшимча бланк шаблони', 'Бланк қўшиш', 'Қоралама'],
+  ])('localizes primary and additional report selection in %s', async (language, allowed, create, additional, add, draft) => {
+    await i18n.changeLanguage(language);
+    try {
+      const creating = renderAddBlank({ activeInstance: null });
+      expect(screen.getByRole('combobox', { name: allowed })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: create })).toBeInTheDocument();
+      creating.unmount();
+
+      renderAddBlank();
+      expect(screen.getByRole('combobox', { name: additional })).toHaveValue('3');
+      expect(screen.getByRole('button', { name: add })).toBeEnabled();
+      expect(screen.getAllByText(draft)).not.toHaveLength(0);
+    } finally {
+      await act(async () => { await i18n.changeLanguage('ru'); });
+    }
+  });
 
   it('renders the add-blank action from server-resolved templates and creates the chosen blank', async () => {
     const onInstanceChange = vi.fn();

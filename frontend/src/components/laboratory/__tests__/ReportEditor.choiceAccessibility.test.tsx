@@ -108,8 +108,11 @@ describe('LABUX-FE-002: choice dropdown exposes its clinical field label', () =>
 
     const blood = screen.getByRole('combobox', { name: 'Результат: Кровь (визуальная оценка)' });
     expect(blood).toBeEnabled();
+    expect(blood).toHaveAccessibleDescription(/обязательное/);
+    expect(blood).not.toBeRequired();
     const urine = screen.getByRole('combobox', { name: 'Результат: Моча (визуальная оценка)' });
     expect(urine).toBeEnabled();
+    expect(urine).not.toHaveAccessibleDescription(/обязательное/);
   });
 
   it('two adjacent choice fields are distinguishable by name (not just by position)', () => {

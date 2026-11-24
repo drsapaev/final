@@ -415,12 +415,12 @@ export default function LabQueueWorkbench({
                         {item.template?.name || `${t18('queue.history_report_number')} #${item.id}`}
                       </div>
                       <div className="lqw-history-meta">
-                        {t18('queue.history_created')}: {new Date(item.created_at).toLocaleString()} | {t18('queue.history_status')}: {formatLabStatus(item.status)}
+                        {t18('queue.history_created')}: {new Date(item.created_at).toLocaleString()} | {t18('queue.history_status')}: {formatLabStatus(item.status, t)}
                       </div>
                     </div>
                     <div className="lqw-history-badges">
                       <Badge variant={getLabStatusVariant(item.status)}>
-                        {formatLabStatus(item.status)}
+                        {formatLabStatus(item.status, t)}
                       </Badge>
                       <Badge variant={historySeverityBadge(item).variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
                         {formatSeverityLabel(historySeverityBadge(item).label)}

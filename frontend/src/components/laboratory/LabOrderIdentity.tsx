@@ -43,7 +43,7 @@ export default function LabOrderIdentity({ appointment, report, orderId }: Props
         {barcodes.length > 0 && <div><dt>{t('labWorkspace.specimens')}</dt><dd>{barcodes.join(', ')}</dd></div>}
       </dl>
       {typeof report?.status === 'string' && (
-        <Badge variant={getLabStatusVariant(report.status)}>{formatLabStatus(report.status)}</Badge>
+        <Badge variant={getLabStatusVariant(report.status)}>{formatLabStatus(report.status, t)}</Badge>
       )}
     </header>
   );

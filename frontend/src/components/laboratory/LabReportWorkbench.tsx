@@ -1534,8 +1534,7 @@ export default function LabReportWorkbench({
               {/* WF-11 fix: warning когда escape hatch активен */}
               {!templateResolutionLoading && useUnassignedTemplate && (
                 <Alert severity="warning">
-                  Создание отчёта без привязки к услугам визита. Убедитесь,
-                  что выбрали правильный шаблон — проверка соответствия отключена.
+                  {t('workbench.unassigned_template_warning')}
                 </Alert>
               )}
               {!allocationUnavailable && !templateResolutionLoading && singleAllowedTemplate && !templateHasBlockingGap && (
@@ -1546,14 +1545,14 @@ export default function LabReportWorkbench({
               {assignmentPicker}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--mac-spacing-3)', alignItems: 'end' }}>
                 <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
-                  <span>{serviceContextPresent && !useUnassignedTemplate ? 'Допустимый отчёт' : 'Шаблон отчёта'}</span>
+                  <span>{t(serviceContextPresent && !useUnassignedTemplate ? 'workbench.allowed_report' : 'workbench.report_template')}</span>
                   <select
                     className="macos-input"
                     value={allocationUnavailable ? '' : selectedTemplateId}
                     onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedTemplateId(event.target.value)}
                     disabled={instanceTransitionPending || templateResolutionLoading || templateHasBlockingGap || allocationUnavailable}
                   >
-                    <option value="">Выберите шаблон</option>
+                    <option value="">{t('workbench.select_report_template')}</option>
                     {availableTemplateOptions.map((template) => (
                       <option key={template.id} value={template.id}>
                         {String(template.name ?? '')} ({String(template.family ?? '')})
@@ -1580,7 +1579,7 @@ export default function LabReportWorkbench({
                       {String((activeInstance.patient_snapshot as Record<string, unknown> | undefined)?.full_name ?? '') || `Пациент #${String(activeInstance.patient_id ?? '')}`}
                     </div>
                     <Badge variant={getLabStatusVariant(activeInstance.status as string)}>
-                      {t(`workbench.workflow_status_${String(activeInstance.status).toLowerCase()}`, { defaultValue: formatLabStatus(activeInstance.status as string) })}
+                      {formatLabStatus(String(activeInstance.status ?? ''), t)}
                     </Badge>
                     <Badge variant="info">{String((activeInstance.template as Record<string, unknown> | undefined)?.name ?? '')}</Badge>
                   </div>
@@ -1630,10 +1629,10 @@ export default function LabReportWorkbench({
                       отчёты остаются в истории (reportHistory / недавние). */}
                   {selectedAppointment && !templateResolutionLoading && allowedTemplates.length > 0 && (
                     <Alert severity="info">
-                      <span>Добавить ещё бланк:</span>
+                      <span>{t('workbench.additional_report_heading')}</span>
                       <select
                         className="macos-input"
-                        aria-label="Шаблон дополнительного бланка"
+                        aria-label={t('workbench.additional_report_template')}
                         value={addBlankTemplateIdValue}
                         onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAddBlankTemplateId(event.target.value)}
                         disabled={instanceTransitionPending || allocationUnavailable}
@@ -1650,14 +1649,14 @@ export default function LabReportWorkbench({
                         size="small"
                         disabled={saving || isDirty || instanceTransitionPending || busyAction === 'create' || !addBlankTemplateIdValue
                           || missingAssignment}
-                        title={isDirty ? 'Сначала сохраните несохранённые изменения черновика' : undefined}
+                        title={isDirty ? t('workbench.additional_report_save_first') : undefined}
                         onClick={() => handleCreateInstance(addBlankTemplateIdValue)}
                       >
                         <FolderPlus size={14} aria-hidden="true" />
-                        Добавить бланк
+                        {t('workbench.additional_report_add')}
                       </Button>
                       {isDirty && (
-                        <span> — сначала сохраните несохранённые изменения черновика</span>
+                        <span>{t('workbench.additional_report_save_first_inline')}</span>
                       )}
                     </Alert>
                   )}
