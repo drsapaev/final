@@ -4,7 +4,22 @@ import { forceRefreshToken } from './client';
 import type { LabWorklistPage, LabWorklistQuery } from '../types/features/labWorkspace';
 
 const API_V1_BASE = getApiBaseUrl();
-const DRAFT_WRITE_TIMEOUT_MS = 25_000;
+const DRAFT_REQUEST_TIMEOUT_MS = 25_000;
+
+function normalizePatientId(value: unknown) {
+  const id = typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function isAmbiguousCreationError(error: unknown) {
+  if (typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number') {
+    return error.status >= 500 || (error.status === 409 && 'code' in error
+      && (error.code === 'idempotency_uncertain_outcome' || error.code === 'idempotency_in_flight'));
+  }
+  return error instanceof TypeError || error instanceof SyntaxError || (
+    error instanceof DOMException && ['AbortError', 'TimeoutError', 'NetworkError'].includes(error.name)
+  );
+}
 
 function draftWriteSearch(expectedUpdatedAt: string | null, draftRequestId?: string) {
   const search = new URLSearchParams();
@@ -50,9 +65,8 @@ function isAuthRejected(error: unknown): boolean {
  * LABR-FE-001 (audit 3886): converge the lab transport on the canonical
  * shared expired-JWT refresh. A rejected 401 (the server did NOT execute
  * the command) is safely retried once after a single-flight refresh —
- * including for mutations, which keep their Idempotency-Key and fail
- * closed on any transport error (no automatic retry of ambiguous POSTs:
- * network/timeout failures still surface as before).
+ * including for mutations, which keep their Idempotency-Key. Ambiguous
+ * transport errors are handled by the calling operation.
  */
 async function withAuthRetry<T>(perform: () => Promise<T>): Promise<T> {
   try {
@@ -91,13 +105,18 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
 
     if (!response.ok) {
       let detail = `${response.status} ${response.statusText}`;
+      let code: string | undefined;
       try {
         const payload = await response.json();
         detail = payload.detail || detail;
+        if (typeof payload.code === 'string') code = payload.code;
       } catch {
         // Ignore JSON parsing failures and use the fallback detail.
       }
-      throw Object.assign(new Error(detail), { status: response.status });
+      throw Object.assign(new Error(detail), {
+        status: response.status,
+        ...(code ? { code } : {}),
+      });
     }
 
     if (response.status === 204) {
@@ -274,22 +293,43 @@ export const labReportingApi = {
     return request(`/lab/report-instances/${instanceId}`, options);
   },
 
-  createInstance(
+  async createInstance(
     payload: Record<string, unknown>,
     options: { idempotencyKey?: string } = {},
   ) {
-    // PR 3351 (review round 9, P1): устойчивый Idempotency-Key операции
-    // создания. IdempotencyMiddleware — opt-in: без заголовка POST просто
-    // проходит в хендлер и каждый ретрай коммитит НОВЫЙ бланк. С ключом
-    // потерянный ответ (502 proxy / crash вкладки / retry после reload)
-    // безопасен: повтор с тем же ключом получает закоммиченный ответ.
-    return request('/lab/report-instances', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      ...(options.idempotencyKey
-        ? { headers: { 'Idempotency-Key': options.idempotencyKey } }
-        : {}),
-    });
+    const { idempotencyKey } = options;
+    const body = JSON.stringify(payload);
+    try {
+      return await request('/lab/report-instances', {
+        method: 'POST',
+        body,
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+      });
+    } catch (error) {
+      if (!idempotencyKey || !isAmbiguousCreationError(error)) throw error;
+      // Recover only from a committed receipt for the original serialized request.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), DRAFT_REQUEST_TIMEOUT_MS);
+      try {
+        const originalRequest = JSON.parse(body) as Record<string, unknown>;
+        const patientId = normalizePatientId(originalRequest?.patient_id);
+        const recovered = await request('/lab/report-instances/creation-result', {
+          method: 'POST',
+          body: JSON.stringify({ idempotency_key: idempotencyKey, request: originalRequest }),
+          signal: controller.signal,
+        });
+        if (typeof recovered === 'object' && recovered !== null && 'id' in recovered
+          && typeof recovered.id === 'number' && Number.isSafeInteger(recovered.id) && recovered.id > 0
+          && patientId !== null && 'patient_id' in recovered && normalizePatientId(recovered.patient_id) === patientId
+          && 'updated_at' in recovered && typeof recovered.updated_at === 'string' && recovered.updated_at.trim()
+          && 'sections' in recovered && Array.isArray(recovered.sections)) return recovered;
+      } catch {
+        // Preserve the original creation error when reconciliation is unavailable.
+      } finally {
+        clearTimeout(timeout);
+      }
+      throw error;
+    }
   },
 
   // P1 fix: doctor-initiated lab order — creates a LabReportInstance in DRAFT
@@ -314,7 +354,7 @@ export const labReportingApi = {
     return request(`/lab/report-instances/${instanceId}${search}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout?.(DRAFT_WRITE_TIMEOUT_MS),
+      signal: AbortSignal.timeout?.(DRAFT_REQUEST_TIMEOUT_MS),
     });
   },
 
@@ -328,7 +368,7 @@ export const labReportingApi = {
     return request(`/lab/report-instances/${instanceId}/bulk-values${search}`, {
       method: 'POST',
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout?.(DRAFT_WRITE_TIMEOUT_MS),
+      signal: AbortSignal.timeout?.(DRAFT_REQUEST_TIMEOUT_MS),
     });
   },
 

@@ -21,7 +21,7 @@ from app.models.lab import (
     LabReportValue,
     LabResult,
 )
-from app.models.lab_release import LabReportWorkflowEvent
+from app.models.lab_release import LabReportCreationReceipt, LabReportWorkflowEvent
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -667,6 +667,85 @@ def test_lab_report_create_same_idempotency_key_replays_committed_instance(
         .count()
     )
     assert count == 1, "две отправки с одним ключом создали второй бланк"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("appointment_only", [False, True], ids=["existing-visit", "appointment-only"])
+def test_lab_report_creation_recovers_after_commit_before_middleware_outcome(
+    client, auth_headers, admin_user, db_session, test_patient, test_visit, monkeypatch, appointment_only,
+):
+    from app.api.v1.endpoints import lab_reporting
+    from app.middleware import idempotency_middleware
+    from app.schemas.lab_reporting import LabReportInstanceCreate
+    from app.services.lab_reporting_service import LabReportingService
+
+    monkeypatch.setattr(idempotency_middleware, "get_distributed_claim", lambda: None)
+    notify = Mock()
+    monkeypatch.setattr(LabReportingService, "_emit_lab_new_study_notification", notify)
+    payload = _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
+    appointment_date = None
+    if appointment_only:
+        appointment = _create_appointment(db_session, patient_id=test_patient.id, doctor_id=test_visit.doctor_id)
+        appointment_date = test_visit.visit_date + timedelta(days=1)
+        appointment.appointment_date = appointment_date
+        db_session.commit()
+        payload.pop("visit_id")
+        payload["appointment_id"] = appointment.id
+        assert not db_session.query(Visit).filter_by(patient_id=test_patient.id, visit_date=appointment_date).count()
+    key = str(uuid4())
+    create_path = "/api/v1/lab/report-instances"
+    lookup_path = f"{create_path}/creation-result"
+    headers = auth_headers | {"Idempotency-Key": key}
+    lookup = {"idempotency_key": key, "request": payload}
+
+    # The endpoint commits before materializing its response. Crash at that
+    # boundary while the existing middleware has intent but no cached outcome.
+    with monkeypatch.context() as failure:
+        failure.setattr(lab_reporting, "_instance_out", Mock(
+            side_effect=RuntimeError("synthetic creation response lost"),
+        ))
+        with pytest.raises(RuntimeError, match="synthetic creation response lost"):
+            client.post(create_path, headers=headers, json=payload)
+
+    retry = client.post(create_path, headers=headers, json=payload)
+    assert retry.status_code == 409, retry.text
+    assert retry.json()["code"] == "idempotency_uncertain_outcome"
+
+    receipt = db_session.query(LabReportCreationReceipt).filter_by(actor_user_id=admin_user.id).one()
+    assert len(receipt.key_digest) == len(receipt.request_digest) == 64
+    assert receipt.key_digest != key
+    report_id = receipt.instance_id
+    recovered = client.post(lookup_path, headers=auth_headers, json=lookup)
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.headers["Cache-Control"] == "no-store"
+    assert recovered.json()["id"] == report_id
+    assert recovered.json()["patient_id"] == test_patient.id
+
+    mismatched = client.post(lookup_path, headers=auth_headers, json={
+        **lookup, "request": {**payload, "branding_overrides": {"clinic_name": "SYNTHETIC changed"}},
+    })
+    assert mismatched.status_code == 409, mismatched.text
+
+    other_staff = _create_lab_user(db_session, label="other_create_recovery")
+    other_headers = {"Authorization": f"Bearer {_mint_access_token(other_staff)}"}
+    assert client.post(lookup_path, headers=other_headers, json=lookup).status_code == 404
+    assert client.post(lookup_path, headers=auth_headers, json={
+        **lookup, "idempotency_key": str(uuid4()),
+    }).status_code == 404
+
+    # If execution runs again after middleware cache/intent expiry, the
+    # canonical service still resolves the same durable creation.
+    replay = LabReportingService(db_session).create_instance(
+        LabReportInstanceCreate.model_validate(payload).model_dump(exclude_unset=True),
+        actor_user_id=admin_user.id, idempotency_key=key,
+    )
+    assert replay.id == report_id
+    assert db_session.query(LabReportInstance).filter_by(patient_id=test_patient.id).count() == 1
+    assert db_session.query(LabOrder).filter_by(patient_id=test_patient.id).count() == 1
+    if appointment_date is not None:
+        provisioned = db_session.query(Visit).filter_by(patient_id=test_patient.id, visit_date=appointment_date).one()
+        assert recovered.json()["visit_id"] == provisioned.id
+    notify.assert_called_once()
 
 
 @pytest.mark.integration

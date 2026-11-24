@@ -1,4 +1,4 @@
-"""Authenticated laboratory report workflow history and draft receipts."""
+"""Authenticated laboratory report workflow history and operation receipts."""
 
 from datetime import datetime
 from typing import Any
@@ -70,3 +70,16 @@ class LabDraftMutationReceipt(Base):
     request_id: Mapped[UUID] = mapped_column(Uuid(), primary_key=True)
     request_digest: Mapped[str] = mapped_column(String(64), nullable=False)
     applied_version: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class LabReportCreationReceipt(Base):
+    __tablename__ = "lab_report_creation_receipts"
+
+    actor_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True,
+    )
+    key_digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    request_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    instance_id: Mapped[int] = mapped_column(
+        ForeignKey("lab_report_instances.id", ondelete="CASCADE"), nullable=False, index=True,
+    )

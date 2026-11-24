@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.lab import (
@@ -19,7 +19,7 @@ from app.models.lab import (
     LabReportTemplateVersion,
     LabTemplateServiceBinding,
 )
-from app.models.lab_release import LabDraftMutationReceipt
+from app.models.lab_release import LabDraftMutationReceipt, LabReportCreationReceipt
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.setting import Setting
@@ -376,6 +376,19 @@ class LabReportingApiRepository:
         self.db.add(instance)
         self.db.flush()
         return instance
+
+    def lock_creation_request(self, key_digest: str) -> None:
+        if self.db.get_bind().dialect.name == "postgresql":
+            lock_key = int.from_bytes(bytes.fromhex(key_digest[:16]), "big", signed=True)
+            self.db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+
+    def get_creation_receipt(
+        self, actor_user_id: int, key_digest: str,
+    ) -> LabReportCreationReceipt | None:
+        return self.db.get(LabReportCreationReceipt, (actor_user_id, key_digest))
+
+    def add_creation_receipt(self, receipt: LabReportCreationReceipt) -> None:
+        self.db.add(receipt)
 
     def get_draft_mutation_receipt(
         self, instance_id: int, actor_user_id: int, operation: str, request_id: UUID,

@@ -168,6 +168,13 @@ class LabReportInstanceCreate(BaseModel):
     branding_overrides: dict[str, Any] = Field(default_factory=dict)
 
 
+class LabReportCreationLookupIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(min_length=1, max_length=128)
+    request: LabReportInstanceCreate
+
+
 class LabReportInstanceUpdate(BaseModel):
     signer_snapshot: dict[str, Any] | None = None
     branding_snapshot: dict[str, Any] | None = None

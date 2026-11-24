@@ -13,7 +13,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.models.lab_release import LabDraftMutationReceipt
+from app.models.lab_release import LabDraftMutationReceipt, LabReportCreationReceipt
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
 
@@ -67,6 +67,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
         *,
         actor_name: str | None = None,
         actor_user_id: int | None = None,
+        idempotency_key: str | None = None,
     ) -> LabReportInstance:
         logger.info(
             "[LAB] create_instance has_appointment_context=%s has_visit_context=%s has_template_version=%s",
@@ -74,7 +75,13 @@ class InstancesMixin(LabReportingServiceMixinBase):
             payload.get("visit_id") is not None,
             payload.get("template_version_id") is not None,
         )
-        if settings.LAB_MANAGED_RELEASE_ENABLED:
+        receipt = None
+        if idempotency_key is not None:
+            receipt = self._creation_receipt_identity(payload, actor_user_id, idempotency_key)
+            existing = self._report_from_creation_receipt(receipt)
+            if existing is not None:
+                return existing
+        elif settings.LAB_MANAGED_RELEASE_ENABLED:
             self._workflow_actor(actor_user_id)
         patient = self.repository.get_patient(payload["patient_id"])
         if not patient:
@@ -116,6 +123,13 @@ class InstancesMixin(LabReportingServiceMixinBase):
             service_codes=payload.get("service_codes"),
             service_items=payload.get("service_items"),
         )
+        if receipt is not None:
+            # Visit resolution and template seeding may commit independently.
+            # Serialize the report, order and allocation writes after those steps.
+            self.repository.lock_creation_request(receipt.key_digest)
+            existing = self._report_from_creation_receipt(receipt)
+            if existing is not None:
+                return existing
         order, created_new_order = self._resolve_or_create_order(
             order_id=payload.get("order_id"),
             patient_id=patient.id,
@@ -156,6 +170,9 @@ class InstancesMixin(LabReportingServiceMixinBase):
         )
         self.repository.add_instance(instance)
         self._claim_ordered_services(instance, payload.get("visit_service_ids") or [], template.code)
+        if receipt is not None:
+            receipt.instance_id = instance.id
+            self.repository.add_creation_receipt(receipt)
         self.repository.commit()
         if created_new_order and order is not None:
             self._emit_lab_new_study_notification(
@@ -165,6 +182,41 @@ class InstancesMixin(LabReportingServiceMixinBase):
             )
         logger.info("[LAB] create_instance created instance_id=%s", instance.id)
         return self.get_instance(instance.id)
+
+    def reconcile_created_instance(
+        self, payload: dict[str, Any], *, actor_user_id: int, idempotency_key: str,
+    ) -> LabReportInstance:
+        receipt = self._creation_receipt_identity(payload, actor_user_id, idempotency_key)
+        instance = self._report_from_creation_receipt(receipt)
+        if instance is None:
+            raise LabReportingDomainError(404, "No committed report for this creation request")
+        return instance
+
+    def _creation_receipt_identity(
+        self, payload: dict[str, Any], actor_user_id: int | None, idempotency_key: str,
+    ) -> LabReportCreationReceipt:
+        actor = self._workflow_actor(actor_user_id)
+        secret = settings.SECRET_KEY.encode()
+        key_digest = hmac.new(
+            secret, f"lab-report-create-key-v1\x00{actor.id}\x00{idempotency_key}".encode(), "sha256",
+        ).hexdigest()
+        body = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=date.isoformat)
+        request_digest = hmac.new(
+            secret, f"lab-report-create-payload-v1\x00{key_digest}\x00{body}".encode(), "sha256",
+        ).hexdigest()
+        return LabReportCreationReceipt(
+            actor_user_id=actor.id, key_digest=key_digest, request_digest=request_digest,
+        )
+
+    def _report_from_creation_receipt(
+        self, identity: LabReportCreationReceipt,
+    ) -> LabReportInstance | None:
+        receipt = self.repository.get_creation_receipt(identity.actor_user_id, identity.key_digest)
+        if receipt is None:
+            return None
+        if not hmac.compare_digest(receipt.request_digest, identity.request_digest):
+            raise LabReportingDomainError(409, "Creation key already bound to a different report request")
+        return self.get_instance(receipt.instance_id)
 
 
     def update_instance(

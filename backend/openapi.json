@@ -57827,6 +57827,60 @@
         }
       }
     },
+    "/api/v1/lab/report-instances/creation-result": {
+      "post": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Get Lab Report Creation Result",
+        "description": "Read a committed creation using the original request after a lost response.",
+        "operationId": "get_lab_report_creation_result_api_v1_lab_report_instances_creation_result_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabReportCreationLookupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabReportInstanceOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No committed report for this actor and key"
+          },
+          "409": {
+            "description": "The key is bound to a different creation request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/lab/report-instances/{instance_id}": {
       "get": {
         "tags": [
@@ -99482,6 +99536,26 @@
           "updated_field_keys"
         ],
         "title": "LabReportBulkSaveResponse"
+      },
+      "LabReportCreationLookupIn": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "request": {
+            "$ref": "#/components/schemas/LabReportInstanceCreate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "request"
+        ],
+        "title": "LabReportCreationLookupIn"
       },
       "LabReportFieldDefOut": {
         "properties": {

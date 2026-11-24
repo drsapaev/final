@@ -18391,6 +18391,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/report-instances/creation-result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Lab Report Creation Result
+         * @description Read a committed creation using the original request after a lost response.
+         */
+        post: operations["get_lab_report_creation_result_api_v1_lab_report_instances_creation_result_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lab/report-instances/{instance_id}": {
         parameters: {
             query?: never;
@@ -32684,6 +32704,12 @@ export type components = {
             instance: components["schemas"]["LabReportInstanceOut"];
             /** Updated Field Keys */
             updated_field_keys: string[];
+        };
+        /** LabReportCreationLookupIn */
+        LabReportCreationLookupIn: {
+            /** Idempotency Key */
+            idempotency_key: string;
+            request: components["schemas"]["LabReportInstanceCreate"];
         };
         /** LabReportFieldDefOut */
         LabReportFieldDefOut: {
@@ -81520,6 +81546,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LabReportInstanceOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lab_report_creation_result_api_v1_lab_report_instances_creation_result_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabReportCreationLookupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabReportInstanceOut"];
+                };
+            };
+            /** @description No committed report for this actor and key */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key is bound to a different creation request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

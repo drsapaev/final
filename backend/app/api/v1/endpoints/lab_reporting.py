@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from app.schemas.lab_reporting import (
     LabCriticalFindingOut,
     LabOrderSummaryOut,
     LabReportBulkSaveResponse,
+    LabReportCreationLookupIn,
     LabReportInstanceCreate,
     LabReportInstanceOut,
     LabReportInstanceSummaryOut,
@@ -608,19 +609,49 @@ def list_lab_report_instances(
 @router.post("/report-instances", response_model=LabReportInstanceOut)
 def create_lab_report_instance(
     payload: LabReportInstanceCreate,
+    request: Request,
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
     service = LabReportingService(db)
     try:
         actor_name = getattr(user, "full_name", None) or getattr(user, "username", None)
+        idempotency_key = request.headers.get("Idempotency-Key") or None
         return _instance_out(
             service,
             service.create_instance(
-                payload.model_dump(), actor_name=actor_name, actor_user_id=user.id,
+                payload.model_dump(exclude_unset=idempotency_key is not None),
+                actor_name=actor_name, actor_user_id=user.id, idempotency_key=idempotency_key,
             ),
             user.id,
         )
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.post(
+    "/report-instances/creation-result",
+    response_model=LabReportInstanceOut,
+    responses={
+        404: {"description": "No committed report for this actor and key"},
+        409: {"description": "The key is bound to a different creation request"},
+    },
+)
+def get_lab_report_creation_result(
+    payload: LabReportCreationLookupIn,
+    response: Response,
+    db: Session = Depends(get_db),
+    user=Depends(require_active_roles("Admin", "Lab")),
+):
+    """Read a committed creation using the original request after a lost response."""
+    service = LabReportingService(db)
+    try:
+        instance = service.reconcile_created_instance(
+            payload.request.model_dump(exclude_unset=True),
+            actor_user_id=user.id, idempotency_key=payload.idempotency_key,
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return _instance_out(service, instance, user.id)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
