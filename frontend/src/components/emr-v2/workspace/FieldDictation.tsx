@@ -24,6 +24,17 @@ interface LocalRecognitionConstructor {
   install?: (options: { langs: string[]; processLocally: true }) => Promise<boolean>;
 }
 
+type DocumentPolicy = { allowsFeature?: (feature: string) => boolean };
+
+function microphoneBlocked(): boolean {
+  if (typeof document === 'undefined') return false;
+  const { permissionsPolicy, featurePolicy } = document as Document & {
+    permissionsPolicy?: DocumentPolicy;
+    featurePolicy?: DocumentPolicy;
+  };
+  return (permissionsPolicy?.allowsFeature?.('microphone') ?? featurePolicy?.allowsFeature?.('microphone')) === false;
+}
+
 function localRecognition(): LocalRecognitionConstructor | undefined {
   const browser = window as Window & {
     SpeechRecognition?: LocalRecognitionConstructor;
@@ -178,7 +189,9 @@ export function FieldDictation({ disabled, onInsert }: { disabled: boolean; onIn
   return (
     <details className="emr-workspace-visit-section" open={open} onToggle={event => setOpen(event.currentTarget.open)}>
       <summary>{t('emr_workspace.dictation')}</summary>
-      {open && <DictationControls key={lang} lang={lang} disabled={disabled} onInsert={onInsert} />}
+      {open && (microphoneBlocked()
+        ? <p role="status">{t('emr_workspace.dictation_microphone_blocked')}</p>
+        : <DictationControls key={lang} lang={lang} disabled={disabled} onInsert={onInsert} />)}
     </details>
   );
 }

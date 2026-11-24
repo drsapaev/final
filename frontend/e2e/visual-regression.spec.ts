@@ -960,7 +960,7 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     await expect(identity).toBeInViewport();
     await expect(editor.getByRole('heading', { name: 'Клиническая сводка', exact: true })).toBeInViewport();
     await expect(editor.getByRole('region', { name: 'Показатели текущего приёма' })).toBeInViewport();
-    await expect(editor.getByRole('spinbutton', { name: 'Pulse' })).toHaveValue('');
+    await expect(editor.getByRole('spinbutton', { name: 'Пульс', exact: true })).toHaveValue('');
 
     // Capture the visible editor, where the identity, vitals and summary are rendered.
     const bounds = await editor.boundingBox();

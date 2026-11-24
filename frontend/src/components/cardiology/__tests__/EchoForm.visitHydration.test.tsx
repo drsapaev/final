@@ -135,6 +135,7 @@ describe('ECHO-FE-001: untouched Save never rewrites the stored echo subtree', (
     // Untouched hydrated values ride along unchanged.
     expect(payload.data.specialty_data.echo.leftVentricle.edd).toBe('5.0');
     expect(payload.data.specialty_data.echo.conclusion).toBe('Без патологии');
+    expect(payload.data.specialty_data.echo.measurement_metadata).not.toHaveProperty('definition_version');
 
     await waitFor(() => {
       expect(screen.getByText(/сохранены/i)).toBeInTheDocument();
@@ -158,6 +159,124 @@ describe('ECHO-FE-001: untouched Save never rewrites the stored echo subtree', (
     });
     await screen.findByDisplayValue('58');
     expect(screen.getByRole('button', { name: /сохранить/i })).toBeEnabled();
+  });
+});
+
+describe('Echo save checks the loaded revision of the Echo section', () => {
+  it('accepts a new EMR revision with unchanged Echo and retains its explicit definition and unknown fields', async () => {
+    const original = emrWithEcho('58', 'Без патологии', 7);
+    const originalEcho = {
+      ...original.data.specialty_data.echo,
+      measurement_metadata: { definition_version: 4, device_key: 'SYNTHETIC-legacy-device' },
+      legacy_measurements: { other: 'SYNTHETIC-legacy-measurement' },
+    };
+    apiMocks.get.mockResolvedValueOnce({ data: {
+      ...original,
+      data: { specialty_data: { echo: originalEcho } },
+    } });
+    apiMocks.get.mockResolvedValueOnce({ data: {
+      row_version: 8,
+      data: {
+        complaints: 'SYNTHETIC-updated-other-section',
+        specialty_data: {
+          echo: {
+            legacy_measurements: originalEcho.legacy_measurements,
+            conclusion: originalEcho.conclusion,
+            measurement_metadata: originalEcho.measurement_metadata,
+            leftVentricle: originalEcho.leftVentricle,
+          },
+          ecg: { conclusion: 'SYNTHETIC-new-ecg' },
+        },
+      },
+    } });
+    apiMocks.post.mockResolvedValueOnce({ status: 200 });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    await screen.findByDisplayValue('58');
+    fireEvent.change(screen.getByRole('textbox', { name: 'ФВ' }), { target: { value: '45' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Сохранить' })); });
+
+    const [, payload] = apiMocks.post.mock.calls[0];
+    expect(payload.row_version).toBe(8);
+    expect(payload.data.complaints).toBe('SYNTHETIC-updated-other-section');
+    expect(payload.data.specialty_data.ecg).toEqual({ conclusion: 'SYNTHETIC-new-ecg' });
+    expect(payload.data.specialty_data.echo.leftVentricle.ef).toBe('45');
+    expect(payload.data.specialty_data.echo.legacy_measurements).toEqual(originalEcho.legacy_measurements);
+    expect(payload.data.specialty_data.echo.measurement_metadata).toMatchObject(originalEcho.measurement_metadata);
+  });
+
+  it('keeps unsaved fields and requires explicit recovery after another writer updates the Echo', async () => {
+    const previous = emrWithEcho('58', 'SYNTHETIC-old-conclusion', 7);
+    const changed = emrWithEcho('70', 'SYNTHETIC-new-conclusion', 8);
+    apiMocks.get.mockResolvedValueOnce({ data: previous }).mockResolvedValue({ data: changed });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    await screen.findByDisplayValue('58');
+    const ef = screen.getByRole('textbox', { name: 'ФВ' });
+    const save = screen.getByRole('button', { name: 'Сохранить' });
+    fireEvent.change(ef, { target: { value: '45' } });
+    await act(async () => { fireEvent.click(save); });
+
+    expect(apiMocks.post).not.toHaveBeenCalled();
+    expect(ef).toHaveValue('45');
+    expect(save).toBeDisabled();
+    expect(screen.getByText(/Сохранённая версия ЭМК изменилась/i)).toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Загрузить актуальную версию и применить мои правки/i }));
+    });
+    expect(ef).toHaveValue('45');
+    expect(screen.getByRole('textbox', { name: 'Заключение' })).toHaveValue('SYNTHETIC-new-conclusion');
+    expect(screen.getByText(/ещё не записаны/i)).toBeVisible();
+    expect(save).toBeEnabled();
+    expect(apiMocks.post).not.toHaveBeenCalled();
+
+    apiMocks.post.mockResolvedValueOnce({ status: 200 });
+    await act(async () => { fireEvent.click(save); });
+    expect(apiMocks.post).toHaveBeenCalledTimes(1);
+    const [, payload] = apiMocks.post.mock.calls[0];
+    expect(payload.row_version).toBe(8);
+    expect(payload.data.specialty_data.echo.leftVentricle.ef).toBe('45');
+    expect(payload.data.specialty_data.echo.conclusion).toBe('SYNTHETIC-new-conclusion');
+  });
+
+  it('preserves the local draft when the save loses a row-version race after the re-read', async () => {
+    apiMocks.get.mockResolvedValue({ data: emrWithEcho('58', 'SYNTHETIC-original', 7) });
+    apiMocks.post.mockRejectedValueOnce({ response: { status: 409 } });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    await screen.findByDisplayValue('58');
+    const ef = screen.getByRole('textbox', { name: 'ФВ' });
+    const save = screen.getByRole('button', { name: 'Сохранить' });
+    fireEvent.change(ef, { target: { value: '45' } });
+    await act(async () => { fireEvent.click(save); });
+
+    expect(apiMocks.post).toHaveBeenCalledTimes(1);
+    expect(ef).toHaveValue('45');
+    expect(save).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Загрузить актуальную версию/i })).toBeVisible();
+  });
+
+  it('blocks a write when the EMR is finalized and exposes readonly comments and disclosure state', async () => {
+    const stored = emrWithEcho('58', 'SYNTHETIC-original', 7);
+    apiMocks.get.mockResolvedValueOnce({ data: stored });
+    apiMocks.get.mockResolvedValueOnce({ data: { ...stored, status: 'signed', row_version: 8 } });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    await screen.findByDisplayValue('58');
+    const comments = screen.getByRole('textbox', { name: 'Комментарии' });
+    fireEvent.change(comments, { target: { value: 'SYNTHETIC-unsaved-draft' } });
+    const save = screen.getByRole('button', { name: 'Сохранить' });
+    await act(async () => { fireEvent.click(save); });
+
+    expect(apiMocks.post).not.toHaveBeenCalled();
+    expect(save).toBeDisabled();
+    expect(comments).toHaveValue('SYNTHETIC-unsaved-draft');
+    expect(comments).toHaveAttribute('readonly');
+    expect(screen.getByText(/ЭМК закрыта для редактирования/i)).toBeVisible();
+    const disclosure = screen.getByRole('button', { name: 'Правый желудочек' });
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.keyDown(disclosure, { key: 'Enter' });
+    expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('textbox', { name: 'КДР ПЖ' })).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Метод измерения фракции выброса')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Дата исследования')).toHaveAttribute('readonly');
   });
 });
 
